@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTST Report — trackonpath — 2026-04-09</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:20px 24px;background:#f0f2f5;color:#222;font-size:14px}
+h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
+
+/* Scenario info card */
+.scenario-card{background:#1a3a6b;color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+.scenario-card .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mi{background:rgba(255,255,255,.15);padding:4px 11px;border-radius:4px;font-size:12px;line-height:1.6}
+.ml{font-weight:700;margin-right:4px}
+
+/* Summary row */
+.sum{display:flex;gap:12px;margin-bottom:12px}
+.sc{flex:1;padding:12px;border-radius:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.sc .n{font-size:26px;font-weight:700;line-height:1.1}
+.sc .l{font-size:11px;opacity:.75;margin-top:3px}
+.st{background:#e3f2fd;color:#1565c0}
+.sp{background:#e8f5e9;color:#2e7d32}
+.sf{background:#ffebee;color:#c62828}
+
+/* Overall banner */
+.overall{text-align:center;padding:9px 14px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:18px}
+.overall-ok  {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.overall-fail{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.overall-auth{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+
+/* Section headings — collapsible */
+.section-details{margin:18px 0 4px;border:none}
+.section-details > .section-title{
+  font-size:13px;font-weight:700;color:#455a64;padding:8px 12px;
+  background:#eceff1;border-radius:5px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;list-style:none}
+.section-details > .section-title::-webkit-details-marker{display:none}
+.section-details > .section-title::marker{display:none}
+.section-details > .section-title:hover{background:#e0e5e8}
+.section-details[open] > .section-title{border-radius:5px 5px 0 0;background:#dde3e8}
+.section-details > .section-title::before{content:'▶';font-size:10px;color:#78909c;transition:transform .15s}
+.section-details[open] > .section-title::before{transform:rotate(90deg)}
+.section-note{font-weight:400;font-size:12px}
+
+/* Warning box */
+.warn-box{background:#fff3e0;border:1px solid #ffcc80;color:#e65100;padding:12px 16px;
+  border-radius:6px;margin-bottom:14px;font-size:13px}
+
+/* ── Request block container ──────────────────────────────────────── */
+.rb{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+/* Color coding: left border by assertion outcome */
+.rc-green {border-left:5px solid #4caf50}
+.rc-orange{border-left:5px solid #ff9800}
+.rc-red   {border-left:5px solid #f44336}
+
+/* ── Clickable request title ────────────────────────────────────────── */
+.req-details{border:none}
+.req-title{
+  padding:9px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  cursor:pointer;user-select:none;list-style:none;border-bottom:1px solid #eee;
+  font-size:13px}
+.req-title::-webkit-details-marker{display:none}
+.req-title::marker{display:none}
+.rc-green  .req-title{background:#f2faf2}
+.rc-orange .req-title{background:#fffbf2}
+.rc-red    .req-title{background:#fff5f5}
+.rc-green  .req-title:hover{background:#e8f5e9}
+.rc-orange .req-title:hover{background:#fff3e0}
+.rc-red    .req-title:hover{background:#ffebee}
+.req-details[open] .req-title{border-bottom:2px solid #e0e0e0}
+.req-title::before{content:'▶';font-size:9px;color:#90a4ae;transition:transform .15s;flex-shrink:0}
+.req-details[open] .req-title::before{transform:rotate(90deg)}
+
+/* ── Request body (detail view) ─────────────────────────────────────── */
+.req-body{}
+
+/* Summary stats bar */
+.req-summary{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  padding:7px 14px;background:#f9f9f9;border-bottom:1px solid #eee;
+  font-size:12px;font-weight:600}
+.rsum-ok  {color:#2e7d32}
+.rsum-fail{color:#c62828}
+.rsum-time{color:#607d8b;font-weight:400}
+.rsum-sep {color:#ccc}
+.ru-small{flex:1;font-family:'Courier New',monospace;font-size:10px;
+  word-break:break-all;color:#90a4ae;font-weight:400}
+.rtime{font-size:11px;font-weight:500;color:#607d8b;white-space:nowrap;
+  background:#eceff1;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode{font-size:11px;font-weight:700;white-space:nowrap;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode-ok{background:#e8f5e9;color:#2e7d32}
+.rcode-err{background:#ffebee;color:#c62828}
+.rcode-warn{background:#fff8e1;color:#e65100}
+
+/* ── Assert sub-sections ────────────────────────────────────────────── */
+.assert-section{border-top:1px solid #f0f0f0}
+.assert-title{
+  padding:7px 14px;font-weight:600;font-size:12px;cursor:pointer;
+  user-select:none;list-style:none;display:flex;align-items:center;gap:6px}
+.assert-title::-webkit-details-marker{display:none}
+.assert-title::marker{display:none}
+.passed-title{color:#2e7d32;background:#f9fbf9}
+.passed-title:hover{background:#f1f8e9}
+.failed-title{color:#c62828;background:#fff9f9}
+.failed-title:hover{background:#ffebee}
+
+/* ── Sub-panels (req/resp headers+body) ─────────────────────────────── */
+.sub-summary{
+  padding:7px 14px;cursor:pointer;font-weight:500;font-size:12px;user-select:none;
+  list-style:none;display:flex;align-items:center;gap:6px;color:#546e7a;flex-wrap:wrap;
+  background:#fafafa}
+.sub-summary::-webkit-details-marker{display:none}
+.sub-summary::marker{display:none}
+.sub-summary:hover{background:#f0f0f0}
+
+/* ── Shared inner elements ──────────────────────────────────────────── */
+.ri{background:#607d8b;color:#fff;border-radius:50%;width:21px;height:21px;display:flex;align-items:center;
+  justify-content:center;font-size:10px;flex-shrink:0;font-weight:700}
+.rm{padding:2px 7px;border-radius:3px;font-weight:700;font-size:11px;flex-shrink:0}
+.rm-GET   {background:#e3f2fd;color:#1565c0}
+.rm-POST  {background:#e8f5e9;color:#2e7d32}
+.rm-PUT   {background:#fff8e1;color:#e65100}
+.rm-PATCH {background:#f3e5f5;color:#6a1b9a}
+.rm-DELETE{background:#ffebee;color:#c62828}
+.rname{font-weight:700;flex-shrink:0;color:#1a3a6b}
+.badge{padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;flex-shrink:0}
+.badge-ok  {background:#e8f5e9;color:#2e7d32}
+.badge-err {background:#ffebee;color:#c62828}
+.badge-warn{background:#fff8e1;color:#e65100}
+.abadge{padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;margin-left:2px}
+.abadge-ok  {background:#e8f5e9;color:#2e7d32}
+.abadge-fail{background:#ffebee;color:#c62828}
+
+/* Panel content */
+.panel{padding:12px 16px;background:#fafafa}
+.panel-lbl{font-size:10px;font-weight:700;color:#607d8b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.muted{font-size:12px;color:#90a4ae;font-style:italic;margin:4px 0}
+.hdrtbl{border-collapse:collapse;width:100%;font-size:11px;font-family:'Courier New',monospace}
+.hdrk{padding:2px 14px 2px 0;color:#607d8b;white-space:nowrap;vertical-align:top;font-weight:600}
+.hdrv{padding:2px 0;color:#37474f;word-break:break-all}
+
+/* Code blocks */
+.code{margin:0;padding:12px 16px;background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;
+  font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;
+  word-break:break-word;line-height:1.5}
+
+/* Test result rows */
+.tc{padding:6px 14px 8px}
+.no-assert{padding:6px 14px 8px;font-size:12px;color:#90a4ae;font-style:italic}
+.tr{padding:5px 9px;margin:3px 0;border-radius:4px;font-size:12px;display:flex;flex-direction:column}
+.tr-ok  {background:#f1f8e9;color:#33691e}
+.tr-fail{background:#ffebee;color:#b71c1c}
+.ti{margin-right:6px}
+.te{font-size:11px;margin-top:3px;padding:3px 8px;background:rgba(0,0,0,.06);border-radius:3px;
+  font-family:'Courier New',monospace;word-break:break-all;white-space:pre-wrap}
+
+/* Legend */
+.legend{background:#fff;border-radius:7px;padding:11px 16px;margin-bottom:16px;
+  font-size:12px;color:#546e7a;border:1px solid #e0e0e0}
+.legend b{color:#37474f}
+
+/* Color legend */
+.color-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.cl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.cl-green {background:#4caf50}
+.cl-orange{background:#ff9800}
+.cl-red   {background:#f44336}
+
+/* Footer */
+.foot{text-align:center;color:#bbb;font-size:11px;margin-top:20px;padding-top:10px;border-top:1px solid #e0e0e0}
+</style>
+</head>
+<body>
+
+<h1><img src="/oscar-icon.svg" alt="OSCAR" style="height:32px;vertical-align:middle;margin-right:10px">OTST Validation Report</h1>
+
+<div class="scenario-card">
+  <div class="row">
+    <div class="mi"><span class="ml">Date:</span>2026-04-09</div>
+    <div class="mi"><span class="ml">Environment:</span>trackonpath</div>
+    <div class="mi"><span class="ml">API Version:</span>N/A</div>
+    <div class="mi"><span class="ml">Scenario Version:</span>3.4</div>
+    <div class="mi"><span class="ml">Scenario:</span>OTST_EXCH_SRCH_CRIT_1ADT_1LEG</div>
+    <div class="mi"><span class="ml">Collection run:</span>Common Requests</div>
+    <div class="mi"><span class="ml">Type:</span>EXCHANGE</div>
+  </div>
+</div>
+
+<div class="sum">
+  <div class="sc st"><div class="n">3</div><div class="l">OSDM Requests</div></div>
+  <div class="sc st"><div class="n">80</div><div class="l">OSDM Assertions</div></div>
+  <div class="sc sp"><div class="n">69</div><div class="l">Passed</div></div>
+  <div class="sc sf"><div class="n">11</div><div class="l">Failed</div></div>
+</div>
+
+<div class="overall overall-auth">
+  🔐 Authentication failed — check credentials in your environment file
+</div>
+
+<div class="legend">
+  <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
+  plus two global OSDM compliance checks on every response:
+  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
+  <div class="color-legend">
+    <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>
+    <div class="cl-item"><div class="cl-dot cl-orange"></div> 1–30% of assertions failed</div>
+    <div class="cl-item"><div class="cl-dot cl-red"></div> More than 30% of assertions failed</div>
+  </div>
+</div>
+
+
+
+<details class="section-details">
+  <summary class="section-title">🚂 Common Requests (3 requests) <span class="abadge abadge-ok">69 passed</span> <span class="abadge abadge-fail">11 failed</span></summary>
+  
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">01. POST Get Offer</span>
+      <span class="abadge abadge-ok">61 ✅</span> <span class="abadge abadge-fail">7 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 1855 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 61</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 7</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 1855 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://osdm-5.platform.bileto.zone/api/offers</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (61)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: embed</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: embed</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: tripResponseParameters</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: tripResponseParameters</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: nonTripSearchCriteria</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: nonTripSearchCriteria</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: requestedSections</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: requestedSections</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: inboundTripIds</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: inboundTripIds</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: inboundTripSpecifications</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: inboundTripSpecifications</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status code is 200</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'offers' array exists with 1 offer(s)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">offers[0].offerId is a non-empty string (OSDM: Offer.offerId required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">offers[0].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">offers[0].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:1)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">offers[0].passengerRefs count matches requested passengers (expected: 1, actual: 1)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">At least one matching product has the expected flexibility - count : 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - minimalPrice structure exists, is a number &gt;= 0 : 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) exist in minimalPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - overallServiceClass is defined - overallServiceClass: Standard</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - overallTravelClass is defined - overallTravelClass: ANY_CLASS</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - overallFlexibility is a valid OSDM value: NON_FLEXIBLE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer summary - overallAccommodationType is a valid value: SEAT</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer preBookableUntil is a valid date in the future - preBookableUntil: 2026-04-09T19:56:26.050539549Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Passengers are defined - length: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Passenger 1 externalRef is defined - externalRef: 00001</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Passenger 1 type is a known OSDM value - type: PERSON</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Passenger 1 dateOfBirth is a valid date in the past - dateOfBirth: 1999-01-01</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Passenger 1 reduction cards - reductionCards: []</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer minimalPrice &gt;= sum of offerParts price - minimalPrice: 0, sumPartsPrice: 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer overallFlexibility consistency - overallFlex: NON_FLEXIBLE, flexibilityResult: NON_FLEXIBLE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer tripCoverage.coveredLegIds are non-empty strings - count: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admissionOfferParts[0].price.currency matches offerSummary currency (expected: CZK, actual: CZK)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservationOfferParts[0].price.currency matches offerSummary currency (expected: CZK, actual: CZK)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Trips are defined - length: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">selectedOffer.tripCoverage.coveredTripId (0edddd50-744a-4758-ab79-7efaf45fdd1d) is part of Trip ids</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Trip 1 startTime is before endTime (OSDM: temporal order)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Trip 1 direction is a known value - direction: OUT_BOUND</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Trip 1 has legs - length: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Trip 1 Leg 1 has TrainID, Origin &amp; Destination - TrainID: 1140, Origin: Praha hl.n., Destination: Turnov</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 type: NRT</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 validFrom is a valid date - validFrom: 2026-04-19T05:22:00Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 validUntil is in the future - validUntil: Sun Apr 19 2026 09:10:00 GMT+0200 (heure d’été d’Europe centrale)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 price structure is valid - amount: 0, currency: CZK</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 offerMode is a known value - offerMode: COLLECTIVE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 isReusable is a boolean - isReusable: false</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AdmissionOfferPart 1 passengerRefs has at least one entry</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Reservation linkage in admission with id 811f77f9-130c-4e1e-ba64-cc1b4aca333f, reservationsRef ids should match reservationOfferParts ids</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Admission part 1 afterSalesConditions validity</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">ReservationOfferPart 1 price structure is valid - amount: 0, currency: CZK</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">ReservationOfferPart 1 refundable is a valid value - refundable: YES</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">ReservationOfferPart 1 exchangeable is a valid value - exchangeable: NO</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">ReservationOfferPart 1 offerMode is a known value - offerMode: COLLECTIVE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">ReservationOfferPart 1 passengerRefs has at least one entry</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Reservation part 1 availablePlaces is an array and contains accommodationType and numericAvailability</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Reservation part 1 afterSalesConditions validity</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (7)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: embed</span>
+          <div class="te">Transport failure for embed: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: tripResponseParameters</span>
+          <div class="te">Transport failure for tripResponseParameters: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: nonTripSearchCriteria</span>
+          <div class="te">Transport failure for nonTripSearchCriteria: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: requestedSections</span>
+          <div class="te">Transport failure for requestedSections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: inboundTripIds</span>
+          <div class="te">Transport failure for inboundTripIds: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: inboundTripSpecifications</span>
+          <div class="te">Transport failure for inboundTripSpecifications: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Admission part 1 is exchangeable (scenarioType=EXCHANGE) - exchangeable: NO</span>
+          <div class="te">Admission part should be exchangeable in EXCHANGE scenario: expected 'NO' to deeply equal 'YES'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (237)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://osdm-5.platform.bileto.zone/api
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/trackonpath-datafile.json
+[LOG] 
+    ####################################
+    # 🛠️  POST Get Offer — OTST_RFND_TRIP_SPEC_2ADT_2LEG 🛠️ #
+    ####################################
+    
+[LOG] [INFO] resetScenarioEnvVars: all business env vars cleared
+[INFO] [INFO] resetScenarioEnvVars: all business env vars cleared
+[LOG] [INFO] ⏳ Getting scenario data
+[INFO] [INFO] ⏳ Getting scenario data
+[LOG] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/trackonpath-datafile.json
+[INFO] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/trackonpath-datafile.json
+[LOG] [INFO] 🛠️ Check data file structure schema
+[INFO] [INFO] 🛠️ Check data file structure schema
+[LOG] [INFO] systemInfoParameters: coachId = null
+[INFO] [INFO] systemInfoParameters: coachId = null
+[LOG] [INFO] systemInfoParameters: productId = null
+[INFO] [INFO] systemInfoParameters: productId = null
+[LOG] [INFO] 🎯 scenariosToRun [7/8]: selected &quot;OTST_EXCH_SRCH_CRIT_1ADT_1LEG&quot; — next will pick index 7
+[INFO] [INFO] 🎯 scenariosToRun [7/8]: selected &quot;OTST_EXCH_SRCH_CRIT_1ADT_1LEG&quot; — next will pick index 7
+[LOG] [INFO] 🔢 osdmVersion — data file: &quot;3.4&quot;, env file: &quot;undefined&quot;, effective: &quot;3.4&quot; (data file takes priority)
+[INFO] [INFO] 🔢 osdmVersion — data file: &quot;3.4&quot;, env file: &quot;undefined&quot;, effective: &quot;3.4&quot; (data file takes priority)
+[LOG] [INFO] 📋 Scenario selected: &quot;OTST_EXCH_SRCH_CRIT_1ADT_1LEG&quot; ; Scenario Type: &quot;EXCHANGE&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.4&quot;
+[INFO] [INFO] 📋 Scenario selected: &quot;OTST_EXCH_SRCH_CRIT_1ADT_1LEG&quot; ; Scenario Type: &quot;EXCHANGE&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.4&quot;
+[LOG] [INFO] ⏳ processing a search
+[INFO] [INFO] ⏳ processing a search
+[LOG] [INFO] Bileto exception — TripSearchCriteria uses OffsetDateTime: &quot;2026-04-19T07:00:00+02:00&quot;
+[INFO] [INFO] Bileto exception — TripSearchCriteria uses OffsetDateTime: &quot;2026-04-19T07:00:00+02:00&quot;
+[LOG] [INFO] 📅 TripSearchCriteria datetime — osdmVersion: &quot;3.4&quot; (parsed: 3.4) → OffsetDateTime format (Bileto exception) → &quot;2026-04-19T07:00:00+02:00&quot;
+[INFO] [INFO] 📅 TripSearchCriteria datetime — osdmVersion: &quot;3.4&quot; (parsed: 3.4) → OffsetDateTime format (Bileto exception) → &quot;2026-04-19T07:00:00+02:00&quot;
+[LOG] [INFO] Found number of purchaser: 1
+[INFO] [INFO] Found number of purchaser: 1
+[LOG] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33699999999&quot;}}}]
+[INFO] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33699999999&quot;}}}]
+[LOG] [INFO] Found number of passengers: 1
+[INFO] [INFO] Found number of passengers: 1
+[LOG] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}}]
+[INFO] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}}]
+[LOG] [INFO] ✅ Correct data set was found for this scenario : OTST_EXCH_SRCH_CRIT_1ADT_1LEG
+[INFO] [INFO] ✅ Correct data set was found for this scenario : OTST_EXCH_SRCH_CRIT_1ADT_1LEG
+[LOG] [reportGenerator] 🗑️  Previous run data cleared.
+[LOG] [reportGenerator] ✅ Report directory: C:\Users\patri\OneDrive\Documents\TrackOnPath\Contract_execution\UIC_New_Revenue_Management project\projets\OSDM\OTST\GitHub_OSDM-Testing\OSDM-testing\O\collections-bruno\OTST_V2.0.1\Validation_Reports
+[LOG] 🔄 Loop-back — starting scenario: OTST_EXCH_SRCH_CRIT_1ADT_1LEG [7/8 remaining]
+[LOG] ⏩ [STEP] Executing request : 01. POST Get Offer
+[LOG] [INFO] ➤ postOfferResponsePreRequest
+[INFO] [INFO] ➤ postOfferResponsePreRequest
+[LOG] [INFO] ➤ buildOfferCollectionRequest
+[INFO] [INFO] ➤ buildOfferCollectionRequest
+[LOG] [INFO] Build using TripType: SEARCH
+[INFO] [INFO] Build using TripType: SEARCH
+[LOG] [INFO] ➤ ensureAuthorizationOr403
+[INFO] [INFO] ➤ ensureAuthorizationOr403
+[LOG] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] ✅ Offer param probe executed: embed
+[WARN] [WARNING] ❌ Offer param probe has no transport error: embed: Transport failure for embed: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: embed
+[LOG] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[INFO] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[INFO] [INFO] ✅ Offer param probe executed: tripResponseParameters
+[WARN] [WARNING] ❌ Offer param probe has no transport error: tripResponseParameters: Transport failure for tripResponseParameters: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: tripResponseParameters
+[INFO] [INFO] ✅ Offer param probe executed: nonTripSearchCriteria
+[WARN] [WARNING] ❌ Offer param probe has no transport error: nonTripSearchCriteria: Transport failure for nonTripSearchCriteria: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: nonTripSearchCriteria
+[INFO] [INFO] ✅ Offer param probe executed: requestedSections
+[WARN] [WARNING] ❌ Offer param probe has no transport error: requestedSections: Transport failure for requestedSections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: requestedSections
+[INFO] [INFO] ✅ Offer param probe executed: inboundTripIds
+[WARN] [WARNING] ❌ Offer param probe has no transport error: inboundTripIds: Transport failure for inboundTripIds: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: inboundTripIds
+[INFO] [INFO] ✅ Offer param probe executed: inboundTripSpecifications
+[WARN] [WARNING] ❌ Offer param probe has no transport error: inboundTripSpecifications: Transport failure for inboundTripSpecifications: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: inboundTripSpecifications
+[INFO] [INFO] Offer parameter support check done: supported=0, rejected=0, inconclusive=18
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.requestedOfferParts -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.productTags -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.productSelections -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.flexibilities -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.travelClasses -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.serviceClassTypes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.offerMode -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.currency -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.inboundDate -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] requestedFulfillmentOptions -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] corporateCodes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] promotionCodes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] embed -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] tripResponseParameters -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] nonTripSearchCriteria -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] requestedSections -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] inboundTripIds -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] inboundTripSpecifications -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] ✅ Status code is 200
+[INFO] [INFO] ➤ postOfferResponse
+[WARN] [WARNING] ⚠️ No warnings found.
+[WARN] [WARNING] ⚠️ No problems found.
+[INFO] [INFO] 'offers' array exists with 1 offer(s)
+[INFO] [INFO] ✅ 'offers' array exists with 1 offer(s)
+[INFO] [INFO] ✅ offers[0].offerId is a non-empty string (OSDM: Offer.offerId required)
+[INFO] [INFO] ✅ offers[0].createdOn is a valid ISO datetime (OSDM: Offer.createdOn required)
+[INFO] [INFO] ✅ offers[0].passengerRefs is a non-empty array (OSDM: Offer.passengerRefs minItems:1)
+[INFO] [INFO] ✅ offers[0].passengerRefs count matches requested passengers (expected: 1, actual: 1)
+[INFO] [INFO] Stored offerCurrency: CZK
+[INFO] [INFO] ➤ selectAndSetOffer
+[INFO] [INFO] No accommodation filter applied
+[INFO] [INFO] Applying flexibility filter: NON_FLEXIBLE
+[INFO] [INFO] Selected Offer ID: b82fe76f-8e60-4443-acdd-125aaf551fd4
+[INFO] [INFO] Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE
+[INFO] [INFO] ✅ Selected offer has expected flexibility - expected: NON_FLEXIBLE, actual: NON_FLEXIBLE
+[INFO] [INFO] At least one matching product has the expected flexibility - count : 1
+[INFO] [INFO] ✅ At least one matching product has the expected flexibility - count : 1
+[INFO] [INFO] overallFlexibility is 'NON_FLEXIBLE' - skipping admissionOfferParts validation
+[INFO] [INFO] ➤ validateOfferSummary
+[INFO] [INFO] Offer summary - minimalPrice structure exists, is a number &gt;= 0 : 0
+[INFO] [INFO] ✅ Offer summary - minimalPrice structure exists, is a number &gt;= 0 : 0
+[INFO] [INFO] Price fields (currency, scale) are present in minimalPrice
+[INFO] [INFO] ✅ Price fields exist (currency, scale) exist in minimalPrice
+[INFO] [INFO] Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE
+[INFO] [INFO] ✅ Offer summary - overallFlexibility is defined - overallFlexibility: NON_FLEXIBLE
+[INFO] [INFO] Offer summary - overallServiceClass is defined - overallServiceClass: Standard
+[INFO] [INFO] ✅ Offer summary - overallServiceClass is defined - overallServiceClass: Standard
+[INFO] [INFO] Offer summary - overallTravelClass is defined - overallTravelClass: ANY_CLASS
+[INFO] [INFO] ✅ Offer summary - overallTravelClass is defined - overallTravelClass: ANY_CLASS
+[INFO] [INFO] Offer summary - overallFlexibility valid value check: NON_FLEXIBLE
+[INFO] [INFO] ✅ Offer summary - overallFlexibility is a valid OSDM value: NON_FLEXIBLE
+[INFO] [INFO] Offer summary - overallAccommodationType: SEAT
+[INFO] [INFO] ✅ Offer summary - overallAccommodationType is a valid value: SEAT
+[INFO] [INFO] preBookableUntil: 2026-04-09T19:56:26.050539549Z
+[INFO] [INFO] ✅ Offer preBookableUntil is a valid date in the future - preBookableUntil: 2026-04-09T19:56:26.050539549Z
+[INFO] [INFO] ➤ validatePassengers
+[INFO] [INFO] Passengers are defined - length: 1
+[INFO] [INFO] ✅ Passengers are defined - length: 1
+[INFO] [INFO] Passenger 1 externalRef: 00001
+[INFO] [INFO] ✅ Passenger 1 externalRef is defined - externalRef: 00001
+[INFO] [INFO] Passenger 1 type valid value check: PERSON
+[INFO] [INFO] ✅ Passenger 1 type is a known OSDM value - type: PERSON
+[INFO] [INFO] Passenger 1 dateOfBirth: 1999-01-01
+[INFO] [INFO] ✅ Passenger 1 dateOfBirth is a valid date in the past - dateOfBirth: 1999-01-01
+[INFO] [INFO] Passenger 1 reduction cards - reductionCards: []
+[INFO] [INFO] ✅ Passenger 1 reduction cards - reductionCards: []
+[INFO] [INFO] ➤ validateOfferParts
+[INFO] [INFO] Admission parts price: 0
+[INFO] [INFO] Reservation parts price: 0
+[INFO] [INFO] Ancillary parts price: 0
+[INFO] [INFO] Offer minimalPrice &gt;= sum of offerParts price - minimalPrice: 0, sumPartsPrice: 0
+[INFO] [INFO] ✅ Offer minimalPrice &gt;= sum of offerParts price - minimalPrice: 0, sumPartsPrice: 0
+[INFO] [INFO] productFlex: NON_FLEXIBLE, Result: NON_FLEXIBLE
+[INFO] [INFO] ✅ Offer overallFlexibility consistency - overallFlex: NON_FLEXIBLE, flexibilityResult: NON_FLEXIBLE
+[INFO] [INFO] Covered Trip ID: 0edddd50-744a-4758-ab79-7efaf45fdd1d
+[INFO] [INFO] tripCoverage.coveredLegIds: [&quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;]
+[INFO] [INFO] ✅ Offer tripCoverage.coveredLegIds are non-empty strings - count: 1
+[INFO] [INFO] ✅ admissionOfferParts[0].price.currency matches offerSummary currency (expected: CZK, actual: CZK)
+[INFO] [INFO] ✅ reservationOfferParts[0].price.currency matches offerSummary currency (expected: CZK, actual: CZK)
+[INFO] [INFO] A8 currency consistency checked for all offer parts against summaryCurrency=CZK
+[INFO] [INFO] ➤ validateTripsAndLegs
+[INFO] [INFO] Trips are defined - length: 1
+[INFO] [INFO] ✅ Trips are defined - length: 1
+[INFO] [INFO] tripIds found: [&quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;]
+[INFO] [INFO] Checking coveredTripId 0edddd50-744a-4758-ab79-7efaf45fdd1d is in tripIds: [&quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;]
+[INFO] [INFO] ✅ selectedOffer.tripCoverage.coveredTripId (0edddd50-744a-4758-ab79-7efaf45fdd1d) is part of Trip ids
+[INFO] [INFO] Trip 1: startTime=2026-04-19T07:22:00+02:00, endTime=2026-04-19T09:10:00+02:00 ✓
+[INFO] [INFO] ✅ Trip 1 startTime is before endTime (OSDM: temporal order)
+[INFO] [INFO] Trip 1 direction: OUT_BOUND
+[INFO] [INFO] ✅ Trip 1 direction is a known value - direction: OUT_BOUND
+[INFO] [INFO] Trip 1 has legs - length: 1
+[INFO] [INFO] ✅ Trip 1 has legs - length: 1
+[INFO] [INFO] Trip 1 Leg 1 has TrainID, Origin &amp; Destination - TrainID: 1140, Origin: Praha hl.n., Destination: Turnov
+[INFO] [INFO] ✅ Trip 1 Leg 1 has TrainID, Origin &amp; Destination - TrainID: 1140, Origin: Praha hl.n., Destination: Turnov
+[INFO] [INFO] ➤ validateAdmissions
+[INFO] [INFO] Validating admissionOfferParts 1 id=811f77f9-130c-4e1e-ba64-cc1b4aca333f
+[INFO] [INFO] AdmissionOfferPart 1 type: NRT
+[INFO] [INFO] ✅ AdmissionOfferPart 1 type: NRT
+[INFO] [INFO] AdmissionOfferPart 1 validFrom: 2026-04-19T05:22:00Z
+[INFO] [INFO] ✅ AdmissionOfferPart 1 validFrom is a valid date - validFrom: 2026-04-19T05:22:00Z
+[INFO] [INFO] AdmissionOfferPart 1 validUntil is in the future - validUntil: Sun Apr 19 2026 09:10:00 GMT+0200 (heure d’été d’Europe centrale)
+[INFO] [INFO] ✅ AdmissionOfferPart 1 validUntil is in the future - validUntil: Sun Apr 19 2026 09:10:00 GMT+0200 (heure d’été d’Europe centrale)
+[INFO] [INFO] AdmissionOfferPart 1 price: 0 CZK
+[INFO] [INFO] ✅ AdmissionOfferPart 1 price structure is valid - amount: 0, currency: CZK
+[INFO] [INFO] AdmissionOfferPart 1 offerMode: COLLECTIVE
+[INFO] [INFO] ✅ AdmissionOfferPart 1 offerMode is a known value - offerMode: COLLECTIVE
+[INFO] [INFO] AdmissionOfferPart 1 isReusable: false
+[INFO] [INFO] ✅ AdmissionOfferPart 1 isReusable is a boolean - isReusable: false
+[INFO] [INFO] AdmissionOfferPart 1 passengerRefs: [&quot;00001&quot;]
+[INFO] [INFO] ✅ AdmissionOfferPart 1 passengerRefs has at least one entry
+[INFO] [INFO] reservationsRef.id : f5bfe7f2-8f54-4814-8335-2c1d32d86eab → match in reservationOfferParts : true
+[INFO] [INFO] ✅ Reservation linkage in admission with id 811f77f9-130c-4e1e-ba64-cc1b4aca333f, reservationsRef ids should match reservationOfferParts ids
+[INFO] [INFO] No ancillaryRefs found for admission id=811f77f9-130c-4e1e-ba64-cc1b4aca333f → test skipped
+[INFO] [INFO] AdmissionOfferPart 1 has 2 afterSalesCondition(s)
+[INFO] [INFO] Validating afterSalesCondition[0] for admission 811f77f9-130c-4e1e-ba64-cc1b4aca333f
+[INFO] [INFO] afterSalesCondition[0].condition: REFUND
+[INFO] [INFO] afterSalesCondition[0].validFrom: 2026-04-09T19:41:26Z
+[INFO] [INFO] afterSalesCondition[0].validUntil: 2026-04-19T05:12:00Z
+[INFO] [INFO] afterSalesCondition[0].afterSaleFee: 0 CZK
+[INFO] [INFO] Validating afterSalesCondition[1] for admission 811f77f9-130c-4e1e-ba64-cc1b4aca333f
+[INFO] [INFO] afterSalesCondition[1].condition: REFUND
+[INFO] [INFO] afterSalesCondition[1].validFrom: 2026-04-09T19:41:26Z
+[INFO] [INFO] afterSalesCondition[1].validUntil: 2026-04-19T05:22:00Z
+[INFO] [INFO] afterSalesCondition[1].afterSaleFee: 0 CZK
+[INFO] [INFO] ✅ Admission part 1 afterSalesConditions validity
+[INFO] [INFO] ➤ validateReservations
+[INFO] [INFO] Validating reservationOfferParts 1 id : f5bfe7f2-8f54-4814-8335-2c1d32d86eab
+[INFO] [INFO] ReservationOfferPart 1 price: 0 CZK
+[INFO] [INFO] ✅ ReservationOfferPart 1 price structure is valid - amount: 0, currency: CZK
+[INFO] [INFO] ReservationOfferPart 1 refundable: YES
+[INFO] [INFO] ✅ ReservationOfferPart 1 refundable is a valid value - refundable: YES
+[INFO] [INFO] ReservationOfferPart 1 exchangeable: NO
+[INFO] [INFO] ✅ ReservationOfferPart 1 exchangeable is a valid value - exchangeable: NO
+[INFO] [INFO] ReservationOfferPart 1 offerMode: COLLECTIVE
+[INFO] [INFO] ✅ ReservationOfferPart 1 offerMode is a known value - offerMode: COLLECTIVE
+[INFO] [INFO] ReservationOfferPart 1 passengerRefs: [&quot;00001&quot;]
+[INFO] [INFO] ✅ ReservationOfferPart 1 passengerRefs has at least one entry
+[INFO] [INFO] availablePlaces count : 1
+[INFO] [INFO] availablePlaces[0] accommodationType : SEAT, numericAvailability : 0
+[INFO] [INFO] ✅ Reservation part 1 availablePlaces is an array and contains accommodationType and numericAvailability
+[INFO] [INFO] No numericAvailability for reservation id : f5bfe7f2-8f54-4814-8335-2c1d32d86eab → test skipped
+[INFO] [INFO] No numberOfPrivateCompartments for reservation id=f5bfe7f2-8f54-4814-8335-2c1d32d86eab → test skipped
+[INFO] [INFO] No availablePlacePreferences for reservation id=f5bfe7f2-8f54-4814-8335-2c1d32d86eab → test skipped
+[INFO] [INFO] No ancillaryRefs found for reservation id : f5bfe7f2-8f54-4814-8335-2c1d32d86eab → test skipped
+[INFO] [INFO] Reservation part 1 has 2 afterSalesCondition(s)
+[INFO] [INFO] Validating afterSalesCondition[0] for reservation f5bfe7f2-8f54-4814-8335-2c1d32d86eab
+[INFO] [INFO] afterSalesCondition[0].condition: REFUND
+[INFO] [INFO] afterSalesCondition[0].validFrom: 2026-04-09T19:41:26Z
+[INFO] [INFO] afterSalesCondition[0].validUntil: 2026-04-19T05:12:00Z
+[INFO] [INFO] afterSalesCondition[0].afterSaleFee: 0 CZK
+[INFO] [INFO] Validating afterSalesCondition[1] for reservation f5bfe7f2-8f54-4814-8335-2c1d32d86eab
+[INFO] [INFO] afterSalesCondition[1].condition: REFUND
+[INFO] [INFO] afterSalesCondition[1].validFrom: 2026-04-09T19:41:26Z
+[INFO] [INFO] afterSalesCondition[1].validUntil: 2026-04-19T05:22:00Z
+[INFO] [INFO] afterSalesCondition[1].afterSaleFee: 0 CZK
+[INFO] [INFO] ✅ Reservation part 1 afterSalesConditions validity
+[INFO] [INFO] ➤ validateAncillaries
+[INFO] [INFO] No ancillaryOfferParts found for offer.id : undefined → test skipped
+[INFO] [INFO] ➤ handleAccommodationAndPlaceSelection
+[INFO] [INFO] accommodationSelection is undefined, skipping place selection
+[INFO] [INFO] ➤ ensureYesWhenRefundOrExchangeSelected
+[ERROR] [ERROR] ⛔ scenarioType is EXCHANGE but Admission part 1 is not exchangeable
+[WARN] [WARNING] ❌ Admission part 1 is exchangeable (scenarioType=EXCHANGE) - exchangeable: NO: Admission part should be exchangeable in EXCHANGE scenario: expected 'NO' to deeply equal 'YES'
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;tripSearchCriteria&quot;: {
+    &quot;departureTime&quot;: &quot;2026-04-19T07:00:00+02:00&quot;,
+    &quot;origin&quot;: {
+      &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+      &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5457076&quot;
+    },
+    &quot;destination&quot;: {
+      &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+      &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+    },
+    &quot;parameters&quot;: {
+      &quot;dataFilter&quot;: {
+        &quot;carrierFilter&quot;: {
+          &quot;carriers&quot;: [
+            &quot;urn:uic:rics:3189&quot;
+          ],
+          &quot;exclude&quot;: false
+        },
+        &quot;vehicleFilter&quot;: {
+          &quot;vehicleNumbers&quot;: [
+            &quot;1140&quot;
+          ],
+          &quot;lineNumbers&quot;: null,
+          &quot;exclude&quot;: false
+        }
+      }
+    }
+  },
+  &quot;anonymousPassengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;gender&quot;: &quot;X&quot;
+    }
+  ],
+  &quot;offerSearchCriteria&quot;: {
+    &quot;currency&quot;: &quot;CZK&quot;,
+    &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+    &quot;requestedOfferParts&quot;: [
+      &quot;RESERVATION&quot;,
+      &quot;ADMISSION&quot;,
+      &quot;ANCILLARY&quot;
+    ],
+    &quot;flexibilities&quot;: [
+      &quot;FULL_FLEXIBLE&quot;,
+      &quot;SEMI_FLEXIBLE&quot;,
+      &quot;NON_FLEXIBLE&quot;
+    ],
+    &quot;serviceClassTypes&quot;: [
+      &quot;STANDARD&quot;
+    ],
+    &quot;travelClasses&quot;: [
+      &quot;SECOND&quot;
+    ]
+  },
+  &quot;requestedFulfillmentOptions&quot;: [
+    {
+      &quot;type&quot;: &quot;ETICKET&quot;,
+      &quot;media&quot;: &quot;PDF_A4&quot;
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;warnings&quot;: null,
+  &quot;problems&quot;: [],
+  &quot;offers&quot;: [
+    {
+      &quot;offerId&quot;: &quot;b82fe76f-8e60-4443-acdd-125aaf551fd4&quot;,
+      &quot;summary&quot;: &quot;Admission Praha hl.n. - Turnov&quot;,
+      &quot;offerSummary&quot;: {
+        &quot;minimalPrice&quot;: {
+          &quot;currency&quot;: &quot;CZK&quot;,
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2,
+          &quot;vats&quot;: [
+            {
+              &quot;countryCode&quot;: &quot;CZ&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2,
+              &quot;netAmount&quot;: 0,
+              &quot;netAmountScale&quot;: 2,
+              &quot;grossAmount&quot;: 0,
+              &quot;grossAmountScale&quot;: 2,
+              &quot;percentage&quot;: 12,
+              &quot;taxId&quot;: null,
+              &quot;scope&quot;: &quot;NATIONAL&quot;
+            }
+          ],
+          &quot;appliedCurrencyConversion&quot;: null
+        },
+        &quot;overallServiceClass&quot;: {
+          &quot;type&quot;: &quot;STANDARD&quot;,
+          &quot;name&quot;: &quot;Standard&quot;
+        },
+        &quot;overallTravelClass&quot;: &quot;ANY_CLASS&quot;,
+        &quot;overallAccommodationType&quot;: &quot;SEAT&quot;,
+        &quot;overallAccommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+        &quot;overallFlexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+        &quot;minimalIndicatedConsumption&quot;: null
+      },
+      &quot;createdOn&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+      &quot;preBookableUntil&quot;: &quot;2026-04-09T19:56:26.050539549Z&quot;,
+      &quot;passengerRefs&quot;: [
+        &quot;00001&quot;
+      ],
+      &quot;products&quot;: [
+        {
+          &quot;id&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+          &quot;summary&quot;: &quot;Ticket with reservation&quot;,
+          &quot;summaryTranslations&quot;: [],
+          &quot;type&quot;: &quot;IRT&quot;,
+          &quot;code&quot;: &quot;AA_IRT&quot;,
+          &quot;descriptionTranslations&quot;: [],
+          &quot;owner&quot;: &quot;urn:x_bileto:code:arri&quot;,
+          &quot;conditions&quot;: [],
+          &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+          &quot;serviceClass&quot;: {
+            &quot;type&quot;: &quot;STANDARD&quot;,
+            &quot;name&quot;: &quot;Standard&quot;
+          },
+          &quot;travelClass&quot;: &quot;ANY_CLASS&quot;,
+          &quot;fulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;isTrainBound&quot;: true,
+          &quot;isReturnProduct&quot;: false,
+          &quot;serviceConstraintTextTranslations&quot;: [],
+          &quot;carrierConstraintTextTranslations&quot;: [],
+          &quot;descriptiveTexts&quot;: [],
+          &quot;combinationTags&quot;: [],
+          &quot;productTags&quot;: [],
+          &quot;_links&quot;: []
+        }
+      ],
+      &quot;tripCoverage&quot;: {
+        &quot;coveredTripId&quot;: &quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;,
+        &quot;coveredLegIds&quot;: [
+          &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;
+        ],
+        &quot;coveredSections&quot;: []
+      },
+      &quot;inboundTripCoverage&quot;: null,
+      &quot;admissionOfferParts&quot;: [
+        {
+          &quot;objectType&quot;: &quot;AdmissionOfferPart&quot;,
+          &quot;id&quot;: &quot;811f77f9-130c-4e1e-ba64-cc1b4aca333f&quot;,
+          &quot;createdOn&quot;: &quot;2026-04-09T19:41:25.563638Z&quot;,
+          &quot;validFrom&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+          &quot;validUntil&quot;: &quot;2026-04-19T07:10:00Z&quot;,
+          &quot;price&quot;: {
+            &quot;currency&quot;: &quot;CZK&quot;,
+            &quot;amount&quot;: 0,
+            &quot;scale&quot;: 2,
+            &quot;vats&quot;: [
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              },
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              }
+            ],
+            &quot;appliedCurrencyConversion&quot;: null
+          },
+          &quot;tripCoverage&quot;: {
+            &quot;coveredTripId&quot;: &quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;,
+            &quot;coveredLegIds&quot;: [
+              &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;
+            ],
+            &quot;coveredSections&quot;: []
+          },
+          &quot;inboundTripCoverage&quot;: null,
+          &quot;offerMode&quot;: &quot;COLLECTIVE&quot;,
+          &quot;isReusable&quot;: false,
+          &quot;passengerRefs&quot;: [
+            &quot;00001&quot;
+          ],
+          &quot;refundable&quot;: &quot;YES&quot;,
+          &quot;exchangeable&quot;: &quot;NO&quot;,
+          &quot;afterSalesConditions&quot;: [
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:12:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            },
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            }
+          ],
+          &quot;offerTag&quot;: null,
+          &quot;summaryProductId&quot;: null,
+          &quot;products&quot;: [
+            {
+              &quot;productId&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+              &quot;legIds&quot;: [
+                &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;
+              ]
+            }
+          ],
+          &quot;availableFulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;appliedCorporateCodes&quot;: [],
+          &quot;appliedPassengerTypes&quot;: [],
+          &quot;appliedPromotionCodes&quot;: [],
+          &quot;appliedReductionCardTypes&quot;: [],
+          &quot;regionalValiditySummary&quot;: null,
+          &quot;indicatedConsumption&quot;: null,
+          &quot;grantedReductionAmounts&quot;: null,
+          &quot;_links&quot;: [],
+          &quot;regionalValidity&quot;: null,
+          &quot;regionalValidities&quot;: [],
+          &quot;reservations&quot;: [
+            {
+              &quot;isIncluded&quot;: true,
+              &quot;minGroupItemsToBeBooked&quot;: 1,
+              &quot;maxGroupItemsToBeBooked&quot;: 1,
+              &quot;reservationGroup&quot;: {
+                &quot;id&quot;: &quot;f5bfe7f2-8f54-4814-8335-2c1d32d86eab&quot;,
+                &quot;name&quot;: &quot;IRT Included Reservation&quot;,
+                &quot;reservationRefs&quot;: [
+                  {
+                    &quot;id&quot;: &quot;f5bfe7f2-8f54-4814-8335-2c1d32d86eab&quot;,
+                    &quot;_links&quot;: []
+                  }
+                ]
+              }
+            }
+          ],
+          &quot;ancillaries&quot;: [],
+          &quot;feeRefs&quot;: [],
+          &quot;regulatoryConditions&quot;: [],
+          &quot;includedReservations&quot;: [],
+          &quot;throughTicketTags&quot;: []
+        }
+      ],
+      &quot;reservationOfferParts&quot;: [
+        {
+          &quot;objectType&quot;: &quot;ReservationOfferPart&quot;,
+          &quot;id&quot;: &quot;f5bfe7f2-8f54-4814-8335-2c1d32d86eab&quot;,
+          &quot;createdOn&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+          &quot;validFrom&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+          &quot;validUntil&quot;: &quot;2026-04-19T09:10:00+02:00&quot;,
+          &quot;price&quot;: {
+            &quot;currency&quot;: &quot;CZK&quot;,
+            &quot;amount&quot;: 0,
+            &quot;scale&quot;: 2,
+            &quot;vats&quot;: [
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              },
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              }
+            ],
+            &quot;appliedCurrencyConversion&quot;: null
+          },
+          &quot;tripCoverage&quot;: {
+            &quot;coveredTripId&quot;: &quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;,
+            &quot;coveredLegIds&quot;: [
+              &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;
+            ],
+            &quot;coveredSections&quot;: []
+          },
+          &quot;inboundTripCoverage&quot;: null,
+          &quot;offerMode&quot;: &quot;COLLECTIVE&quot;,
+          &quot;isReusable&quot;: false,
+          &quot;passengerRefs&quot;: [
+            &quot;00001&quot;
+          ],
+          &quot;refundable&quot;: &quot;YES&quot;,
+          &quot;exchangeable&quot;: &quot;NO&quot;,
+          &quot;afterSalesConditions&quot;: [
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:12:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            },
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:26Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            }
+          ],
+          &quot;offerTag&quot;: null,
+          &quot;summaryProductId&quot;: null,
+          &quot;products&quot;: [
+            {
+              &quot;productId&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+              &quot;legIds&quot;: [
+                &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;
+              ]
+            }
+          ],
+          &quot;availableFulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;appliedCorporateCodes&quot;: [],
+          &quot;appliedPassengerTypes&quot;: [],
+          &quot;appliedPromotionCodes&quot;: [],
+          &quot;appliedReductionCardTypes&quot;: [],
+          &quot;regionalValiditySummary&quot;: null,
+          &quot;indicatedConsumption&quot;: null,
+          &quot;grantedReductionAmounts&quot;: null,
+          &quot;_links&quot;: [],
+          &quot;distributionMode&quot;: &quot;PRODUCT_MODE&quot;,
+          &quot;ancillaries&quot;: [],
+          &quot;availablePlaces&quot;: [
+            {
+              &quot;accommodationType&quot;: &quot;SEAT&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;numericAvailability&quot;: 0,
+              &quot;tripLegCoverage&quot;: null
+            }
+          ],
+          &quot;availablePlacePreferences&quot;: [],
+          &quot;feeRefs&quot;: [],
+          &quot;supportedPlaceSelectionFlows&quot;: []
+        }
+      ],
+      &quot;ancillaryOfferParts&quot;: [],
+      &quot;continuousServiceOfferParts&quot;: [],
+      &quot;fees&quot;: [],
+      &quot;fares&quot;: [],
+      &quot;_links&quot;: []
+    }
+  ],
+  &quot;anonymousPassengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;prmNeeds&quot;: [],
+      &quot;cards&quot;: [],
+      &quot;gender&quot;: &quot;X&quot;,
+      &quot;residency&quot;: null,
+      &quot;transportable&quot;: null
+    }
+  ],
+  &quot;trips&quot;: [
+    {
+      &quot;id&quot;: &quot;0edddd50-744a-4758-ab79-7efaf45fdd1d&quot;,
+      &quot;externalRef&quot;: null,
+      &quot;summary&quot;: &quot;Praha hl.n. - Turnov&quot;,
+      &quot;duration&quot;: &quot;PT1H48M&quot;,
+      &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+      &quot;origin&quot;: {
+        &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+        &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5457076&quot;
+      },
+      &quot;originName&quot;: &quot;Praha hl.n.&quot;,
+      &quot;destination&quot;: {
+        &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+        &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+      },
+      &quot;destinationName&quot;: &quot;Turnov&quot;,
+      &quot;startTime&quot;: &quot;2026-04-19T07:22:00+02:00&quot;,
+      &quot;endTime&quot;: &quot;2026-04-19T09:10:00+02:00&quot;,
+      &quot;transfers&quot;: 0,
+      &quot;distance&quot;: 102000,
+      &quot;legs&quot;: [
+        {
+          &quot;id&quot;: &quot;b4e3e4e4-a483-430b-8db4-5276ec4fab87&quot;,
+          &quot;externalRef&quot;: null,
+          &quot;timedLeg&quot;: {
+            &quot;start&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:x_bileto:stn:7bbf6def-4dc5-49cd-8d2c-49048adf26a7&quot;
+              },
+              &quot;stopPlaceName&quot;: &quot;Praha hl.n.&quot;,
+              &quot;serviceDeparture&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T07:22:00+02:00&quot;
+              },
+              &quot;status&quot;: {
+                &quot;order&quot;: 1,
+                &quot;noBoardingAtStop&quot;: false,
+                &quot;noAlightingAtStop&quot;: false,
+                &quot;isBorderPoint&quot;: false
+              }
+            },
+            &quot;intermediates&quot;: null,
+            &quot;end&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+              },
+              &quot;stopPlaceName&quot;: &quot;Turnov&quot;,
+              &quot;serviceArrival&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T09:10:00+02:00&quot;
+              },
+              &quot;status&quot;: {
+                &quot;order&quot;: 10,
+                &quot;noBoardingAtStop&quot;: false,
+                &quot;noAlightingAtStop&quot;: false,
+                &quot;isBorderPoint&quot;: false
+              }
+            },
+            &quot;service&quot;: {
+              &quot;mode&quot;: {
+                &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                &quot;name&quot;: &quot;Rail&quot;,
+                &quot;shortName&quot;: null,
+                &quot;description&quot;: &quot;Used for intercity or long-distance travel.&quot;
+              },
+              &quot;productCategory&quot;: null,
+              &quot;vehicleNumbers&quot;: [
+                &quot;1140&quot;
+              ],
+              &quot;lineNumbers&quot;: [
+                &quot;R21&quot;
+              ],
+              &quot;serviceStatus&quot;: null,
+              &quot;situationFullRefs&quot;: [],
+              &quot;carriers&quot;: [
+                {
+                  &quot;ref&quot;: &quot;urn:uic:rics:3189&quot;,
+                  &quot;name&quot;: &quot;ARRIVA vlaky s.r.o.&quot;
+                }
+              ],
+              &quot;attributes&quot;: []
+            },
+            &quot;operatingDays&quot;: {
+              &quot;from&quot;: &quot;2026-04-09T12:00:00Z&quot;,
+              &quot;until&quot;: &quot;2026-12-12T12:00:00Z&quot;,
+              &quot;pattern&quot;: &quot;11111111111111111111110001111000111110011111001111100111110011111001111100111110011111000111100111110011111001111100111110011111001111100111110011111001111100111110011111000111111111111111111111111111111111111111111111111111111111111111111111111111&quot;
+            },
+            &quot;duration&quot;: &quot;PT1H48M&quot;,
+            &quot;co2Emission&quot;: null,
+            &quot;attributes&quot;: []
+          },
+          &quot;transferLeg&quot;: null,
+          &quot;continuousLeg&quot;: null
+        }
+      ],
+      &quot;operatingDays&quot;: {
+        &quot;from&quot;: &quot;2026-04-09T12:00:00Z&quot;,
+        &quot;until&quot;: &quot;2026-12-12T12:00:00Z&quot;,
+        &quot;pattern&quot;: &quot;11111111111111111111110001111000111110011111001111100111110011111001111100111110011111000111100111110011111001111100111110011111001111100111110011111001111100111110011111000111111111111111111111111111111111111111111111111111111111111111111111111111&quot;
+      },
+      &quot;situationFullRefs&quot;: [],
+      &quot;tripStatus&quot;: null,
+      &quot;_links&quot;: []
+    }
+  ],
+  &quot;_links&quot;: []
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-green">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">POST Offer-Req param chk</span>
+      <span class="abadge abadge-ok">2 ✅</span>
+      <span class="rcode rcode-ok">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 1921 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 1921 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://osdm-5.platform.bileto.zone/api/offers</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (2)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer baseline request executed</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details>
+    <summary class="sub-summary">🧾 Console Log (17)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://osdm-5.platform.bileto.zone/api
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/trackonpath-datafile.json
+[LOG] 
+    ####################################
+    # 🛠️  POST Get Offer — OTST_EXCH_SRCH_CRIT_1ADT_1LEG 🛠️ #
+    ####################################
+    
+[LOG] ⏩ [STEP] Executing request : POST Offer-Req param chk
+[LOG] [INFO] ➤ postOfferResponsePreRequest
+[INFO] [INFO] ➤ postOfferResponsePreRequest
+[LOG] [INFO] ➤ buildOfferCollectionRequest
+[INFO] [INFO] ➤ buildOfferCollectionRequest
+[LOG] [INFO] Build using TripType: SEARCH
+[INFO] [INFO] Build using TripType: SEARCH
+[LOG] [INFO] ➤ ensureAuthorizationOr403
+[INFO] [INFO] ➤ ensureAuthorizationOr403
+[LOG] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] ✅ Offer baseline request executed
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;tripSearchCriteria&quot;: {
+    &quot;departureTime&quot;: &quot;2026-04-19T07:00:00+02:00&quot;,
+    &quot;origin&quot;: {
+      &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+      &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5457076&quot;
+    },
+    &quot;destination&quot;: {
+      &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+      &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+    },
+    &quot;parameters&quot;: {
+      &quot;dataFilter&quot;: {
+        &quot;carrierFilter&quot;: {
+          &quot;carriers&quot;: [
+            &quot;urn:uic:rics:3189&quot;
+          ],
+          &quot;exclude&quot;: false
+        },
+        &quot;vehicleFilter&quot;: {
+          &quot;vehicleNumbers&quot;: [
+            &quot;1140&quot;
+          ],
+          &quot;lineNumbers&quot;: null,
+          &quot;exclude&quot;: false
+        }
+      }
+    }
+  },
+  &quot;anonymousPassengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;gender&quot;: &quot;X&quot;
+    }
+  ],
+  &quot;offerSearchCriteria&quot;: {
+    &quot;currency&quot;: &quot;CZK&quot;,
+    &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+    &quot;requestedOfferParts&quot;: [
+      &quot;RESERVATION&quot;,
+      &quot;ADMISSION&quot;,
+      &quot;ANCILLARY&quot;
+    ],
+    &quot;flexibilities&quot;: [
+      &quot;FULL_FLEXIBLE&quot;,
+      &quot;SEMI_FLEXIBLE&quot;,
+      &quot;NON_FLEXIBLE&quot;
+    ],
+    &quot;serviceClassTypes&quot;: [
+      &quot;STANDARD&quot;
+    ],
+    &quot;travelClasses&quot;: [
+      &quot;SECOND&quot;
+    ]
+  },
+  &quot;requestedFulfillmentOptions&quot;: [
+    {
+      &quot;type&quot;: &quot;ETICKET&quot;,
+      &quot;media&quot;: &quot;PDF_A4&quot;
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;warnings&quot;: null,
+  &quot;problems&quot;: [],
+  &quot;offers&quot;: [
+    {
+      &quot;offerId&quot;: &quot;cf2b4c76-7b30-44e7-b475-b1cf5bec8fa8&quot;,
+      &quot;summary&quot;: &quot;Admission Praha hl.n. - Turnov&quot;,
+      &quot;offerSummary&quot;: {
+        &quot;minimalPrice&quot;: {
+          &quot;currency&quot;: &quot;CZK&quot;,
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2,
+          &quot;vats&quot;: [
+            {
+              &quot;countryCode&quot;: &quot;CZ&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2,
+              &quot;netAmount&quot;: 0,
+              &quot;netAmountScale&quot;: 2,
+              &quot;grossAmount&quot;: 0,
+              &quot;grossAmountScale&quot;: 2,
+              &quot;percentage&quot;: 12,
+              &quot;taxId&quot;: null,
+              &quot;scope&quot;: &quot;NATIONAL&quot;
+            }
+          ],
+          &quot;appliedCurrencyConversion&quot;: null
+        },
+        &quot;overallServiceClass&quot;: {
+          &quot;type&quot;: &quot;STANDARD&quot;,
+          &quot;name&quot;: &quot;Standard&quot;
+        },
+        &quot;overallTravelClass&quot;: &quot;ANY_CLASS&quot;,
+        &quot;overallAccommodationType&quot;: &quot;SEAT&quot;,
+        &quot;overallAccommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+        &quot;overallFlexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+        &quot;minimalIndicatedConsumption&quot;: null
+      },
+      &quot;createdOn&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+      &quot;preBookableUntil&quot;: &quot;2026-04-09T19:56:28.139606988Z&quot;,
+      &quot;passengerRefs&quot;: [
+        &quot;00001&quot;
+      ],
+      &quot;products&quot;: [
+        {
+          &quot;id&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+          &quot;summary&quot;: &quot;Ticket with reservation&quot;,
+          &quot;summaryTranslations&quot;: [],
+          &quot;type&quot;: &quot;IRT&quot;,
+          &quot;code&quot;: &quot;AA_IRT&quot;,
+          &quot;descriptionTranslations&quot;: [],
+          &quot;owner&quot;: &quot;urn:x_bileto:code:arri&quot;,
+          &quot;conditions&quot;: [],
+          &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+          &quot;serviceClass&quot;: {
+            &quot;type&quot;: &quot;STANDARD&quot;,
+            &quot;name&quot;: &quot;Standard&quot;
+          },
+          &quot;travelClass&quot;: &quot;ANY_CLASS&quot;,
+          &quot;fulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;isTrainBound&quot;: true,
+          &quot;isReturnProduct&quot;: false,
+          &quot;serviceConstraintTextTranslations&quot;: [],
+          &quot;carrierConstraintTextTranslations&quot;: [],
+          &quot;descriptiveTexts&quot;: [],
+          &quot;combinationTags&quot;: [],
+          &quot;productTags&quot;: [],
+          &quot;_links&quot;: []
+        }
+      ],
+      &quot;tripCoverage&quot;: {
+        &quot;coveredTripId&quot;: &quot;93addb1e-8ecb-49c3-8a4a-f0d287a08ad2&quot;,
+        &quot;coveredLegIds&quot;: [
+          &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;
+        ],
+        &quot;coveredSections&quot;: []
+      },
+      &quot;inboundTripCoverage&quot;: null,
+      &quot;admissionOfferParts&quot;: [
+        {
+          &quot;objectType&quot;: &quot;AdmissionOfferPart&quot;,
+          &quot;id&quot;: &quot;90f0ee8e-1b22-4f3c-9b9a-fcc4ac05c81b&quot;,
+          &quot;createdOn&quot;: &quot;2026-04-09T19:41:27.629241Z&quot;,
+          &quot;validFrom&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+          &quot;validUntil&quot;: &quot;2026-04-19T07:10:00Z&quot;,
+          &quot;price&quot;: {
+            &quot;currency&quot;: &quot;CZK&quot;,
+            &quot;amount&quot;: 0,
+            &quot;scale&quot;: 2,
+            &quot;vats&quot;: [
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              },
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              }
+            ],
+            &quot;appliedCurrencyConversion&quot;: null
+          },
+          &quot;tripCoverage&quot;: {
+            &quot;coveredTripId&quot;: &quot;93addb1e-8ecb-49c3-8a4a-f0d287a08ad2&quot;,
+            &quot;coveredLegIds&quot;: [
+              &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;
+            ],
+            &quot;coveredSections&quot;: []
+          },
+          &quot;inboundTripCoverage&quot;: null,
+          &quot;offerMode&quot;: &quot;COLLECTIVE&quot;,
+          &quot;isReusable&quot;: false,
+          &quot;passengerRefs&quot;: [
+            &quot;00001&quot;
+          ],
+          &quot;refundable&quot;: &quot;YES&quot;,
+          &quot;exchangeable&quot;: &quot;NO&quot;,
+          &quot;afterSalesConditions&quot;: [
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:12:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            },
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            }
+          ],
+          &quot;offerTag&quot;: null,
+          &quot;summaryProductId&quot;: null,
+          &quot;products&quot;: [
+            {
+              &quot;productId&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+              &quot;legIds&quot;: [
+                &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;
+              ]
+            }
+          ],
+          &quot;availableFulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;appliedCorporateCodes&quot;: [],
+          &quot;appliedPassengerTypes&quot;: [],
+          &quot;appliedPromotionCodes&quot;: [],
+          &quot;appliedReductionCardTypes&quot;: [],
+          &quot;regionalValiditySummary&quot;: null,
+          &quot;indicatedConsumption&quot;: null,
+          &quot;grantedReductionAmounts&quot;: null,
+          &quot;_links&quot;: [],
+          &quot;regionalValidity&quot;: null,
+          &quot;regionalValidities&quot;: [],
+          &quot;reservations&quot;: [
+            {
+              &quot;isIncluded&quot;: true,
+              &quot;minGroupItemsToBeBooked&quot;: 1,
+              &quot;maxGroupItemsToBeBooked&quot;: 1,
+              &quot;reservationGroup&quot;: {
+                &quot;id&quot;: &quot;fc2473c6-ba1e-466f-b7e0-f10a368135c7&quot;,
+                &quot;name&quot;: &quot;IRT Included Reservation&quot;,
+                &quot;reservationRefs&quot;: [
+                  {
+                    &quot;id&quot;: &quot;fc2473c6-ba1e-466f-b7e0-f10a368135c7&quot;,
+                    &quot;_links&quot;: []
+                  }
+                ]
+              }
+            }
+          ],
+          &quot;ancillaries&quot;: [],
+          &quot;feeRefs&quot;: [],
+          &quot;regulatoryConditions&quot;: [],
+          &quot;includedReservations&quot;: [],
+          &quot;throughTicketTags&quot;: []
+        }
+      ],
+      &quot;reservationOfferParts&quot;: [
+        {
+          &quot;objectType&quot;: &quot;ReservationOfferPart&quot;,
+          &quot;id&quot;: &quot;fc2473c6-ba1e-466f-b7e0-f10a368135c7&quot;,
+          &quot;createdOn&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+          &quot;validFrom&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+          &quot;validUntil&quot;: &quot;2026-04-19T09:10:00+02:00&quot;,
+          &quot;price&quot;: {
+            &quot;currency&quot;: &quot;CZK&quot;,
+            &quot;amount&quot;: 0,
+            &quot;scale&quot;: 2,
+            &quot;vats&quot;: [
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              },
+              {
+                &quot;countryCode&quot;: &quot;CZ&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;netAmount&quot;: 0,
+                &quot;netAmountScale&quot;: 2,
+                &quot;grossAmount&quot;: 0,
+                &quot;grossAmountScale&quot;: 2,
+                &quot;percentage&quot;: 12,
+                &quot;taxId&quot;: null,
+                &quot;scope&quot;: &quot;NATIONAL&quot;
+              }
+            ],
+            &quot;appliedCurrencyConversion&quot;: null
+          },
+          &quot;tripCoverage&quot;: {
+            &quot;coveredTripId&quot;: &quot;93addb1e-8ecb-49c3-8a4a-f0d287a08ad2&quot;,
+            &quot;coveredLegIds&quot;: [
+              &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;
+            ],
+            &quot;coveredSections&quot;: []
+          },
+          &quot;inboundTripCoverage&quot;: null,
+          &quot;offerMode&quot;: &quot;COLLECTIVE&quot;,
+          &quot;isReusable&quot;: false,
+          &quot;passengerRefs&quot;: [
+            &quot;00001&quot;
+          ],
+          &quot;refundable&quot;: &quot;YES&quot;,
+          &quot;exchangeable&quot;: &quot;NO&quot;,
+          &quot;afterSalesConditions&quot;: [
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:12:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            },
+            {
+              &quot;condition&quot;: &quot;REFUND&quot;,
+              &quot;validFrom&quot;: &quot;2026-04-09T19:41:28Z&quot;,
+              &quot;validUntil&quot;: &quot;2026-04-19T05:22:00Z&quot;,
+              &quot;afterSaleFee&quot;: {
+                &quot;currency&quot;: &quot;CZK&quot;,
+                &quot;amount&quot;: 0,
+                &quot;scale&quot;: 2,
+                &quot;vats&quot;: [],
+                &quot;appliedCurrencyConversion&quot;: null
+              },
+              &quot;reimbursementMethod&quot;: {
+                &quot;paymentMethod&quot;: &quot;ORIGINAL_ACCOUNT&quot;
+              }
+            }
+          ],
+          &quot;offerTag&quot;: null,
+          &quot;summaryProductId&quot;: null,
+          &quot;products&quot;: [
+            {
+              &quot;productId&quot;: &quot;2a4f1f4d-780f-4a68-94c0-b9845754430b&quot;,
+              &quot;legIds&quot;: [
+                &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;
+              ]
+            }
+          ],
+          &quot;availableFulfillmentOptions&quot;: [
+            {
+              &quot;type&quot;: &quot;ETICKET&quot;,
+              &quot;media&quot;: &quot;PDF_A4&quot;,
+              &quot;applications&quot;: null,
+              &quot;specification&quot;: null
+            }
+          ],
+          &quot;appliedCorporateCodes&quot;: [],
+          &quot;appliedPassengerTypes&quot;: [],
+          &quot;appliedPromotionCodes&quot;: [],
+          &quot;appliedReductionCardTypes&quot;: [],
+          &quot;regionalValiditySummary&quot;: null,
+          &quot;indicatedConsumption&quot;: null,
+          &quot;grantedReductionAmounts&quot;: null,
+          &quot;_links&quot;: [],
+          &quot;distributionMode&quot;: &quot;PRODUCT_MODE&quot;,
+          &quot;ancillaries&quot;: [],
+          &quot;availablePlaces&quot;: [
+            {
+              &quot;accommodationType&quot;: &quot;SEAT&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;numericAvailability&quot;: 0,
+              &quot;tripLegCoverage&quot;: null
+            }
+          ],
+          &quot;availablePlacePreferences&quot;: [],
+          &quot;feeRefs&quot;: [],
+          &quot;supportedPlaceSelectionFlows&quot;: []
+        }
+      ],
+      &quot;ancillaryOfferParts&quot;: [],
+      &quot;continuousServiceOfferParts&quot;: [],
+      &quot;fees&quot;: [],
+      &quot;fares&quot;: [],
+      &quot;_links&quot;: []
+    }
+  ],
+  &quot;anonymousPassengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;prmNeeds&quot;: [],
+      &quot;cards&quot;: [],
+      &quot;gender&quot;: &quot;X&quot;,
+      &quot;residency&quot;: null,
+      &quot;transportable&quot;: null
+    }
+  ],
+  &quot;trips&quot;: [
+    {
+      &quot;id&quot;: &quot;93addb1e-8ecb-49c3-8a4a-f0d287a08ad2&quot;,
+      &quot;externalRef&quot;: null,
+      &quot;summary&quot;: &quot;Praha hl.n. - Turnov&quot;,
+      &quot;duration&quot;: &quot;PT1H48M&quot;,
+      &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+      &quot;origin&quot;: {
+        &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+        &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5457076&quot;
+      },
+      &quot;originName&quot;: &quot;Praha hl.n.&quot;,
+      &quot;destination&quot;: {
+        &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+        &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+      },
+      &quot;destinationName&quot;: &quot;Turnov&quot;,
+      &quot;startTime&quot;: &quot;2026-04-19T07:22:00+02:00&quot;,
+      &quot;endTime&quot;: &quot;2026-04-19T09:10:00+02:00&quot;,
+      &quot;transfers&quot;: 0,
+      &quot;distance&quot;: 102000,
+      &quot;legs&quot;: [
+        {
+          &quot;id&quot;: &quot;e18c2218-5e3b-41f8-a0fd-a5fc39de83c5&quot;,
+          &quot;externalRef&quot;: null,
+          &quot;timedLeg&quot;: {
+            &quot;start&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:x_bileto:stn:7bbf6def-4dc5-49cd-8d2c-49048adf26a7&quot;
+              },
+              &quot;stopPlaceName&quot;: &quot;Praha hl.n.&quot;,
+              &quot;serviceDeparture&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T07:22:00+02:00&quot;
+              },
+              &quot;status&quot;: {
+                &quot;order&quot;: 1,
+                &quot;noBoardingAtStop&quot;: false,
+                &quot;noAlightingAtStop&quot;: false,
+                &quot;isBorderPoint&quot;: false
+              }
+            },
+            &quot;intermediates&quot;: null,
+            &quot;end&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+              },
+              &quot;stopPlaceName&quot;: &quot;Turnov&quot;,
+              &quot;serviceArrival&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T09:10:00+02:00&quot;
+              },
+              &quot;status&quot;: {
+                &quot;order&quot;: 10,
+                &quot;noBoardingAtStop&quot;: false,
+                &quot;noAlightingAtStop&quot;: false,
+                &quot;isBorderPoint&quot;: false
+              }
+            },
+            &quot;service&quot;: {
+              &quot;mode&quot;: {
+                &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                &quot;name&quot;: &quot;Rail&quot;,
+                &quot;shortName&quot;: null,
+                &quot;description&quot;: &quot;Used for intercity or long-distance travel.&quot;
+              },
+              &quot;productCategory&quot;: null,
+              &quot;vehicleNumbers&quot;: [
+                &quot;1140&quot;
+              ],
+              &quot;lineNumbers&quot;: [
+                &quot;R21&quot;
+              ],
+              &quot;serviceStatus&quot;: null,
+              &quot;situationFullRefs&quot;: [],
+              &quot;carriers&quot;: [
+                {
+                  &quot;ref&quot;: &quot;urn:uic:rics:3189&quot;,
+                  &quot;name&quot;: &quot;ARRIVA vlaky s.r.o.&quot;
+                }
+              ],
+              &quot;attributes&quot;: []
+            },
+            &quot;operatingDays&quot;: {
+              &quot;from&quot;: &quot;2026-04-09T12:00:00Z&quot;,
+              &quot;until&quot;: &quot;2026-12-12T12:00:00Z&quot;,
+              &quot;pattern&quot;: &quot;11111111111111111111110001111000111110011111001111100111110011111001111100111110011111000111100111110011111001111100111110011111001111100111110011111001111100111110011111000111111111111111111111111111111111111111111111111111111111111111111111111111&quot;
+            },
+            &quot;duration&quot;: &quot;PT1H48M&quot;,
+            &quot;co2Emission&quot;: null,
+            &quot;attributes&quot;: []
+          },
+          &quot;transferLeg&quot;: null,
+          &quot;continuousLeg&quot;: null
+        }
+      ],
+      &quot;operatingDays&quot;: {
+        &quot;from&quot;: &quot;2026-04-09T12:00:00Z&quot;,
+        &quot;until&quot;: &quot;2026-12-12T12:00:00Z&quot;,
+        &quot;pattern&quot;: &quot;11111111111111111111110001111000111110011111001111100111110011111001111100111110011111000111100111110011111001111100111110011111001111100111110011111001111100111110011111000111111111111111111111111111111111111111111111111111111111111111111111111111&quot;
+      },
+      &quot;situationFullRefs&quot;: [],
+      &quot;tripStatus&quot;: null,
+      &quot;_links&quot;: []
+    }
+  ],
+  &quot;_links&quot;: []
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">3</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">02. POST Create Booking</span>
+      <span class="abadge abadge-ok">6 ✅</span> <span class="abadge abadge-fail">4 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 927 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 6</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 4</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 927 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://osdm-5.platform.bileto.zone/api/bookings</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (6)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: offerSearchCriteria.requestedOfferParts</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: offerSearchCriteria.requestedOfferParts</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: offerSearchCriteria.productTags</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: offerSearchCriteria.productTags</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: offerSearchCriteria.productSelections</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: offerSearchCriteria.productSelections</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (4)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: offerSearchCriteria.requestedOfferParts</span>
+          <div class="te">Transport failure for offerSearchCriteria.requestedOfferParts: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: offerSearchCriteria.productTags</span>
+          <div class="te">Transport failure for offerSearchCriteria.productTags: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: offerSearchCriteria.productSelections</span>
+          <div class="te">Transport failure for offerSearchCriteria.productSelections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json': expected 'application/problem+json' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (18)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://osdm-5.platform.bileto.zone/api
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/trackonpath-datafile.json
+[LOG] ⏩ [STEP] Executing request : 02. POST Create Booking
+[LOG] [INFO] ➤ buildBookingRequest
+[INFO] [INFO] ➤ buildBookingRequest
+[LOG] [INFO] ➤ accommodationAndPlaceSelection
+[INFO] [INFO] ➤ accommodationAndPlaceSelection
+[INFO] [INFO] ✅ Offer param probe executed: offerSearchCriteria.requestedOfferParts
+[WARN] [WARNING] ❌ Offer param probe has no transport error: offerSearchCriteria.requestedOfferParts: Transport failure for offerSearchCriteria.requestedOfferParts: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: offerSearchCriteria.requestedOfferParts
+[INFO] [INFO] ✅ Offer param probe executed: offerSearchCriteria.productTags
+[WARN] [WARNING] ❌ Offer param probe has no transport error: offerSearchCriteria.productTags: Transport failure for offerSearchCriteria.productTags: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: offerSearchCriteria.productTags
+[INFO] [INFO] ✅ Offer param probe executed: offerSearchCriteria.productSelections
+[WARN] [WARNING] ❌ Offer param probe has no transport error: offerSearchCriteria.productSelections: Transport failure for offerSearchCriteria.productSelections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: offerSearchCriteria.productSelections
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json': expected 'application/problem+json' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;offers&quot;: [
+    {
+      &quot;offerId&quot;: &quot;b82fe76f-8e60-4443-acdd-125aaf551fd4&quot;,
+      &quot;passengerRefs&quot;: [
+        &quot;00001&quot;
+      ]
+    }
+  ],
+  &quot;purchaser&quot;: {
+    &quot;detail&quot;: {
+      &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+      &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+      &quot;contact&quot;: {
+        &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+        &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+      }
+    }
+  },
+  &quot;passengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;gender&quot;: &quot;X&quot;,
+      &quot;detail&quot;: {
+        &quot;firstName&quot;: &quot;John&quot;,
+        &quot;lastName&quot;: &quot;Doe&quot;,
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;email@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33612345678&quot;
+        }
+      }
+    }
+  ],
+  &quot;externalRef&quot;: &quot;00001&quot;
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://osdm.io/problems/booking_insufficient_availability&quot;,
+  &quot;title&quot;: &quot;Not enough seats available.&quot;,
+  &quot;status&quot;: 404,
+  &quot;detail&quot;: &quot;No seats (/offers/placeSelections/places) selected in request - selecting default ones: Requested 1 seats, but only 0 available.&quot;,
+  &quot;instance&quot;: &quot;/api/bookings&quot;,
+  &quot;code&quot;: &quot;urn:uic:problem:BOOKING_INSUFFICIENT_AVAILABILITY&quot;,
+  &quot;pointers&quot;: [
+    {
+      &quot;code&quot;: &quot;urn:uic:problem:BOOKING_INSUFFICIENT_AVAILABILITY&quot;,
+      &quot;requestPointer&quot;: &quot;/offers/placeSelections/places&quot;
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<div class="foot">
+  Generated by OTST Bruno Collection &mdash; Thu, 09 Apr 2026 19:41:30 GMT
+</div>
+
+</body>
+</html>

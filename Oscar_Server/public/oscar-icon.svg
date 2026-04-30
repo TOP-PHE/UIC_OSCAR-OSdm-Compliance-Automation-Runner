@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+
+    <!-- UIC 2024 Brand Colors:
+         Primary Blue:  #0090D4
+         Teal:          #00A3B0
+         Amber/Gold:    #FCC44D
+         Dark:          #3C3C3B
+         Green:         #62B576
+    -->
+
+    <!-- Blue gradient for main circle (UIC primary blue) -->
+    <radialGradient id="bgGrad" cx="38%" cy="32%" r="72%">
+      <stop offset="0%" stop-color="#22ADE8"/>
+      <stop offset="55%" stop-color="#0090D4"/>
+      <stop offset="100%" stop-color="#005A8A"/>
+    </radialGradient>
+
+    <!-- Gold gradient for star (UIC accent4 amber) -->
+    <linearGradient id="starGold" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFD96A"/>
+      <stop offset="45%" stop-color="#FCC44D"/>
+      <stop offset="100%" stop-color="#D99A1A"/>
+    </linearGradient>
+
+    <!-- Highlight on star (simulates 3D shine) -->
+    <linearGradient id="starShine" x1="10%" y1="0%" x2="60%" y2="80%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.45)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+
+    <!-- Drop shadow for the whole icon -->
+    <filter id="iconShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#003050" flood-opacity="0.4"/>
+    </filter>
+
+    <!-- Glow effect for the checkmark -->
+    <filter id="checkGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip to main circle -->
+    <clipPath id="mainClip">
+      <circle cx="100" cy="100" r="94"/>
+    </clipPath>
+
+  </defs>
+
+  <!-- ── BACKGROUND CIRCLE ── -->
+  <circle cx="100" cy="100" r="94" fill="url(#bgGrad)" filter="url(#iconShadow)"/>
+
+  <!-- ── GEAR TEETH RING (16 teeth at 22.5° intervals — symbolises Automation Runner) ── -->
+  <g transform="translate(100,100)" fill="rgba(255,255,255,0.22)">
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(0)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(22.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(45)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(67.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(90)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(112.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(135)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(157.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(180)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(202.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(225)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(247.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(270)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(292.5)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(315)"/>
+    <rect x="-5"   y="-95" width="10" height="13" rx="2.5" transform="rotate(337.5)"/>
+  </g>
+
+  <!-- Inner decorative ring -->
+  <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+
+  <!-- ── RAILWAY PERSPECTIVE TRACKS (clipped, very subtle — OSDM context) ── -->
+  <g clip-path="url(#mainClip)" opacity="0.13" stroke="white" fill="none" stroke-linecap="round">
+    <!-- Two perspective rails converging toward vanishing point -->
+    <line x1="63"  y1="178" x2="94"  y2="57"  stroke-width="3.5"/>
+    <line x1="137" y1="178" x2="106" y2="57"  stroke-width="3.5"/>
+    <!-- Cross-ties (sleepers) -->
+    <line x1="65"  y1="166" x2="135" y2="166" stroke-width="3"/>
+    <line x1="68"  y1="151" x2="132" y2="151" stroke-width="2.5"/>
+    <line x1="71"  y1="136" x2="129" y2="136" stroke-width="2.5"/>
+    <line x1="74"  y1="121" x2="126" y2="121" stroke-width="2"/>
+    <line x1="77"  y1="106" x2="123" y2="106" stroke-width="2"/>
+    <line x1="80"  y1="91"  x2="120" y2="91"  stroke-width="1.5"/>
+    <line x1="83"  y1="76"  x2="117" y2="76"  stroke-width="1.5"/>
+    <line x1="86"  y1="61"  x2="114" y2="61"  stroke-width="1"/>
+  </g>
+
+  <!-- ── CIRCULAR REFRESH ARROWS (symbolises automated continuous testing loop) ── -->
+  <!-- Upper-right arc: clockwise from top to right -->
+  <path d="M 100,24 A 76,76 0 0,1 164,76"
+        stroke="rgba(255,255,255,0.28)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- Arrowhead at (164,76), tangent direction ≈ SE (135°) -->
+  <polygon points="164,76 152,72 158,84"
+           fill="rgba(255,255,255,0.28)"/>
+
+  <!-- Lower-left arc: clockwise from bottom to left -->
+  <path d="M 100,176 A 76,76 0 0,1 36,124"
+        stroke="rgba(255,255,255,0.28)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- Arrowhead at (36,124), tangent direction ≈ NW (315°) -->
+  <polygon points="36,124 48,128 42,116"
+           fill="rgba(255,255,255,0.28)"/>
+
+  <!-- ── GOLD STAR (OSCAR reference + excellence/quality marker) ──
+       Center: (100, 91)  Outer r=46  Inner r=20
+       Outer points at -90°, -18°, 54°, 126°, 198°
+       P0=(100,45) P1=(144,79) P2=(127,130) P3=(73,130) P4=(56,79)
+       Inner points at -54°, 18°, 90°, 162°, 234°
+       Q0=(112,77) Q1=(119,99) Q2=(100,111) Q3=(81,99) Q4=(88,77)
+  -->
+  <path d="M 100,45
+           L 112,77  L 144,79
+           L 119,99  L 127,130
+           L 100,111 L  73,130
+           L  81,99  L  56,79
+           L  88,77  Z"
+        fill="url(#starGold)"/>
+
+  <!-- Star shine overlay (top-left lighter area — gives 3-D depth) -->
+  <path d="M 100,45
+           L 112,77  L 144,79
+           L 119,99  L 127,130
+           L 100,111 L  73,130
+           L  81,99  L  56,79
+           L  88,77  Z"
+        fill="url(#starShine)"/>
+
+  <!-- ── WHITE CHECKMARK (Conformance validated!) ── -->
+  <!--  left-foot → bend → upper-right tip  -->
+  <path d="M 79,94 L 93,113 L 123,71"
+        stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"
+        fill="none" filter="url(#checkGlow)"/>
+
+  <!-- ── BOTTOM LABEL BADGE ── -->
+  <rect x="46" y="149" width="108" height="24" rx="12" fill="rgba(0,0,0,0.20)"/>
+  <text x="100" y="166"
+        text-anchor="middle"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-weight="900"
+        font-size="11.5"
+        fill="white"
+        letter-spacing="4">OSCAR</text>
+
+</svg>

@@ -1,0 +1,88 @@
+info:
+  name: 07. GET Booking after Fulfillments
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{api_base}}/bookings/{{bookingId}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Requestor
+      value: "{{requestor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+    - type: after-response
+      code: |-
+        const { validationLogger, displayFulFilledBooking } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { postCreateBookingResponse } = require(bru.getEnvVar("library_base")+"bookings.js");
+
+
+        // Validate HTTP response status
+        test("Status code is 200", () => {
+            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        });
+
+        if (res.getStatus() !== 200) {
+          test("Status code is 200", () => {
+            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+          });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("GET Booking after Fulfillments");
+          return;
+        }
+
+        // Parse JSON safely
+        let jsonData;
+        try {
+            jsonData = res.getBody();
+        } catch (e) {
+            validationLogger("Failed to parse JSON response");
+            test("JSON parsing should succeed", () => {
+                throw e;
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("GET Booking after Fulfillments (JSON parse)");
+            return;
+        }
+        postCreateBookingResponse(
+        bru.getEnvVar("offer"),
+        jsonData,
+        ["FULFILLED", "CONFIRMED"],
+        ["FULFILLED", "CONFIRMED"]);
+
+        displayFulFilledBooking(jsonData);
+
+        if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
+            bru.runner.setNextRequest("10. POST Refund Offers");
+            console.log("scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")
+        } else if(bru.getEnvVar("scenarioType")?.includes("EXCHANGE")) {
+            bru.runner.setNextRequest("10. POST Exchange Offers");
+            console.log("scenarioType in data file contains 'EXCHANGE' keyword, executing 10. POST Exchange Offers")    
+        } else{
+            console.log("scenarioType in data file doesn't contain 'REFUND' or 'EXCHANGE' keyword, SALE scenario complete.");
+            // ── Multi-scenario: loop to next scenario or truly stop ────────────
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+              console.log('🔄 Looping to scenario [' + (_scNextIdx + 1) + '/' + _scList.length + ']: ' + _scList[_scNextIdx]);
+              bru.setEnvVar('__loopback', 'true');
+              bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+              console.log('✅ All scenarios complete — run finished');
+              bru.runner.stopExecution();
+            }
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

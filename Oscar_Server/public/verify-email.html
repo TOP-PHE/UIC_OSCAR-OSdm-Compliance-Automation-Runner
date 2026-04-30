@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Confirm Registration</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;min-height:100vh;display:flex;flex-direction:column}
+.uic-banner{background:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.page-center{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+.card{background:#fff;border-radius:10px;box-shadow:0 2px 16px rgba(0,0,0,.1);width:100%;max-width:440px;padding:36px 32px}
+.logo{text-align:center;margin-bottom:28px}
+.logo h1{color:#0090D4;font-size:26px;letter-spacing:1px;margin-top:8px}
+.logo p{color:#90a4ae;font-size:13px;margin-top:4px}
+.logo img{height:40px}
+h2{font-size:18px;color:#37474f;margin-bottom:6px}
+.subtitle{color:#78909c;font-size:13px;margin-bottom:24px;line-height:1.5}
+.info-row{background:#f5f7f9;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:13px;color:#455a64}
+.info-row span{font-weight:700;color:#0090D4}
+.field{margin-bottom:16px}
+label{display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+input{width:100%;padding:10px 12px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px;transition:border .2s}
+input:focus{outline:none;border-color:#0090D4}
+.btn{width:100%;padding:12px;background:#0090D4;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+.btn:hover{background:#005A8A}
+.btn:disabled{background:#90a4ae;cursor:not-allowed}
+.error{background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+.success{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:6px;padding:14px;font-size:13px;text-align:center;line-height:1.6}
+.site-footer{width:100%;text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-left">
+    <a href="https://uis.org" aria-label="UIC website">
+      <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+    </a>
+  </div>
+  <div class="uic-banner-right">
+    <a href="https://osdm.io" aria-label="OSDM website">
+      <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+    </a>
+  </div>
+</header>
+
+<div class="page-center">
+<div class="card">
+  <div class="logo">
+    <img src="/oscar-icon.svg" alt="OSCAR">
+    <h1>OSCAR</h1>
+    <p>OSDM Conformance Automation Runner</p>
+  </div>
+
+  <div id="loading" style="text-align:center;color:#78909c;padding:20px 0">Verifying your link…</div>
+
+  <div id="main" style="display:none">
+    <h2>Set your password</h2>
+    <p class="subtitle">Your email address has been confirmed. Choose a password to activate your account.</p>
+    <div class="info-row">
+      Email: <span id="info-email"></span><br>
+      Company: <span id="info-company"></span>
+    </div>
+    <div id="error" class="error" style="display:none"></div>
+    <form id="confirm-form">
+      <div class="field">
+        <label>Password <span style="color:#90a4ae;font-weight:400">(min 8 chars)</span></label>
+        <input type="password" id="password" required minlength="8" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input type="password" id="password2" required minlength="8" autocomplete="new-password">
+      </div>
+      <button class="btn" type="submit" id="btn">Activate Account</button>
+    </form>
+  </div>
+
+  <div id="expired" style="display:none">
+    <div class="error">This confirmation link has expired or is invalid.<br>
+    Please <a href="/?register=1" style="color:#c62828">register again</a>.</div>
+  </div>
+
+  <div id="done" style="display:none">
+    <div class="success">
+      ✅ <strong>Account activated!</strong><br>
+      Redirecting you to the dashboard…
+    </div>
+  </div>
+</div>
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script>
+const token = new URLSearchParams(location.search).get('token');
+
+async function init() {
+  if (!token) { showExpired(); return; }
+  try {
+    const res  = await fetch(`/v1/auth/register/check-token?token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (!res.ok) { showExpired(data.detail); return; }
+    document.getElementById('info-email').textContent   = data.email;
+    document.getElementById('info-company').textContent = data.companyName;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display    = 'block';
+  } catch(e) {
+    showExpired('Server unreachable.');
+  }
+}
+
+function showExpired(msg) {
+  document.getElementById('loading').style.display  = 'none';
+  document.getElementById('expired').style.display  = 'block';
+  if (msg) document.querySelector('#expired .error').innerHTML =
+    msg + '<br>Please <a href="/" style="color:#c62828">register again</a>.';
+}
+
+async function doConfirm(e) {
+  e.preventDefault();
+  const pwd  = document.getElementById('password').value;
+  const pwd2 = document.getElementById('password2').value;
+  const errEl = document.getElementById('error');
+  errEl.style.display = 'none';
+
+  if (pwd !== pwd2) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = 'Activating…';
+
+  try {
+    const res  = await fetch('/v1/auth/register/confirm', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token, password: pwd })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.detail || data.title || 'Activation failed.';
+      errEl.style.display = 'block';
+      return;
+    }
+    localStorage.setItem('oscar_token',   data.token);
+    localStorage.setItem('oscar_company', JSON.stringify(data.company));
+    localStorage.setItem('oscar_user',    JSON.stringify(data.user));
+    document.getElementById('main').style.display = 'none';
+    document.getElementById('done').style.display = 'block';
+    setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+  } catch(e) {
+    errEl.textContent = 'Server unreachable.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Activate Account';
+  }
+}
+
+document.getElementById('confirm-form').addEventListener('submit', doConfirm);
+
+init();
+</script>
+</body>
+</html>

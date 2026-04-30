@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTST Report — bileto-sandbox — 2026-04-09</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:20px 24px;background:#f0f2f5;color:#222;font-size:14px}
+h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
+
+/* Scenario info card */
+.scenario-card{background:#1a3a6b;color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+.scenario-card .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mi{background:rgba(255,255,255,.15);padding:4px 11px;border-radius:4px;font-size:12px;line-height:1.6}
+.ml{font-weight:700;margin-right:4px}
+
+/* Summary row */
+.sum{display:flex;gap:12px;margin-bottom:12px}
+.sc{flex:1;padding:12px;border-radius:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.sc .n{font-size:26px;font-weight:700;line-height:1.1}
+.sc .l{font-size:11px;opacity:.75;margin-top:3px}
+.st{background:#e3f2fd;color:#1565c0}
+.sp{background:#e8f5e9;color:#2e7d32}
+.sf{background:#ffebee;color:#c62828}
+
+/* Overall banner */
+.overall{text-align:center;padding:9px 14px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:18px}
+.overall-ok  {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.overall-fail{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.overall-auth{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+
+/* Section headings — collapsible */
+.section-details{margin:18px 0 4px;border:none}
+.section-details > .section-title{
+  font-size:13px;font-weight:700;color:#455a64;padding:8px 12px;
+  background:#eceff1;border-radius:5px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;list-style:none}
+.section-details > .section-title::-webkit-details-marker{display:none}
+.section-details > .section-title::marker{display:none}
+.section-details > .section-title:hover{background:#e0e5e8}
+.section-details[open] > .section-title{border-radius:5px 5px 0 0;background:#dde3e8}
+.section-details > .section-title::before{content:'▶';font-size:10px;color:#78909c;transition:transform .15s}
+.section-details[open] > .section-title::before{transform:rotate(90deg)}
+.section-note{font-weight:400;font-size:12px}
+
+/* Warning box */
+.warn-box{background:#fff3e0;border:1px solid #ffcc80;color:#e65100;padding:12px 16px;
+  border-radius:6px;margin-bottom:14px;font-size:13px}
+
+/* ── Request block container ──────────────────────────────────────── */
+.rb{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+/* Color coding: left border by assertion outcome */
+.rc-green {border-left:5px solid #4caf50}
+.rc-orange{border-left:5px solid #ff9800}
+.rc-red   {border-left:5px solid #f44336}
+
+/* ── Clickable request title ────────────────────────────────────────── */
+.req-details{border:none}
+.req-title{
+  padding:9px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  cursor:pointer;user-select:none;list-style:none;border-bottom:1px solid #eee;
+  font-size:13px}
+.req-title::-webkit-details-marker{display:none}
+.req-title::marker{display:none}
+.rc-green  .req-title{background:#f2faf2}
+.rc-orange .req-title{background:#fffbf2}
+.rc-red    .req-title{background:#fff5f5}
+.rc-green  .req-title:hover{background:#e8f5e9}
+.rc-orange .req-title:hover{background:#fff3e0}
+.rc-red    .req-title:hover{background:#ffebee}
+.req-details[open] .req-title{border-bottom:2px solid #e0e0e0}
+.req-title::before{content:'▶';font-size:9px;color:#90a4ae;transition:transform .15s;flex-shrink:0}
+.req-details[open] .req-title::before{transform:rotate(90deg)}
+
+/* ── Request body (detail view) ─────────────────────────────────────── */
+.req-body{}
+
+/* Summary stats bar */
+.req-summary{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  padding:7px 14px;background:#f9f9f9;border-bottom:1px solid #eee;
+  font-size:12px;font-weight:600}
+.rsum-ok  {color:#2e7d32}
+.rsum-fail{color:#c62828}
+.rsum-time{color:#607d8b;font-weight:400}
+.rsum-sep {color:#ccc}
+.ru-small{flex:1;font-family:'Courier New',monospace;font-size:10px;
+  word-break:break-all;color:#90a4ae;font-weight:400}
+.rtime{font-size:11px;font-weight:500;color:#607d8b;white-space:nowrap;
+  background:#eceff1;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode{font-size:11px;font-weight:700;white-space:nowrap;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode-ok{background:#e8f5e9;color:#2e7d32}
+.rcode-err{background:#ffebee;color:#c62828}
+.rcode-warn{background:#fff8e1;color:#e65100}
+
+/* ── Assert sub-sections ────────────────────────────────────────────── */
+.assert-section{border-top:1px solid #f0f0f0}
+.assert-title{
+  padding:7px 14px;font-weight:600;font-size:12px;cursor:pointer;
+  user-select:none;list-style:none;display:flex;align-items:center;gap:6px}
+.assert-title::-webkit-details-marker{display:none}
+.assert-title::marker{display:none}
+.passed-title{color:#2e7d32;background:#f9fbf9}
+.passed-title:hover{background:#f1f8e9}
+.failed-title{color:#c62828;background:#fff9f9}
+.failed-title:hover{background:#ffebee}
+
+/* ── Sub-panels (req/resp headers+body) ─────────────────────────────── */
+.sub-summary{
+  padding:7px 14px;cursor:pointer;font-weight:500;font-size:12px;user-select:none;
+  list-style:none;display:flex;align-items:center;gap:6px;color:#546e7a;flex-wrap:wrap;
+  background:#fafafa}
+.sub-summary::-webkit-details-marker{display:none}
+.sub-summary::marker{display:none}
+.sub-summary:hover{background:#f0f0f0}
+
+/* ── Shared inner elements ──────────────────────────────────────────── */
+.ri{background:#607d8b;color:#fff;border-radius:50%;width:21px;height:21px;display:flex;align-items:center;
+  justify-content:center;font-size:10px;flex-shrink:0;font-weight:700}
+.rm{padding:2px 7px;border-radius:3px;font-weight:700;font-size:11px;flex-shrink:0}
+.rm-GET   {background:#e3f2fd;color:#1565c0}
+.rm-POST  {background:#e8f5e9;color:#2e7d32}
+.rm-PUT   {background:#fff8e1;color:#e65100}
+.rm-PATCH {background:#f3e5f5;color:#6a1b9a}
+.rm-DELETE{background:#ffebee;color:#c62828}
+.rname{font-weight:700;flex-shrink:0;color:#1a3a6b}
+.badge{padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;flex-shrink:0}
+.badge-ok  {background:#e8f5e9;color:#2e7d32}
+.badge-err {background:#ffebee;color:#c62828}
+.badge-warn{background:#fff8e1;color:#e65100}
+.abadge{padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;margin-left:2px}
+.abadge-ok  {background:#e8f5e9;color:#2e7d32}
+.abadge-fail{background:#ffebee;color:#c62828}
+
+/* Panel content */
+.panel{padding:12px 16px;background:#fafafa}
+.panel-lbl{font-size:10px;font-weight:700;color:#607d8b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.muted{font-size:12px;color:#90a4ae;font-style:italic;margin:4px 0}
+.hdrtbl{border-collapse:collapse;width:100%;font-size:11px;font-family:'Courier New',monospace}
+.hdrk{padding:2px 14px 2px 0;color:#607d8b;white-space:nowrap;vertical-align:top;font-weight:600}
+.hdrv{padding:2px 0;color:#37474f;word-break:break-all}
+
+/* Code blocks */
+.code{margin:0;padding:12px 16px;background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;
+  font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;
+  word-break:break-word;line-height:1.5}
+
+/* Test result rows */
+.tc{padding:6px 14px 8px}
+.no-assert{padding:6px 14px 8px;font-size:12px;color:#90a4ae;font-style:italic}
+.tr{padding:5px 9px;margin:3px 0;border-radius:4px;font-size:12px;display:flex;flex-direction:column}
+.tr-ok  {background:#f1f8e9;color:#33691e}
+.tr-fail{background:#ffebee;color:#b71c1c}
+.ti{margin-right:6px}
+.te{font-size:11px;margin-top:3px;padding:3px 8px;background:rgba(0,0,0,.06);border-radius:3px;
+  font-family:'Courier New',monospace;word-break:break-all;white-space:pre-wrap}
+
+/* Legend */
+.legend{background:#fff;border-radius:7px;padding:11px 16px;margin-bottom:16px;
+  font-size:12px;color:#546e7a;border:1px solid #e0e0e0}
+.legend b{color:#37474f}
+
+/* Color legend */
+.color-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.cl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.cl-green {background:#4caf50}
+.cl-orange{background:#ff9800}
+.cl-red   {background:#f44336}
+
+/* Footer */
+.foot{text-align:center;color:#bbb;font-size:11px;margin-top:20px;padding-top:10px;border-top:1px solid #e0e0e0}
+</style>
+</head>
+<body>
+
+<h1><img src="/oscar-icon.svg" alt="OSCAR" style="height:32px;vertical-align:middle;margin-right:10px">OTST Validation Report</h1>
+
+<div class="scenario-card">
+  <div class="row">
+    <div class="mi"><span class="ml">Date:</span>2026-04-09</div>
+    <div class="mi"><span class="ml">Environment:</span>bileto-sandbox</div>
+    <div class="mi"><span class="ml">API Version:</span>N/A</div>
+    <div class="mi"><span class="ml">Scenario Version:</span>3.4</div>
+    <div class="mi"><span class="ml">Scenario:</span>OTST_RFND_TRIP_SPEC_2ADT_2LEG</div>
+    <div class="mi"><span class="ml">Collection run:</span>Common Requests</div>
+    <div class="mi"><span class="ml">Type:</span>REFUND</div>
+  </div>
+</div>
+
+<div class="sum">
+  <div class="sc st"><div class="n">1</div><div class="l">OSDM Requests</div></div>
+  <div class="sc st"><div class="n">15</div><div class="l">OSDM Assertions</div></div>
+  <div class="sc sp"><div class="n">9</div><div class="l">Passed</div></div>
+  <div class="sc sf"><div class="n">6</div><div class="l">Failed</div></div>
+</div>
+
+<div class="overall overall-auth">
+  🔐 Authentication failed — check credentials in your environment file
+</div>
+
+<div class="legend">
+  <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
+  plus two global OSDM compliance checks on every response:
+  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
+  <div class="color-legend">
+    <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>
+    <div class="cl-item"><div class="cl-dot cl-orange"></div> 1–30% of assertions failed</div>
+    <div class="cl-item"><div class="cl-dot cl-red"></div> More than 30% of assertions failed</div>
+  </div>
+</div>
+
+
+
+<details class="section-details">
+  <summary class="section-title">🚂 Common Requests (1 request) <span class="abadge abadge-ok">9 passed</span> <span class="abadge abadge-fail">6 failed</span></summary>
+  
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">01. POST Get Offer</span>
+      <span class="abadge abadge-ok">9 ✅</span> <span class="abadge abadge-fail">6 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 500</span>
+      <span class="rtime">⏱ 1082 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 9</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 6</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 500</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 1082 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">500</span>
+    <span class="ru-small">https://osdm-5.platform.bileto.zone/api/offers</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (9)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: offerSearchCriteria.offerMode</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: offerSearchCriteria.offerMode</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: nonTripSearchCriteria</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: nonTripSearchCriteria</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: requestedSections</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: requestedSections</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: offerSearchCriteria.currency</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: offerSearchCriteria.currency</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (6)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: offerSearchCriteria.offerMode</span>
+          <div class="te">Transport failure for offerSearchCriteria.offerMode: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: nonTripSearchCriteria</span>
+          <div class="te">Transport failure for nonTripSearchCriteria: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: requestedSections</span>
+          <div class="te">Transport failure for requestedSections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: offerSearchCriteria.currency</span>
+          <div class="te">Transport failure for offerSearchCriteria.currency: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Status code is 200</span>
+          <div class="te">[ERROR] Wrong response status: expected 500 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Status code is 200 — STOP on failure</span>
+          <div class="te">[ERROR] Wrong response status: 500</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (65)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://osdm-5.platform.bileto.zone/api
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/bileto-sandbox-datafile.json
+[LOG] 
+    ####################################
+    # 🛠️  POST Get Offer — OTST_RFND_SRCH_CRIT_1ADT_2LEG 🛠️ #
+    ####################################
+    
+[LOG] [INFO] resetScenarioEnvVars: all business env vars cleared
+[INFO] [INFO] resetScenarioEnvVars: all business env vars cleared
+[LOG] [INFO] ⏳ Getting scenario data
+[INFO] [INFO] ⏳ Getting scenario data
+[LOG] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/bileto-sandbox-datafile.json
+[INFO] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/bileto-sandbox-datafile.json
+[LOG] [INFO] 🛠️ Check data file structure schema
+[INFO] [INFO] 🛠️ Check data file structure schema
+[LOG] [INFO] systemInfoParameters: coachId = null
+[INFO] [INFO] systemInfoParameters: coachId = null
+[LOG] [INFO] systemInfoParameters: productId = null
+[INFO] [INFO] systemInfoParameters: productId = null
+[LOG] [INFO] 🎯 scenariosToRun [6/7]: selected &quot;OTST_RFND_TRIP_SPEC_2ADT_2LEG&quot; — next will pick index 6
+[INFO] [INFO] 🎯 scenariosToRun [6/7]: selected &quot;OTST_RFND_TRIP_SPEC_2ADT_2LEG&quot; — next will pick index 6
+[LOG] [INFO] 🔢 osdmVersion — data file: &quot;3.4&quot;, env file: &quot;undefined&quot;, effective: &quot;3.4&quot; (data file takes priority)
+[INFO] [INFO] 🔢 osdmVersion — data file: &quot;3.4&quot;, env file: &quot;undefined&quot;, effective: &quot;3.4&quot; (data file takes priority)
+[LOG] [INFO] 📋 Scenario selected: &quot;OTST_RFND_TRIP_SPEC_2ADT_2LEG&quot; ; Scenario Type: &quot;REFUND&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.4&quot;
+[INFO] [INFO] 📋 Scenario selected: &quot;OTST_RFND_TRIP_SPEC_2ADT_2LEG&quot; ; Scenario Type: &quot;REFUND&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.4&quot;
+[LOG] [INFO] ⏳ processing a specification
+[INFO] [INFO] ⏳ processing a specification
+[LOG] [INFO] Found number of purchaser: 1
+[INFO] [INFO] Found number of purchaser: 1
+[LOG] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33699999999&quot;}}}]
+[INFO] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33699999999&quot;}}}]
+[LOG] [INFO] Found number of passengers: 2
+[INFO] [INFO] Found number of passengers: 2
+[LOG] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}},{&quot;externalRef&quot;:&quot;00002&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-03&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;Marta&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}}]
+[INFO] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}},{&quot;externalRef&quot;:&quot;00002&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-03&quot;,&quot;gender&quot;:&quot;X&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;Marta&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;contact&quot;:{&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}}]
+[LOG] [INFO] ✅ Correct data set was found for this scenario : OTST_RFND_TRIP_SPEC_2ADT_2LEG
+[INFO] [INFO] ✅ Correct data set was found for this scenario : OTST_RFND_TRIP_SPEC_2ADT_2LEG
+[LOG] [reportGenerator] 🗑️  Previous run data cleared.
+[LOG] [reportGenerator] ✅ Report directory: C:\Users\patri\OneDrive\Documents\TrackOnPath\Contract_execution\UIC_New_Revenue_Management project\projets\OSDM\OTST\GitHub_OSDM-Testing\OSDM-testing\O\collections-bruno\OTST_V2.0.1\Validation_Reports
+[LOG] 🔄 Loop-back — starting scenario: OTST_RFND_TRIP_SPEC_2ADT_2LEG [6/7 remaining]
+[LOG] ⏩ [STEP] Executing request : 01. POST Get Offer
+[LOG] [INFO] ➤ postOfferResponsePreRequest
+[INFO] [INFO] ➤ postOfferResponsePreRequest
+[LOG] [INFO] ➤ buildOfferCollectionRequest
+[INFO] [INFO] ➤ buildOfferCollectionRequest
+[LOG] [INFO] Build using TripType: SPECIFICATION
+[INFO] [INFO] Build using TripType: SPECIFICATION
+[LOG] [INFO] ➤ ensureAuthorizationOr403
+[INFO] [INFO] ➤ ensureAuthorizationOr403
+[LOG] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] Run a preoffer authorization check to avoid 403 errors ...
+[INFO] [INFO] ✅ Offer param probe executed: offerSearchCriteria.offerMode
+[WARN] [WARNING] ❌ Offer param probe has no transport error: offerSearchCriteria.offerMode: Transport failure for offerSearchCriteria.offerMode: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: offerSearchCriteria.offerMode
+[LOG] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[INFO] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[INFO] [INFO] ✅ Offer param probe executed: nonTripSearchCriteria
+[WARN] [WARNING] ❌ Offer param probe has no transport error: nonTripSearchCriteria: Transport failure for nonTripSearchCriteria: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: nonTripSearchCriteria
+[INFO] [INFO] ✅ Offer param probe executed: requestedSections
+[WARN] [WARNING] ❌ Offer param probe has no transport error: requestedSections: Transport failure for requestedSections: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: requestedSections
+[INFO] [INFO] ✅ Offer param probe executed: offerSearchCriteria.currency
+[WARN] [WARNING] ❌ Offer param probe has no transport error: offerSearchCriteria.currency: Transport failure for offerSearchCriteria.currency: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: offerSearchCriteria.currency
+[ERROR] [WARNING] ❌ Status code is 200: [ERROR] Wrong response status: expected 500 to deeply equal 200
+[ERROR] [WARNING] ❌ Status code is 200 — STOP on failure: [ERROR] Wrong response status: 500
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;tripSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;f36a48ef-c93e-47aa-a6f4-b3cb8de841a9&quot;,
+      &quot;legs&quot;: [
+        {
+          &quot;externalRef&quot;: &quot;81c7b2a9-7858-4344-bc19-9d946e9e7ae6&quot;,
+          &quot;timedLeg&quot;: {
+            &quot;start&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5457076&quot;
+              },
+              &quot;serviceDeparture&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T09:10:00+01:00&quot;
+              }
+            },
+            &quot;end&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+              },
+              &quot;serviceArrival&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T09:30:00+01:00&quot;
+              }
+            },
+            &quot;service&quot;: {
+              &quot;productCategory&quot;: {
+                &quot;productCategoryRef&quot;: &quot;&quot;,
+                &quot;name&quot;: &quot;&quot;,
+                &quot;shortName&quot;: &quot;&quot;
+              },
+              &quot;vehicleNumbers&quot;: [
+                &quot;1140&quot;
+              ],
+              &quot;carriers&quot;: [
+                {
+                  &quot;ref&quot;: &quot;urn:uic:rics:3189&quot;
+                }
+              ]
+            }
+          }
+        },
+        {
+          &quot;externalRef&quot;: &quot;a5634030-9675-43ab-9265-762723586d72&quot;,
+          &quot;timedLeg&quot;: {
+            &quot;start&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454300&quot;
+              },
+              &quot;serviceDeparture&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T10:10:00+01:00&quot;
+              }
+            },
+            &quot;end&quot;: {
+              &quot;stopPlaceRef&quot;: {
+                &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:5454212&quot;
+              },
+              &quot;serviceArrival&quot;: {
+                &quot;timetabledTime&quot;: &quot;2026-04-19T10:30:00+01:00&quot;
+              }
+            },
+            &quot;service&quot;: {
+              &quot;productCategory&quot;: {
+                &quot;productCategoryRef&quot;: &quot;&quot;,
+                &quot;name&quot;: &quot;&quot;,
+                &quot;shortName&quot;: &quot;&quot;
+              },
+              &quot;vehicleNumbers&quot;: [
+                &quot;1062&quot;
+              ],
+              &quot;carriers&quot;: [
+                {
+                  &quot;ref&quot;: &quot;urn:uic:rics:3189&quot;
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  &quot;anonymousPassengerSpecifications&quot;: [
+    {
+      &quot;externalRef&quot;: &quot;00001&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+      &quot;gender&quot;: &quot;X&quot;
+    },
+    {
+      &quot;externalRef&quot;: &quot;00002&quot;,
+      &quot;type&quot;: &quot;PERSON&quot;,
+      &quot;dateOfBirth&quot;: &quot;1999-01-03&quot;,
+      &quot;gender&quot;: &quot;X&quot;
+    }
+  ],
+  &quot;offerSearchCriteria&quot;: {
+    &quot;currency&quot;: &quot;CZK&quot;,
+    &quot;offerMode&quot;: &quot;COLLECTIVE&quot;,
+    &quot;requestedOfferParts&quot;: [
+      &quot;RESERVATION&quot;,
+      &quot;ADMISSION&quot;,
+      &quot;ANCILLARY&quot;
+    ],
+    &quot;flexibilities&quot;: [
+      &quot;FULL_FLEXIBLE&quot;,
+      &quot;SEMI_FLEXIBLE&quot;,
+      &quot;NON_FLEXIBLE&quot;
+    ],
+    &quot;serviceClassTypes&quot;: [
+      &quot;STANDARD&quot;
+    ],
+    &quot;travelClasses&quot;: [
+      &quot;SECOND&quot;
+    ]
+  },
+  &quot;requestedFulfillmentOptions&quot;: [
+    {
+      &quot;type&quot;: &quot;ETICKET&quot;,
+      &quot;media&quot;: &quot;PDF_A4&quot;
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;timestamp&quot;: &quot;2026-04-09T12:36:06.104+00:00&quot;,
+  &quot;status&quot;: 500,
+  &quot;error&quot;: &quot;Internal Server Error&quot;,
+  &quot;path&quot;: &quot;/api/offers&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<div class="foot">
+  Generated by OTST Bruno Collection &mdash; Thu, 09 Apr 2026 12:36:05 GMT
+</div>
+
+</body>
+</html>

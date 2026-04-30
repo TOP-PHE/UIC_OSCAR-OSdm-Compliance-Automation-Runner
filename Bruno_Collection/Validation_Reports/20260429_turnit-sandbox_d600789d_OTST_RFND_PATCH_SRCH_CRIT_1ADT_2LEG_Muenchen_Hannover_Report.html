@@ -1,0 +1,3038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTST Report — turnit-sandbox_d600789d — 2026-04-29</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:20px 24px;background:#f0f2f5;color:#222;font-size:14px}
+h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
+
+/* Scenario info card */
+.scenario-card{background:#1a3a6b;color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+.scenario-card .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mi{background:rgba(255,255,255,.15);padding:4px 11px;border-radius:4px;font-size:12px;line-height:1.6}
+.ml{font-weight:700;margin-right:4px}
+
+/* Summary row */
+.sum{display:flex;gap:12px;margin-bottom:12px}
+.sc{flex:1;padding:12px;border-radius:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.sc .n{font-size:26px;font-weight:700;line-height:1.1}
+.sc .l{font-size:11px;opacity:.75;margin-top:3px}
+.st{background:#e3f2fd;color:#1565c0}
+.sp{background:#e8f5e9;color:#2e7d32}
+.sf{background:#ffebee;color:#c62828}
+
+/* Overall banner */
+.overall{text-align:center;padding:9px 14px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:18px}
+.overall-ok  {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.overall-fail{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.overall-auth{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+
+/* Section headings — collapsible */
+.section-details{margin:18px 0 4px;border:none}
+.section-details > .section-title{
+  font-size:13px;font-weight:700;color:#455a64;padding:8px 12px;
+  background:#eceff1;border-radius:5px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;list-style:none}
+.section-details > .section-title::-webkit-details-marker{display:none}
+.section-details > .section-title::marker{display:none}
+.section-details > .section-title:hover{background:#e0e5e8}
+.section-details[open] > .section-title{border-radius:5px 5px 0 0;background:#dde3e8}
+.section-details > .section-title::before{content:'▶';font-size:10px;color:#78909c;transition:transform .15s}
+.section-details[open] > .section-title::before{transform:rotate(90deg)}
+.section-note{font-weight:400;font-size:12px}
+
+/* Warning box */
+.warn-box{background:#fff3e0;border:1px solid #ffcc80;color:#e65100;padding:12px 16px;
+  border-radius:6px;margin-bottom:14px;font-size:13px}
+
+/* ── Request block container ──────────────────────────────────────── */
+.rb{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+/* Color coding: left border by assertion outcome */
+.rc-green {border-left:5px solid #4caf50}
+.rc-orange{border-left:5px solid #ff9800}
+.rc-red   {border-left:5px solid #f44336}
+
+/* ── Clickable request title ────────────────────────────────────────── */
+.req-details{border:none}
+.req-title{
+  padding:9px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  cursor:pointer;user-select:none;list-style:none;border-bottom:1px solid #eee;
+  font-size:13px}
+.req-title::-webkit-details-marker{display:none}
+.req-title::marker{display:none}
+.rc-green  .req-title{background:#f2faf2}
+.rc-orange .req-title{background:#fffbf2}
+.rc-red    .req-title{background:#fff5f5}
+.rc-green  .req-title:hover{background:#e8f5e9}
+.rc-orange .req-title:hover{background:#fff3e0}
+.rc-red    .req-title:hover{background:#ffebee}
+.req-details[open] .req-title{border-bottom:2px solid #e0e0e0}
+.req-title::before{content:'▶';font-size:9px;color:#90a4ae;transition:transform .15s;flex-shrink:0}
+.req-details[open] .req-title::before{transform:rotate(90deg)}
+
+/* ── Request body (detail view) ─────────────────────────────────────── */
+.req-body{}
+
+/* Summary stats bar */
+.req-summary{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  padding:7px 14px;background:#f9f9f9;border-bottom:1px solid #eee;
+  font-size:12px;font-weight:600}
+.rsum-ok  {color:#2e7d32}
+.rsum-fail{color:#c62828}
+.rsum-time{color:#607d8b;font-weight:400}
+.rsum-sep {color:#ccc}
+.ru-small{flex:1;font-family:'Courier New',monospace;font-size:10px;
+  word-break:break-all;color:#90a4ae;font-weight:400}
+.rtime{font-size:11px;font-weight:500;color:#607d8b;white-space:nowrap;
+  background:#eceff1;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode{font-size:11px;font-weight:700;white-space:nowrap;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode-ok{background:#e8f5e9;color:#2e7d32}
+.rcode-err{background:#ffebee;color:#c62828}
+.rcode-warn{background:#fff8e1;color:#e65100}
+
+/* ── Assert sub-sections ────────────────────────────────────────────── */
+.assert-section{border-top:1px solid #f0f0f0}
+.assert-title{
+  padding:7px 14px;font-weight:600;font-size:12px;cursor:pointer;
+  user-select:none;list-style:none;display:flex;align-items:center;gap:6px}
+.assert-title::-webkit-details-marker{display:none}
+.assert-title::marker{display:none}
+.passed-title{color:#2e7d32;background:#f9fbf9}
+.passed-title:hover{background:#f1f8e9}
+.failed-title{color:#c62828;background:#fff9f9}
+.failed-title:hover{background:#ffebee}
+
+/* ── Sub-panels (req/resp headers+body) ─────────────────────────────── */
+.sub-summary{
+  padding:7px 14px;cursor:pointer;font-weight:500;font-size:12px;user-select:none;
+  list-style:none;display:flex;align-items:center;gap:6px;color:#546e7a;flex-wrap:wrap;
+  background:#fafafa}
+.sub-summary::-webkit-details-marker{display:none}
+.sub-summary::marker{display:none}
+.sub-summary:hover{background:#f0f0f0}
+
+/* ── Shared inner elements ──────────────────────────────────────────── */
+.ri{background:#607d8b;color:#fff;border-radius:50%;width:21px;height:21px;display:flex;align-items:center;
+  justify-content:center;font-size:10px;flex-shrink:0;font-weight:700}
+.rm{padding:2px 7px;border-radius:3px;font-weight:700;font-size:11px;flex-shrink:0}
+.rm-GET   {background:#e3f2fd;color:#1565c0}
+.rm-POST  {background:#e8f5e9;color:#2e7d32}
+.rm-PUT   {background:#fff8e1;color:#e65100}
+.rm-PATCH {background:#f3e5f5;color:#6a1b9a}
+.rm-DELETE{background:#ffebee;color:#c62828}
+.rname{font-weight:700;flex-shrink:0;color:#1a3a6b}
+.badge{padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;flex-shrink:0}
+.badge-ok  {background:#e8f5e9;color:#2e7d32}
+.badge-err {background:#ffebee;color:#c62828}
+.badge-warn{background:#fff8e1;color:#e65100}
+.abadge{padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;margin-left:2px}
+.abadge-ok  {background:#e8f5e9;color:#2e7d32}
+.abadge-fail{background:#ffebee;color:#c62828}
+
+/* Panel content */
+.panel{padding:12px 16px;background:#fafafa}
+.panel-lbl{font-size:10px;font-weight:700;color:#607d8b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.muted{font-size:12px;color:#90a4ae;font-style:italic;margin:4px 0}
+.hdrtbl{border-collapse:collapse;width:100%;font-size:11px;font-family:'Courier New',monospace}
+.hdrk{padding:2px 14px 2px 0;color:#607d8b;white-space:nowrap;vertical-align:top;font-weight:600}
+.hdrv{padding:2px 0;color:#37474f;word-break:break-all}
+
+/* Code blocks */
+.code{margin:0;padding:12px 16px;background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;
+  font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;
+  word-break:break-word;line-height:1.5}
+
+/* Test result rows */
+.tc{padding:6px 14px 8px}
+.no-assert{padding:6px 14px 8px;font-size:12px;color:#90a4ae;font-style:italic}
+.tr{padding:5px 9px;margin:3px 0;border-radius:4px;font-size:12px;display:flex;flex-direction:column}
+.tr-ok  {background:#f1f8e9;color:#33691e}
+.tr-fail{background:#ffebee;color:#b71c1c}
+.ti{margin-right:6px}
+.te{font-size:11px;margin-top:3px;padding:3px 8px;background:rgba(0,0,0,.06);border-radius:3px;
+  font-family:'Courier New',monospace;word-break:break-all;white-space:pre-wrap}
+
+/* Legend */
+.legend{background:#fff;border-radius:7px;padding:11px 16px;margin-bottom:16px;
+  font-size:12px;color:#546e7a;border:1px solid #e0e0e0}
+.legend b{color:#37474f}
+
+/* Color legend */
+.color-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.cl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.cl-green {background:#4caf50}
+.cl-orange{background:#ff9800}
+.cl-red   {background:#f44336}
+
+/* Footer */
+.foot{text-align:center;color:#bbb;font-size:11px;margin-top:20px;padding-top:10px;border-top:1px solid #e0e0e0}
+</style>
+</head>
+<body>
+
+<h1><img src="/oscar-icon.svg" alt="OSCAR" style="height:32px;vertical-align:middle;margin-right:10px">OTST Validation Report</h1>
+
+<div class="scenario-card">
+  <div class="row">
+    <div class="mi"><span class="ml">Date:</span>2026-04-29</div>
+    <div class="mi"><span class="ml">Environment:</span>turnit-sandbox_d600789d</div>
+    <div class="mi"><span class="ml">API Version:</span>N/A</div>
+    <div class="mi"><span class="ml">Scenario Version:</span>3.0.5</div>
+    <div class="mi"><span class="ml">Scenario:</span>OTST_RFND_PATCH_SRCH_CRIT_1ADT_2LEG_Muenchen_Hannover</div>
+    <div class="mi"><span class="ml">Collection run:</span>System Information + Common Requests + Refund</div>
+    <div class="mi"><span class="ml">Type:</span>REFUND</div>
+  </div>
+</div>
+
+<div class="sum">
+  <div class="sc st"><div class="n">14</div><div class="l">OSDM Requests</div></div>
+  <div class="sc st"><div class="n">168</div><div class="l">OSDM Assertions</div></div>
+  <div class="sc sp"><div class="n">145</div><div class="l">Passed</div></div>
+  <div class="sc sf"><div class="n">23</div><div class="l">Failed</div></div>
+</div>
+
+<div class="overall overall-fail">
+  ❌ 23 OSDM assertion(s) failed
+</div>
+
+<div class="legend">
+  <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
+  plus two global OSDM compliance checks on every response:
+  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
+  <div class="color-legend">
+    <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>
+    <div class="cl-item"><div class="cl-dot cl-orange"></div> 1–30% of assertions failed</div>
+    <div class="cl-item"><div class="cl-dot cl-red"></div> More than 30% of assertions failed</div>
+  </div>
+</div>
+
+
+
+<details class="section-details">
+  <summary class="section-title">⚙️ System Information (9 requests) <span class="abadge abadge-ok">4 passed</span> <span class="abadge abadge-fail">15 failed</span></summary>
+  
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\00. GET System Version Check</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 263 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 263 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/versions</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /versions → 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 — /versions endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (51)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] 🛠️  New Collection Execution — clearing env vars and loading scenario data...
+[LOG] ✅ All environment variables cleared
+[LOG] [INFO] Multi-scenario run initialised — scenariosToRunIndex reset to 0
+[LOG] [INFO] ⏳ Getting scenario data
+[INFO] [INFO] ⏳ Getting scenario data
+[LOG] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/turnit-sandbox-datafile.json
+[INFO] [INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] [INFO] 🛠️ Check data file structure schema
+[INFO] [INFO] 🛠️ Check data file structure schema
+[LOG] [INFO] systemInfoParameters: coachId = null
+[INFO] [INFO] systemInfoParameters: coachId = null
+[LOG] [INFO] systemInfoParameters: productId = null
+[INFO] [INFO] systemInfoParameters: productId = null
+[LOG] [INFO] ⚡ Parallel mode — running only: OTST_RFND_SRCH_CRIT_2ADT_2LEG
+[INFO] [INFO] ⚡ Parallel mode — running only: OTST_RFND_SRCH_CRIT_2ADT_2LEG
+[LOG] [INFO] 🎯 scenariosToRun [1/1]: selected &quot;OTST_RFND_SRCH_CRIT_2ADT_2LEG&quot; — last in list, run will stop after this scenario
+[INFO] [INFO] 🎯 scenariosToRun [1/1]: selected &quot;OTST_RFND_SRCH_CRIT_2ADT_2LEG&quot; — last in list, run will stop after this scenario
+[LOG] [INFO] 🔢 osdmVersion — data file: &quot;3.0.5&quot;, env file: &quot;undefined&quot;, effective: &quot;3.0.5&quot; (data file takes priority)
+[INFO] [INFO] 🔢 osdmVersion — data file: &quot;3.0.5&quot;, env file: &quot;undefined&quot;, effective: &quot;3.0.5&quot; (data file takes priority)
+[LOG] [INFO] 📋 Scenario selected: &quot;OTST_RFND_SRCH_CRIT_2ADT_2LEG&quot; ; Scenario Type: &quot;REFUND&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.0.5&quot;
+[INFO] [INFO] 📋 Scenario selected: &quot;OTST_RFND_SRCH_CRIT_2ADT_2LEG&quot; ; Scenario Type: &quot;REFUND&quot; ; Scenario Action: &quot;null&quot; ; OSDM version: &quot;3.0.5&quot;
+[LOG] [INFO] 🛒 Sales-flow actions: patchPassengers=true, placeSelection=true, addAncillary=true, getBooking=true, deleteAncillary=true
+[INFO] [INFO] 🛒 Sales-flow actions: patchPassengers=true, placeSelection=true, addAncillary=true, getBooking=true, deleteAncillary=true
+[LOG] [INFO] ⏳ processing a search
+[INFO] [INFO] ⏳ processing a search
+[LOG] [INFO] 📅 TripSearchCriteria datetime — osdmVersion: &quot;3.0.5&quot; (parsed: 3) → LocalDateTime format (offset/Z stripped) → &quot;2026-05-09T00:00:00&quot; (raw: &quot;2026-05-09T00:00:00+02:00&quot;)
+[INFO] [INFO] 📅 TripSearchCriteria datetime — osdmVersion: &quot;3.0.5&quot; (parsed: 3) → LocalDateTime format (offset/Z stripped) → &quot;2026-05-09T00:00:00&quot; (raw: &quot;2026-05-09T00:00:00+02:00&quot;)
+[LOG] [INFO] Found number of purchaser: 1
+[INFO] [INFO] Found number of purchaser: 1
+[LOG] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}]
+[INFO] [INFO] Pushed purchaserSpec to environment: [{&quot;detail&quot;:{&quot;firstName&quot;:&quot;JohnPurchaser&quot;,&quot;lastName&quot;:&quot;DoePurchaser&quot;,&quot;email&quot;:&quot;emailPurchaser@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}]
+[LOG] [INFO] Found number of passengers: 2
+[INFO] [INFO] Found number of passengers: 2
+[LOG] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}},{&quot;externalRef&quot;:&quot;00002&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-03&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;Marta&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}]
+[INFO] [INFO] Pushed passengerSpec to environment: [{&quot;externalRef&quot;:&quot;00001&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-01&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;John&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}},{&quot;externalRef&quot;:&quot;00002&quot;,&quot;type&quot;:&quot;PERSON&quot;,&quot;dateOfBirth&quot;:&quot;1999-01-03&quot;,&quot;detail&quot;:{&quot;firstName&quot;:&quot;Marta&quot;,&quot;lastName&quot;:&quot;Doe&quot;,&quot;email&quot;:&quot;email@email.com&quot;,&quot;phoneNumber&quot;:&quot;+33612345678&quot;}}]
+[LOG] [WARN] No offerSearchCriteria on scenario 'OTST_RFND_SRCH_CRIT_2ADT_2LEG' — using defaults.
+[WARN] [WARN] No offerSearchCriteria on scenario 'OTST_RFND_SRCH_CRIT_2ADT_2LEG' — using defaults.
+[LOG] [INFO] ✅ Correct data set was found for this scenario : OTST_RFND_SRCH_CRIT_2ADT_2LEG
+[INFO] [INFO] ✅ Correct data set was found for this scenario : OTST_RFND_SRCH_CRIT_2ADT_2LEG
+[LOG] ✅ Scenario data loaded — osdmVersion: 3.0.5
+[LOG] [reportGenerator] 🗑️  Previous run data cleared.
+[LOG] [reportGenerator] ✅ Report directory: C:\Users\patri\OneDrive\Documents\TrackOnPath\Contract_execution\UIC_New_Revenue_Management project\projets\OSDM\OTST\GitHub_OSDM-Testing\OSDM-testing\O\collections-bruno\OTST_V2.0.1\Validation_Reports
+[LOG] 📊 HTML report initialised for this scenario.
+[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[INFO] [INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+[ERROR] [ERROR] GET /versions → 404 Not Found — endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /versions → 404 Not Found (FAIL): Expected 200, got 404 — /versions endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGHC:00000004/4211f39f-dbbc-47d3-87af-c4fbc80a1d6b&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\01. GET Coach</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 151 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 151 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/coach-layouts</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /coach-layouts → 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /coach-layouts → 404 Not Found — endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /coach-layouts → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGHE:00000004/ba1383aa-f278-4ca9-bfc8-502d668e7f6d&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">3</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\02. GET Coach By Id</span>
+      <span class="abadge abadge-ok">1 ✅</span> <span class="abadge abadge-fail">1 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 400</span>
+      <span class="rtime">⏱ 256 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 400</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 256 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">400</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/coach-layouts/null</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (1)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (1)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /coach-layouts/{id} prerequisite: GET Coach succeeded with valid body</span>
+          <div class="te">GET Coach did not provide valid data; cannot validate By-Id endpoint</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /coach-layouts/{id} prerequisite failed: GET Coach did not return valid list data
+[WARN] [WARNING] ❌ GET /coach-layouts/{id} prerequisite: GET Coach succeeded with valid body: GET Coach did not provide valid data; cannot validate By-Id endpoint
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;LAYOUT_NOT_FOUND&quot;,
+  &quot;title&quot;: &quot;Coach layout not found or invalid ID&quot;,
+  &quot;status&quot;: 400,
+  &quot;errors&quot;: {},
+  &quot;code&quot;: &quot;LAYOUT_NOT_FOUND&quot;,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGG8:00000009/c43827cf-e52b-4868-8bf2-1acbf301015a&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">4</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\04. GET Passenger Categories</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 145 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 145 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/passenger-categories</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /passenger-categories → 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /passenger-categories → 404 Not Found — endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /passenger-categories → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGHE:00000005/19ef57fd-e8de-49b5-8d60-eb369ef574dc&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">5</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\05. GET Promotion Codes</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 145 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 145 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/promotion-codes</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /promotion-codes → 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /promotion-codes → 404 Not Found — endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /promotion-codes → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGH4:0000000B/7b434d33-c980-4f96-b28e-ce2a799e4121&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-green">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">6</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\06. GET Reduction Cards</span>
+      <span class="abadge abadge-ok">3 ✅</span>
+      <span class="rcode rcode-ok">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 217 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 3</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 217 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/reduction-cards</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (3)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">GET /reduction-cards → 200 OK</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">GET /reduction-cards response body is present and not empty</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details>
+    <summary class="sub-summary">🧾 Console Log (7)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[INFO] [INFO] ✅ GET /reduction-cards → 200 OK
+[INFO] [INFO] ✅ GET /reduction-cards response body is present and not empty
+[INFO] [INFO] GET /reduction-cards → 200 OK, body received
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;reductionCardTypes&quot;: [
+    {
+      &quot;code&quot;: &quot;YOUNG&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;457D087B&quot;,
+        &quot;text&quot;: &quot;Youth/Jovem ID&quot;,
+        &quot;shortText&quot;: &quot;Youth/Jovem ID&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;TD&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;8FAE4B60&quot;,
+        &quot;text&quot;: &quot;Disruption/Interrupção&quot;,
+        &quot;shortText&quot;: &quot;Disruption/Interrupção&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;E01&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;3D788EE8&quot;,
+        &quot;text&quot;: &quot;Employee/Funcionário&quot;,
+        &quot;shortText&quot;: &quot;Employee/Funcionário&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;prm&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;BB1B1814&quot;,
+        &quot;text&quot;: &quot;Disabled/Desabilitado (PRM)&quot;,
+        &quot;shortText&quot;: &quot;Disabled/Desabilitado (PRM)&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;ST01&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;B2266390&quot;,
+        &quot;text&quot;: &quot;Student/Estudante&quot;,
+        &quot;shortText&quot;: &quot;Student/Estudante&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;FREE&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;6FB93752&quot;,
+        &quot;text&quot;: &quot;Free pass/Passe Livre&quot;,
+        &quot;shortText&quot;: &quot;Free pass/Passe Livre&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    },
+    {
+      &quot;code&quot;: &quot;CLIENT&quot;,
+      &quot;name&quot;: {
+        &quot;id&quot;: &quot;48826A45&quot;,
+        &quot;text&quot;: &quot;Client en compte&quot;,
+        &quot;shortText&quot;: &quot;Client en compte&quot;
+      },
+      &quot;cardIdRequired&quot;: false,
+      &quot;serviceClassTypes&quot;: [
+        &quot;CARD_TYPE.REDUCTION_CARD&quot;
+      ],
+      &quot;areConcessionVouchersUsed&quot;: false
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">7</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\07. GET Zones</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 150 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 150 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/zones</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /zones → 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /zones → 404 Not Found — endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /zones → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGH4:0000000C/93a63734-d5eb-4ca3-8bfd-2b80cebea808&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">8</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\08. GET Products</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 261 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 261 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/products</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /products -&gt; 404 Not Found (FAIL)</span>
+          <div class="te">Expected 200, got 404 - endpoint not supported: expected 404 to deeply equal 200</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /products -&gt; 404 Not Found - endpoint not implemented by this vendor
+[WARN] [WARNING] ❌ GET /products -&gt; 404 Not Found (FAIL): Expected 200, got 404 - endpoint not supported: expected 404 to deeply equal 200
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGH8:00000005/d07a1ba3-08c3-49e7-97ae-269ee6a96fbb&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">9</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">01-System Infos Requests\09. GET Product By ProductId</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 404</span>
+      <span class="rtime">⏱ 233 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 404</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 233 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">404</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/products/null</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">GET /products/{productId} prerequisite: GET Products succeeded with valid body</span>
+          <div class="te">GET Products did not provide valid data; cannot validate By-Id endpoint</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (6)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[ERROR] [ERROR] GET /products/{productId} prerequisite failed: GET Products did not return valid list data
+[WARN] [WARNING] ❌ GET /products/{productId} prerequisite: GET Products succeeded with valid body: GET Products did not provide valid data; cannot validate By-Id endpoint
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Accept</td><td class="hdrv">application/json</td></tr><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">content-type</td><td class="hdrv"></td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/404&quot;,
+  &quot;title&quot;: &quot;Not Found&quot;,
+  &quot;status&quot;: 404,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGG8:0000000B/0c79e14b-7803-46a9-8ac3-78fbb30483f3&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<details class="section-details">
+  <summary class="section-title">🚂 Common Requests (3 requests) <span class="abadge abadge-ok">126 passed</span> <span class="abadge abadge-fail">6 failed</span></summary>
+  
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">05. GET Booking before Fulfillments</span>
+      <span class="abadge abadge-ok">58 ✅</span> <span class="abadge abadge-fail">3 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 552 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 58</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 3</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 552 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/bookings/18e8b333-5ac3-4ebf-9c44-deaa1a984057</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (58)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: inboundTripIds</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: inboundTripIds</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe executed: inboundTripSpecifications</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Offer param probe did not trigger provider 5xx: inboundTripSpecifications</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='true' booking='true'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is PREBOOKED for admission[0] - expected: PREBOOKED, actual: PREBOOKED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'PREBOOKED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=ADULT exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].tripCoverage exists in both</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is PREBOOKED for reservation[0] - expected: PREBOOKED, actual: PREBOOKED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].status 'PREBOOKED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is PREBOOKED for reservation[1] - expected: PREBOOKED, actual: PREBOOKED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].status 'PREBOOKED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: ON_HOLD,AVAILABLE, actual: AVAILABLE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].status 'AVAILABLE' is a valid OSDM FulfillmentStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 1, actual: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (3)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: inboundTripIds</span>
+          <div class="te">Transport failure for inboundTripIds: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Offer param probe has no transport error: inboundTripSpecifications</span>
+          <div class="te">Transport failure for inboundTripSpecifications: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span>
+          <div class="te">expected 1777461419166 to be at most 1777461418141</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (146)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 05. GET Booking before Fulfillments
+[INFO] [INFO] ✅ Offer param probe executed: inboundTripIds
+[WARN] [WARNING] ❌ Offer param probe has no transport error: inboundTripIds: Transport failure for inboundTripIds: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: inboundTripIds
+[INFO] [INFO] ✅ Offer param probe executed: inboundTripSpecifications
+[WARN] [WARNING] ❌ Offer param probe has no transport error: inboundTripSpecifications: Transport failure for inboundTripSpecifications: Request failed with status code 401: expected 'Request failed with status code 401' to deeply equal null
+[INFO] [INFO] ✅ Offer param probe did not trigger provider 5xx: inboundTripSpecifications
+[INFO] [INFO] Offer parameter support check done: supported=0, rejected=0, inconclusive=18
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.requestedOfferParts -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.productTags -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.productSelections -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.flexibilities -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.travelClasses -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.serviceClassTypes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.offerMode -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.currency -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] offerSearchCriteria.inboundDate -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] requestedFulfillmentOptions -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] corporateCodes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] promotionCodes -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] embed -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] tripResponseParameters -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] nonTripSearchCriteria -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] requestedSections -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] inboundTripIds -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] [TRANSPORT_ERROR] inboundTripSpecifications -&gt; HTTP 0 | transport=Request failed with status code 401
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: 18e8b333-5ac3-4ebf-9c44-deaa1a984057
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: NR6K43
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z
+[INFO] [INFO] booking.confirmationTimeLimit: 2026-04-29T11:36:59.100929Z
+[INFO] [INFO] ✅ booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[YES] booking=[YES] intersection=[YES]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]
+[INFO] [INFO] admission refundable: offer=[YES] booking=[YES] intersection=[YES]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]
+[INFO] [INFO] admission[0].isReservationRequired: offer='true' booking='true'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='true' booking='true'
+[INFO] [INFO] admission[0].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ admission[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] admission[0]: status: PREBOOKED
+[INFO] [INFO] ✅ Status is PREBOOKED for admission[0] - expected: PREBOOKED, actual: PREBOOKED
+[INFO] [INFO] ✅ admission[0].status 'PREBOOKED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[11600] booking=[11600] intersection=[11600]
+[INFO] [INFO] admission price.currency: offer=[EUR] booking=[EUR] intersection=[EUR]
+[INFO] [INFO] admission price.scale: offer=[2] booking=[2] intersection=[2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=ADULT
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=ADULT found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=ADULT exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: '8cd1ec52-1530-483b-9495-b43b00b9f2d9' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='ADULT' booking='ADULT'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].tripCoverage exists in both offer and booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].tripCoverage exists in both
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId: offer='13acb3cd-7cfe-4e7e-960c-12b367d2d249' booking='13acb3cd-7cfe-4e7e-960c-12b367d2d249'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both offer and booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both
+[INFO] [INFO] reservation exchangeable: offer=[NO,YES] booking=[NO,YES] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]
+[INFO] [INFO] reservation refundable: offer=[NO,YES] booking=[NO,YES] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]
+[WARN] [WARNING] reservation[0]: 'isReservationRequired' missing in offer or booking
+[INFO] [INFO] reservation[0].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ reservation[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] reservation[0]: status: PREBOOKED
+[INFO] [INFO] ✅ Status is PREBOOKED for reservation[0] - expected: PREBOOKED, actual: PREBOOKED
+[INFO] [INFO] ✅ reservation[0].status 'PREBOOKED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] reservation price.amount: offer=[0,9700] booking=[0,9700] intersection=[0,9700]
+[INFO] [INFO] reservation price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] reservation price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ reservation prices have at least one member in common between offer and booking
+[INFO] [INFO] reservation[0].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ reservation[0].validFrom is present in both offer and booking
+[INFO] [INFO] reservation[0].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ reservation[0].validUntil is present in both offer and booking
+[INFO] [INFO] reservation exchangeable: offer=[NO,YES] booking=[NO,YES] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]
+[INFO] [INFO] reservation refundable: offer=[NO,YES] booking=[NO,YES] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[NO,YES]
+[WARN] [WARNING] reservation[1]: 'isReservationRequired' missing in offer or booking
+[INFO] [INFO] reservation[1].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ reservation[1].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] reservation[1]: status: PREBOOKED
+[INFO] [INFO] ✅ Status is PREBOOKED for reservation[1] - expected: PREBOOKED, actual: PREBOOKED
+[INFO] [INFO] ✅ reservation[1].status 'PREBOOKED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] reservation price.amount: offer=[0,9700] booking=[0,9700] intersection=[0,9700]
+[INFO] [INFO] reservation price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] reservation price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ reservation prices have at least one member in common between offer and booking
+[INFO] [INFO] reservation[1].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ reservation[1].validFrom is present in both offer and booking
+[INFO] [INFO] reservation[1].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ reservation[1].validUntil is present in both offer and booking
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: 18e8b333-5ac3-4ebf-9c44-deaa1a984057
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)
+[WARN] [WARNING] ❌ Fulfillment[0] createdOn is a valid datetime at or before now: expected 1777461419166 to be at most 1777461418141
+[INFO] [INFO] Fulfillment[0] status comparison - expected: ON_HOLD,AVAILABLE, actual: AVAILABLE
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: ON_HOLD,AVAILABLE, actual: AVAILABLE
+[INFO] [INFO] ✅ Fulfillment[0].status 'AVAILABLE' is a valid OSDM FulfillmentStatus
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 124f2f26-20be-4a8a-82e3-9f6ca5543942 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 3e9a94e7-c583-491c-9e74-300f5cc87cca exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca]
+[INFO] [INFO] Fulfillment[0] has no document refs or documents (may be pre-issuance state)
+[INFO] [INFO] Booking passenger count - expected: 1, actual: 1
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 1, actual: 1
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.0.5</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;id&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+    &quot;bookingCode&quot;: &quot;NR6K43&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;summary&quot;: &quot;Booking NR6K43&quot;,
+    &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;id&quot;: &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;,
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;,
+        &quot;cards&quot;: [],
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;detail&quot;: {
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;Doe&quot;,
+          &quot;email&quot;: &quot;email@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33612345678&quot;
+        },
+        &quot;prmNeeds&quot;: [],
+        &quot;age&quot;: 27,
+        &quot;sharePlaceWithGuardian&quot;: false
+      }
+    ],
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;preferredLanguage&quot;: &quot;CULTURE.EN_GB&quot;,
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+        &quot;phoneNumber&quot;: &quot;+33612345678&quot;
+      }
+    },
+    &quot;provisionalPrice&quot;: {
+      &quot;vats&quot;: [],
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;amount&quot;: 21300,
+      &quot;scale&quot;: 2
+    },
+    &quot;confirmedPrice&quot;: {
+      &quot;vats&quot;: [],
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;amount&quot;: 0,
+      &quot;scale&quot;: 2
+    },
+    &quot;isFinalPaymentRequired&quot;: false,
+    &quot;isPlaceChangeInProgress&quot;: false,
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;offerId&quot;: &quot;3a3c2672-a354-463d-9076-dda23e60cbed&quot;,
+        &quot;admissions&quot;: [
+          {
+            &quot;isReservationRequired&quot;: true,
+            &quot;feeRefs&quot;: [],
+            &quot;reservationRefs&quot;: [
+              {
+                &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+              },
+              {
+                &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+              }
+            ],
+            &quot;ancillaryRefs&quot;: [],
+            &quot;regulatoryConditions&quot;: [
+              &quot;CIV&quot;
+            ],
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+            &quot;summary&quot;: &quot;Class 2 bed, 5/9/2026 8:00:00 AM +02:00 - 5/10/2026 6:00:00 AM +02:00, urn:uic:stn:8400058 - urn:uic:stn:8000600, JohnUpdate Doe&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 11600,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 11600,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+                &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;9dea1dd0-d06e-4b55-989a-6e3223946a42&quot;,
+                &quot;legIds&quot;: [
+                  &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+                  &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;PREBOOKED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: false,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;YES&quot;,
+            &quot;exchangeable&quot;: &quot;YES&quot;,
+            &quot;appliedCorporateCodes&quot;: [],
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;passengerRef&quot;: &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;,
+                &quot;type&quot;: &quot;ADULT&quot;,
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;tripCoverage&quot;: {
+                  &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;
+                },
+                &quot;appliedReductionCardTypes&quot;: []
+              }
+            ],
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          }
+        ],
+        &quot;reservations&quot;: [
+          {
+            &quot;placeAllocation&quot;: {
+              &quot;accommodationType&quot;: &quot;SEAT&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;reservedPlaces&quot;: [
+                {
+                  &quot;id&quot;: &quot;3874&quot;,
+                  &quot;passengerIds&quot;: [
+                    &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+                  ],
+                  &quot;vehicleNumber&quot;: &quot;10&quot;,
+                  &quot;coachNumber&quot;: &quot;10&quot;,
+                  &quot;placeNumbers&quot;: [
+                    &quot;4&quot;
+                  ],
+                  &quot;placeProperties&quot;: [
+                    &quot;AISLE&quot;
+                  ]
+                }
+              ],
+              &quot;tripLegCoverage&quot;: {
+                &quot;tripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+                &quot;legId&quot;: &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+              }
+            },
+            &quot;feeRefs&quot;: [],
+            &quot;availablePlacePreferences&quot;: [
+              {
+                &quot;graphicalReservation&quot;: &quot;WITHOUT_FEE&quot;
+              }
+            ],
+            &quot;objectType&quot;: &quot;Reservation&quot;,
+            &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;95ed0b4e-e040-4191-b74e-7e0bf00ab9d5&quot;,
+                &quot;legIds&quot;: [
+                  &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;PREBOOKED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: false,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          },
+          {
+            &quot;placeAllocation&quot;: {
+              &quot;accommodationType&quot;: &quot;COUCHETTE&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;reservedPlaces&quot;: [
+                {
+                  &quot;id&quot;: &quot;3875&quot;,
+                  &quot;passengerIds&quot;: [
+                    &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+                  ],
+                  &quot;vehicleNumber&quot;: &quot;27&quot;,
+                  &quot;coachNumber&quot;: &quot;27&quot;,
+                  &quot;placeDescription&quot;: &quot;21-26&quot;,
+                  &quot;placeNumbers&quot;: [
+                    &quot;22&quot;
+                  ],
+                  &quot;placeProperties&quot;: [
+                    &quot;MEN&quot;,
+                    &quot;LOWER_BED&quot;
+                  ]
+                }
+              ],
+              &quot;tripLegCoverage&quot;: {
+                &quot;tripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+                &quot;legId&quot;: &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              }
+            },
+            &quot;feeRefs&quot;: [],
+            &quot;availablePlacePreferences&quot;: [
+              {
+                &quot;graphicalReservation&quot;: &quot;WITHOUT_FEE&quot;
+              }
+            ],
+            &quot;objectType&quot;: &quot;Reservation&quot;,
+            &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 9700,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 9700,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;b8b84b07-93d8-400e-82ad-6d65fa35f9c9&quot;,
+                &quot;legIds&quot;: [
+                  &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;PREBOOKED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: false,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;YES&quot;,
+            &quot;exchangeable&quot;: &quot;YES&quot;,
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          }
+        ],
+        &quot;ancillaries&quot;: [],
+        &quot;fees&quot;: [],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+          &quot;coveredLegIds&quot;: [
+            &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+            &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+          ]
+        },
+        &quot;appliedThroughTicketTags&quot;: [],
+        &quot;products&quot;: [
+          {
+            &quot;id&quot;: &quot;9dea1dd0-d06e-4b55-989a-6e3223946a42&quot;,
+            &quot;summary&quot;: &quot;Class 2 bed&quot;,
+            &quot;type&quot;: &quot;ADMISSION_POINT2POINT&quot;,
+            &quot;code&quot;: &quot;C2B&quot;,
+            &quot;description&quot;: &quot;Class 2 bed&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;2nd Class couchette refundable&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;FULL_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;FIRST&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          },
+          {
+            &quot;id&quot;: &quot;95ed0b4e-e040-4191-b74e-7e0bf00ab9d5&quot;,
+            &quot;summary&quot;: &quot;Class 1 TER&quot;,
+            &quot;type&quot;: &quot;RESERVATION&quot;,
+            &quot;code&quot;: &quot;C1TER&quot;,
+            &quot;description&quot;: &quot;Class 1 TER&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;Class 1 seat&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;FIRST&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          },
+          {
+            &quot;id&quot;: &quot;b8b84b07-93d8-400e-82ad-6d65fa35f9c9&quot;,
+            &quot;summary&quot;: &quot;Class 2 TER bed&quot;,
+            &quot;type&quot;: &quot;RESERVATION&quot;,
+            &quot;code&quot;: &quot;TERB&quot;,
+            &quot;description&quot;: &quot;Class 2 TER bed&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;2 class bed&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;FULL_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;SECOND&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          }
+        ]
+      }
+    ],
+    &quot;trips&quot;: [
+      {
+        &quot;id&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+        &quot;externalRef&quot;: &quot;c1e1e86f-5e36-4fc4-8b70-7242e29f6d65&quot;,
+        &quot;duration&quot;: &quot;PT22H&quot;,
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;origin&quot;: {
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;,
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+        },
+        &quot;destination&quot;: {
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000600&quot;,
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+        },
+        &quot;startTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;,
+        &quot;endTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;,
+        &quot;transfers&quot;: 1,
+        &quot;legs&quot;: [
+          {
+            &quot;id&quot;: &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+            &quot;externalRef&quot;: &quot;a06a0742-a0ab-49ae-814d-0ebf5907d27c&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;start&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Amsterdam Centraal&quot;,
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;
+                }
+              },
+              &quot;intermediates&quot;: [
+                {
+                  &quot;stopPlaceRef&quot;: {
+                    &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400621&quot;,
+                    &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                  },
+                  &quot;stopPlaceName&quot;: &quot;Utrecht Centraal&quot;,
+                  &quot;serviceArrival&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T09:30:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T09:30:00+02:00&quot;
+                  },
+                  &quot;serviceDeparture&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T09:40:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T09:40:00+02:00&quot;
+                  }
+                },
+                {
+                  &quot;stopPlaceRef&quot;: {
+                    &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8049700&quot;,
+                    &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                  },
+                  &quot;stopPlaceName&quot;: &quot;Osnabrück Hbf&quot;,
+                  &quot;serviceArrival&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T12:55:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T12:55:00+02:00&quot;
+                  },
+                  &quot;serviceDeparture&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T13:00:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T13:00:00+02:00&quot;
+                  }
+                }
+              ],
+              &quot;end&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000152&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Hannover Hbf&quot;,
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-09T14:40:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-09T14:40:00+02:00&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                  &quot;name&quot;: &quot;Train&quot;,
+                  &quot;shortName&quot;: &quot;Train&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Express train&quot;,
+                  &quot;shortName&quot;: &quot;ST&quot;,
+                  &quot;productCategoryRef&quot;: &quot;ST&quot;
+                },
+                &quot;publishedServiceName&quot;: &quot;2 East-West Express&quot;,
+                &quot;vehicleNumbers&quot;: [
+                  &quot;21&quot;
+                ],
+                &quot;lineNumbers&quot;: [
+                  &quot;2 East-West Express&quot;
+                ],
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;1100&quot;,
+                    &quot;name&quot;: &quot;Turnit Express&quot;
+                  }
+                ],
+                &quot;attributes&quot;: []
+              },
+              &quot;duration&quot;: &quot;PT6H40M&quot;,
+              &quot;isUnreservedService&quot;: false
+            },
+            &quot;isActive&quot;: true
+          },
+          {
+            &quot;id&quot;: &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;,
+            &quot;externalRef&quot;: &quot;1bd33d3e-133f-44bc-bd9e-42032d1dcf90&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;start&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000152&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Hannover Hbf&quot;,
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-10T01:10:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-10T01:10:00+02:00&quot;
+                }
+              },
+              &quot;intermediates&quot;: [],
+              &quot;end&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000600&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Muenchen Hbf&quot;,
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                  &quot;name&quot;: &quot;Train&quot;,
+                  &quot;shortName&quot;: &quot;Train&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Express train&quot;,
+                  &quot;shortName&quot;: &quot;ST&quot;,
+                  &quot;productCategoryRef&quot;: &quot;ST&quot;
+                },
+                &quot;publishedServiceName&quot;: &quot;North-South Express&quot;,
+                &quot;vehicleNumbers&quot;: [
+                  &quot;13&quot;
+                ],
+                &quot;lineNumbers&quot;: [
+                  &quot;1 North-South Express&quot;
+                ],
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;1100&quot;,
+                    &quot;name&quot;: &quot;Turnit Express&quot;
+                  }
+                ],
+                &quot;attributes&quot;: []
+              },
+              &quot;duration&quot;: &quot;PT4H50M&quot;,
+              &quot;isUnreservedService&quot;: false
+            },
+            &quot;isActive&quot;: true
+          }
+        ],
+        &quot;tripStatus&quot;: {
+          &quot;unplanned&quot;: false,
+          &quot;cancelled&quot;: false,
+          &quot;deviation&quot;: false,
+          &quot;delayed&quot;: false,
+          &quot;infeasible&quot;: false
+        }
+      }
+    ],
+    &quot;confirmationTimeLimit&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+        &quot;bookingRef&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+        &quot;summary&quot;: &quot;Fulfillment for booking part 260429357060&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+        &quot;status&quot;: &quot;AVAILABLE&quot;,
+        &quot;controlNumber&quot;: &quot;260429357060&quot;,
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+          },
+          {
+            &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+          },
+          {
+            &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+          }
+        ],
+        &quot;issuer&quot;: &quot;1100&quot;
+      }
+    ],
+    &quot;paymentMethods&quot;: [],
+    &quot;pendingVouchers&quot;: []
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">06. POST Obtaining Fulfillments from Booking</span>
+      <span class="abadge abadge-ok">11 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 884 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 11</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 884 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/bookings/18e8b333-5ac3-4ebf-9c44-deaa1a984057/fulfillments</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (11)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[1] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span>
+          <div class="te">expected 1777461419166 to be at most 1777461419148</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (29)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 06. POST Obtaining Fulfillments from Booking
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: 18e8b333-5ac3-4ebf-9c44-deaa1a984057
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)
+[WARN] [WARNING] ❌ Fulfillment[0] createdOn is a valid datetime at or before now: expected 1777461419166 to be at most 1777461419148
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 3e9a94e7-c583-491c-9e74-300f5cc87cca exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 124f2f26-20be-4a8a-82e3-9f6ca5543942 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942]
+[INFO] [INFO] Fulfillment[0] number of documents: 2
+[INFO] [INFO] Fulfillment[0].document[0] -&gt; medium=PDF_A4, type=TICKET, link=https://api.sandbox.turnit.tech/retailer/ticket/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0].document[0] - fields exist
+[INFO] [INFO] Fulfillment[0].document[1] -&gt; medium=PKPASS, type=TICKET, link=https://api.sandbox.turnit.tech/retailer/pkpass/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0].document[1] - fields exist
+[INFO] [INFO] ✅ Fulfillment[0] documents exist and contain valid data
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.0.5</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;fulfillments&quot;: [
+    {
+      &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+      &quot;bookingRef&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+      &quot;summary&quot;: &quot;Fulfillment for booking part 260429357060&quot;,
+      &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+      &quot;status&quot;: &quot;FULFILLED&quot;,
+      &quot;controlNumber&quot;: &quot;260429357060&quot;,
+      &quot;bookingParts&quot;: [
+        {
+          &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+        },
+        {
+          &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+        },
+        {
+          &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+        }
+      ],
+      &quot;issuer&quot;: &quot;1100&quot;,
+      &quot;fulfillmentDocuments&quot;: [
+        {
+          &quot;medium&quot;: &quot;PDF_A4&quot;,
+          &quot;type&quot;: &quot;TICKET&quot;,
+          &quot;downloadLink&quot;: &quot;https://api.sandbox.turnit.tech/retailer/ticket/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+          &quot;format&quot;: &quot;application/pdf&quot;
+        },
+        {
+          &quot;medium&quot;: &quot;PKPASS&quot;,
+          &quot;type&quot;: &quot;TICKET&quot;,
+          &quot;downloadLink&quot;: &quot;https://api.sandbox.turnit.tech/retailer/pkpass/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+          &quot;format&quot;: &quot;application/vnd.apple.pkpass&quot;
+        }
+      ],
+      &quot;fulfillmentParts&quot;: [
+        {
+          &quot;securityFeatures&quot;: [
+            {
+              &quot;type&quot;: {
+                &quot;type&quot;: &quot;BAR_CODE&quot;,
+                &quot;format&quot;: &quot;PNG&quot;,
+                &quot;symbology&quot;: &quot;AZTEC&quot;
+              },
+              &quot;data&quot;: &quot;iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAABHNCSVQICAgIfAhkiAAAAwJJREFUeJzt3cFu2kAARVFc8f+/7O5QFuUmtdWZYXrOmgjHcDWbJ3Oc53k+gD/6NfsCYGXP2RfwE8dx/PXfjDoYr1zbKFfuwcr3egYnCASBQBAIBIFAEAgEgUAQCASBQBAIBIFAEAgEgUB4jRVHje6uDNt2G8OtPKRc+V7P+I46QSAIBIJAIAgEgkAgCASCQCAIBIJAIAgEgkAgCATC8CcrrjyKXPl9DA/ncIJAEAgEgUAQCASBQBAIBIFAEAgEgUAQCASBQBAIhOMcvGj7lJEa/y9PVoQfEggEgUAQCASBQBAIBIFAEAgEgUAQCASBQBAIhFs/Az3qJ513e6rgbkZ9PjOGrk4QCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEgEAgCgfAaKxoReurj47H25zNj4OgEgSAQCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEgEAjP71/y3srDtlFWvgcrjy9XvravnCAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4dZY8YpPGan9S7s9kXIUT1aExQgEgkAgCASCQCAIBIJAIAgEgkAgCASCQCAIBMKtsaLh4TWGh+PcvddOEAgCgSAQCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEw/Gegdxs47vb/jPIpg00nCASBQBAIBIFAEAgEgUAQCASBQBAIBIFAEAgEgUB4jRVHje5WHjh+yoBuByuPPL9+D5wgEAQCQSAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAuE1VtxtqLfyGI5rZnxHnSAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4daTFUeNx0a9z6h7sPK9Xvnarrj7/zhBIAgEgkAgCASCQCAIBIJAIAgEgkAgCASCQCAIBMLz+5e8t9uw7YqV78FuT5ecca+dIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQCQSAQBAJh+M9A7zagG2XlUeTOnCAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4Tgt2uAtJwgEgUD4DTYKkZJZ5GQJAAAAAElFTkSuQmCC&quot;
+            },
+            {
+              &quot;type&quot;: {
+                &quot;type&quot;: &quot;BAR_CODE&quot;,
+                &quot;format&quot;: &quot;TEXT&quot;,
+                &quot;symbology&quot;: &quot;AZTEC&quot;
+              },
+              &quot;data&quot;: &quot;MjYwNDI5MzU3MDYw&quot;
+            }
+          ],
+          &quot;status&quot;: &quot;FULFILLED&quot;
+        }
+      ]
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">3</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">07. GET Booking after Fulfillments</span>
+      <span class="abadge abadge-ok">57 ✅</span> <span class="abadge abadge-fail">1 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 653 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 57</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 653 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/bookings/18e8b333-5ac3-4ebf-9c44-deaa1a984057</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (57)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='true' booking='true'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=ADULT exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].tripCoverage exists in both</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for reservation[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for reservation[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">reservation[1].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[1] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 1, actual: 1</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (1)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (127)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 07. GET Booking after Fulfillments
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: 18e8b333-5ac3-4ebf-9c44-deaa1a984057
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: NR6K43
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-29T11:16:59.166Z, offer.createdOn: 2026-04-29T11:16:57.509Z
+[INFO] [INFO] booking.confirmationTimeLimit: 2026-04-29T11:36:59.100929Z
+[INFO] [INFO] ✅ booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[YES] booking=[YES] intersection=[YES]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[YES] booking=[YES]
+[INFO] [INFO] admission refundable: offer=[YES] booking=[YES] intersection=[YES]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[YES] booking=[YES]
+[INFO] [INFO] admission[0].isReservationRequired: offer='true' booking='true'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='true' booking='true'
+[INFO] [INFO] admission[0].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ admission[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] admission[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[11600] booking=[11600] intersection=[11600]
+[INFO] [INFO] admission price.currency: offer=[EUR] booking=[EUR] intersection=[EUR]
+[INFO] [INFO] admission price.scale: offer=[2] booking=[2] intersection=[2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=ADULT
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=ADULT found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=ADULT exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: '8cd1ec52-1530-483b-9495-b43b00b9f2d9' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='ADULT' booking='ADULT'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].tripCoverage exists in both offer and booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].tripCoverage exists in both
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId: offer='13acb3cd-7cfe-4e7e-960c-12b367d2d249' booking='13acb3cd-7cfe-4e7e-960c-12b367d2d249'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].tripCoverage.coveredTripId matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both offer and booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].appliedReductionCardTypes is empty in both
+[INFO] [INFO] reservation exchangeable: offer=[NO,YES] booking=[YES,NO] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]
+[INFO] [INFO] reservation refundable: offer=[NO,YES] booking=[YES,NO] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]
+[WARN] [WARNING] reservation[0]: 'isReservationRequired' missing in offer or booking
+[INFO] [INFO] reservation[0].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ reservation[0].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] reservation[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for reservation[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ reservation[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] reservation price.amount: offer=[0,9700] booking=[9700,0] intersection=[0,9700]
+[INFO] [INFO] reservation price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] reservation price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ reservation prices have at least one member in common between offer and booking
+[INFO] [INFO] reservation[0].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ reservation[0].validFrom is present in both offer and booking
+[INFO] [INFO] reservation[0].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ reservation[0].validUntil is present in both offer and booking
+[INFO] [INFO] reservation exchangeable: offer=[NO,YES] booking=[YES,NO] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation exchangeable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]
+[INFO] [INFO] reservation refundable: offer=[NO,YES] booking=[YES,NO] intersection=[NO,YES]
+[INFO] [INFO] ✅ reservation refundable values have at least one member in common between offer and booking offer=[NO,YES] booking=[YES,NO]
+[WARN] [WARNING] reservation[1]: 'isReservationRequired' missing in offer or booking
+[INFO] [INFO] reservation[1].offerMode: offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] ✅ reservation[1].offerMode matches between offer and booking : offer='INDIVIDUAL' booking='INDIVIDUAL'
+[INFO] [INFO] reservation[1]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for reservation[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ reservation[1].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] reservation price.amount: offer=[0,9700] booking=[9700,0] intersection=[0,9700]
+[INFO] [INFO] reservation price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] reservation price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ reservation prices have at least one member in common between offer and booking
+[INFO] [INFO] reservation[1].validFrom: offer='2026-04-29T11:16:57.5092976+00:00' booking='2026-05-09T06:00:00+00:00'
+[INFO] [INFO] ✅ reservation[1].validFrom is present in both offer and booking
+[INFO] [INFO] reservation[1].validUntil: offer='2026-04-29T11:46:57.5092976+00:00' booking='2026-05-10T04:00:00+00:00'
+[INFO] [INFO] ✅ reservation[1].validUntil is present in both offer and booking
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: 18e8b333-5ac3-4ebf-9c44-deaa1a984057
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: 18e8b333-5ac3-4ebf-9c44-deaa1a984057, actual: 18e8b333-5ac3-4ebf-9c44-deaa1a984057)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-29T11:16:59.166269Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 3e9a94e7-c583-491c-9e74-300f5cc87cca exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 124f2f26-20be-4a8a-82e3-9f6ca5543942 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,124f2f26-20be-4a8a-82e3-9f6ca5543942,3e9a94e7-c583-491c-9e74-300f5cc87cca,0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942], actual: [0b78cafe-9ffc-4e88-955f-a33bb87ab2bb,3e9a94e7-c583-491c-9e74-300f5cc87cca,124f2f26-20be-4a8a-82e3-9f6ca5543942]
+[INFO] [INFO] Fulfillment[0] number of documents: 2
+[INFO] [INFO] Fulfillment[0].document[0] -&gt; medium=PDF_A4, type=TICKET, link=https://api.sandbox.turnit.tech/retailer/ticket/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0].document[0] - fields exist
+[INFO] [INFO] Fulfillment[0].document[1] -&gt; medium=PKPASS, type=TICKET, link=https://api.sandbox.turnit.tech/retailer/pkpass/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Fulfillment[0].document[1] - fields exist
+[INFO] [INFO] ✅ Fulfillment[0] documents exist and contain valid data
+[INFO] [INFO] Booking passenger count - expected: 1, actual: 1
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 1, actual: 1
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.0.5</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;id&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+    &quot;bookingCode&quot;: &quot;NR6K43&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;summary&quot;: &quot;Booking NR6K43&quot;,
+    &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;id&quot;: &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;,
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;dateOfBirth&quot;: &quot;1999-01-01&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;,
+        &quot;cards&quot;: [],
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;detail&quot;: {
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;Doe&quot;,
+          &quot;email&quot;: &quot;email@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33612345678&quot;
+        },
+        &quot;prmNeeds&quot;: [],
+        &quot;age&quot;: 27,
+        &quot;sharePlaceWithGuardian&quot;: false
+      }
+    ],
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;preferredLanguage&quot;: &quot;CULTURE.EN_GB&quot;,
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+        &quot;phoneNumber&quot;: &quot;+33612345678&quot;
+      }
+    },
+    &quot;provisionalPrice&quot;: {
+      &quot;vats&quot;: [],
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;amount&quot;: 0,
+      &quot;scale&quot;: 2
+    },
+    &quot;confirmedPrice&quot;: {
+      &quot;vats&quot;: [],
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;amount&quot;: 21300,
+      &quot;scale&quot;: 2
+    },
+    &quot;isFinalPaymentRequired&quot;: false,
+    &quot;isPlaceChangeInProgress&quot;: false,
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;offerId&quot;: &quot;3a3c2672-a354-463d-9076-dda23e60cbed&quot;,
+        &quot;admissions&quot;: [
+          {
+            &quot;isReservationRequired&quot;: true,
+            &quot;feeRefs&quot;: [],
+            &quot;reservationRefs&quot;: [
+              {
+                &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+              },
+              {
+                &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+              }
+            ],
+            &quot;ancillaryRefs&quot;: [],
+            &quot;regulatoryConditions&quot;: [
+              &quot;CIV&quot;
+            ],
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+            &quot;summary&quot;: &quot;Class 2 bed, 5/9/2026 8:00:00 AM +02:00 - 5/10/2026 6:00:00 AM +02:00, urn:uic:stn:8400058 - urn:uic:stn:8000600, JohnUpdate Doe&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;confirmedOn&quot;: &quot;2026-04-29T11:17:04.357229Z&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 11600,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 11600,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+                &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;9dea1dd0-d06e-4b55-989a-6e3223946a42&quot;,
+                &quot;legIds&quot;: [
+                  &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+                  &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: true,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;YES&quot;,
+            &quot;exchangeable&quot;: &quot;YES&quot;,
+            &quot;appliedCorporateCodes&quot;: [],
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;passengerRef&quot;: &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;,
+                &quot;type&quot;: &quot;ADULT&quot;,
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;tripCoverage&quot;: {
+                  &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;
+                },
+                &quot;appliedReductionCardTypes&quot;: []
+              }
+            ],
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          }
+        ],
+        &quot;reservations&quot;: [
+          {
+            &quot;placeAllocation&quot;: {
+              &quot;accommodationType&quot;: &quot;COUCHETTE&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;reservedPlaces&quot;: [
+                {
+                  &quot;id&quot;: &quot;3875&quot;,
+                  &quot;passengerIds&quot;: [
+                    &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+                  ],
+                  &quot;vehicleNumber&quot;: &quot;27&quot;,
+                  &quot;coachNumber&quot;: &quot;27&quot;,
+                  &quot;placeDescription&quot;: &quot;21-26&quot;,
+                  &quot;placeNumbers&quot;: [
+                    &quot;22&quot;
+                  ],
+                  &quot;placeProperties&quot;: [
+                    &quot;MEN&quot;,
+                    &quot;LOWER_BED&quot;
+                  ]
+                }
+              ],
+              &quot;tripLegCoverage&quot;: {
+                &quot;tripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+                &quot;legId&quot;: &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              }
+            },
+            &quot;feeRefs&quot;: [],
+            &quot;availablePlacePreferences&quot;: [
+              {
+                &quot;graphicalReservation&quot;: &quot;WITHOUT_FEE&quot;
+              }
+            ],
+            &quot;objectType&quot;: &quot;Reservation&quot;,
+            &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;confirmedOn&quot;: &quot;2026-04-29T11:17:04.359323Z&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 9700,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 9700,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;47016e77-fd93-42d1-87b5-619277fbe400&quot;,
+                &quot;legIds&quot;: [
+                  &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: true,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;YES&quot;,
+            &quot;exchangeable&quot;: &quot;YES&quot;,
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          },
+          {
+            &quot;placeAllocation&quot;: {
+              &quot;accommodationType&quot;: &quot;SEAT&quot;,
+              &quot;accommodationSubType&quot;: &quot;ANY_SEAT&quot;,
+              &quot;reservedPlaces&quot;: [
+                {
+                  &quot;id&quot;: &quot;3874&quot;,
+                  &quot;passengerIds&quot;: [
+                    &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+                  ],
+                  &quot;vehicleNumber&quot;: &quot;10&quot;,
+                  &quot;coachNumber&quot;: &quot;10&quot;,
+                  &quot;placeNumbers&quot;: [
+                    &quot;4&quot;
+                  ],
+                  &quot;placeProperties&quot;: [
+                    &quot;AISLE&quot;
+                  ]
+                }
+              ],
+              &quot;tripLegCoverage&quot;: {
+                &quot;tripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+                &quot;legId&quot;: &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+              }
+            },
+            &quot;feeRefs&quot;: [],
+            &quot;availablePlacePreferences&quot;: [
+              {
+                &quot;graphicalReservation&quot;: &quot;WITHOUT_FEE&quot;
+              }
+            ],
+            &quot;objectType&quot;: &quot;Reservation&quot;,
+            &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+            &quot;confirmableUntil&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+            &quot;validFrom&quot;: &quot;2026-05-09T06:00:00+00:00&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-10T04:00:00+00:00&quot;,
+            &quot;confirmedOn&quot;: &quot;2026-04-29T11:17:04.361795Z&quot;,
+            &quot;price&quot;: {
+              &quot;vats&quot;: [],
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2
+            },
+            &quot;originalPrice&quot;: {
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;amount&quot;: 0,
+              &quot;scale&quot;: 2
+            },
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+              &quot;coveredLegIds&quot;: [
+                &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+              ]
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;79ed74c2-86ef-4c92-a516-e7b12458fb25&quot;,
+                &quot;legIds&quot;: [
+                  &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;
+                ]
+              }
+            ],
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;hasBeenInSoldStatus&quot;: true,
+            &quot;offerMode&quot;: &quot;INDIVIDUAL&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;8cd1ec52-1530-483b-9495-b43b00b9f2d9&quot;
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;appliedPromotionCodes&quot;: [],
+            &quot;appliedReductions&quot;: []
+          }
+        ],
+        &quot;ancillaries&quot;: [],
+        &quot;fees&quot;: [],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredTripId&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+          &quot;coveredLegIds&quot;: [
+            &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+            &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;
+          ]
+        },
+        &quot;appliedThroughTicketTags&quot;: [],
+        &quot;products&quot;: [
+          {
+            &quot;id&quot;: &quot;9dea1dd0-d06e-4b55-989a-6e3223946a42&quot;,
+            &quot;summary&quot;: &quot;Class 2 bed&quot;,
+            &quot;type&quot;: &quot;ADMISSION_POINT2POINT&quot;,
+            &quot;code&quot;: &quot;C2B&quot;,
+            &quot;description&quot;: &quot;Class 2 bed&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;2nd Class couchette refundable&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;FULL_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;FIRST&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          },
+          {
+            &quot;id&quot;: &quot;47016e77-fd93-42d1-87b5-619277fbe400&quot;,
+            &quot;summary&quot;: &quot;Class 2 TER bed&quot;,
+            &quot;type&quot;: &quot;RESERVATION&quot;,
+            &quot;code&quot;: &quot;TERB&quot;,
+            &quot;description&quot;: &quot;Class 2 TER bed&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;2 class bed&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;FULL_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;SECOND&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          },
+          {
+            &quot;id&quot;: &quot;79ed74c2-86ef-4c92-a516-e7b12458fb25&quot;,
+            &quot;summary&quot;: &quot;Class 1 TER&quot;,
+            &quot;type&quot;: &quot;RESERVATION&quot;,
+            &quot;code&quot;: &quot;C1TER&quot;,
+            &quot;description&quot;: &quot;Class 1 TER&quot;,
+            &quot;owner&quot;: &quot;1100&quot;,
+            &quot;conditions&quot;: [
+              {
+                &quot;type&quot;: &quot;SALE&quot;,
+                &quot;description&quot;: &quot;Class 1 seat&quot;
+              }
+            ],
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;type&quot;: &quot;STANDARD&quot;,
+              &quot;name&quot;: &quot;Standard&quot;
+            },
+            &quot;travelClass&quot;: &quot;FIRST&quot;,
+            &quot;isTrainBound&quot;: true,
+            &quot;isReturnProduct&quot;: false,
+            &quot;fulfillmentOptions&quot;: [
+              {
+                &quot;type&quot;: &quot;ETICKET&quot;,
+                &quot;media&quot;: &quot;PDF_A4&quot;
+              }
+            ],
+            &quot;descriptiveTexts&quot;: [],
+            &quot;freeItemCount&quot;: 0,
+            &quot;productTags&quot;: []
+          }
+        ]
+      }
+    ],
+    &quot;trips&quot;: [
+      {
+        &quot;id&quot;: &quot;13acb3cd-7cfe-4e7e-960c-12b367d2d249&quot;,
+        &quot;externalRef&quot;: &quot;c1e1e86f-5e36-4fc4-8b70-7242e29f6d65&quot;,
+        &quot;duration&quot;: &quot;PT22H&quot;,
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;origin&quot;: {
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;,
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+        },
+        &quot;destination&quot;: {
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000600&quot;,
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+        },
+        &quot;startTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;,
+        &quot;endTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;,
+        &quot;transfers&quot;: 1,
+        &quot;legs&quot;: [
+          {
+            &quot;id&quot;: &quot;3c9c22fd-80fa-4466-860b-91dedb50ba47&quot;,
+            &quot;externalRef&quot;: &quot;a06a0742-a0ab-49ae-814d-0ebf5907d27c&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;start&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Amsterdam Centraal&quot;,
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-09T08:00:00+02:00&quot;
+                }
+              },
+              &quot;intermediates&quot;: [
+                {
+                  &quot;stopPlaceRef&quot;: {
+                    &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400621&quot;,
+                    &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                  },
+                  &quot;stopPlaceName&quot;: &quot;Utrecht Centraal&quot;,
+                  &quot;serviceArrival&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T09:30:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T09:30:00+02:00&quot;
+                  },
+                  &quot;serviceDeparture&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T09:40:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T09:40:00+02:00&quot;
+                  }
+                },
+                {
+                  &quot;stopPlaceRef&quot;: {
+                    &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8049700&quot;,
+                    &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                  },
+                  &quot;stopPlaceName&quot;: &quot;Osnabrück Hbf&quot;,
+                  &quot;serviceArrival&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T12:55:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T12:55:00+02:00&quot;
+                  },
+                  &quot;serviceDeparture&quot;: {
+                    &quot;timetabledTime&quot;: &quot;2026-05-09T13:00:00+02:00&quot;,
+                    &quot;observedTime&quot;: &quot;2026-05-09T13:00:00+02:00&quot;
+                  }
+                }
+              ],
+              &quot;end&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000152&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Hannover Hbf&quot;,
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-09T14:40:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-09T14:40:00+02:00&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                  &quot;name&quot;: &quot;Train&quot;,
+                  &quot;shortName&quot;: &quot;Train&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Express train&quot;,
+                  &quot;shortName&quot;: &quot;ST&quot;,
+                  &quot;productCategoryRef&quot;: &quot;ST&quot;
+                },
+                &quot;publishedServiceName&quot;: &quot;2 East-West Express&quot;,
+                &quot;vehicleNumbers&quot;: [
+                  &quot;21&quot;
+                ],
+                &quot;lineNumbers&quot;: [
+                  &quot;2 East-West Express&quot;
+                ],
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;1100&quot;,
+                    &quot;name&quot;: &quot;Turnit Express&quot;
+                  }
+                ],
+                &quot;attributes&quot;: []
+              },
+              &quot;duration&quot;: &quot;PT6H40M&quot;,
+              &quot;isUnreservedService&quot;: false
+            },
+            &quot;isActive&quot;: true
+          },
+          {
+            &quot;id&quot;: &quot;86d9ea0b-2650-4777-8f06-01d782810d44&quot;,
+            &quot;externalRef&quot;: &quot;1bd33d3e-133f-44bc-bd9e-42032d1dcf90&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;start&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000152&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Hannover Hbf&quot;,
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-10T01:10:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-10T01:10:00+02:00&quot;
+                }
+              },
+              &quot;intermediates&quot;: [],
+              &quot;end&quot;: {
+                &quot;stopPlaceRef&quot;: {
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8000600&quot;,
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Muenchen Hbf&quot;,
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;,
+                  &quot;observedTime&quot;: &quot;2026-05-10T06:00:00+02:00&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;,
+                  &quot;name&quot;: &quot;Train&quot;,
+                  &quot;shortName&quot;: &quot;Train&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Express train&quot;,
+                  &quot;shortName&quot;: &quot;ST&quot;,
+                  &quot;productCategoryRef&quot;: &quot;ST&quot;
+                },
+                &quot;publishedServiceName&quot;: &quot;North-South Express&quot;,
+                &quot;vehicleNumbers&quot;: [
+                  &quot;13&quot;
+                ],
+                &quot;lineNumbers&quot;: [
+                  &quot;1 North-South Express&quot;
+                ],
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;1100&quot;,
+                    &quot;name&quot;: &quot;Turnit Express&quot;
+                  }
+                ],
+                &quot;attributes&quot;: []
+              },
+              &quot;duration&quot;: &quot;PT4H50M&quot;,
+              &quot;isUnreservedService&quot;: false
+            },
+            &quot;isActive&quot;: true
+          }
+        ],
+        &quot;tripStatus&quot;: {
+          &quot;unplanned&quot;: false,
+          &quot;cancelled&quot;: false,
+          &quot;deviation&quot;: false,
+          &quot;delayed&quot;: false,
+          &quot;infeasible&quot;: false
+        }
+      }
+    ],
+    &quot;confirmationTimeLimit&quot;: &quot;2026-04-29T11:36:59.100929Z&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+        &quot;bookingRef&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+        &quot;summary&quot;: &quot;Fulfillment for booking part 260429357060&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-29T11:16:59.166269Z&quot;,
+        &quot;status&quot;: &quot;FULFILLED&quot;,
+        &quot;controlNumber&quot;: &quot;260429357060&quot;,
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+          },
+          {
+            &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+          },
+          {
+            &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+          }
+        ],
+        &quot;issuer&quot;: &quot;1100&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;TICKET&quot;,
+            &quot;downloadLink&quot;: &quot;https://api.sandbox.turnit.tech/retailer/ticket/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+            &quot;format&quot;: &quot;application/pdf&quot;
+          },
+          {
+            &quot;medium&quot;: &quot;PKPASS&quot;,
+            &quot;type&quot;: &quot;TICKET&quot;,
+            &quot;downloadLink&quot;: &quot;https://api.sandbox.turnit.tech/retailer/pkpass/0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+            &quot;format&quot;: &quot;application/vnd.apple.pkpass&quot;
+          }
+        ],
+        &quot;fulfillmentParts&quot;: [
+          {
+            &quot;securityFeatures&quot;: [
+              {
+                &quot;type&quot;: {
+                  &quot;type&quot;: &quot;BAR_CODE&quot;,
+                  &quot;format&quot;: &quot;PNG&quot;,
+                  &quot;symbology&quot;: &quot;AZTEC&quot;
+                },
+                &quot;data&quot;: &quot;iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAABHNCSVQICAgIfAhkiAAAAwJJREFUeJzt3cFu2kAARVFc8f+/7O5QFuUmtdWZYXrOmgjHcDWbJ3Oc53k+gD/6NfsCYGXP2RfwE8dx/PXfjDoYr1zbKFfuwcr3egYnCASBQBAIBIFAEAgEgUAQCASBQBAIBIFAEAgEgUB4jRVHje6uDNt2G8OtPKRc+V7P+I46QSAIBIJAIAgEgkAgCASCQCAIBIJAIAgEgkAgCATC8CcrrjyKXPl9DA/ncIJAEAgEgUAQCASBQBAIBIFAEAgEgUAQCASBQBAIhOMcvGj7lJEa/y9PVoQfEggEgUAQCASBQBAIBIFAEAgEgUAQCASBQBAIhFs/Az3qJ513e6rgbkZ9PjOGrk4QCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEgEAgCgfAaKxoReurj47H25zNj4OgEgSAQCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEgEAjP71/y3srDtlFWvgcrjy9XvravnCAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4dZY8YpPGan9S7s9kXIUT1aExQgEgkAgCASCQCAIBIJAIAgEgkAgCASCQCAIBMKtsaLh4TWGh+PcvddOEAgCgSAQCAKBIBAIAoEgEAgCgSAQCAKBIBAIAoEw/Gegdxs47vb/jPIpg00nCASBQBAIBIFAEAgEgUAQCASBQBAIBIFAEAgEgUB4jRVHje5WHjh+yoBuByuPPL9+D5wgEAQCQSAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAuE1VtxtqLfyGI5rZnxHnSAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4daTFUeNx0a9z6h7sPK9Xvnarrj7/zhBIAgEgkAgCASCQCAIBIJAIAgEgkAgCASCQCAIBMLz+5e8t9uw7YqV78FuT5ecca+dIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQCQSAQBAJh+M9A7zagG2XlUeTOnCAQBAJBIBAEAkEgEAQCQSAQBAJBIBAEAkEgEAQC4Tgt2uAtJwgEgUD4DTYKkZJZ5GQJAAAAAElFTkSuQmCC&quot;
+              },
+              {
+                &quot;type&quot;: {
+                  &quot;type&quot;: &quot;BAR_CODE&quot;,
+                  &quot;format&quot;: &quot;TEXT&quot;,
+                  &quot;symbology&quot;: &quot;AZTEC&quot;
+                },
+                &quot;data&quot;: &quot;MjYwNDI5MzU3MDYw&quot;
+              }
+            ],
+            &quot;status&quot;: &quot;FULFILLED&quot;
+          }
+        ]
+      }
+    ],
+    &quot;paymentMethods&quot;: [],
+    &quot;pendingVouchers&quot;: []
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<details class="section-details">
+  <summary class="section-title">💰 Refund (2 requests) <span class="abadge abadge-ok">15 passed</span> <span class="abadge abadge-fail">2 failed</span></summary>
+  
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-POST">POST</span>
+      <span class="rname">10. POST Refund Offers</span>
+      <span class="abadge abadge-ok">15 ✅</span> <span class="abadge abadge-fail">1 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 258 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 15</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 258 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/bookings/18e8b333-5ac3-4ebf-9c44-deaa1a984057/refund-offers</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (15)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'refundOffers' array exists with 1 refund offer(s)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer at index 0 has a valid Offer Id 618b60e3-ba34-4039-b77c-13bd554ed5f6</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] has valid status, expected: PROPOSED, actual: PROPOSED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] validFrom is valid: 2026-04-29T11:17:06.0581719Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] validUntil is valid and approximately 15 minutes in the future: 2026-04-29T11:32:06.0581719Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] validFrom is before or equal to validUntil (OSDM: temporal order)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AppliedOverruleCode is valid, (expected: appliedOverruleCode = PAYMENT_FAILURE, actual: expectedOverruleCode = PAYMENT_FAILURE)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund financial identity: refundFee(0) + refundableAmount(21300) = confirmedPrice(21300) (OSDM: integer arithmetic)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] refundableAmount exists and is valid, amount: 21300, currency: EUR</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] refundFee exists and is valid, amount: 0, currency: EUR</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] fulfillments is a non-empty array (OSDM: minItems:1)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] has valid reimbursementStatus: IMMEDIATE</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] has 1 breakdown(s)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] breakdown[0] is valid, refundFee amount: 0, refundableAmount amount: 21300</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">[OSDM] Content-Type is application/json</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (1)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Refund offer[0] createdOn is valid and in the past: 2026-04-29T11:17:06.0581719Z</span>
+          <div class="te">expected 1777461426058 to be at most 1777461420468</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (47)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 10. POST Refund Offers
+[LOG] [INFO] ➤ requestRefundOffersBody
+[INFO] [INFO] ➤ requestRefundOffersBody
+[INFO] [INFO] ➤ postPatchRefundOfferResponse
+[INFO] [INFO] 'refundOffers' array exists with 1 refund offer(s)
+[INFO] [INFO] ✅ 'refundOffers' array exists with 1 refund offer(s)
+[INFO] [INFO] ➤ validateRefundOfferResponse
+[INFO] [INFO] Validating refund offer at index 0
+[INFO] [INFO] Refund offer at index 0 has a valid Offer Id 618b60e3-ba34-4039-b77c-13bd554ed5f6
+[INFO] [INFO] ✅ Refund offer at index 0 has a valid Offer Id 618b60e3-ba34-4039-b77c-13bd554ed5f6
+[INFO] [INFO] Refund offer[0] has valid status, expected: PROPOSED, actual: PROPOSED
+[INFO] [INFO] ✅ Refund offer[0] has valid status, expected: PROPOSED, actual: PROPOSED
+[WARN] [WARNING] ❌ Refund offer[0] createdOn is valid and in the past: 2026-04-29T11:17:06.0581719Z: expected 1777461426058 to be at most 1777461420468
+[INFO] [INFO] Refund offer[0] validFrom is valid: 2026-04-29T11:17:06.0581719Z
+[INFO] [INFO] ✅ Refund offer[0] validFrom is valid: 2026-04-29T11:17:06.0581719Z
+[INFO] [INFO] Refund offer[0] validUntil is valid and approximately 15 minutes in the future: 2026-04-29T11:32:06.0581719Z
+[INFO] [INFO] ✅ Refund offer[0] validUntil is valid and approximately 15 minutes in the future: 2026-04-29T11:32:06.0581719Z
+[INFO] [INFO] Refund offer[0] temporal order OK: validFrom=2026-04-29T11:17:06.0581719Z ≤ validUntil=2026-04-29T11:32:06.0581719Z
+[INFO] [INFO] ✅ Refund offer[0] validFrom is before or equal to validUntil (OSDM: temporal order)
+[INFO] [INFO] ExpectedOverruleCode: PAYMENT_FAILURE
+[INFO] [INFO] AppliedOverruleCode: PAYMENT_FAILURE
+[INFO] [INFO] ✅ AppliedOverruleCode is valid, (expected: appliedOverruleCode = PAYMENT_FAILURE, actual: expectedOverruleCode = PAYMENT_FAILURE)
+[INFO] [INFO] Refund offer[0] refundableAmount: 21300 EUR
+[INFO] [INFO] confirmedPriceAmount: 21300
+[INFO] [INFO] RefundOffer.refundableAmount.amount: 21300
+[INFO] [INFO] RefundOffer.refundFee.amount: 0
+[INFO] [INFO] OverruleCode: PAYMENT_FAILURE
+[INFO] [INFO] Financial identity verified (scaled): 0 + 2130000 = 2130000
+[INFO] [INFO] ✅ Refund financial identity: refundFee(0) + refundableAmount(21300) = confirmedPrice(21300) (OSDM: integer arithmetic)
+[INFO] [INFO] ✅ Refund offer[0] refundableAmount exists and is valid, amount: 21300, currency: EUR
+[INFO] [INFO] Refund offer[0] refundFee: 0 EUR
+[INFO] [INFO] ✅ Refund offer[0] refundFee exists and is valid, amount: 0, currency: EUR
+[INFO] [INFO] Refund offer[0] has 1 fulfillment(s)
+[INFO] [INFO] ✅ Refund offer[0] fulfillments is a non-empty array (OSDM: minItems:1)
+[INFO] [INFO] Refund offer[0] has valid reimbursementStatus: IMMEDIATE
+[INFO] [INFO] ✅ Refund offer[0] has valid reimbursementStatus: IMMEDIATE
+[INFO] [INFO] Refund offer[0] has 1 breakdown(s)
+[INFO] [INFO] ✅ Refund offer[0] has 1 breakdown(s)
+[INFO] [INFO] Refund offer[0] breakdown[0] refundFee: 0 EUR
+[INFO] [INFO] Refund offer[0] breakdown[0] is valid, refundFee amount: 0, refundableAmount amount: 21300 bookingParts=3, fulfillmentId=0b78cafe-9ffc-4e88-955f-a33bb87ab2bb
+[INFO] [INFO] ✅ Refund offer[0] breakdown[0] is valid, refundFee amount: 0, refundableAmount amount: 21300
+[INFO] [INFO] Refund offer[0] breakdown[0] bookingParts IDs: 0b78cafe-9ffc-4e88-955f-a33bb87ab2bb, 3e9a94e7-c583-491c-9e74-300f5cc87cca, 124f2f26-20be-4a8a-82e3-9f6ca5543942
+[INFO] [INFO] Stored refundOffersOfferId: 618b60e3-ba34-4039-b77c-13bd554ed5f6
+[INFO] [INFO] ✅ [OSDM] Content-Type is application/json</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.0.5</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;fulfillmentIds&quot;: [
+    &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+  ],
+  &quot;overruleCode&quot;: &quot;PAYMENT_FAILURE&quot;
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;refundOffers&quot;: [
+    {
+      &quot;id&quot;: &quot;618b60e3-ba34-4039-b77c-13bd554ed5f6&quot;,
+      &quot;summary&quot;: &quot;Refund offer&quot;,
+      &quot;createdOn&quot;: &quot;2026-04-29T11:17:06.0581719Z&quot;,
+      &quot;validFrom&quot;: &quot;2026-04-29T11:17:06.0581719Z&quot;,
+      &quot;validUntil&quot;: &quot;2026-04-29T11:32:06.0581719Z&quot;,
+      &quot;status&quot;: &quot;PROPOSED&quot;,
+      &quot;reimbursementStatus&quot;: &quot;IMMEDIATE&quot;,
+      &quot;appliedOverruleCode&quot;: &quot;PAYMENT_FAILURE&quot;,
+      &quot;refundOfferBreakDown&quot;: [
+        {
+          &quot;refundFee&quot;: {
+            &quot;vats&quot;: [],
+            &quot;currency&quot;: &quot;EUR&quot;,
+            &quot;amount&quot;: 0,
+            &quot;scale&quot;: 2
+          },
+          &quot;refundableAmount&quot;: {
+            &quot;vats&quot;: [],
+            &quot;currency&quot;: &quot;EUR&quot;,
+            &quot;amount&quot;: 21300,
+            &quot;scale&quot;: 2
+          },
+          &quot;bookingParts&quot;: [
+            {
+              &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+            },
+            {
+              &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+            },
+            {
+              &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+            }
+          ],
+          &quot;fulfillmentId&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+        }
+      ],
+      &quot;fulfillments&quot;: [
+        {
+          &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;,
+          &quot;bookingRef&quot;: &quot;18e8b333-5ac3-4ebf-9c44-deaa1a984057&quot;,
+          &quot;createdOn&quot;: &quot;2026-04-29T11:17:00.343001Z&quot;,
+          &quot;status&quot;: &quot;FULFILLED&quot;,
+          &quot;controlNumber&quot;: &quot;260429357060&quot;,
+          &quot;bookingParts&quot;: [
+            {
+              &quot;id&quot;: &quot;0b78cafe-9ffc-4e88-955f-a33bb87ab2bb&quot;
+            },
+            {
+              &quot;id&quot;: &quot;3e9a94e7-c583-491c-9e74-300f5cc87cca&quot;
+            },
+            {
+              &quot;id&quot;: &quot;124f2f26-20be-4a8a-82e3-9f6ca5543942&quot;
+            }
+          ],
+          &quot;issuer&quot;: &quot;1100&quot;
+        }
+      ],
+      &quot;refundFee&quot;: {
+        &quot;vats&quot;: [],
+        &quot;currency&quot;: &quot;EUR&quot;,
+        &quot;amount&quot;: 0,
+        &quot;scale&quot;: 2
+      },
+      &quot;refundableAmount&quot;: {
+        &quot;vats&quot;: [],
+        &quot;currency&quot;: &quot;EUR&quot;,
+        &quot;amount&quot;: 21300,
+        &quot;scale&quot;: 2
+      }
+    }
+  ]
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-red">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">11. GET Refund Offer</span>
+      <span class="abadge abadge-ok">0 ✅</span> <span class="abadge abadge-fail">1 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 405</span>
+      <span class="rtime">⏱ 144 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 405</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 144 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-err">405</span>
+    <span class="ru-small">https://api.sandbox.turnit.tech/retailer/bookings/18e8b333-5ac3-4ebf-9c44-deaa1a984057/refund-offers/618b60e3-ba34-4039-b77c-13bd554ed5f6</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (1)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (5)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://api.sandbox.turnit.tech/retailer
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/turnit-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 11. GET Refund Offer
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/problem+json; charset=utf-8': expected 'application/problem+json; charset=utf…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer 37Axxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.0.5</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">eyJxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;type&quot;: &quot;https://httpstatuses.io/405&quot;,
+  &quot;title&quot;: &quot;Method Not Allowed&quot;,
+  &quot;status&quot;: 405,
+  &quot;traceId&quot;: &quot;0HNL08UBPNGH4:0000000D/38f0f50c-e3fc-48a5-bbf5-567875d1f3f0&quot;
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<div class="foot">
+  Generated by OTST Bruno Collection &mdash; Wed, 29 Apr 2026 11:17:00 GMT
+</div>
+
+</body>
+</html>

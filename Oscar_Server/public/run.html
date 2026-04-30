@@ -1,0 +1,365 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - New Run</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-text{display:flex;flex-direction:column;line-height:1.3}
+.uic-banner-name{font-size:18px;font-weight:900;color:#3C3C3B;letter-spacing:2px}
+.uic-banner-sub{font-size:11px;color:#90a4ae}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:640px;margin:30px auto;padding:0 16px}
+h2{color:#0090D4;font-size:20px;margin-bottom:18px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:26px;margin-bottom:20px}
+.card h3{font-size:13px;color:#455a64;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #eceff1}
+.field{margin-bottom:14px}
+label{display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.val{padding:9px 11px;background:#f5f7f9;border:1px solid #eceff1;border-radius:6px;font-size:13px;color:#37474f;word-break:break-all}
+.val.missing{color:#e65100;font-style:italic}
+.badge{display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700}
+.badge-ok{background:#e8f5e9;color:#2e7d32}
+.badge-warn{background:#fff3e0;color:#e65100}
+.badge-oauth{background:#e3f2fd;color:#1565c0}
+.btn{padding:12px 24px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:15px}
+.btn-run{background:#2e7d32;color:#fff;width:100%}
+.btn-run:hover{background:#1b5e20}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+.btn-run:disabled{background:#a5d6a7;cursor:not-allowed}
+.warn-box{background:#fff3e0;border:1px solid #ffcc80;color:#e65100;padding:11px 15px;border-radius:6px;margin-bottom:16px;font-size:13px}
+.warn-box a{color:#0090D4;font-weight:700}
+.info-box{background:#e3f2fd;border:1px solid #90caf9;color:#1565c0;padding:11px 15px;border-radius:6px;margin-bottom:16px;font-size:13px}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'run');</script>
+</header>
+
+<div class="container">
+  <h2>&#9654; New Conformance Test Run</h2>
+
+  <div id="warn" class="warn-box" style="display:none"></div>
+  <div id="info" class="info-box" style="display:none"></div>
+
+  <!-- Run configuration summary -->
+  <div class="card">
+    <h3>Run Configuration (your credentials + your company)</h3>
+    <div class="field">
+      <label>OSDM API Endpoint</label>
+      <div id="cfg-endpoint" class="val missing">Not configured</div>
+    </div>
+    <div class="field">
+      <label>Authentication Mode</label>
+      <div id="cfg-auth" class="val">-</div>
+    </div>
+    <div class="field">
+      <label>Credentials</label>
+      <div id="cfg-creds" class="val missing">Not configured</div>
+    </div>
+    <div class="field">
+      <label>Requestor</label>
+      <div id="cfg-requestor" class="val" style="color:#90a4ae;font-style:italic">Not set (optional)</div>
+    </div>
+    <div class="field">
+      <label>Subscription Key</label>
+      <div id="cfg-subscription-key" class="val" style="color:#90a4ae;font-style:italic">Not set (optional)</div>
+    </div>
+    <div class="field">
+      <label>Test Configuration</label>
+      <div id="cfg-datafile" class="val missing">Not configured</div>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+      <a href="/profile.html"  style="font-size:12px;color:#1a3a6b">✏️ Edit API Config →</a>
+      <a href="/scenarios.html" style="font-size:12px;color:#1a3a6b">🧪 Edit Test Config →</a>
+    </div>
+  </div>
+
+  <!-- Company Queue Status -->
+  <div class="card" id="queue-panel" style="display:none">
+    <h3>Company Queue</h3>
+    <div id="queue-status-content"></div>
+  </div>
+
+  <!-- Launch -->
+  <div class="card">
+    <h3>Launch</h3>
+    <p style="color:#546e7a;margin-bottom:16px;font-size:13px">
+      OSCAR will execute the full OTST Bruno collection against your API endpoint using the
+      configuration above. The run is asynchronous - you will be redirected to the live log view.
+    </p>
+    <p style="color:#78909c;font-size:12px;margin-bottom:14px">
+      Each scenario runs independently in parallel. Concurrency is controlled by your test framework configuration.
+    </p>
+    <button class="btn btn-run" id="run-btn" data-action="start-run" disabled>&#9654; Start Conformance Test Run</button>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+const warnEl = document.getElementById('warn');
+function showWarn(msg) { warnEl.innerHTML = msg; warnEl.style.display = 'block'; }
+function addWarn(msg)  {
+  warnEl.innerHTML += (warnEl.style.display === 'none' ? '' : '<br>') + msg;
+  warnEl.style.display = 'block';
+}
+
+async function loadProfile() {
+  // Two endpoints since v12: company-shared bits (api_base, datafile_*) and
+  // per-tester credentials (auth_mode, OAuth profile, has_token, etc.) live
+  // in different resources. Fetch both in parallel.
+  const [companyRes, credsRes] = await Promise.all([
+    fetch('/v1/company',         { headers: { Authorization: `Bearer ${token}` } }),
+    fetch('/v1/me/credentials',  { headers: { Authorization: `Bearer ${token}` } })
+  ]);
+  if (!companyRes.ok || !credsRes.ok) return;
+  const c = await companyRes.json();   // { api_base, datafile_*, ... }
+  const m = await credsRes.json();     // { auth_mode, has_token, has_client_id, ... }
+
+  let apiReady  = true;
+  let testReady = false;
+  const warnings = [];
+
+  // Endpoint (company-shared)
+  if (c.api_base) {
+    document.getElementById('cfg-endpoint').textContent = c.api_base;
+    document.getElementById('cfg-endpoint').classList.remove('missing');
+  } else {
+    document.getElementById('cfg-endpoint').textContent = '⚠  Not configured';
+    warnings.push('API endpoint is not set — go to <a href="/profile.html">API Config</a>.');
+    apiReady = false;
+  }
+
+  // Auth mode (per-tester)
+  const authMode = m.auth_mode === 'oauth2' ? 'OAuth2 Client Credentials' : 'Bearer Token';
+  document.getElementById('cfg-auth').innerHTML = `<span class="badge ${m.auth_mode === 'oauth2' ? 'badge-oauth' : 'badge-ok'}">${authMode}</span>`;
+
+  // Credentials (per-tester)
+  if (m.auth_mode === 'bearer' && m.has_token) {
+    document.getElementById('cfg-creds').innerHTML = '<span class="badge badge-ok">✓ Bearer token configured</span>';
+    document.getElementById('cfg-creds').classList.remove('missing');
+  } else if (m.auth_mode === 'oauth2' && m.has_client_id && m.has_client_secret && m.token_url) {
+    document.getElementById('cfg-creds').innerHTML = '<span class="badge badge-ok">✓ OAuth2 credentials configured</span>';
+    document.getElementById('cfg-creds').classList.remove('missing');
+  } else {
+    document.getElementById('cfg-creds').textContent = '⚠  Credentials not configured';
+    warnings.push('Authentication credentials are missing — go to <a href="/profile.html">API Config</a>.');
+    apiReady = false;
+  }
+
+  // Requestor (per-tester)
+  if (m.has_requestor) {
+    document.getElementById('cfg-requestor').innerHTML = '<span class="badge badge-ok">✓ Configured</span>';
+    document.getElementById('cfg-requestor').style.fontStyle = 'normal';
+    document.getElementById('cfg-requestor').style.color = '';
+  }
+
+  // Subscription Key (per-tester)
+  if (m.has_subscription_key) {
+    document.getElementById('cfg-subscription-key').innerHTML = '<span class="badge badge-ok">✓ Configured</span>';
+    document.getElementById('cfg-subscription-key').style.fontStyle = 'normal';
+    document.getElementById('cfg-subscription-key').style.color = '';
+  }
+
+  // Test Configuration — fetch actual datafile to show scenariosToRun
+  const dfEl = document.getElementById('cfg-datafile');
+  if (!c.datafile_updated_at) {
+    dfEl.textContent = '⚠  No test configuration — set up in Test Config';
+    warnings.push('Test Configuration is not set up — go to <a href="/scenarios.html">Test Config</a> to upload or create one.');
+  } else {
+    // Fetch the datafile to read scenariosToRun
+    try {
+      const dfRes = await fetch('/v1/company/datafile', { headers: { Authorization: `Bearer ${token}` } });
+      if (dfRes.ok) {
+        const df = await dfRes.json();
+        const totalCount = (df.scenarios || []).length;
+        const toRun = df.scenariosToRun;
+        let toRunCount, toRunDesc, toRunBadgeClass;
+
+        if (toRun === 'ALL' || !Array.isArray(toRun)) {
+          toRunCount    = totalCount;
+          toRunDesc     = `All ${totalCount} scenario(s) — <a href="/scenarios.html">use Test Config to narrow this down</a>`;
+          toRunBadgeClass = 'badge-warn';
+        } else if (toRun.length === 0) {
+          toRunCount    = 0;
+          toRunDesc     = '⚠ 0 scenarios selected — run will fall back to ALL. <a href="/scenarios.html">Fix in Test Config</a>';
+          toRunBadgeClass = 'badge-warn';
+          warnings.push('scenariosToRun is empty — the runner will fall back to running ALL scenarios. <a href="/scenarios.html">Update Test Config</a>.');
+        } else {
+          toRunCount    = toRun.length;
+          toRunDesc     = toRun.length + ' of ' + totalCount + ' scenario(s) selected';
+          toRunBadgeClass = 'badge-ok';
+          testReady = true;
+        }
+
+        dfEl.innerHTML =
+          `<span class="badge ${toRunBadgeClass}">✓ Configured</span> ` +
+          `<span style="color:#546e7a;font-size:12px"> · ${toRunDesc}</span>` +
+          `<div style="font-size:11px;color:#90a4ae;margin-top:4px">Saved ${new Date(c.datafile_updated_at).toLocaleString()}</div>`;
+        dfEl.classList.remove('missing');
+      } else {
+        dfEl.innerHTML = '<span class="badge badge-warn">⚠ File missing on server</span>';
+        warnings.push('Test Configuration file is missing on the server — go to <a href="/scenarios.html">Test Config</a> to re-upload.');
+      }
+    } catch(_) {
+      dfEl.innerHTML = `<span class="badge badge-warn">Uploaded ${new Date(c.datafile_updated_at).toLocaleString()}</span>`;
+      dfEl.classList.remove('missing');
+      testReady = true;
+    }
+  }
+
+  // Aggregate warnings
+  if (warnings.length > 0) {
+    warnEl.innerHTML = '⚠&nbsp; ' + warnings.join('<br>⚠&nbsp; ');
+    warnEl.style.display = 'block';
+  }
+
+  const ready = apiReady && testReady;
+  document.getElementById('run-btn').disabled = !ready;
+}
+
+async function startRun() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Submitting...';
+
+  const res = await fetch('/v1/runs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ parallel: true })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showWarn(data.detail || data.title || 'Failed to start run.');
+    btn.disabled = false;
+    btn.textContent = '\u25B6 Start Conformance Test Run';
+    return;
+  }
+
+  alert('Batch submitted: ' + data.runs.length + ' scenarios queued (batch: ' + data.batch_id.slice(0, 8) + ')');
+  window.location.href = '/dashboard.html';
+}
+
+document.querySelector('[data-action="start-run"]').addEventListener('click', startRun);
+
+/* ── Queue Status Panel ── */
+async function pollQueueStatus() {
+  try {
+    const res = await fetch('/v1/runs/queue-status', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const panel = document.getElementById('queue-panel');
+    const content = document.getElementById('queue-status-content');
+
+    if (!data.runs || data.runs.length === 0) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+
+    const used = data.slots_used != null ? data.slots_used : data.runs.filter(function(r) { return r.status === 'RUNNING'; }).length;
+    const total = data.slots_total != null ? data.slots_total : '?';
+    const pct = data.slots_total ? Math.round((used / data.slots_total) * 100) : 0;
+
+    var html = '';
+    // Slot usage bar
+    html += '<div style="margin-bottom:14px">';
+    html += '<div style="font-size:12px;font-weight:700;color:#546e7a;margin-bottom:6px">' + used + '/' + total + ' slots used</div>';
+    html += '<div style="background:#eceff1;border-radius:4px;height:8px;overflow:hidden">';
+    html += '<div style="background:#0090D4;height:100%;width:' + pct + '%;border-radius:4px;transition:width .3s"></div>';
+    html += '</div></div>';
+
+    // Runs table
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+    html += '<thead><tr style="border-bottom:2px solid #eceff1;text-align:left">';
+    html += '<th style="padding:6px 8px;color:#78909c;font-size:11px;font-weight:700">#</th>';
+    html += '<th style="padding:6px 8px;color:#78909c;font-size:11px;font-weight:700">SCENARIO</th>';
+    html += '<th style="padding:6px 8px;color:#78909c;font-size:11px;font-weight:700">USER</th>';
+    html += '<th style="padding:6px 8px;color:#78909c;font-size:11px;font-weight:700">STATUS</th>';
+    html += '</tr></thead><tbody>';
+
+    var queuePos = 0;
+    data.runs.forEach(function(run) {
+      var pos = '';
+      if (run.status === 'QUEUED') { queuePos++; pos = '#' + queuePos; }
+
+      var scenario = run.scenario_code || 'All scenarios';
+      var email = run.user_email || '-';
+      var youBadge = run.is_current_user
+        ? ' <span style="background:#e3f2fd;color:#1565c0;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">you</span>'
+        : '';
+
+      var statusBadge = '';
+      if (run.status === 'RUNNING') {
+        statusBadge = '<span class="badge badge-ok" style="display:inline-flex;align-items:center;gap:4px">'
+          + '<svg width="12" height="12" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke="#2e7d32" stroke-width="3" fill="none" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>'
+          + 'RUNNING</span>';
+      } else {
+        statusBadge = '<span class="badge badge-warn">QUEUED</span>';
+      }
+
+      html += '<tr style="border-bottom:1px solid #f5f5f5">';
+      html += '<td style="padding:6px 8px;color:#90a4ae;font-weight:700">' + pos + '</td>';
+      html += '<td style="padding:6px 8px">' + scenario + '</td>';
+      html += '<td style="padding:6px 8px">' + email + youBadge + '</td>';
+      html += '<td style="padding:6px 8px">' + statusBadge + '</td>';
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    content.innerHTML = html;
+  } catch (e) {
+    // silently ignore fetch errors for queue polling
+  }
+}
+setInterval(pollQueueStatus, 5000);
+pollQueueStatus();
+
+loadProfile();
+</script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>
+
+

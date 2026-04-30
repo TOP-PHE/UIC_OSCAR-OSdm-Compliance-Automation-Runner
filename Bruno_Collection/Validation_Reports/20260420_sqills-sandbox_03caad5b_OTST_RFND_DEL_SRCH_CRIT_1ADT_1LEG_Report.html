@@ -1,0 +1,2504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTST Report — sqills-sandbox_03caad5b — 2026-04-20</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:20px 24px;background:#f0f2f5;color:#222;font-size:14px}
+h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
+
+/* Scenario info card */
+.scenario-card{background:#1a3a6b;color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+.scenario-card .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mi{background:rgba(255,255,255,.15);padding:4px 11px;border-radius:4px;font-size:12px;line-height:1.6}
+.ml{font-weight:700;margin-right:4px}
+
+/* Summary row */
+.sum{display:flex;gap:12px;margin-bottom:12px}
+.sc{flex:1;padding:12px;border-radius:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.sc .n{font-size:26px;font-weight:700;line-height:1.1}
+.sc .l{font-size:11px;opacity:.75;margin-top:3px}
+.st{background:#e3f2fd;color:#1565c0}
+.sp{background:#e8f5e9;color:#2e7d32}
+.sf{background:#ffebee;color:#c62828}
+
+/* Overall banner */
+.overall{text-align:center;padding:9px 14px;border-radius:6px;font-weight:700;font-size:13px;margin-bottom:18px}
+.overall-ok  {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.overall-fail{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.overall-auth{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+
+/* Section headings — collapsible */
+.section-details{margin:18px 0 4px;border:none}
+.section-details > .section-title{
+  font-size:13px;font-weight:700;color:#455a64;padding:8px 12px;
+  background:#eceff1;border-radius:5px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;list-style:none}
+.section-details > .section-title::-webkit-details-marker{display:none}
+.section-details > .section-title::marker{display:none}
+.section-details > .section-title:hover{background:#e0e5e8}
+.section-details[open] > .section-title{border-radius:5px 5px 0 0;background:#dde3e8}
+.section-details > .section-title::before{content:'▶';font-size:10px;color:#78909c;transition:transform .15s}
+.section-details[open] > .section-title::before{transform:rotate(90deg)}
+.section-note{font-weight:400;font-size:12px}
+
+/* Warning box */
+.warn-box{background:#fff3e0;border:1px solid #ffcc80;color:#e65100;padding:12px 16px;
+  border-radius:6px;margin-bottom:14px;font-size:13px}
+
+/* ── Request block container ──────────────────────────────────────── */
+.rb{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+/* Color coding: left border by assertion outcome */
+.rc-green {border-left:5px solid #4caf50}
+.rc-orange{border-left:5px solid #ff9800}
+.rc-red   {border-left:5px solid #f44336}
+
+/* ── Clickable request title ────────────────────────────────────────── */
+.req-details{border:none}
+.req-title{
+  padding:9px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  cursor:pointer;user-select:none;list-style:none;border-bottom:1px solid #eee;
+  font-size:13px}
+.req-title::-webkit-details-marker{display:none}
+.req-title::marker{display:none}
+.rc-green  .req-title{background:#f2faf2}
+.rc-orange .req-title{background:#fffbf2}
+.rc-red    .req-title{background:#fff5f5}
+.rc-green  .req-title:hover{background:#e8f5e9}
+.rc-orange .req-title:hover{background:#fff3e0}
+.rc-red    .req-title:hover{background:#ffebee}
+.req-details[open] .req-title{border-bottom:2px solid #e0e0e0}
+.req-title::before{content:'▶';font-size:9px;color:#90a4ae;transition:transform .15s;flex-shrink:0}
+.req-details[open] .req-title::before{transform:rotate(90deg)}
+
+/* ── Request body (detail view) ─────────────────────────────────────── */
+.req-body{}
+
+/* Summary stats bar */
+.req-summary{
+  display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+  padding:7px 14px;background:#f9f9f9;border-bottom:1px solid #eee;
+  font-size:12px;font-weight:600}
+.rsum-ok  {color:#2e7d32}
+.rsum-fail{color:#c62828}
+.rsum-time{color:#607d8b;font-weight:400}
+.rsum-sep {color:#ccc}
+.ru-small{flex:1;font-family:'Courier New',monospace;font-size:10px;
+  word-break:break-all;color:#90a4ae;font-weight:400}
+.rtime{font-size:11px;font-weight:500;color:#607d8b;white-space:nowrap;
+  background:#eceff1;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode{font-size:11px;font-weight:700;white-space:nowrap;padding:1px 7px;border-radius:9px;flex-shrink:0}
+.rcode-ok{background:#e8f5e9;color:#2e7d32}
+.rcode-err{background:#ffebee;color:#c62828}
+.rcode-warn{background:#fff8e1;color:#e65100}
+
+/* ── Assert sub-sections ────────────────────────────────────────────── */
+.assert-section{border-top:1px solid #f0f0f0}
+.assert-title{
+  padding:7px 14px;font-weight:600;font-size:12px;cursor:pointer;
+  user-select:none;list-style:none;display:flex;align-items:center;gap:6px}
+.assert-title::-webkit-details-marker{display:none}
+.assert-title::marker{display:none}
+.passed-title{color:#2e7d32;background:#f9fbf9}
+.passed-title:hover{background:#f1f8e9}
+.failed-title{color:#c62828;background:#fff9f9}
+.failed-title:hover{background:#ffebee}
+
+/* ── Sub-panels (req/resp headers+body) ─────────────────────────────── */
+.sub-summary{
+  padding:7px 14px;cursor:pointer;font-weight:500;font-size:12px;user-select:none;
+  list-style:none;display:flex;align-items:center;gap:6px;color:#546e7a;flex-wrap:wrap;
+  background:#fafafa}
+.sub-summary::-webkit-details-marker{display:none}
+.sub-summary::marker{display:none}
+.sub-summary:hover{background:#f0f0f0}
+
+/* ── Shared inner elements ──────────────────────────────────────────── */
+.ri{background:#607d8b;color:#fff;border-radius:50%;width:21px;height:21px;display:flex;align-items:center;
+  justify-content:center;font-size:10px;flex-shrink:0;font-weight:700}
+.rm{padding:2px 7px;border-radius:3px;font-weight:700;font-size:11px;flex-shrink:0}
+.rm-GET   {background:#e3f2fd;color:#1565c0}
+.rm-POST  {background:#e8f5e9;color:#2e7d32}
+.rm-PUT   {background:#fff8e1;color:#e65100}
+.rm-PATCH {background:#f3e5f5;color:#6a1b9a}
+.rm-DELETE{background:#ffebee;color:#c62828}
+.rname{font-weight:700;flex-shrink:0;color:#1a3a6b}
+.badge{padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;flex-shrink:0}
+.badge-ok  {background:#e8f5e9;color:#2e7d32}
+.badge-err {background:#ffebee;color:#c62828}
+.badge-warn{background:#fff8e1;color:#e65100}
+.abadge{padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;margin-left:2px}
+.abadge-ok  {background:#e8f5e9;color:#2e7d32}
+.abadge-fail{background:#ffebee;color:#c62828}
+
+/* Panel content */
+.panel{padding:12px 16px;background:#fafafa}
+.panel-lbl{font-size:10px;font-weight:700;color:#607d8b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.muted{font-size:12px;color:#90a4ae;font-style:italic;margin:4px 0}
+.hdrtbl{border-collapse:collapse;width:100%;font-size:11px;font-family:'Courier New',monospace}
+.hdrk{padding:2px 14px 2px 0;color:#607d8b;white-space:nowrap;vertical-align:top;font-weight:600}
+.hdrv{padding:2px 0;color:#37474f;word-break:break-all}
+
+/* Code blocks */
+.code{margin:0;padding:12px 16px;background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;
+  font-size:11px;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;
+  word-break:break-word;line-height:1.5}
+
+/* Test result rows */
+.tc{padding:6px 14px 8px}
+.no-assert{padding:6px 14px 8px;font-size:12px;color:#90a4ae;font-style:italic}
+.tr{padding:5px 9px;margin:3px 0;border-radius:4px;font-size:12px;display:flex;flex-direction:column}
+.tr-ok  {background:#f1f8e9;color:#33691e}
+.tr-fail{background:#ffebee;color:#b71c1c}
+.ti{margin-right:6px}
+.te{font-size:11px;margin-top:3px;padding:3px 8px;background:rgba(0,0,0,.06);border-radius:3px;
+  font-family:'Courier New',monospace;word-break:break-all;white-space:pre-wrap}
+
+/* Legend */
+.legend{background:#fff;border-radius:7px;padding:11px 16px;margin-bottom:16px;
+  font-size:12px;color:#546e7a;border:1px solid #e0e0e0}
+.legend b{color:#37474f}
+
+/* Color legend */
+.color-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.cl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.cl-green {background:#4caf50}
+.cl-orange{background:#ff9800}
+.cl-red   {background:#f44336}
+
+/* Footer */
+.foot{text-align:center;color:#bbb;font-size:11px;margin-top:20px;padding-top:10px;border-top:1px solid #e0e0e0}
+</style>
+</head>
+<body>
+
+<h1><img src="/oscar-icon.svg" alt="OSCAR" style="height:32px;vertical-align:middle;margin-right:10px">OTST Validation Report</h1>
+
+<div class="scenario-card">
+  <div class="row">
+    <div class="mi"><span class="ml">Date:</span>2026-04-20</div>
+    <div class="mi"><span class="ml">Environment:</span>sqills-sandbox_03caad5b</div>
+    <div class="mi"><span class="ml">API Version:</span>N/A</div>
+    <div class="mi"><span class="ml">Scenario Version:</span>3.4</div>
+    <div class="mi"><span class="ml">Scenario:</span>OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG</div>
+    <div class="mi"><span class="ml">Collection run:</span>Common Requests + Refund</div>
+    <div class="mi"><span class="ml">Type:</span>REFUND</div>
+  </div>
+</div>
+
+<div class="sum">
+  <div class="sc st"><div class="n">7</div><div class="l">OSDM Requests</div></div>
+  <div class="sc st"><div class="n">258</div><div class="l">OSDM Assertions</div></div>
+  <div class="sc sp"><div class="n">244</div><div class="l">Passed</div></div>
+  <div class="sc sf"><div class="n">14</div><div class="l">Failed</div></div>
+</div>
+
+<div class="overall overall-auth">
+  🔐 Authentication failed — check credentials in your environment file
+</div>
+
+<div class="legend">
+  <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
+  plus two global OSDM compliance checks on every response:
+  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
+  <div class="color-legend">
+    <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>
+    <div class="cl-item"><div class="cl-dot cl-orange"></div> 1–30% of assertions failed</div>
+    <div class="cl-item"><div class="cl-dot cl-red"></div> More than 30% of assertions failed</div>
+  </div>
+</div>
+
+
+
+<details class="section-details">
+  <summary class="section-title">🚂 Common Requests (5 requests) <span class="abadge abadge-ok">234 passed</span> <span class="abadge abadge-fail">12 failed</span></summary>
+  
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">12. GET Booking before Patch Refund</span>
+      <span class="abadge abadge-ok">32 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 300 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 32</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 300 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/Y60STO84?embed=ALL</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (32)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: Y60STO84, actual: Y60STO84)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b], actual: [595f5afb-43b9-4370-b897-fb3767d53f7b]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 1, actual: 1</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (78)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 12. GET Booking before Patch Refund
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: Y60STO84
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: Y60STO84
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] booking.confirmationTimeLimit absent → test skipped
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission refundable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission[0].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[0]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[105000] booking=[105000] intersection=[105000]
+[INFO] [INFO] admission price.currency: offer=[EUR] booking=[EUR] intersection=[EUR]
+[INFO] [INFO] admission price.scale: offer=[2] booking=[2] intersection=[2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-05-30T00:00:00Z' booking='2026-05-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: 'e7bf0fb3-9884-3dd8-8d34-d8df50d654c5' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[WARN] [WARNING] No booked ancillary[0] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSQQ69S9uwxF6zdUBdowjFKA==
+[WARN] [WARNING] No booked ancillary[1] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSpRFYhqAD6DwNp-Xpn6BPWA==
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: Y60STO84-001
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: Y60STO84
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: Y60STO84, actual: Y60STO84)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 595f5afb-43b9-4370-b897-fb3767d53f7b exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b], actual: [595f5afb-43b9-4370-b897-fb3767d53f7b]
+[INFO] [INFO] Fulfillment[0] has no document refs or documents (may be pre-issuance state)
+[INFO] [INFO] Booking passenger count - expected: 1, actual: 1
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 1, actual: 1
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;admissions&quot;: [
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:39Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;595f5afb-43b9-4370-b897-fb3767d53f7b&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 105000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;STAN_ABO2_M&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-30T00:00:00Z&quot;
+          }
+        ],
+        &quot;offerId&quot;: &quot;c38d72c6-04a2-419d-9f2d-66e66ad62a0f&quot;,
+        &quot;products&quot;: [
+          {
+            &quot;code&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;description&quot;: &quot;Standard subscription 2nd class product Sqills S3 OSDM sandbox - Month&quot;,
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;id&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;owner&quot;: &quot;urn:uic:rics:sqills&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;name&quot;: &quot;HIGH&quot;,
+              &quot;type&quot;: &quot;HIGH&quot;
+            },
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;travelClass&quot;: &quot;SECOND&quot;
+          }
+        ],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+        }
+      }
+    ],
+    &quot;bookingCode&quot;: &quot;Y60STO84&quot;,
+    &quot;confirmedPrice&quot;: {
+      &quot;amount&quot;: 105000,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;595f5afb-43b9-4370-b897-fb3767d53f7b&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;Y60STO84&quot;,
+        &quot;controlNumber&quot;: &quot;Y60STO84-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;id&quot;: &quot;Y60STO84-001&quot;,
+        &quot;status&quot;: &quot;FULFILLED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;Y60STO84&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;gender&quot;: &quot;FEMALE&quot;,
+        &quot;id&quot;: &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, JohnUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      }
+    ],
+    &quot;provisionalPrice&quot;: {
+      &quot;amount&quot;: -105000,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+        },
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;summary&quot;: &quot;DoePurchaser, JohnPurchaser&quot;
+      }
+    },
+    &quot;refundOffers&quot;: [
+      {
+        &quot;appliedOverruleCode&quot;: &quot;PAYMENT_FAILURE&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:41Z&quot;,
+        &quot;fulfillments&quot;: [
+          {
+            &quot;bookingParts&quot;: [
+              {
+                &quot;id&quot;: &quot;595f5afb-43b9-4370-b897-fb3767d53f7b&quot;
+              }
+            ],
+            &quot;bookingRef&quot;: &quot;Y60STO84&quot;,
+            &quot;controlNumber&quot;: &quot;Y60STO84-001&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;id&quot;: &quot;Y60STO84-001&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAcfXq0YCYCSi4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv20gVsBiOwNtWcBV44bh-vy89_l1Q==&quot;,
+        &quot;refundFee&quot;: {
+          &quot;amount&quot;: 0,
+          &quot;currency&quot;: &quot;EUR&quot;,
+          &quot;scale&quot;: 2
+        },
+        &quot;refundableAmount&quot;: {
+          &quot;amount&quot;: 105000,
+          &quot;currency&quot;: &quot;EUR&quot;,
+          &quot;scale&quot;: 2
+        },
+        &quot;status&quot;: &quot;PROPOSED&quot;,
+        &quot;summary&quot;: &quot;Y60STO84 - refund&quot;,
+        &quot;validFrom&quot;: &quot;2026-04-20T19:43:41Z&quot;,
+        &quot;validUntil&quot;: &quot;2026-04-20T20:13:41Z&quot;
+      }
+    ],
+    &quot;trips&quot;: [
+      {
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;,
+        &quot;transfers&quot;: 0
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">07. GET Booking after Fulfillments</span>
+      <span class="abadge abadge-ok">81 ✅</span> <span class="abadge abadge-fail">4 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 393 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 81</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 4</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 393 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/Q72S2BE4</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (81)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[2] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2] appliedPassengerTypes[0] - type=Y exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[2] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [cfad04d4-a89f-469e-b606-c29f7d8d381b]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[1] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [2388d735-5d13-41d6-8666-bce788bfd68e]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1].document[1] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [0cf51585-7e1e-4b69-be25-cfe50c725749]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2].document[1] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[2] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 3, actual: 3</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (4)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'CONFIRMED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[1].status 'CONFIRMED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[2].status 'CONFIRMED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (185)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 07. GET Booking after Fulfillments
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: Q72S2BE4
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: Q72S2BE4
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] booking.confirmationTimeLimit absent → test skipped
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission refundable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission[0].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[0]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[35000,35000,35000] booking=[35000,35000,35000] intersection=[35000,35000,35000]
+[INFO] [INFO] admission price.currency: offer=[EUR,EUR,EUR] booking=[EUR,EUR,EUR] intersection=[EUR,EUR,EUR]
+[INFO] [INFO] admission price.scale: offer=[2,2,2] booking=[2,2,2] intersection=[2,2,2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-05-07T00:00:00Z' booking='2026-05-07T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: '3f703e07-c94c-36ff-a099-a15e8656b5f0' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[INFO] [INFO] admission exchangeable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission refundable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission[1].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[1].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[1]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[1]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[1].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[35000,35000,35000] booking=[35000,35000,35000] intersection=[35000,35000,35000]
+[INFO] [INFO] admission price.currency: offer=[EUR,EUR,EUR] booking=[EUR,EUR,EUR] intersection=[EUR,EUR,EUR]
+[INFO] [INFO] admission price.scale: offer=[2,2,2] booking=[2,2,2] intersection=[2,2,2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[1].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[1].validFrom is present in both offer and booking
+[INFO] [INFO] admission[1].validUntil: offer='2026-05-07T00:00:00Z' booking='2026-05-07T00:00:00Z'
+[INFO] [INFO] ✅ admission[1].validUntil is present in both offer and booking
+[INFO] [INFO] admission[1] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[1] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[1] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].passengerRef in booking: '4b08816b-7fd7-30de-907b-ffc9ad2ff2d2' (offer externalRef was: '00002')
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].description matches
+[INFO] [INFO] admission exchangeable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission refundable: offer=[NO,NO,NO] booking=[NO,NO,NO] intersection=[NO,NO,NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO,NO,NO] booking=[NO,NO,NO]
+[INFO] [INFO] admission[2].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[2].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[2]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[2]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[2] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[2].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[35000,35000,35000] booking=[35000,35000,35000] intersection=[35000,35000,35000]
+[INFO] [INFO] admission price.currency: offer=[EUR,EUR,EUR] booking=[EUR,EUR,EUR] intersection=[EUR,EUR,EUR]
+[INFO] [INFO] admission price.scale: offer=[2,2,2] booking=[2,2,2] intersection=[2,2,2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[2].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[2].validFrom is present in both offer and booking
+[INFO] [INFO] admission[2].validUntil: offer='2026-05-07T00:00:00Z' booking='2026-05-07T00:00:00Z'
+[INFO] [INFO] ✅ admission[2].validUntil is present in both offer and booking
+[INFO] [INFO] admission[2] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[2] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[2] appliedPassengerTypes[0] - type=Y
+[INFO] [INFO] admission[2] appliedPassengerTypes[0] - type=Y found in booking
+[INFO] [INFO] ✅ admission[2] appliedPassengerTypes[0] - type=Y exists in booking
+[INFO] [INFO] admission[2] appliedPassengerTypes[0].passengerRef in booking: 'd0bec7a5-f1cb-3a42-a974-1d6af5df5495' (offer externalRef was: '00003')
+[INFO] [INFO] ✅ admission[2] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[2] appliedPassengerTypes[0].type: offer='Y' booking='Y'
+[INFO] [INFO] ✅ admission[2] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[2] appliedPassengerTypes[0].description: offer='Youth' booking='Youth'
+[INFO] [INFO] ✅ admission[2] appliedPassengerTypes[0].description matches
+[WARN] [WARNING] No booked ancillary[0] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSQQ69S9uwxF6zdUBdowjFKA==
+[WARN] [WARNING] No booked ancillary[1] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p42LyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSsaZ1rkTnEAxu_p9_tsAPAg==
+[WARN] [WARNING] No booked ancillary[2] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4mLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSX8HN8s4qXD3aeCphunhJGw==
+[WARN] [WARNING] No booked ancillary[3] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSpRFYhqAD6DwNp-Xpn6BPWA==
+[WARN] [WARNING] No booked ancillary[4] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p42LyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSVbmQYz9UPG7QLDrLimiFcg==
+[WARN] [WARNING] No booked ancillary[5] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4mLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSu94oP7WZcF9kqo_VhtDDaw==
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 3
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: Q72S2BE4-001
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: Q72S2BE4
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'CONFIRMED' is a valid OSDM FulfillmentStatus: 'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: cfad04d4-a89f-469e-b606-c29f7d8d381b exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [cfad04d4-a89f-469e-b606-c29f7d8d381b]
+[INFO] [INFO] Fulfillment[0] number of documents: 2
+[INFO] [INFO] Fulfillment[0].document[0] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-001_260420214342932.png
+[INFO] [INFO] ✅ Fulfillment[0].document[0] - fields exist
+[INFO] [INFO] Fulfillment[0].document[1] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P1_260420214342984.pdf
+[INFO] [INFO] ✅ Fulfillment[0].document[1] - fields exist
+[INFO] [INFO] ✅ Fulfillment[0] documents exist and contain valid data
+[INFO] [INFO] Fulfillment[1] id exists: Q72S2BE4-002
+[INFO] [INFO] ✅ Fulfillment[1] id exists
+[INFO] [INFO] Fulfillment[1] bookingRef exists: Q72S2BE4
+[INFO] [INFO] ✅ Fulfillment[1] bookingRef exists
+[INFO] [INFO] Fulfillment[1].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[1].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)
+[INFO] [INFO] Fulfillment[1] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[1] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[INFO] [INFO] ✅ Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[WARN] [WARNING] ❌ Fulfillment[1].status 'CONFIRMED' is a valid OSDM FulfillmentStatus: 'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'
+[INFO] [INFO] ✅ Fulfillment[1] controlNumber exists
+[INFO] [INFO] Fulfillment[1] bookingPart.id: 2388d735-5d13-41d6-8666-bce788bfd68e exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[1] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [2388d735-5d13-41d6-8666-bce788bfd68e]
+[INFO] [INFO] Fulfillment[1] number of documents: 2
+[INFO] [INFO] Fulfillment[1].document[0] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-002_260420214342954.png
+[INFO] [INFO] ✅ Fulfillment[1].document[0] - fields exist
+[INFO] [INFO] Fulfillment[1].document[1] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P2_260420214342984.pdf
+[INFO] [INFO] ✅ Fulfillment[1].document[1] - fields exist
+[INFO] [INFO] ✅ Fulfillment[1] documents exist and contain valid data
+[INFO] [INFO] Fulfillment[2] id exists: Q72S2BE4-003
+[INFO] [INFO] ✅ Fulfillment[2] id exists
+[INFO] [INFO] Fulfillment[2] bookingRef exists: Q72S2BE4
+[INFO] [INFO] ✅ Fulfillment[2] bookingRef exists
+[INFO] [INFO] Fulfillment[2].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[2].bookingRef matches current bookingId (expected: Q72S2BE4, actual: Q72S2BE4)
+[INFO] [INFO] Fulfillment[2] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[2] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[2] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[INFO] [INFO] ✅ Fulfillment[2] status comparison - expected: FULFILLED,CONFIRMED, actual: CONFIRMED
+[WARN] [WARNING] ❌ Fulfillment[2].status 'CONFIRMED' is a valid OSDM FulfillmentStatus: 'CONFIRMED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'CONFIRMED'
+[INFO] [INFO] ✅ Fulfillment[2] controlNumber exists
+[INFO] [INFO] Fulfillment[2] bookingPart.id: 0cf51585-7e1e-4b69-be25-cfe50c725749 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[2] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749,cfad04d4-a89f-469e-b606-c29f7d8d381b,2388d735-5d13-41d6-8666-bce788bfd68e,0cf51585-7e1e-4b69-be25-cfe50c725749], actual: [0cf51585-7e1e-4b69-be25-cfe50c725749]
+[INFO] [INFO] Fulfillment[2] number of documents: 2
+[INFO] [INFO] Fulfillment[2].document[0] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-003_260420214342973.png
+[INFO] [INFO] ✅ Fulfillment[2].document[0] - fields exist
+[INFO] [INFO] Fulfillment[2].document[1] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P3_260420214342984.pdf
+[INFO] [INFO] ✅ Fulfillment[2].document[1] - fields exist
+[INFO] [INFO] ✅ Fulfillment[2] documents exist and contain valid data
+[INFO] [INFO] Booking passenger count - expected: 3, actual: 3
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 3, actual: 3
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;admissions&quot;: [
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;3f703e07-c94c-36ff-a099-a15e8656b5f0&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:42Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;cfad04d4-a89f-469e-b606-c29f7d8d381b&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;3f703e07-c94c-36ff-a099-a15e8656b5f0&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 35000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;legIds&quot;: [
+                  &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+                ],
+                &quot;productId&quot;: &quot;STAN_ABO2&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredLegIds&quot;: [
+                &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+              ],
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-07T00:00:00Z&quot;
+          },
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;4b08816b-7fd7-30de-907b-ffc9ad2ff2d2&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:42Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;2388d735-5d13-41d6-8666-bce788bfd68e&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;4b08816b-7fd7-30de-907b-ffc9ad2ff2d2&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 35000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;legIds&quot;: [
+                  &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+                ],
+                &quot;productId&quot;: &quot;STAN_ABO2&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredLegIds&quot;: [
+                &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+              ],
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-07T00:00:00Z&quot;
+          },
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Youth&quot;,
+                &quot;passengerRef&quot;: &quot;d0bec7a5-f1cb-3a42-a974-1d6af5df5495&quot;,
+                &quot;type&quot;: &quot;Y&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:42Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;0cf51585-7e1e-4b69-be25-cfe50c725749&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;d0bec7a5-f1cb-3a42-a974-1d6af5df5495&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 35000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;legIds&quot;: [
+                  &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+                ],
+                &quot;productId&quot;: &quot;STAN_ABO2&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredLegIds&quot;: [
+                &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+              ],
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-07T00:00:00Z&quot;
+          }
+        ],
+        &quot;offerId&quot;: &quot;c090ab05-c63b-40a2-9c66-04bf353c8b43&quot;,
+        &quot;products&quot;: [
+          {
+            &quot;code&quot;: &quot;STAN_ABO2&quot;,
+            &quot;description&quot;: &quot;Standard subscription 2nd class product Sqills S3 OSDM sandbox  - Week&quot;,
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;id&quot;: &quot;STAN_ABO2&quot;,
+            &quot;owner&quot;: &quot;urn:uic:rics:sqills&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;name&quot;: &quot;HIGH&quot;,
+              &quot;type&quot;: &quot;HIGH&quot;
+            },
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;travelClass&quot;: &quot;SECOND&quot;
+          }
+        ],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredLegIds&quot;: [
+            &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+          ],
+          &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+        }
+      }
+    ],
+    &quot;bookingCode&quot;: &quot;Q72S2BE4&quot;,
+    &quot;confirmedPrice&quot;: {
+      &quot;amount&quot;: 105000,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;cfad04d4-a89f-469e-b606-c29f7d8d381b&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;Q72S2BE4&quot;,
+        &quot;controlNumber&quot;: &quot;Q72S2BE4-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-001_260420214342932.png&quot;,
+            &quot;format&quot;: &quot;image/png&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          },
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P1_260420214342984.pdf&quot;,
+            &quot;format&quot;: &quot;application/pdf&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;Q72S2BE4-001&quot;,
+        &quot;status&quot;: &quot;CONFIRMED&quot;
+      },
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;2388d735-5d13-41d6-8666-bce788bfd68e&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;Q72S2BE4&quot;,
+        &quot;controlNumber&quot;: &quot;Q72S2BE4-002&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-002_260420214342954.png&quot;,
+            &quot;format&quot;: &quot;image/png&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          },
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P2_260420214342984.pdf&quot;,
+            &quot;format&quot;: &quot;application/pdf&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;Q72S2BE4-002&quot;,
+        &quot;status&quot;: &quot;CONFIRMED&quot;
+      },
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;0cf51585-7e1e-4b69-be25-cfe50c725749&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;Q72S2BE4&quot;,
+        &quot;controlNumber&quot;: &quot;Q72S2BE4-003&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4-003_260420214342973.png&quot;,
+            &quot;format&quot;: &quot;image/png&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          },
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/Q72S2BE4_P3_260420214342984.pdf&quot;,
+            &quot;format&quot;: &quot;application/pdf&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;Q72S2BE4-003&quot;,
+        &quot;status&quot;: &quot;CONFIRMED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;Q72S2BE4&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;id&quot;: &quot;3f703e07-c94c-36ff-a099-a15e8656b5f0&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, JohnUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      },
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-04&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;MartaUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00002&quot;,
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;id&quot;: &quot;4b08816b-7fd7-30de-907b-ffc9ad2ff2d2&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, MartaUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      },
+      {
+        &quot;dateOfBirth&quot;: &quot;2010-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;AliceUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00003&quot;,
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;id&quot;: &quot;d0bec7a5-f1cb-3a42-a974-1d6af5df5495&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, AliceUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      }
+    ],
+    &quot;provisionalPrice&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+        },
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;summary&quot;: &quot;DoePurchaser, JohnPurchaser&quot;
+      }
+    },
+    &quot;trips&quot;: [
+      {
+        &quot;destination&quot;: {
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;
+        },
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;duration&quot;: &quot;PT7H25M&quot;,
+        &quot;endTime&quot;: &quot;2026-04-30T16:35:00+02:00&quot;,
+        &quot;externalRef&quot;: &quot;0:RDA|OSDM_202|OSDM_IC|2026-04-30|2026-04-30T09:10|2026-04-30T16:35;8500010;8400058&quot;,
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;,
+        &quot;legs&quot;: [
+          {
+            &quot;id&quot;: &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;duration&quot;: &quot;PT7H25M&quot;,
+              &quot;end&quot;: {
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-04-30T16:35:00+02:00&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Amsterdam Central&quot;,
+                &quot;stopPlaceRef&quot;: {
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;urn:uic:rics:1&quot;
+                  }
+                ],
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Sqills Intercity train&quot;,
+                  &quot;productCategoryRef&quot;: &quot;urn:uic:sbc:SQILLS_IC&quot;,
+                  &quot;shortName&quot;: &quot;Sqills Intercity train&quot;
+                },
+                &quot;vehicleNumbers&quot;: [
+                  &quot;OSDM_202&quot;
+                ]
+              },
+              &quot;start&quot;: {
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-04-30T09:10:00+02:00&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Basel SBB&quot;,
+                &quot;stopPlaceRef&quot;: {
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8500010&quot;
+                }
+              }
+            }
+          }
+        ],
+        &quot;origin&quot;: {
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8500010&quot;
+        },
+        &quot;startTime&quot;: &quot;2026-04-30T09:10:00+02:00&quot;,
+        &quot;transfers&quot;: 0
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">3</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">07. GET Booking after Fulfillments</span>
+      <span class="abadge abadge-ok">56 ✅</span> <span class="abadge abadge-fail">3 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 437 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 56</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 3</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 437 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/0XW08577</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (56)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[1] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: 0XW08577, actual: 0XW08577)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83], actual: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1].bookingRef matches current bookingId (expected: 0XW08577, actual: 0XW08577)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83], actual: [4cb98425-032c-472b-95fa-0911fdbbec83]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1].document[0] - fields exist</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[1] documents exist and contain valid data</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 2, actual: 2</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (3)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[1].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (130)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 07. GET Booking after Fulfillments
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: 0XW08577
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: 0XW08577
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z
+[INFO] [INFO] booking.confirmationTimeLimit absent → test skipped
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[NO,NO] booking=[NO,NO] intersection=[NO,NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]
+[INFO] [INFO] admission refundable: offer=[NO,NO] booking=[NO,NO] intersection=[NO,NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]
+[INFO] [INFO] admission[0].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[0]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[35000,35000] booking=[35000,35000] intersection=[35000,35000]
+[INFO] [INFO] admission price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] admission price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-05-07T00:00:00Z' booking='2026-05-07T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: '9a1b5717-d261-3189-9a52-876ab681e3bb' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[INFO] [INFO] admission exchangeable: offer=[NO,NO] booking=[NO,NO] intersection=[NO,NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]
+[INFO] [INFO] admission refundable: offer=[NO,NO] booking=[NO,NO] intersection=[NO,NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO,NO] booking=[NO,NO]
+[INFO] [INFO] admission[1].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[1].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[1]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[1]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[1] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[1].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[35000,35000] booking=[35000,35000] intersection=[35000,35000]
+[INFO] [INFO] admission price.currency: offer=[EUR,EUR] booking=[EUR,EUR] intersection=[EUR,EUR]
+[INFO] [INFO] admission price.scale: offer=[2,2] booking=[2,2] intersection=[2,2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[1].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[1].validFrom is present in both offer and booking
+[INFO] [INFO] admission[1].validUntil: offer='2026-05-07T00:00:00Z' booking='2026-05-07T00:00:00Z'
+[INFO] [INFO] ✅ admission[1].validUntil is present in both offer and booking
+[INFO] [INFO] admission[1] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[1] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[1] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].passengerRef in booking: 'ef687eec-0985-3fca-8552-0baaf8c316ec' (offer externalRef was: '00002')
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[1] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[1] appliedPassengerTypes[0].description matches
+[WARN] [WARNING] No booked ancillary[0] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSQQ69S9uwxF6zdUBdowjFKA==
+[WARN] [WARNING] No booked ancillary[1] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p42LyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSsaZ1rkTnEAxu_p9_tsAPAg==
+[WARN] [WARNING] No booked ancillary[2] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSpRFYhqAD6DwNp-Xpn6BPWA==
+[WARN] [WARNING] No booked ancillary[3] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p42LyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSVbmQYz9UPG7QLDrLimiFcg==
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 2
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: 0XW08577-001
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: 0XW08577
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: 0XW08577, actual: 0XW08577)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 60c6fb2e-eeb8-49c4-9f12-e530e87ed62f exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83], actual: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f]
+[INFO] [INFO] Fulfillment[0] number of documents: 1
+[INFO] [INFO] Fulfillment[0].document[0] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/0XW08577-001_260420214343414.png
+[INFO] [INFO] ✅ Fulfillment[0].document[0] - fields exist
+[INFO] [INFO] ✅ Fulfillment[0] documents exist and contain valid data
+[INFO] [INFO] Fulfillment[1] id exists: 0XW08577-002
+[INFO] [INFO] ✅ Fulfillment[1] id exists
+[INFO] [INFO] Fulfillment[1] bookingRef exists: 0XW08577
+[INFO] [INFO] ✅ Fulfillment[1] bookingRef exists
+[INFO] [INFO] Fulfillment[1].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[1].bookingRef matches current bookingId (expected: 0XW08577, actual: 0XW08577)
+[INFO] [INFO] Fulfillment[1] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[1] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[1] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[1].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[1] controlNumber exists
+[INFO] [INFO] Fulfillment[1] bookingPart.id: 4cb98425-032c-472b-95fa-0911fdbbec83 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[1] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83,60c6fb2e-eeb8-49c4-9f12-e530e87ed62f,4cb98425-032c-472b-95fa-0911fdbbec83], actual: [4cb98425-032c-472b-95fa-0911fdbbec83]
+[INFO] [INFO] Fulfillment[1] number of documents: 1
+[INFO] [INFO] Fulfillment[1].document[0] -&gt; medium=PDF_A4, type=ETICKET, link=https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/0XW08577-002_260420214343449.png
+[INFO] [INFO] ✅ Fulfillment[1].document[0] - fields exist
+[INFO] [INFO] ✅ Fulfillment[1] documents exist and contain valid data
+[INFO] [INFO] Booking passenger count - expected: 2, actual: 2
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 2, actual: 2
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;admissions&quot;: [
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;9a1b5717-d261-3189-9a52-876ab681e3bb&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:42Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;60c6fb2e-eeb8-49c4-9f12-e530e87ed62f&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;9a1b5717-d261-3189-9a52-876ab681e3bb&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 35000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;legIds&quot;: [
+                  &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+                ],
+                &quot;productId&quot;: &quot;STAN_ABO2&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredLegIds&quot;: [
+                &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+              ],
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-07T00:00:00Z&quot;
+          },
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;ef687eec-0985-3fca-8552-0baaf8c316ec&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:42Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;4cb98425-032c-472b-95fa-0911fdbbec83&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;ef687eec-0985-3fca-8552-0baaf8c316ec&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 35000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;legIds&quot;: [
+                  &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+                ],
+                &quot;productId&quot;: &quot;STAN_ABO2&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredLegIds&quot;: [
+                &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+              ],
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-07T00:00:00Z&quot;
+          }
+        ],
+        &quot;offerId&quot;: &quot;91e93179-9f59-478b-bba2-547af4f96230&quot;,
+        &quot;products&quot;: [
+          {
+            &quot;code&quot;: &quot;STAN_ABO2&quot;,
+            &quot;description&quot;: &quot;Standard subscription 2nd class product Sqills S3 OSDM sandbox  - Week&quot;,
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;id&quot;: &quot;STAN_ABO2&quot;,
+            &quot;owner&quot;: &quot;urn:uic:rics:sqills&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;name&quot;: &quot;HIGH&quot;,
+              &quot;type&quot;: &quot;HIGH&quot;
+            },
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Week&quot;,
+            &quot;travelClass&quot;: &quot;SECOND&quot;
+          }
+        ],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredLegIds&quot;: [
+            &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;
+          ],
+          &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;
+        }
+      }
+    ],
+    &quot;bookingCode&quot;: &quot;0XW08577&quot;,
+    &quot;confirmedPrice&quot;: {
+      &quot;amount&quot;: 70000,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;60c6fb2e-eeb8-49c4-9f12-e530e87ed62f&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;0XW08577&quot;,
+        &quot;controlNumber&quot;: &quot;0XW08577-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/0XW08577-001_260420214343414.png&quot;,
+            &quot;format&quot;: &quot;image/png&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;0XW08577-001&quot;,
+        &quot;status&quot;: &quot;FULFILLED&quot;
+      },
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;4cb98425-032c-472b-95fa-0911fdbbec83&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;0XW08577&quot;,
+        &quot;controlNumber&quot;: &quot;0XW08577-002&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;fulfillmentDocuments&quot;: [
+          {
+            &quot;downloadLink&quot;: &quot;https://ticket.sqills-osdm-test.cloud.sqills.com/ticket/0XW08577-002_260420214343449.png&quot;,
+            &quot;format&quot;: &quot;image/png&quot;,
+            &quot;medium&quot;: &quot;PDF_A4&quot;,
+            &quot;type&quot;: &quot;ETICKET&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;0XW08577-002&quot;,
+        &quot;status&quot;: &quot;FULFILLED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;0XW08577&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;John&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;id&quot;: &quot;9a1b5717-d261-3189-9a52-876ab681e3bb&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, John&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      },
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-04&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;MartaUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00002&quot;,
+        &quot;gender&quot;: &quot;X&quot;,
+        &quot;id&quot;: &quot;ef687eec-0985-3fca-8552-0baaf8c316ec&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, MartaUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      }
+    ],
+    &quot;provisionalPrice&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+        },
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;summary&quot;: &quot;DoePurchaser, JohnPurchaser&quot;
+      }
+    },
+    &quot;trips&quot;: [
+      {
+        &quot;destination&quot;: {
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;
+        },
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;duration&quot;: &quot;PT7H25M&quot;,
+        &quot;endTime&quot;: &quot;2026-04-30T16:35:00+02:00&quot;,
+        &quot;externalRef&quot;: &quot;0:RDA|OSDM_202|OSDM_IC|2026-04-30|2026-04-30T09:10|2026-04-30T16:35;8500010;8400058&quot;,
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3Op4yRB5TD9KNeuLHwrspaHyJcvxyavoYLBg0_x6YPtHy1scFfxwTeZKSBTjNtW-sYd3bFWuOeRlQObt6KWWCJOg5BXmtmI_mPEuSajmIrMwOtdeTZraGu-kn0nHUAedigxf6rDhwCkgoPdEQhHGnB7amAZqi3e-f981HsCuNXraeHVDj2JsLfdo_oBdYfanQ1J7jzOAwfjNbNIcWpAj2aNvA32Mmcecnb0lhO7RCOCu17O2xQ8HO4qxhFZhsPcBs=&quot;,
+        &quot;legs&quot;: [
+          {
+            &quot;id&quot;: &quot;OSDM_202|OSDM_IC|2026-04-30T09:10:00+02:00|2026-04-30T16:35:00+02:00|8500010|8400058&quot;,
+            &quot;timedLeg&quot;: {
+              &quot;duration&quot;: &quot;PT7H25M&quot;,
+              &quot;end&quot;: {
+                &quot;serviceArrival&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-04-30T16:35:00+02:00&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Amsterdam Central&quot;,
+                &quot;stopPlaceRef&quot;: {
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8400058&quot;
+                }
+              },
+              &quot;service&quot;: {
+                &quot;carriers&quot;: [
+                  {
+                    &quot;ref&quot;: &quot;urn:uic:rics:1&quot;
+                  }
+                ],
+                &quot;mode&quot;: {
+                  &quot;ptMode&quot;: &quot;TRAIN&quot;
+                },
+                &quot;productCategory&quot;: {
+                  &quot;name&quot;: &quot;Sqills Intercity train&quot;,
+                  &quot;productCategoryRef&quot;: &quot;urn:uic:sbc:SQILLS_IC&quot;,
+                  &quot;shortName&quot;: &quot;Sqills Intercity train&quot;
+                },
+                &quot;vehicleNumbers&quot;: [
+                  &quot;OSDM_202&quot;
+                ]
+              },
+              &quot;start&quot;: {
+                &quot;serviceDeparture&quot;: {
+                  &quot;timetabledTime&quot;: &quot;2026-04-30T09:10:00+02:00&quot;
+                },
+                &quot;stopPlaceName&quot;: &quot;Basel SBB&quot;,
+                &quot;stopPlaceRef&quot;: {
+                  &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+                  &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8500010&quot;
+                }
+              }
+            }
+          }
+        ],
+        &quot;origin&quot;: {
+          &quot;objectType&quot;: &quot;StopPlaceRef&quot;,
+          &quot;stopPlaceRef&quot;: &quot;urn:uic:stn:8500010&quot;
+        },
+        &quot;startTime&quot;: &quot;2026-04-30T09:10:00+02:00&quot;,
+        &quot;transfers&quot;: 0
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">4</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">14. GET Booking after Patch Refund</span>
+      <span class="abadge abadge-ok">33 ✅</span> <span class="abadge abadge-fail">1 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 335 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 33</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 1</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 335 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/JXPSTLFW?embed=ALL</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (33)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is REFUNDED for admission[0] - expected: REFUNDED, actual: REFUNDED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'REFUNDED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: JXPSTLFW, actual: JXPSTLFW)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: REFUNDED, actual: REFUNDED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].status 'REFUNDED' is a valid OSDM FulfillmentStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212], actual: [3a79dd51-cbf4-4617-8618-1d8d56760212]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 1, actual: 1</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (1)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (78)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 14. GET Booking after Patch Refund
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: JXPSTLFW
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: JXPSTLFW
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:31.000Z
+[INFO] [INFO] booking.confirmationTimeLimit absent → test skipped
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission refundable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission[0].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[0]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[0]: status: REFUNDED
+[INFO] [INFO] ✅ Status is REFUNDED for admission[0] - expected: REFUNDED, actual: REFUNDED
+[INFO] [INFO] ✅ admission[0].status 'REFUNDED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[105000] booking=[105000] intersection=[105000]
+[INFO] [INFO] admission price.currency: offer=[EUR] booking=[EUR] intersection=[EUR]
+[INFO] [INFO] admission price.scale: offer=[2] booking=[2] intersection=[2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-05-30T00:00:00Z' booking='2026-05-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: 'ff43a6ae-ac15-3e0c-bdd9-d5f0eaa2ac2c' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[WARN] [WARNING] No booked ancillary[0] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSQQ69S9uwxF6zdUBdowjFKA==
+[WARN] [WARNING] No booked ancillary[1] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSpRFYhqAD6DwNp-Xpn6BPWA==
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: JXPSTLFW-001
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: JXPSTLFW
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: JXPSTLFW, actual: JXPSTLFW)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: REFUNDED, actual: REFUNDED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: REFUNDED, actual: REFUNDED
+[INFO] [INFO] ✅ Fulfillment[0].status 'REFUNDED' is a valid OSDM FulfillmentStatus
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 3a79dd51-cbf4-4617-8618-1d8d56760212 exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212,3a79dd51-cbf4-4617-8618-1d8d56760212], actual: [3a79dd51-cbf4-4617-8618-1d8d56760212]
+[INFO] [INFO] Fulfillment[0] has no document refs or documents (may be pre-issuance state)
+[INFO] [INFO] Booking passenger count - expected: 1, actual: 1
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 1, actual: 1
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;admissions&quot;: [
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;ff43a6ae-ac15-3e0c-bdd9-d5f0eaa2ac2c&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:38Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;3a79dd51-cbf4-4617-8618-1d8d56760212&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;ff43a6ae-ac15-3e0c-bdd9-d5f0eaa2ac2c&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 105000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;STAN_ABO2_M&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;REFUNDED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-30T00:00:00Z&quot;
+          }
+        ],
+        &quot;offerId&quot;: &quot;f6ac2f73-2891-45c3-9c68-40afb76b7915&quot;,
+        &quot;products&quot;: [
+          {
+            &quot;code&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;description&quot;: &quot;Standard subscription 2nd class product Sqills S3 OSDM sandbox - Month&quot;,
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;id&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;owner&quot;: &quot;urn:uic:rics:sqills&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;name&quot;: &quot;HIGH&quot;,
+              &quot;type&quot;: &quot;HIGH&quot;
+            },
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;travelClass&quot;: &quot;SECOND&quot;
+          }
+        ],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+        }
+      }
+    ],
+    &quot;bookingCode&quot;: &quot;JXPSTLFW&quot;,
+    &quot;confirmedPrice&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;3a79dd51-cbf4-4617-8618-1d8d56760212&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;JXPSTLFW&quot;,
+        &quot;controlNumber&quot;: &quot;JXPSTLFW-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;id&quot;: &quot;JXPSTLFW-001&quot;,
+        &quot;status&quot;: &quot;REFUNDED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;JXPSTLFW&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;gender&quot;: &quot;FEMALE&quot;,
+        &quot;id&quot;: &quot;ff43a6ae-ac15-3e0c-bdd9-d5f0eaa2ac2c&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, JohnUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      }
+    ],
+    &quot;provisionalPrice&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+        },
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;summary&quot;: &quot;DoePurchaser, JohnPurchaser&quot;
+      }
+    },
+    &quot;refundOffers&quot;: [
+      {
+        &quot;appliedOverruleCode&quot;: &quot;PAYMENT_FAILURE&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:40Z&quot;,
+        &quot;fulfillments&quot;: [
+          {
+            &quot;bookingParts&quot;: [
+              {
+                &quot;id&quot;: &quot;3a79dd51-cbf4-4617-8618-1d8d56760212&quot;
+              }
+            ],
+            &quot;bookingRef&quot;: &quot;JXPSTLFW&quot;,
+            &quot;controlNumber&quot;: &quot;JXPSTLFW-001&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;id&quot;: &quot;JXPSTLFW-001&quot;,
+            &quot;status&quot;: &quot;REFUNDED&quot;
+          }
+        ],
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==&quot;,
+        &quot;refundFee&quot;: {
+          &quot;amount&quot;: 0,
+          &quot;currency&quot;: &quot;EUR&quot;,
+          &quot;scale&quot;: 2
+        },
+        &quot;refundableAmount&quot;: {
+          &quot;amount&quot;: 0,
+          &quot;currency&quot;: &quot;EUR&quot;,
+          &quot;scale&quot;: 2
+        },
+        &quot;status&quot;: &quot;CONFIRMED&quot;,
+        &quot;summary&quot;: &quot;JXPSTLFW - refund&quot;,
+        &quot;validFrom&quot;: &quot;2026-04-20T19:43:40Z&quot;,
+        &quot;validUntil&quot;: &quot;2026-04-20T19:43:40Z&quot;
+      }
+    ],
+    &quot;trips&quot;: [
+      {
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;,
+        &quot;transfers&quot;: 0
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">5</span>
+      <span class="rm rm-GET">GET</span>
+      <span class="rname">16. GET Booking after Delete Refund</span>
+      <span class="abadge abadge-ok">32 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 517 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 32</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 517 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/Y60STO84?embed=ALL</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (32)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'booking' object exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.id is a non-empty string (OSDM: Booking.id required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookingCode is a non-empty string when present</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.bookedOffers is a non-empty array (OSDM: required)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">confirmedPrice structure exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Price fields exist (currency, scale) in provisionalPrice and confirmedPrice</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission prices have at least one member in common between offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validFrom is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0].validUntil is present in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes exist in both offer and booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0] - type=A exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].passengerRef exists in booking</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].type matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">admission[0] appliedPassengerTypes[0].description matches</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillments exist at index 0</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] id exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingRef exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0].bookingRef matches current bookingId (expected: Y60STO84, actual: Y60STO84)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] createdOn is a valid datetime at or before now</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] controlNumber exists</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b], actual: [595f5afb-43b9-4370-b897-fb3767d53f7b]</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Booking contains exactly the expected number of passengers - expected: 1, actual: 1</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus</span>
+          <div class="te">'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (78)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 16. GET Booking after Delete Refund
+[INFO] [INFO] ► postCreateBookingResponse
+[INFO] [INFO] 'booking' object exists
+[INFO] [INFO] ✅ 'booking' object exists
+[INFO] [INFO] booking.id: Y60STO84
+[INFO] [INFO] ✅ booking.id is a non-empty string (OSDM: Booking.id required)
+[INFO] [INFO] booking.bookingCode: Y60STO84
+[INFO] [INFO] ✅ booking.bookingCode is a non-empty string when present
+[INFO] [INFO] booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] ✅ booking.createdOn: 2026-04-20T19:43:34.000Z, offer.createdOn: 2026-04-20T19:43:32.000Z
+[INFO] [INFO] booking.confirmationTimeLimit absent → test skipped
+[INFO] [INFO] booking.bookedOffers count: 1
+[INFO] [INFO] ✅ booking.bookedOffers is a non-empty array (OSDM: required)
+[INFO] [INFO] provisionalPrice structure exists
+[INFO] [INFO] ✅ provisionalPrice structure exists
+[INFO] [INFO] confirmedPrice structure exists
+[INFO] [INFO] ✅ confirmedPrice structure exists
+[INFO] [INFO] provisionalPrice and confirmedPrice fields present
+[INFO] [INFO] ✅ Price fields exist (currency, scale) in provisionalPrice and confirmedPrice
+[INFO] [INFO] Currency consistent across prices: EUR
+[INFO] [INFO] ✅ provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)
+[INFO] [INFO] ✅ booking.provisionalPrice.currency matches offer currency (expected: EUR, actual: EUR)
+[INFO] [INFO] admission exchangeable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission exchangeable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission refundable: offer=[NO] booking=[NO] intersection=[NO]
+[INFO] [INFO] ✅ admission refundable values have at least one member in common between offer and booking offer=[NO] booking=[NO]
+[INFO] [INFO] admission[0].isReservationRequired: offer='false' booking='false'
+[INFO] [INFO] ✅ admission[0].isReservationRequired matches between offer and booking : offer='false' booking='false'
+[WARN] [WARNING] admission[0]: 'offerMode' missing in offer or booking
+[INFO] [INFO] admission[0]: status: FULFILLED
+[INFO] [INFO] ✅ Status is FULFILLED,CONFIRMED for admission[0] - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ admission[0].status 'FULFILLED' is a valid OSDM BookingPartStatus
+[INFO] [INFO] admission price.amount: offer=[105000] booking=[105000] intersection=[105000]
+[INFO] [INFO] admission price.currency: offer=[EUR] booking=[EUR] intersection=[EUR]
+[INFO] [INFO] admission price.scale: offer=[2] booking=[2] intersection=[2]
+[INFO] [INFO] ✅ admission prices have at least one member in common between offer and booking
+[INFO] [INFO] admission[0].validFrom: offer='2026-04-30T00:00:00Z' booking='2026-04-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validFrom is present in both offer and booking
+[INFO] [INFO] admission[0].validUntil: offer='2026-05-30T00:00:00Z' booking='2026-05-30T00:00:00Z'
+[INFO] [INFO] ✅ admission[0].validUntil is present in both offer and booking
+[INFO] [INFO] admission[0] has 1 appliedPassengerType(s) in offer and 1 in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes exist in both offer and booking
+[INFO] [INFO] Validating admission[0] appliedPassengerTypes[0] - type=A
+[INFO] [INFO] admission[0] appliedPassengerTypes[0] - type=A found in booking
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0] - type=A exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].passengerRef in booking: 'e7bf0fb3-9884-3dd8-8d34-d8df50d654c5' (offer externalRef was: '00001')
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].passengerRef exists in booking
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].type: offer='A' booking='A'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].type matches
+[INFO] [INFO] admission[0] appliedPassengerTypes[0].description: offer='Adult' booking='Adult'
+[INFO] [INFO] ✅ admission[0] appliedPassengerTypes[0].description matches
+[WARN] [WARNING] No booked ancillary[0] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAgYYif3eTmEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSQQ69S9uwxF6zdUBdowjFKA==
+[WARN] [WARNING] No booked ancillary[1] found for offer part id=AAAAAAAAAAAAAAAqTqiZDp9kTarvnvAufYSdw5OSEzC3Ee4QDRllWU_p4GLyzBtHAC4UycEZ2HM4-r9fBOv2rxpeKR_FR4rnisID-D3mHhsbIyPNBDg3rPpUMdoNjUE9fbZv-YPEQAaTkdmzHE9AGvGiNhqRykk8HfDSpRFYhqAD6DwNp-Xpn6BPWA==
+[INFO] [INFO] ► validateFulfillments
+[INFO] [INFO] Number of fulfillments: 1
+[INFO] [INFO] ✅ Fulfillments exist at index 0
+[INFO] [INFO] Fulfillment[0] id exists: Y60STO84-001
+[INFO] [INFO] ✅ Fulfillment[0] id exists
+[INFO] [INFO] Fulfillment[0] bookingRef exists: Y60STO84
+[INFO] [INFO] ✅ Fulfillment[0] bookingRef exists
+[INFO] [INFO] Fulfillment[0].bookingRef matches bookingId ✓
+[INFO] [INFO] ✅ Fulfillment[0].bookingRef matches current bookingId (expected: Y60STO84, actual: Y60STO84)
+[INFO] [INFO] Fulfillment[0] createdOn: 2026-04-20T19:43:34Z
+[INFO] [INFO] ✅ Fulfillment[0] createdOn is a valid datetime at or before now
+[INFO] [INFO] Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[INFO] [INFO] ✅ Fulfillment[0] status comparison - expected: FULFILLED,CONFIRMED, actual: FULFILLED
+[WARN] [WARNING] ❌ Fulfillment[0].status 'FULFILLED' is a valid OSDM FulfillmentStatus: 'FULFILLED' is not a valid FulfillmentStatus enum value: expected [ 'AVAILABLE', 'USED', …(7) ] to include 'FULFILLED'
+[INFO] [INFO] ✅ Fulfillment[0] controlNumber exists
+[INFO] [INFO] Fulfillment[0] bookingPart.id: 595f5afb-43b9-4370-b897-fb3767d53f7b exists in admissionReservationAncillaryBookingPartsIds
+[INFO] [INFO] ✅ Fulfillment[0] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b,595f5afb-43b9-4370-b897-fb3767d53f7b], actual: [595f5afb-43b9-4370-b897-fb3767d53f7b]
+[INFO] [INFO] Fulfillment[0] has no document refs or documents (may be pre-issuance state)
+[INFO] [INFO] Booking passenger count - expected: 1, actual: 1
+[INFO] [INFO] ✅ Booking contains exactly the expected number of passengers - expected: 1, actual: 1
+[INFO] [INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <p class="muted">No request body</p>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;booking&quot;: {
+    &quot;bookedOffers&quot;: [
+      {
+        &quot;admissions&quot;: [
+          {
+            &quot;appliedPassengerTypes&quot;: [
+              {
+                &quot;description&quot;: &quot;Adult&quot;,
+                &quot;passengerRef&quot;: &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;,
+                &quot;type&quot;: &quot;A&quot;
+              }
+            ],
+            &quot;availableFulfillmentOptions&quot;: [
+              {
+                &quot;media&quot;: &quot;PDF_A4&quot;,
+                &quot;type&quot;: &quot;ETICKET&quot;
+              }
+            ],
+            &quot;confirmableUntil&quot;: &quot;2026-04-20T19:43:39Z&quot;,
+            &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+            &quot;exchangeable&quot;: &quot;NO&quot;,
+            &quot;id&quot;: &quot;595f5afb-43b9-4370-b897-fb3767d53f7b&quot;,
+            &quot;isReservationRequired&quot;: false,
+            &quot;objectType&quot;: &quot;Admission&quot;,
+            &quot;passengerIds&quot;: [
+              &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;
+            ],
+            &quot;price&quot;: {
+              &quot;amount&quot;: 105000,
+              &quot;currency&quot;: &quot;EUR&quot;,
+              &quot;scale&quot;: 2
+            },
+            &quot;products&quot;: [
+              {
+                &quot;productId&quot;: &quot;STAN_ABO2_M&quot;
+              }
+            ],
+            &quot;refundable&quot;: &quot;NO&quot;,
+            &quot;status&quot;: &quot;FULFILLED&quot;,
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;tripCoverage&quot;: {
+              &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+            },
+            &quot;validFrom&quot;: &quot;2026-04-30T00:00:00Z&quot;,
+            &quot;validUntil&quot;: &quot;2026-05-30T00:00:00Z&quot;
+          }
+        ],
+        &quot;offerId&quot;: &quot;c38d72c6-04a2-419d-9f2d-66e66ad62a0f&quot;,
+        &quot;products&quot;: [
+          {
+            &quot;code&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;description&quot;: &quot;Standard subscription 2nd class product Sqills S3 OSDM sandbox - Month&quot;,
+            &quot;flexibility&quot;: &quot;NON_FLEXIBLE&quot;,
+            &quot;id&quot;: &quot;STAN_ABO2_M&quot;,
+            &quot;owner&quot;: &quot;urn:uic:rics:sqills&quot;,
+            &quot;serviceClass&quot;: {
+              &quot;name&quot;: &quot;HIGH&quot;,
+              &quot;type&quot;: &quot;HIGH&quot;
+            },
+            &quot;summary&quot;: &quot;Standard subscription 2nd class - Month&quot;,
+            &quot;travelClass&quot;: &quot;SECOND&quot;
+          }
+        ],
+        &quot;tripCoverage&quot;: {
+          &quot;coveredTripId&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;
+        }
+      }
+    ],
+    &quot;bookingCode&quot;: &quot;Y60STO84&quot;,
+    &quot;confirmedPrice&quot;: {
+      &quot;amount&quot;: 105000,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+    &quot;externalRef&quot;: &quot;00001&quot;,
+    &quot;fulfillmentType&quot;: &quot;ETICKET&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;595f5afb-43b9-4370-b897-fb3767d53f7b&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;Y60STO84&quot;,
+        &quot;controlNumber&quot;: &quot;Y60STO84-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;id&quot;: &quot;Y60STO84-001&quot;,
+        &quot;status&quot;: &quot;FULFILLED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;Y60STO84&quot;,
+    &quot;passengers&quot;: [
+      {
+        &quot;dateOfBirth&quot;: &quot;1999-01-02&quot;,
+        &quot;detail&quot;: {
+          &quot;contact&quot;: {
+            &quot;email&quot;: &quot;email@email.com&quot;,
+            &quot;phoneNumber&quot;: &quot;+33612345679&quot;
+          },
+          &quot;firstName&quot;: &quot;JohnUpdate&quot;,
+          &quot;lastName&quot;: &quot;DoeUpdate&quot;
+        },
+        &quot;externalRef&quot;: &quot;00001&quot;,
+        &quot;gender&quot;: &quot;FEMALE&quot;,
+        &quot;id&quot;: &quot;e7bf0fb3-9884-3dd8-8d34-d8df50d654c5&quot;,
+        &quot;summary&quot;: &quot;DoeUpdate, JohnUpdate&quot;,
+        &quot;type&quot;: &quot;PERSON&quot;
+      }
+    ],
+    &quot;provisionalPrice&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2,
+      &quot;vats&quot;: [
+        {
+          &quot;amount&quot;: 0,
+          &quot;scale&quot;: 2
+        }
+      ]
+    },
+    &quot;purchaser&quot;: {
+      &quot;detail&quot;: {
+        &quot;contact&quot;: {
+          &quot;email&quot;: &quot;emailPurchaser@email.com&quot;,
+          &quot;phoneNumber&quot;: &quot;+33699999999&quot;
+        },
+        &quot;firstName&quot;: &quot;JohnPurchaser&quot;,
+        &quot;lastName&quot;: &quot;DoePurchaser&quot;,
+        &quot;summary&quot;: &quot;DoePurchaser, JohnPurchaser&quot;
+      }
+    },
+    &quot;trips&quot;: [
+      {
+        &quot;direction&quot;: &quot;OUT_BOUND&quot;,
+        &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqT_YoPORGOcnNpC1omXFw1B6Gg5Y7N01-ZokHozaUXneKPDljcKZkTL1w3OYlB8Ys-pivFSrOQc-FYj8n4rlw2OCPGkVuZgvOZ8FNUAJc1T3Tqd23Q6kEqteVFILU0x-oUvWmJPAgtAXl71Q7nuCZdv4C9VA9JopD9lMcnQhwYFQrD-8PWWWuSDqDP-DTpGGQQoWgC0c6qas=&quot;,
+        &quot;transfers&quot;: 0
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<details class="section-details">
+  <summary class="section-title">💰 Refund (2 requests) <span class="abadge abadge-ok">10 passed</span> <span class="abadge abadge-fail">2 failed</span></summary>
+  
+<div class="rb rc-green">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">1</span>
+      <span class="rm rm-DELETE">DELETE</span>
+      <span class="rname">15. DEL Refund Offer</span>
+      
+      <span class="rcode rcode-ok">↩ Rsp-code: 204</span>
+      <span class="rtime">⏱ 674 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 0</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 204</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 674 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">204</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/Y60STO84/refund-offers/AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAcfXq0YCYCSi4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv20gVsBiOwNtWcBV44bh-vy89_l1Q==</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (0)</summary>
+        <div class="tc"><div class="no-assert">No passed assertions</div></div>
+      </details>
+      
+      <details>
+    <summary class="sub-summary">🧾 Console Log (4)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 15. DEL Refund Offer</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">&quot;&quot;</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+
+<div class="rb rc-orange">
+  <details class="req-details">
+    <summary class="req-title">
+      <span class="ri">2</span>
+      <span class="rm rm-PATCH">PATCH</span>
+      <span class="rname">13. PATCH Refund Offer</span>
+      <span class="abadge abadge-ok">10 ✅</span> <span class="abadge abadge-fail">2 ❌</span>
+      <span class="rcode rcode-err">↩ Rsp-code: 200</span>
+      <span class="rtime">⏱ 1561 ms</span>
+    </summary>
+    <div class="req-body">
+      <div class="req-summary">
+    <span class="rsum-ok">✅ Passed: 10</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-fail">❌ Failed: 2</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-code">↩ Rsp-code: 200</span>
+    <span class="rsum-sep">|</span>
+    <span class="rsum-time">⏱ Response time: 1561 ms</span>
+    <span class="rsum-sep">|</span>
+    <span class="badge badge-ok">200</span>
+    <span class="ru-small">https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/bookings/JXPSTLFW/refund-offers/AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==</span>
+  </div>
+      <details class="assert-section">
+        <summary class="assert-title passed-title">✅ Passed validations (10)</summary>
+        <div class="tc"><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">'refundOffers' array exists with 1 refund offer(s)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer at index 0 has a valid Offer Id AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] has valid status, expected: CONFIRMED, actual: CONFIRMED</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] createdOn is valid and in the past: 2026-04-20T19:43:40Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] validFrom is valid: 2026-04-20T19:43:40Z</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] validFrom is before or equal to validUntil (OSDM: temporal order)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">AppliedOverruleCode is valid, (expected: appliedOverruleCode = PAYMENT_FAILURE, actual: expectedOverruleCode = PAYMENT_FAILURE)</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] refundableAmount exists and is valid, amount: 0, currency: EUR</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] refundFee exists and is valid, amount: 0, currency: EUR</span></div><div class="tr tr-ok"><span class="ti">✅</span><span class="tn">Refund offer[0] fulfillments is a non-empty array (OSDM: minItems:1)</span></div></div>
+      </details>
+      
+      <details class="assert-section">
+        <summary class="assert-title failed-title">❌ Failed validations (2)</summary>
+        <div class="tc"><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">Refund offer[0] validUntil is valid and approximately 15 minutes in the future: 2026-04-20T19:43:40Z</span>
+          <div class="te">expected 1776714220000 to be above 1776714225235</div>
+        </div><div class="tr tr-fail">
+          <span class="ti">❌</span>
+          <span class="tn">[OSDM] Content-Type is application/json</span>
+          <div class="te">Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</div>
+        </div></div>
+      </details>
+      <details>
+    <summary class="sub-summary">🧾 Console Log (33)</summary>
+    <div class="panel">
+      <pre class="code">[LOG] API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
+[LOG] Library base is available : ./library-bruno/
+[LOG] Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json
+[LOG] ⏩ [STEP] Executing request : 13. PATCH Refund Offer
+[INFO] [INFO] ➤ postPatchRefundOfferResponse
+[INFO] [INFO] 'refundOffers' array exists with 1 refund offer(s)
+[INFO] [INFO] ✅ 'refundOffers' array exists with 1 refund offer(s)
+[INFO] [INFO] ➤ validateRefundOfferResponse
+[INFO] [INFO] Validating refund offer at index 0
+[INFO] [INFO] Refund offer at index 0 has a valid Offer Id AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==
+[INFO] [INFO] ✅ Refund offer at index 0 has a valid Offer Id AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==
+[INFO] [INFO] Refund offer[0] has valid status, expected: CONFIRMED, actual: CONFIRMED
+[INFO] [INFO] ✅ Refund offer[0] has valid status, expected: CONFIRMED, actual: CONFIRMED
+[INFO] [INFO] Refund offer[0] createdOn is valid and in the past: 2026-04-20T19:43:40Z
+[INFO] [INFO] ✅ Refund offer[0] createdOn is valid and in the past: 2026-04-20T19:43:40Z
+[INFO] [INFO] Refund offer[0] validFrom is valid: 2026-04-20T19:43:40Z
+[INFO] [INFO] ✅ Refund offer[0] validFrom is valid: 2026-04-20T19:43:40Z
+[WARN] [WARNING] ❌ Refund offer[0] validUntil is valid and approximately 15 minutes in the future: 2026-04-20T19:43:40Z: expected 1776714220000 to be above 1776714225235
+[INFO] [INFO] Refund offer[0] temporal order OK: validFrom=2026-04-20T19:43:40Z ≤ validUntil=2026-04-20T19:43:40Z
+[INFO] [INFO] ✅ Refund offer[0] validFrom is before or equal to validUntil (OSDM: temporal order)
+[INFO] [INFO] ExpectedOverruleCode: PAYMENT_FAILURE
+[INFO] [INFO] AppliedOverruleCode: PAYMENT_FAILURE
+[INFO] [INFO] ✅ AppliedOverruleCode is valid, (expected: appliedOverruleCode = PAYMENT_FAILURE, actual: expectedOverruleCode = PAYMENT_FAILURE)
+[INFO] [INFO] Refund offer[0] refundableAmount: 0 EUR
+[INFO] [INFO] ✅ Refund offer[0] refundableAmount exists and is valid, amount: 0, currency: EUR
+[INFO] [INFO] Refund offer[0] refundFee: 0 EUR
+[INFO] [INFO] ✅ Refund offer[0] refundFee exists and is valid, amount: 0, currency: EUR
+[INFO] [INFO] Refund offer[0] has 1 fulfillment(s)
+[INFO] [INFO] ✅ Refund offer[0] fulfillments is a non-empty array (OSDM: minItems:1)
+[INFO] [INFO] reimbursementStatus is not present in refund offer[0] → test skipped
+[INFO] [INFO] No refundOfferBreakDown found for refund offer[0]
+[INFO] [INFO] Stored refundOffersOfferId: AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==
+[WARN] [WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: 'application/vnd.uic.osdm+json; version=3.4.0; charset=utf-8': expected 'application/vnd.uic.osdm+json; versio…' to include 'application/json'</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📤 Request Headers &amp; Body</summary>
+    <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      <table class="hdrtbl"><tr><td class="hdrk">Authorization</td><td class="hdrv">Bearer eyJxxxxxxxxxxxxxxxxx</td></tr><tr><td class="hdrk">Content-Type</td><td class="hdrv">application/json;version=3.4</td></tr><tr><td class="hdrk">Requestor</td><td class="hdrv">{{rxxxxxxxxxxxxxxxxx</td></tr></table>
+      <div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">{
+  &quot;status&quot;: &quot;CONFIRMED&quot;
+}</pre>
+    </div>
+  </details>
+      <details>
+    <summary class="sub-summary">📥 Response Body</summary>
+    <div class="panel">
+      <pre class="code">{
+  &quot;refundOffer&quot;: {
+    &quot;appliedOverruleCode&quot;: &quot;PAYMENT_FAILURE&quot;,
+    &quot;createdOn&quot;: &quot;2026-04-20T19:43:40Z&quot;,
+    &quot;fulfillments&quot;: [
+      {
+        &quot;bookingParts&quot;: [
+          {
+            &quot;id&quot;: &quot;3a79dd51-cbf4-4617-8618-1d8d56760212&quot;
+          }
+        ],
+        &quot;bookingRef&quot;: &quot;JXPSTLFW&quot;,
+        &quot;controlNumber&quot;: &quot;JXPSTLFW-001&quot;,
+        &quot;createdOn&quot;: &quot;2026-04-20T19:43:34Z&quot;,
+        &quot;id&quot;: &quot;JXPSTLFW-001&quot;,
+        &quot;status&quot;: &quot;REFUNDED&quot;
+      }
+    ],
+    &quot;id&quot;: &quot;AAAAAAAAAAAAAAAqTrvsDt49G6_vnolAYpuK0YCbd0u4UbcDFWZ5Sw3762Ls3lofDyQCq6BtwR0z8LlOEv21gVsBKNYH3FoKZ-uc1zvj8eWuZw==&quot;,
+    &quot;refundFee&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2
+    },
+    &quot;refundableAmount&quot;: {
+      &quot;amount&quot;: 0,
+      &quot;currency&quot;: &quot;EUR&quot;,
+      &quot;scale&quot;: 2
+    },
+    &quot;status&quot;: &quot;CONFIRMED&quot;,
+    &quot;summary&quot;: &quot;JXPSTLFW - refund&quot;,
+    &quot;validFrom&quot;: &quot;2026-04-20T19:43:40Z&quot;,
+    &quot;validUntil&quot;: &quot;2026-04-20T19:43:40Z&quot;
+  }
+}</pre>
+    </div>
+  </details>
+    </div>
+  </details>
+</div>
+</details>
+
+<div class="foot">
+  Generated by OTST Bruno Collection &mdash; Mon, 20 Apr 2026 19:43:46 GMT
+</div>
+
+</body>
+</html>

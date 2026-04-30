@@ -1,0 +1,23 @@
+name: OTST_Benerail_Env
+variables:
+  - secret: true
+    name: Ocp-Apim-Subscription-Key
+  - secret: true
+    name: requestor
+  - secret: true
+    name: access_token
+  - name: x-bnds-backend
+    value: c03
+  - name: api_base
+    value: https://benerail-stg-apim.azure-api.net/acc/osdm
+  - name: data_file
+    value: <own value here>
+    disabled: true
+  - name: library_base
+    value: ./library-bruno/
+  - name: data_base
+    value: http://localhost:8080/data_base/benerail_datafile.json
+  - name: json_schema
+    value: https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/Bruno-Enhancements/json_validator/datafile.schema.json
+  - name: scenariosToRunIndex
+    value: "0"

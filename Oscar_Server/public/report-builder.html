@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Report Builder</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:1000px;margin:30px auto;padding:0 16px}
+.top-bar{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.top-bar h2{color:#0090D4;font-size:20px;flex:1}
+.subtitle{color:#90a4ae;font-size:13px;margin-bottom:24px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:20px;overflow:hidden}
+.card-title{padding:12px 16px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #eceff1;color:#546e7a;display:flex;align-items:center;gap:8px}
+.card-title .step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#0090D4;color:#fff;font-size:11px;font-weight:800}
+.card-body{padding:16px}
+.btn{padding:8px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+.btn-primary{background:#0090D4;color:#fff}.btn-primary:hover{background:#005A8A}
+.btn-secondary{background:#eceff1;color:#455a64}.btn-secondary:hover{background:#cfd8dc}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* Run selection */
+.runs-list{max-height:320px;overflow-y:auto;border:1px solid #eceff1;border-radius:6px}
+.run-check-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f5f5f5;font-size:13px;cursor:pointer;transition:background .12s}
+.run-check-row:hover{background:#f9f9f9}
+.run-check-row:last-child{border-bottom:none}
+.run-check-row input[type=checkbox]{cursor:pointer;width:14px;height:14px;flex-shrink:0}
+.run-env{font-weight:600;color:#1a3a6b;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-date{color:#546e7a;font-size:12px;flex-shrink:0}
+.run-scenarios{color:#0090D4;font-size:12px;font-weight:600;flex-shrink:0}
+.status{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700}
+.s-COMPLETED{background:#e8f5e9;color:#2e7d32}
+.s-FAILED{background:#ffebee;color:#c62828}
+.s-CANCELLED{background:#eceff1;color:#546e7a}
+.s-DELETED_BY_ADMIN{background:#fff3e0;color:#e65100}
+.empty{text-align:center;padding:32px;color:#90a4ae;font-size:13px}
+
+/* Run filter bar */
+.run-filter-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:#f7f9fb;border:1px solid #eceff1;border-radius:6px}
+.run-filter-bar .field{display:flex;flex-direction:column;gap:4px;min-width:160px}
+.run-filter-bar .field label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
+.run-filter-bar select,.run-filter-bar input[type=date]{padding:6px 8px;border:1px solid #cfd8dc;border-radius:5px;font-size:13px;font-family:inherit;background:#fff}
+.run-filter-bar .reset-link{font-size:12px;color:#0090D4;cursor:pointer;font-weight:600;background:none;border:none;padding:6px 4px}
+.run-filter-bar .reset-link:hover{text-decoration:underline}
+.run-check-row input[type=radio]{cursor:pointer;width:14px;height:14px;flex-shrink:0}
+.run-user{color:#546e7a;font-size:12px;flex-shrink:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-company{color:#1a3a6b;font-size:12px;font-weight:600;flex-shrink:0;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Filter grid */
+.filter-section{margin-bottom:16px}
+.filter-section:last-child{margin-bottom:0}
+.filter-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a;margin-bottom:8px}
+.checkbox-grid{display:flex;flex-wrap:wrap;gap:6px 16px}
+.checkbox-grid label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:3px 0}
+.checkbox-grid label input{cursor:pointer}
+.radio-group{display:flex;gap:16px;flex-wrap:wrap}
+.radio-group label{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+.radio-group label input{cursor:pointer}
+.select-all-toggle{font-size:11px;color:#0090D4;cursor:pointer;font-weight:600;margin-left:8px}
+.select-all-toggle:hover{text-decoration:underline}
+
+/* Actions */
+.actions-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.template-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid #eceff1}
+.template-select{padding:6px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px;font-family:inherit;min-width:180px}
+
+/* Report output */
+#report-output{display:none}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.summary-stat{background:#f5f5f5;border-radius:6px;padding:14px 16px;text-align:center}
+.summary-stat .val{font-size:24px;font-weight:800;color:#1a2e40}
+.summary-stat .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#90a4ae;margin-top:4px}
+.summary-stat.pass .val{color:#2e7d32}
+.summary-stat.fail .val{color:#c62828}
+.summary-stat.rate .val{color:#0090D4}
+
+.breakdown-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
+.breakdown-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
+.breakdown-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5}
+.breakdown-table .num{text-align:center;font-weight:600}
+.breakdown-table .pass-cell{color:#2e7d32}
+.breakdown-table .fail-cell{color:#c62828}
+
+/* Assertion rendering (same as run-detail) */
+.suite-header{padding:8px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;cursor:pointer}
+.suite-header:hover{background:#e3e8ec}
+.req-header{padding:6px 16px 6px 32px;background:#f5f5f5;font-size:12px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+.assertion-row{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid #f5f5f5;font-size:12px}
+.assertion-row:hover{background:#fafbfc}
+/* Full error message on its own line — wraps instead of being truncated to
+   180px / 60 chars, so the certifier can read the expected-vs-actual detail
+   without scrolling the log or hovering for a tooltip. */
+.assertion-error{padding:2px 16px 8px 42px;border-bottom:1px solid #f5f5f5;font-size:11px;color:#c62828;font-family:'Consolas','Monaco','Courier New',monospace;white-space:pre-wrap;word-break:break-word;line-height:1.5;background:#fff7f7}
+.a-pass{color:#2e7d32}
+.a-fail{color:#c62828;font-weight:700}
+.a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
+.a-cat{background:#e3f2fd;color:#1565c0}
+.a-dom{background:#f3e5f5;color:#6a1b9a}
+.a-sev-critical{background:#ffebee;color:#c62828}
+.a-sev-major{background:#fff3e0;color:#e65100}
+.a-sev-minor{background:#fff8e1;color:#f9a825}
+.a-sev-info{background:#e8f5e9;color:#2e7d32}
+
+.export-bar{display:flex;gap:10px;padding:12px 16px;border-top:1px solid #eceff1;background:#fafbfc}
+
+/* Logs */
+.log-suite-header{padding:8px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px}
+.log-req-header{padding:6px 16px 6px 32px;background:#f5f5f5;font-size:12px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+.log-row{display:grid;grid-template-columns:120px 60px 90px 1fr;gap:8px;padding:4px 16px 4px 32px;border-bottom:1px solid #f5f5f5;font-size:12px;font-family:'Consolas','Monaco','Courier New',monospace}
+.log-row:hover{background:#fafbfc}
+.log-ts{color:#90a4ae;font-size:11px}
+.log-level{font-weight:700;text-align:center;border-radius:3px;padding:1px 4px;font-size:10px}
+.log-level.l-error{background:#ffebee;color:#c62828}
+.log-level.l-warn,.log-level.l-warning{background:#fff3e0;color:#e65100}
+.log-level.l-info{background:#e8f5e9;color:#2e7d32}
+.log-level.l-stdout,.log-level.l-stderr{background:#eceff1;color:#546e7a}
+.log-cat{font-size:10px;color:#1565c0;background:#e3f2fd;border-radius:3px;padding:1px 6px;text-align:center;align-self:center}
+.log-msg{color:#37474f;white-space:pre-wrap;word-break:break-word}
+.log-empty{padding:20px;text-align:center;color:#90a4ae;font-size:13px}
+
+/* Scenario milestone banners — full-width dividers in the log stream so the
+   reader instantly sees "scenario 2 started" / "attempt 3/3 retry" / "skipped
+   after 3 attempts" instead of having to parse those from plain log text. */
+.log-milestone{display:flex;align-items:center;gap:10px;padding:10px 16px;margin:4px 0;border-radius:6px;font-size:12px;font-weight:600;border-left:4px solid}
+.log-milestone .mile-label{text-transform:uppercase;font-size:10px;letter-spacing:.6px;font-weight:800;padding:2px 8px;border-radius:3px;background:#fff}
+.log-milestone .mile-scenario{font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px}
+.log-milestone .mile-attempt{color:#546e7a;font-size:11px;font-weight:500}
+.log-milestone .mile-ts{color:#90a4ae;font-size:10px;margin-left:auto;font-family:'Consolas','Monaco','Courier New',monospace}
+.mile-start{background:#e8f4fb;border-color:#0090D4;color:#0b5a8a}
+.mile-start .mile-label{color:#0090D4;border:1px solid #b3d9ea}
+.mile-retry{background:#fff3e0;border-color:#e65100;color:#773800}
+.mile-retry .mile-label{color:#e65100;border:1px solid #ffcc80}
+.mile-skipped{background:#ffebee;border-color:#c62828;color:#842029}
+.mile-skipped .mile-label{color:#c62828;border:1px solid #ef9a9a}
+.mile-end{background:#e8f5e9;border-color:#2e7d32;color:#1b5e20}
+.mile-end .mile-label{color:#2e7d32;border:1px solid #a5d6a7}
+
+/* JSON block coalescing — collapses consecutive inspect-style lines (from
+   console.log(obj)) into one expandable pill. Restores the "Selected Offer"
+   dump to a single row instead of dozens. */
+.log-json-row{display:grid;grid-template-columns:120px 60px 90px 1fr;gap:8px;padding:4px 16px 4px 32px;border-bottom:1px solid #f5f5f5;font-size:12px;font-family:'Consolas','Monaco','Courier New',monospace;align-items:center}
+.log-json-row:hover{background:#fafbfc}
+.log-json-toggle{background:none;border:none;color:#0090D4;cursor:pointer;padding:2px 8px;font-size:12px;font-family:inherit;font-weight:600;display:inline-flex;align-items:center;gap:6px;border-radius:4px}
+.log-json-toggle:hover{background:#e8f4fb}
+.log-json-toggle .caret{transition:transform .15s;display:inline-block}
+.log-json-toggle.expanded .caret{transform:rotate(90deg)}
+.log-json-summary{color:#546e7a;font-size:11px;margin-left:4px;font-family:'Segoe UI',Arial,sans-serif}
+.log-json-body{display:none;padding:8px 16px 8px 80px;background:#fafbfc;border-bottom:1px solid #f5f5f5;font-family:'Consolas','Monaco','Courier New',monospace;font-size:11px;color:#37474f;white-space:pre-wrap;word-break:break-word;line-height:1.45;max-height:400px;overflow:auto}
+.log-json-body.expanded{display:block}
+
+/* Vendor capability matrix */
+.cap-table{width:100%;border-collapse:collapse;font-size:13px}
+.cap-table th{background:#eceff1;text-align:left;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a}
+.cap-table td{padding:8px 12px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+.cap-table tr:hover td{background:#fafbfc}
+.cap-endpoint{font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px;color:#263238}
+.cap-method{display:inline-block;font-family:'Consolas','Monaco','Courier New',monospace;font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;background:#eceff1;color:#37474f;margin-right:6px;min-width:42px;text-align:center}
+.cap-status{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase}
+.cap-IMPLEMENTED{background:#e8f5e9;color:#2e7d32}
+.cap-PARTIAL{background:#fff3e0;color:#e65100}
+.cap-NOT_IMPLEMENTED{background:#ffebee;color:#c62828}
+.cap-NOT_APPLICABLE{background:#eceff1;color:#546e7a;border:1px dashed #b0bec5}
+.cap-ERROR{background:#ffe0b2;color:#bf360c}
+.cap-UNKNOWN{background:#eceff1;color:#546e7a}
+.cap-summary{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.cap-summary-pill{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid}
+.cap-summary-pill.s-IMPLEMENTED{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
+.cap-summary-pill.s-PARTIAL{background:#fff3e0;border-color:#ffcc80;color:#e65100}
+.cap-summary-pill.s-NOT_IMPLEMENTED{background:#ffebee;border-color:#ef9a9a;color:#c62828}
+.cap-summary-pill.s-ERROR{background:#ffe0b2;border-color:#ffab91;color:#bf360c}
+.cap-summary-pill.s-NOT_APPLICABLE{background:#eceff1;border-color:#b0bec5;color:#546e7a}
+
+/* Request context tags — render key/value pairs extracted from the sent
+   payload (refund mode, exchange mode, flexibility filter, etc.) as small
+   chips under the endpoint label. Lets a certifier interpret PARTIAL /
+   NOT_IMPLEMENTED results without opening the request body. */
+.cap-ctx-row{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px}
+.cap-ctx-tag{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;background:#eef3f6;color:#455a64;border:1px solid #cfd8dc;font-family:'Segoe UI',Arial,sans-serif}
+.cap-ctx-tag .k{color:#90a4ae;font-weight:500}
+.cap-ctx-tag.hl-mode-reason-code{background:#fff8e1;border-color:#ffe082;color:#7a4a00}
+.cap-ctx-tag.hl-mode-voluntary{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+
+@media print{
+  .uic-banner,.site-footer,.card:has(.actions-row),.card:has(.runs-list),.card:has(.filter-section){display:none!important}
+  .export-bar{display:none!important}
+  body{background:#fff}
+  .container{margin:0;max-width:100%}
+  #report-output{display:block!important}
+}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'report-builder');</script>
+</header>
+
+<div class="container">
+  <div class="top-bar">
+    <h2>Report Builder</h2>
+  </div>
+  <div class="subtitle">Build filtered OSDM conformance reports</div>
+
+  <!-- Step 1: Select Runs -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">1</span> Select Run</div>
+    <div class="card-body">
+      <div class="run-filter-bar" id="run-filter-bar">
+        <div class="field" id="company-field" style="display:none">
+          <label for="filter-company">Company</label>
+          <select id="filter-company"><option value="">All companies</option></select>
+        </div>
+        <div class="field" id="user-field">
+          <label for="filter-user">User</label>
+          <select id="filter-user"><option value="">All users</option></select>
+        </div>
+        <div class="field">
+          <label for="filter-date">Date</label>
+          <input type="date" id="filter-date">
+        </div>
+        <button type="button" class="reset-link" id="filter-reset">Reset (latest)</button>
+      </div>
+      <div id="runs-list" class="runs-list">
+        <div class="empty">Loading runs...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Filter Criteria -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">2</span> Filter Criteria</div>
+    <div class="card-body">
+      <!-- Categories -->
+      <div class="filter-section">
+        <div class="filter-label">Categories <span class="select-all-toggle" data-action="toggle-all" data-group="cat">Deselect all</span></div>
+        <div class="checkbox-grid" id="cat-checks"></div>
+      </div>
+      <!-- Domains -->
+      <div class="filter-section">
+        <div class="filter-label">Domains <span class="select-all-toggle" data-action="toggle-all" data-group="dom">Deselect all</span></div>
+        <div class="checkbox-grid" id="dom-checks"></div>
+      </div>
+      <!-- Status -->
+      <div class="filter-section">
+        <div class="filter-label">Status</div>
+        <div class="radio-group" id="status-radios"></div>
+      </div>
+      <!-- Severity -->
+      <div class="filter-section">
+        <div class="filter-label">Severity <span class="select-all-toggle" data-action="toggle-all" data-group="sev">Deselect all</span></div>
+        <div class="checkbox-grid" id="sev-checks"></div>
+      </div>
+      <!-- Logs -->
+      <div class="filter-section">
+        <div class="filter-label">Logs</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="logs-include-passed">
+          Include logs from requests whose assertions all passed
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Actions -->
+  <div class="card">
+    <div class="card-title"><span class="step-num">3</span> Actions</div>
+    <div class="card-body">
+      <div class="actions-row">
+        <button class="btn btn-primary" id="generate-btn" data-action="generate" disabled>Generate Report</button>
+        <button class="btn btn-secondary" id="save-template-btn" data-action="save-template">Save as Template</button>
+      </div>
+      <div class="template-row">
+        <select class="template-select" id="template-select">
+          <option value="">-- Load Template --</option>
+        </select>
+        <button class="btn btn-sm btn-secondary" id="load-template-btn" data-action="load-template">Load</button>
+        <button class="btn btn-sm btn-secondary" id="delete-template-btn" data-action="delete-template">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Output -->
+  <div id="report-output">
+    <div class="card">
+      <div class="card-title">Report Summary</div>
+      <div class="card-body">
+        <div id="report-meta" style="margin-bottom:14px;font-size:13px;color:#37474f;line-height:1.6"></div>
+        <div id="report-summary" class="summary-grid"></div>
+      </div>
+    </div>
+    <div class="card" id="capability-card" style="display:none">
+      <div class="card-title">Vendor Capability Matrix</div>
+      <div class="card-body">
+        <div id="capability-summary" class="cap-summary"></div>
+        <table class="cap-table" id="capability-table">
+          <thead><tr><th>Scenario</th><th>Endpoint</th><th>HTTP</th><th>Capability</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Breakdown by Domain</div>
+      <div class="card-body">
+        <table class="breakdown-table" id="domain-breakdown">
+          <thead><tr><th>Domain</th><th class="num">Total</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Pass Rate</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Breakdown by Category</div>
+      <div class="card-body">
+        <table class="breakdown-table" id="category-breakdown">
+          <thead><tr><th>Category</th><th class="num">Total</th><th class="num">Passed</th><th class="num">Failed</th><th class="num">Pass Rate</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Assertion Details</div>
+      <div id="assertion-content" style="max-height:700px;overflow-y:auto"></div>
+    </div>
+    <div class="card" id="logs-card">
+      <div class="card-title">Logs <span id="logs-count" style="margin-left:auto;font-weight:600;color:#90a4ae;text-transform:none;letter-spacing:0;font-size:11px"></span></div>
+      <div id="logs-content" style="max-height:700px;overflow-y:auto"></div>
+      <div class="export-bar">
+        <button class="btn btn-primary btn-sm" id="export-csv-btn" data-action="export-csv">Export CSV</button>
+        <button class="btn btn-secondary btn-sm" id="print-btn" data-action="print">Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script>
+/* ── Auth check ────────────────────────────────────────────────────────────── */
+const token = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+/* ── Constants ─────────────────────────────────────────────────────────────── */
+const CATEGORIES = [
+  'environment_check','http_status','content_type','response_structure',
+  'field_validation','business_logic','data_consistency','prerequisite',
+  'script_error','parameter_probe','scenario_config'
+];
+const DOMAINS = [
+  'infrastructure','system','offer','booking',
+  'fulfillment','passenger','refund','exchange'
+];
+const SEVERITIES = ['critical','major','minor','info'];
+const STATUS_OPTIONS = [
+  { value: 'all',    label: 'All' },
+  { value: 'failed', label: 'Failed only' },
+  { value: 'passed', label: 'Passed only' }
+];
+
+/* ── State ─────────────────────────────────────────────────────────────────── */
+const FINISHED_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'DELETED_BY_ADMIN'];
+const userRole = (user && user.role) || 'company_user';
+const isPlatformUser = userRole === 'administrator' || userRole === 'certification_user';
+const canPickAnyUser = isPlatformUser || userRole === 'test_manager';
+
+let allRuns = [];
+let selectedRunId = null;
+let reportData = null;
+let runFilters = { companyId: '', userId: '', date: '' };
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
+}
+function runScenarioLabel(r) {
+  // What identifies this run for a human? Prefer the actual scenario(s) executed:
+  //   - single-scenario run → r.scenario_code (e.g. OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG)
+  //   - multi-scenario run  → distinct scenario_names from run_suites (joined backend-side)
+  //   - legacy run with no structured data → fall back to env_name_used or short id
+  if (r.scenario_code) return r.scenario_code;
+  if (r.scenario_names) return r.scenario_names.split(',').join(', ');
+  return r.env_name_used || r.id.slice(0, 8);
+}
+function pct(n, d) {
+  return d > 0 ? Math.round(n / d * 1000) / 10 : 0;
+}
+function scenarioLabel(r) {
+  // Prefer accurate scenario_count (= row count in run_suites). Fall back to
+  // artifact_count for legacy runs predating structured-results extraction.
+  var n = (typeof r.scenario_count === 'number') ? r.scenario_count : 0;
+  if (n === 0 && r.artifact_count) {
+    return r.artifact_count + ' artifacts';
+  }
+  return n + ' scenario' + (n === 1 ? '' : 's');
+}
+
+/* ── Build filter UI ───────────────────────────────────────────────────────── */
+function buildCheckboxes(containerId, items, namePrefix) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = items.map(function(item) {
+    return '<label><input type="checkbox" name="' + namePrefix + '" value="' + escHtml(item) + '" checked> ' + escHtml(item) + '</label>';
+  }).join('');
+}
+
+function buildRadios(containerId, options, name) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = options.map(function(opt, i) {
+    return '<label><input type="radio" name="' + name + '" value="' + opt.value + '"' + (i === 0 ? ' checked' : '') + '> ' + escHtml(opt.label) + '</label>';
+  }).join('');
+}
+
+buildCheckboxes('cat-checks', CATEGORIES, 'filter_cat');
+buildCheckboxes('dom-checks', DOMAINS, 'filter_dom');
+buildRadios('status-radios', STATUS_OPTIONS, 'filter_status');
+buildCheckboxes('sev-checks', SEVERITIES, 'filter_sev');
+
+/* ── Load runs ─────────────────────────────────────────────────────────────── */
+async function loadRuns() {
+  try {
+    var res = await fetch('/v1/runs?limit=200', { headers: { Authorization: 'Bearer ' + token } });
+    if (res.status === 401) { logout(); return; }
+    var data = await res.json();
+    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.indexOf(r.status) !== -1; });
+    populateFilterDropdowns();
+    applyDefaultSelection();
+    renderRunsList();
+  } catch (e) {
+    document.getElementById('runs-list').innerHTML = '<div class="empty">Failed to load runs.</div>';
+  }
+}
+
+function populateFilterDropdowns() {
+  // Company dropdown — only certifier/admin can pick across companies
+  if (isPlatformUser) {
+    document.getElementById('company-field').style.display = '';
+    var companies = {};
+    allRuns.forEach(function(r) {
+      if (r.company_id) companies[r.company_id] = r.company_name || r.company_id;
+    });
+    var companyIds = Object.keys(companies).sort(function(a, b) {
+      return companies[a].localeCompare(companies[b]);
+    });
+    var companySelect = document.getElementById('filter-company');
+    companySelect.innerHTML = '<option value="">All companies</option>'
+      + companyIds.map(function(id) {
+          return '<option value="' + escHtml(id) + '">' + escHtml(companies[id]) + '</option>';
+        }).join('');
+  }
+
+  // User dropdown — visible for certifier/admin/test_manager (not regular tester)
+  if (canPickAnyUser) {
+    document.getElementById('user-field').style.display = '';
+    refreshUserDropdown();
+  } else {
+    document.getElementById('user-field').style.display = 'none';
+  }
+}
+
+function refreshUserDropdown() {
+  // Limit user list to runs matching the selected company filter
+  var pool = allRuns;
+  if (runFilters.companyId) {
+    pool = pool.filter(function(r) { return r.company_id === runFilters.companyId; });
+  }
+  var emails = {};
+  pool.forEach(function(r) {
+    if (r.submitted_by) emails[r.submitted_by] = true;
+  });
+  var list = Object.keys(emails).sort();
+  var sel = document.getElementById('filter-user');
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">All users</option>'
+    + list.map(function(e) { return '<option value="' + escHtml(e) + '">' + escHtml(e) + '</option>'; }).join('');
+  // Keep previous selection if still valid
+  if (prev && emails[prev]) sel.value = prev;
+  else { sel.value = ''; runFilters.userId = ''; }
+}
+
+function getFilteredRuns() {
+  return allRuns.filter(function(r) {
+    if (runFilters.companyId && r.company_id !== runFilters.companyId) return false;
+    if (runFilters.userId && r.submitted_by !== runFilters.userId) return false;
+    if (runFilters.date) {
+      var d = (r.queued_at || '').slice(0, 10);
+      if (d !== runFilters.date) return false;
+    }
+    return true;
+  });
+}
+
+function applyDefaultSelection() {
+  // No date filter → pick latest matching run as default
+  var pool = getFilteredRuns();
+  if (!runFilters.date && pool.length > 0) {
+    selectedRunId = pool[0].id;
+  } else if (pool.length === 0) {
+    selectedRunId = null;
+  } else if (selectedRunId && !pool.some(function(r) { return r.id === selectedRunId; })) {
+    // Selected run no longer in the filtered set
+    selectedRunId = pool[0].id;
+  }
+  updateGenerateButton();
+}
+
+function renderRunsList() {
+  var el = document.getElementById('runs-list');
+  var pool = getFilteredRuns();
+  if (!pool.length) {
+    el.innerHTML = '<div class="empty">No runs match the selected filters.</div>';
+    return;
+  }
+  el.innerHTML = pool.map(function(r) {
+    var checked = selectedRunId === r.id ? ' checked' : '';
+    var statusCls = 's-' + (r.status || 'COMPLETED');
+    var primary = escHtml(runScenarioLabel(r));
+    var envSub  = r.env_name_used ? ' <span style="color:#90a4ae;font-weight:400;font-size:11px">[' + escHtml(r.env_name_used) + ']</span>' : '';
+    return '<div class="run-check-row" data-run-id="' + r.id + '">'
+      + '<input type="radio" name="run-pick" value="' + r.id + '" data-action="select-run"' + checked + '>'
+      + '<span class="run-env" title="' + escHtml(r.id) + '">' + primary + envSub + '</span>'
+      + (isPlatformUser && r.company_name ? '<span class="run-company">' + escHtml(r.company_name) + '</span>' : '')
+      + (r.submitted_by ? '<span class="run-user">' + escHtml(r.submitted_by) + '</span>' : '')
+      + '<span class="run-date">' + fmtDate(r.queued_at) + '</span>'
+      + '<span class="status ' + statusCls + '">' + escHtml(r.status || '') + '</span>'
+      + '<span class="run-scenarios">' + scenarioLabel(r) + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function updateGenerateButton() {
+  document.getElementById('generate-btn').disabled = !selectedRunId;
+}
+
+function onFilterChange() {
+  runFilters.companyId = isPlatformUser ? document.getElementById('filter-company').value : '';
+  runFilters.date      = document.getElementById('filter-date').value;
+  if (canPickAnyUser) {
+    refreshUserDropdown();
+    runFilters.userId = document.getElementById('filter-user').value;
+  } else {
+    runFilters.userId = '';
+  }
+  applyDefaultSelection();
+  renderRunsList();
+}
+
+function resetFilters() {
+  runFilters = { companyId: '', userId: '', date: '' };
+  if (isPlatformUser) document.getElementById('filter-company').value = '';
+  document.getElementById('filter-date').value = '';
+  if (canPickAnyUser) refreshUserDropdown();
+  applyDefaultSelection();
+  renderRunsList();
+}
+
+/* ── Collect current filter state ──────────────────────────────────────────── */
+function getFilters() {
+  var cats = [];
+  document.querySelectorAll('input[name="filter_cat"]:checked').forEach(function(cb) { cats.push(cb.value); });
+  var doms = [];
+  document.querySelectorAll('input[name="filter_dom"]:checked').forEach(function(cb) { doms.push(cb.value); });
+  var sevs = [];
+  document.querySelectorAll('input[name="filter_sev"]:checked').forEach(function(cb) { sevs.push(cb.value); });
+  var status = document.querySelector('input[name="filter_status"]:checked').value;
+  return { categories: cats, domains: doms, severities: sevs, status: status };
+}
+
+/* ── Generate report ───────────────────────────────────────────────────────── */
+async function generateReport() {
+  if (!selectedRunId) return;
+  var btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  var filters = getFilters();
+  var payload = {
+    run_ids: [selectedRunId],
+    filters: filters
+  };
+
+  try {
+    var res = await fetch('/v1/reports/configured', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      var errBody = await res.json().catch(function() { return {}; });
+      alert('Report generation failed: ' + (errBody.detail || res.statusText));
+      btn.disabled = false;
+      btn.textContent = 'Generate Report';
+      return;
+    }
+    reportData = await res.json();
+    renderReport();
+  } catch (e) {
+    alert('Network error generating report.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate Report';
+}
+
+/* ── Render report ─────────────────────────────────────────────────────────── */
+function renderReport() {
+  if (!reportData) return;
+  document.getElementById('report-output').style.display = 'block';
+
+  // Echo back the run + scenario(s) the report covers, so the user can verify
+  // the selection at a glance without scrolling into Assertion Details.
+  var run = allRuns.find(function(r) { return r.id === selectedRunId; });
+  var meta = '';
+  if (run) {
+    var scenarioList = run.scenario_code
+      || (run.scenario_names ? run.scenario_names.split(',').join(', ') : '');
+    var scenariosFromReport = (reportData.suites || [])
+      .map(function(su) { return su.scenario_name; })
+      .filter(function(v, i, a) { return v && a.indexOf(v) === i; });
+    if (!scenarioList && scenariosFromReport.length) scenarioList = scenariosFromReport.join(', ');
+
+    meta = '<div><strong>Run:</strong> ' + escHtml(run.id) + '</div>'
+      + (scenarioList ? '<div><strong>Scenario(s):</strong> ' + escHtml(scenarioList) + '</div>' : '')
+      + (run.env_name_used ? '<div><strong>Environment:</strong> ' + escHtml(run.env_name_used) + '</div>' : '')
+      + (run.company_name ? '<div><strong>Company:</strong> ' + escHtml(run.company_name) + '</div>' : '')
+      + (run.submitted_by ? '<div><strong>Submitted by:</strong> ' + escHtml(run.submitted_by) + '</div>' : '')
+      + '<div><strong>Queued at:</strong> ' + escHtml(fmtDate(run.queued_at))
+      +   ' &nbsp;&middot;&nbsp; <strong>Status:</strong> ' + escHtml(run.status || '') + '</div>';
+  }
+  document.getElementById('report-meta').innerHTML = meta;
+
+  var s = reportData.summary || {};
+  var total = s.total || 0;
+  var passed = s.passed || 0;
+  var failed = s.failed || 0;
+  var rate = pct(passed, total);
+
+  document.getElementById('report-summary').innerHTML =
+    '<div class="summary-stat"><div class="val">' + total + '</div><div class="lbl">Total Assertions</div></div>'
+    + '<div class="summary-stat pass"><div class="val">' + passed + '</div><div class="lbl">Passed</div></div>'
+    + '<div class="summary-stat fail"><div class="val">' + failed + '</div><div class="lbl">Failed</div></div>'
+    + '<div class="summary-stat rate"><div class="val">' + rate + '%</div><div class="lbl">Pass Rate</div></div>';
+
+  renderCapabilityMatrix(reportData.capability_matrix || []);
+  renderBreakdown('domain-breakdown', reportData.by_domain || [], 'domain');
+  renderBreakdown('category-breakdown', reportData.by_category || [], 'category');
+  renderAssertions(reportData.suites || []);
+  renderLogs();
+
+  document.getElementById('report-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function getFilteredLogs() {
+  if (!reportData || !Array.isArray(reportData.events)) return [];
+  var includePassed = document.getElementById('logs-include-passed').checked;
+  return reportData.events.filter(function(e) {
+    // Milestones always render — they're scenario dividers the certifier relies
+    // on to know which scenario/attempt a log window belongs to.
+    if (e.event_kind && e.event_kind !== 'log') return true;
+    return includePassed || e.request_result === 'FAIL';
+  });
+}
+
+/* ── Multi-line JSON coalescing ────────────────────────────────────────────
+ * Bruno library scripts call console.log(obj) which util.inspect-formats the
+ * object across many lines. Each line becomes its own run_events row. The
+ * result: a single "Selected Offer" dump explodes to 20-30 rows in the UI.
+ *
+ * This collapses a run of continuation-looking lines into one JSON block
+ * pill. Heuristic:
+ *   - An opener looks like "Selected Offer: {" or ends with " {" / " ["
+ *     or matches the forward-compatible marker "[JSON:label]".
+ *   - A continuation is a line that starts with whitespace, or is a pure
+ *     closer ("}" / "]" / "},"), AND belongs to the same request as the opener.
+ *   - The block closes on the first non-continuation line (or request change).
+ */
+function looksLikeJsonOpener(msg) {
+  var s = (msg || '').trimRight();
+  if (/^\s*\[JSON:[^\]]+\]/.test(s)) return true;          // explicit marker
+  if (/[:=]\s*[\{\[]\s*$/.test(s)) return true;             // "Selected Offer: {"
+  if (/^[A-Za-z_][\w\s]*:\s*[\{\[]\s*$/.test(s.trim())) return true;
+  return false;
+}
+function looksLikeJsonContinuation(msg) {
+  if (msg == null) return false;
+  if (/^\s+\S/.test(msg)) return true;                      // indented line
+  if (/^[\}\]][,\s]*$/.test(msg.trim())) return true;       // closer
+  return false;
+}
+function coalesceJsonBlocks(events) {
+  var out = [];
+  var i = 0;
+  while (i < events.length) {
+    var e = events[i];
+    var msg = e.message || '';
+    if (e.event_kind && e.event_kind !== 'log') { out.push(e); i++; continue; }
+    if (looksLikeJsonOpener(msg)) {
+      var block = { opener: e, lines: [msg], reqName: e.request_name, suite: e.suite_name };
+      var j = i + 1;
+      while (j < events.length) {
+        var n = events[j];
+        if (n.event_kind && n.event_kind !== 'log') break;
+        if (n.request_name !== block.reqName || n.suite_name !== block.suite) break;
+        if (!looksLikeJsonContinuation(n.message || '')) break;
+        block.lines.push(n.message || '');
+        j++;
+      }
+      // Need at least one continuation line for it to be worth collapsing.
+      if (block.lines.length >= 2) {
+        out.push({ __jsonBlock: true, event: e, body: block.lines.join('\n') });
+        i = j;
+        continue;
+      }
+    }
+    out.push(e);
+    i++;
+  }
+  return out;
+}
+function jsonBlockLabel(opener) {
+  var s = (opener.message || '').trim();
+  // Explicit marker wins.
+  var m = s.match(/^\[JSON:([^\]]+)\]\s*(.*)$/);
+  if (m) return m[1];
+  // Otherwise take the text before the colon/brace as the label.
+  m = s.match(/^([^:\{\[]+)[:=]?\s*[\{\[]/);
+  if (m) return m[1].trim();
+  return 'object';
+}
+
+function renderMilestone(e) {
+  var kind = (e.event_kind || '').replace('scenario_', '');
+  var labelMap = {
+    start:   { cls: 'mile-start',   text: 'Scenario start' },
+    retry:   { cls: 'mile-retry',   text: 'Retry' },
+    skipped: { cls: 'mile-skipped', text: 'Scenario skipped' },
+    end:     { cls: 'mile-end',     text: 'Scenario end' }
+  };
+  var def = labelMap[kind] || { cls: 'mile-start', text: e.event_kind || 'milestone' };
+  var attempt = (e.attempt_index && e.attempt_total)
+    ? 'attempt ' + e.attempt_index + '/' + e.attempt_total
+    : '';
+  var ts = e.ts ? new Date(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+  return '<div class="log-milestone ' + def.cls + '">'
+    + '<span class="mile-label">' + escHtml(def.text) + '</span>'
+    + '<span class="mile-scenario">' + escHtml(e.scenario_name || '(unknown scenario)') + '</span>'
+    + (attempt ? '<span class="mile-attempt">' + escHtml(attempt) + '</span>' : '')
+    + '<span class="mile-ts">' + escHtml(ts) + '</span>'
+    + '</div>';
+}
+
+function renderLogs() {
+  var content = document.getElementById('logs-content');
+  var counter = document.getElementById('logs-count');
+  var events = getFilteredLogs();
+  counter.textContent = events.length + ' event' + (events.length === 1 ? '' : 's');
+  if (events.length === 0) {
+    content.innerHTML = '<div class="log-empty">No log events for the selected filter (try enabling "Include logs from requests whose assertions all passed").</div>';
+    return;
+  }
+
+  // Group by scenario → suite → request. Milestone events are emitted above
+  // the group they logically precede, so they become visual dividers rather
+  // than appearing mid-request.
+  var scenarioBySuite = {};
+  (reportData.suites || []).forEach(function(s) {
+    if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
+  });
+
+  // Partition events into top-level milestones + suite-scoped events. A
+  // milestone is anchored to its scenario_name; we'll render it before the
+  // first group of that scenario.
+  var milestones = [];
+  var regular = [];
+  events.forEach(function(e) {
+    if (e.event_kind && e.event_kind !== 'log') milestones.push(e);
+    else regular.push(e);
+  });
+
+  var groups = {};
+  var groupOrder = [];
+  regular.forEach(function(e) {
+    var scen = e.scenario_name || scenarioBySuite[e.suite_name] || '';
+    var key = scen + '||' + (e.suite_name || '');
+    if (!groups[key]) {
+      groups[key] = { scenario: scen, suite: e.suite_name, requests: {}, reqOrder: [] };
+      groupOrder.push(key);
+    }
+    var reqName = e.request_name || '(unknown request)';
+    if (!groups[key].requests[reqName]) {
+      groups[key].requests[reqName] = [];
+      groups[key].reqOrder.push(reqName);
+    }
+    groups[key].requests[reqName].push(e);
+  });
+
+  // Stamp each group with the milestone that most recently precedes its first
+  // event (by id). This way we render the milestone banner inside the scenario
+  // transition — right before the first log of the new scenario.
+  var milestonesByScenarioOrder = milestones.slice().sort(function(a, b) { return (a.id||0) - (b.id||0); });
+
+  var html = '';
+  var rendered = {};
+  groupOrder.forEach(function(k) {
+    var g = groups[k];
+    // Emit any milestones that apply to this scenario and haven't been rendered yet.
+    milestonesByScenarioOrder.forEach(function(m) {
+      if (rendered[m.id]) return;
+      if ((m.scenario_name || '') === g.scenario) {
+        html += renderMilestone(m);
+        rendered[m.id] = true;
+      }
+    });
+    var headerLabel = g.scenario
+      ? '<span style="color:#90a4ae;margin-right:6px">Scenario:</span>' + escHtml(g.scenario) + ' &mdash; ' + escHtml(g.suite || '(root)')
+      : escHtml(g.suite || '(root)');
+    html += '<div class="log-suite-header">' + headerLabel + '</div>';
+    g.reqOrder.forEach(function(reqName) {
+      var evs = g.requests[reqName];
+      var anyFail = evs.some(function(e) { return e.request_result === 'FAIL'; });
+      var badge = anyFail
+        ? '<span class="a-fail">FAIL</span>'
+        : '<span class="a-pass">PASS</span>';
+      // Collapse multi-line JSON dumps so "Selected Offer: {...}" (30 lines)
+      // becomes a single expandable pill instead of swamping the view.
+      var collapsed = coalesceJsonBlocks(evs);
+      html += '<div class="log-req-header">' + badge + ' <span>' + escHtml(reqName) + '</span>'
+        + '<span style="color:#90a4ae;font-size:11px;margin-left:auto">' + evs.length + ' log line' + (evs.length === 1 ? '' : 's') + '</span></div>';
+      collapsed.forEach(function(item) {
+        if (item.__jsonBlock) {
+          var o = item.event;
+          var lvl = (o.level || 'stdout').toLowerCase();
+          var ts  = o.ts ? new Date(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var label = jsonBlockLabel(o);
+          var lineCount = item.body.split('\n').length;
+          var bodyId = 'json-body-' + (o.id || Math.random().toString(36).slice(2));
+          html += '<div class="log-json-row">'
+            + '<span class="log-ts">' + escHtml(ts) + '</span>'
+            + '<span class="log-level l-' + escHtml(lvl) + '">' + escHtml(lvl) + '</span>'
+            + '<span class="log-cat">' + escHtml(o.category || '-') + '</span>'
+            + '<span>'
+            +   '<button class="log-json-toggle" data-action="toggle-json" data-target="' + bodyId + '">'
+            +     '<span class="caret">&#9656;</span>'
+            +     '<span>' + escHtml(label) + '</span>'
+            +   '</button>'
+            +   '<span class="log-json-summary">' + lineCount + ' line' + (lineCount === 1 ? '' : 's') + ' &middot; click to expand</span>'
+            + '</span>'
+            + '</div>'
+            + '<pre class="log-json-body" id="' + bodyId + '">' + escHtml(item.body) + '</pre>';
+        } else {
+          var e2 = item;
+          var lvl2 = (e2.level || 'stdout').toLowerCase();
+          var ts2  = e2.ts ? new Date(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          html += '<div class="log-row">'
+            + '<span class="log-ts">' + escHtml(ts2) + '</span>'
+            + '<span class="log-level l-' + escHtml(lvl2) + '">' + escHtml(lvl2) + '</span>'
+            + '<span class="log-cat">' + escHtml(e2.category || '-') + '</span>'
+            + '<span class="log-msg">' + escHtml(e2.message || '') + '</span>'
+            + '</div>';
+        }
+      });
+    });
+  });
+
+  // Any milestones that didn't match a rendered group (e.g. scenarios whose
+  // suites were filtered out) are appended at the end so they're not lost.
+  milestonesByScenarioOrder.forEach(function(m) {
+    if (!rendered[m.id]) html += renderMilestone(m);
+  });
+
+  content.innerHTML = html;
+}
+
+/* ── Vendor Capability Matrix ──────────────────────────────────────────────
+ * Shows the certifier which endpoints the vendor actually implements, so they
+ * can conclude "not implemented" without reading log messages line-by-line.
+ */
+function renderCapabilityMatrix(rows) {
+  var card = document.getElementById('capability-card');
+  if (!rows || rows.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  var counts = { IMPLEMENTED: 0, PARTIAL: 0, NOT_IMPLEMENTED: 0, ERROR: 0, NOT_APPLICABLE: 0 };
+  rows.forEach(function(r) {
+    var k = r.vendor_capability || 'UNKNOWN';
+    if (counts[k] != null) counts[k]++;
+  });
+  var summary = '';
+  ['NOT_IMPLEMENTED', 'ERROR', 'PARTIAL', 'IMPLEMENTED', 'NOT_APPLICABLE'].forEach(function(k) {
+    if (counts[k] > 0) {
+      summary += '<div class="cap-summary-pill s-' + k + '">'
+        + counts[k] + ' ' + k.replace('_', ' ').toLowerCase()
+        + '</div>';
+    }
+  });
+  document.getElementById('capability-summary').innerHTML = summary;
+
+  // Preserve execution order (rows come back from /reports/configured sorted
+  // by run_requests.id ASC = Bruno execution sequence). Certifiers read this
+  // top-to-bottom matching their mental model of the test flow.
+  var tbody = document.querySelector('#capability-table tbody');
+  tbody.innerHTML = rows.map(function(r) {
+    var cap = r.vendor_capability || 'UNKNOWN';
+    var method = r.http_method ? '<span class="cap-method">' + escHtml(r.http_method) + '</span>' : '';
+    var endpoint = (r.suite_name ? escHtml(r.suite_name) + ' / ' : '') + escHtml(r.request_name || '');
+    var ctxTags  = renderContextTags(r.context);
+    return '<tr>'
+      + '<td>' + escHtml(r.scenario_name || '-') + '</td>'
+      + '<td class="cap-endpoint">' + method + endpoint + ctxTags + '</td>'
+      + '<td>' + (r.http_status != null ? escHtml(r.http_status) : '-') + '</td>'
+      + '<td><span class="cap-status cap-' + cap + '">' + escHtml(cap.replace('_', ' ')) + '</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+/* Render a context blob (refund mode, flexibility filter, pax count, …) as
+ * a row of small chips under the endpoint label. A handful of keys get
+ * highlight classes so the eye catches them; everything else falls back to
+ * the neutral gray tag.
+ */
+function renderContextTags(ctx) {
+  if (!ctx || typeof ctx !== 'object') return '';
+  var tags = [];
+  Object.keys(ctx).forEach(function(k) {
+    var v = ctx[k];
+    if (v == null || v === '') return;
+    var hl = '';
+    if (k === 'mode' && (v === 'reason-code' || v === 'voluntary')) hl = ' hl-mode-' + v;
+    tags.push('<span class="cap-ctx-tag' + hl + '"><span class="k">' + escHtml(k) + ':</span> ' + escHtml(String(v)) + '</span>');
+  });
+  if (!tags.length) return '';
+  return '<div class="cap-ctx-row">' + tags.join('') + '</div>';
+}
+
+function renderBreakdown(tableId, data, keyField) {
+  var tbody = document.getElementById(tableId).querySelector('tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#90a4ae;padding:16px">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(row) {
+    var name = row[keyField] || 'other';
+    var t = row.total || 0;
+    var p = row.passed || 0;
+    var f = row.failed || 0;
+    var r = pct(p, t);
+    return '<tr><td>' + escHtml(name) + '</td>'
+      + '<td class="num">' + t + '</td>'
+      + '<td class="num pass-cell">' + p + '</td>'
+      + '<td class="num fail-cell">' + f + '</td>'
+      + '<td class="num">' + r + '%</td></tr>';
+  }).join('');
+}
+
+function renderAssertions(suites) {
+  var el = document.getElementById('assertion-content');
+  if (!suites.length) {
+    el.innerHTML = '<div style="padding:16px;color:#90a4ae">No assertion data available.</div>';
+    return;
+  }
+  var html = '';
+  suites.forEach(function(suite) {
+    var sfailed = suite.failed || 0;
+    var sTotal = suite.total || 0;
+    var headerLabel = suite.scenario_name
+      ? escHtml(suite.scenario_name) + ' &mdash; ' + escHtml(suite.suite_name)
+      : escHtml(suite.suite_name);
+    html += '<div class="suite-header">'
+      + '<span style="color:#90a4ae;font-weight:600;margin-right:6px">Scenario:</span>'
+      + headerLabel
+      + ' -- ' + sTotal + ' assertions'
+      + (sfailed > 0 ? ' -- <span style="color:#c62828">' + sfailed + ' failed</span>' : '')
+      + ' -- ' + (suite.pass_rate || 0) + '%</div>';
+
+    // Pre-count request_name occurrences in this suite to label parameterized
+    // iterations (e.g. "01. POST Get Offer (iteration 3/8)").
+    var reqList = suite.requests || [];
+    var nameCounts = {};
+    reqList.forEach(function(r) {
+      var n = r.request_name || '(unnamed)';
+      nameCounts[n] = (nameCounts[n] || 0) + 1;
+    });
+    var iterIndex = {};
+
+    reqList.forEach(function(req) {
+      var statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
+        : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
+        : '<span style="color:#90a4ae">SKIP</span>';
+      var rname = req.request_name || '(unnamed)';
+      var iterSuffix = '';
+      if (nameCounts[rname] > 1) {
+        iterIndex[rname] = (iterIndex[rname] || 0) + 1;
+        iterSuffix = ' <span style="color:#90a4ae;font-weight:500;font-size:11px">(iteration '
+          + iterIndex[rname] + '/' + nameCounts[rname] + ')</span>';
+      }
+      html += '<div class="req-header">' + statusBadge + ' <span>' + escHtml(rname) + '</span>' + iterSuffix
+        + '<span style="color:#90a4ae;font-size:11px;margin-left:auto">'
+        + (req.http_method || '') + ' ' + (req.http_status || '') + ' -- ' + (req.duration_ms || 0) + 'ms</span></div>';
+
+      (req.assertions || []).forEach(function(a) {
+        var icon = a.passed ? '<span class="a-pass">&#10003;</span>' : '<span class="a-fail">&#10007;</span>';
+        var sev = (!a.passed && a.severity) ? '<span class="a-badge a-sev-' + escHtml(a.severity) + '">' + escHtml(a.severity) + '</span>' : '';
+        html += '<div class="assertion-row">' + icon
+          + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(a.assertion_name) + '">' + escHtml(a.assertion_name) + '</span>'
+          + (a.category ? '<span class="a-badge a-cat">' + escHtml(a.category) + '</span>' : '')
+          + (a.domain ? '<span class="a-badge a-dom">' + escHtml(a.domain) + '</span>' : '')
+          + sev
+          + '</div>';
+        // Failed assertions show their error message on a dedicated full-width
+        // line so expected-vs-actual details are readable without tooltips.
+        if (a.error_msg && !a.passed) {
+          html += '<div class="assertion-error">&#9888; ' + escHtml(a.error_msg) + '</div>';
+        }
+      });
+    });
+  });
+  el.innerHTML = html;
+}
+
+/* ── Export CSV ─────────────────────────────────────────────────────────────── */
+function exportCSV() {
+  if (!reportData || !reportData.suites) return;
+  var rows = [];
+
+  // Capability matrix first — it's the certifier's top-level conclusion.
+  if (Array.isArray(reportData.capability_matrix) && reportData.capability_matrix.length) {
+    rows.push(['--- VENDOR CAPABILITY MATRIX ---']);
+    rows.push(['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']);
+    reportData.capability_matrix.forEach(function(r) {
+      rows.push([
+        r.scenario_name || '',
+        r.suite_name || '',
+        r.request_name || '',
+        r.http_method || '',
+        r.http_status != null ? String(r.http_status) : '',
+        r.vendor_capability || 'UNKNOWN'
+      ]);
+    });
+    rows.push([]);
+  }
+
+  rows.push(['--- ASSERTIONS ---']);
+  rows.push(['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']);
+
+  reportData.suites.forEach(function(suite) {
+    var reqList = suite.requests || [];
+    var nameCounts = {};
+    reqList.forEach(function(r) {
+      var n = r.request_name || '(unnamed)';
+      nameCounts[n] = (nameCounts[n] || 0) + 1;
+    });
+    var iterIndex = {};
+
+    reqList.forEach(function(req) {
+      var rname = req.request_name || '';
+      var iterCell = '';
+      if (nameCounts[rname] > 1) {
+        iterIndex[rname] = (iterIndex[rname] || 0) + 1;
+        iterCell = iterIndex[rname] + '/' + nameCounts[rname];
+      }
+      (req.assertions || []).forEach(function(a) {
+        rows.push([
+          suite.scenario_name || '',
+          suite.suite_name || '',
+          rname,
+          iterCell,
+          a.assertion_name || '',
+          a.passed ? 'PASS' : 'FAIL',
+          a.category || '',
+          a.domain || '',
+          a.severity || '',
+          (a.error_msg || '').replace(/"/g, '""')
+        ]);
+      });
+    });
+  });
+
+  // Append a logs section using the same toggle the user has on screen.
+  var logEvents = getFilteredLogs();
+  if (logEvents.length > 0) {
+    rows.push([]); // blank row separator
+    rows.push(['--- LOGS ---']);
+    rows.push(['Scenario','Group','Request','Timestamp','Level','Category','Message']);
+    var scenarioBySuite = {};
+    (reportData.suites || []).forEach(function(s) {
+      if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
+    });
+    logEvents.forEach(function(e) {
+      rows.push([
+        scenarioBySuite[e.suite_name] || '',
+        e.suite_name || '',
+        e.request_name || '',
+        e.ts || '',
+        (e.level || ''),
+        e.category || '',
+        (e.message || '').replace(/"/g, '""')
+      ]);
+    });
+  }
+
+  var csv = rows.map(function(r) {
+    return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+  }).join('\n');
+
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oscar-report-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── Templates (localStorage) ──────────────────────────────────────────────── */
+var TEMPLATE_KEY = 'oscar_report_templates';
+
+function loadTemplateList() {
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  var sel = document.getElementById('template-select');
+  sel.innerHTML = '<option value="">-- Load Template --</option>';
+  Object.keys(templates).sort().forEach(function(name) {
+    var opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+function saveTemplate() {
+  var name = prompt('Template name:');
+  if (!name || !name.trim()) return;
+  name = name.trim();
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  templates[name] = getFilters();
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+  loadTemplateList();
+  document.getElementById('template-select').value = name;
+}
+
+function loadTemplate() {
+  var sel = document.getElementById('template-select');
+  var name = sel.value;
+  if (!name) return;
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  var tpl = templates[name];
+  if (!tpl) return;
+
+  // Apply categories
+  document.querySelectorAll('input[name="filter_cat"]').forEach(function(cb) {
+    cb.checked = tpl.categories.indexOf(cb.value) !== -1;
+  });
+  // Apply domains
+  document.querySelectorAll('input[name="filter_dom"]').forEach(function(cb) {
+    cb.checked = tpl.domains.indexOf(cb.value) !== -1;
+  });
+  // Apply severities
+  document.querySelectorAll('input[name="filter_sev"]').forEach(function(cb) {
+    cb.checked = tpl.severities.indexOf(cb.value) !== -1;
+  });
+  // Apply status
+  document.querySelectorAll('input[name="filter_status"]').forEach(function(r) {
+    r.checked = r.value === tpl.status;
+  });
+}
+
+function deleteTemplate() {
+  var sel = document.getElementById('template-select');
+  var name = sel.value;
+  if (!name) return;
+  if (!confirm('Delete template "' + name + '"?')) return;
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  delete templates[name];
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+  loadTemplateList();
+}
+
+loadTemplateList();
+
+/* ── Toggle all helper ─────────────────────────────────────────────────────── */
+function toggleAll(group) {
+  var nameMap = { cat: 'filter_cat', dom: 'filter_dom', sev: 'filter_sev' };
+  var name = nameMap[group];
+  if (!name) return;
+  var checkboxes = document.querySelectorAll('input[name="' + name + '"]');
+  var allChecked = true;
+  checkboxes.forEach(function(cb) { if (!cb.checked) allChecked = false; });
+  checkboxes.forEach(function(cb) { cb.checked = !allChecked; });
+  // Update toggle label
+  var toggle = document.querySelector('[data-action="toggle-all"][data-group="' + group + '"]');
+  if (toggle) toggle.textContent = allChecked ? 'Select all' : 'Deselect all';
+}
+
+/* ── Event delegation ──────────────────────────────────────────────────────── */
+
+// Run selection (single-select via radio)
+document.getElementById('runs-list').addEventListener('change', function(e) {
+  if (e.target.dataset.action === 'select-run' && e.target.checked) {
+    selectedRunId = e.target.value;
+    updateGenerateButton();
+  }
+});
+document.getElementById('runs-list').addEventListener('click', function(e) {
+  if (e.target.type === 'radio') return;
+  var row = e.target.closest('.run-check-row');
+  if (!row) return;
+  var rb = row.querySelector('input[type="radio"]');
+  if (rb && !rb.checked) {
+    rb.checked = true;
+    selectedRunId = rb.value;
+    updateGenerateButton();
+  }
+});
+
+// Filter bar
+['filter-company', 'filter-user', 'filter-date'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('change', onFilterChange);
+});
+document.getElementById('filter-reset').addEventListener('click', resetFilters);
+
+// Generate
+document.getElementById('generate-btn').addEventListener('click', generateReport);
+
+// Logs include-passed toggle: re-render logs in place (no new fetch needed)
+document.getElementById('logs-include-passed').addEventListener('change', function() {
+  if (reportData) renderLogs();
+});
+
+// Templates
+document.getElementById('save-template-btn').addEventListener('click', saveTemplate);
+document.getElementById('load-template-btn').addEventListener('click', loadTemplate);
+document.getElementById('delete-template-btn').addEventListener('click', deleteTemplate);
+
+// Export/Print
+document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+document.getElementById('print-btn').addEventListener('click', function() { window.print(); });
+
+// Toggle all (delegated on document for the small toggle spans)
+document.addEventListener('click', function(e) {
+  if (e.target.dataset.action === 'toggle-all') {
+    toggleAll(e.target.dataset.group);
+  }
+});
+
+// Expand/collapse JSON log blocks (delegated — rows are re-rendered on filter change)
+document.getElementById('logs-content').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="toggle-json"]');
+  if (!btn) return;
+  var body = document.getElementById(btn.dataset.target);
+  if (!body) return;
+  var expanded = body.classList.toggle('expanded');
+  btn.classList.toggle('expanded', expanded);
+});
+
+/* ── Init ──────────────────────────────────────────────────────────────────── */
+loadRuns();
+</script>
+</body>
+</html>

@@ -1,0 +1,1412 @@
+{
+  "meta": {
+    "envName": "sqills-sandbox_e44bbd48",
+    "dateStr": "20260429",
+    "osdmVersion": "3.4",
+    "scenarioCode": "OTST_TKT_SRCH_CRIT_1ADT_1LEG",
+    "scenarioType": "SALE",
+    "scenarioAction": "",
+    "startedAt": "2026-04-29T20:01:59.355Z"
+  },
+  "requests": [
+    {
+      "requestName": "00. GET System Version Check",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/versions",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:04 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSFhjIxFiAEMVA="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 141,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /versions → 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 — /versions endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "🛠️  New Collection Execution — clearing env vars and loading scenario data..."
+        },
+        {
+          "level": "log",
+          "message": "✅ All environment variables cleared"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Multi-scenario run initialised — scenariosToRunIndex reset to 0"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ⏳ Getting scenario data"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ⏳ Getting scenario data"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 🌐 Data file was not set, grabbing data base url from environment : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 🛠️ Check data file structure schema"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 🛠️ Check data file structure schema"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] systemInfoParameters: coachId = null"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] systemInfoParameters: coachId = null"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] systemInfoParameters: productId = null"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] systemInfoParameters: productId = null"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ⚡ Parallel mode — running only: OTST_TKT_SRCH_CRIT_1ADT_1LEG"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ⚡ Parallel mode — running only: OTST_TKT_SRCH_CRIT_1ADT_1LEG"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 🎯 scenariosToRun [1/1]: selected \"OTST_TKT_SRCH_CRIT_1ADT_1LEG\" — last in list, run will stop after this scenario"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 🎯 scenariosToRun [1/1]: selected \"OTST_TKT_SRCH_CRIT_1ADT_1LEG\" — last in list, run will stop after this scenario"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 🔢 osdmVersion — data file: \"3.4\", env file: \"undefined\", effective: \"3.4\" (data file takes priority)"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 🔢 osdmVersion — data file: \"3.4\", env file: \"undefined\", effective: \"3.4\" (data file takes priority)"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 📋 Scenario selected: \"OTST_TKT_SRCH_CRIT_1ADT_1LEG\" ; Scenario Type: \"SALE\" ; Scenario Action: \"null\" ; OSDM version: \"3.4\""
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 📋 Scenario selected: \"OTST_TKT_SRCH_CRIT_1ADT_1LEG\" ; Scenario Type: \"SALE\" ; Scenario Action: \"null\" ; OSDM version: \"3.4\""
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 🛒 Sales-flow actions: patchPassengers=true, placeSelection=true, addAncillary=true, getBooking=true, deleteAncillary=true"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 🛒 Sales-flow actions: patchPassengers=true, placeSelection=true, addAncillary=true, getBooking=true, deleteAncillary=true"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ⏳ processing a search"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ⏳ processing a search"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] 📅 TripSearchCriteria datetime — osdmVersion: \"3.4\" (parsed: 3.4) → LocalDateTime format (offset/Z stripped) → \"2026-05-09T07:00:00\" (raw: \"2026-05-09T07:00:00+02:00\")"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] 📅 TripSearchCriteria datetime — osdmVersion: \"3.4\" (parsed: 3.4) → LocalDateTime format (offset/Z stripped) → \"2026-05-09T07:00:00\" (raw: \"2026-05-09T07:00:00+02:00\")"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Found number of purchaser: 1"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Found number of purchaser: 1"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Pushed purchaserSpec to environment: [{\"detail\":{\"firstName\":\"JohnPurchaser\",\"lastName\":\"DoePurchaser\",\"contact\":{\"email\":\"emailPurchaser@email.com\",\"phoneNumber\":\"+33699999999\"}}}]"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Pushed purchaserSpec to environment: [{\"detail\":{\"firstName\":\"JohnPurchaser\",\"lastName\":\"DoePurchaser\",\"contact\":{\"email\":\"emailPurchaser@email.com\",\"phoneNumber\":\"+33699999999\"}}}]"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Found number of passengers: 1"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Found number of passengers: 1"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Pushed passengerSpec to environment: [{\"externalRef\":\"00001\",\"type\":\"PERSON\",\"dateOfBirth\":\"1999-01-01\",\"detail\":{\"firstName\":\"John\",\"lastName\":\"Doe\",\"contact\":{\"email\":\"email@email.com\",\"phoneNumber\":\"+33612345678\"}}}]"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Pushed passengerSpec to environment: [{\"externalRef\":\"00001\",\"type\":\"PERSON\",\"dateOfBirth\":\"1999-01-01\",\"detail\":{\"firstName\":\"John\",\"lastName\":\"Doe\",\"contact\":{\"email\":\"email@email.com\",\"phoneNumber\":\"+33612345678\"}}}]"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ✅ Correct data set was found for this scenario : OTST_TKT_SRCH_CRIT_1ADT_1LEG"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ Correct data set was found for this scenario : OTST_TKT_SRCH_CRIT_1ADT_1LEG"
+        },
+        {
+          "level": "log",
+          "message": "✅ Scenario data loaded — osdmVersion: 3.4"
+        },
+        {
+          "level": "log",
+          "message": "[reportGenerator] 🗑️  Previous run data cleared."
+        },
+        {
+          "level": "log",
+          "message": "[reportGenerator] ✅ Report directory: C:\\Users\\patri\\OneDrive\\Documents\\TrackOnPath\\Contract_execution\\UIC_New_Revenue_Management project\\projets\\OSDM\\OTST\\GitHub_OSDM-Testing\\OSDM-testing\\O\\collections-bruno\\OTST_V2.0.1\\Validation_Reports"
+        },
+        {
+          "level": "log",
+          "message": "📊 HTML report initialised for this scenario."
+        },
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /versions → 404 Not Found — endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /versions → 404 Not Found (FAIL): Expected 200, got 404 — /versions endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:01:59.357Z"
+    },
+    {
+      "requestName": "01. GET Coach",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/coach-layouts",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:04 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSFkgh5FiAEMNg="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 143,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /coach-layouts → 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ JSON Data file structure validation passed with schema from : https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /coach-layouts → 404 Not Found — endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /coach-layouts → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:01:59.625Z"
+    },
+    {
+      "requestName": "02. GET Coach By Id",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/coach-layouts/null",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:05 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSFmg1oliAEMVQ="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 110,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /coach-layouts/{id} prerequisite: GET Coach succeeded with valid body",
+          "passed": false,
+          "error": "GET Coach did not provide valid data; cannot validate By-Id endpoint"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /coach-layouts/{id} prerequisite failed: GET Coach did not return valid list data"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /coach-layouts/{id} prerequisite: GET Coach succeeded with valid body: GET Coach did not provide valid data; cannot validate By-Id endpoint"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:01:59.809Z"
+    },
+    {
+      "requestName": "04. GET Passenger Categories",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/passenger-categories",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:05 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSFog8sFiAEMeQ="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 118,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /passenger-categories → 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /passenger-categories → 404 Not Found — endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /passenger-categories → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:00.013Z"
+    },
+    {
+      "requestName": "05. GET Promotion Codes",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/promotion-codes",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:05 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSFqgGgFiAEMaQ="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 119,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /promotion-codes → 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /promotion-codes → 404 Not Found — endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /promotion-codes → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:00.231Z"
+    },
+    {
+      "requestName": "06. GET Reduction Cards",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/reduction-cards",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 501,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:07 GMT",
+        "content-length": "0",
+        "connection": "close",
+        "apigw-requestid": "cmSFsg-NliAEMxw="
+      },
+      "responseBody": "\"\"",
+      "responseTime": 1562,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /reduction-cards → 501 Server Error (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 501 server error: expected 501 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": false,
+          "error": "Expected application/json, got: '': expected '' to include 'application/json'"
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /reduction-cards → 501 Server Error"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /reduction-cards → 501 Server Error (FAIL): Expected 200, got 501 server error: expected 501 to deeply equal 200"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ [OSDM] Content-Type is application/json: Expected application/json, got: '': expected '' to include 'application/json'"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:01.945Z"
+    },
+    {
+      "requestName": "07. GET Zones",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/zones",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:07 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSGBh6LFiAEMwQ="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 169,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /zones → 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /zones → 404 Not Found — endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /zones → 404 Not Found (FAIL): Expected 200, got 404 — endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:02.476Z"
+    },
+    {
+      "requestName": "08. GET Products",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/products",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 200,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:08 GMT",
+        "content-type": "application/json; version=3.0.5; charset=utf-8",
+        "content-length": "852",
+        "connection": "close",
+        "x-s3-version": "1.218.0",
+        "vary": "Accept-Encoding",
+        "x-s3-correlation-id": "0c0adffd-eb7e-4618-8596-41a0595c6545",
+        "x-s3-githash": "f9ad27c",
+        "x-s3-osdm-version": "3.0.5",
+        "x-s3-service": "s3p-osdm-s3-adapter",
+        "apigw-requestid": "cmSGFiK2FiAEMRA="
+      },
+      "responseBody": "{\"products\":[{\"code\":\"BIKE_01\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"BIKE_01\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Standard bike product\"},{\"code\":\"CAN_FEE1\",\"description\":\"Cancellation fee - Flexible products\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"CAN_FEE1\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Cancellation fee 1\"},{\"code\":\"CAN_FEE2\",\"description\":\"Cancellation fee - Medium Flex products\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"CAN_FEE2\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Cancellation fee 2\"},{\"code\":\"CAN_FEE3\",\"description\":\"Cancellation fee - Low fixed products\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"CAN_FEE3\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Cancellation fee 3\"},{\"code\":\"LUGGAGE\",\"description\":\"Standard luggage Sqills OSDM sandbox\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"LUGGAGE\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Luggage\"},{\"code\":\"SBB_DINNER\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_DINNER\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"SBB 3 course dinner\"},{\"code\":\"SBBGL\",\"flexibility\":\"SEMI_FLEXIBLE\",\"id\":\"SBBGL\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Clacier Expres Super Saver 2nd class - Full Flex\",\"travelClass\":\"SECOND\"},{\"code\":\"SBBGL1\",\"flexibility\":\"SEMI_FLEXIBLE\",\"id\":\"SBBGL1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Clacier Expres Super Saver 1st class - Full Flex\",\"travelClass\":\"FIRST\"},{\"code\":\"SBB_NOR1\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_NOR1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Normal price 1st class - Fully flex\",\"travelClass\":\"FIRST\"},{\"code\":\"SBB_PLATE\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_PLATE\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Plate of the day\"},{\"code\":\"SBB_SEAT\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_SEAT\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"SSB Seat 2nd class\",\"travelClass\":\"SECOND\"},{\"code\":\"SBB_SEAT1\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_SEAT1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"SSB Seat 1st class\",\"travelClass\":\"FIRST\"},{\"code\":\"SBB_SSV\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_SSV\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"STANDARD\",\"type\":\"STANDARD\"},\"summary\":\"Super Saver 2nd class - Full Flex\",\"travelClass\":\"FIRST\"},{\"code\":\"SBB_SSV1\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SBB_SSV1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Super Saver 1e class - Full Flex\",\"travelClass\":\"FIRST\"},{\"code\":\"SSB_NOR\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"SSB_NOR\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Normal price - Fully flex\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN1\",\"description\":\"Standard 1st class  Sqills OSDM sandbox product - Flexible\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"STAN1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard 1st class product - Flexible\",\"travelClass\":\"FIRST\"},{\"code\":\"STAN1_L\",\"description\":\"Standard 1st class  Sqills OSDM sandbox product - Low fixed\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN1_L\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"STANDARD\",\"type\":\"STANDARD\"},\"summary\":\"Standard 1st class product - Low Fixed\",\"travelClass\":\"FIRST\"},{\"code\":\"STAN1_M\",\"description\":\"Standard 1st class  Sqills OSDM sandbox product - Medium Flexible\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"STAN1_M\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"STANDARD\",\"type\":\"STANDARD\"},\"summary\":\"Standard 1st class - Medium Flexible\",\"travelClass\":\"FIRST\"},{\"code\":\"STAN2\",\"description\":\"Standard 2nd class Sqills OSDM sandbox product - Flexible\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"STAN2\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard 2nd class product - Flexible\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN2_L\",\"description\":\"Standard 2nd class Sqills OSDM sandbox product - Low Fixed\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN2_L\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"BASIC\",\"type\":\"BASIC\"},\"summary\":\"Standard 2nd class product - Low Fixed\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN2_M\",\"description\":\"Standard 2nd class Sqills OSDM sandbox product - Medium Flexible\",\"flexibility\":\"SEMI_FLEXIBLE\",\"id\":\"STAN2_M\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"STANDARD\",\"type\":\"STANDARD\"},\"summary\":\"Standard 2nd class product - Medium Flexible\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN_ABO1\",\"description\":\"Standard subscription 1st class product Sqills S3 OSDM sandbox  - Week\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN_ABO1\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard abonnement 1st class - Week\",\"travelClass\":\"FIRST\"},{\"code\":\"STAN_ABO1_M\",\"description\":\"Standard subscription 1st class product Sqills S3 OSDM sandbox  - Month\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN_ABO1_M\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard subscription 1st class - Month\",\"travelClass\":\"FIRST\"},{\"code\":\"STAN_ABO2\",\"description\":\"Standard subscription 2nd class product Sqills S3 OSDM sandbox  - Week\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN_ABO2\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard subscription 2nd class - Week\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN_ABO2_M\",\"description\":\"Standard subscription 2nd class product Sqills S3 OSDM sandbox - Month\",\"flexibility\":\"NON_FLEXIBLE\",\"id\":\"STAN_ABO2_M\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"HIGH\",\"type\":\"HIGH\"},\"summary\":\"Standard subscription 2nd class - Month\",\"travelClass\":\"SECOND\"},{\"code\":\"STAN_BUS\",\"description\":\"Standar bus ticket\",\"flexibility\":\"FULL_FLEXIBLE\",\"id\":\"STAN_BUS\",\"owner\":\"urn:uic:rics:sqills\",\"serviceClass\":{\"name\":\"STANDARD\",\"type\":\"STANDARD\"},\"summary\":\"Standard bus\",\"travelClass\":\"SECOND\"}]}",
+      "responseTime": 254,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /products -> 200 OK",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "GET /products response body is present and not empty",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "GET /products response contains at least one product id",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ GET /products -> 200 OK"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ GET /products response body is present and not empty"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ GET /products response contains at least one product id"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] GET /products -> 200 OK, body received"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:03.041Z"
+    },
+    {
+      "requestName": "09. GET Product By ProductId",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/products/BIKE_01",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 200,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:08 GMT",
+        "content-type": "application/json; version=3.0.5; charset=utf-8",
+        "content-length": "199",
+        "connection": "close",
+        "x-s3-correlation-id": "8d868d37-ce2c-407d-8a49-f84fdb8faf62",
+        "x-s3-githash": "f9ad27c",
+        "x-s3-osdm-version": "3.0.5",
+        "x-s3-service": "s3p-osdm-s3-adapter",
+        "x-s3-version": "1.218.0",
+        "vary": "Accept-Encoding",
+        "apigw-requestid": "cmSGJjPFliAEMnQ="
+      },
+      "responseBody": "{\"product\":{\"code\":\"BIKE_01\",\"flexibility\":\"FULL_FLEXIBLE\",\"fulfillmentOptions\":[{\"media\":\"PDF_A4\",\"type\":\"ETICKET\"}],\"id\":\"BIKE_01\",\"owner\":\"urn:uic:rics:sqills\",\"summary\":\"Standard bike product\"}}",
+      "responseTime": 172,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /products/{productId} -> 200 OK",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "GET /products/{productId} response body is present",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] productId was null; picked random id from GET Products response: BIKE_01"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ GET /products/{productId} -> 200 OK"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ GET /products/{productId} response body is present"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] GET /products/{productId} -> 200 OK, productId=BIKE_01"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:03.398Z"
+    },
+    {
+      "requestName": "10. GET Product Tags",
+      "requestMethod": "GET",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/product-tags",
+      "requestHeaders": {
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}",
+        "content-type": null
+      },
+      "requestBody": "",
+      "responseStatus": 404,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:08 GMT",
+        "content-type": "application/json",
+        "content-length": "23",
+        "connection": "close",
+        "apigw-requestid": "cmSGMg0zliAEMlw="
+      },
+      "responseBody": "{\"message\":\"Not Found\"}",
+      "responseTime": 128,
+      "group": "osdm",
+      "runType": "System Information",
+      "testResults": [
+        {
+          "name": "GET /product-tags -> 404 Not Found (FAIL)",
+          "passed": false,
+          "error": "Expected 200, got 404 - endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] GET /product-tags -> 404 Not Found - endpoint not implemented by this vendor"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ GET /product-tags -> 404 Not Found (FAIL): Expected 200, got 404 - endpoint not supported: expected 404 to deeply equal 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:03.644Z"
+    },
+    {
+      "requestName": "01. POST Get Offer",
+      "requestMethod": "POST",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/offers",
+      "requestHeaders": {
+        "Content-Type": "application/json;version=3.4",
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}"
+      },
+      "requestBody": {
+        "tripSearchCriteria": {
+          "departureTime": "2026-05-09T07:00:00",
+          "origin": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8500010"
+          },
+          "destination": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8400058"
+          },
+          "parameters": {
+            "dataFilter": {
+              "carrierFilter": {
+                "carriers": [
+                  "urn:uic:rics:1"
+                ],
+                "exclude": false
+              },
+              "vehicleFilter": {
+                "vehicleNumbers": [
+                  "OSDM_202"
+                ],
+                "lineNumbers": null,
+                "exclude": false
+              }
+            }
+          }
+        },
+        "anonymousPassengerSpecifications": [
+          {
+            "externalRef": "00001",
+            "type": "PERSON",
+            "dateOfBirth": "1999-01-01"
+          }
+        ],
+        "offerSearchCriteria": {
+          "flexibilities": [
+            "SEMI_FLEXIBLE"
+          ]
+        },
+        "requestedFulfillmentOptions": [
+          {
+            "type": "ETICKET",
+            "media": "PDF_A4"
+          }
+        ]
+      },
+      "responseStatus": 200,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:09 GMT",
+        "content-type": "application/json; version=3.4.0; charset=utf-8",
+        "content-length": "106",
+        "connection": "close",
+        "vary": "Accept-Encoding",
+        "x-s3-correlation-id": "63412e84-6811-4807-988c-869353e5f7cc",
+        "x-s3-githash": "f9ad27c",
+        "x-s3-osdm-version": "3.4.0",
+        "x-s3-service": "s3p-osdm-s3-adapter",
+        "x-s3-version": "1.218.0",
+        "apigw-requestid": "cmSGShGEFiAEMVQ="
+      },
+      "responseBody": "{\"anonymousPassengerSpecifications\":[{\"dateOfBirth\":\"1999-01-01\",\"externalRef\":\"00001\",\"type\":\"PERSON\"}]}",
+      "responseTime": 309,
+      "group": "osdm",
+      "runType": "Common Requests",
+      "testResults": [
+        {
+          "name": "Status code is 200",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Offers found in response",
+          "passed": false,
+          "error": "No offers found or 'offers' is not an array."
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "\n    ####################################\n    # 🛠️  POST Get Offer — OTST_TKT_SRCH_CRIT_1ADT_1LEG 🛠️ #\n    ####################################\n    "
+        },
+        {
+          "level": "log",
+          "message": "⏩ [STEP] Executing request : 01. POST Get Offer"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ Status code is 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponse"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No warnings found."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No problems found."
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ Offers found in response: No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:04.516Z"
+    },
+    {
+      "requestName": "01. POST Get Offer",
+      "requestMethod": "POST",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/offers",
+      "requestHeaders": {
+        "Content-Type": "application/json;version=3.4",
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}"
+      },
+      "requestBody": {
+        "tripSearchCriteria": {
+          "departureTime": "2026-05-09T07:00:00",
+          "origin": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8500010"
+          },
+          "destination": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8400058"
+          },
+          "parameters": {
+            "dataFilter": {
+              "carrierFilter": {
+                "carriers": [
+                  "urn:uic:rics:1"
+                ],
+                "exclude": false
+              },
+              "vehicleFilter": {
+                "vehicleNumbers": [
+                  "OSDM_202"
+                ],
+                "lineNumbers": null,
+                "exclude": false
+              }
+            }
+          }
+        },
+        "anonymousPassengerSpecifications": [
+          {
+            "externalRef": "00001",
+            "type": "PERSON",
+            "dateOfBirth": "1999-01-01"
+          }
+        ],
+        "offerSearchCriteria": {
+          "flexibilities": [
+            "SEMI_FLEXIBLE"
+          ]
+        },
+        "requestedFulfillmentOptions": [
+          {
+            "type": "ETICKET",
+            "media": "PDF_A4"
+          }
+        ]
+      },
+      "responseStatus": 200,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:10 GMT",
+        "content-type": "application/json; version=3.4.0; charset=utf-8",
+        "content-length": "106",
+        "connection": "close",
+        "x-s3-service": "s3p-osdm-s3-adapter",
+        "x-s3-version": "1.218.0",
+        "vary": "Accept-Encoding",
+        "x-s3-correlation-id": "61fa1bd3-d283-4b66-b2e7-a5be0fd4773e",
+        "x-s3-githash": "f9ad27c",
+        "x-s3-osdm-version": "3.4.0",
+        "apigw-requestid": "cmSGYg5dFiAEMlw="
+      },
+      "responseBody": "{\"anonymousPassengerSpecifications\":[{\"dateOfBirth\":\"1999-01-01\",\"externalRef\":\"00001\",\"type\":\"PERSON\"}]}",
+      "responseTime": 216,
+      "group": "osdm",
+      "runType": "Common Requests",
+      "testResults": [
+        {
+          "name": "Status code is 200",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Offers found in response",
+          "passed": false,
+          "error": "No offers found or 'offers' is not an array."
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "\n    ####################################\n    # 🛠️  POST Get Offer — OTST_TKT_SRCH_CRIT_1ADT_1LEG 🛠️ #\n    ####################################\n    "
+        },
+        {
+          "level": "log",
+          "message": "⏩ [STEP] Executing request : 01. POST Get Offer"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ Status code is 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponse"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No warnings found."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No problems found."
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ Offers found in response: No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:04.931Z"
+    },
+    {
+      "requestName": "01. POST Get Offer",
+      "requestMethod": "POST",
+      "requestUrl": "https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud/offers",
+      "requestHeaders": {
+        "Content-Type": "application/json;version=3.4",
+        "Accept": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImVjOTI0MzBhLTYwZTItNDdlMi04ZDFlLTA5ZWQ1ZGM1ZGIyZSIsInR5cCI6IkpXVCJ9.eyJhdWQiOlsiczMtYXBpIl0sImlzcyI6Imh0dHBzOi8vc3FpbGxzLW9zZG0tdGVzdC5jbG91ZC5zcWlsbHMuY29tIiwiZXhwIjoxNzc3NDkzNTQ1LCJpYXQiOjE3Nzc0OTE3NDUsImp0aSI6IjMwNWRiY2FiLWE0MDUtNDAxYi04Y2VlLWVhNDgyNGQ2ODMyMSIsInMzIjp7ImNsbiI6IjV5ZjUweno1OGVsMTNjYTg5bng3ZjF4aWpsM2c1cThzcHF6M3Q3ZXJnOThiMndiMXk3IiwidXNyIjp7ImlkIjoiVXpOOE1qQTQiLCJmc3QiOiJQYXRyaWNrIiwibm1lIjoicGF0cmljay5oZXVndWV0LmFnZW50IiwibHN0IjoiSGV1Z3VldCJ9LCJybHMiOlsiUk9MRV9VU0VSIiwiUk9MRV9BR0VOVCJdLCJzbGMiOiJPU0RNX1NBTkRCT1giLCJhZ3QiOnsib2ZjIjpbXSwiaWQiOjIwOCwiY3RyIjpbeyJjb2RlIjoiT1NETTEiLCJuYW1lIjoiT1NETSBTcWlsbHMgY29udHJhY3QgMSJ9LHsiY29kZSI6Ik9TRE0yIiwibmFtZSI6Ik9TRE0gU3FpbGxzIGNvbnRyYWN0IDIifV0sImVtbCI6IkhFVUdVRVRAdWljLm9yZyIsIm9yZyI6eyJkZXMiOiJPU0RNIFNxaWxscyBzYW5kYm94IG9yZ2FuaXphdGlvbiIsImNkZSI6Ik9TRE0iLCJubWUiOiJPU0RNIHNhbmRib3giLCJjdHJkIjoiT1NETTEifSwic2N0ciI6Ik9TRE0xIiwicmxzIjpbIk9TRE0gc3FpbGxzIEFnZW50Il0sInNpZCI6ImNhM2ExZWFlLTNkMTMtNDFjYi1iYzgzLWQxYTFkZGQ2OTZmMyJ9LCJzaWQiOiJjNTVkYWFhOS1mYzZhLTQ2NWUtYmJjMS05ZTY4OTA0MTg3ZWEiLCJwbGMiOlsiMDAwMDEiLCJnbnlleCIsIjBueGZ0IiwiaGRzajgiLCJpNThnZSJdLCJwYXMiOiJleUpoYkdjaU9pSlNVekkxTmlJc0ltdHBaQ0k2SW1Wak9USTBNekJoTFRZd1pUSXRORGRsTWkwNFpERmxMVEE1WldRMVpHTTFaR0l5WlNJc0luUjVjQ0k2SWtwWFZDSjkuZXlKaGRXUWlPbHNpYUhSMGNITTZMeTl6Y1dsc2JITXRiM05rYlMxMFpYTjBMbU5zYjNWa0xuTnhhV3hzY3k1amIyMGlYU3dpWlhod0lqb3hOemMzTkRrek5UUTFMQ0pwWVhRaU9qRTNOemMwT1RFM05EVXNJbWx6Y3lJNkltaDBkSEJ6T2k4dmMzRnBiR3h6TFc5elpHMHRkR1Z6ZEM1amJHOTFaQzV6Y1dsc2JITXVZMjl0SWl3aWFuUnBJam9pWTJWbE56QTJORGd0TVRJNU1pMDBNbUV5TFRreU5UZ3RObU0yWmpNME56YzBOV1ZrSWl3aWNIUWlPaUpCUjBWT1ZDSXNJbk5qZEhJaU9pSlBVMFJOTVNJc0luTnNZeUk2SWs5VFJFMWZVMEZPUkVKUFdDSXNJbk4xWWlJNklsVjZUamhOYWtFMElpd2lkV2xrSWpvaVZYcE9PRTFxUVRRaWZRLmhUWm0zQm5MemJGQWR5c2N0Sk1WVkZZR0o0X1VVOE0zWUt0bXdJNUZreTY3WUc0ZXdKYzlNdEF0MVpSa2pzZ1Jfd1BBLU54MmFva1lraC02OWRXdjNPMnZ1aEpGZ2JRNVJqeEhrZlJ5d3p5Z0NKMWpqYmdkM3dfbWVIY2VMTER4NFV2NWtITzJBNUdGYWx3NWJiTFhLZGotdHR4b01UM05HMzdpa2hOUGVlMGx3bHRDVDM0TjdoN3M5U2ZHUGJDeVRvdEtoNlN2M05oWWtiOXMwUTJDNmJ0Y2puUWFEaUkyZ0xVV0ZRejlUWktkbmh5RkxCNFR6TnRBSVR4NjhmSHdMLUEwMkFGUVNIV3p4RkNNWERGVkE4UHdxV1Zyek1sSVJlWVQyYnRlT3VKZF8ySUtCWUJNTHZMV2hrdWwyLUR2ZlhxSUF2TGNfNXdTV3B3aF9NY2UtQSIsImRzYyI6MX19.ZY5CgMTEIN9V_IF90EAVeGiK2_W-gaiocGR_T87-DZuJmPu0JwVgkB5x2dNakSLDEmCBtql_yx6_HXIyf0Ng_VJjrdxkR_fsWQhmFdNxms1umLOvX4OZ-oXlVOxxaez97NEWs0Lf5ouHR1FZUqirjWbC12e6uMXAcnTlsrpVCJsMs3AdfCKsfJV0Izw2qndtNr_Ld82i8fDC5bDKvJDi6aAyTbR8fUCee4fzMXDdJzbMXagbwC31vJT7wxpLgq3FweoAN_WZN2QOqbEnvtGZdul9pJH0OlCIaBvqGy5gIPCJnFpWW82of0ktNhBnsX8z7e49glMJphoZ8GMLHFmMsA",
+        "Requestor": "{{requestor}}"
+      },
+      "requestBody": {
+        "tripSearchCriteria": {
+          "departureTime": "2026-05-09T07:00:00",
+          "origin": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8500010"
+          },
+          "destination": {
+            "objectType": "StopPlaceRef",
+            "stopPlaceRef": "urn:uic:stn:8400058"
+          },
+          "parameters": {
+            "dataFilter": {
+              "carrierFilter": {
+                "carriers": [
+                  "urn:uic:rics:1"
+                ],
+                "exclude": false
+              },
+              "vehicleFilter": {
+                "vehicleNumbers": [
+                  "OSDM_202"
+                ],
+                "lineNumbers": null,
+                "exclude": false
+              }
+            }
+          }
+        },
+        "anonymousPassengerSpecifications": [
+          {
+            "externalRef": "00001",
+            "type": "PERSON",
+            "dateOfBirth": "1999-01-01"
+          }
+        ],
+        "offerSearchCriteria": {
+          "flexibilities": [
+            "SEMI_FLEXIBLE"
+          ]
+        },
+        "requestedFulfillmentOptions": [
+          {
+            "type": "ETICKET",
+            "media": "PDF_A4"
+          }
+        ]
+      },
+      "responseStatus": 200,
+      "responseHeaders": {
+        "date": "Wed, 29 Apr 2026 20:02:10 GMT",
+        "content-type": "application/json; version=3.4.0; charset=utf-8",
+        "content-length": "106",
+        "connection": "close",
+        "x-s3-service": "s3p-osdm-s3-adapter",
+        "x-s3-version": "1.218.0",
+        "vary": "Accept-Encoding",
+        "x-s3-correlation-id": "a0cd5d2e-1f44-415d-ba11-ab915c854e81",
+        "x-s3-githash": "f9ad27c",
+        "x-s3-osdm-version": "3.4.0",
+        "apigw-requestid": "cmSGciTUliAEMRA="
+      },
+      "responseBody": "{\"anonymousPassengerSpecifications\":[{\"dateOfBirth\":\"1999-01-01\",\"externalRef\":\"00001\",\"type\":\"PERSON\"}]}",
+      "responseTime": 169,
+      "group": "osdm",
+      "runType": "Common Requests",
+      "testResults": [
+        {
+          "name": "Status code is 200",
+          "passed": true,
+          "error": null
+        },
+        {
+          "name": "Offers found in response",
+          "passed": false,
+          "error": "No offers found or 'offers' is not an array."
+        },
+        {
+          "name": "[OSDM] Content-Type is application/json",
+          "passed": true,
+          "error": null
+        }
+      ],
+      "consoleLogs": [
+        {
+          "level": "log",
+          "message": "API base is available : https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud"
+        },
+        {
+          "level": "log",
+          "message": "Library base is available : ./library-bruno/"
+        },
+        {
+          "level": "log",
+          "message": "Data file is available : http://localhost:3001/data/sqills-sandbox-datafile.json"
+        },
+        {
+          "level": "log",
+          "message": "\n    ####################################\n    # 🛠️  POST Get Offer — OTST_TKT_SRCH_CRIT_1ADT_1LEG 🛠️ #\n    ####################################\n    "
+        },
+        {
+          "level": "log",
+          "message": "⏩ [STEP] Executing request : 01. POST Get Offer"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponsePreRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ buildOfferCollectionRequest"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Build using TripType: SEARCH"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ ensureAuthorizationOr403"
+        },
+        {
+          "level": "log",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] Run a preoffer authorization check to avoid 403 errors ..."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ Status code is 200"
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ➤ postOfferResponse"
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No warnings found."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ⚠️ No problems found."
+        },
+        {
+          "level": "error",
+          "message": "[ERROR] No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "warn",
+          "message": "[WARNING] ❌ Offers found in response: No offers found or 'offers' is not an array."
+        },
+        {
+          "level": "info",
+          "message": "[INFO] ✅ [OSDM] Content-Type is application/json"
+        }
+      ],
+      "timestamp": "2026-04-29T20:02:05.312Z"
+    }
+  ]
+}

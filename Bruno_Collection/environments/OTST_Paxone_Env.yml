@@ -1,0 +1,23 @@
+name: OTST_Paxone_Env
+variables:
+  - secret: true
+    name: client_id
+  - secret: true
+    name: client_secret
+  - secret: true
+    name: access_token
+  - name: api-host
+    value: https://staging.sandbox.paxone.app/api/v1/auth/user/token
+  - name: api_base
+    value: https://staging.sandbox.paxone.app/api/osdm
+  - name: data_file
+    value: <own value here>
+    disabled: true
+  - name: library_base
+    value: ./library-bruno/
+  - name: data_base
+    value: http://localhost:8080/data_base/paxone_datafile.json
+  - name: json_schema
+    value: https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/Bruno-Enhancements/json_validator/datafile.schema.json
+  - name: scenariosToRunIndex
+    value: "0"

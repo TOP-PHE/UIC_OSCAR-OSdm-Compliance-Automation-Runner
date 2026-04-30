@@ -1,0 +1,85 @@
+info:
+  name: 02. POST Create Booking
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: |
+      {{BookingRequest}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const { buildBookingRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+        buildBookingRequest();
+    - type: after-response
+      code: |-
+        const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
+
+        test("Status code is 200", () => {
+            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        });
+
+        if (res.getStatus() !== 200) {
+          test("Status code is 200", () => {
+            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+          });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Create Booking");
+          return;
+        }
+
+        postCreateBookingResponse(
+            bru.getEnvVar("offer"),
+            res.getBody(),
+            ["PREBOOKED"],
+            ["ON_HOLD", "AVAILABLE"]
+        );
+
+        bru.deleteEnvVar("currentPassengerIndex");
+
+        // Routing after POST Create Booking:
+        //   1. Legacy `skipPatchPassengerRequest` still wins for explicit
+        //      test-harness overrides.
+        //   2. New per-scenario opt-out `salesFlow_patchPassengers` — set by
+        //      scenarioParser from the data file's scenario.salesFlowActions.
+        //      Missing / unset → defaults to "true" so scenarios that predate
+        //      the flag retain their historic behaviour.
+        //   3. Default → run the PATCH Multi Passenger step.
+        //
+        // NOTE: the previous numbering ("05. PATCH Multi Passenger" /
+        // "06. GET Passenger") in this routing block was a silent bug — the
+        // collection was re-numbered to 03 / 04 at some point and Bruno's
+        // setNextRequest accepts the call but when the named request does
+        // not exist it just continues to the next request in sequence. As a
+        // consequence the skip path (old `skipPatchPassengerRequest === true`)
+        // silently never worked either. Fixed here to match the actual
+        // request names in the collection.
+        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+            || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
+            bru.runner.setNextRequest("04. GET Passenger");
+        } else {
+            bru.runner.setNextRequest("03. PATCH Multi Passenger");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

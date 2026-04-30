@@ -1,0 +1,102 @@
+info:
+  name: 10. POST Exchange Offers
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings/{{bookingId}}/exchange-offers?embed=ALL"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Requestor
+      value: "{{requestor}}"
+    - name: Content-Type2
+      value: application/json;version={{osdm-version}}
+      disabled: true
+  params:
+    - name: embed
+      value: ALL
+      type: query
+  body:
+    type: json
+    data: "{{requestExchangeOffersBodyData}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const { requestExchangeOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
+
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+
+        requestExchangeOffersBody(bru.getEnvVar("overruleCode"));
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { postPatchExchangeOffersResponse } = require(bru.getEnvVar("library_base")+"exchanges.js");
+
+        // Validate HTTP response status
+        test("Status code is 200", () => {
+            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        });
+
+        if (res.getStatus() !== 200) {
+          test("Status code is 200", () => {
+            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+          });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Exchange Offers");
+          return;
+        }
+
+        // Parse JSON safely
+        let jsonData;
+        try {
+            jsonData = res.getBody();
+        } catch (e) {
+            validationLogger("Failed to parse JSON response");
+            test("JSON parsing should succeed", () => {
+                throw e;
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("POST Exchange Offers (JSON parse)");
+            return;
+        }
+
+        // Retry up to 3 times if no exchange offers returned
+        try {
+          postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
+          bru.setEnvVar('__exchangeOfferRetryCount', '0'); // reset on success
+        } catch (noOffersErr) {
+          test("Exchange offers found in response", () => { throw noOffersErr; });
+          const _retryCount = parseInt(bru.getEnvVar('__exchangeOfferRetryCount') || '0', 10) + 1;
+          bru.setEnvVar('__exchangeOfferRetryCount', String(_retryCount));
+          if (_retryCount < 3) {
+            console.log('⚠️ No exchange offers (attempt ' + _retryCount + '/3) — retrying...');
+            bru.runner.setNextRequest('10. POST Exchange Offers');
+          } else {
+            console.log('[INFO] No exchange offers returned after 3 attempts — skipping this scenario');
+            bru.setEnvVar('__exchangeOfferRetryCount', '0');
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+              console.log('⏭️ Skipping to next scenario [' + (_scNextIdx + 1) + '/' + _scList.length + ']: ' + _scList[_scNextIdx]);
+              bru.setEnvVar('__loopback', 'true');
+              bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+              console.log('✅ No more scenarios — stopping run');
+              bru.runner.stopExecution();
+            }
+          }
+          return;
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

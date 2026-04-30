@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Administration</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-text{display:flex;flex-direction:column;line-height:1.3}
+.uic-banner-name{font-size:18px;font-weight:900;color:#3C3C3B;letter-spacing:2px}
+.uic-banner-sub{font-size:11px;color:#90a4ae}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:1200px;margin:28px auto;padding:0 16px;width:100%}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+h2{color:#0090D4;font-size:22px}
+.msg{padding:9px 14px;border-radius:6px;font-size:13px;margin-bottom:12px;display:none}
+.msg-ok{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.msg-err{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.panel{display:none}
+.panel.active{display:block}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:18px;margin-bottom:16px}
+.card h3{font-size:13px;color:#455a64;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.kpi{background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.kpi .n{font-size:26px;font-weight:700;color:#1a3a6b}
+.kpi .l{font-size:11px;color:#90a4ae;margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.field{display:flex;flex-direction:column;gap:5px;min-width:180px;flex:1}
+label{font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px}
+input,select{width:100%;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px}
+input:focus,select:focus{outline:none;border-color:#0090D4}
+.btn{padding:9px 12px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}
+.btn-primary{background:#0090D4;color:#fff}
+.btn-secondary{background:#eceff1;color:#455a64}
+.btn-danger{background:#c62828;color:#fff}
+.btn-small{padding:6px 10px;font-size:11px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:9px 8px;border-bottom:1px solid #eceff1;text-align:left;vertical-align:middle}
+th{color:#546e7a;background:#f5f7f9;text-transform:uppercase;letter-spacing:.4px;font-size:10px}
+.mono{font-family:'Courier New',monospace}
+.hidden{display:none}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+/* deletion management */
+.pending-action-bar{display:flex;align-items:center;gap:8px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px;flex-wrap:wrap}
+.btn-success{background:#2e7d32;color:#fff}
+tr.del-pending{background:#fff8e1}
+tr.del-by-admin{background:#fce4ec;opacity:.85}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap}
+.sb-DELETION_REQUESTED{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+.sb-DELETED_BY_ADMIN  {background:#fce4ec;color:#c62828;border:1px solid #ef9a9a;text-decoration:line-through}
+.sb-COMPLETED         {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.sb-FAILED            {background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+.sb-RUNNING           {background:#fff8e1;color:#e65100;border:1px solid #ffcc80}
+.sb-QUEUED            {background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
+.sb-CANCELLED         {background:#eceff1;color:#546e7a;border:1px solid #b0bec5}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>
+    var _tab = new URLSearchParams(location.search).get('tab') || 'users';
+    renderOscarNav('oscar-nav', 'admin-' + _tab);
+  </script>
+</header>
+
+<div class="container">
+  <div class="top">
+    <h2 id="page-title">Manage Users</h2>
+    <button class="btn btn-secondary" id="btn-refresh">Refresh</button>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <section id="panel-users" class="panel active">
+    <div class="card">
+      <h3>Create User</h3>
+      <div class="row">
+        <div class="field"><label>Email</label><input id="new-email" type="email" placeholder="user@domain.com"></div>
+        <div class="field"><label>Password</label><input id="new-password" type="password" placeholder="Min 8 chars"></div>
+        <div class="field"><label>Role</label>
+          <select id="new-role">
+            <option value="company_user">Tester</option>
+            <option value="test_manager">Test Manager</option>
+            <option value="certification_user">Certifier</option>
+            <option value="administrator">Administrator</option>
+          </select>
+        </div>
+        <div class="field" id="new-company-field"><label>Company</label><select id="new-company"></select></div>
+        <button class="btn btn-primary" id="btn-create-user">Create</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>User Directory</h3>
+      <div class="row" style="margin-bottom:12px">
+        <div class="field"><label>Search</label><input id="user-search" type="text" placeholder="email or company"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Company</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-companies" class="panel">
+    <div class="card">
+      <h3>Create Company</h3>
+      <div class="row" style="align-items:flex-end">
+        <div class="field">
+          <label>Company Name</label>
+          <input id="new-co-name" type="text" placeholder="e.g. Deutsche Bahn">
+        </div>
+        <div class="field">
+          <label>Short ID <span style="font-weight:400;text-transform:none;font-size:10px;color:#90a4ae">(auto-generated, letters &amp; hyphens only)</span></label>
+          <input id="new-co-slug" type="text" placeholder="e.g. deutsche-bahn" pattern="[a-z0-9\-]+" title="Lowercase letters, digits and hyphens only">
+          <span style="font-size:10px;color:#90a4ae;margin-top:3px">Used internally to identify the company. Cannot be changed later.</span>
+        </div>
+        <button class="btn btn-primary" id="btn-create-company" style="align-self:flex-end;margin-bottom:18px">Create</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Company Directory</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Slug</th><th>Users</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="companies-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-reports" class="panel">
+
+    <!-- ── Pending Deletion Requests card (hidden when empty) ── -->
+    <div class="card" id="pending-del-card" style="display:none;border:2px solid #ffe082">
+      <h3 style="color:#e65100">⏳ Pending Deletion Requests (<span id="pending-del-count">0</span>)</h3>
+      <p style="font-size:12px;color:#78909c;margin-bottom:10px">These runs were soft-deleted by Testers and are awaiting your confirmation. Confirm to permanently remove, or restore to make them visible again.</p>
+
+      <!-- Bulk action bar for pending deletions -->
+      <div id="pending-del-bar" class="pending-action-bar" style="display:none;margin-bottom:10px">
+        <span id="pending-del-bar-label" style="flex:1;font-size:13px;color:#e65100;font-weight:600"></span>
+        <button class="btn btn-small btn-success" id="btn-bulk-restore-pending">↩ Restore Selected</button>
+        <button class="btn btn-small btn-danger" id="btn-bulk-confirm-pending">✓ Confirm Deletion (Permanent)</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th><input type="checkbox" id="chk-all-pending"></th><th>Run</th><th>Company</th><th>Submitted By</th><th>Deletion Requested By</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="pending-del-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Admin bulk action bar for main runs list ── -->
+    <div id="runs-action-bar" class="pending-action-bar" style="display:none;margin-bottom:10px">
+      <span id="runs-bar-label" style="flex:1;font-size:13px;color:#546e7a;font-weight:600"></span>
+      <button class="btn btn-small btn-secondary" id="btn-bulk-restore-runs">↩ Restore</button>
+      <button class="btn btn-small" style="background:#e65100;color:#fff" id="btn-bulk-softdel-runs">🏷 Flag for Deletion</button>
+      <button class="btn btn-small btn-danger" id="btn-bulk-purge-runs">⚠ Permanently Delete</button>
+    </div>
+
+    <!-- ── All Runs card ── -->
+    <div class="card">
+      <h3>All Runs <span id="runs-summary" style="font-weight:400;color:#90a4ae;font-size:12px"></span></h3>
+
+      <!-- Filters -->
+      <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="field" style="min-width:160px;max-width:240px">
+          <label>Filter by Company</label>
+          <select id="filter-company"><option value="">— All companies —</option></select>
+        </div>
+        <div class="field" style="min-width:200px;max-width:280px">
+          <label>Filter by User</label>
+          <select id="filter-user"><option value="">— All users —</option></select>
+        </div>
+        <div class="field" style="min-width:140px;max-width:200px">
+          <label>Filter by Status</label>
+          <select id="filter-status">
+            <option value="">— Any status —</option>
+            <option value="COMPLETED">COMPLETED</option>
+            <option value="FAILED">FAILED</option>
+            <option value="CANCELLED">CANCELLED</option>
+            <option value="QUEUED">QUEUED</option>
+            <option value="RUNNING">RUNNING</option>
+            <option value="DELETED_BY_ADMIN">DELETED_BY_ADMIN</option>
+          </select>
+        </div>
+        <button class="btn btn-small btn-secondary" id="btn-clear-filters">Clear filters</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-all-runs" title="Select all rows currently shown (after filters)"></th>
+              <th>Run</th><th>Company</th><th>Status</th><th>Submitted By</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="runs-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Comparison Snapshots</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Comparison ID</th><th>Company</th><th>Run A</th><th>Run B</th><th>Created</th></tr></thead>
+          <tbody id="comparisons-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-activity" class="panel">
+    <div class="grid" id="activity-kpis"></div>
+
+    <div class="card">
+      <h3>Top Submitters (Last 7 Days)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>User</th><th>Runs</th></tr></thead>
+          <tbody id="submitters-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Recent Login Events</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Event</th><th>Email</th><th>IP</th><th>User-Agent</th></tr></thead>
+          <tbody id="auth-events-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-config" class="panel">
+    <div class="card">
+      <h3>Server Information</h3>
+      <div class="grid" id="server-info-grid"></div>
+    </div>
+
+    <div class="card">
+      <h3>Runtime Configuration</h3>
+      <p style="font-size:12px;color:#78909c;margin-bottom:14px">Changes take effect immediately without server restart.</p>
+      <div id="config-form"></div>
+      <div style="margin-top:14px">
+        <button class="btn btn-primary" id="btn-save-config">Save Configuration</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const token = localStorage.getItem('oscar_token');
+const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+if (!token) window.location.href = '/';
+
+const isAdmin  = user.role === 'administrator';
+const isCertif = user.role === 'certification_user';
+
+// Only admins and auditors may access this page
+if (!isAdmin && !isCertif) {
+  window.location.href = '/dashboard.html';
+}
+
+
+const authHeaders = { Authorization: `Bearer ${token}` };
+let companies = [];       // excludes platform-root — used for Create User form
+let allCompanies = [];    // full list including platform-root — used for user-table dropdowns
+let userSearchTimer = null;
+
+// Open the tab requested via ?tab= URL param (default: reports for auditors, users for admins)
+const _initTab = new URLSearchParams(location.search).get('tab')
+  || (isCertif ? 'reports' : 'users');
+let currentTab = _initTab;
+
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+function showMsg(text, ok) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function fmtDate(ts) {
+  if (!ts) return '-';
+  return new Date(ts).toLocaleString();
+}
+
+var TAB_TITLES = { users: 'Manage Users', companies: 'Manage Companies', reports: 'All Reports', activity: 'Server Activity', config: 'Server Config' };
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('page-title').textContent = TAB_TITLES[name] || name;
+  refreshCurrentTab();
+}
+
+function refreshCurrentTab() {
+  if (currentTab === 'users') loadUsers();
+  if (currentTab === 'reports') loadReports();
+  if (currentTab === 'activity') loadActivity();
+  if (currentTab === 'companies') loadCompaniesPanel();
+  if (currentTab === 'config') loadConfig();
+}
+
+function toggleNewCompanyField() {
+  const role = document.getElementById('new-role').value;
+  const needsCompany = role === 'company_user' || role === 'test_manager';
+  document.getElementById('new-company-field').classList.toggle('hidden', !needsCompany);
+}
+
+async function loadCompanies() {
+  const res = await fetch('/v1/admin/companies', { headers: authHeaders });
+  const data = await res.json();
+  allCompanies = data.companies || [];
+  companies = allCompanies.filter(c => c.slug !== 'platform-root');
+
+  const options = companies.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.slug)})</option>`).join('');
+  document.getElementById('new-company').innerHTML = options;
+}
+
+function companyOptions(selectedId) {
+  const none = `<option value="" ${!selectedId ? 'selected' : ''}>\u2014 None \u2014</option>`;
+  return none + allCompanies.map(c => `<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+}
+
+// Returns either an editable <select> (Tester or Certifier) or a read-only label (Administrator)
+function companyCellHtml(u) {
+  if (u.role === 'company_user' || u.role === 'certification_user') {
+    return `<select id="company-${u.id}">${companyOptions(u.company_id)}</select>`;
+  }
+  return `<span style="color:#78909c;font-size:12px;font-style:italic">${esc(u.company_name || 'Platform')}</span>`;
+}
+
+// When the role dropdown changes, swap the company cell between editable and read-only
+function onRoleChange(userId) {
+  const role = document.getElementById(`role-${userId}`).value;
+  const cell = document.getElementById(`company-cell-${userId}`);
+  if (!cell) return;
+  if (role === 'company_user' || role === 'certification_user') {
+    // Tester and Certifier can be assigned to a company
+    cell.innerHTML = `<select id="company-${userId}">${companyOptions('')}</select>`;
+  } else {
+    // Administrator always belongs to the platform
+    cell.innerHTML = `<span style="color:#78909c;font-size:12px;font-style:italic">Platform</span>`;
+  }
+}
+
+const ROLE_LABELS = { administrator: 'Administrator', certification_user: 'Certifier', test_manager: 'Test Manager', company_user: 'Tester' };
+
+function roleOptions(selectedRole) {
+  const roles = ['administrator','certification_user','test_manager','company_user'];
+  return roles.map(r => `<option value="${r}" ${r===selectedRole?'selected':''}>${ROLE_LABELS[r] || r}</option>`).join('');
+}
+
+function debouncedLoadUsers() {
+  clearTimeout(userSearchTimer);
+  userSearchTimer = setTimeout(loadUsers, 250);
+}
+
+async function loadUsers() {
+  const q = encodeURIComponent(document.getElementById('user-search').value || '');
+  const res = await fetch(`/v1/admin/users?q=${q}`, { headers: authHeaders });
+  const data = await res.json();
+  const tbody = document.getElementById('users-tbody');
+
+  tbody.innerHTML = (data.users || []).map(u => `
+    <tr>
+      <td class="mono">${esc(u.email)}</td>
+      <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}">${roleOptions(u.role)}</select></td>
+      <td id="company-cell-${u.id}">${companyCellHtml(u)}</td>
+      <td>${fmtDate(u.created_at)}</td>
+      <td>
+        <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
+        <button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
+        <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function createUser() {
+  const role = document.getElementById('new-role').value;
+  const body = {
+    email: document.getElementById('new-email').value.trim(),
+    password: document.getElementById('new-password').value,
+    role
+  };
+
+  if (role === 'company_user' || role === 'test_manager') {
+    body.company_id = document.getElementById('new-company').value;
+  }
+
+  const res = await fetch('/v1/admin/users', {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'User creation failed.', false); return; }
+  showMsg(`User created: ${data.user.email}`, true);
+  document.getElementById('new-email').value = '';
+  document.getElementById('new-password').value = '';
+  loadUsers();
+}
+
+async function saveUser(userId) {
+  const role = document.getElementById(`role-${userId}`).value;
+  const companyEl = document.getElementById(`company-${userId}`);
+  const companyId = companyEl ? companyEl.value : '';
+
+  const body = { role };
+  if (companyId) body.company_id = companyId;
+
+  const res = await fetch(`/v1/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'User update failed.', false); return; }
+  const companyLabel = data.user && data.user.company_name ? ` (${data.user.company_name})` : '';
+  showMsg(`User updated: ${data.user.email}${companyLabel}`, true);
+  await loadCompanies();
+  await loadUsers();
+}
+
+async function resetPwd(userId, email) {
+  const newPwd = prompt(`New password for ${email}:`);
+  if (!newPwd) return;
+  const res = await fetch(`/v1/admin/users/${userId}/reset-password`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_password: newPwd })
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Password reset failed.', false); return; }
+  showMsg(`Password reset for ${email}`, true);
+}
+
+async function deleteUser(userId, email) {
+  if (!confirm(`Delete user ${email}?`)) return;
+  const res = await fetch(`/v1/admin/users/${userId}`, { method: 'DELETE', headers: authHeaders });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Delete failed.', false); return; }
+  showMsg(`User deleted: ${email}`, true);
+  loadUsers();
+}
+
+async function loadCompaniesPanel() {
+  const res = await fetch('/v1/admin/companies', { headers: authHeaders });
+  const data = await res.json();
+  const tbody = document.getElementById('companies-tbody');
+  tbody.innerHTML = (data.companies || []).map(c => `
+    <tr>
+      <td><input id="coname-${c.id}" value="${esc(c.name)}" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
+      <td><input id="coslug-${c.id}" value="${esc(c.slug)}" class="mono" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
+      <td>${c.user_count}</td>
+      <td>${fmtDate(c.created_at)}</td>
+      <td>
+        <button class="btn btn-small btn-secondary" data-action="save-company" data-company-id="${c.id}">Save</button>
+        <button class="btn btn-small btn-danger" data-action="delete-company" data-company-id="${c.id}" data-name="${esc(c.name)}">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+  await loadCompanies();
+}
+
+function autoSlug() {
+  const name = document.getElementById('new-co-name').value;
+  const slug = name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  document.getElementById('new-co-slug').value = slug;
+}
+
+async function createCompany() {
+  const name = document.getElementById('new-co-name').value.trim();
+  const slug = document.getElementById('new-co-slug').value.trim();
+  if (!name || !slug) { showMsg('Name and slug are required.', false); return; }
+  const res = await fetch('/v1/admin/companies', {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, slug })
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Company creation failed.', false); return; }
+  showMsg(`Company created: ${data.company.name}`, true);
+  document.getElementById('new-co-name').value = '';
+  document.getElementById('new-co-slug').value = '';
+  loadCompaniesPanel();
+}
+
+async function saveCompany(companyId) {
+  const name = document.getElementById(`coname-${companyId}`).value.trim();
+  const slug = document.getElementById(`coslug-${companyId}`).value.trim();
+  const res = await fetch(`/v1/admin/companies/${companyId}`, {
+    method: 'PATCH',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, slug })
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Company update failed.', false); return; }
+  showMsg(`Company updated: ${data.company.name}`, true);
+  loadCompaniesPanel();
+}
+
+async function deleteCompany(companyId, name) {
+  if (!confirm(`Delete company "${name}"?\nThis will fail if users are still assigned to it.`)) return;
+  const res = await fetch(`/v1/admin/companies/${companyId}`, { method: 'DELETE', headers: authHeaders });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Delete failed.', false); return; }
+  showMsg(`Company deleted: ${name}`, true);
+  loadCompaniesPanel();
+}
+
+// ── Reports tab state ─────────────────────────────────────────────────────────
+let selectedPending = new Set();  // DELETION_REQUESTED run IDs
+let selectedRuns    = new Set();  // all-runs table selection
+let _allRunsCache   = [];         // every run fetched (after pagination)
+let _comparisonsCache = [];       // last fetched comparisons (re-used on filter change)
+const BULK_CHUNK_SIZE = 50;       // server-side limit per request
+
+// Fetch the entire runs list by paginating through GET /v1/runs.
+// The server caps each page at 200, so we loop until we have everything.
+async function fetchAllRuns() {
+  const PAGE = 200;
+  let offset = 0;
+  let total = Infinity;
+  const all = [];
+  while (offset < total) {
+    const res = await fetch(`/v1/runs?limit=${PAGE}&offset=${offset}`, { headers: authHeaders });
+    if (!res.ok) throw new Error(`GET /v1/runs failed (${res.status})`);
+    const data = await res.json();
+    total = data.total ?? data.runs?.length ?? 0;
+    all.push(...(data.runs || []));
+    if (!data.runs || data.runs.length === 0) break;  // safety
+    offset += PAGE;
+  }
+  return all;
+}
+
+async function loadReports() {
+  const [allRuns, cmpRes] = await Promise.all([
+    fetchAllRuns(),
+    fetch('/v1/reports/comparisons', { headers: authHeaders })
+  ]);
+  const cmpData  = await cmpRes.json();
+  _allRunsCache = allRuns;
+  _comparisonsCache = cmpData.comparisons || [];
+
+  // ── Populate filter dropdowns from the full data set ──────────────────────
+  const companies = [...new Set(allRuns.map(r => r.company_name).filter(Boolean))].sort();
+  const users     = [...new Set(allRuns.map(r => r.submitted_by).filter(Boolean))].sort();
+
+  const fc = document.getElementById('filter-company');
+  const fu = document.getElementById('filter-user');
+  const prevC = fc.value, prevU = fu.value;
+  fc.innerHTML = '<option value="">— All companies —</option>' +
+    companies.map(c => `<option value="${esc(c)}"${c===prevC?' selected':''}>${esc(c)}</option>`).join('');
+  fu.innerHTML = '<option value="">— All users —</option>' +
+    users.map(u => `<option value="${esc(u)}"${u===prevU?' selected':''}>${esc(u)}</option>`).join('');
+
+  renderReportsTables();
+}
+
+// Re-render tables based on current filter state. Called by loadReports() and
+// by filter dropdown 'change' events (no DB hit — uses _allRunsCache).
+function renderReportsTables() {
+  const allRuns = _allRunsCache;
+  const fCompany = document.getElementById('filter-company').value;
+  const fUser    = document.getElementById('filter-user').value;
+  const fStatus  = document.getElementById('filter-status').value;
+
+  const matchesFilter = r =>
+    (!fCompany || r.company_name === fCompany) &&
+    (!fUser    || r.submitted_by === fUser) &&
+    (!fStatus  || r.status === fStatus);
+
+  // ── Pending deletion section (also respects filters) ──────────────────────
+  const pending = allRuns.filter(r => r.status === 'DELETION_REQUESTED' && matchesFilter(r));
+  const pendingCard = document.getElementById('pending-del-card');
+  pendingCard.style.display = pending.length > 0 ? 'block' : 'none';
+  document.getElementById('pending-del-count').textContent = pending.length;
+
+  document.getElementById('pending-del-tbody').innerHTML = pending.map(r => `
+    <tr class="del-pending">
+      <td><input type="checkbox" class="chk-pending" value="${r.id}" data-action="toggle-pending"></td>
+      <td class="mono"><a href="/run-detail.html?id=${encodeURIComponent(r.id)}">${esc(r.id.slice(0,8))}</a></td>
+      <td>${esc(r.company_name || '-')}</td>
+      <td class="mono">${esc(r.submitted_by || '-')}</td>
+      <td style="color:#e65100;font-size:11px">${esc(r.deleted_by || '-')}</td>
+      <td>${fmtDate(r.queued_at)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-small btn-success" data-action="single-admin" data-admin-action="restore" data-run-id="${r.id}">↩ Restore</button>
+        <button class="btn btn-small btn-danger"  data-action="single-admin" data-admin-action="confirm_delete" data-run-id="${r.id}">✓ Confirm Delete</button>
+      </td>
+    </tr>`).join('');
+
+  // ── Main runs table (all non-DELETION_REQUESTED, filter-aware) ────────────
+  const mainRuns = allRuns.filter(r => r.status !== 'DELETION_REQUESTED' && matchesFilter(r));
+
+  // Update summary line on the card heading
+  const totalAll = allRuns.filter(r => r.status !== 'DELETION_REQUESTED').length;
+  const summary = document.getElementById('runs-summary');
+  if (summary) {
+    summary.textContent = (mainRuns.length === totalAll)
+      ? `(${totalAll} total)`
+      : `(showing ${mainRuns.length} of ${totalAll})`;
+  }
+  // Reset selection when filters change so we don't act on hidden rows
+  selectedRuns.clear();
+  const masterChk = document.getElementById('chk-all-runs');
+  if (masterChk) masterChk.checked = false;
+  updateRunsBar();
+
+  document.getElementById('runs-tbody').innerHTML = mainRuns.map(r => {
+    const isDel = r.status === 'DELETED_BY_ADMIN';
+    const rowCls = isDel ? 'del-by-admin' : '';
+    return `
+    <tr class="${rowCls}">
+      <td><input type="checkbox" class="chk-run" value="${r.id}" data-action="toggle-run"></td>
+      <td class="mono"><a href="/run-detail.html?id=${encodeURIComponent(r.id)}">${esc(r.id.slice(0,8))}</a></td>
+      <td>${esc(r.company_name || '-')}</td>
+      <td><span class="status-badge sb-${esc(r.status)}">${esc(r.status)}</span>
+        ${isDel ? `<span style="font-size:10px;color:#c62828;margin-left:4px">by ${esc(r.deleted_by||'admin')}</span>` : ''}
+      </td>
+      <td class="mono">${esc(r.submitted_by || '-')}</td>
+      <td>${fmtDate(r.queued_at)}</td>
+      <td style="white-space:nowrap">
+        ${isDel
+          ? `<button class="btn btn-small btn-secondary" data-action="single-admin" data-admin-action="restore" data-run-id="${r.id}">↩ Restore</button>
+             <button class="btn btn-small btn-danger"    data-action="single-admin" data-admin-action="purge" data-run-id="${r.id}">⚠ Purge</button>`
+          : `<button class="btn btn-small" style="background:#e65100;color:#fff;font-size:11px;padding:4px 8px"
+               data-action="single-admin" data-admin-action="soft_delete" data-run-id="${r.id}">🏷 Flag Delete</button>
+             <button class="btn btn-small btn-danger" data-action="single-admin" data-admin-action="purge" data-run-id="${r.id}">⚠ Purge</button>`
+        }
+      </td>
+    </tr>`;
+  }).join('');
+
+  // ── Comparisons ───────────────────────────────────────────────────────────
+  document.getElementById('comparisons-tbody').innerHTML = _comparisonsCache.map(c => `
+    <tr>
+      <td class="mono">${esc((c.id || '').slice(0,8))}</td>
+      <td>${esc(c.company_name || '-')}</td>
+      <td class="mono">${esc((c.run_a_id || '').slice(0,8))}</td>
+      <td class="mono">${esc((c.run_b_id || '').slice(0,8))}</td>
+      <td>${fmtDate(c.created_at)}</td>
+    </tr>`).join('');
+}
+
+// ── Checkbox helpers ──────────────────────────────────────────────────────────
+function toggleAllPending(master) {
+  document.querySelectorAll('.chk-pending').forEach(cb => {
+    cb.checked = master.checked;
+    if (master.checked) selectedPending.add(cb.value);
+    else                selectedPending.delete(cb.value);
+  });
+  updatePendingBar();
+}
+function togglePendingRow(cb) {
+  if (cb.checked) selectedPending.add(cb.value);
+  else            selectedPending.delete(cb.value);
+  updatePendingBar();
+}
+function updatePendingBar() {
+  const bar = document.getElementById('pending-del-bar');
+  const lbl = document.getElementById('pending-del-bar-label');
+  bar.style.display = selectedPending.size > 0 ? 'flex' : 'none';
+  lbl.textContent = `${selectedPending.size} run(s) selected`;
+}
+
+function toggleAllRuns(master) {
+  // Select/deselect ALL filtered rows (the full filtered set, not just the
+  // visible DOM page). This makes "select all" actually mean all rows the
+  // user is currently looking at after filters are applied.
+  selectedRuns.clear();
+  if (master.checked) {
+    document.querySelectorAll('.chk-run').forEach(cb => {
+      cb.checked = true;
+      selectedRuns.add(cb.value);
+    });
+  } else {
+    document.querySelectorAll('.chk-run').forEach(cb => { cb.checked = false; });
+  }
+  updateRunsBar();
+}
+function toggleRunRow(cb) {
+  if (cb.checked) selectedRuns.add(cb.value);
+  else            selectedRuns.delete(cb.value);
+  updateRunsBar();
+}
+function updateRunsBar() {
+  const bar = document.getElementById('runs-action-bar');
+  const lbl = document.getElementById('runs-bar-label');
+  bar.style.display = selectedRuns.size > 0 ? 'flex' : 'none';
+  lbl.textContent = `${selectedRuns.size} run(s) selected`;
+}
+
+// ── Admin action helpers ──────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  soft_delete:     'flag selected runs for deletion',
+  confirm_delete:  'PERMANENTLY delete the selected deletion requests',
+  purge:           'PERMANENTLY delete the selected runs (this cannot be undone)',
+  restore:         'restore the selected runs'
+};
+
+async function singleAdminAction(action, runId) {
+  const label = ACTION_LABELS[action] || action;
+  if (!confirm(`Are you sure you want to ${label}?\n\nRun: ${runId.slice(0,8)}`)) return;
+  await callBulkAdminAction(action, [runId]);
+}
+
+async function bulkAdminAction(action, source) {
+  const ids = [...(source === 'pending' ? selectedPending : selectedRuns)];
+  if (ids.length === 0) { showMsg('No runs selected.', false); return; }
+  const label = ACTION_LABELS[action] || action;
+  if (!confirm(`Are you sure you want to ${label}?\n\n${ids.length} run(s) selected.`)) return;
+  await callBulkAdminAction(action, ids);
+  if (source === 'pending') { selectedPending.clear(); }
+  else                      { selectedRuns.clear(); }
+}
+
+async function callBulkAdminAction(action, run_ids) {
+  // Server caps each request at 50 IDs (BULK_CHUNK_SIZE). For larger
+  // selections we transparently chunk and aggregate the results.
+  const chunks = [];
+  for (let i = 0; i < run_ids.length; i += BULK_CHUNK_SIZE) {
+    chunks.push(run_ids.slice(i, i + BULK_CHUNK_SIZE));
+  }
+
+  let doneCount = 0;
+  let skipCount = 0;
+  let notFound  = 0;
+  let firstError = null;
+
+  for (let i = 0; i < chunks.length; i++) {
+    if (chunks.length > 1) {
+      showMsg(`Processing batch ${i + 1} of ${chunks.length} (${chunks[i].length} runs)…`, true);
+    }
+    const res = await fetch('/v1/runs/bulk-admin-action', {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, run_ids: chunks[i] })
+    });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json();
+    if (!res.ok) {
+      firstError = data.detail || data.title || `HTTP ${res.status}`;
+      break;
+    }
+    doneCount += (data.processed || []).length;
+    skipCount += (data.skipped   || []).length;
+    notFound  += (data.not_found || []).length;
+  }
+
+  if (firstError) {
+    showMsg(`Action partially failed: ${firstError} (processed ${doneCount} before stopping)`, false);
+  } else {
+    let msg = `${doneCount} run(s) updated (action: ${action}).`;
+    if (skipCount) msg += ` ${skipCount} skipped.`;
+    if (notFound)  msg += ` ${notFound} not found.`;
+    if (chunks.length > 1) msg += ` [${chunks.length} batches]`;
+    showMsg(msg, true);
+  }
+  loadReports();
+}
+
+async function loadActivity() {
+  const res = await fetch('/v1/admin/activity', { headers: authHeaders });
+  const data = await res.json();
+
+  document.getElementById('activity-kpis').innerHTML = `
+    <div class="kpi"><div class="n">${data.totals.users}</div><div class="l">Users</div></div>
+    <div class="kpi"><div class="n">${data.totals.companies}</div><div class="l">Companies</div></div>
+    <div class="kpi"><div class="n">${data.totals.runs}</div><div class="l">Total Runs</div></div>
+    <div class="kpi"><div class="n">${data.runs_last_24h}</div><div class="l">Runs (24h)</div></div>
+    <div class="kpi"><div class="n">${data.logins_last_24h}</div><div class="l">Logins (24h)</div></div>
+    <div class="kpi"><div class="n">${data.failed_logins_last_24h}</div><div class="l">Failed Logins (24h)</div></div>
+  `;
+
+  document.getElementById('submitters-tbody').innerHTML = (data.top_submitters_last_7d || []).map(x => `
+    <tr><td class="mono">${esc(x.email)}</td><td>${x.runs}</td></tr>
+  `).join('');
+
+  document.getElementById('auth-events-tbody').innerHTML = (data.latest_auth_events || []).map(e => `
+    <tr>
+      <td>${fmtDate(e.created_at)}</td>
+      <td>${esc(e.event_type)}</td>
+      <td class="mono">${esc(e.email || '-')}</td>
+      <td class="mono">${esc(e.ip || '-')}</td>
+      <td>${esc((e.user_agent || '-').slice(0,80))}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Static element event listeners ───────────────────────────────────────────
+document.getElementById('btn-refresh').addEventListener('click', refreshCurrentTab);
+document.getElementById('new-role').addEventListener('change', toggleNewCompanyField);
+document.getElementById('btn-create-user').addEventListener('click', createUser);
+document.getElementById('user-search').addEventListener('input', debouncedLoadUsers);
+document.getElementById('new-co-name').addEventListener('input', autoSlug);
+document.getElementById('btn-create-company').addEventListener('click', createCompany);
+document.getElementById('btn-bulk-restore-pending').addEventListener('click', function() { bulkAdminAction('restore','pending'); });
+document.getElementById('btn-bulk-confirm-pending').addEventListener('click', function() { bulkAdminAction('confirm_delete','pending'); });
+document.getElementById('chk-all-pending').addEventListener('change', function() { toggleAllPending(this); });
+document.getElementById('btn-bulk-restore-runs').addEventListener('click', function() { bulkAdminAction('restore','runs'); });
+document.getElementById('btn-bulk-softdel-runs').addEventListener('click', function() { bulkAdminAction('soft_delete','runs'); });
+document.getElementById('btn-bulk-purge-runs').addEventListener('click', function() { bulkAdminAction('purge','runs'); });
+document.getElementById('chk-all-runs').addEventListener('change', function() { toggleAllRuns(this); });
+
+// Filter dropdowns — re-render from cache without re-fetching
+['filter-company', 'filter-user', 'filter-status'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', function() { renderReportsTables(); });
+});
+const clearBtn = document.getElementById('btn-clear-filters');
+if (clearBtn) clearBtn.addEventListener('click', function() {
+  document.getElementById('filter-company').value = '';
+  document.getElementById('filter-user').value    = '';
+  document.getElementById('filter-status').value  = '';
+  renderReportsTables();
+});
+
+// ── Event delegation for dynamically generated elements ──────────────────────
+
+// Users table delegation (click + change)
+document.getElementById('users-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  var action = el.getAttribute('data-action');
+  var userId = el.getAttribute('data-user-id');
+  if (action === 'save-user') saveUser(userId);
+  else if (action === 'reset-pwd') resetPwd(userId, el.getAttribute('data-email'));
+  else if (action === 'delete-user') deleteUser(userId, el.getAttribute('data-email'));
+});
+document.getElementById('users-tbody').addEventListener('change', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.getAttribute('data-action') === 'role-change') onRoleChange(el.getAttribute('data-user-id'));
+});
+
+// Companies table delegation
+document.getElementById('companies-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  var action = el.getAttribute('data-action');
+  var companyId = el.getAttribute('data-company-id');
+  if (action === 'save-company') saveCompany(companyId);
+  else if (action === 'delete-company') deleteCompany(companyId, el.getAttribute('data-name'));
+});
+
+// Pending deletion table delegation (click + change)
+document.getElementById('pending-del-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.getAttribute('data-action') === 'single-admin') {
+    singleAdminAction(el.getAttribute('data-admin-action'), el.getAttribute('data-run-id'));
+  }
+});
+document.getElementById('pending-del-tbody').addEventListener('change', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.getAttribute('data-action') === 'toggle-pending') togglePendingRow(el);
+});
+
+// Runs table delegation (click + change)
+document.getElementById('runs-tbody').addEventListener('click', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.getAttribute('data-action') === 'single-admin') {
+    singleAdminAction(el.getAttribute('data-admin-action'), el.getAttribute('data-run-id'));
+  }
+});
+document.getElementById('runs-tbody').addEventListener('change', function(e) {
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  if (el.getAttribute('data-action') === 'toggle-run') toggleRunRow(el);
+});
+
+// ── Server Config ────────────────────────────────────────────────────────────
+let _configCache = null;
+
+const CONFIG_LABELS = {
+  MAX_CONCURRENT_RUNS: 'Max Concurrent Runs',
+  PARALLEL_STAGGER_MS: 'Batch Stagger Delay (ms)',
+  RUN_TIMEOUT_MS:      'Run Timeout (ms)',
+  LOG_LEVEL:           'Log Level',
+  SMTP_HOST:   'SMTP Host',
+  SMTP_PORT:   'SMTP Port',
+  SMTP_SECURE: 'SMTP Secure (TLS)',
+  SMTP_USER:   'SMTP User',
+  SMTP_PASS:   'SMTP Password',
+  SMTP_FROM:   'SMTP From Address',
+};
+
+async function loadConfig() {
+  const res = await fetch('/v1/admin/config', { headers: authHeaders });
+  if (!res.ok) { showMsg('Failed to load config', false); return; }
+  const data = await res.json();
+  _configCache = data.config;
+
+  // Server info cards
+  const si = data.server_info;
+  document.getElementById('server-info-grid').innerHTML = [
+    { n: si.version, l: 'Version' },
+    { n: si.node_version, l: 'Node.js' },
+    { n: si.platform, l: 'Platform' },
+    { n: formatUptime(si.uptime_seconds), l: 'Uptime' },
+  ].map(k => `<div class="kpi"><div class="n" style="font-size:18px">${esc(k.n)}</div><div class="l">${k.l}</div></div>`).join('')
+    + `<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px">
+         <div style="margin-bottom:4px"><strong style="color:#546e7a">Collection:</strong> <span class="mono">${esc(si.collection_path)}</span></div>
+         <div><strong style="color:#546e7a">Bruno CLI:</strong> <span class="mono">${esc(si.bru_cmd)}</span></div>
+       </div>`;
+
+  // Config form — group by category
+  const smtpKeys    = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');
+  const loggingKeys = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'logging');
+  const runnerKeys  = Object.entries(data.config).filter(([_, cfg]) => !cfg.group);
+
+  function configRow([key, cfg]) {
+    const isNum = cfg.type === 'number';
+    const isEnum = cfg.type === 'enum';
+    const isSensitive = cfg.sensitive;
+    const rangeHint = isNum && cfg.min != null ? `(${cfg.min} – ${cfg.max})` : '';
+
+    let control;
+    if (isEnum) {
+      const opts = (cfg.options || []).map(o =>
+        `<option value="${esc(o)}"${o === cfg.value ? ' selected' : ''}>${esc(o)}</option>`
+      ).join('');
+      control = `<select id="cfg-${key}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
+    } else {
+      const inputType = isSensitive ? 'password' : (isNum ? 'number' : 'text');
+      const attrs = isNum ? `min="${cfg.min}" max="${cfg.max}"` : '';
+      control = `<input id="cfg-${key}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(cfg.description || '')}">`;
+    }
+
+    return `
+    <div class="row" style="margin-bottom:12px;align-items:start">
+      <div class="field" style="max-width:320px">
+        <label for="cfg-${key}">${esc(CONFIG_LABELS[key] || key)}</label>
+        ${control}
+      </div>
+      <div style="flex:1;font-size:12px;color:#78909c;padding-top:22px">
+        ${esc(cfg.description)} ${rangeHint ? `<span style="color:#b0bec5">${rangeHint}</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  let html = '<div style="font-size:13px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Runner Settings</div>';
+  html += runnerKeys.map(configRow).join('');
+  if (loggingKeys.length) {
+    html += '<div style="font-size:13px;font-weight:700;color:#6a1b9a;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">Logging</div>';
+    html += loggingKeys.map(configRow).join('');
+  }
+  html += '<div style="font-size:13px;font-weight:700;color:#0090D4;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">SMTP / Email Settings</div>';
+  html += smtpKeys.map(configRow).join('');
+  document.getElementById('config-form').innerHTML = html;
+}
+
+async function saveConfig() {
+  if (!_configCache) return;
+  const payload = {};
+  for (const key of Object.keys(_configCache)) {
+    const el = document.getElementById('cfg-' + key);
+    if (el) payload[key] = el.value;
+  }
+  const res = await fetch('/v1/admin/config', {
+    method: 'PATCH',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || 'Failed to save config', false); return; }
+  if (data.errors && data.errors.length > 0) {
+    showMsg('Saved with warnings: ' + data.errors.join('; '), false);
+  } else {
+    showMsg('Configuration saved — changes take effect immediately.', true);
+  }
+  _configCache = data.config;
+}
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+// Wire up save config button (avoids inline onclick blocked by CSP)
+document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+
+(async function init(){
+  try {
+    // Load companies first — required so the company dropdowns in the user table are populated
+    if (isAdmin) {
+      await loadCompanies();
+      toggleNewCompanyField();
+    }
+    // Activate the tab after companies are ready
+    switchTab(_initTab);
+  } catch (e) {
+    showMsg('Failed to load admin data.', false);
+  }
+})();
+</script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>
