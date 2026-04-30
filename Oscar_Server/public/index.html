@@ -1,0 +1,263 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Login</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;min-height:100vh;display:flex;flex-direction:column}
+.card{background:#fff;border-radius:10px;box-shadow:0 2px 16px rgba(0,0,0,.1);width:100%;max-width:420px;padding:36px 32px}
+.logo{text-align:center;margin-bottom:28px}
+.logo-icons{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px}
+.logo-icons img{height:40px;width:auto}
+.logo h1{color:#0090D4;font-size:26px;letter-spacing:1px}
+.logo p{color:#90a4ae;font-size:13px;margin-top:4px}
+.tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid #e0e0e0}
+.tab{flex:1;padding:10px;text-align:center;cursor:pointer;color:#90a4ae;font-weight:600;font-size:14px;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab.active{color:#0090D4;border-bottom-color:#0090D4}
+.form{display:none}
+.form.active{display:block}
+.field{margin-bottom:16px}
+label{display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+input{width:100%;padding:10px 12px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px;transition:border .2s}
+input:focus{outline:none;border-color:#0090D4}
+.btn{width:100%;padding:12px;background:#0090D4;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
+.btn:hover{background:#005A8A}
+.btn:disabled{background:#90a4ae;cursor:not-allowed}
+.error{background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.beta-notice{margin:16px 0 10px;padding:14px;border:2px solid #FCC44D;border-radius:8px;background:#fff8e6;color:#5f4b1f}
+.beta-notice-title{font-size:14px;font-weight:800;margin-bottom:8px;color:#5a4300}
+.beta-notice p{font-size:12px;line-height:1.5;margin-bottom:8px}
+.beta-notice ul{margin:0;padding-left:18px}
+.beta-notice li{font-size:12px;line-height:1.5;margin-bottom:4px}
+.footer{text-align:center;color:#b0bec5;font-size:11px;margin-top:24px}
+.site-footer{width:100%;text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d}
+.uic-banner{background:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-text{display:flex;flex-direction:column;line-height:1.3}
+.uic-banner-name{font-size:18px;font-weight:900;color:#3C3C3B;letter-spacing:2px}
+.uic-banner-sub{font-size:11px;color:#90a4ae}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.page-center{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-left">
+    <a href="https://uis.org" aria-label="UIC website">
+      <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+    </a>
+  </div>
+  <div class="uic-banner-right">
+    <a href="https://osdm.io" aria-label="OSDM website">
+      <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+    </a>
+  </div>
+</header>
+<div class="page-center">
+<div class="card">
+  <div class="logo">
+    <div class="logo-icons">
+      <img src="/oscar-icon.svg" alt="OSCAR">
+    </div>
+    <h1>OSCAR</h1>
+    <p>OSDM Conformance Automation Runner</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-login">Sign In</div>
+    <div class="tab" id="tab-register">Register</div>
+  </div>
+
+  <div id="error" class="error"></div>
+
+  <!-- Login -->
+  <form id="login" class="form active">
+    <div class="field"><label>Email</label><input type="email" id="l-email" required autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="l-password" required autocomplete="current-password"></div>
+    <button class="btn" type="submit" id="l-btn">Sign In</button>
+  </form>
+
+  <div id="beta-notice" class="beta-notice">
+    <div class="beta-notice-title">⚠️ Experimental / Beta Software Notice</div>
+    <p>This application is an early-stage, experimental product (Minimum Viable Product). It is provided for evaluation and testing purposes only.</p>
+    <p>The application may contain bugs, security vulnerabilities, or incomplete features and is provided "AS IS" and "AS AVAILABLE", without warranties of any kind.</p>
+    <p>Do not use this application for production, sensitive, or critical data. Use is entirely at your own risk.</p>
+    <p>By logging in, you acknowledge and accept that:</p>
+    <ul>
+      <li>the application is not production-ready,</li>
+      <li>data loss, errors, or interruptions may occur,</li>
+      <li>no security, availability, or support guarantees are provided.</li>
+    </ul>
+  </div>
+
+  <!-- Register -->
+  <div id="register" class="form">
+    <div style="background:#e8f4fb;border:1px solid #b3d9f0;border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#1a3a6b;line-height:1.6">
+      <strong>Tester accounts only.</strong> Self-registration is available for Tester (company) accounts.<br>
+      For Administrator or Certifier access, contact
+      <a href="mailto:Heuguet@uic.org" style="color:#0090D4">Heuguet@uic.org</a>.
+    </div>
+    <form id="register-form">
+      <div class="field">
+        <label>Company Name</label>
+        <select id="r-company" required style="width:100%;padding:10px 12px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px;background:#fff">
+          <option value="">— Select your company —</option>
+        </select>
+        <div id="r-company-hint" style="font-size:11px;color:#90a4ae;margin-top:4px">Your email must contain your company name.</div>
+      </div>
+      <div class="field">
+        <label>Email <span style="color:#90a4ae;font-weight:400">(company email address)</span></label>
+        <input type="email" id="r-email" required autocomplete="username">
+        <div id="r-match-msg" style="font-size:11px;margin-top:4px;display:none"></div>
+      </div>
+      <button class="btn" type="submit" id="r-btn">Send Confirmation Email</button>
+    </form>
+    <div id="r-success" style="display:none;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;padding:14px;margin-top:14px;font-size:13px;color:#2e7d32;line-height:1.6;text-align:center">
+      ✅ <strong>Check your inbox!</strong><br>
+      A confirmation link has been sent to your email address.<br>
+      Click the link in the email to set your password and activate your account.
+      <div id="r-devlink" style="display:none;margin-top:12px;padding:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:5px;color:#6d4c00;font-size:12px;text-align:left">
+        <strong>⚡ DEV MODE — SMTP not configured.</strong><br>
+        No real email was sent. Use this link to simulate clicking the confirmation email:<br>
+        <a id="r-devlink-a" href="#" style="color:#0090D4;word-break:break-all;font-size:11px"></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">&copy; UIC - International union of railways. 2026. All rights reserved.</div>
+</div>
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script>
+const API = '';
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.querySelectorAll('.form').forEach(f => f.classList.remove('active'));
+  document.getElementById(tab).classList.add('active');
+  document.getElementById('beta-notice').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('error').style.display = 'none';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('l-btn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const res = await fetch(`${API}/v1/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email: document.getElementById('l-email').value, password: document.getElementById('l-password').value })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.detail || data.title || 'Login failed.'); return; }
+    localStorage.setItem('oscar_token', data.token);
+    localStorage.setItem('oscar_company', JSON.stringify(data.company));
+    localStorage.setItem('oscar_user', JSON.stringify(data.user));
+    window.location.href = '/welcome.html';
+  } catch(err) { showError('Server unreachable. Is OSCAR running?'); }
+  finally { btn.disabled = false; btn.textContent = 'Sign In'; }
+}
+
+function checkEmailCompany() {
+  const company = document.getElementById('r-company').value.trim();
+  const email   = document.getElementById('r-email').value.trim().toLowerCase();
+  const msgEl   = document.getElementById('r-match-msg');
+  if (!company || !email) { msgEl.style.display = 'none'; return; }
+  const words = company.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+  const matches = words.length === 0 || words.some(w => email.includes(w));
+  msgEl.style.display = 'block';
+  if (matches) {
+    msgEl.style.color = '#2e7d32';
+    msgEl.textContent = '✓ Email matches company name.';
+  } else {
+    msgEl.style.color = '#c62828';
+    msgEl.textContent = '✗ Email does not appear to match company name "' + company + '".';
+  }
+}
+
+async function doRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('r-btn');
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    const res = await fetch(`${API}/v1/auth/register/request`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email:       document.getElementById('r-email').value.trim(),
+        companyName: document.getElementById('r-company').value.trim()
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.detail || data.title || 'Registration failed.'); return; }
+
+    // Always hide the form and show the "check your inbox" panel
+    document.querySelector('#register form').style.display = 'none';
+    document.getElementById('r-success').style.display = 'block';
+
+    // Dev mode: SMTP not configured — show the link directly on the panel so
+    // the developer can click it manually (simulates opening the email link).
+    if (data.verificationUrl) {
+      const devBlock = document.getElementById('r-devlink');
+      const devLink  = document.getElementById('r-devlink-a');
+      devLink.href        = data.verificationUrl;
+      devLink.textContent = data.verificationUrl;
+      devBlock.style.display = 'block';
+    }
+  } catch(err) { showError('Server unreachable. Is OSCAR running?'); }
+  finally { btn.disabled = false; btn.textContent = 'Send Confirmation Email'; }
+}
+
+// ── Load companies for registration dropdown ────────────────────────────────
+async function loadCompanies() {
+  try {
+    const res = await fetch(`${API}/v1/auth/register/companies`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const sel = document.getElementById('r-company');
+    (data.companies || []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn('Failed to load companies:', e.message); }
+}
+loadCompanies();
+
+// Bind event listeners (CSP-safe — no inline handlers)
+document.getElementById('tab-login').addEventListener('click', () => showTab('login'));
+document.getElementById('tab-register').addEventListener('click', () => showTab('register'));
+document.getElementById('login').addEventListener('submit', doLogin);
+document.getElementById('register-form').addEventListener('submit', doRegister);
+document.getElementById('r-company').addEventListener('change', checkEmailCompany);
+document.getElementById('r-email').addEventListener('input', checkEmailCompany);
+
+// If already logged in, go straight to the welcome page
+if (localStorage.getItem('oscar_token')) {
+  window.location.href = '/welcome.html';
+}
+</script>
+</body>
+</html>
+
+

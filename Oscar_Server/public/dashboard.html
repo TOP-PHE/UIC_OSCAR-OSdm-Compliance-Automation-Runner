@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:1000px;margin:30px auto;padding:0 16px}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+h2{color:#0090D4;font-size:20px}
+.btn{padding:9px 18px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+.btn-primary{background:#0090D4;color:#fff}.btn-primary:hover{background:#005A8A}
+.btn-compare{background:#7b1fa2;color:#fff}.btn-compare:hover{background:#6a1b9a}
+.btn-compare:disabled,.btn-danger:disabled{opacity:.45;cursor:not-allowed}
+.btn-danger{background:#c62828;color:#fff}.btn-danger:hover{background:#b71c1c}
+.btn-secondary{background:#eceff1;color:#455a64}.btn-secondary:hover{background:#cfd8dc}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:20px}
+.card-title{padding:12px 16px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #eceff1}
+.runs-header{display:grid;grid-template-columns:28px 2fr 1fr 2fr 1.2fr .8fr .7fr .8fr;gap:8px;padding:10px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px}
+.run-row   {display:grid;grid-template-columns:28px 2fr 1fr 2fr 1.2fr .8fr .7fr .8fr;gap:8px;padding:11px 16px;border-top:1px solid #f5f5f5;align-items:center;cursor:pointer;transition:background .15s}
+.run-row:hover{background:#f9f9f9}
+.run-row.deleted-by-admin{background:#fff8e1;opacity:.85}
+.run-row input[type=checkbox]{cursor:pointer;width:14px;height:14px}
+.status{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700}
+.s-QUEUED            {background:#e3f2fd;color:#1565c0}
+.s-RUNNING           {background:#fff8e1;color:#e65100}
+.s-COMPLETED         {background:#e8f5e9;color:#2e7d32}
+.s-FAILED            {background:#ffebee;color:#c62828}
+.s-CANCELLED         {background:#eceff1;color:#546e7a}
+.s-DELETED_BY_ADMIN  {background:#fff3e0;color:#e65100;text-decoration:line-through}
+.badge-admin-del{background:#e65100;color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:8px;margin-left:6px;vertical-align:middle;white-space:nowrap}
+.url{font-family:'Courier New',monospace;font-size:11px;color:#78909c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+.empty{text-align:center;padding:48px;color:#90a4ae}
+
+/* ── Action bar ──────────────────────────────────────────────────────────── */
+.action-bar{display:flex;align-items:center;gap:10px;border-radius:8px;padding:12px 16px;margin-bottom:16px;flex-wrap:wrap}
+.action-bar-compare{background:#f3e5f5}
+.action-bar-delete {background:#fff8e1;border:1px solid #ffe082}
+.action-bar span{font-size:13px;font-weight:600}
+.action-bar-compare span{color:#6a1b9a}
+.action-bar-delete  span{color:#e65100}
+
+/* ── Soft-delete info modal ──────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{background:#fff;border-radius:10px;max-width:480px;width:90%;padding:28px 28px 22px;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.modal h3{font-size:16px;font-weight:800;color:#1a2e40;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.modal p{font-size:13px;color:#37474f;line-height:1.65;margin-bottom:10px}
+.modal ul{padding-left:18px;margin-bottom:14px}
+.modal ul li{font-size:13px;color:#37474f;line-height:1.7}
+.modal-note{background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:10px 14px;font-size:12px;color:#1565c0;margin-bottom:18px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+
+/* ── Admin-deleted section banner ────────────────────────────────────────── */
+.section-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:8px 16px;background:#fff3e0;color:#e65100;border-radius:8px 8px 0 0;border-bottom:1px solid #ffe0b2;display:flex;align-items:center;gap:8px}
+
+/* ── Batch grouping ─────────────────────────────────────────────────────── */
+.batch-header{background:#f0f7ff;cursor:pointer}
+.batch-header:hover{background:#e3f0fc}
+.batch-arrow{font-size:10px;margin-right:6px;display:inline-block;transition:transform .15s}
+.batch-arrow.open{transform:rotate(90deg)}
+.batch-child{background:#fafcff;border-left:3px solid #0090D4}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'dashboard');</script>
+</header>
+
+<div class="container">
+  <div class="top-bar">
+    <h2>Test Runs</h2>
+    <a href="/run.html" class="btn btn-primary">&#9654; New Run</a>
+  </div>
+
+  <!-- Live queue status panel -->
+  <div id="queue-info" style="display:none;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <strong style="color:#0090D4;font-size:13px">Company Queue</strong>
+      <span id="qi-slots" style="font-size:12px;color:#546e7a"></span>
+    </div>
+    <div id="qi-runs" style="font-size:12px"></div>
+  </div>
+
+  <!-- Compare action bar (shown when 2 runs selected) -->
+  <div id="compare-bar" class="action-bar action-bar-compare" style="display:none">
+    <span id="compare-label" style="flex:1">Select exactly 2 runs to compare</span>
+    <button class="btn btn-compare" id="compare-btn" disabled>⚖ Compare Selected</button>
+  </div>
+
+  <!-- Delete action bar (shown when 1+ runs selected and canDelete) -->
+  <div id="delete-bar" class="action-bar action-bar-delete" style="display:none">
+    <span id="delete-label" style="flex:1">Select runs to request deletion</span>
+    <button class="btn btn-danger" id="delete-btn" disabled>🗑 Request Deletion</button>
+  </div>
+
+  <!-- Main runs card -->
+  <div class="card">
+    <div class="runs-header">
+      <div></div>
+      <div>Run / Environment</div>
+      <div>Status</div>
+      <div>Endpoint</div>
+      <div>Date</div>
+      <div>Duration</div>
+      <div>Scenarios</div>
+      <div>Compare</div>
+    </div>
+    <div id="runs-list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- Admin-deleted runs section (shown separately, cannot be selected) -->
+  <div id="admin-deleted-section" style="display:none">
+    <div class="section-label">⚠️ Flagged by Administrator — awaiting final removal</div>
+    <div class="card" style="border-radius:0 0 8px 8px;margin-top:0">
+      <div class="runs-header" style="grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr">
+        <div>Run / Environment</div><div>Status</div><div>Endpoint</div><div>Date</div><div>Flagged by</div>
+      </div>
+      <div id="admin-deleted-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Soft-delete confirmation modal -->
+<div id="delete-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h3>🗑 Request Run Deletion</h3>
+    <p>You are about to request deletion of <strong id="modal-count">N</strong> run(s).</p>
+    <div class="modal-note">
+      ℹ️ <strong>This is a soft delete.</strong> The selected runs will be removed from your dashboard and queued for administrator review. Only an Administrator can permanently delete data from OSCAR.
+    </div>
+    <p>The runs will no longer appear in your dashboard once submitted.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm-btn">Confirm — Request Deletion</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script>
+const token   = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+const canDelete = user.role === 'administrator' || user.role === 'company_user' || user.role === 'test_manager';
+
+let selected  = new Set();   // runs selected for deletion
+let compared  = new Set();   // runs selected for comparison
+let allRuns  = [];
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function duration(start, end) {
+  if (!start || !end) return '-';
+  const s = Math.round((new Date(end) - new Date(start)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
+}
+
+// ── Render a single run row (used for both unbatched and batch-child rows) ───
+function renderRunRow(r, opts) {
+  const isBatchChild = opts && opts.batchChild;
+  const batchAttr = isBatchChild ? ` data-batch-id="${r.batch_id}"` : '';
+  const childStyle = isBatchChild ? ' style="display:none;padding-left:30px"' : '';
+  const childClass = isBatchChild ? ' batch-child' : '';
+  const label = isBatchChild
+    ? (r.scenario_code || r.env_name_used || r.id.slice(0,8))
+    : (r.env_name_used || r.id.slice(0,8));
+  return `
+    <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
+      <div class="cb-cell">
+        ${canDelete
+          ? `<input type="checkbox" value="${r.id}" data-action="select" ${selected.has(r.id)?'checked':''}>`
+          : ''}
+      </div>
+      <div style="font-weight:600;color:#1a3a6b;font-size:13px">${label}</div>
+      <div><span class="status s-${r.status}">${r.status === 'RUNNING' ? '<span class="spin">⟳</span> ' : ''}${r.status}</span></div>
+      <div class="url" title="${r.api_base_used || ''}">${r.api_base_used || '-'}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${duration(r.started_at, r.completed_at)}</div>
+      <div style="font-size:12px;font-weight:600;color:#0090D4;text-align:center">${r.artifact_count > 0 ? r.artifact_count : '-'}</div>
+      <div class="cb-cell">
+        <input type="checkbox" value="${r.id}" class="cmp-cb" data-action="compare" ${compared.has(r.id)?'checked':''}>
+      </div>
+    </div>`;
+}
+
+// ── Compute summary status for a batch of runs ──────────────────────────────
+function batchSummaryStatus(runs) {
+  const statuses = runs.map(r => r.status);
+  if (statuses.some(s => s === 'FAILED'))     return 'FAILED';
+  if (statuses.some(s => s === 'RUNNING'))    return 'RUNNING';
+  if (statuses.every(s => s === 'COMPLETED')) return 'COMPLETED';
+  if (statuses.every(s => s === 'QUEUED'))    return 'QUEUED';
+  // mixed (some completed, some queued, etc.)
+  if (statuses.some(s => s === 'COMPLETED'))  return 'RUNNING';
+  return 'QUEUED';
+}
+
+// ── Render normal runs (excludes DELETED_BY_ADMIN) ───────────────────────────
+function renderRuns(runs) {
+  const normal = runs.filter(r => r.status !== 'DELETED_BY_ADMIN');
+  const el = document.getElementById('runs-list');
+  if (!normal.length) {
+    el.innerHTML = '<div class="empty">No runs yet. <a href="/run.html">Start your first run →</a></div>';
+    return;
+  }
+
+  // Separate batched vs unbatched runs
+  const batched = {};    // batch_id → [runs]
+  const unbatched = [];  // runs without batch_id
+
+  normal.forEach(r => {
+    if (r.batch_id) {
+      (batched[r.batch_id] = batched[r.batch_id] || []).push(r);
+    } else {
+      unbatched.push(r);
+    }
+  });
+
+  let html = '';
+
+  // Render batched groups first, newest batch first
+  const batchIds = Object.keys(batched).sort((a, b) => {
+    const aTime = new Date(batched[a][0].queued_at).getTime();
+    const bTime = new Date(batched[b][0].queued_at).getTime();
+    return bTime - aTime;
+  });
+
+  batchIds.forEach(batchId => {
+    const batchRuns = batched[batchId].sort(
+      (a, b) => new Date(a.queued_at) - new Date(b.queued_at)
+    );
+    const batchStatus = batchSummaryStatus(batchRuns);
+    const completed = batchRuns.filter(r => r.status === 'COMPLETED').length;
+
+    // Compute batch duration: earliest started_at to latest completed_at
+    const starts = batchRuns.filter(r => r.started_at).map(r => new Date(r.started_at));
+    const ends   = batchRuns.filter(r => r.completed_at).map(r => new Date(r.completed_at));
+    const batchDuration = starts.length && ends.length
+      ? duration(new Date(Math.min(...starts)).toISOString(), new Date(Math.max(...ends)).toISOString())
+      : '-';
+
+    // Batch header row (no checkboxes)
+    html += `
+    <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
+      <div></div>
+      <div style="font-weight:700;color:#0090D4">
+        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)
+      </div>
+      <div><span class="status s-${batchStatus}">${completed}/${batchRuns.length} done</span></div>
+      <div class="url">${batchRuns[0].api_base_used || '-'}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(batchRuns[0].queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${batchDuration}</div>
+      <div></div>
+      <div></div>
+    </div>`;
+
+    // Child rows (hidden by default)
+    batchRuns.forEach(r => { html += renderRunRow(r, { batchChild: true }); });
+  });
+
+  // Render unbatched runs after batched groups
+  unbatched.forEach(r => { html += renderRunRow(r); });
+
+  el.innerHTML = html;
+}
+
+// ── Render admin-deleted runs (read-only section) ────────────────────────────
+function renderAdminDeletedRuns(runs) {
+  const flagged = runs.filter(r => r.status === 'DELETED_BY_ADMIN');
+  const section = document.getElementById('admin-deleted-section');
+  if (!flagged.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  // Override grid to 5 columns matching the section header (no checkbox / compare cols)
+  const GRID = 'grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr';
+  document.getElementById('admin-deleted-list').innerHTML = flagged.map(r => `
+    <div class="run-row deleted-by-admin" style="${GRID}" data-run-id="${r.id}">
+      <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+        <span style="font-weight:600;color:#1a3a6b;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${r.env_name_used || r.id.slice(0,8)}
+        </span>
+        <span class="badge-admin-del" style="align-self:flex-start">Flagged by Admin</span>
+      </div>
+      <div><span class="status s-DELETED_BY_ADMIN">FLAGGED</span></div>
+      <div class="url" title="${r.api_base_used || ''}">${r.api_base_used || '-'}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#e65100;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.deleted_by || 'Admin'}</div>
+    </div>`).join('');
+}
+
+// ── Selection logic ───────────────────────────────────────────────────────────
+function toggleSelect(cb) {
+  if (cb.checked) selected.add(cb.value);
+  else            selected.delete(cb.value);
+  updateBars();
+}
+
+function toggleCompare(cb) {
+  if (cb.checked) compared.add(cb.value);
+  else            compared.delete(cb.value);
+  updateBars();
+}
+
+function updateBars() {
+  // Compare bar — uses compared set
+  const cCount = compared.size;
+  const cBar = document.getElementById('compare-bar');
+  const cBtn = document.getElementById('compare-btn');
+  const cLbl = document.getElementById('compare-label');
+  cBar.style.display = cCount > 0 ? 'flex' : 'none';
+  cBtn.disabled = cCount !== 2;
+  cLbl.textContent = cCount === 2
+    ? '2 runs selected — ready to compare'
+    : `${cCount} run(s) selected — select exactly 2 to compare`;
+
+  // Delete bar — uses selected set
+  if (canDelete) {
+    const dCount = selected.size;
+    const dBar = document.getElementById('delete-bar');
+    const dBtn = document.getElementById('delete-btn');
+    const dLbl = document.getElementById('delete-label');
+    dBar.style.display = dCount > 0 ? 'flex' : 'none';
+    dBtn.disabled = dCount === 0;
+    dLbl.textContent = dCount === 1 ? '1 run selected' : `${dCount} runs selected`;
+  }
+}
+
+function goCompare() {
+  const [a, b] = [...compared];
+  window.location.href = `/compare.html?a=${a}&b=${b}`;
+}
+
+// ── Soft-delete modal ─────────────────────────────────────────────────────────
+function openDeleteModal() {
+  if (selected.size === 0) return;
+  document.getElementById('modal-count').textContent = selected.size;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+function closeDeleteModal() {
+  document.getElementById('delete-modal').style.display = 'none';
+}
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('delete-modal')) closeDeleteModal();
+}
+
+async function confirmDelete() {
+  closeDeleteModal();
+  const ids = [...selected];
+  const res = await fetch('/v1/runs/bulk-delete', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_ids: ids })
+  });
+  if (res.status === 401) { logout(); return; }
+  const data = await res.json();
+
+  if (data.deleted && data.deleted.length) {
+    data.deleted.forEach(id => selected.delete(id));
+    loadRuns();
+  }
+  if (data.skipped && data.skipped.length) {
+    alert(`${data.skipped.length} run(s) could not be flagged:\n` +
+      data.skipped.map(s => `- ${s.id.slice(0,8)}: ${s.reason}`).join('\n'));
+  }
+}
+
+// ── Load runs ─────────────────────────────────────────────────────────────────
+async function loadRuns() {
+  const res = await fetch('/v1/runs?limit=100', { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401) { logout(); return; }
+  const data = await res.json();
+  allRuns = data.runs || [];
+  renderRuns(allRuns);
+  renderAdminDeletedRuns(allRuns);
+  updateBars();
+
+  const hasActive = allRuns.some(r => r.status === 'QUEUED' || r.status === 'RUNNING');
+  if (hasActive) setTimeout(loadRuns, 3000);
+}
+
+// ── Event delegation (replaces inline onclick/onchange handlers) ─────────────
+document.getElementById('compare-btn').addEventListener('click', goCompare);
+document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeDeleteModal);
+document.getElementById('modal-confirm-btn').addEventListener('click', confirmDelete);
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+
+// Delegated handlers for dynamically rendered run rows
+document.getElementById('runs-list').addEventListener('click', function(e) {
+  if (e.target.type === 'checkbox') return; // let change handler deal with it
+
+  // Batch header toggle
+  const el = e.target.closest('[data-action="toggle-batch"]');
+  if (el) {
+    const batchId = el.dataset.batchId;
+    const children = document.querySelectorAll(`.batch-child[data-batch-id="${batchId}"]`);
+    const arrow = el.querySelector('.batch-arrow');
+    const isOpen = children[0] && children[0].style.display !== 'none';
+    children.forEach(c => c.style.display = isOpen ? 'none' : '');
+    if (arrow) arrow.classList.toggle('open', !isOpen);
+    return; // don't navigate
+  }
+
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
+});
+document.getElementById('runs-list').addEventListener('change', function(e) {
+  if (e.target.dataset.action === 'select') toggleSelect(e.target);
+  if (e.target.dataset.action === 'compare') toggleCompare(e.target);
+});
+document.getElementById('admin-deleted-list').addEventListener('click', function(e) {
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
+});
+
+loadRuns();
+
+// ── Live queue status ────────────────────────────────────────────────────────
+async function pollQueueInfo() {
+  try {
+    const res = await fetch('/v1/runs/queue-status', { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const panel = document.getElementById('queue-info');
+    if (data.runs.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    document.getElementById('qi-slots').textContent =
+      `${data.slots_used}/${data.concurrent_limit} slots used — ${data.slots_available} available`;
+    const rows = data.runs.map(r => {
+      const you = r.is_current_user ? ' <strong style="color:#0090D4">(you)</strong>' : '';
+      const status = r.status === 'RUNNING'
+        ? '<span style="color:#e65100;font-weight:700">RUNNING</span>'
+        : `<span style="color:#1565c0">QUEUED #${r.position}</span>`;
+      return `<div style="display:flex;gap:12px;padding:3px 0;border-bottom:1px solid #f5f5f5">
+        <span style="min-width:60px">${status}</span>
+        <span style="min-width:200px;font-weight:600;color:#1a2e40">${r.scenario_code || 'All scenarios'}</span>
+        <span style="color:#78909c">${r.user_email}${you}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('qi-runs').innerHTML = rows;
+  } catch(_) {}
+}
+setInterval(pollQueueInfo, 3000);
+pollQueueInfo();
+</script>
+</body>
+</html>

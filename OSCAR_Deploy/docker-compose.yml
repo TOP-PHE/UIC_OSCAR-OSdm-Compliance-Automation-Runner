@@ -1,0 +1,35 @@
+services:
+  oscar:
+    build:
+      context: ../Oscar_Server
+      dockerfile: Dockerfile
+    container_name: oscar
+    env_file: .env
+    environment:
+      # Path to the Bruno CLI binary inside the runtime image (installed
+      # in the builder stage and copied across — see Oscar_Server/Dockerfile).
+      BRU_CMD: /usr/local/bin/bru
+      # Path inside the container where the Bruno collection is mounted.
+      # Matches the read-only volume mapping below.
+      COLLECTION_PATH: /collection
+      NODE_ENV: production
+    ports:
+      # Bind to localhost only — front with nginx for HTTPS termination.
+      # In a dev/test setup you can drop the 127.0.0.1: prefix to expose
+      # the port directly on all interfaces.
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # Persist SQLite DB, artifacts, and datafiles across container restarts.
+      # The folder is created on first run; gitignored at the repo root.
+      - ./data:/app/data
+      # Mount the Bruno test collection from the sibling Bruno_Collection/
+      # folder of the monorepo. Read-only — OSCAR never writes here.
+      - ../Bruno_Collection:/collection:ro
+    restart: unless-stopped
+
+# ── Notes ─────────────────────────────────────────────────────────────────
+# - The OSCAR image bundles the Bruno CLI, so no separate Bruno service is
+#   needed. The collection is just data, mounted read-only.
+# - To upgrade: `git pull` at the monorepo root, then from this folder:
+#       docker compose up -d --build
+# - To back up: stop the container, tar `./data/oscar.db`, restart.

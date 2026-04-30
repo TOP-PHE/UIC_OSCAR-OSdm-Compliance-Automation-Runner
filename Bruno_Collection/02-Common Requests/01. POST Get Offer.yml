@@ -1,0 +1,131 @@
+info:
+  name: 01. POST Get Offer
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{api_base}}/offers"
+  headers:
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: "{{OfferCollectionRequest}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // ── Multi-scenario loop-back: reset env vars and load next scenario ────
+        // When __loopback is 'true' the runner has been routed back here from the
+        // terminal step of the previous scenario.  Reset all business env vars,
+        // load the next scenario's data, and initialise a fresh HTML report so
+        // each scenario produces its own independent report file.
+        if (bru.getEnvVar('__loopback') === 'true') {
+          bru.setEnvVar('__loopback', null);
+          try {
+            const { getScenarioData, resetScenarioEnvVars } = require(bru.getEnvVar('library_base') + 'scenarioParser.js');
+            const { initReport } = require(bru.getEnvVar('library_base') + 'reportGenerator.js');
+            resetScenarioEnvVars();
+            await getScenarioData();
+            initReport(bru.getEnvVar('library_base'));
+            bru.setEnvVar('__reportInitDone', 'true');
+            const _list = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _idx  = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            console.log('🔄 Loop-back — starting scenario: ' + (bru.getEnvVar('scenarioCode') || '?') +
+              ' [' + _idx + '/' + _list.length + ' remaining]');
+          } catch (_lbErr) {
+            console.log('[ERROR] Loop-back setup failed: ' + (_lbErr && _lbErr.message));
+            const { loopbackOrStop } = require(bru.getEnvVar('library_base') + 'loopback.js');
+            loopbackOrStop('Loop-back setup');
+          }
+        }
+
+        const { postOfferResponsePreRequest } = require(bru.getEnvVar("library_base")+"offers.js");
+        postOfferResponsePreRequest();
+    - type: after-response
+      code: |-
+        const { postOfferResponse } = require(bru.getEnvVar("library_base")+"offers.js");
+        const { displayOfferResponse } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base")+"testCapture.js");
+
+        // Validate HTTP response status
+        bruTest(`Status code is 200`, () => {
+            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        });
+
+        // Stop flow if status != 200
+        if (res.getStatus() !== 200) {
+          bruTest("Status code is 200 — STOP on failure", () => {
+            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+          });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer");
+          return;
+        }
+
+        // Parse JSON safely
+        let jsonData;
+        try {
+            jsonData = res.getBody();
+        } catch (e) {
+            validationLogger("Failed to parse JSON response");
+            bruTest("JSON parsing should succeed", () => {
+                throw e;
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("POST Get Offer (JSON parse)");
+            return;
+        }
+
+        // Catch "no offers": retry up to 3 times, then skip to next scenario
+        try {
+          postOfferResponse(jsonData);
+          bru.setEnvVar('__offerRetryCount', '0'); // reset on success
+        } catch (noOffersErr) {
+          bruTest("Offers found in response", () => { throw noOffersErr; });
+          const _retryCount = parseInt(bru.getEnvVar('__offerRetryCount') || '0', 10) + 1;
+          bru.setEnvVar('__offerRetryCount', String(_retryCount));
+          if (_retryCount < 3) {
+            console.log('⚠️ No offers (attempt ' + _retryCount + '/3) — retrying...');
+            bru.runner.setNextRequest('01. POST Get Offer');
+          } else {
+            console.log('[INFO] No offers returned after 3 attempts — skipping this scenario');
+            bru.setEnvVar('__offerRetryCount', '0');
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+              console.log('⏭️ Skipping to next scenario [' + (_scNextIdx + 1) + '/' + _scList.length + ']: ' + _scList[_scNextIdx]);
+              bru.setEnvVar('__loopback', 'true');
+              bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+              console.log('✅ No more scenarios — stopping run');
+              bru.runner.stopExecution();
+            }
+          }
+          return;
+        }
+        displayOfferResponse(jsonData);
+
+        //swaggerSchemaValidatorContent();
+
+        const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
+
+        if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true") {
+          bru.runner.setNextRequest("03. POST Create Booking");
+          bru.setGlobalEnvVar("skipPlaceMaps", true);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

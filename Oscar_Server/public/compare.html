@@ -1,0 +1,226 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Report Comparison</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-text{display:flex;flex-direction:column;line-height:1.3}
+.uic-banner-name{font-size:18px;font-weight:900;color:#3C3C3B;letter-spacing:2px}
+.uic-banner-sub{font-size:11px;color:#90a4ae}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:1100px;margin:30px auto;padding:0 16px}
+h2{color:#0090D4;font-size:20px;margin-bottom:18px}
+.run-cards{display:flex;gap:14px;margin-bottom:20px}
+.run-card{flex:1;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:16px}
+.run-card h4{font-size:12px;font-weight:700;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.run-card .url{font-family:'Courier New',monospace;font-size:12px;color:#37474f;word-break:break-all}
+/* Summary tiles */
+.summary{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.tile{flex:1;min-width:120px;background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tile .n{font-size:28px;font-weight:700}
+.tile .l{font-size:11px;color:#90a4ae;margin-top:3px}
+.tile-p2f{border-top:4px solid #f44336}.tile-p2f .n{color:#c62828}
+.tile-f2p{border-top:4px solid #4caf50}.tile-f2p .n{color:#2e7d32}
+.tile-add{border-top:4px solid #2196f3}.tile-add .n{color:#1565c0}
+.tile-rem{border-top:4px solid #ff9800}.tile-rem .n{color:#e65100}
+.tile-uf {border-top:4px solid #9e9e9e}.tile-uf  .n{color:#546e7a}
+.tile-up {border-top:4px solid #a5d6a7}.tile-up  .n{color:#2e7d32}
+/* Filter bar */
+.filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.filter-btn{padding:6px 14px;border:2px solid #cfd8dc;border-radius:20px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+.filter-btn.active{color:#fff;border-color:transparent}
+.fb-ALL   {}.fb-ALL.active{background:#546e7a;border-color:#546e7a}
+.fb-PASSED_TO_FAILED.active {background:#c62828;border-color:#c62828}
+.fb-FAILED_TO_PASSED.active {background:#2e7d32;border-color:#2e7d32}
+.fb-ADDED.active            {background:#1565c0;border-color:#1565c0}
+.fb-REMOVED.active          {background:#e65100;border-color:#e65100}
+.fb-UNCHANGED_FAIL.active   {background:#546e7a;border-color:#546e7a}
+.fb-UNCHANGED_PASS.active   {background:#388e3c;border-color:#388e3c}
+/* Diff items */
+.diff-item{background:#fff;border-radius:6px;margin-bottom:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.diff-header{padding:10px 14px;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.cat-badge{padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.cat-PASSED_TO_FAILED {background:#ffebee;color:#c62828}
+.cat-FAILED_TO_PASSED {background:#e8f5e9;color:#2e7d32}
+.cat-ADDED            {background:#e3f2fd;color:#1565c0}
+.cat-REMOVED          {background:#fff3e0;color:#e65100}
+.cat-UNCHANGED_FAIL   {background:#fafafa;color:#546e7a}
+.cat-UNCHANGED_PASS   {background:#f1f8e9;color:#388e3c}
+.diff-path{font-size:12px;color:#37474f;flex:1;word-break:break-all}
+.diff-path .suite{color:#90a4ae;font-size:11px}
+.diff-error{font-size:11px;padding:6px 14px 10px;color:#b71c1c;font-family:'Courier New',monospace;background:#fff8f8;border-top:1px solid #ffcdd2;white-space:pre-wrap;word-break:break-all}
+.empty{text-align:center;padding:40px;color:#90a4ae}
+.loading{text-align:center;padding:60px;color:#90a4ae;font-size:16px}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'compare');</script>
+</header>
+
+<div class="container">
+  <h2>⚖ Report Comparison</h2>
+  <div id="main"><div class="loading">⏳ Computing diff...</div></div>
+</div>
+
+<script>
+const token = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+const params = new URLSearchParams(location.search);
+const runAId = params.get('a');
+const runBId = params.get('b');
+if (!runAId || !runBId) window.location.href = '/dashboard.html';
+
+let allItems  = [];
+let activeFilter = 'ALL';
+
+const LABELS = {
+  PASSED_TO_FAILED: '❌ Passed → Failed',
+  FAILED_TO_PASSED: '✅ Failed → Passed',
+  ADDED:            '➕ Added',
+  REMOVED:          '➖ Removed',
+  UNCHANGED_FAIL:   '⬜ Unchanged (Fail)',
+  UNCHANGED_PASS:   '✔ Unchanged (Pass)'
+};
+
+function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
+
+function renderDiff(data) {
+  const s = data.summary;
+  document.getElementById('main').innerHTML = `
+    <div class="run-cards">
+      <div class="run-card">
+        <h4>Run A (baseline)</h4>
+        <div class="url">${data.run_a.api_base || '-'}</div>
+        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_a.queued_at)}</div>
+      </div>
+      <div style="display:flex;align-items:center;font-size:22px;color:#90a4ae;padding-top:8px">→</div>
+      <div class="run-card">
+        <h4>Run B (latest)</h4>
+        <div class="url">${data.run_b.api_base || '-'}</div>
+        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_b.queued_at)}</div>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="tile tile-p2f"><div class="n">${s.passed_to_failed}</div><div class="l">Passed → Failed</div></div>
+      <div class="tile tile-f2p"><div class="n">${s.failed_to_passed}</div><div class="l">Failed → Passed</div></div>
+      <div class="tile tile-add"><div class="n">${s.added}</div><div class="l">Added</div></div>
+      <div class="tile tile-rem"><div class="n">${s.removed}</div><div class="l">Removed</div></div>
+      <div class="tile tile-uf" ><div class="n">${s.unchanged_fail}</div><div class="l">Unchanged Fail</div></div>
+      <div class="tile tile-up" ><div class="n">${s.unchanged_pass}</div><div class="l">Unchanged Pass</div></div>
+    </div>
+
+    <div class="filter-bar">
+      <span style="font-size:12px;color:#546e7a;font-weight:700">Filter:</span>
+      ${['ALL','PASSED_TO_FAILED','FAILED_TO_PASSED','ADDED','REMOVED','UNCHANGED_FAIL','UNCHANGED_PASS'].map(f =>
+        `<button class="filter-btn fb-${f} ${f==='ALL'?'active':''}" data-filter="${f}" id="fb-${f}">
+          ${f === 'ALL' ? `All (${s.total})` : LABELS[f]}
+        </button>`
+      ).join('')}
+    </div>
+
+    <div id="diff-list"></div>
+  `;
+
+  allItems = data.items || [];
+  renderItems();
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`fb-${f}`).classList.add('active');
+  renderItems();
+}
+
+function renderItems() {
+  const filtered = activeFilter === 'ALL' ? allItems : allItems.filter(i => i.category === activeFilter);
+  const el = document.getElementById('diff-list');
+  if (!filtered.length) { el.innerHTML = '<div class="empty">No items match this filter.</div>'; return; }
+  el.innerHTML = filtered.map(item => {
+    const error = item.run_b && item.run_b.error ? `<div class="diff-error">${esc(item.run_b.error)}</div>` : (item.run_a && item.run_a.error && item.category === 'REMOVED' ? `<div class="diff-error">${esc(item.run_a.error)}</div>` : '');
+    return `<div class="diff-item">
+      <div class="diff-header">
+        <span class="cat-badge cat-${item.category}">${LABELS[item.category] || item.category}</span>
+        <div class="diff-path">
+          <div class="suite">${esc(item.suite)} › ${esc(item.request)}</div>
+          <div style="margin-top:2px">${esc(item.assertion)}</div>
+        </div>
+      </div>
+      ${error}
+    </div>`;
+  }).join('');
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadComparison() {
+  const res = await fetch('/v1/reports/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ run_a_id: runAId, run_b_id: runBId })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    document.getElementById('main').innerHTML = `<div class="empty">⚠️ ${data.detail || data.title || 'Failed to compute comparison.'}</div>`;
+    return;
+  }
+  renderDiff(data);
+}
+
+document.getElementById('main').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-filter]');
+  if (btn) setFilter(btn.dataset.filter);
+});
+
+loadComparison();
+</script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>
+
+

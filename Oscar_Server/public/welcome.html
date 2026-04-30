@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Welcome</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Header / nav (shared pattern) ───────────────────────────────────────── */
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.container{max-width:960px;margin:32px auto;padding:0 16px;flex:1}
+
+/* ── Role welcome banner ─────────────────────────────────────────────────── */
+.welcome-banner{border-radius:10px;padding:28px 32px;margin-bottom:28px;display:flex;align-items:center;gap:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.welcome-banner.tester     {background:linear-gradient(135deg,#e8f5e9 0%,#f1f8e9 100%);border-left:5px solid #2e7d32}
+.welcome-banner.certifier  {background:linear-gradient(135deg,#e3f2fd 0%,#e8eaf6 100%);border-left:5px solid #1565c0}
+.welcome-banner.administrator{background:linear-gradient(135deg,#ffebee 0%,#fce4ec 100%);border-left:5px solid #c62828}
+.welcome-icon{font-size:48px;line-height:1;flex-shrink:0}
+.welcome-text h1{font-size:22px;font-weight:800;color:#1a2e40;margin-bottom:6px}
+.welcome-text h1 span{font-size:22px}
+.welcome-text p{font-size:14px;color:#546e7a;line-height:1.6;max-width:560px}
+.role-pill{display:inline-block;padding:3px 12px;border-radius:12px;font-size:12px;font-weight:800;margin-left:6px;vertical-align:middle;border-width:1px;border-style:solid}
+.role-pill.tester      {background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7}
+.role-pill.certifier   {background:#e3f2fd;color:#1565c0;border-color:#90caf9}
+.role-pill.administrator{background:#ffebee;color:#c62828;border-color:#ef9a9a}
+
+/* ── Quick actions ───────────────────────────────────────────────────────── */
+.section-title{font-size:13px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
+.actions-grid{display:grid;gap:14px;margin-bottom:32px}
+.actions-grid.cols-5{grid-template-columns:repeat(5,1fr)}
+.actions-grid.cols-4{grid-template-columns:repeat(4,1fr)}
+.actions-grid.cols-2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:900px){.actions-grid.cols-5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.actions-grid.cols-5,.actions-grid.cols-4,.actions-grid.cols-2{grid-template-columns:1fr 1fr}}
+.action-card{background:#fff;border-radius:8px;padding:20px 16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);text-decoration:none;color:#222;transition:box-shadow .2s,transform .15s;border-top:3px solid transparent;display:flex;flex-direction:column;align-items:center;gap:10px}
+.action-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.13);transform:translateY(-2px)}
+.action-card.blue  {border-top-color:#0090D4}
+.action-card.green {border-top-color:#2e7d32}
+.action-card.purple{border-top-color:#7b1fa2}
+.action-card.teal  {border-top-color:#00A2AF}
+.action-card.orange{border-top-color:#e65100}
+.action-card.red   {border-top-color:#c62828}
+.action-card .ac-icon{font-size:28px;line-height:1}
+.action-card .ac-label{font-size:13px;font-weight:700;color:#1a2e40}
+.action-card .ac-desc {font-size:11px;color:#90a4ae;line-height:1.4}
+
+/* ── News carousel ───────────────────────────────────────────────────────── */
+.news-section{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:32px}
+.news-header{background:#0090D4;color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.news-header-title{font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.news-counter{font-size:12px;color:rgba(255,255,255,.75)}
+.news-body{padding:24px}
+.news-tag{display:inline-block;padding:2px 10px;border-radius:9px;font-size:11px;font-weight:700;background:#e3f2fd;color:#1565c0;margin-bottom:10px;border:1px solid #90caf9}
+.news-title{font-size:18px;font-weight:800;color:#1a2e40;margin-bottom:8px;line-height:1.35}
+.news-date{font-size:12px;color:#90a4ae;margin-bottom:14px}
+.news-content{font-size:14px;color:#37474f;line-height:1.7}
+.news-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid #eceff1;background:#fafbfc}
+.news-dots{display:flex;gap:7px;align-items:center}
+.news-dot{width:8px;height:8px;border-radius:50%;background:#cfd8dc;cursor:pointer;transition:background .2s,transform .15s;border:none;padding:0}
+.news-dot.active{background:#0090D4;transform:scale(1.25)}
+.news-nav-btn{border:none;background:none;cursor:pointer;color:#546e7a;font-size:22px;padding:4px 10px;border-radius:6px;transition:background .15s,color .15s;line-height:1}
+.news-nav-btn:hover:not(:disabled){background:#e8f4fb;color:#0090D4}
+.news-nav-btn:disabled{color:#cfd8dc;cursor:default}
+.news-loading{padding:48px;text-align:center;color:#90a4ae;font-size:13px}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+</style>
+</head>
+<body>
+
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'welcome');</script>
+</header>
+
+<div class="container">
+
+  <!-- Role-aware welcome banner -->
+  <div class="welcome-banner" id="welcome-banner">
+    <div class="welcome-icon" id="welcome-icon">👋</div>
+    <div class="welcome-text">
+      <h1 id="welcome-heading">Welcome to OSCAR</h1>
+      <p id="welcome-desc"></p>
+    </div>
+  </div>
+
+  <!-- Quick action cards -->
+  <div class="section-title">Quick Actions</div>
+  <div class="actions-grid" id="actions-grid"></div>
+
+  <!-- News carousel -->
+  <div class="section-title">Latest News</div>
+  <div class="news-section">
+    <div class="news-header">
+      <span class="news-header-title">📰 OSCAR News</span>
+      <span class="news-counter" id="news-counter"></span>
+    </div>
+    <div id="news-body" class="news-loading">Loading news…</div>
+    <div class="news-nav" id="news-nav" style="display:none">
+      <button class="news-nav-btn" id="btn-prev" title="Previous news" disabled>&#8592;</button>
+      <div class="news-dots" id="news-dots"></div>
+      <button class="news-nav-btn" id="btn-next" title="Next news">&#8594;</button>
+    </div>
+  </div>
+
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script>
+// ── Auth guard ────────────────────────────────────────────────────────────────
+const token   = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+
+const user    = JSON.parse(localStorage.getItem('oscar_user')    || '{}');
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const role    = user.role || 'company_user';
+
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+// ── Role meta ─────────────────────────────────────────────────────────────────
+const ROLE_CONFIG = {
+  administrator: {
+    label:   'Administrator',
+    cssClass:'administrator',
+    icon:    '🛡️',
+    desc:    'You have full access to manage users, companies, and monitor server activity. Use the menus above to navigate to the area you need.',
+    actions: [
+      { href:'/admin.html?tab=users',     label:'Manage Users',     desc:'Add, edit or disable user accounts',      icon:'👥', color:'red'    },
+      { href:'/admin.html?tab=companies', label:'Manage Companies', desc:'Configure company profiles and settings',  icon:'🏢', color:'blue'   },
+      { href:'/admin.html?tab=reports',   label:'All Reports',      desc:'Browse conformance reports for all tenants',icon:'📋', color:'teal'   },
+      { href:'/admin.html?tab=activity',  label:'Server Activity',  desc:'Live run queue and execution logs',         icon:'📡', color:'green'  },
+    ],
+    cols: 'cols-4',
+  },
+  certification_user: {
+    label:   'Certifier',
+    cssClass:'certifier',
+    icon:    '🔍',
+    desc:    'You have read access to all submitted conformance reports. Review results and use the Compare tool to track conformance progress over time.',
+    actions: [
+      { href:'/admin.html?tab=reports', label:'All Reports', desc:'Browse all submitted test reports',        icon:'📋', color:'blue'   },
+      { href:'/compare.html',           label:'Compare',     desc:'Diff two reports side by side',            icon:'⚖️', color:'purple' },
+    ],
+    cols: 'cols-2',
+  },
+  _tester: {
+    label:   'Tester',
+    cssClass:'tester',
+    icon:    '🚀',
+    desc:    'Run OSDM conformance tests against your API, review results, and compare reports to track your implementation progress.',
+    actions: [
+      { href:'/run.html',       label:'New Run',     desc:'Execute the full OTST test suite',       icon:'▶️',  color:'green'  },
+      { href:'/dashboard.html', label:'Dashboard',   desc:'View your run history and results',       icon:'📊', color:'blue'   },
+      { href:'/compare.html',   label:'Compare',     desc:'Diff two reports side by side',           icon:'⚖️', color:'purple' },
+      { href:'/profile.html',   label:'API Config',  desc:'Update your endpoint & credentials',      icon:'⚙️', color:'teal'   },
+      { href:'/scenarios.html', label:'Test Config', desc:'Select scenarios and edit parameters',    icon:'🧪', color:'orange' },
+    ],
+    cols: 'cols-5',
+  },
+};
+
+function getRoleConfig() {
+  return ROLE_CONFIG[role] || ROLE_CONFIG['_tester'];
+}
+
+// ── Render welcome banner ─────────────────────────────────────────────────────
+(function renderWelcome() {
+  const cfg = getRoleConfig();
+  const banner  = document.getElementById('welcome-banner');
+  const heading = document.getElementById('welcome-heading');
+  const desc    = document.getElementById('welcome-desc');
+  const icon    = document.getElementById('welcome-icon');
+
+  banner.classList.add(cfg.cssClass);
+  icon.textContent = cfg.icon;
+
+  const displayName = user.email ? user.email.split('@')[0] : 'there';
+  const pill = `<span class="role-pill ${cfg.cssClass}">${cfg.label}</span>`;
+  heading.innerHTML = `Welcome, ${displayName}! ${pill}`;
+  desc.innerHTML = `You are acting as <strong>${cfg.label}</strong>. ${cfg.desc}`;
+})();
+
+// ── Render quick actions ──────────────────────────────────────────────────────
+(function renderActions() {
+  const cfg  = getRoleConfig();
+  const grid = document.getElementById('actions-grid');
+  grid.className = 'actions-grid ' + cfg.cols;
+  grid.innerHTML = cfg.actions.map(a => `
+    <a href="${a.href}" class="action-card ${a.color}">
+      <div class="ac-icon">${a.icon}</div>
+      <div class="ac-label">${a.label}</div>
+      <div class="ac-desc">${a.desc}</div>
+    </a>`).join('');
+})();
+
+// ── News carousel ─────────────────────────────────────────────────────────────
+let newsItems = [];
+let newsIndex = 0;
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderNewsItem(idx) {
+  const item = newsItems[idx];
+  document.getElementById('news-body').innerHTML = `
+    <div class="news-body">
+      <div class="news-tag">${esc(item.tag || 'News')}</div>
+      <div class="news-title">${esc(item.title)}</div>
+      <div class="news-date">${esc(item.date)}</div>
+      <div class="news-content">${esc(item.content)}</div>
+    </div>`;
+
+  document.getElementById('news-counter').textContent =
+    newsItems.length > 1 ? `${idx + 1} / ${newsItems.length}` : '';
+
+  // Update dots
+  document.querySelectorAll('.news-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === idx);
+  });
+
+  // Update buttons
+  document.getElementById('btn-prev').disabled = idx === 0;
+  document.getElementById('btn-next').disabled = idx === newsItems.length - 1;
+}
+
+function moveNews(dir) {
+  const next = newsIndex + dir;
+  if (next < 0 || next >= newsItems.length) return;
+  newsIndex = next;
+  renderNewsItem(newsIndex);
+}
+
+async function loadNews() {
+  try {
+    const res = await fetch('/news/index.json');
+    if (!res.ok) throw new Error('Failed to load news.');
+    newsItems = await res.json();
+    if (!Array.isArray(newsItems) || newsItems.length === 0) {
+      document.getElementById('news-body').innerHTML =
+        '<div class="news-loading">No news available.</div>';
+      return;
+    }
+
+    // Build dots
+    const dotsEl = document.getElementById('news-dots');
+    dotsEl.innerHTML = newsItems.map((_, i) =>
+      `<button class="news-dot${i === 0 ? ' active' : ''}" title="News ${i+1}"></button>`
+    ).join('');
+    dotsEl.querySelectorAll('.news-dot').forEach((dot, i) => {
+      dot.addEventListener('click', () => goToNews(i));
+    });
+
+    document.getElementById('news-nav').style.display =
+      newsItems.length > 1 ? 'flex' : 'none';
+
+    newsIndex = 0;
+    renderNewsItem(0);
+  } catch (err) {
+    document.getElementById('news-body').innerHTML =
+      `<div class="news-loading">Could not load news: ${esc(err.message)}</div>`;
+  }
+}
+
+function goToNews(idx) {
+  newsIndex = idx;
+  renderNewsItem(idx);
+}
+
+document.getElementById('btn-prev').addEventListener('click', () => moveNews(-1));
+document.getElementById('btn-next').addEventListener('click', () => moveNews(1));
+
+loadNews();
+</script>
+</body>
+</html>

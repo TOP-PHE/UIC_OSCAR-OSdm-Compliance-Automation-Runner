@@ -1,0 +1,561 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR - Run Detail</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-text{display:flex;flex-direction:column;line-height:1.3}
+.uic-banner-name{font-size:18px;font-weight:900;color:#3C3C3B;letter-spacing:2px}
+.uic-banner-sub{font-size:11px;color:#90a4ae}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:1000px;margin:30px auto;padding:0 16px}
+.top-bar{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.top-bar h2{color:#0090D4;font-size:20px;flex:1}
+.status{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:10px;font-size:13px;font-weight:700}
+.s-QUEUED   {background:#e3f2fd;color:#1565c0}
+.s-RUNNING  {background:#fff8e1;color:#e65100}
+.s-COMPLETED{background:#e8f5e9;color:#2e7d32}
+.s-FAILED   {background:#ffebee;color:#c62828}
+.s-CANCELLED{background:#eceff1;color:#546e7a}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.meta-item{background:#fff;border-radius:6px;padding:8px 14px;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+.meta-item .lbl{color:#90a4ae;font-weight:700;text-transform:uppercase;letter-spacing:.4px;font-size:10px;margin-bottom:3px}
+.meta-item .val{color:#37474f;font-weight:600}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;overflow:hidden}
+.card-header{padding:10px 16px;background:#eceff1;font-size:12px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between}
+.log-box{background:#1e1e1e;padding:14px 16px;max-height:450px;overflow-y:auto;font-family:'Courier New',monospace;font-size:12px;line-height:1.6}
+.log-line{white-space:pre-wrap;word-break:break-all}
+.l-stdout{color:#d4d4d4}
+.l-stderr{color:#ff9800}
+.l-info  {color:#81c784}
+.l-error {color:#ef5350}
+.btn{padding:8px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+.btn-dl{background:#0090D4;color:#fff}
+.btn-dl:hover{background:#005A8A}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+.btn-danger{background:#c62828;color:#fff}.btn-danger:hover{background:#b71c1c}
+.btn-sm{padding:5px 12px;font-size:12px;background:#eceff1;color:#455a64}
+.artifact-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #f5f5f5}
+.artifact-row:first-child{border-top:none}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.auth-error-banner{background:#fff3e0;border:2px solid #e65100;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px}
+.auth-error-banner .auth-icon{font-size:22px;flex-shrink:0;margin-top:1px}
+.auth-error-banner .auth-body{flex:1}
+.auth-error-banner .auth-title{font-size:14px;font-weight:800;color:#bf360c;margin-bottom:4px}
+.auth-error-banner .auth-msg{font-size:13px;color:#5d4037;line-height:1.5}
+.auth-error-banner .auth-link{display:inline-block;margin-top:8px;padding:5px 14px;background:#e65100;color:#fff;border-radius:5px;font-size:12px;font-weight:700;text-decoration:none}
+.auth-error-banner .auth-link:hover{background:#bf360c}
+.log-level-btn{transition:background .15s}
+.log-level-btn.active{background:#0090D4;color:#fff}
+.log-line.hidden{display:none}
+.log-line .search-hl{background:#ffe082;color:#000;border-radius:2px;padding:0 1px}
+.assertion-filter{transition:background .15s}
+.assertion-filter.active{background:#0090D4;color:#fff}
+.assertion-row{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid #f5f5f5;font-size:12px}
+.assertion-row:hover{background:#fafbfc}
+.a-pass{color:#2e7d32}
+.a-fail{color:#c62828;font-weight:700}
+.a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
+.a-cat{background:#e3f2fd;color:#1565c0}
+.a-dom{background:#f3e5f5;color:#6a1b9a}
+.a-sev-critical{background:#ffebee;color:#c62828}
+.a-sev-major{background:#fff3e0;color:#e65100}
+.a-sev-minor{background:#fff8e1;color:#f9a825}
+.a-sev-info{background:#e8f5e9;color:#2e7d32}
+.suite-header{padding:8px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;cursor:pointer}
+.suite-header:hover{background:#e3e8ec}
+.req-header{padding:6px 16px 6px 32px;background:#f5f5f5;font-size:12px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'dashboard');</script>
+</header>
+
+<div class="container">
+  <div class="top-bar">
+    <h2 id="run-title">Run Detail</h2>
+    <span id="delete-btn-wrap"></span>
+    <span id="status-badge" class="status">-</span>
+  </div>
+
+  <div id="meta" class="meta"></div>
+
+  <!-- Live Log -->
+  <div class="card">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px">
+      <span>📋 Execution Log</span>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button class="btn btn-sm log-level-btn active" data-level="all">All</button>
+        <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
+        <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
+        <button class="btn btn-sm log-level-btn" data-level="info">info</button>
+        <button class="btn btn-sm log-level-btn" data-level="error">error</button>
+      </div>
+      <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
+      <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm" id="log-copy-btn">Copy</button>
+        <button class="btn btn-sm" id="log-download-btn">Download</button>
+      </div>
+      <label style="font-size:12px;font-weight:400;color:#546e7a">
+        <input type="checkbox" id="autoscroll" checked> Auto-scroll
+      </label>
+    </div>
+    <div id="log-box" class="log-box"><span style="color:#546e7a;font-style:italic">Waiting for logs...</span></div>
+  </div>
+
+  <!-- Assertions -->
+  <div class="card" id="assertions-card" style="display:none">
+    <div class="card-header">
+      <span>✅ Assertions</span>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm assertion-filter active" data-filter="all">All</button>
+        <button class="btn btn-sm assertion-filter" data-filter="passed">Passed</button>
+        <button class="btn btn-sm assertion-filter" data-filter="failed">Failed</button>
+        <select class="btn btn-sm" id="assertion-category-filter" style="font-size:11px"><option value="">All categories</option></select>
+        <select class="btn btn-sm" id="assertion-domain-filter" style="font-size:11px"><option value="">All domains</option></select>
+      </div>
+    </div>
+    <div id="assertion-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>
+    <div id="assertion-content" style="max-height:600px;overflow-y:auto"></div>
+  </div>
+
+  <!-- Artifacts -->
+  <div class="card" id="artifacts-card" style="display:none">
+    <div class="card-header">🔎 Artifacts</div>
+    <div id="artifacts-list"></div>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('oscar_token');
+if (!token) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+function logout() { localStorage.clear(); window.location.href = '/'; }
+
+const runId = new URLSearchParams(location.search).get('id');
+if (!runId) window.location.href = '/dashboard.html';
+
+let lastEventId = 0;
+let polling     = true;
+
+function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
+function duration(a, b) {
+  if (!a || !b) return '-';
+  const s = Math.round((new Date(b) - new Date(a)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+}
+
+function updateStatus(run) {
+  const badge = document.getElementById('status-badge');
+  badge.className = `status s-${run.status}`;
+  const spin = (run.status === 'RUNNING' || run.status === 'QUEUED') ? '<span class="spin">⟳</span> ' : '';
+  badge.innerHTML = `${spin}${run.status}`;
+  document.getElementById('run-title').textContent = run.env_name_used || `Run ${run.id.slice(0,8)}`;
+
+  const metaItems = [
+    { lbl: 'Run ID',    val: run.id.slice(0,8) + '...' },
+    { lbl: 'Endpoint',  val: run.api_base_used || '-' },
+    { lbl: 'Auth Mode', val: run.auth_mode_used || '-' },
+    { lbl: 'Queued',    val: fmtDate(run.queued_at) },
+    { lbl: 'Started',   val: fmtDate(run.started_at) },
+    { lbl: 'Duration',  val: duration(run.started_at, run.completed_at) },
+    { lbl: 'Exit Code', val: run.exit_code != null ? run.exit_code : '-' },
+  ];
+  if (run.scenario_code) metaItems.push({ lbl: 'Scenario', val: run.scenario_code });
+  if (run.batch_id) metaItems.push({ lbl: 'Batch', val: `<a href="/dashboard.html" style="color:#0090D4;text-decoration:none">${run.batch_id.slice(0,8)}... (view batch)</a>` });
+  document.getElementById('meta').innerHTML = metaItems.map(m => `<div class="meta-item"><div class="lbl">${m.lbl}</div><div class="val">${m.val}</div></div>`).join('');
+
+  // Auth error banner — shown when runner detected a token problem
+  const existingBanner  = document.getElementById('auth-error-banner');
+  const isFormatError   = run.error_message === 'TOKEN_FORMAT_ERROR';
+  const isAuthError     = run.error_message === 'TOKEN_AUTH_ERROR';
+  const isOAuthError    = !isFormatError && !isAuthError && run.error_message && run.auth_mode_used === 'oauth2';
+  const showBanner      = isFormatError || isAuthError || isOAuthError;
+
+  if (showBanner && !existingBanner) {
+    const banner = document.createElement('div');
+    banner.id        = 'auth-error-banner';
+    banner.className = 'auth-error-banner';
+    if (isFormatError) {
+      banner.innerHTML = `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">Invalid token format — Bruno could not parse the API configuration</div>
+          <div class="auth-msg">
+            The token saved in your API settings contains invalid characters (e.g. a stray quote <code style="background:#fbe9e7;padding:1px 4px;border-radius:3px">"</code> or leading/trailing whitespace).<br>
+            Please copy the token carefully from your provider and re-save it — do not include surrounding quotes.
+          </div>
+          <a href="/profile.html" class="auth-link">Fix API Token →</a>
+        </div>`;
+    } else if (isAuthError) {
+      banner.innerHTML = `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">API Token rejected — HTTP 401 Unauthorized</div>
+          <div class="auth-msg">
+            The token configured in your API settings was refused by the provider.<br>
+            This usually means the token has expired or is incorrect.
+          </div>
+          <a href="/profile.html" class="auth-link">Update API Token →</a>
+        </div>`;
+    } else {
+      banner.innerHTML = `
+        <div class="auth-icon">⚠️</div>
+        <div class="auth-body">
+          <div class="auth-title">OAuth2 authentication failed</div>
+          <div class="auth-msg">${run.error_message.replace(/</g,'&lt;')}</div>
+          <a href="/profile.html" class="auth-link">Update OAuth2 Credentials →</a>
+        </div>`;
+    }
+    document.getElementById('meta').insertAdjacentElement('afterend', banner);
+  } else if (!showBanner && existingBanner) {
+    existingBanner.remove();
+  }
+
+  if (run.status === 'COMPLETED' || run.status === 'FAILED' || run.status === 'CANCELLED') {
+    polling = false;
+    loadArtifacts();
+    loadAssertions();
+
+    // Show delete button if user has permission
+    const canDelete = user.role === 'administrator' ||
+      ((user.role === 'company_user' || user.role === 'test_manager') && run.user_id === user.id);
+    const wrap = document.getElementById('delete-btn-wrap');
+    if (canDelete && !wrap.querySelector('button')) {
+      wrap.innerHTML = '<button class="btn btn-danger" data-action="delete-run">🗑 Delete Run</button>';
+    }
+  }
+}
+
+let activeLogLevel = 'all';
+let logSearchTerm = '';
+
+function appendLogs(events) {
+  if (!events.length) return;
+  const box = document.getElementById('log-box');
+  if (box.querySelector('span[style]')) box.innerHTML = '';
+  events.forEach(e => {
+    const line = document.createElement('div');
+    line.className = `log-line l-${e.level}`;
+    line.dataset.level = e.level;
+    line.textContent = `[${e.ts.slice(11,19)}] ${e.message}`;
+    // Apply current filters to new lines
+    if (activeLogLevel !== 'all' && e.level !== activeLogLevel) line.classList.add('hidden');
+    if (logSearchTerm && !e.message.toLowerCase().includes(logSearchTerm)) line.classList.add('hidden');
+    box.appendChild(line);
+    lastEventId = Math.max(lastEventId, e.id);
+  });
+  if (document.getElementById('autoscroll').checked) {
+    box.scrollTop = box.scrollHeight;
+  }
+  updateLogMatchCount();
+}
+
+function applyLogFilters() {
+  const box = document.getElementById('log-box');
+  const lines = box.querySelectorAll('.log-line');
+  lines.forEach(line => {
+    const level = line.dataset.level;
+    const text = line.textContent.toLowerCase();
+    const levelOk = activeLogLevel === 'all' || level === activeLogLevel;
+    const searchOk = !logSearchTerm || text.includes(logSearchTerm);
+    line.classList.toggle('hidden', !(levelOk && searchOk));
+  });
+  updateLogMatchCount();
+}
+
+function updateLogMatchCount() {
+  const box = document.getElementById('log-box');
+  const visible = box.querySelectorAll('.log-line:not(.hidden)').length;
+  const total = box.querySelectorAll('.log-line').length;
+  const el = document.getElementById('log-match-count');
+  if (total > 0 && (activeLogLevel !== 'all' || logSearchTerm)) {
+    el.textContent = `${visible}/${total} shown`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+function copyLogs() {
+  const box = document.getElementById('log-box');
+  const visible = [...box.querySelectorAll('.log-line:not(.hidden)')].map(l => l.textContent).join('\n');
+  navigator.clipboard.writeText(visible).then(() => {
+    const btn = document.getElementById('log-copy-btn');
+    btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+function downloadLogs() {
+  const box = document.getElementById('log-box');
+  const visible = [...box.querySelectorAll('.log-line:not(.hidden)')].map(l => l.textContent).join('\n');
+  const blob = new Blob([visible], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `run-${runId.slice(0,8)}-logs.txt`;
+  a.click();
+}
+
+async function poll() {
+  try {
+    const [runRes, logRes] = await Promise.all([
+      fetch(`/v1/runs/${runId}`,       { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`/v1/runs/${runId}/logs?since_id=${lastEventId}`, { headers: { Authorization: `Bearer ${token}` } })
+    ]);
+    if (runRes.status === 401) { logout(); return; }
+    const run  = await runRes.json();
+    const logs = await logRes.json();
+    updateStatus(run);
+    appendLogs(logs.events || []);
+  } catch(e) { /* network hiccup - keep polling */ }
+
+  if (polling) setTimeout(poll, 1500);
+}
+
+async function loadArtifacts() {
+  const res = await fetch(`/v1/runs/${runId}/artifacts`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return;
+  const data = await res.json();
+  if (!data.artifacts.length) return;
+
+  document.getElementById('artifacts-card').style.display = 'block';
+  document.getElementById('artifacts-list').innerHTML = data.artifacts.map(a => {
+    // HTML reports are served via the public static /artifacts route (no auth needed in browser).
+    // JSON results keep the authenticated API endpoint for programmatic access — for those
+    // we render a button that does an authenticated fetch + Blob download (a plain <a href>
+    // would 401 because the browser does not send the Bearer token automatically).
+    // For HTML reports extract the scenario code from the filename:
+    // report_{SCENARIO_CODE}.html → "OTST RFND PATCH ..." (underscores → spaces)
+    // Falls back to "HTML Report" for legacy single-scenario report.html
+    const scenarioLabel = a.type === 'html_report'
+      ? (a.filename.replace(/^report_/, '').replace(/\.html$/i, '').replace(/_/g, ' ') || 'HTML Report')
+      : null;
+    const label    = a.type === 'html_report' ? `📊 ${scenarioLabel}` : '📄 JSON Results';
+    if (a.type === 'html_report') {
+      const href = `/artifacts/${runId}/${a.filename}`;
+      return `
+      <div class="artifact-row">
+        <span style="flex:1;font-weight:600">${label}</span>
+        <span style="color:#90a4ae;font-size:12px">${a.filename}</span>
+        <a href="${href}" target="_blank" class="btn btn-dl">🔍 Open Report</a>
+      </div>`;
+    }
+    return `
+    <div class="artifact-row">
+      <span style="flex:1;font-weight:600">${label}</span>
+      <span style="color:#90a4ae;font-size:12px">${a.filename}</span>
+      <button class="btn btn-dl" data-action="download-artifact" data-artifact-id="${a.id}" data-filename="${a.filename}">⬇ Download</button>
+    </div>`;
+  }).join('');
+}
+
+// Authenticated artifact download. Replaces the plain <a href> the JSON
+// results used to use, which the browser cannot send a Bearer token through.
+async function downloadArtifact(artifactId, filename) {
+  try {
+    const res = await fetch(`/v1/runs/${runId}/artifacts/${artifactId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'artifact';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (e) {
+    alert('Network error during download: ' + e.message);
+  }
+}
+
+// Delegate clicks on the artifacts card so the listener survives re-renders.
+document.getElementById('artifacts-list').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action="download-artifact"]');
+  if (!btn) return;
+  e.preventDefault();
+  downloadArtifact(btn.dataset.artifactId, btn.dataset.filename);
+});
+
+async function deleteRun() {
+  if (!confirm('Delete this run? It will no longer appear in the dashboard.')) return;
+  const res = await fetch(`/v1/runs/${runId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (res.status === 401) { logout(); return; }
+  if (res.ok) {
+    window.location.href = '/dashboard.html';
+  } else {
+    const err = await res.json();
+    alert(err.detail || 'Could not delete run.');
+  }
+}
+
+document.getElementById('delete-btn-wrap').addEventListener('click', function(e) {
+  if (e.target.closest('[data-action="delete-run"]')) deleteRun();
+});
+
+// ── Assertions ──────────────────────────────────────────────────────────────
+let assertionsData = null;
+let activeAssertionFilter = 'all';
+
+function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function loadAssertions() {
+  try {
+    const res = await fetch(`/v1/runs/${runId}/assertions`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    assertionsData = await res.json();
+    if (!assertionsData.summary || assertionsData.summary.total === 0) return;
+    document.getElementById('assertions-card').style.display = 'block';
+
+    // Populate filter dropdowns
+    const catSel = document.getElementById('assertion-category-filter');
+    const domSel = document.getElementById('assertion-domain-filter');
+    (assertionsData.by_category || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.category; o.textContent = (c.category||'other') + ' (' + c.total + ')';
+      catSel.appendChild(o);
+    });
+    (assertionsData.by_domain || []).forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.domain; o.textContent = (d.domain||'other') + ' (' + d.total + ')';
+      domSel.appendChild(o);
+    });
+    renderAssertions();
+  } catch(_) {}
+}
+
+function renderAssertions() {
+  if (!assertionsData) return;
+  const s = assertionsData.summary;
+  const passRate = s.total > 0 ? Math.round(s.passed / s.total * 1000) / 10 : 0;
+  document.getElementById('assertion-summary').innerHTML =
+    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate`;
+
+  const catFilter = document.getElementById('assertion-category-filter').value;
+  const domFilter = document.getElementById('assertion-domain-filter').value;
+  let html = '';
+
+  for (const suite of assertionsData.suites || []) {
+    let suiteHtml = '';
+    let suiteFiltered = 0;
+
+    for (const req of suite.requests || []) {
+      let assertions = req.assertions || [];
+      if (activeAssertionFilter === 'passed') assertions = assertions.filter(a => a.passed);
+      if (activeAssertionFilter === 'failed') assertions = assertions.filter(a => !a.passed);
+      if (catFilter) assertions = assertions.filter(a => a.category === catFilter);
+      if (domFilter) assertions = assertions.filter(a => a.domain === domFilter);
+      if (assertions.length === 0) continue;
+      suiteFiltered += assertions.length;
+
+      const statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
+        : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
+        : '<span style="color:#90a4ae">SKIP</span>';
+      suiteHtml += `<div class="req-header">${statusBadge} <span>${escHtml(req.request_name)}</span>
+        <span style="color:#90a4ae;font-size:11px;margin-left:auto">${req.http_method||''} ${req.http_status||''} · ${req.duration_ms||0}ms</span></div>`;
+
+      for (const a of assertions) {
+        const icon = a.passed ? '<span class="a-pass">✓</span>' : '<span class="a-fail">✗</span>';
+        const sev = !a.passed && a.severity ? `<span class="a-badge a-sev-${a.severity}">${escHtml(a.severity)}</span>` : '';
+        suiteHtml += `<div class="assertion-row">${icon}
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.assertion_name)}">${escHtml(a.assertion_name)}</span>
+          ${a.category ? `<span class="a-badge a-cat">${escHtml(a.category)}</span>` : ''}
+          ${a.domain ? `<span class="a-badge a-dom">${escHtml(a.domain)}</span>` : ''}
+          ${sev}
+          ${a.error_msg ? `<span style="color:#c62828;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.error_msg)}">⚠ ${escHtml(a.error_msg.slice(0,60))}</span>` : ''}
+        </div>`;
+      }
+    }
+
+    if (suiteFiltered === 0) continue;
+    const sfailed = suite.failed || 0;
+    html += `<div class="suite-header">${escHtml(suite.suite_name)} — ${suiteFiltered} assertions${sfailed > 0 ? ` · <span style="color:#c62828">${sfailed} failed</span>` : ''} · ${suite.pass_rate}%</div>${suiteHtml}`;
+  }
+
+  document.getElementById('assertion-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No assertions match the selected filters.</div>';
+}
+
+// Assertion filter event listeners
+document.getElementById('assertions-card').addEventListener('click', function(e) {
+  const btn = e.target.closest('.assertion-filter');
+  if (!btn) return;
+  activeAssertionFilter = btn.dataset.filter;
+  document.querySelectorAll('.assertion-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAssertions();
+});
+document.getElementById('assertion-category-filter').addEventListener('change', function() { renderAssertions(); });
+document.getElementById('assertion-domain-filter').addEventListener('change', function() { renderAssertions(); });
+
+// Log filter event listeners
+document.querySelector('.card-header').addEventListener('click', function(e) {
+  const btn = e.target.closest('.log-level-btn');
+  if (!btn) return;
+  activeLogLevel = btn.dataset.level;
+  document.querySelectorAll('.log-level-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyLogFilters();
+});
+document.getElementById('log-search').addEventListener('input', function() {
+  logSearchTerm = this.value.toLowerCase().trim();
+  applyLogFilters();
+});
+document.getElementById('log-copy-btn').addEventListener('click', copyLogs);
+document.getElementById('log-download-btn').addEventListener('click', downloadLogs);
+
+poll();
+</script>
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp; <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+</body>
+</html>
+
+

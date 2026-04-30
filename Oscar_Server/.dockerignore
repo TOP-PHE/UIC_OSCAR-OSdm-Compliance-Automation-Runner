@@ -1,0 +1,12 @@
+node_modules/
+data/
+.git/
+.gitignore
+*.env
+oscar-server.env
+.env.example
+oscar_dev_docs/
+oscar-user-management.ps1
+.claude/
+*.log
+*.md

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Database and runtime data
+data/
+
+# Environment files (contain secrets — never commit these)
+oscar-server.env
+.env
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local admin scripts (not for deployment)
+oscar-user-management.ps1
+
+# Claude Code workspace (local IDE state — do not commit)
+.claude/

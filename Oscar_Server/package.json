@@ -1,0 +1,47 @@
+{
+  "name": "oscar-server",
+  "version": "1.2.0",
+  "description": "OSCAR — OSDM Conformance Automation Runner Server",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "verbose": true,
+    "testTimeout": 10000
+  },
+  "dependencies": {
+    "bcrypt": "~6.0.0",
+    "cors": "~2.8.5",
+    "dotenv": "~16.4.5",
+    "express": "~4.22.0",
+    "express-rate-limit": "~8.3.2",
+    "express-validator": "~7.3.2",
+    "helmet": "~8.1.0",
+    "jsonwebtoken": "~9.0.2",
+    "multer": "~1.4.5-lts.1",
+    "nodemailer": "~8.0.4",
+    "pino": "~9.5.0",
+    "pino-pretty": "~13.0.0",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "~9.0.1"
+  },
+  "devDependencies": {
+    "eslint": "~9.39.0",
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
+  },
+  "_notes": "SQLite via built-in node:sqlite (Node.js 22+) — no native compilation needed"
+}

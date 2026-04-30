@@ -1,0 +1,25 @@
+name: OTST_Turnit_Env
+variables:
+  - secret: true
+    name: client.id
+  - secret: true
+    name: client.secret
+  - secret: true
+    name: requestor
+  - secret: true
+    name: access_token
+  - name: api_base
+    value: https://api.sandbox.turnit.tech/retailer
+  - name: api-host
+    value: https://identity.sandbox.turnit.tech
+  - name: data_file
+    value: <own value here>
+    disabled: true
+  - name: library_base
+    value: ./library-bruno/
+  - name: data_base
+    value: http://localhost:8080/data_base/turnit_datafile.json
+  - name: json_schema
+    value: https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/Bruno-Enhancements/json_validator/datafile.schema.json
+  - name: scenariosToRunIndex
+    value: "0"
