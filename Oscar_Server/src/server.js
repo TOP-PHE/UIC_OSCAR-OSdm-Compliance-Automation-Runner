@@ -36,6 +36,9 @@ if (missing.length > 0) {
 // ── Initialise structured logger ─────────────────────────────────────────────
 const log = require('./utils/logger');
 
+// ── Version info + compatibility check (logs warning if combo not tested) ────
+const { getVersionInfo } = require('./utils/versionInfo');
+
 // ── Initialise DB (runs schema migration on startup) ──────────────────────────
 require('./db/db');
 
@@ -207,9 +210,16 @@ app.get('/health', (req, res) => {
     node_version: process.version,
   };
 
+  // 6. Version + compatibility (server / collection / release-label)
+  const versionInfo = getVersionInfo();
+
   res.status(overallOk ? 200 : 503).json({
     status:  overallOk ? 'ok' : 'degraded',
-    version: '1.0.0',
+    version: versionInfo.server_version,
+    server_version:       versionInfo.server_version,
+    collection_version:   versionInfo.collection_version,
+    release_label:        versionInfo.release_label,
+    compatibility_status: versionInfo.compatibility_status,
     checks,
   });
 });
