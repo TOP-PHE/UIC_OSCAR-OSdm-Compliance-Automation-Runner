@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Build stage — has npm, build tools, Bruno CLI install
+# Build stage — installs app dependencies (with native compilation for bcrypt)
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:22-slim AS builder
 
@@ -8,43 +8,38 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Bruno CLI globally — used at runtime by the worker via the
-# /usr/local/lib/node_modules path. Bruno only needs the bru.cmd / bru
-# binary and its own node_modules tree; the global npm CLI itself is
-# not invoked at runtime, so it gets dropped in the runtime stage below.
-RUN npm install -g @usebruno/cli
-
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Runtime stage — minimal, no npm CLI (clears CVE-2026-33671 picomatch)
+# Runtime stage — installs Bruno CLI in place, then strips npm
 # ─────────────────────────────────────────────────────────────────────────────
+# We install Bruno CLI directly in the runtime stage rather than copying it
+# from the builder. Reason: `npm install -g` creates a symlink at
+# /usr/local/bin/bru pointing into /usr/local/lib/node_modules/@usebruno/cli/.
+# A `COPY --from=builder /usr/local/bin/bru` resolves the symlink and copies
+# only the shim file, breaking its relative require('../src') paths.
+# Installing in-place preserves the symlink + the full @usebruno/cli tree.
+#
+# After install, we drop npm (and corepack) to:
+#   1. Clear CVE-2026-33671 (picomatch ReDoS) flagged by Trivy inside the
+#      npm-vendored copy of picomatch.
+#   2. Shrink the runtime image by ~50 MB.
+# OSCAR never invokes npm at runtime — node_modules is already in place
+# (copied from the builder stage below).
 FROM node:22-slim
-
-# Remove the bundled npm CLI from the runtime image. The OSCAR server
-# never invokes npm itself — node_modules is already installed by the
-# build stage and copied in below. Dropping npm:
-#   1. Eliminates the HIGH-severity CVE-2026-33671 (picomatch ReDoS) that
-#      Trivy flags inside npm's vendored picomatch.
-#   2. Shrinks the image by ~50 MB.
-# corepack is also removed since it bundles its own dependencies and is
-# not used at runtime.
-RUN rm -rf /usr/local/lib/node_modules/npm \
-           /usr/local/lib/node_modules/corepack \
-           /usr/local/bin/npm \
-           /usr/local/bin/npx \
-           /usr/local/bin/corepack
 
 WORKDIR /app
 
-# Bring in the Bruno CLI installed in the builder stage. The global
-# install path on the official node image is /usr/local — copying that
-# subtree preserves both the package files and the bin shims.
-COPY --from=builder /usr/local/lib/node_modules/@usebruno /usr/local/lib/node_modules/@usebruno
-COPY --from=builder /usr/local/bin/bru /usr/local/bin/bru
+RUN npm install -g @usebruno/cli && \
+    rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /usr/local/bin/corepack \
+           /root/.npm
 
 # App dependencies (already installed without dev deps in the builder)
 COPY --from=builder /app/node_modules ./node_modules
