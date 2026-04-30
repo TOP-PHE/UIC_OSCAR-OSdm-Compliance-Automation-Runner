@@ -1,0 +1,277 @@
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Nav (shared) ───────────────────────────────────────────────────────── */
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-left,.uic-banner-right{display:flex;align-items:center}
+.uic-banner-logo{height:46px;width:auto}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.container{max-width:1060px;margin:28px auto;padding:0 16px;flex:1}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.page-header h2{color:#0090D4;font-size:20px}
+.header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:18px;overflow:hidden}
+.card-head{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eceff1}
+.card-head-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#455a64;display:flex;align-items:center;gap:8px}
+.card-body{padding:18px}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn{padding:9px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+.btn-primary{background:#0090D4;color:#fff}.btn-primary:hover{background:#005A8A}
+.btn-success{background:#2e7d32;color:#fff}.btn-success:hover{background:#1b5e20}
+.btn-secondary{background:#eceff1;color:#455a64}.btn-secondary:hover{background:#cfd8dc}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ── Messages ───────────────────────────────────────────────────────────── */
+.msg{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none}
+.msg-ok {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.msg-err{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+
+/* ── Scenario selector list ─────────────────────────────────────────────── */
+.scenario-selector{display:flex;flex-direction:column;gap:0}
+.selector-row{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f5f5f5;transition:background .1s;cursor:pointer}
+.selector-row:last-child{border-bottom:none}
+.selector-row:hover{background:#f5f8ff}
+.selector-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#0090D4}
+.selector-label{display:flex;flex-direction:column;gap:2px}
+.selector-code{font-family:'Courier New',monospace;font-size:11px;font-weight:700;color:#546e7a}
+.selector-desc{font-size:13px;color:#1a2e40;font-weight:600}
+.selector-badges{display:flex;gap:5px;flex-wrap:wrap}
+
+/* ── Scenario library (expandable) ─────────────────────────────────────── */
+.scenario-item{border-bottom:1px solid #f0f0f0}
+.scenario-item:last-child{border-bottom:none}
+.scenario-toggle{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;transition:background .1s;user-select:none}
+.scenario-toggle:hover{background:#f5f8ff}
+.toggle-arrow{color:#90a4ae;font-size:13px;transition:transform .2s;flex-shrink:0}
+.toggle-arrow.open{transform:rotate(90deg)}
+.scenario-detail{display:none;padding:0 16px 16px 42px}
+.scenario-detail.open{display:block}
+
+/* ── Train resource rows (expand/collapse, mirrors scenario-item) ─────── */
+.train-item{border-bottom:1px solid #f0f0f0}
+.train-item:last-child{border-bottom:none}
+.train-row{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;transition:background .1s;user-select:none}
+.train-row:hover{background:#f5f8ff}
+.train-row-label{font-weight:700;color:#1a2e40;font-size:13px}
+.train-row-sub{font-size:11px;color:#90a4ae;font-family:'Courier New',monospace}
+.train-detail{display:none;padding:0 16px 16px 16px}
+.train-detail.open{display:block}
+
+/* ── Parameter sections ─────────────────────────────────────────────────── */
+.param-section{background:#fafbfc;border:1px solid #eceff1;border-radius:6px;margin-bottom:12px;overflow:hidden}
+.param-section-head{padding:8px 14px;background:#eceff1;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#546e7a;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.param-section-head:hover{background:#e3e8ec}
+.param-section-head .ps-arrow{transition:transform .15s;font-size:10px;color:#90a4ae;margin-left:auto}
+.param-section-head .ps-arrow.open{transform:rotate(90deg)}
+.param-section-body{display:none}
+.param-section-body.open{display:block}
+.param-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:12px 14px}
+.param-grid.wide{grid-template-columns:1fr 1fr}
+.param-full{grid-column:1/-1}
+.param-field{display:flex;flex-direction:column;gap:4px}
+.param-label{font-size:10px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px}
+.param-label .param-hint{font-weight:400;text-transform:none;font-size:10px;color:#b0bec5;margin-left:4px;letter-spacing:0}
+.param-input{padding:7px 9px;border:1px solid #cfd8dc;border-radius:5px;font-size:12px;background:#fff;color:#1a2e40;width:100%}
+.param-input:focus{outline:none;border-color:#0090D4}
+.param-select{appearance:auto}
+
+/* ── Multi-checkbox groups ──────────────────────────────────────────────── */
+.multi-check{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px}
+.multi-check label{display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #cfd8dc;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;transition:background .1s,border-color .1s}
+.multi-check label:hover{background:#e8f4fb;border-color:#90caf9}
+.multi-check label input{accent-color:#0090D4}
+.multi-check label.checked{background:#e3f2fd;border-color:#1976d2;color:#1565c0}
+
+/* ── Passenger / leg cards ─────────────────────────────────────────────── */
+.sub-card{background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin-bottom:8px}
+.sub-card-title{font-size:11px;font-weight:800;color:#0090D4;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap}
+.badge-sale    {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.badge-refund  {background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+.badge-exchange{background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
+.badge-info    {background:#f3e5f5;color:#7b1fa2;border:1px solid #ce93d8}
+.badge-in-run  {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.badge-not-in-run{background:#eceff1;color:#90a4ae;border:1px solid #cfd8dc}
+
+/* ── Empty / loading ────────────────────────────────────────────────────── */
+.placeholder{text-align:center;padding:48px;color:#90a4ae;font-size:14px}
+
+/* ── Save confirmation banner ───────────────────────────────────────────── */
+.save-confirm{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:none}
+.save-confirm-title{font-size:13px;font-weight:800;color:#2e7d32;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.save-confirm-body{font-size:13px;color:#37474f;line-height:1.6}
+.save-confirm-list{margin:8px 0 0 18px;font-size:12px;color:#455a64}
+.save-confirm-list li{margin-bottom:3px;font-family:'Courier New',monospace}
+.save-error{background:#ffebee;border:1px solid #ef9a9a;border-radius:8px;padding:14px 18px;margin-bottom:18px;display:none}
+.save-error-title{font-size:13px;font-weight:800;color:#c62828;margin-bottom:4px}
+.save-error-body{font-size:13px;color:#37474f}
+
+/* ── Data file banner ────────────────────────────────────────────────────── */
+.df-banner{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.df-banner-info{display:flex;align-items:center;gap:12px}
+.df-banner-icon{font-size:22px;flex-shrink:0}
+.df-banner-name{font-size:14px;font-weight:700;color:#1b5e20}
+.df-banner-ts{font-size:12px;color:#388e3c;margin-top:2px}
+.df-banner-scratch{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:13px;color:#e65100}
+.df-banner-scratch strong{color:#bf360c}
+
+/* ── No-file choice card ─────────────────────────────────────────────────── */
+.choice-card{background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.1);padding:36px;text-align:center;max-width:740px;margin:40px auto}
+.choice-icon{font-size:40px;margin-bottom:12px}
+.choice-title{font-size:18px;font-weight:800;color:#1a2e40;margin-bottom:8px}
+.choice-body{font-size:14px;color:#78909c;margin-bottom:28px}
+.choice-options{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:wrap}
+/* Clickable option (upload) */
+.choice-opt{flex:1;min-width:240px;border:2px solid #e0e0e0;border-radius:8px;padding:24px 18px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center}
+.choice-opt:hover{border-color:#0090D4;background:#f0f8ff}
+.choice-opt-icon{font-size:28px;margin-bottom:8px}
+.choice-opt-title{font-size:13px;font-weight:700;color:#1a2e40;margin-bottom:4px}
+.choice-opt-body{font-size:11px;color:#90a4ae}
+/* Non-clickable panel (local mgmt) — sub-items are what you click */
+.choice-panel{flex:1;min-width:240px;border:2px solid #e0e0e0;border-radius:8px;padding:24px 18px;text-align:left}
+.choice-panel-icon{font-size:28px;margin-bottom:8px;text-align:center}
+.choice-panel-title{font-size:13px;font-weight:700;color:#1a2e40;margin-bottom:4px;text-align:center}
+.choice-panel-body{font-size:11px;color:#90a4ae;text-align:center;margin-bottom:16px}
+/* Sub-items inside the local panel */
+.choice-subs{display:flex;flex-direction:column;gap:8px}
+.choice-sub{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e0e0e0;border-radius:7px;cursor:pointer;transition:border-color .15s,background .15s}
+.choice-sub:hover{border-color:#0090D4;background:#f0f8ff}
+.choice-sub.coming-soon{opacity:.55;cursor:not-allowed}
+.choice-sub.coming-soon:hover{border-color:#e0e0e0;background:#fff}
+.choice-sub-icon{font-size:22px;flex-shrink:0}
+.choice-sub-title{font-size:12px;font-weight:700;color:#1a2e40;display:flex;align-items:center;gap:6px}
+.choice-sub-desc{font-size:11px;color:#90a4ae;margin-top:2px}
+.badge-soon{display:inline-block;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+
+/* ── Danger button ───────────────────────────────────────────────────────── */
+.btn-danger{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}.btn-danger:hover{background:#ffcdd2}
+
+/* ── Wizard ──────────────────────────────────────────────────────────────── */
+.wiz-stepper{display:flex;align-items:center;gap:0;margin-bottom:24px;background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.wiz-step{display:flex;align-items:center;gap:8px;flex:1}
+.wiz-step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;border:2px solid #cfd8dc;background:#fff;color:#90a4ae}
+.wiz-step-label{font-size:12px;font-weight:600;color:#90a4ae}
+.wiz-step.active .wiz-step-num{border-color:#0090D4;background:#0090D4;color:#fff}
+.wiz-step.active .wiz-step-label{color:#0090D4;font-weight:700}
+.wiz-step.done .wiz-step-num{border-color:#2e7d32;background:#2e7d32;color:#fff}
+.wiz-step.done .wiz-step-label{color:#2e7d32}
+.wiz-step-sep{flex:1;height:2px;background:#eceff1;margin:0 8px;max-width:40px}
+.wiz-body{display:flex;flex-direction:column;gap:16px}
+/* Framework sections */
+.fw-section{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;margin-bottom:4px}
+.fw-section-head{padding:12px 18px;background:#f5f8ff;border-bottom:1px solid #e3eaf5;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#455a64;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.fw-section-head .fw-toggle-icon{margin-left:auto;color:#90a4ae;font-size:11px;transition:transform .2s}
+.fw-section-head.open .fw-toggle-icon{transform:rotate(90deg)}
+.fw-section-body{padding:16px 18px;display:none}
+.fw-section-body.open{display:block}
+.fw-subsection{margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0}
+.fw-subsection-label{font-size:11px;font-weight:700;color:#78909c;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+/* Pill toggles (multi-select checkboxes styled as chips) */
+.pill-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border:1px solid #cfd8dc;border-radius:14px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#455a64;transition:background .12s,border-color .12s,color .12s;user-select:none}
+.pill:hover{border-color:#0090D4;color:#0090D4}
+.pill.selected{background:#e3f2fd;border-color:#1976d2;color:#1565c0}
+.pill.mandatory{background:#fce4ec;border-color:#e91e63;color:#880e4f;cursor:default}
+.pill input{display:none}
+/* IROPS reason-code panel */
+.irops-panel{margin-top:10px;padding:12px 14px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;display:none}
+.irops-panel.open{display:block}
+.irops-panel-title{font-size:11px;font-weight:700;color:#f57f17;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px}
+/* Three-option row (Full / Partial / IROPS) */
+.aftersales-row{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.aftersales-row-title{font-size:13px;font-weight:700;color:#1a2e40;margin-bottom:4px}
+.aftersales-options{display:flex;gap:8px;flex-wrap:wrap}
+.aftersales-opt{flex:1;min-width:130px;border:2px solid #e0e0e0;border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center}
+.aftersales-opt:hover{border-color:#0090D4;background:#f0f8ff}
+.aftersales-opt.selected{border-color:#0090D4;background:#e3f2fd}
+.aftersales-opt input{display:none}
+.aftersales-opt-icon{font-size:18px}
+.aftersales-opt-label{font-size:12px;font-weight:700;color:#1a2e40;margin-top:3px}
+.aftersales-opt-desc{font-size:10px;color:#90a4ae;margin-top:2px}
+/* Passenger age-range table */
+.pax-age-table{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.pax-age-row{display:flex;align-items:center;gap:12px;padding:6px 10px;background:#f9fbff;border:1px solid #e8edf5;border-radius:5px}
+.pax-age-label{font-size:11px;font-weight:700;color:#455a64;width:120px;flex-shrink:0;text-transform:uppercase;letter-spacing:.3px}
+.pax-age-pair{display:flex;align-items:center;gap:6px;font-size:11px;color:#78909c}
+.pax-age-pair input{width:64px;padding:4px 6px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;color:#1a2e40;text-align:center}
+/* Train detail form grid */
+.train-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Field validation */
+.param-input.invalid{border-color:#ef9a9a !important;background:#fff8f8}
+.field-error{font-size:11px;color:#c62828;margin-top:3px;display:none}
+.field-error.show{display:block}
+/* Wizard footer nav */
+.wiz-footer{display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid #eceff1}
+/* Done banner */
+.wiz-done{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:32px;text-align:center}
+.wiz-done-icon{font-size:40px;margin-bottom:12px}
+.wiz-done-title{font-size:18px;font-weight:800;color:#2e7d32;margin-bottom:8px}
+.wiz-done-body{font-size:13px;color:#37474f;line-height:1.6;margin-bottom:20px}
+
+/* ── Step 3 Scenario Creation ────────────────────────────────────────────── */
+.scen-type-cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.scen-type-card{flex:1;min-width:110px;border:2px solid #e0e0e0;border-radius:8px;padding:14px 10px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center}
+.scen-type-card:hover{border-color:#0090D4;background:#f0f8ff}
+.scen-type-card.selected{border-color:#0090D4;background:#e3f2fd}
+.scen-type-card.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.scen-type-card-icon{font-size:24px;margin-bottom:6px}
+.scen-type-card-label{font-size:13px;font-weight:700;color:#1a2e40}
+.scen-type-card-desc{font-size:10px;color:#90a4ae;margin-top:3px}
+.pax-counter-rows{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pax-counter-row{display:flex;align-items:center;gap:12px;padding:8px 12px;background:#f9fbff;border:1px solid #e8edf5;border-radius:6px}
+.pax-counter-label{font-size:12px;font-weight:700;color:#455a64;flex:1;text-transform:uppercase;letter-spacing:.3px}
+.pax-counter-age{font-size:11px;color:#90a4ae;min-width:80px}
+.pax-counter-ctrl{display:flex;align-items:center;gap:8px}
+.pax-counter-btn{width:28px;height:28px;border:1px solid #cfd8dc;border-radius:4px;background:#fff;cursor:pointer;font-size:16px;font-weight:700;color:#455a64;display:flex;align-items:center;justify-content:center;line-height:1;transition:background .1s}
+.pax-counter-btn:hover{background:#e3f2fd;border-color:#1976d2;color:#1565c0}
+.pax-counter-val{min-width:28px;text-align:center;font-size:14px;font-weight:700;color:#1a2e40}
+.code-preview{background:#1a2e40;color:#e8f0fe;font-family:'Courier New',monospace;font-size:14px;font-weight:700;padding:12px 18px;border-radius:6px;margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.code-preview-label{font-size:10px;font-weight:400;color:#78909c;text-transform:uppercase;letter-spacing:.4px}
+.sub-type-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.sub-type-opt{flex:1;min-width:90px;border:2px solid #e0e0e0;border-radius:7px;padding:8px 10px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.sub-type-opt:hover{border-color:#0090D4;background:#f0f8ff}
+.sub-type-opt.selected{border-color:#0090D4;background:#e3f2fd}
+.train-sel-detail{background:#f5f8ff;border:1px solid #e3eaf5;border-radius:6px;padding:12px 14px;margin-top:10px;font-size:12px;color:#455a64;display:none}
+.train-sel-detail.open{display:block}
+.s3-action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+
+/* ── Config sections (3-section layout) ────────────────────────────────── */
+.config-section{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px;overflow:hidden}
+.config-section-head{padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid #eceff1;transition:background .15s}
+.config-section-head:hover{background:#f5f8ff}
+.config-section-num{width:28px;height:28px;border-radius:50%;background:#0090D4;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.config-section-title{font-size:14px;font-weight:800;color:#1a2e40;flex:1}
+.config-section-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;white-space:nowrap}
+.config-section-badge.ok{background:#e8f5e9;color:#2e7d32}
+.config-section-badge.warn{background:#fff3e0;color:#e65100}
+.section-delete-btn{background:none;border:1px solid #ef9a9a;border-radius:5px;padding:3px 8px;font-size:13px;cursor:pointer;color:#c62828;opacity:.6;transition:opacity .15s,background .15s}
+.section-delete-btn:hover{opacity:1;background:#ffebee}
+.row-delete-btn{background:none;border:none;padding:2px 6px;font-size:14px;cursor:pointer;color:#c62828;opacity:.4;transition:opacity .15s;border-radius:4px}
+.row-delete-btn:hover{opacity:1;background:#ffebee}
+.config-section-toggle{font-size:11px;color:#90a4ae;transition:transform .2s}
+.config-section-toggle.open{transform:rotate(90deg)}
+.config-section-summary{padding:10px 18px 10px 58px;font-size:12px;color:#78909c;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .15s}
+.config-section-summary:hover{background:#f5f8ff}
+.config-section-body{padding:18px}
+.config-section-body.open{display:block}
+.prereq-msg{padding:20px;text-align:center;color:#e65100;font-size:13px;background:#fff8e1;border-radius:6px;margin:8px}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}

@@ -187,7 +187,7 @@ if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 function showMsg(text, ok) {
   const el = document.getElementById('msg');
@@ -264,8 +264,8 @@ async function loadProfile() {
   // Two endpoints since v12: company-shared bits and per-tester credentials
   // are now separate resources. Fire both in parallel.
   const [companyRes, credsRes] = await Promise.all([
-    fetch('/v1/company',         { headers: { Authorization: `Bearer ${token}` } }),
-    fetch('/v1/me/credentials',  { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/v1/company',         {}),
+    fetch('/v1/me/credentials',  {})
   ]);
   if (!companyRes.ok || !credsRes.ok) return;
   const c = await companyRes.json();
@@ -303,7 +303,7 @@ async function saveConfig() {
   if (apiBase) {
     const r = await fetch('/v1/company', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_base: apiBase })
     });
     if (!r.ok) {
@@ -337,7 +337,7 @@ async function saveConfig() {
 
   const r2 = await fetch('/v1/me/credentials', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(creds)
   });
   if (!r2.ok) {

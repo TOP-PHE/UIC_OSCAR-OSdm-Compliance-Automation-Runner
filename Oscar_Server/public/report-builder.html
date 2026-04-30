@@ -197,6 +197,68 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .cap-ctx-tag.hl-mode-voluntary{background:#e8f5e9;border-color:#a5d6a7;color:#2e7d32}
 .spin{display:inline-block;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── HTTP Traffic viewer ───────────────────────────────────────────────────── */
+.http-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #eceff1;cursor:pointer;font-size:13px;background:#fff;transition:background .12s}
+.http-row:hover{background:#f5fafd}
+.http-row.expanded{background:#eaf6fb;border-bottom:1px solid #b3e0f7}
+.http-row .arrow{display:inline-block;width:14px;color:#90a4ae;font-size:10px;transition:transform .15s}
+.http-row.expanded .arrow{transform:rotate(90deg);color:#0090D4}
+.http-row .method{font-family:'Courier New',monospace;font-weight:700;font-size:11px;padding:2px 6px;border-radius:3px;letter-spacing:.4px;min-width:46px;text-align:center}
+.http-row .method.GET{background:#e3f2fd;color:#1565c0}
+.http-row .method.POST{background:#e8f5e9;color:#2e7d32}
+.http-row .method.PUT,.http-row .method.PATCH{background:#fff8e1;color:#bf6f00}
+.http-row .method.DELETE{background:#ffebee;color:#c62828}
+.http-row .scenario{font-size:11px;color:#90a4ae;font-family:'Courier New',monospace}
+.http-row .name{flex:1;color:#37474f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.http-row .url{flex:2;color:#78909c;font-family:'Courier New',monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.http-row .status{font-family:'Courier New',monospace;font-weight:700;font-size:12px;padding:2px 7px;border-radius:3px;min-width:36px;text-align:center}
+.http-row .status.s2{background:#e8f5e9;color:#2e7d32}     /* 2xx */
+.http-row .status.s3{background:#e3f2fd;color:#1565c0}     /* 3xx */
+.http-row .status.s4{background:#fff8e1;color:#bf6f00}     /* 4xx */
+.http-row .status.s5{background:#ffebee;color:#c62828}     /* 5xx */
+.http-row .status.s0{background:#f5f5f5;color:#90a4ae}     /* 0/null */
+.http-row .duration{font-size:11px;color:#90a4ae;font-family:'Courier New',monospace;min-width:60px;text-align:right}
+.http-row .has-link{font-size:10px;color:#6a1b9a;background:#f3e5f5;padding:1px 5px;border-radius:8px;font-weight:600}
+
+.http-detail{padding:14px 16px 18px;background:#fafbfc;border-bottom:2px solid #eceff1;font-size:13px}
+.http-detail .nav-arrows{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.http-detail .nav-arrow{padding:5px 12px;border:1px solid #b3e0f7;background:#fff;color:#0090D4;border-radius:5px;font-size:12px;cursor:pointer;font-weight:600;font-family:inherit}
+.http-detail .nav-arrow:hover{background:#e3f2fd}
+.http-detail .nav-arrow.parent::before{content:'← ';font-weight:700}
+.http-detail .nav-arrow.child::after{content:' →';font-weight:700}
+.http-detail .nav-arrow .meta{font-weight:400;color:#90a4ae;margin-left:4px;font-family:'Courier New',monospace}
+.http-detail .tab-bar{display:flex;gap:2px;margin-bottom:8px;border-bottom:2px solid #eceff1}
+.http-detail .tab{padding:7px 16px;font-size:12px;font-weight:700;color:#78909c;cursor:pointer;border-radius:4px 4px 0 0;background:transparent;border:none;font-family:inherit}
+.http-detail .tab:hover{color:#0090D4}
+.http-detail .tab.active{color:#0090D4;background:#fff;border-bottom:2px solid #0090D4;margin-bottom:-2px}
+.http-detail .tab.empty{color:#cfd8dc;cursor:default}
+.http-detail .tab-body{background:#fff;border:1px solid #eceff1;border-radius:0 6px 6px 6px;padding:12px;max-height:520px;overflow:auto}
+.http-detail .copy-btn{float:right;font-size:11px;background:#eceff1;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;color:#546e7a;font-family:inherit}
+.http-detail .copy-btn:hover{background:#cfd8dc}
+.http-detail .raw-text{font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#37474f;line-height:1.5}
+
+/* JSON tree viewer */
+.json-tree{font-family:'Courier New',monospace;font-size:12px;line-height:1.35;color:#37474f}
+.json-tree .line{padding:0;margin:0}
+.json-tree .node{margin:0}
+.json-tree .toggle{display:inline-block;width:12px;color:#0090D4;cursor:pointer;user-select:none;text-align:center;font-size:9px}
+.json-tree .toggle.empty{color:#cfd8dc;cursor:default}
+.json-tree .key{color:#6a1b9a;font-weight:600}
+.json-tree .str{color:#2e7d32}
+.json-tree .num{color:#0277bd}
+.json-tree .bool{color:#bf6f00;font-weight:600}
+.json-tree .null{color:#90a4ae;font-style:italic}
+.json-tree .punct{color:#90a4ae}
+.json-tree .summary{color:#90a4ae;font-style:italic;cursor:pointer;margin-left:4px}
+.json-tree .summary:hover{color:#0090D4;text-decoration:underline}
+.json-tree .children{margin-left:14px;border-left:1px dashed #cfd8dc;padding-left:8px;padding-top:0;padding-bottom:0}
+.json-tree .collapsed > .children{display:none}
+.json-tree-empty{color:#90a4ae;font-style:italic;padding:8px;text-align:center}
+.headers-table{width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:12px}
+.headers-table td{padding:4px 8px;border-bottom:1px solid #f0f4f7;vertical-align:top}
+.headers-table td:first-child{color:#6a1b9a;font-weight:600;width:30%;word-break:break-word}
+.headers-table td:last-child{color:#37474f;word-break:break-word}
 .site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
 
 @media print{
@@ -290,6 +352,25 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
           Include logs from requests whose assertions all passed
         </label>
       </div>
+      <!-- HTTP Traffic (Phase C: bodies + headers + chain navigation) -->
+      <div class="filter-section">
+        <div class="filter-label">HTTP Traffic</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="http-include">
+          Include HTTP request/response bodies + headers
+        </label>
+        <div id="http-filter-options" style="display:none;padding-left:22px;font-size:13px">
+          <label style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;cursor:pointer">
+            <input type="radio" name="http_filter" value="all" checked> All requests
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;cursor:pointer">
+            <input type="radio" name="http_filter" value="failed"> Failed only (non-2xx or failed assertions)
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="radio" name="http_filter" value="non2xx"> Non-2xx HTTP only
+          </label>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -352,6 +433,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
       <div class="card-title">Assertion Details</div>
       <div id="assertion-content" style="max-height:700px;overflow-y:auto"></div>
     </div>
+    <div class="card" id="http-card" style="display:none">
+      <div class="card-title">HTTP Traffic <span id="http-count" style="margin-left:auto;font-weight:600;color:#90a4ae;text-transform:none;letter-spacing:0;font-size:11px"></span></div>
+      <div id="http-content" style="max-height:800px;overflow-y:auto"></div>
+    </div>
     <div class="card" id="logs-card">
       <div class="card-title">Logs <span id="logs-count" style="margin-left:auto;font-weight:600;color:#90a4ae;text-transform:none;letter-spacing:0;font-size:11px"></span></div>
       <div id="logs-content" style="max-height:700px;overflow-y:auto"></div>
@@ -373,11 +458,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 
 <script>
 /* ── Auth check ────────────────────────────────────────────────────────────── */
-const token = localStorage.getItem('oscar_token');
-if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// auth guard — redirect to login if no session hint
+if (!user || !user.email) window.location.href = '/';
+// logout() provided by nav.js
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
 const CATEGORIES = [
@@ -460,7 +545,7 @@ buildCheckboxes('sev-checks', SEVERITIES, 'filter_sev');
 /* ── Load runs ─────────────────────────────────────────────────────────────── */
 async function loadRuns() {
   try {
-    var res = await fetch('/v1/runs?limit=200', { headers: { Authorization: 'Bearer ' + token } });
+    var res = await fetch('/v1/runs?limit=200', {});
     if (res.status === 401) { logout(); return; }
     var data = await res.json();
     allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.indexOf(r.status) !== -1; });
@@ -623,7 +708,7 @@ async function generateReport() {
   try {
     var res = await fetch('/v1/reports/configured', {
       method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (res.status === 401) { logout(); return; }
@@ -687,6 +772,7 @@ function renderReport() {
   renderBreakdown('category-breakdown', reportData.by_category || [], 'category');
   renderAssertions(reportData.suites || []);
   renderLogs();
+  renderHttpTraffic();   // Phase C: req/res list + chain navigation
 
   document.getElementById('report-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1265,6 +1351,315 @@ document.getElementById('generate-btn').addEventListener('click', generateReport
 document.getElementById('logs-include-passed').addEventListener('change', function() {
   if (reportData) renderLogs();
 });
+
+/* ── Phase C: HTTP Traffic viewer ─────────────────────────────────────────────
+ * Independent of the generated report — fetches from
+ *   GET /v1/runs/:id/requests              (list, no bodies)
+ *   GET /v1/runs/:id/requests/:reqId       (full bodies + parent + children)
+ * Lazy load: bodies only fetched when a row is expanded.
+ */
+var _httpRequests = [];   // current list cached in memory
+var _httpDetailCache = {};// reqId → full detail (parent + children + bodies)
+
+document.getElementById('http-include').addEventListener('change', function() {
+  document.getElementById('http-filter-options').style.display = this.checked ? 'block' : 'none';
+  if (reportData) renderHttpTraffic();
+});
+document.querySelectorAll('input[name="http_filter"]').forEach(function(r) {
+  r.addEventListener('change', function() { if (reportData) renderHttpTraffic(); });
+});
+
+async function renderHttpTraffic() {
+  var card = document.getElementById('http-card');
+  var include = document.getElementById('http-include').checked;
+  if (!include || !selectedRunId) { card.style.display = 'none'; return; }
+
+  var filter = (document.querySelector('input[name="http_filter"]:checked') || {}).value || 'all';
+  card.style.display = 'block';
+  document.getElementById('http-content').innerHTML =
+    '<div style="padding:20px;text-align:center;color:#90a4ae"><span class="spin">⟳</span> Loading…</div>';
+
+  try {
+    var url = '/v1/runs/' + encodeURIComponent(selectedRunId) + '/requests?status_filter=' + filter;
+    var res = await fetch(url, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    _httpRequests = data.requests || [];
+    _httpDetailCache = {};   // invalidate detail cache when filter changes
+    document.getElementById('http-count').textContent =
+      _httpRequests.length + (filter === 'all' ? ' request(s)' : ' ' + filter + ' request(s)');
+    renderHttpList();
+  } catch (e) {
+    document.getElementById('http-content').innerHTML =
+      '<div style="padding:20px;color:#c62828">Failed to load HTTP traffic: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderHttpList() {
+  if (!_httpRequests.length) {
+    document.getElementById('http-content').innerHTML =
+      '<div style="padding:20px;text-align:center;color:#90a4ae">No requests match the current filter.</div>';
+    return;
+  }
+  // Group by scenario for readability
+  var byScenario = {};
+  _httpRequests.forEach(function(r) {
+    var k = r.scenario_name || '(no scenario)';
+    if (!byScenario[k]) byScenario[k] = [];
+    byScenario[k].push(r);
+  });
+
+  var html = '';
+  Object.keys(byScenario).forEach(function(scen) {
+    html += '<div style="background:#f5f7f9;padding:8px 12px;font-size:12px;font-weight:700;color:#0090D4;border-bottom:1px solid #cfd8dc">'
+         + escHtml(scen) + '</div>';
+    byScenario[scen].forEach(function(r) {
+      html += renderHttpRow(r);
+    });
+  });
+  document.getElementById('http-content').innerHTML = html;
+}
+
+function renderHttpRow(r) {
+  var sClass = r.http_status == null ? 's0'
+    : r.http_status >= 500 ? 's5'
+    : r.http_status >= 400 ? 's4'
+    : r.http_status >= 300 ? 's3'
+    : r.http_status >= 200 ? 's2' : 's0';
+  var statusLbl = r.http_status == null ? '—' : r.http_status;
+  var linkBadge = r.parent_request_id
+    ? '<span class="has-link" title="Linked to parent request">↑ chain</span>' : '';
+  return '<div class="http-row" data-action="toggle-http" data-req-id="' + r.id + '">'
+    + '<span class="arrow">▶</span>'
+    + '<span class="method ' + escAttr(r.http_method || '') + '">' + escHtml(r.http_method || '?') + '</span>'
+    + '<span class="name" title="' + escAttr(r.request_name) + '">' + escHtml(r.request_name) + '</span>'
+    + '<span class="url" title="' + escAttr(r.http_url || '') + '">' + escHtml(r.http_url || '') + '</span>'
+    + '<span class="status ' + sClass + '">' + escHtml(String(statusLbl)) + '</span>'
+    + '<span class="duration">' + (r.duration_ms != null ? r.duration_ms + 'ms' : '—') + '</span>'
+    + linkBadge
+    + '</div>'
+    + '<div class="http-detail" id="http-detail-' + r.id + '" style="display:none"></div>';
+}
+
+document.getElementById('http-content').addEventListener('click', function(e) {
+  var row = e.target.closest('[data-action="toggle-http"]');
+  if (!row) {
+    // could be a nav-arrow click
+    var nav = e.target.closest('[data-nav-req-id]');
+    if (nav) {
+      var navId = nav.getAttribute('data-nav-req-id');
+      navigateToHttpRequest(navId);
+    }
+    // or a json toggle — walk up to the .node ancestor (the .line wrapping
+    // the toggle is a sibling of .children, not its parent)
+    var tog = e.target.closest('[data-json-toggle]');
+    if (tog) {
+      var node = tog.closest('.node');
+      if (node) {
+        node.classList.toggle('collapsed');
+        // Flip the arrow glyph on the toggle in the OPENING line of this node
+        // (the first .toggle inside the immediate .line child)
+        var topLine = node.querySelector(':scope > .line');
+        var arrow = topLine && topLine.querySelector('.toggle');
+        if (arrow && !arrow.classList.contains('empty')) {
+          arrow.textContent = node.classList.contains('collapsed') ? '▶' : '▼';
+        }
+      }
+    }
+    // or a tab switch
+    var tab = e.target.closest('[data-http-tab]');
+    if (tab) switchHttpTab(tab);
+    // or copy
+    var cpy = e.target.closest('[data-copy-target]');
+    if (cpy) copyJsonContent(cpy);
+    return;
+  }
+  toggleHttpRow(row);
+});
+
+async function toggleHttpRow(row) {
+  var reqId = row.getAttribute('data-req-id');
+  var detail = document.getElementById('http-detail-' + reqId);
+  if (row.classList.contains('expanded')) {
+    row.classList.remove('expanded');
+    detail.style.display = 'none';
+    return;
+  }
+  row.classList.add('expanded');
+  detail.style.display = 'block';
+  detail.innerHTML = '<div style="color:#90a4ae;font-style:italic;padding:8px">Loading…</div>';
+
+  try {
+    var data = _httpDetailCache[reqId] || await fetchHttpDetail(reqId);
+    _httpDetailCache[reqId] = data;
+    detail.innerHTML = renderHttpDetail(data);
+  } catch (e) {
+    detail.innerHTML = '<div style="color:#c62828;padding:8px">Failed to load detail: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function fetchHttpDetail(reqId) {
+  var url = '/v1/runs/' + encodeURIComponent(selectedRunId) + '/requests/' + encodeURIComponent(reqId);
+  var res = await fetch(url, {});
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+function renderHttpDetail(data) {
+  var r = data.request || {};
+  var nav = '';
+  if (data.parent) {
+    nav += '<button class="nav-arrow parent" data-nav-req-id="' + data.parent.id + '">'
+         + 'parent: ' + escHtml(data.parent.request_name)
+         + '<span class="meta">' + escHtml(data.parent.http_method || '') + ' ' + escHtml((data.parent.http_url||'').split('?')[0].split('/').pop()) + '</span>'
+         + '</button>';
+  }
+  if (data.children && data.children.length) {
+    data.children.forEach(function(c) {
+      nav += '<button class="nav-arrow child" data-nav-req-id="' + c.id + '">'
+           + 'child: ' + escHtml(c.request_name)
+           + '<span class="meta">' + escHtml(c.http_method || '') + '</span>'
+           + '</button>';
+    });
+  }
+  var navHtml = nav ? '<div class="nav-arrows">' + nav + '</div>' : '';
+
+  var hasReqBody = !!r.request_body;
+  var hasResBody = !!r.response_body;
+  var hasReqHdr  = !!r.request_headers;
+  var hasResHdr  = !!r.response_headers;
+
+  var tabs =
+      '<button class="tab' + (hasResBody ? ' active' : (hasReqBody ? '' : ' active')) + (hasResBody ? '' : ' empty') + '" data-http-tab="response" data-detail-id="' + r.id + '">Response Body</button>'
+    + '<button class="tab' + (hasResBody ? '' : (hasReqBody ? ' active' : '')) + (hasReqBody ? '' : ' empty') + '" data-http-tab="request" data-detail-id="' + r.id + '">Request Body</button>'
+    + '<button class="tab' + (hasResHdr ? '' : ' empty') + '" data-http-tab="resHeaders" data-detail-id="' + r.id + '">Response Headers</button>'
+    + '<button class="tab' + (hasReqHdr ? '' : ' empty') + '" data-http-tab="reqHeaders" data-detail-id="' + r.id + '">Request Headers</button>';
+
+  var initial = hasResBody ? 'response' : (hasReqBody ? 'request' : (hasResHdr ? 'resHeaders' : 'reqHeaders'));
+  var body = renderHttpTabBody(r, initial);
+
+  return navHtml
+    + '<div class="tab-bar" data-detail-id="' + r.id + '">' + tabs + '</div>'
+    + '<div class="tab-body" id="http-tab-body-' + r.id + '">' + body + '</div>';
+}
+
+function renderHttpTabBody(r, kind) {
+  var raw, isJson = true;
+  if (kind === 'response') raw = r.response_body;
+  else if (kind === 'request') raw = r.request_body;
+  else if (kind === 'resHeaders') return renderHeaders(r.response_headers);
+  else if (kind === 'reqHeaders') return renderHeaders(r.request_headers);
+
+  if (raw == null || raw === '') return '<div class="json-tree-empty">(empty)</div>';
+
+  // Try parse JSON; fall back to raw text
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch (_e) { isJson = false; }
+
+  var copyId = 'http-raw-' + r.id + '-' + kind;
+  var copyBtn = '<button class="copy-btn" data-copy-target="' + copyId + '">Copy</button>';
+
+  if (isJson) {
+    return copyBtn
+      + '<div class="json-tree" id="' + copyId + '" data-raw="' + escAttr(raw) + '">' + renderJsonNode(parsed, '', true) + '</div>';
+  }
+  return copyBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
+}
+
+function renderHeaders(jsonStr) {
+  if (!jsonStr) return '<div class="json-tree-empty">(no headers captured)</div>';
+  var obj;
+  try { obj = JSON.parse(jsonStr); } catch (_e) { return '<div class="raw-text">' + escHtml(jsonStr) + '</div>'; }
+  if (!obj || typeof obj !== 'object') return '<div class="json-tree-empty">(empty)</div>';
+  var rows = Object.keys(obj).map(function(k) {
+    return '<tr><td>' + escHtml(k) + '</td><td>' + escHtml(String(obj[k])) + '</td></tr>';
+  }).join('');
+  return '<table class="headers-table"><tbody>' + rows + '</tbody></table>';
+}
+
+/* JSON tree renderer — recursive, expandable */
+function renderJsonNode(value, key, root) {
+  var keyHtml = key !== '' ? '<span class="key">' + escHtml(key) + '</span><span class="punct">: </span>' : '';
+  if (value === null) return '<div class="line">' + keyHtml + '<span class="null">null</span></div>';
+  if (typeof value === 'boolean') return '<div class="line">' + keyHtml + '<span class="bool">' + value + '</span></div>';
+  if (typeof value === 'number') return '<div class="line">' + keyHtml + '<span class="num">' + value + '</span></div>';
+  if (typeof value === 'string') return '<div class="line">' + keyHtml + '<span class="str">' + escHtml(JSON.stringify(value)) + '</span></div>';
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '<div class="line">' + keyHtml + '<span class="punct">[]</span></div>';
+    var inner = value.map(function(v, i) { return renderJsonNode(v, String(i), false); }).join('');
+    var summary = ' <span class="summary" data-json-toggle>(' + value.length + ' item' + (value.length===1?'':'s') + ')</span>';
+    var startCollapsed = !root && value.length > 5;
+    var arrowChar = startCollapsed ? '▶' : '▼';
+    // No dedicated closing-bracket line — the dashed border + indentation
+    // already convey scope. Drops 33% of vertical space vs full pretty-print.
+    return '<div class="node' + (startCollapsed ? ' collapsed' : '') + '">'
+      + '<div class="line"><span class="toggle" data-json-toggle>' + arrowChar + '</span>' + keyHtml + '<span class="punct">[</span>' + summary + '</div>'
+      + '<div class="children">' + inner + '</div>'
+      + '</div>';
+  }
+  // object
+  var keys = Object.keys(value);
+  if (keys.length === 0) return '<div class="line">' + keyHtml + '<span class="punct">{}</span></div>';
+  var innerObj = keys.map(function(k) { return renderJsonNode(value[k], k, false); }).join('');
+  var summaryObj = ' <span class="summary" data-json-toggle>(' + keys.length + ' field' + (keys.length===1?'':'s') + ')</span>';
+  var startCollapsedObj = !root && keys.length > 8;
+  var arrowCharObj = startCollapsedObj ? '▶' : '▼';
+  return '<div class="node' + (startCollapsedObj ? ' collapsed' : '') + '">'
+    + '<div class="line"><span class="toggle" data-json-toggle>' + arrowCharObj + '</span>' + keyHtml + '<span class="punct">{</span>' + summaryObj + '</div>'
+    + '<div class="children">' + innerObj + '</div>'
+    + '</div>';
+}
+
+function switchHttpTab(tabEl) {
+  var kind = tabEl.getAttribute('data-http-tab');
+  var detailId = tabEl.getAttribute('data-detail-id');
+  if (tabEl.classList.contains('empty')) return;
+  // toggle active on siblings
+  tabEl.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  tabEl.classList.add('active');
+  // re-render body
+  var data = _httpDetailCache[detailId];
+  if (!data) return;
+  document.getElementById('http-tab-body-' + detailId).innerHTML = renderHttpTabBody(data.request, kind);
+}
+
+function navigateToHttpRequest(reqId) {
+  // Make sure the row is in the list; if not, the user changed filter — refetch
+  var existing = document.querySelector('[data-req-id="' + reqId + '"]');
+  if (!existing) {
+    // Switch filter to "all" so the target is visible
+    var allRadio = document.querySelector('input[name="http_filter"][value="all"]');
+    if (allRadio) { allRadio.checked = true; renderHttpTraffic().then(function() { navigateToHttpRequest(reqId); }); }
+    return;
+  }
+  // Collapse other open rows for clarity (optional — keeps UI focused)
+  document.querySelectorAll('.http-row.expanded').forEach(function(r) {
+    if (r !== existing) {
+      r.classList.remove('expanded');
+      var d = document.getElementById('http-detail-' + r.getAttribute('data-req-id'));
+      if (d) d.style.display = 'none';
+    }
+  });
+  if (!existing.classList.contains('expanded')) toggleHttpRow(existing);
+  existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyJsonContent(btn) {
+  var targetId = btn.getAttribute('data-copy-target');
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  // Prefer the original raw payload (kept as data-raw) over the formatted tree
+  var text = el.getAttribute('data-raw') || el.textContent || '';
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+  });
+}
+
+function escAttr(s) { return escHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }
+
 
 // Templates
 document.getElementById('save-template-btn').addEventListener('click', saveTemplate);

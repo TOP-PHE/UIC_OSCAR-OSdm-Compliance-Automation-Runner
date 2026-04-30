@@ -14,6 +14,32 @@
 (function (global) {
   'use strict';
 
+  // ── Universal auth-injecting fetch wrapper ──────────────────────────────────
+  // Every page that loads nav.js automatically gets a fetch() that:
+  //   - includes credentials so the oscar_session httpOnly cookie travels
+  //   - injects Authorization: Bearer <token> from localStorage as a fallback
+  //     for dev/HTTP environments where the Secure cookie attribute is blocked
+  // This way scattered fetch(url, {}) calls in scenarios.js, dashboard.html,
+  // etc. don't need to know about auth — they just work.
+  if (!global.__oscarFetchPatched) {
+    var _origFetch = global.fetch.bind(global);
+    global.fetch = function(input, init) {
+      init = init || {};
+      // Don't override credentials if the caller already set one (e.g. CORS)
+      if (init.credentials == null) init.credentials = 'same-origin';
+      // Inject Authorization header unless the caller already provided one
+      var bearer = null;
+      try { bearer = localStorage.getItem('oscar_token'); } catch (_e) {}
+      if (bearer) {
+        var hdrs = new Headers(init.headers || {});
+        if (!hdrs.has('Authorization')) hdrs.set('Authorization', 'Bearer ' + bearer);
+        init.headers = hdrs;
+      }
+      return _origFetch(input, init);
+    };
+    global.__oscarFetchPatched = true;
+  }
+
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -44,12 +70,6 @@
     var container = document.getElementById(containerId);
     if (!container) return;
 
-    var token = localStorage.getItem('oscar_token');
-    // Basic JWT format validation (three Base64url segments)
-    if (!token || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
-      localStorage.clear(); window.location.href = '/'; return;
-    }
-
     var user, company;
     try {
       user    = JSON.parse(localStorage.getItem('oscar_user')    || '{}');
@@ -57,6 +77,8 @@
     } catch (_e) {
       localStorage.clear(); window.location.href = '/'; return;
     }
+    // If user info is missing, session is not established — redirect to login.
+    if (!user || !user.email) { localStorage.clear(); window.location.href = '/'; return; }
     var role    = user.role || '';
 
     var isAdmin  = role === 'administrator';
@@ -129,4 +151,18 @@
   }
 
   global.renderOscarNav = renderOscarNav;
+
+  // ── Global logout helper ─────────────────────────────────────────────────────
+  // Revokes the session token on the server (clears httpOnly cookie), then clears
+  // client-side session storage and redirects to the login page.
+  global.logout = function logout() {
+    fetch('/v1/auth/logout', { method: 'POST', credentials: 'same-origin' })
+      .catch(function () { /* ignore network errors — session data is cleared regardless */ })
+      .finally(function () {
+        localStorage.removeItem('oscar_user');
+        localStorage.removeItem('oscar_company');
+        localStorage.removeItem('oscar_token'); // remove legacy key if still present
+        window.location.href = '/';
+      });
+  };
 })(window);

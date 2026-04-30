@@ -293,8 +293,8 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 </div>
 
 <script>
-const token = localStorage.getItem('oscar_token');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 
 const isAdmin  = user.role === 'administrator';
@@ -306,7 +306,10 @@ if (!isAdmin && !isCertif) {
 }
 
 
-const authHeaders = { Authorization: `Bearer ${token}` };
+// Send Bearer header on every admin API call. The auth middleware accepts
+// both httpOnly cookie AND Authorization: Bearer — the cookie is the prod
+// path, this is the dev/HTTP fallback.
+const authHeaders = { Authorization: 'Bearer ' + token };
 let companies = [];       // excludes platform-root — used for Create User form
 let allCompanies = [];    // full list including platform-root — used for user-table dropdowns
 let userSearchTimer = null;
@@ -316,7 +319,7 @@ const _initTab = new URLSearchParams(location.search).get('tab')
   || (isCertif ? 'reports' : 'users');
 let currentTab = _initTab;
 
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 function showMsg(text, ok) {
   const el = document.getElementById('msg');

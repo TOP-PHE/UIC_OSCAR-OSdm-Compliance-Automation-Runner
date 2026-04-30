@@ -28,6 +28,113 @@ const { extractRequestContext } = require('./contextExtractors');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 
+// Maximum size (bytes) of a single request or response body persisted to DB.
+// Bodies larger than this are truncated with a marker. Default 100 KB which
+// covers ~99% of OSDM payloads while keeping per-run storage bounded.
+const MAX_BODY_SIZE = parseInt(process.env.MAX_BODY_SIZE || '102400', 10);
+
+/**
+ * Serialize an object/string to a JSON string of bounded size. Returns NULL
+ * if the input is empty. If the serialization exceeds MAX_BODY_SIZE, the
+ * result is truncated with a "[truncated NNN bytes]" suffix so the consumer
+ * can detect the cut.
+ */
+function serializeBounded(value) {
+  if (value === null || value === undefined || value === '') return null;
+  let str;
+  if (typeof value === 'string') str = value;
+  else {
+    try { str = JSON.stringify(value); } catch (_e) { return null; }
+  }
+  if (str.length <= MAX_BODY_SIZE) return str;
+  const cut = MAX_BODY_SIZE - 32;
+  return str.slice(0, cut) + `\n[truncated ${str.length - cut} bytes]`;
+}
+
+/**
+ * Extract response body from Bruno's entry. Bruno's serialization varies
+ * across versions / endpoints — try common shapes in order.
+ */
+function getResponseBody(entry) {
+  const r = entry && entry.response;
+  if (!r) return null;
+  return r.data ?? r.body ?? r.json ?? r.text ?? null;
+}
+
+function getRequestBody(entry) {
+  const r = entry && entry.request;
+  if (!r) return null;
+  return r.data ?? r.body ?? r.json ?? null;
+}
+
+function getHeaders(obj) {
+  if (!obj || !obj.headers) return null;
+  // Bruno headers can be: array of {name,value}, plain object, or Map-like
+  if (Array.isArray(obj.headers)) {
+    const out = {};
+    for (const h of obj.headers) {
+      if (h && h.name && !h.disabled) out[h.name] = h.value;
+    }
+    return out;
+  }
+  if (typeof obj.headers === 'object') return obj.headers;
+  return null;
+}
+
+/**
+ * Heuristic linkage for the "navigate up/down through message chain" feature.
+ *
+ * The OSDM flow generally goes:
+ *   /offers → /bookings (booking references an offerId from /offers)
+ *   /booking/{id} → /refund-offers → /refunds
+ *   /booking/{id} → /exchange-offers → /exchanges
+ *   /booking/{id} → /fulfillments
+ *
+ * For now we use a path-based heuristic: a request to one of the "child"
+ * endpoints links to the most recent earlier "parent" request from the same
+ * scenario (same run_id + scenario_name). We rely on insertion order — by the
+ * time we link, the parent has already been INSERT-ed in this transaction.
+ *
+ * This stays accurate without needing to parse offerIds out of every body,
+ * which would be brittle across vendor variations.
+ */
+const PARENT_PATH_RULES = [
+  // child endpoint regex                    →   parent endpoint regex
+  { child: /\/bookings(\b|\?|\/|$)/i,             parent: /\/offers(\b|\?|\/|$)/i },
+  { child: /\/refund-offers(\b|\?|\/|$)/i,        parent: /\/bookings(\/|$)/i },
+  { child: /\/refunds(\b|\?|\/|$)/i,              parent: /\/refund-offers(\b|\?|\/|$)/i },
+  { child: /\/exchange-offers(\b|\?|\/|$)/i,      parent: /\/bookings(\/|$)/i },
+  { child: /\/exchanges(\b|\?|\/|$)/i,            parent: /\/exchange-offers(\b|\?|\/|$)/i },
+  { child: /\/fulfillments(\b|\?|\/|$)/i,         parent: /\/bookings(\/|$)/i },
+];
+
+function inferParentRequestId(url, runId, scenarioName) {
+  if (!url || !runId) return null;
+  for (const { child, parent } of PARENT_PATH_RULES) {
+    if (child.test(url)) {
+      // Find the most recent matching parent in the same scenario.
+      // We can't filter by parent regex directly in SQL, so we pull the last
+      // few requests of this scenario and pick the first that matches.
+      const candidates = require('../db/db').all(
+        `SELECT rq.id, rq.http_url
+           FROM run_requests rq
+           JOIN run_suites s ON s.id = rq.suite_id
+          WHERE rq.run_id = ?
+            AND s.scenario_name IS ?
+            AND rq.http_url IS NOT NULL
+          ORDER BY rq.id DESC
+          LIMIT 30`,
+        [runId, scenarioName ?? null]
+      );
+      for (const c of candidates) {
+        if (parent.test(c.http_url)) return c.id;
+      }
+      return null;   // child pattern matched but no parent yet — chain root
+    }
+  }
+  return null;       // not a recognized child endpoint
+}
+
 // Auth/token URL patterns to skip (same as diff.js)
 const AUTH_URL_RE = /\/(token|login|auth|logon|oauth)/i;
 const AUTH_NAME_RE = /access.?token/i;
@@ -161,11 +268,35 @@ function extractStructuredResults(runId, companyId) {
         // to know which extractor was used.
         const context = extractRequestContext(entry);
 
-        // Insert request row
+        // Capture full HTTP traffic (bounded by MAX_BODY_SIZE) so Report Builder
+        // can show req/res content + headers and let users navigate the message
+        // chain. Bodies are JSON-serialized; when already a string they pass
+        // through unchanged. Headers are stored as JSON objects.
+        const reqBody = serializeBounded(getRequestBody(entry));
+        const resBody = serializeBounded(getResponseBody(entry));
+        const reqHeaders = serializeBounded(getHeaders(entry.request));
+        const resHeaders = serializeBounded(getHeaders(entry.response));
+
+        // Heuristic parent linkage: when this is a /bookings, /refund-offers,
+        // /exchange-offers, or /fulfillments call, look up the most recent
+        // /offers (or /refund-offers / /exchange-offers) request earlier in
+        // the same scenario and link to it. Lets the UI render
+        // "← view originating offer" arrows in the JSON viewer.
+        let parentRequestId = null;
+        try {
+          parentRequestId = inferParentRequestId(url, runId, scenario);
+        } catch (_e) { /* linkage is best-effort */ }
+
+        // Insert request row (now with bodies + headers + parent link)
         const reqResult = dbRun(
-          `INSERT INTO run_requests (suite_id, run_id, company_id, request_name, http_method, http_url, http_status, duration_ms, context)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [suiteId, runId, companyId, reqName, method, url, httpStatus, duration, context]
+          `INSERT INTO run_requests
+             (suite_id, run_id, company_id, request_name, http_method, http_url,
+              http_status, duration_ms, context,
+              request_body, request_headers, response_body, response_headers,
+              parent_request_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [suiteId, runId, companyId, reqName, method, url, httpStatus, duration, context,
+           reqBody, reqHeaders, resBody, resHeaders, parentRequestId]
         );
         const requestId = reqResult.lastInsertRowid;
         const reqTotals = { total: 0, passed: 0, failed: 0 };
@@ -266,4 +397,4 @@ function extractStructuredResults(runId, companyId) {
   return { suites: suiteCount, requests: requestCount, assertions: assertionCount };
 }
 
-module.exports = { extractStructuredResults };
+module.exports = { extractStructuredResults, classifyVendorCapability, serializeBounded };

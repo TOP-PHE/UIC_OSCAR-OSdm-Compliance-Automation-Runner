@@ -153,7 +153,7 @@ async function doConfirm(e) {
       errEl.style.display = 'block';
       return;
     }
-    localStorage.setItem('oscar_token',   data.token);
+    // oscar_token no longer stored in localStorage — httpOnly cookie is used instead
     localStorage.setItem('oscar_company', JSON.stringify(data.company));
     localStorage.setItem('oscar_user',    JSON.stringify(data.user));
     document.getElementById('main').style.display = 'none';

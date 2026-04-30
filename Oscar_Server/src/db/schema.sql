@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE INDEX IF NOT EXISTS idx_runs_company_id ON runs(company_id);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+CREATE INDEX IF NOT EXISTS idx_runs_user_id ON runs(user_id);
 
 -- ── Run Events (log stream) ───────────────────────────────────────────────────
 -- Additional columns added via migrations in db.js:
@@ -322,6 +323,18 @@ CREATE TABLE IF NOT EXISTS report_templates (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ── Token Revocation Blacklist ────────────────────────────────────────────────
+-- Stores revoked JWT IDs (jti) so individual sessions can be invalidated
+-- without rotating the global JWT secret. Rows are pruned once expires_at
+-- passes — a background vacuum or periodic job can handle this.
+CREATE TABLE IF NOT EXISTS token_blacklist (
+  jti         TEXT PRIMARY KEY,
+  user_id     TEXT REFERENCES users(id) ON DELETE CASCADE,
+  expires_at  TEXT NOT NULL,             -- ISO-8601 UTC; mirrors the JWT exp
+  revoked_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
 
 -- ── Seed schema version ───────────────────────────────────────────────────────
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
