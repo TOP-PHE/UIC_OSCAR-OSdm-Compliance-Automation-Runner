@@ -216,6 +216,23 @@ router.get('/', (req, res) => {
   const isPlatform = isPlatformRole(req.user.role);
   let rows, total;
 
+  // Aggregate subquery fragments reused by both branches below.
+  // LEFT JOINs avoid N+1 correlated subqueries (one scan per run row).
+  const agg = `
+       LEFT JOIN (
+         SELECT run_id, COUNT(*) AS artifact_count
+         FROM   run_artifacts
+         GROUP  BY run_id
+       ) ra ON ra.run_id = r.id
+       LEFT JOIN (
+         SELECT run_id,
+                COUNT(*)                              AS scenario_count,
+                GROUP_CONCAT(DISTINCT scenario_name)  AS scenario_names
+         FROM   run_suites
+         WHERE  scenario_name IS NOT NULL
+         GROUP  BY run_id
+       ) rs ON rs.run_id = r.id`;
+
   if (isPlatform && !req.companyId) {
     // Admin / certifier: see everything except permanently deleted
     rows = all(
@@ -224,14 +241,12 @@ router.get('/', (req, res) => {
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.deleted_by, r.previous_status, r.batch_id, r.scenario_code,
               u.email AS submitted_by,
-              (SELECT COUNT(*) FROM run_artifacts WHERE run_id = r.id) AS artifact_count,
-              (SELECT COUNT(*) FROM run_suites WHERE run_id = r.id) AS scenario_count,
-              (SELECT GROUP_CONCAT(DISTINCT scenario_name)
-                 FROM run_suites
-                 WHERE run_id = r.id AND scenario_name IS NOT NULL) AS scenario_names
+              COALESCE(ra.artifact_count, 0) AS artifact_count,
+              COALESCE(rs.scenario_count,  0) AS scenario_count,
+              rs.scenario_names
        FROM runs r
        JOIN users u ON u.id = r.user_id
-       JOIN companies c ON c.id = r.company_id
+       JOIN companies c ON c.id = r.company_id${agg}
        WHERE r.status != 'DELETED'
        ORDER BY r.queued_at DESC
        LIMIT ? OFFSET ?`,
@@ -247,14 +262,12 @@ router.get('/', (req, res) => {
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
               u.email AS submitted_by,
-              (SELECT COUNT(*) FROM run_artifacts WHERE run_id = r.id) AS artifact_count,
-              (SELECT COUNT(*) FROM run_suites WHERE run_id = r.id) AS scenario_count,
-              (SELECT GROUP_CONCAT(DISTINCT scenario_name)
-                 FROM run_suites
-                 WHERE run_id = r.id AND scenario_name IS NOT NULL) AS scenario_names
+              COALESCE(ra.artifact_count, 0) AS artifact_count,
+              COALESCE(rs.scenario_count,  0) AS scenario_count,
+              rs.scenario_names
        FROM runs r
        JOIN users u ON u.id = r.user_id
-       JOIN companies c ON c.id = r.company_id
+       JOIN companies c ON c.id = r.company_id${agg}
        WHERE r.company_id = ? AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
        ORDER BY r.queued_at DESC
        LIMIT ? OFFSET ?`,
@@ -602,6 +615,114 @@ router.get('/:id/assertions', (req, res) => {
     by_category: byCategory,
     by_domain: byDomain,
     suites: result
+  });
+});
+
+// ── GET /v1/runs/:id/requests ─────────────────────────────────────────────────
+// HTTP traffic listing for a run. Returns one row per request_name with
+// metadata only (no bodies) so the caller can render a navigable list.
+// Bodies are loaded lazily via GET /v1/runs/:id/requests/:reqId.
+//
+// Query params:
+//   ?status_filter=failed   — only requests that failed (4xx/5xx) or had
+//                             at least one failed assertion
+//   ?status_filter=non2xx   — only HTTP non-2xx (regardless of assertions)
+//   ?status_filter=all      — everything (default)
+//   ?scenario=CODE          — limit to one scenario (matches run_suites.scenario_name)
+router.get('/:id/requests', (req, res) => {
+  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+
+  const { status_filter: filter = 'all', scenario } = req.query;
+
+  let sql = `
+    SELECT rq.id,
+           rq.suite_id,
+           s.scenario_name,
+           s.suite_name,
+           rq.request_name,
+           rq.http_method,
+           rq.http_url,
+           rq.http_status,
+           rq.duration_ms,
+           rq.parent_request_id,
+           rq.passed,
+           rq.failed,
+           CASE WHEN rq.request_body  IS NOT NULL THEN 1 ELSE 0 END AS has_request_body,
+           CASE WHEN rq.response_body IS NOT NULL THEN 1 ELSE 0 END AS has_response_body
+      FROM run_requests rq
+      JOIN run_suites s ON s.id = rq.suite_id
+     WHERE rq.run_id = ?`;
+  const params = [req.params.id];
+
+  if (scenario) { sql += ' AND s.scenario_name = ?'; params.push(scenario); }
+  if (filter === 'failed') {
+    // Failed = HTTP non-2xx OR at least one failed assertion on this request
+    sql += ' AND (rq.http_status IS NULL OR rq.http_status < 200 OR rq.http_status >= 300 OR rq.failed > 0)';
+  } else if (filter === 'non2xx') {
+    sql += ' AND (rq.http_status IS NULL OR rq.http_status < 200 OR rq.http_status >= 300)';
+  }
+  sql += ' ORDER BY rq.id ASC';
+
+  const requests = all(sql, params);
+  return res.json({
+    run_id: req.params.id,
+    total: requests.length,
+    filter,
+    scenario: scenario || null,
+    requests
+  });
+});
+
+// ── GET /v1/runs/:id/requests/:reqId ─────────────────────────────────────────
+// Full HTTP traffic for a single request: bodies + headers + chain links.
+// Bodies returned as strings exactly as stored (JSON or truncated marker);
+// the UI parses them client-side so we don't fail if a vendor returns
+// non-JSON. Parent and children are returned as compact summaries (no bodies)
+// so the client can render "← parent" / "→ children" navigation.
+router.get('/:id/requests/:reqId', (req, res) => {
+  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
+
+  // Tenant scope: the request row must belong to this run (which we just
+  // validated belongs to the caller).
+  const reqRow = get(
+    `SELECT rq.*, s.scenario_name, s.suite_name
+       FROM run_requests rq
+       JOIN run_suites s ON s.id = rq.suite_id
+      WHERE rq.id = ? AND rq.run_id = ?`,
+    [req.params.reqId, req.params.id]
+  );
+  if (!reqRow) return res.status(404).json({ status: 404, title: 'Request not found.' });
+
+  // Parent (if any) — compact summary
+  let parent = null;
+  if (reqRow.parent_request_id) {
+    parent = get(
+      `SELECT rq.id, rq.request_name, rq.http_method, rq.http_url, rq.http_status,
+              s.scenario_name
+         FROM run_requests rq
+         JOIN run_suites s ON s.id = rq.suite_id
+        WHERE rq.id = ? AND rq.run_id = ?`,
+      [reqRow.parent_request_id, req.params.id]
+    );
+  }
+
+  // Children — requests pointing to this one as their parent
+  const children = all(
+    `SELECT rq.id, rq.request_name, rq.http_method, rq.http_url, rq.http_status,
+            s.scenario_name
+       FROM run_requests rq
+       JOIN run_suites s ON s.id = rq.suite_id
+      WHERE rq.parent_request_id = ? AND rq.run_id = ?
+      ORDER BY rq.id ASC`,
+    [reqRow.id, req.params.id]
+  );
+
+  return res.json({
+    request: reqRow,
+    parent,
+    children
   });
 });
 

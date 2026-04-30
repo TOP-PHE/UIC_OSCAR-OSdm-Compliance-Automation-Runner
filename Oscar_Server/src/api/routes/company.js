@@ -9,18 +9,32 @@
  * GET    /v1/company/datafile  — serve data file download for browser
  */
 
-const express = require('express');
-const path    = require('path');
-const fs      = require('fs');
-const crypto  = require('crypto');
-const multer  = require('multer');
+const express   = require('express');
+const path      = require('path');
+const fs        = require('fs');
+const crypto    = require('crypto');
+const multer    = require('multer');
+const rateLimit = require('express-rate-limit');
 const { get, all, run } = require('../../db/db');
 const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope } = require('../helpers/shared');
+const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
+
+// ── Rate limiter for datafile write operations ────────────────────────────────
+// Prevents a leaked session token from being used to hammer the filesystem.
+// Limit is generous enough (20 uploads per 15 min) to not affect normal usage.
+const datafileMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15-minute window
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests',
+             detail: 'Too many datafile upload attempts. Please wait before trying again.' }
+});
 
 // ── Multer — datafile upload ───────────────────────────────────────────────────
 // Files are stored as {slug}-datafile.json in data/datafiles/
@@ -149,7 +163,7 @@ function requireTestManager(req, res) {
 }
 
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
-router.post('/datafile', upload.single('datafile'), (req, res) => {
+router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), (req, res) => {
   if (!requireTestManager(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
@@ -190,7 +204,7 @@ router.post('/datafile', upload.single('datafile'), (req, res) => {
 // NOTE: body is already parsed by the global express.json({limit:'5mb'}) in
 // server.js.  Do NOT add a second express.json() here — it would try to parse
 // an already-consumed stream.
-router.put('/datafile/json', (req, res) => {
+router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
   // Resolve company scope — same pattern as other routes
   if (req.user.role === 'certification_user') {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot modify the data file.' });
@@ -234,7 +248,12 @@ router.put('/datafile/json', (req, res) => {
 
   const filePath = path.join(dir, `${company.slug}-datafile.json`);
   const content  = JSON.stringify(body, null, 4);
-  fs.writeFileSync(filePath, content, 'utf8');
+  try {
+    await fs.promises.writeFile(filePath, content, 'utf8');
+  } catch (err) {
+    log.error({ err, companyId: targetCompanyId }, 'Failed to write datafile to disk');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
+  }
 
   const hash = crypto.createHash('sha256').update(content).digest('hex');
   run(

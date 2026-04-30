@@ -25,7 +25,27 @@ const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
-const JWT_EXPIRY  = '8h';
+const JWT_EXPIRY     = '8h';
+const JWT_EXPIRY_SEC = 8 * 60 * 60;   // same as JWT_EXPIRY in seconds
+
+// ── Session cookie helper ─────────────────────────────────────────────────────
+// Sets an httpOnly, Secure, SameSite=Strict cookie named oscar_session with
+// the JWT so the token never touches JavaScript-accessible storage.
+// The legacy token field is kept in the JSON body so CLI / API clients that
+// rely on Bearer tokens continue to work.
+function setSessionCookie(res, token) {
+  res.cookie('oscar_session', token, {
+    httpOnly: true,
+    // Only enforce Secure in production. On dev/local-testing we run on
+    // plain http://localhost and browsers reject Secure cookies on http,
+    // which would prevent login from "sticking". `test` was previously
+    // the only exemption — broaden it to "anything that isn't production".
+    secure:   process.env.NODE_ENV === 'production',
+    sameSite: 'Strict',
+    maxAge:   JWT_EXPIRY_SEC * 1000,
+    path:     '/',
+  });
+}
 
 // ── Rate limiting for auth endpoints (brute-force protection) ────────────────
 const authLimiter = rateLimit({
@@ -38,6 +58,7 @@ const authLimiter = rateLimit({
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
 router.use('/bootstrap', authLimiter);
+router.use('/logout', authLimiter);
 const REGISTRATION_EXPIRY_HOURS = 24;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,8 +70,9 @@ function makeSlug(name) {
 
 function signToken(user, company) {
   const role = normalizeRole(user.role);
+  const jti  = uuidv4();
   return jwt.sign(
-    { sub: user.id, email: user.email, companyId: company.id, role },
+    { sub: user.id, email: user.email, companyId: company.id, role, jti },
     process.env.JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );
@@ -225,6 +247,7 @@ router.post('/register/confirm',
 
   logAuthEvent({ userId: user.id, companyId: company.id, email: user.email, eventType: 'register_confirmed' });
 
+  setSessionCookie(res, jwtToken);
   return res.status(201).json({
     token:   jwtToken,
     user:    { id: user.id, email: user.email, role: normalizeRole(user.role) },
@@ -325,6 +348,7 @@ router.post('/login',
 
   logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_success', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
 
+  setSessionCookie(res, token);
   return res.json({
     token,
     user:    { id: user.id, email: user.email, role: normalizeRole(user.role) },
@@ -338,6 +362,41 @@ router.get('/me', requireAuth, (req, res) => {
   const company = get('SELECT id, name, slug, auth_mode, api_base, datafile_updated_at FROM companies WHERE id = ?', [req.user.companyId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found' });
   return res.json({ user: { ...user, role: normalizeRole(user.role) }, company });
+});
+
+// ── POST /v1/auth/logout ──────────────────────────────────────────────────────
+// Revokes the current session token (blacklists its jti) and clears the
+// oscar_session cookie. Works for both cookie-authenticated and Bearer-token
+// clients: we verify the token from either source, then blacklist its jti.
+router.post('/logout', requireAuth, (req, res) => {
+  // Extract raw token — try cookie first, then Authorization header.
+  const rawCookie = (req.headers.cookie || '').split(';')
+    .map(c => c.trim().split('='))
+    .find(([k]) => k === 'oscar_session');
+  const rawToken = rawCookie
+    ? decodeURIComponent(rawCookie.slice(1).join('='))
+    : ((req.headers['authorization'] || '').startsWith('Bearer ')
+        ? req.headers['authorization'].slice(7)
+        : null);
+
+  if (rawToken) {
+    try {
+      const payload = jwt.decode(rawToken);
+      if (payload && payload.jti) {
+        // exp is a Unix timestamp (seconds); convert to ISO-8601
+        const expiresAt = new Date((payload.exp || 0) * 1000).toISOString();
+        run(
+          `INSERT OR IGNORE INTO token_blacklist (jti, user_id, expires_at) VALUES (?, ?, ?)`,
+          [payload.jti, req.user.id, expiresAt]
+        );
+      }
+    } catch (_) { /* if decode fails just clear the cookie */ }
+  }
+
+  // Clear the session cookie
+  res.clearCookie('oscar_session', { httpOnly: true, secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Strict', path: '/' });
+  return res.json({ logged_out: true });
 });
 
 module.exports = router;

@@ -185,6 +185,38 @@ const MIGRATIONS = [
         throw e;
       }
   }},
+  { version: 13, name: 'run-requests-http-traffic', up: () => {
+      // Persist full request/response payloads + headers per HTTP call so
+      // Report Builder can show them and let the user navigate the message
+      // chain (e.g. booking → originating offer). Bodies are TEXT (JSON or
+      // raw) — truncated upstream in structureResults.js to keep DB size
+      // bounded (default 100 KB per body).
+      _safeAlter('ALTER TABLE run_requests ADD COLUMN request_body TEXT');
+      _safeAlter('ALTER TABLE run_requests ADD COLUMN request_headers TEXT');     // JSON
+      _safeAlter('ALTER TABLE run_requests ADD COLUMN response_body TEXT');
+      _safeAlter('ALTER TABLE run_requests ADD COLUMN response_headers TEXT');    // JSON
+      // Chain navigation: a /bookings call references its originating /offers
+      // result, etc. parent_request_id points to the run_requests.id of the
+      // earlier call in the chain (NULL for chain roots and unlinked calls).
+      _safeAlter('ALTER TABLE run_requests ADD COLUMN parent_request_id INTEGER');
+      // Index for fast "show me children of this offer" lookups
+      try { db.exec('CREATE INDEX IF NOT EXISTS idx_run_requests_parent ON run_requests(parent_request_id)'); }
+      catch (_e) { /* benign */ }
+  }},
+  { version: 14, name: 'token-revocation-blacklist', up: () => {
+      // Per-session token revocation (P3-11). Stores revoked JWT IDs (jti)
+      // so individual sessions can be invalidated without rotating the global
+      // secret. The jti claim is added to all new tokens at signing time.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS token_blacklist (
+          jti        TEXT PRIMARY KEY,
+          user_id    TEXT REFERENCES users(id) ON DELETE CASCADE,
+          expires_at TEXT NOT NULL,
+          revoked_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`);
+        db.exec('CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)');
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

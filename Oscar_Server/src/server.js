@@ -251,17 +251,8 @@ app.use((err, req, res, _next) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, () => {
-  console.log('');
-  console.log('╔═══════════════════════════════════════════════╗');
-  console.log('║   OSCAR — OSDM Conformance Automation Runner  ║');
-  console.log(`║   http://localhost:${PORT}                      ║`);
-  console.log('╚═══════════════════════════════════════════════╝');
-  console.log('');
-  console.log(`[server] Collection : ${process.env.COLLECTION_PATH}`);
-  console.log(`[server] Bruno CLI  : ${process.env.BRU_CMD}`);
-  console.log(`[server] Data dir   : ${DATAFILES_DIR}`);
-  console.log(`[server] JWT secret : persisted in DB (sessions survive restarts; admin can rotate)`);
-  console.log('');
+  log.info({ port: PORT, collection: process.env.COLLECTION_PATH, bru: process.env.BRU_CMD, dataDir: DATAFILES_DIR },
+    'OSCAR — OSDM Conformance Automation Runner started');
 });
 
 module.exports = app;

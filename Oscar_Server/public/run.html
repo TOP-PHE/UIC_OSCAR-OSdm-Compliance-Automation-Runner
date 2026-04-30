@@ -130,7 +130,7 @@ const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 const warnEl = document.getElementById('warn');
 function showWarn(msg) { warnEl.innerHTML = msg; warnEl.style.display = 'block'; }
@@ -144,8 +144,8 @@ async function loadProfile() {
   // per-tester credentials (auth_mode, OAuth profile, has_token, etc.) live
   // in different resources. Fetch both in parallel.
   const [companyRes, credsRes] = await Promise.all([
-    fetch('/v1/company',         { headers: { Authorization: `Bearer ${token}` } }),
-    fetch('/v1/me/credentials',  { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/v1/company',         {}),
+    fetch('/v1/me/credentials',  {})
   ]);
   if (!companyRes.ok || !credsRes.ok) return;
   const c = await companyRes.json();   // { api_base, datafile_*, ... }
@@ -204,7 +204,7 @@ async function loadProfile() {
   } else {
     // Fetch the datafile to read scenariosToRun
     try {
-      const dfRes = await fetch('/v1/company/datafile', { headers: { Authorization: `Bearer ${token}` } });
+      const dfRes = await fetch('/v1/company/datafile', {});
       if (dfRes.ok) {
         const df = await dfRes.json();
         const totalCount = (df.scenarios || []).length;
@@ -260,7 +260,7 @@ async function startRun() {
 
   const res = await fetch('/v1/runs', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ parallel: true })
   });
   const data = await res.json();
@@ -280,7 +280,7 @@ document.querySelector('[data-action="start-run"]').addEventListener('click', st
 /* ── Queue Status Panel ── */
 async function pollQueueStatus() {
   try {
-    const res = await fetch('/v1/runs/queue-status', { headers: { Authorization: 'Bearer ' + token } });
+    const res = await fetch('/v1/runs/queue-status', {});
     if (!res.ok) return;
     const data = await res.json();
     const panel = document.getElementById('queue-panel');

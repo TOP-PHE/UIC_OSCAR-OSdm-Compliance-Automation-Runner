@@ -12,6 +12,10 @@
 
 const jwt = require('jsonwebtoken');
 
+// Mock db.js so this unit test runs on any Node version (db.js needs node:sqlite ≥ 22).
+// requireAuth calls get() to check the token blacklist; returning null means "not revoked".
+jest.mock('../../src/db/db', () => ({ get: () => null }));
+
 process.env.JWT_SECRET = 'test-jwt-secret-deterministic';
 
 const { requireAuth, requireRole, normalizeRole, isPlatformRole, requireNotRole } = require('../../src/api/middleware/auth');

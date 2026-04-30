@@ -32,6 +32,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .welcome-banner.tester     {background:linear-gradient(135deg,#e8f5e9 0%,#f1f8e9 100%);border-left:5px solid #2e7d32}
 .welcome-banner.certifier  {background:linear-gradient(135deg,#e3f2fd 0%,#e8eaf6 100%);border-left:5px solid #1565c0}
 .welcome-banner.administrator{background:linear-gradient(135deg,#ffebee 0%,#fce4ec 100%);border-left:5px solid #c62828}
+.welcome-banner.test-manager{background:linear-gradient(135deg,#f3e5f5 0%,#ede7f6 100%);border-left:5px solid #6a1b9a}
 .welcome-icon{font-size:48px;line-height:1;flex-shrink:0}
 .welcome-text h1{font-size:22px;font-weight:800;color:#1a2e40;margin-bottom:6px}
 .welcome-text h1 span{font-size:22px}
@@ -40,6 +41,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .role-pill.tester      {background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7}
 .role-pill.certifier   {background:#e3f2fd;color:#1565c0;border-color:#90caf9}
 .role-pill.administrator{background:#ffebee;color:#c62828;border-color:#ef9a9a}
+.role-pill.test-manager{background:#f3e5f5;color:#6a1b9a;border-color:#ce93d8}
 
 /* ── Quick actions ───────────────────────────────────────────────────────── */
 .section-title{font-size:13px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
@@ -146,14 +148,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 
 <script>
 // ── Auth guard ────────────────────────────────────────────────────────────────
-const token   = localStorage.getItem('oscar_token');
+const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 
 const user    = JSON.parse(localStorage.getItem('oscar_user')    || '{}');
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const role    = user.role || 'company_user';
 
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_CONFIG = {
@@ -180,6 +182,20 @@ const ROLE_CONFIG = {
       { href:'/compare.html',           label:'Compare',     desc:'Diff two reports side by side',            icon:'⚖️', color:'purple' },
     ],
     cols: 'cols-2',
+  },
+  test_manager: {
+    label:   'Test Manager',
+    cssClass:'test-manager',
+    icon:    '⭐',
+    desc:    'You manage the shared test framework, resources and scenarios for your company. Run conformance tests and curate the configuration that all testers in your company use.',
+    actions: [
+      { href:'/scenarios.html', label:'Test Config', desc:'Manage shared framework, resources, scenarios', icon:'🧪', color:'orange' },
+      { href:'/run.html',       label:'New Run',     desc:'Execute the full OTST test suite',              icon:'▶️',  color:'green'  },
+      { href:'/dashboard.html', label:'Dashboard',   desc:'View your run history and results',             icon:'📊', color:'blue'   },
+      { href:'/compare.html',   label:'Compare',     desc:'Diff two reports side by side',                 icon:'⚖️', color:'purple' },
+      { href:'/profile.html',   label:'API Config',  desc:'Update your endpoint & credentials',            icon:'⚙️', color:'teal'   },
+    ],
+    cols: 'cols-5',
   },
   _tester: {
     label:   'Tester',

@@ -164,7 +164,7 @@ const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 const runId = new URLSearchParams(location.search).get('id');
 if (!runId) window.location.href = '/dashboard.html';
@@ -332,8 +332,8 @@ function downloadLogs() {
 async function poll() {
   try {
     const [runRes, logRes] = await Promise.all([
-      fetch(`/v1/runs/${runId}`,       { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`/v1/runs/${runId}/logs?since_id=${lastEventId}`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`/v1/runs/${runId}`,       {}),
+      fetch(`/v1/runs/${runId}/logs?since_id=${lastEventId}`, {})
     ]);
     if (runRes.status === 401) { logout(); return; }
     const run  = await runRes.json();
@@ -346,7 +346,7 @@ async function poll() {
 }
 
 async function loadArtifacts() {
-  const res = await fetch(`/v1/runs/${runId}/artifacts`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`/v1/runs/${runId}/artifacts`, {});
   if (!res.ok) return;
   const data = await res.json();
   if (!data.artifacts.length) return;
@@ -383,12 +383,11 @@ async function loadArtifacts() {
 }
 
 // Authenticated artifact download. Replaces the plain <a href> the JSON
-// results used to use, which the browser cannot send a Bearer token through.
+// results used to use, which requires an authenticated request (the session
+// cookie is sent automatically by the browser for same-origin requests).
 async function downloadArtifact(artifactId, filename) {
   try {
-    const res = await fetch(`/v1/runs/${runId}/artifacts/${artifactId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await fetch(`/v1/runs/${runId}/artifacts/${artifactId}`, {});
     if (res.status === 401) { logout(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -419,10 +418,8 @@ document.getElementById('artifacts-list').addEventListener('click', e => {
 
 async function deleteRun() {
   if (!confirm('Delete this run? It will no longer appear in the dashboard.')) return;
-  const res = await fetch(`/v1/runs/${runId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  const res = await fetch(`/v1/runs/${runId}`, { method: 'DELETE',
+    });
   if (res.status === 401) { logout(); return; }
   if (res.ok) {
     window.location.href = '/dashboard.html';
@@ -444,7 +441,7 @@ function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').re
 
 async function loadAssertions() {
   try {
-    const res = await fetch(`/v1/runs/${runId}/assertions`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`/v1/runs/${runId}/assertions`, {});
     if (!res.ok) return;
     assertionsData = await res.json();
     if (!assertionsData.summary || assertionsData.summary.total === 0) return;

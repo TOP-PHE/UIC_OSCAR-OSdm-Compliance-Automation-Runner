@@ -369,6 +369,10 @@ router.post('/configured', (req, res) => {
         vendor_capability: r.vendor_capability,
         result:        r.result,
         context:       r.context ? safeJsonParse(r.context) : null,
+        // Include the DB row id so the UI can call /reports/requests/:id/messages
+        // to fetch the raw HTTP exchange. rq_id may be replaced by a better-ranked
+        // row in a later iteration — that's fine, we always expose the worst one.
+        rq_id:         r.rq_id,
       };
     }
   });
@@ -386,6 +390,103 @@ router.post('/configured', (req, res) => {
     events,
     capability_matrix,
     assertions
+  });
+});
+
+// ── GET /v1/reports/requests/:id/messages ────────────────────────────────────
+// Returns the raw HTTP exchange (headers + body) stored for a single
+// run_request row, plus adjacent IDs for chain navigation.
+//
+// Query params:
+//   failed_only=true   — when navigating, skip PASS requests so the certifier
+//                        can jump straight from one failure to the next
+router.get('/requests/:id/messages', (req, res) => {
+  const requestId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid request id.' });
+  }
+
+  const isPlatform = isPlatformRole(req.user.role);
+
+  // Fetch the target row together with its suite's scenario_name and the run's
+  // company_id so we can enforce tenant ownership in one query.
+  const row = get(
+    `SELECT rq.id, rq.run_id, rq.suite_id, rq.company_id,
+            rq.request_name, rq.http_method, rq.http_url, rq.http_status,
+            rq.result, rq.duration_ms,
+            rq.req_headers, rq.req_body, rq.resp_headers, rq.resp_body,
+            rs.suite_name, rs.scenario_name
+     FROM run_requests rq
+     JOIN run_suites rs ON rs.id = rq.suite_id
+     WHERE rq.id = ?`,
+    [requestId]
+  );
+
+  if (!row) return res.status(404).json({ status: 404, title: 'Request not found.' });
+
+  // Tenant check — non-platform users may only access their own company's data.
+  if (!isPlatform && row.company_id !== req.companyId) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Request does not belong to your company.' });
+  }
+
+  // ── Chain navigation: prev / next IDs within the same run ────────────────
+  // Execution order is guaranteed by the INTEGER PRIMARY KEY (id ASC).
+  const failedOnly = req.query.failed_only === 'true';
+  const resultFilter = failedOnly ? `AND rq2.result = 'FAIL'` : '';
+
+  const prevRow = get(
+    `SELECT rq2.id FROM run_requests rq2
+     WHERE rq2.run_id = ? AND rq2.id < ? ${resultFilter}
+     ORDER BY rq2.id DESC LIMIT 1`,
+    [row.run_id, requestId]
+  );
+  const nextRow = get(
+    `SELECT rq2.id FROM run_requests rq2
+     WHERE rq2.run_id = ? AND rq2.id > ? ${resultFilter}
+     ORDER BY rq2.id ASC LIMIT 1`,
+    [row.run_id, requestId]
+  );
+
+  // Ordinal position within the (optionally filtered) chain — tells the UI
+  // "request 3 of 12" without requiring the client to know all IDs.
+  const posRow = get(
+    `SELECT COUNT(*) AS pos FROM run_requests rq2
+     WHERE rq2.run_id = ? AND rq2.id <= ? ${resultFilter}`,
+    [row.run_id, requestId]
+  );
+  const totalRow = get(
+    `SELECT COUNT(*) AS total FROM run_requests rq2
+     WHERE rq2.run_id = ? ${resultFilter}`,
+    [row.run_id]
+  );
+
+  // Deserialise stored JSON blobs defensively.
+  function safeParseHeaders(s) {
+    if (!s) return null;
+    try { return JSON.parse(s); } catch (_) { return null; }
+  }
+
+  return res.json({
+    id:            row.id,
+    run_id:        row.run_id,
+    request_name:  row.request_name,
+    suite_name:    row.suite_name,
+    scenario_name: row.scenario_name,
+    http_method:   row.http_method,
+    http_url:      row.http_url,
+    http_status:   row.http_status,
+    result:        row.result,
+    duration_ms:   row.duration_ms,
+    req_headers:   safeParseHeaders(row.req_headers),
+    req_body:      row.req_body || null,
+    resp_headers:  safeParseHeaders(row.resp_headers),
+    resp_body:     row.resp_body || null,
+    // Chain navigation
+    prev_id:       prevRow ? prevRow.id : null,
+    next_id:       nextRow ? nextRow.id : null,
+    position:      posRow  ? posRow.pos  : null,
+    total:         totalRow ? totalRow.total : null,
+    failed_only:   failedOnly,
   });
 });
 

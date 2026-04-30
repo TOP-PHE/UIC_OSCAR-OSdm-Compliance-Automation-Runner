@@ -43,6 +43,12 @@ function _incrementAndCheck(runId) {
 }
 function _resetLineCounter(runId) { _runLineCounters.delete(runId); }
 
+// ── Async FS helpers ──────────────────────────────────────────────────────────
+/** Non-throwing async equivalent of fs.existsSync(). */
+async function fsExists(p) {
+  try { await fs.promises.access(p); return true; } catch { return false; }
+}
+
 // ── Log helper — writes to run_events with optional structured metadata ───────
 function logEvent(runId, level, message, meta) {
   const lineCount = _incrementAndCheck(runId);
@@ -287,7 +293,7 @@ async function createWorkspace(runId) {
   await Promise.all(copyDirs.map(async (item) => {
     const src  = path.join(COLLECTION_PATH, item);
     const dest = path.join(workspaceDir, item);
-    if (fs.existsSync(src)) {
+    if (await fsExists(src)) {
       await fs.promises.cp(src, dest, { recursive: true });
     }
   }));
@@ -296,7 +302,7 @@ async function createWorkspace(runId) {
   const copyFiles = ['opencollection.yml', '.gitignore'];
   await Promise.all(copyFiles.map(async (file) => {
     const src = path.join(COLLECTION_PATH, file);
-    if (fs.existsSync(src)) {
+    if (await fsExists(src)) {
       await fs.promises.copyFile(src, path.join(workspaceDir, file));
     }
   }));
@@ -337,7 +343,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
   // 2. Prepare artifact directory
   const runArtifactDir = path.join(ARTIFACTS_DIR, runId);
-  if (!fs.existsSync(runArtifactDir)) fs.mkdirSync(runArtifactDir, { recursive: true });
+  await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
   // 3. Resolve access token (per-tester credentials, per-tester token cache)
   let accessToken;
@@ -437,7 +443,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // 5. Validate data file exists
   const datafileUrl = `http://localhost:${process.env.PORT || 3001}/data/${companyRow.slug}-datafile.json`;
   const datafilePath = companyRow.datafile_path;
-  if (!datafilePath || !fs.existsSync(datafilePath)) {
+  if (!datafilePath || !(await fsExists(datafilePath))) {
     const msg = 'No data file uploaded. Upload a data file in your company profile before running.';
     dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
     logEvent(runId, 'error', `[runner] ${msg}`);
@@ -471,8 +477,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
   try {
-    if (!fs.existsSync(envsDir)) fs.mkdirSync(envsDir, { recursive: true });
-    fs.writeFileSync(envFilePath, envYml, { mode: 0o600, encoding: 'utf8' });
+    await fs.promises.mkdir(envsDir, { recursive: true });
+    await fs.promises.writeFile(envFilePath, envYml, { mode: 0o600, encoding: 'utf8' });
     logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml` + (scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : ''));
   } catch (err) {
     const msg = `Failed to write env file: ${err.message}`;
@@ -490,9 +496,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const bruJsonRel     = `Validation_Reports/${bruJsonFile}`;             // relative to cwd
   const bruJsonAbsPath = path.join(valDir, bruJsonFile);                  // absolute for post-processing
 
-  if (!fs.existsSync(valDir)) fs.mkdirSync(valDir, { recursive: true });
-
-  // 8. Spawn bru.cmd
+  await fs.promises.mkdir(valDir, { recursive: true });
   logEvent(runId, 'info', `[runner] Spawning bru.cmd — env=${envName} cwd=${runCwd}`);
 
   // Record wall-clock time before Bruno starts so we can later filter report
@@ -591,7 +595,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     let envDeleted = false;
     for (let attempt = 1; attempt <= 3 && !envDeleted; attempt++) {
       try {
-        fs.unlinkSync(envFilePath);
+        await fs.promises.unlink(envFilePath);
         envDeleted = true;
       } catch (err) {
         logEvent(runId, 'warn', `[runner] Env file deletion attempt ${attempt} failed: ${err.code}`);
@@ -624,21 +628,24 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
   try {
     // Look for reportGenerator.js output: has scenario code in name → longer than mergeReportName
-    const candidates = fs.readdirSync(valDir)
-      .filter(f =>
-        f.startsWith(prefix) &&
-        f.endsWith('_Report.html') &&
-        f !== mergeReportName &&          // exclude mergeReport.js output
-        fs.statSync(path.join(valDir, f)).mtimeMs >= runStartTime  // only files from THIS run
-      )
-      .map(f => ({ name: f, mtime: fs.statSync(path.join(valDir, f)).mtimeMs }))
-      .sort((a, b) => b.mtime - a.mtime);  // most recent first (in case of multiple scenarios)
+    const entries = await fs.promises.readdir(valDir);
+    const statResults = await Promise.all(
+      entries
+        .filter(f => f.startsWith(prefix) && f.endsWith('_Report.html') && f !== mergeReportName)
+        .map(async f => {
+          const st = await fs.promises.stat(path.join(valDir, f));
+          return { name: f, mtime: st.mtimeMs };
+        })
+    );
+    const candidates = statResults
+      .filter(r => r.mtime >= runStartTime)    // only files from THIS run
+      .sort((a, b) => b.mtime - a.mtime);      // most recent first
 
     if (candidates.length > 0) {
       // Link ALL scenario reports — one artifact per scenario in multi-scenario runs.
       // Filename format from reportGenerator.js: {prefix}_{SCENARIO_CODE}_Report.html
       // We store each as report_{SCENARIO_CODE}.html so filenames are distinct.
-      candidates.forEach((cand) => {
+      await Promise.all(candidates.map(async (cand) => {
         const scenarioCode = cand.name
           .slice(prefix.length + 1)           // strip "{prefix}_"
           .replace(/_Report\.html$/i, '')      // strip "_Report.html"
@@ -646,13 +653,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const artifactFilename = `report_${scenarioCode}.html`;
         const srcHtml  = path.join(valDir, cand.name);
         const destHtml = path.join(runArtifactDir, artifactFilename);
-        fs.copyFileSync(srcHtml, destHtml);
+        await fs.promises.copyFile(srcHtml, destHtml);
         dbRun(
           `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', ?, ?)`,
           [uuidv4(), runId, artifactFilename, destHtml]
         );
         logEvent(runId, 'info', `[runner] HTML report artifact linked (${cand.name}).`);
-      });
+      }));
       htmlArtifactLinked = true;
     } else {
       logEvent(runId, 'warn', `[runner] No reportGenerator HTML found (prefix=${prefix}, scenario code expected in name).`);
@@ -664,13 +671,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // 10b. Run mergeReport.js (produces a separate report with req/res bodies from .report_tmp.json).
   //      We run it for completeness; its output is used as fallback if reportGenerator.js produced nothing.
   const mergeReportJs = path.join(runCwd, 'library-bruno', 'mergeReport.js');
-  if (fs.existsSync(mergeReportJs) && fs.existsSync(bruJsonAbsPath)) {
+  if (await fsExists(mergeReportJs) && await fsExists(bruJsonAbsPath)) {
     logEvent(runId, 'info', '[runner] Running mergeReport.js...');
 
     // mergeReport.js expects .bru_results.json by convention (hardcoded name).
     // Copy our run-specific JSON to the standard name so mergeReport.js can find it.
     const stdJsonPath = path.join(valDir, '.bru_results.json');
-    try { fs.copyFileSync(bruJsonAbsPath, stdJsonPath); } catch (_) {}
+    try { await fs.promises.copyFile(bruJsonAbsPath, stdJsonPath); } catch (_) {}
 
     const htmlExitCode = await new Promise((resolve) => {
       const proc = spawn(process.execPath, [mergeReportJs, envName], {
@@ -684,14 +691,14 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     });
 
     // Clean up the standard-name JSON copy after mergeReport finishes
-    try { fs.unlinkSync(stdJsonPath); } catch (_) {}
+    try { await fs.promises.unlink(stdJsonPath); } catch (_) {}
 
     // Fallback: if reportGenerator.js report was not found, use mergeReport.js output
     if (!htmlArtifactLinked && htmlExitCode === 0) {
       const mergeHtmlPath = path.join(valDir, mergeReportName);
-      if (fs.existsSync(mergeHtmlPath)) {
+      if (await fsExists(mergeHtmlPath)) {
         const destHtml = path.join(runArtifactDir, `report.html`);
-        fs.copyFileSync(mergeHtmlPath, destHtml);
+        await fs.promises.copyFile(mergeHtmlPath, destHtml);
         dbRun(
           `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'report.html', ?)`,
           [uuidv4(), runId, destHtml]
@@ -701,15 +708,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     }
 
     // Copy the raw JSON results into the run artifact dir, then clean up source
-    if (fs.existsSync(bruJsonAbsPath)) {
+    if (await fsExists(bruJsonAbsPath)) {
       const destJson = path.join(runArtifactDir, '.bru_results.json');
-      fs.copyFileSync(bruJsonAbsPath, destJson);
+      await fs.promises.copyFile(bruJsonAbsPath, destJson);
       dbRun(
         `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'json_results', '.bru_results.json', ?)`,
         [uuidv4(), runId, destJson]
       );
       // Remove run-specific JSON from Validation_Reports to avoid accumulation
-      try { fs.unlinkSync(bruJsonAbsPath); } catch (_) {}
+      try { await fs.promises.unlink(bruJsonAbsPath); } catch (_) {}
     }
   }
 

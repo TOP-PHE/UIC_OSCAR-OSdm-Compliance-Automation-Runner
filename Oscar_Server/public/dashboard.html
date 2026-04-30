@@ -181,12 +181,12 @@ h2{color:#0090D4;font-size:20px}
 </footer>
 
 <script>
-const token   = localStorage.getItem('oscar_token');
+const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 const canDelete = user.role === 'administrator' || user.role === 'company_user' || user.role === 'test_manager';
 
@@ -397,7 +397,7 @@ async function confirmDelete() {
   const ids = [...selected];
   const res = await fetch('/v1/runs/bulk-delete', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ run_ids: ids })
   });
   if (res.status === 401) { logout(); return; }
@@ -415,7 +415,7 @@ async function confirmDelete() {
 
 // ── Load runs ─────────────────────────────────────────────────────────────────
 async function loadRuns() {
-  const res = await fetch('/v1/runs?limit=100', { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch('/v1/runs?limit=100', {});
   if (res.status === 401) { logout(); return; }
   const data = await res.json();
   allRuns = data.runs || [];
@@ -469,7 +469,7 @@ loadRuns();
 // ── Live queue status ────────────────────────────────────────────────────────
 async function pollQueueInfo() {
   try {
-    const res = await fetch('/v1/runs/queue-status', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch('/v1/runs/queue-status', {});
     if (!res.ok) return;
     const data = await res.json();
     const panel = document.getElementById('queue-info');

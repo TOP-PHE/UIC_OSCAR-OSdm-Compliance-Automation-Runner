@@ -99,7 +99,7 @@ const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-function logout() { localStorage.clear(); window.location.href = '/'; }
+// logout() provided by nav.js
 
 const params = new URLSearchParams(location.search);
 const runAId = params.get('a');
@@ -195,7 +195,7 @@ function esc(s) {
 async function loadComparison() {
   const res = await fetch('/v1/reports/compare', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ run_a_id: runAId, run_b_id: runBId })
   });
   const data = await res.json();
