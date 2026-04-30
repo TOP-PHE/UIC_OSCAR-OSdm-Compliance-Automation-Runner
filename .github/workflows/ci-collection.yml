@@ -1,0 +1,67 @@
+name: CI · Bruno collection
+
+# Runs only when the Bruno collection or this workflow itself changes.
+# Server / docs changes skip this entire pipeline.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Bruno_Collection/**'
+      - '.github/workflows/ci-collection.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Bruno_Collection/**'
+      - '.github/workflows/ci-collection.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  validate:
+    name: Validate Bruno collection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      - name: Bruno CLI version
+        run: bru --version
+
+      - name: VERSION file present
+        # Compatibility check at boot reads Bruno_Collection/VERSION; refuse
+        # to merge any PR that drops or empties it.
+        run: |
+          test -s Bruno_Collection/VERSION
+          echo "Collection version: $(cat Bruno_Collection/VERSION)"
+
+      - name: opencollection.yml present and parseable
+        run: |
+          test -f Bruno_Collection/opencollection.yml
+          # Cheap YAML sanity check via Python (preinstalled on ubuntu-latest)
+          python3 -c "import yaml; yaml.safe_load(open('Bruno_Collection/opencollection.yml'))"
+
+      - name: Lint .bru files (syntax, structural)
+        # `bru run --dry-run` would actually call APIs; we just want syntax
+        # validation. Bruno's CLI does not yet have a dedicated lint command,
+        # so we glob and check that each .bru file has the required headers.
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in $(find Bruno_Collection -type f -name '*.bru'); do
+            if ! grep -q '^meta {' "$f"; then
+              echo "MISSING meta block: $f"
+              fail=1
+            fi
+          done
+          exit $fail
