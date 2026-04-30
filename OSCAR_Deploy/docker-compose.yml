@@ -12,6 +12,8 @@ services:
       # Path inside the container where the Bruno collection is mounted.
       # Matches the read-only volume mapping below.
       COLLECTION_PATH: /collection
+      # Path to the monorepo-level compatibility matrix mounted below.
+      COMPATIBILITY_FILE: /app/compatibility.json
       NODE_ENV: production
     ports:
       # Bind to localhost only — front with nginx for HTTPS termination.
@@ -25,6 +27,9 @@ services:
       # Mount the Bruno test collection from the sibling Bruno_Collection/
       # folder of the monorepo. Read-only — OSCAR never writes here.
       - ../Bruno_Collection:/collection:ro
+      # Mount the monorepo-level compatibility matrix (read-only). The server
+      # reads this at startup and surfaces the result via /health.
+      - ../compatibility.json:/app/compatibility.json:ro
     restart: unless-stopped
 
 # ── Notes ─────────────────────────────────────────────────────────────────
