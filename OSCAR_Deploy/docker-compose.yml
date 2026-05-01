@@ -43,7 +43,12 @@ services:
   # rollout therefore happens automatically when promote-release.yml pushes
   # a new :stable image — i.e. only when you push a release-YYYY.MM Git tag.
   watchtower:
-    image: containrrr/watchtower
+    # Active community fork. The original containrrr/watchtower image
+    # ships with an old Docker SDK that requests API v1.25 — Docker
+    # Engine 25+ rejects that as below the minimum (1.40), causing the
+    # container to spin in an error loop. nickfedor/watchtower is the
+    # maintained drop-in replacement using the same env-var contract.
+    image: nickfedor/watchtower:latest
     container_name: watchtower
     restart: unless-stopped
     environment:
