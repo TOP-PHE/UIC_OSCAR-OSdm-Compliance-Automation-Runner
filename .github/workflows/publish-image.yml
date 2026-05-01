@@ -1,0 +1,78 @@
+name: Publish · server image to GHCR
+
+# Builds the OSCAR server image and pushes it to GitHub Container Registry.
+# Runs on every push to main that touches the server (so we always have an
+# :edge tag of latest main) and on every server-vX.Y.Z tag (so we keep an
+# immutable image per server release).
+#
+# Production-grade rollout (the :stable tag) is owned by promote-release.yml
+# and only fires when a release-YYYY.MM tag is pushed. Watchtower on the VPS
+# watches :stable, so :edge updates here do NOT auto-deploy to production.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Oscar_Server/**'
+      - 'compatibility.json'
+      - '.github/workflows/publish-image.yml'
+    tags:
+      - 'server-v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/oscar-server   # ghcr.io/top-phe/oscar-server
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  publish:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write          # needed to push to GHCR
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Lower-case image name
+        # GHCR rejects upper-case characters in the image path. The repo owner
+        # may be mixed-case (TOP-PHE), so we normalise once here and reuse it.
+        id: img
+        run: echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}     # auto-issued, no PAT needed
+
+      - name: Compute tags
+        # Tags applied to every build:
+        #   - :edge        always overwrites the previous edge image
+        #   - :sha-<short> immutable per commit, useful for rollback
+        # If the trigger is a server-vX.Y.Z tag push, also apply that tag.
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,prefix=sha-,format=short
+            type=match,pattern=server-(v.+),group=1,enable=${{ startsWith(github.ref, 'refs/tags/server-v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Oscar_Server
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false   # avoids the multi-arch attestation that breaks Watchtower diffing

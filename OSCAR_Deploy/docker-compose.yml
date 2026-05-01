@@ -1,40 +1,73 @@
 services:
   oscar:
-    build:
-      context: ../Oscar_Server
-      dockerfile: Dockerfile
+    # Production: pull the pre-built image from GHCR (the :stable tag is
+    # promoted by .github/workflows/promote-release.yml when a release-YYYY.MM
+    # Git tag is pushed). For local dev / first-time setup before any image
+    # has been published, comment out the `image:` line and uncomment the
+    # `build:` block below.
+    image: ghcr.io/top-phe/oscar-server:stable
+    # build:
+    #   context: ../Oscar_Server
+    #   dockerfile: Dockerfile
     container_name: oscar
     env_file: .env
     environment:
-      # Path to the Bruno CLI binary inside the runtime image (installed
-      # in the builder stage and copied across — see Oscar_Server/Dockerfile).
+      # Path to the Bruno CLI binary inside the runtime image.
       BRU_CMD: /usr/local/bin/bru
       # Path inside the container where the Bruno collection is mounted.
-      # Matches the read-only volume mapping below.
       COLLECTION_PATH: /collection
       # Path to the monorepo-level compatibility matrix mounted below.
       COMPATIBILITY_FILE: /app/compatibility.json
       NODE_ENV: production
     ports:
       # Bind to localhost only — front with nginx for HTTPS termination.
-      # In a dev/test setup you can drop the 127.0.0.1: prefix to expose
-      # the port directly on all interfaces.
       - "127.0.0.1:3001:3001"
     volumes:
       # Persist SQLite DB, artifacts, and datafiles across container restarts.
-      # The folder is created on first run; gitignored at the repo root.
       - ./data:/app/data
-      # Mount the Bruno test collection from the sibling Bruno_Collection/
-      # folder of the monorepo. Read-only — OSCAR never writes here.
+      # Bruno test collection — read-only bind-mount from the sibling folder
+      # of the monorepo. Refreshed by refresh-collection.sh on collection-only
+      # commits to main, no rebuild needed.
       - ../Bruno_Collection:/collection:ro
-      # Mount the monorepo-level compatibility matrix (read-only). The server
-      # reads this at startup and surfaces the result via /health.
+      # Monorepo compatibility matrix — read-only.
       - ../compatibility.json:/app/compatibility.json:ro
     restart: unless-stopped
+    labels:
+      # Tells Watchtower (below) to monitor THIS container for new versions
+      # of the :stable tag. Containers without this label are ignored.
+      com.centurylinklabs.watchtower.enable: "true"
 
-# ── Notes ─────────────────────────────────────────────────────────────────
-# - The OSCAR image bundles the Bruno CLI, so no separate Bruno service is
-#   needed. The collection is just data, mounted read-only.
-# - To upgrade: `git pull` at the monorepo root, then from this folder:
-#       docker compose up -d --build
-# - To back up: stop the container, tar `./data/oscar.db`, restart.
+  # ── Auto-update agent ──────────────────────────────────────────────────────
+  # Watchtower polls GHCR every 5 minutes and pulls + recreates the oscar
+  # container if a new digest is available for the :stable tag. Production
+  # rollout therefore happens automatically when promote-release.yml pushes
+  # a new :stable image — i.e. only when you push a release-YYYY.MM Git tag.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    environment:
+      # Pull credentials for the private GHCR repo. Set up on the host
+      # via `docker login ghcr.io` before bringing the stack up — the
+      # resulting ~/.docker/config.json is mounted in below.
+      WATCHTOWER_LABEL_ENABLE: "true"      # only update labelled containers
+      WATCHTOWER_CLEANUP: "true"           # remove old image after pull
+      WATCHTOWER_POLL_INTERVAL: "300"      # 5 minutes
+      WATCHTOWER_INCLUDE_RESTARTING: "false"
+      WATCHTOWER_NOTIFICATIONS: ""         # add slack/email here later if wanted
+      TZ: UTC
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Read GHCR creds set up on the host with `docker login ghcr.io`.
+      - /home/ubuntu/.docker/config.json:/config.json:ro
+
+# ── Notes ─────────────────────────────────────────────────────────────────────
+# - Production rollout = push a release-YYYY.MM tag. The promote-release CI
+#   workflow rebuilds the image and pushes it as :stable. Watchtower picks
+#   it up within ~5 min.
+# - Collection updates do NOT need a release tag — the refresh-collection
+#   workflow SSHes in and `git pull`s, the bind-mount makes the new .bru
+#   files immediately visible to the running container.
+# - To roll back: on the VPS, edit the `image:` line above to a specific
+#   tag (e.g. ghcr.io/top-phe/oscar-server:server-v1.2.0) and `docker compose
+#   up -d`. To re-enable auto-update later, restore :stable.

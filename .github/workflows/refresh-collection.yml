@@ -1,0 +1,48 @@
+name: Refresh · Bruno collection on production VPS
+
+# Triggered when main is updated and the change touched only the Bruno
+# collection (no server / deploy / doc changes that would warrant a real
+# release). SSHes into the production VPS and runs `git pull`. The
+# collection is bind-mounted read-only into the container, so no rebuild
+# or container restart is needed — OSCAR sees the new .bru files on the
+# next run.
+#
+# Production server image is NOT touched here — that lives behind the
+# release-tag promotion workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Bruno_Collection/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  refresh:
+    name: SSH git-pull on VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up SSH
+        # Drops the deploy key from the SSH_DEPLOY_KEY secret into the runner's
+        # ssh-agent and pre-populates known_hosts so we don't get a "host key
+        # verification failed" prompt on first connect.
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Trigger collection refresh on VPS
+        # The remote command is intentionally trivial — the locked-down
+        # authorized_keys entry on the VPS forces it to run a single script
+        # regardless of what we type here. See Server_Operations/auto-deploy-setup.md.
+        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh"
+
+      - name: Summary
+        run: |
+          echo "Triggered collection refresh on oscar.uic.org" >> "$GITHUB_STEP_SUMMARY"
+          echo "Server is bind-mounting the collection — new .bru files are visible immediately." >> "$GITHUB_STEP_SUMMARY"
