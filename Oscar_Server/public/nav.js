@@ -65,6 +65,94 @@
       + esc(meta.label) + '</span>';
   }
 
+  // ── Version badge (release / server / collection) ─────────────────────────────
+  // Reads /health, caches the result in localStorage for 5 minutes so we don't
+  // hammer the server on every page navigation. Color-codes the chip based on
+  // compatibility_status:
+  //   tested                → green
+  //   untested_combination  → amber
+  //   matrix_missing        → red
+  //   anything else / fetch failed → gray
+  var VERSION_CACHE_KEY = 'oscar_version_info';
+  var VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
+  var COMPAT_COLORS = {
+    tested:                { bg: '#e8f5e9', fg: '#2e7d32', dot: '#4caf50' },
+    untested_combination:  { bg: '#fff8e1', fg: '#a85b00', dot: '#ffb300' },
+    matrix_missing:        { bg: '#ffebee', fg: '#c62828', dot: '#e53935' },
+    unknown:               { bg: '#eceff1', fg: '#546e7a', dot: '#90a4ae' },
+  };
+  var COMPAT_LABELS = {
+    tested:               'Tested combination',
+    untested_combination: 'Untested combination — server / collection versions are not in compatibility.json',
+    matrix_missing:       'compatibility.json not found on server',
+    unknown:              'Version info unavailable',
+  };
+
+  function loadCachedVersion() {
+    try {
+      var raw = localStorage.getItem(VERSION_CACHE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (Date.now() - (parsed._fetchedAt || 0) > VERSION_CACHE_TTL_MS) return null;
+      return parsed;
+    } catch (_e) { return null; }
+  }
+
+  function fetchVersionInfo() {
+    return fetch('/health')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var info = {
+          server_version:       data.server_version       || data.version || 'unknown',
+          collection_version:   data.collection_version   || 'unknown',
+          release_label:        data.release_label        || null,
+          compatibility_status: data.compatibility_status || 'unknown',
+          _fetchedAt: Date.now(),
+        };
+        try { localStorage.setItem(VERSION_CACHE_KEY, JSON.stringify(info)); } catch (_e) {}
+        return info;
+      })
+      .catch(function () {
+        return { server_version: 'unknown', collection_version: 'unknown',
+                 release_label: null, compatibility_status: 'unknown' };
+      });
+  }
+
+  function renderVersionBadge(info) {
+    if (!info) return '';
+    var status = info.compatibility_status in COMPAT_COLORS ? info.compatibility_status : 'unknown';
+    var c = COMPAT_COLORS[status];
+    var releasePart = info.release_label
+      ? '<strong>' + esc(info.release_label) + '</strong> · '
+      : '';
+    var tooltip = COMPAT_LABELS[status]
+      + '\nServer: ' + (info.server_version || 'unknown')
+      + '\nCollection: ' + (info.collection_version || 'unknown')
+      + (info.release_label ? '\nRelease: ' + info.release_label : '');
+    return '<span class="oscar-version-badge" title="' + esc(tooltip) + '" '
+      + 'style="display:inline-flex;align-items:center;gap:6px;padding:2px 9px;'
+      + 'margin-left:8px;border-radius:10px;font-size:10px;font-weight:600;'
+      + 'font-family:ui-monospace,SFMono-Regular,Consolas,monospace;'
+      + 'background:' + c.bg + ';color:' + c.fg + ';border:1px solid ' + c.fg + '33;">'
+      + '<span style="width:6px;height:6px;border-radius:50%;background:' + c.dot + '"></span>'
+      + releasePart
+      + esc(info.server_version) + ' / ' + esc(info.collection_version)
+      + '</span>';
+  }
+
+  // After the nav DOM is in place, hydrate the badge — first synchronously from
+  // cache (so the badge appears instantly on hot navigation), then refresh from
+  // /health in the background to pick up server-side version changes.
+  function hydrateVersionBadge() {
+    var slot = document.getElementById('oscar-version-slot');
+    if (!slot) return;
+    var cached = loadCachedVersion();
+    if (cached) slot.innerHTML = renderVersionBadge(cached);
+    fetchVersionInfo().then(function (info) {
+      slot.innerHTML = renderVersionBadge(info);
+    });
+  }
+
   // ── Main render function ──────────────────────────────────────────────────────
   function renderOscarNav(containerId, activePage) {
     var container = document.getElementById(containerId);
@@ -136,6 +224,10 @@
       '<a href="/welcome.html" class="brand">'
         + '<img src="/oscar-icon.svg" alt="OSCAR"> OSCAR'
       + '</a>'
+      // Empty slot — populated asynchronously by hydrateVersionBadge() below.
+      // Rendered between brand and the menu items so it stays visible across
+      // every page without affecting the menu layout when missing.
+      + '<span id="oscar-version-slot"></span>'
       + sep
       + linkParts.join(sep)
       + '<span class="spacer"></span>'
@@ -147,6 +239,7 @@
     setTimeout(function() {
       var signout = document.getElementById('nav-signout');
       if (signout) signout.addEventListener('click', function(e) { e.preventDefault(); logout(); });
+      hydrateVersionBadge();
     }, 0);
   }
 
@@ -162,6 +255,7 @@
         localStorage.removeItem('oscar_user');
         localStorage.removeItem('oscar_company');
         localStorage.removeItem('oscar_token'); // remove legacy key if still present
+        localStorage.removeItem('oscar_version_info'); // refresh on next login
         window.location.href = '/';
       });
   };
