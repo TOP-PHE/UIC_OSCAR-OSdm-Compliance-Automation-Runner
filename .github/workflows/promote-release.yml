@@ -1,0 +1,84 @@
+name: Promote · release tag → :stable image
+
+# Triggered when a release-YYYY.MM Git tag is pushed. Builds the server
+# image at that exact tag and publishes it as :stable AND :release-YYYY.MM.
+# This is the ONLY workflow that touches :stable, which is the tag the
+# production VPS Watchtower watches. Everything else (publish-image.yml)
+# only updates :edge / :sha-* / :server-vX.Y.Z.
+#
+# Rationale: keeping :stable promotion as a separate explicit step prevents
+# every commit-to-main from auto-rolling production. You decide when by
+# pushing the release tag.
+on:
+  push:
+    tags:
+      - 'release-*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release-YYYY.MM tag to promote'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/oscar-server
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  promote:
+    name: Build & publish :stable from release tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Resolve release ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ref=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            echo "label=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            # Tag push — github.ref looks like refs/tags/release-2026.04
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "ref=$TAG" >> "$GITHUB_OUTPUT"
+            echo "label=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Lower-case image name
+        id: img
+        run: echo "name=$(echo '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push :stable + :<release-label>
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Oscar_Server
+          push: true
+          tags: |
+            ${{ steps.img.outputs.name }}:stable
+            ${{ steps.img.outputs.name }}:${{ steps.ref.outputs.label }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Summary
+        run: |
+          echo "Promoted ${{ steps.ref.outputs.ref }} to :stable" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Production Watchtower will pick up the new image within its poll interval (default 5 min)." >> "$GITHUB_STEP_SUMMARY"
