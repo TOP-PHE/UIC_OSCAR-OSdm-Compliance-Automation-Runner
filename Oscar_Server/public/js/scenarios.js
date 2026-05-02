@@ -1,3 +1,10 @@
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+
 // ── Auth guard ────────────────────────────────────────────────────────────────
 // Authentication is primarily handled via the oscar_session httpOnly cookie
 // set by the server on login. We also keep an oscar_token mirror in
