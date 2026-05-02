@@ -14,6 +14,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [release-2026.07] — 2026-05-01
+
+### Combined release
+- Server **1.2.0** + collection **OTST_V2.0.1**
+- First release to be deployed via the new auto-rollover pipeline
+
+### Repository
+- Reorganised into a UIC-owned monorepo (`Oscar_Server/`, `Bruno_Collection/`,
+  `OSCAR_Deploy/`, `Documentation/`, root `compatibility.json`)
+- Single source of truth for server, collection, deploy manifests, and docs
+
+### Docker
+- Multi-stage Dockerfile: builder (with bcrypt native deps) → runtime
+  (no npm, ~250 MB)
+- `npm install -g @usebruno/cli` moved to runtime stage so the symlink for
+  `bru` resolves correctly; npm + corepack stripped in the same `RUN` for
+  CVE-2026-33671 (picomatch ReDoS) remediation
+- `package.json` copied into runtime so `src/api/openapi.js` can read the
+  version field
+
+### Versioning
+- `Bruno_Collection/VERSION` (single line) — e.g. `OTST_V2.0.1`
+- `compatibility.json` at repo root — server↔collection tested-together matrix
+- `src/utils/versionInfo.js` — boot-time check, single-line warning if combo
+  not in matrix; non-blocking
+- `/health` enriched with `server_version`, `collection_version`,
+  `release_label`, `compatibility_status`
+- Top banner UI: monospace version chip showing release/server/collection,
+  color-coded by `compatibility_status` (green/amber/red/gray), 5-min
+  localStorage cache, hover tooltip
+- Annotated Git tags: `server-v1.2.0`, `collection-OTST_V2.0.1`,
+  `release-2026.04` … `release-2026.07`
+
+### CI/CD
+- `.github/workflows/ci-server.yml` — path-scoped to `Oscar_Server/**`,
+  lint + audit + tests with coverage gate (50% lines / 42% branches) +
+  docker build + Trivy scan
+- `.github/workflows/ci-collection.yml` — Bruno CLI sanity check, VERSION
+  presence enforcement, `.bru` meta-block lint
+- `.github/workflows/publish-image.yml` — every server-touching push to
+  `main` builds + pushes `ghcr.io/top-phe/oscar-server:edge` and `:sha-XXX`;
+  `server-v*` tag pushes also push `:server-vX.Y.Z`
+- `.github/workflows/promote-release.yml` — `release-YYYY.MM` tag pushes
+  rebuild and push the image as `:stable` and `:release-YYYY.MM` (the only
+  workflow that touches `:stable`)
+- `.github/workflows/refresh-collection.yml` — collection-only commits
+  SSH into the VPS and trigger a pinned `git pull` script
+
+### Production deploy
+- Migrated `/opt/OSCAR-OSdm-Compliance-Automation-Runner/` → `/opt/OSCAR/`
+  monorepo layout in place; SQLite DB and artifacts preserved
+- `OSCAR_Deploy/docker-compose.yml` — uses `image:`-based deploy from GHCR
+  with `:stable`; collection and `compatibility.json` bind-mounted read-only
+- Watchtower added (`nickfedor/watchtower`, the maintained fork — original
+  `containrrr/watchtower` is dead and breaks on Docker 25+ API)
+  - Polls every 5 minutes
+  - Watches only labelled containers (just `oscar`)
+  - Pulls + recreates `oscar` when `:stable` digest changes
+- SSH deploy key locked down via `command="…/refresh-collection.sh"` in
+  `~ubuntu/.ssh/authorized_keys` — even if the key leaks, the worst it can
+  do is force a `git pull`
+- `refresh-collection.sh` — refuses to pull if working tree is dirty,
+  logs every transition to `journalctl -t oscar-deploy`
+
+### Documentation
+- `Documentation/Server_Operations/installation-guide.md` — full VPS
+  install procedure for the monorepo layout (Ubuntu 24.04, Docker, nginx,
+  Let's Encrypt, smoke test against `/health`)
+- `Documentation/Server_Operations/auto-deploy-setup.md` — one-time VPS
+  setup for GHCR pull, SSH key, GitHub secrets, switching from `build:` to
+  `image:`, daily-life recipes, rollback procedure
+- `Documentation/Server_Operations/monorepo-and-autodeploy-transformation.md`
+  — single document narrating the entire two-day transformation, decisions
+  taken, gotchas captured, inventory of artifacts
+- Three doc folders by audience: `Documentation/{Oscar_Server,Bruno_Collection,Server_Operations}/`
+
+---
+
 ## [1.2.0] — 2026-04-27
 
 ### Added — Phase 1 + 2 Audit Implementation
