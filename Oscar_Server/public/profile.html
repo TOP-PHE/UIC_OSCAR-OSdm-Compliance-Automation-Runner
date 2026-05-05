@@ -103,6 +103,26 @@ input[type=password]::placeholder{letter-spacing:2px}
       <label>OSDM API Endpoint</label>
       <input type="url" id="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
     </div>
+
+    <!-- Privacy toggle: only the test_manager may change this. Other roles
+         see it as disabled / read-only so they understand the current
+         setting without being able to flip it. Surfaced only when there is
+         a meaningful value to display. -->
+    <div class="field" id="share-reports-field" style="margin-top:14px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="share_reports_with_certifier" style="width:auto;margin:0">
+        <span>Share test reports with Certifiers</span>
+      </label>
+      <p style="font-size:12px;color:#90a4ae;margin-top:6px">
+        When checked (default), the OSDM Certification team can see this company's
+        runs and reports for audit/compare purposes. Uncheck to keep all reports
+        private to your company's test managers and testers — Certifiers will
+        no longer see them in the "All Reports" view.
+      </p>
+      <p id="share-reports-readonly-note" style="display:none;font-size:11px;color:#b0bec5;font-style:italic;margin-top:4px">
+        Only Test Managers can change this setting.
+      </p>
+    </div>
   </div>
 
   <!-- Per-tester: only YOUR credentials. Each tester maintains their own. -->
@@ -282,6 +302,16 @@ async function loadProfile() {
   // Company-shared
   document.getElementById('api_base').value          = c.api_base  || '';
 
+  // Privacy toggle (v15) — only test_manager may flip it. Others see it as
+  // disabled to inform without misleading.
+  const shareCb = document.getElementById('share_reports_with_certifier');
+  shareCb.checked = c.share_reports_with_certifier !== false;
+  const userRole = (JSON.parse(localStorage.getItem('oscar_user') || '{}')).role;
+  if (userRole !== 'test_manager') {
+    shareCb.disabled = true;
+    document.getElementById('share-reports-readonly-note').style.display = 'block';
+  }
+
   // Per-tester
   document.getElementById('auth_mode').value             = m.auth_mode || 'bearer';
   document.getElementById('token_url').value             = m.token_url || '';
@@ -308,15 +338,26 @@ async function saveConfig() {
   // everything else goes to /v1/me/credentials (per-tester). Sequential so
   // an error in either surfaces clearly.
   const apiBase = document.getElementById('api_base').value.trim();
-  if (apiBase) {
+  // Build the company PATCH payload. api_base is always sent if non-empty.
+  // share_reports_with_certifier is only included when the user is a
+  // test_manager (others see the checkbox disabled and the server would
+  // 403 on the field anyway — but better not to send it at all).
+  const userRole = (JSON.parse(localStorage.getItem('oscar_user') || '{}')).role;
+  const companyPayload = {};
+  if (apiBase) companyPayload.api_base = apiBase;
+  if (userRole === 'test_manager') {
+    companyPayload.share_reports_with_certifier =
+      document.getElementById('share_reports_with_certifier').checked;
+  }
+  if (Object.keys(companyPayload).length > 0) {
     const r = await fetch('/v1/company', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_base: apiBase })
+      body: JSON.stringify(companyPayload)
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
-      showMsg(d.detail || d.title || 'Saving company endpoint failed.', false); return;
+      showMsg(d.detail || d.title || 'Saving company settings failed.', false); return;
     }
   }
 

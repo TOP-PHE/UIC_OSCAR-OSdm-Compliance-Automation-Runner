@@ -143,6 +143,7 @@ app.use('/artifacts', express.static(ARTIFACTS_DIR));
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/v1/auth',            require('./api/routes/auth'));
 app.use('/v1/me/credentials',  require('./api/routes/me-credentials'));
+app.use('/v1/company/users',   require('./api/routes/company-users'));
 app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));

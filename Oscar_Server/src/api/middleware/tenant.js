@@ -27,8 +27,18 @@ function enforceTenant(req, res, next) {
     req.companyId = req.query.company_id || req.headers['x-company-id'] || bodyCompanyId || null;
     // Validate that the specified company actually exists
     if (req.companyId) {
-      const exists = get('SELECT id FROM companies WHERE id = ?', [req.companyId]);
-      if (!exists) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Specified company does not exist.' });
+      const company = get('SELECT id, share_reports_with_certifier FROM companies WHERE id = ?', [req.companyId]);
+      if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Specified company does not exist.' });
+      // Privacy guard (v15): a certification_user targeting a specific
+      // company that opted out of certifier sharing is refused. Administrators
+      // are unaffected — they always have unconditional read access.
+      if (req.user.role === 'certification_user' &&
+          (company.share_reports_with_certifier === 0 || company.share_reports_with_certifier === false)) {
+        return res.status(403).json({
+          status: 403, title: 'Forbidden',
+          detail: 'This company does not share reports with certifiers.'
+        });
+      }
     }
     return next();
   }

@@ -203,6 +203,10 @@
         { href: '/compare.html',           label: 'Compare',         page: 'compare'        },
       ];
     } else {
+      // company_user (tester) and test_manager share the same core menu.
+      // test_manager additionally gets a "Manage Users" entry that points
+      // at admin.html?tab=users — the page detects the role and uses the
+      // /v1/company/users endpoint family scoped to their own company.
       items = [
         homeItem,
         { href: '/dashboard.html',      label: 'Dashboard',      page: 'dashboard'      },
@@ -212,6 +216,9 @@
         { href: '/profile.html',        label: 'API Config',     page: 'profile'        },
         { href: '/scenarios.html',      label: 'Test Config',    page: 'scenarios'      },
       ];
+      if (role === 'test_manager') {
+        items.push({ href: '/admin.html?tab=users', label: 'Manage Users', page: 'admin-users' });
+      }
     }
 
     // ── Build nav bar HTML ────────────────────────────────────────────────────
