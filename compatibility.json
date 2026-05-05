@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.07",
+  "current_release": "2026.08",
   "releases": [
+    {
+      "release": "2026.08",
+      "date": "2026-05-05",
+      "server": "1.2.0",
+      "collection": "OTST_V2.0.1",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Per-company privacy toggle: 'Share test reports with Certifiers' on the API Config page.",
+        "Test Manager user management surface (/v1/company/users) — create / edit / delete / reset-password for users in their own company.",
+        "DB schema migration v15: companies.share_reports_with_certifier."
+      ]
+    },
     {
       "release": "2026.07",
       "date": "2026-05-01",
