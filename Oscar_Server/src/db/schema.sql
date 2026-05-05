@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS companies (
   datafile_path       TEXT,                      -- absolute path on server
   datafile_hash       TEXT,                      -- SHA-256 hex of uploaded file
   datafile_updated_at TEXT,
+  -- Privacy toggle (v15): when 0, certification_user role cannot see this
+  -- company's runs/reports. Only test_manager(s) of the company and the
+  -- platform administrator can. Default 1 keeps current behaviour.
+  share_reports_with_certifier INTEGER NOT NULL DEFAULT 1,
   -- Timestamps
   created_at          TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT NOT NULL DEFAULT (datetime('now'))

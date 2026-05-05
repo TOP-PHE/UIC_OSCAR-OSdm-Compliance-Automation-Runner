@@ -224,6 +224,16 @@ const MIGRATIONS = [
         db.exec('CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at)');
       } catch (_e) { /* benign if already exists */ }
   }},
+
+  { version: 15, name: 'companies-share-reports-with-certifier', up: () => {
+      // Per-company privacy toggle. When 0, certification_user role cannot
+      // see this company's runs / reports — only the company's own
+      // test_manager(s) and the platform administrator do. Default 1
+      // preserves the historical "everyone with the role can see" behaviour
+      // for existing companies; new companies default to 1 too — opt-in to
+      // privacy, not opt-out, since most users will expect today's behaviour.
+      _safeAlter('ALTER TABLE companies ADD COLUMN share_reports_with_certifier INTEGER NOT NULL DEFAULT 1');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

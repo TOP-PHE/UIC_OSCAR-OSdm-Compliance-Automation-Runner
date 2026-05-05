@@ -301,5 +301,65 @@ module.exports = {
       post: { tags: ['Admin'], summary: 'Rotate the JWT secret — invalidates ALL existing sessions', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Rotated' } } },
     },
+    '/v1/company/users': {
+      get: {
+        tags: ['Company'],
+        summary: 'List users in the caller\'s company (test_manager only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'q', in: 'query', schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Users in this company' },
+          403: { description: 'test_manager role required' },
+        },
+      },
+      post: {
+        tags: ['Company'],
+        summary: 'Create a user in the caller\'s company (test_manager only)',
+        description: 'Role must be one of: company_user, test_manager. Platform roles (administrator, certification_user) cannot be assigned through this endpoint.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          201: { description: 'User created' },
+          400: { description: 'Validation failed (invalid role / weak password)' },
+          409: { description: 'Email already used' },
+        },
+      },
+    },
+    '/v1/company/users/{id}': {
+      patch: {
+        tags: ['Company'],
+        summary: 'Update a user in this company (email or role)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'User updated' },
+          400: { description: 'Self-demotion or last-test_manager guard tripped' },
+          404: { description: 'User not in this company' },
+        },
+      },
+      delete: {
+        tags: ['Company'],
+        summary: 'Delete a user in this company (cannot delete self or last test_manager)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'User deleted' },
+          400: { description: 'Self-delete or last-test_manager guard tripped' },
+          404: { description: 'User not in this company' },
+        },
+      },
+    },
+    '/v1/company/users/{id}/reset-password': {
+      post: {
+        tags: ['Company'],
+        summary: 'Reset a company user\'s password (test_manager only)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Password reset' },
+          400: { description: 'Password too weak' },
+          404: { description: 'User not in this company' },
+        },
+      },
+    },
   },
 };

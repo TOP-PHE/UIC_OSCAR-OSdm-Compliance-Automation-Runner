@@ -79,14 +79,17 @@ function safeCompany(c) {
   // Company-level fields only. Per-tester credentials live on the user row
   // since v12 — see GET /v1/me/credentials for the auth profile.
   return {
-    id:                  c.id,
-    name:                c.name,
-    slug:                c.slug,
-    api_base:            c.api_base || null,
-    datafile_hash:       c.datafile_hash || null,
-    datafile_updated_at: c.datafile_updated_at || null,
-    created_at:          c.created_at,
-    updated_at:          c.updated_at
+    id:                           c.id,
+    name:                         c.name,
+    slug:                         c.slug,
+    api_base:                     c.api_base || null,
+    datafile_hash:                c.datafile_hash || null,
+    datafile_updated_at:          c.datafile_updated_at || null,
+    // Privacy toggle (v15). Surfaced as a boolean for the UI; stored as 0/1.
+    // True = certifiers can see this company's runs/reports (default).
+    share_reports_with_certifier: c.share_reports_with_certifier === 1 || c.share_reports_with_certifier === true,
+    created_at:                   c.created_at,
+    updated_at:                   c.updated_at
   };
 }
 
@@ -121,7 +124,7 @@ router.patch('/', (req, res) => {
 
   // PATCH /v1/company now only handles company-shared fields. Per-tester
   // credentials moved to /v1/me/credentials in v12 — see me-credentials.js.
-  const { api_base } = req.body || {};
+  const { api_base, share_reports_with_certifier } = req.body || {};
 
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
@@ -139,9 +142,32 @@ router.patch('/', (req, res) => {
     });
   }
 
+  // share_reports_with_certifier is a privacy toggle reserved for the
+  // company's test_manager. Administrators do NOT bypass this — by design,
+  // only the company owner controls who sees their reports. (Admin still has
+  // unconditional read access to everything regardless of this flag.)
+  if ('share_reports_with_certifier' in (req.body || {})) {
+    if (req.user.role !== 'test_manager') {
+      return res.status(403).json({
+        status: 403, title: 'Forbidden',
+        detail: 'Only test_manager can change share_reports_with_certifier.'
+      });
+    }
+    if (typeof share_reports_with_certifier !== 'boolean') {
+      return res.status(400).json({
+        status: 400, title: 'Bad Request',
+        detail: 'share_reports_with_certifier must be a boolean.'
+      });
+    }
+  }
+
   const updates = [];
   const values  = [];
   if (api_base) { updates.push('api_base = ?'); values.push(api_base.trim()); }
+  if ('share_reports_with_certifier' in (req.body || {})) {
+    updates.push('share_reports_with_certifier = ?');
+    values.push(share_reports_with_certifier ? 1 : 0);
+  }
 
   if (updates.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No fields to update.' });

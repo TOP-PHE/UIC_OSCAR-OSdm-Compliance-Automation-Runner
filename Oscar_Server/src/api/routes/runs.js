@@ -72,12 +72,28 @@ function isRunStale(runRow) {
 /**
  * Return the run row if it exists and is not permanently deleted.
  * companyId = null means platform-role caller (admin/certifier) — no tenant filter.
+ *
+ * Pass `req` (optional) to apply the v15 certifier privacy guard: a
+ * certification_user accessing a run from a company that opted out of
+ * sharing is treated as a 404 (we don't disclose existence to certifiers
+ * who shouldn't see the company's data at all).
  */
-function validateRunOwnership(runId, companyId) {
+function validateRunOwnership(runId, companyId, req) {
+  let row;
   if (!companyId) {
-    return get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [runId]);
+    row = get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [runId]);
+  } else {
+    row = get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [runId, companyId]);
   }
-  return get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [runId, companyId]);
+  if (!row) return null;
+  // v15 certifier privacy guard
+  if (req && req.user && req.user.role === 'certification_user') {
+    const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
+    if (c && (c.share_reports_with_certifier === 0 || c.share_reports_with_certifier === false)) {
+      return null;   // hide existence — same shape as "not found"
+    }
+  }
+  return row;
 }
 
 /**
@@ -241,7 +257,13 @@ router.get('/', (req, res) => {
        ) rs ON rs.run_id = r.id`;
 
   if (isPlatform && !req.companyId) {
-    // Admin / certifier: see everything except permanently deleted
+    // Admin / certifier: see everything except permanently deleted.
+    //
+    // Certifier-only restriction (v15): exclude runs from companies that
+    // have opted out of certifier sharing. Administrators are unaffected.
+    const certifierFilter = req.user.role === 'certification_user'
+      ? 'AND c.share_reports_with_certifier = 1'
+      : '';
     rows = all(
       `SELECT r.id, r.company_id, c.name AS company_name, r.status,
               r.auth_mode_used, r.api_base_used, r.env_name_used,
@@ -254,12 +276,15 @@ router.get('/', (req, res) => {
        FROM runs r
        JOIN users u ON u.id = r.user_id
        JOIN companies c ON c.id = r.company_id${agg}
-       WHERE r.status != 'DELETED'
+       WHERE r.status != 'DELETED' ${certifierFilter}
        ORDER BY r.queued_at DESC
        LIMIT ? OFFSET ?`,
       [limit, offset]
     );
-    total = get("SELECT COUNT(*) AS n FROM runs WHERE status != 'DELETED'");
+    total = get(
+      `SELECT COUNT(*) AS n FROM runs r JOIN companies c ON c.id = r.company_id
+       WHERE r.status != 'DELETED' ${certifierFilter}`
+    );
   } else {
     // Tester: hide DELETION_REQUESTED (they already "deleted" it) and permanently DELETED,
     // but show DELETED_BY_ADMIN (flagged) so they know admin has marked it
@@ -528,14 +553,14 @@ router.get('/batch/:batchId', (req, res) => {
 
 // ── GET /v1/runs/:id ──────────────────────────────────────────────────────────
 router.get('/:id', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
   return res.json(runRow);
 });
 
 // ── GET /v1/runs/:id/logs ─────────────────────────────────────────────────────
 router.get('/:id/logs', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const since  = req.query.since_id ? parseInt(req.query.since_id, 10) : 0;
@@ -559,7 +584,7 @@ router.get('/:id/logs', (req, res) => {
 // Returns structured assertion results in a 3-level hierarchy: suites → requests → assertions.
 // Supports filtering by status, category, domain, and suite.
 router.get('/:id/assertions', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const { status: statusFilter, category, domain, suite } = req.query;
@@ -637,7 +662,7 @@ router.get('/:id/assertions', (req, res) => {
 //   ?status_filter=all      — everything (default)
 //   ?scenario=CODE          — limit to one scenario (matches run_suites.scenario_name)
 router.get('/:id/requests', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const { status_filter: filter = 'all', scenario } = req.query;
@@ -688,7 +713,7 @@ router.get('/:id/requests', (req, res) => {
 // non-JSON. Parent and children are returned as compact summaries (no bodies)
 // so the client can render "← parent" / "→ children" navigation.
 router.get('/:id/requests/:reqId', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   // Tenant scope: the request row must belong to this run (which we just
@@ -735,7 +760,7 @@ router.get('/:id/requests/:reqId', (req, res) => {
 
 // ── GET /v1/runs/:id/artifacts ────────────────────────────────────────────────
 router.get('/:id/artifacts', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const artifacts = all(`SELECT id, type, filename FROM run_artifacts WHERE run_id = ?`, [req.params.id]);
@@ -744,7 +769,7 @@ router.get('/:id/artifacts', (req, res) => {
 
 // ── GET /v1/runs/:id/artifacts/:aid ──────────────────────────────────────────
 router.get('/:id/artifacts/:aid', (req, res) => {
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   const artifact = get(`SELECT * FROM run_artifacts WHERE id = ? AND run_id = ?`, [req.params.aid, req.params.id]);
@@ -770,7 +795,7 @@ router.delete('/:id/cancel', (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot cancel runs.' });
   }
 
-  const runRow = validateRunOwnership(req.params.id, req.companyId);
+  const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   if (runRow.status !== 'QUEUED') {
@@ -790,7 +815,7 @@ router.delete('/:id', (req, res) => {
   }
 
   const isAdmin = req.user.role === 'administrator';
-  const runRow  = validateRunOwnership(req.params.id, req.companyId);
+  const runRow  = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   if (runRow.status === 'QUEUED' || runRow.status === 'RUNNING') {

@@ -81,6 +81,25 @@ function resolveCompanyScope(req, res) {
   return req.user.companyId;
 }
 
+/**
+ * Returns true if the given company shares its run reports with the
+ * certification_user role. Defaults to true (matches schema default and
+ * historical behaviour) for any company missing the column or row.
+ *
+ * Used by the tenant guard and the runs/reports listings to decide
+ * whether to expose this company's data to certifiers.
+ */
+function companyShareWithCertifier(companyId) {
+  if (!companyId) return true;
+  try {
+    const row = get('SELECT share_reports_with_certifier AS s FROM companies WHERE id = ?', [companyId]);
+    if (!row) return true;
+    return row.s === 1 || row.s === true;
+  } catch (_e) {
+    return true;
+  }
+}
+
 module.exports = {
   ALLOWED_ROLES,
   PLATFORM_SLUG,
@@ -88,4 +107,5 @@ module.exports = {
   ensurePlatformCompany,
   auditLog,
   resolveCompanyScope,
+  companyShareWithCertifier,
 };

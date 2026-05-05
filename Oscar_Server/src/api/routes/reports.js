@@ -104,6 +104,11 @@ router.get('/comparisons', (req, res) => {
   let rows;
 
   if (isPlatform && !req.companyId) {
+    // v15: certifiers cannot see report-comparisons from companies that
+    // opted out of certifier sharing. Administrators are unaffected.
+    const certifierFilter = req.user.role === 'certification_user'
+      ? 'AND c.share_reports_with_certifier = 1'
+      : '';
     rows = all(
       `SELECT rc.id, rc.company_id, c.name AS company_name, rc.run_a_id, rc.run_b_id, rc.created_at,
               ra.queued_at as run_a_date, rb.queued_at as run_b_date
@@ -111,7 +116,7 @@ router.get('/comparisons', (req, res) => {
        JOIN companies c ON c.id = rc.company_id
        JOIN runs ra ON ra.id = rc.run_a_id
        JOIN runs rb ON rb.id = rc.run_b_id
-       WHERE ra.status != 'DELETED' AND rb.status != 'DELETED'
+       WHERE ra.status != 'DELETED' AND rb.status != 'DELETED' ${certifierFilter}
        ORDER BY rc.created_at DESC
        LIMIT 200`
     );
@@ -139,6 +144,15 @@ router.get('/comparisons/:id', (req, res) => {
     ? get(`SELECT * FROM report_comparisons WHERE id = ?`, [req.params.id])
     : get(`SELECT * FROM report_comparisons WHERE id = ? AND company_id = ?`, [req.params.id, req.companyId]);
   if (!row) return res.status(404).json({ status: 404, title: 'Comparison not found.' });
+
+  // v15: certifier privacy guard — return 404 (not 403) for non-shared
+  // companies so we don't disclose the comparison's existence.
+  if (req.user.role === 'certification_user') {
+    const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
+    if (c && (c.share_reports_with_certifier === 0 || c.share_reports_with_certifier === false)) {
+      return res.status(404).json({ status: 404, title: 'Comparison not found.' });
+    }
+  }
 
   const runA = get('SELECT id, queued_at, api_base_used, status FROM runs WHERE id = ?', [row.run_a_id]);
   const runB = get('SELECT id, queued_at, api_base_used, status FROM runs WHERE id = ?', [row.run_b_id]);

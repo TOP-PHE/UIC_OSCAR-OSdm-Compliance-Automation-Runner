@@ -305,11 +305,14 @@ const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 const token = localStorage.getItem('oscar_token');
 if (!token) window.location.href = '/';
 
-const isAdmin  = user.role === 'administrator';
-const isCertif = user.role === 'certification_user';
+const isAdmin   = user.role === 'administrator';
+const isCertif  = user.role === 'certification_user';
+const isTestMgr = user.role === 'test_manager';
 
-// Only admins and auditors may access this page
-if (!isAdmin && !isCertif) {
+// Admins, auditors, and test managers reach this page. Test managers
+// only see the "Users" tab and operate against /v1/company/users
+// (scoped to their own company), not /v1/admin/users.
+if (!isAdmin && !isCertif && !isTestMgr) {
   window.location.href = '/dashboard.html';
 }
 
@@ -322,7 +325,13 @@ let companies = [];       // excludes platform-root — used for Create User for
 let allCompanies = [];    // full list including platform-root — used for user-table dropdowns
 let userSearchTimer = null;
 
-// Open the tab requested via ?tab= URL param (default: reports for auditors, users for admins)
+// Test managers use the company-scoped endpoint family. The two URL bases
+// only differ in the prefix — the response shapes match — so we can flip
+// between them with this single switch.
+const USERS_API_BASE = isTestMgr ? '/v1/company/users' : '/v1/admin/users';
+
+// Open the tab requested via ?tab= URL param (default: reports for auditors,
+// users for admins, users for test managers — they have nothing else here)
 const _initTab = new URLSearchParams(location.search).get('tab')
   || (isCertif ? 'reports' : 'users');
 let currentTab = _initTab;
@@ -366,6 +375,12 @@ function refreshCurrentTab() {
 }
 
 function toggleNewCompanyField() {
+  // Test managers always create users INSIDE their own company — the company
+  // dropdown is meaningless for them and the new endpoint scopes server-side.
+  if (isTestMgr) {
+    document.getElementById('new-company-field').classList.add('hidden');
+    return;
+  }
   const role = document.getElementById('new-role').value;
   const needsCompany = role === 'company_user' || role === 'test_manager';
   document.getElementById('new-company-field').classList.toggle('hidden', !needsCompany);
@@ -386,8 +401,12 @@ function companyOptions(selectedId) {
   return none + allCompanies.map(c => `<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
 }
 
-// Returns either an editable <select> (Tester or Certifier) or a read-only label (Administrator)
+// Returns either an editable <select> (Tester or Certifier) or a read-only label (Administrator).
+// For test managers the company is implicit (their own) — we render the company name as static text.
 function companyCellHtml(u) {
+  if (isTestMgr) {
+    return `<span style="color:#78909c;font-size:12px;font-style:italic">${esc(u.company_name || '')}</span>`;
+  }
   if (u.role === 'company_user' || u.role === 'certification_user') {
     return `<select id="company-${u.id}">${companyOptions(u.company_id)}</select>`;
   }
@@ -411,7 +430,12 @@ function onRoleChange(userId) {
 const ROLE_LABELS = { administrator: 'Administrator', certification_user: 'Certifier', test_manager: 'Test Manager', company_user: 'Tester' };
 
 function roleOptions(selectedRole) {
-  const roles = ['administrator','certification_user','test_manager','company_user'];
+  // Test managers may only assign roles within their own company — platform
+  // roles (administrator, certification_user) are off-limits even via the
+  // dropdown so the UI doesn't mislead them with options the server will reject.
+  const roles = isTestMgr
+    ? ['company_user', 'test_manager']
+    : ['administrator', 'certification_user', 'test_manager', 'company_user'];
   return roles.map(r => `<option value="${r}" ${r===selectedRole?'selected':''}>${ROLE_LABELS[r] || r}</option>`).join('');
 }
 
@@ -422,7 +446,7 @@ function debouncedLoadUsers() {
 
 async function loadUsers() {
   const q = encodeURIComponent(document.getElementById('user-search').value || '');
-  const res = await fetch(`/v1/admin/users?q=${q}`, { headers: authHeaders });
+  const res = await fetch(`${USERS_API_BASE}?q=${q}`, { headers: authHeaders });
   const data = await res.json();
   const tbody = document.getElementById('users-tbody');
 
@@ -453,7 +477,7 @@ async function createUser() {
     body.company_id = document.getElementById('new-company').value;
   }
 
-  const res = await fetch('/v1/admin/users', {
+  const res = await fetch(USERS_API_BASE, {
     method: 'POST',
     headers: { ...authHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -475,7 +499,7 @@ async function saveUser(userId) {
   const body = { role };
   if (companyId) body.company_id = companyId;
 
-  const res = await fetch(`/v1/admin/users/${userId}`, {
+  const res = await fetch(`${USERS_API_BASE}/${userId}`, {
     method: 'PATCH',
     headers: { ...authHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -492,7 +516,7 @@ async function saveUser(userId) {
 async function resetPwd(userId, email) {
   const newPwd = prompt(`New password for ${email}:`);
   if (!newPwd) return;
-  const res = await fetch(`/v1/admin/users/${userId}/reset-password`, {
+  const res = await fetch(`${USERS_API_BASE}/${userId}/reset-password`, {
     method: 'POST',
     headers: { ...authHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify({ new_password: newPwd })
@@ -504,7 +528,7 @@ async function resetPwd(userId, email) {
 
 async function deleteUser(userId, email) {
   if (!confirm(`Delete user ${email}?`)) return;
-  const res = await fetch(`/v1/admin/users/${userId}`, { method: 'DELETE', headers: authHeaders });
+  const res = await fetch(`${USERS_API_BASE}/${userId}`, { method: 'DELETE', headers: authHeaders });
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Delete failed.', false); return; }
   showMsg(`User deleted: ${email}`, true);
@@ -1061,6 +1085,18 @@ document.getElementById('btn-save-config').addEventListener('click', saveConfig)
 
 (async function init(){
   try {
+    // Test managers only have the Users tab; the Create User form's role
+    // dropdown is constrained to {Tester, Test Manager} and the Company
+    // dropdown is hidden (their company is implicit).
+    if (isTestMgr) {
+      const roleSelect = document.getElementById('new-role');
+      roleSelect.innerHTML =
+        '<option value="company_user">Tester</option>' +
+        '<option value="test_manager">Test Manager</option>';
+      document.getElementById('new-company-field').classList.add('hidden');
+      document.getElementById('page-title').textContent = 'Manage Company Users';
+    }
+
     // Load companies first — required so the company dropdowns in the user table are populated
     if (isAdmin) {
       await loadCompanies();
