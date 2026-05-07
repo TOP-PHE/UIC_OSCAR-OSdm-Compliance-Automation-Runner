@@ -1,0 +1,43 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Gitleaks configuration. Extends the upstream default ruleset (so we keep
+# every detector for AWS / GCP / Slack / GitHub / etc.) and adds a small,
+# precise allowlist for known false positives.
+#
+# DO NOT add real secrets here. The allowlist must only cover strings that
+# are demonstrably *not* secrets — deterministic test fallbacks, public
+# example values, and the like. New entries require justification in a PR.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "OSCAR-specific known-safe strings"
+
+# CI test-fallback ENCRYPTION_KEY. Used only when the TEST_ENCRYPTION_KEY
+# repo secret is unset (typically: forked PRs or fresh-cloned dev runs).
+# A predictable value here is intentional — tests need a stable key to
+# encrypt/decrypt rows, and any real production deployment overrides it
+# via the .env file. This same fallback appears in both ci-server.yml
+# and sonar.yml; gitleaks only scans the latest commit so this allowlist
+# entry covers any future reappearance too.
+regexes = [
+  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'''
+]
+
+# Files that contain known-public values gitleaks flags as suspicious:
+#   - LICENSE      → contains the Apache 2.0 boilerplate hash literals
+#   - package-lock.json → contains npm registry integrity hashes that look
+#     like base64 secrets
+#   - test fixtures → may contain dummy credentials by design
+paths = [
+  '''(.*?)(LICENSE)$''',
+  '''(.*?)(package-lock\.json)$''',
+  '''(.*?)(_test\.js|\.test\.js)$''',
+  '''Bruno_Collection/.*''',
+  '''Documentation/.*'''
+]
