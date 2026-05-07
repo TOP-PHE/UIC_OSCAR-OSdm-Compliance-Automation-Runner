@@ -362,7 +362,7 @@ function renderFrameworkSection(framework) {
     const flows = (fw.salesFlows||[]).join(', ') || 'None';
     const modes = [fw.rail&&fw.rail.enabled?'Rail':'',fw.pt&&fw.pt.enabled?'Urban':'',fw.shared&&fw.shared.enabled?'Shared':''].filter(Boolean).join(', ')||'None';
     const paxTypes = (fw.passengerTypes||[]).length;
-    summary.innerHTML = `OSDM v${esc(fw.osdmVersion||'?')} · Flows: ${esc(flows)} · Modes: ${esc(modes)} · ${paxTypes} passenger type(s)`;
+    summary.innerHTML = `OSDM v${esc(fw.osdmVersion||'?')} · Flows: ${esc(flows)} · Modes: ${esc(modes)} · ${esc(paxTypes)} passenger type(s)`;
     body.innerHTML = `<div id="framework-form-area"></div>`;
     // If the user was inside the framework form when this refresh fired
     // (auto-save), re-populate the form immediately and restore which
@@ -689,7 +689,7 @@ function deleteScenario(idx) {
     document.getElementById('del-scenarios').style.display = 'none';
   } else {
     badge.textContent = `✅ ${state.scenarios.length} scenario(s) · ${toRun.length} in run`;
-    summary.innerHTML = `${state.scenarios.length} scenario(s) defined, ${toRun.length} selected for next run`;
+    summary.innerHTML = `${esc(state.scenarios.length)} scenario(s) defined, ${esc(toRun.length)} selected for next run`;
   }
 }
 
@@ -741,7 +741,7 @@ function renderTestDataSection(framework, resources) {
   } else {
     badge.className = 'config-section-badge ok';
     badge.textContent = `✅ ${trains.length} train(s)`;
-    summary.innerHTML = `${trains.length} train resource(s) configured`;
+    summary.innerHTML = `${esc(trains.length)} train resource(s) configured`;
     body.innerHTML = `<div id="resources-form-area"></div>`;
   }
 }
@@ -787,8 +787,8 @@ function renderScenariosSection(framework, resources, datafile) {
     badge.className = 'config-section-badge warn';
     badge.textContent = '⚠️ Not configured';
     const missing = !framework ? 'Test Framework (Section 1)' : 'Test Data (Section 2)';
-    summary.innerHTML = `Configure ${missing} first.`;
-    body.innerHTML = `<div class="prereq-msg">⚠️ Please configure ${missing} before creating scenarios.</div>`;
+    summary.innerHTML = `Configure ${esc(missing)} first.`;
+    body.innerHTML = `<div class="prereq-msg">⚠️ Please configure ${esc(missing)} before creating scenarios.</div>`;
     return;
   }
 
@@ -808,7 +808,7 @@ function renderScenariosSection(framework, resources, datafile) {
   } else {
     badge.className = 'config-section-badge ok';
     badge.textContent = `✅ ${scenarios.length} scenario(s) · ${toRun.length} in run`;
-    summary.innerHTML = `${scenarios.length} scenario(s) defined, ${toRun.length} selected for next run`;
+    summary.innerHTML = `${esc(scenarios.length)} scenario(s) defined, ${esc(toRun.length)} selected for next run`;
 
     // Build merged scenario list with checkbox + expandable details
     body.innerHTML = `
@@ -3805,7 +3805,7 @@ async function wizGenerateScenario() {
     // Validate: SEARCH requires non-empty origin and destination
     if (sc.tripType === 'SEARCH' && (!resolvedOrigin || !resolvedDestination)) {
       const missing = [!resolvedOrigin && 'Origin', !resolvedDestination && 'Destination'].filter(Boolean).join(' and ');
-      if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ SEARCH mode requires ${missing} station URN(s). Please fill them in the Train/Trip section above.</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ SEARCH mode requires ${esc(missing)} station URN(s). Please fill them in the Train/Trip section above.</span>`;
       if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate & Add Scenario'; }
       return;
     }
