@@ -1096,7 +1096,7 @@ function renderAll() {
           data-action="toggle-scenario" data-code="${esc(sc.code)}"
           title="${inRun ? 'Remove from run' : 'Add to run'}"
           style="accent-color:#0090D4;width:18px;height:18px;flex-shrink:0;cursor:pointer">
-        <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${idx}">
+        <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${esc(idx)}">
           <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(decodeCode(sc.code))} ${ownerBadge} ${versionBadge}</div>
           <div style="font-size:11px;color:#90a4ae;font-family:'Courier New',monospace">${esc(sc.code)}</div>
         </div>
@@ -1107,13 +1107,13 @@ function renderAll() {
             style="min-width:62px;text-align:center">
             ${inRun ? '✓ In run' : 'Not in run'}
           </span>
-          <span class="toggle-arrow" id="arrow-${idx}" data-action="toggle-detail" data-idx="${idx}" style="cursor:pointer;padding:4px">▶</span>
-          ${isTestManager ? `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${idx}" title="${sc.shared ? 'Make private (your use only)' : 'Share with all testers'}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc'}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>` : ''}
-          ${showDuplicate ? `<button class="btn btn-sm btn-secondary" data-action="duplicate-scenario" data-idx="${idx}" title="Duplicate this shared scenario as your own">📋 Duplicate</button>` : ''}
-          ${canDelete ? `<button class="row-delete-btn" data-action="delete-scenario" data-idx="${idx}" title="Delete this scenario">🗑</button>` : ''}
+          <span class="toggle-arrow" id="arrow-${esc(idx)}" data-action="toggle-detail" data-idx="${esc(idx)}" style="cursor:pointer;padding:4px">▶</span>
+          ${isTestManager ? `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${esc(idx)}" title="${sc.shared ? 'Make private (your use only)' : 'Share with all testers'}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc'}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>` : ''}
+          ${showDuplicate ? `<button class="btn btn-sm btn-secondary" data-action="duplicate-scenario" data-idx="${esc(idx)}" title="Duplicate this shared scenario as your own">📋 Duplicate</button>` : ''}
+          ${canDelete ? `<button class="row-delete-btn" data-action="delete-scenario" data-idx="${esc(idx)}" title="Delete this scenario">🗑</button>` : ''}
         </div>
       </div>
-      <div class="scenario-detail" id="detail-${idx}"></div>
+      <div class="scenario-detail" id="detail-${esc(idx)}"></div>
     </div>`;
   }).join('');
 }
@@ -1143,8 +1143,8 @@ function selectAll(checked) {
 }
 
 function toggleDetail(idx) {
-  const detail = document.getElementById(`detail-${idx}`);
-  const arrow  = document.getElementById(`arrow-${idx}`);
+  const detail = document.getElementById(`detail-${esc(idx)}`);
+  const arrow  = document.getElementById(`arrow-${esc(idx)}`);
   const isOpen = detail.classList.contains('open');
   if (!isOpen) {
     // Lazy-render detail content
@@ -1190,7 +1190,7 @@ function buildDetailHTML(idx) {
           <span class="param-label">Scenario code <span class="param-hint">rename — normalised to A-Z 0-9 _ ; must stay unique</span></span>
           <input class="param-input" type="text" value="${esc(sc.code || '')}"
             style="font-family:'Consolas','Monaco','Courier New',monospace;letter-spacing:.5px"
-            data-action="set-scenario-code" data-idx="${idx}" data-orig="${esc(sc.code || '')}"
+            data-action="set-scenario-code" data-idx="${esc(idx)}" data-orig="${esc(sc.code || '')}"
             ${codeReadOnly ? 'disabled' : ''}>
         </div>
         ${buildSelect(idx, 'scenarioType',       'Scenario Type',        ENUMS.scenarioType)}
@@ -1328,7 +1328,7 @@ function buildSalesFlowActionsSection(idx, sc) {
     ? sc.salesFlowActions : defaultSalesFlowActions();
   const pills = SALES_FLOW_ACTIONS.map(a => {
     const on = current[a.key] === true; // explicit opt-in only
-    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${idx}" data-key="${a.key}" title="${esc(a.description)}"${readOnly?' style="pointer-events:none;opacity:.6"':''}>${a.icon} ${esc(a.label)}</div>`;
+    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${esc(idx)}" data-key="${esc(a.key)}" title="${esc(a.description)}"${readOnly?' style="pointer-events:none;opacity:.6"':''}>${a.icon} ${esc(a.label)}</div>`;
   }).join('');
   return `
   <div class="param-section">
@@ -1360,7 +1360,7 @@ function buildSelect(idx, field, label, options, hint) {
   <div class="param-field">
     <span class="param-label">${esc(label)}${hintHtml}</span>
     <select class="param-input param-select"
-      data-action="set-scenario" data-idx="${idx}" data-field="${field}" data-nullable="true">
+      data-action="set-scenario" data-idx="${esc(idx)}" data-field="${esc(field)}" data-nullable="true">
       ${opts}
     </select>
   </div>`;
@@ -1373,7 +1373,7 @@ function buildText(idx, field, label, placeholder, hint) {
   <div class="param-field">
     <span class="param-label">${esc(label)}${hintHtml}</span>
     <input class="param-input" type="text" value="${esc(val)}" placeholder="${esc(placeholder||'')}"
-      data-action="set-scenario-text" data-idx="${idx}" data-field="${field}">
+      data-action="set-scenario-text" data-idx="${esc(idx)}" data-field="${esc(field)}">
   </div>`;
 }
 
@@ -1392,7 +1392,7 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
   <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#546e7a;margin-bottom:10px">
     <span style="font-weight:600">🚄 ${label}:</span>
     <select class="param-input param-select" style="max-width:280px;font-size:12px"
-      data-action="apply-trip-train" data-idx="${idx}" data-tidx="${tIdx}" data-target="${target}">
+      data-action="apply-trip-train" data-idx="${esc(idx)}" data-tidx="${esc(tIdx)}" data-target="${esc(target)}">
       <option value="">— pick a train to copy its parameters —</option>
       ${trains.map(t => {
         const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
@@ -1412,7 +1412,7 @@ function buildTripSection(idx, sc, trip) {
   <div class="param-field">
     <span class="param-label">Trip Type <span class="param-hint">How the origin/destination is specified</span></span>
     <select class="param-input param-select"
-      data-action="set-trip-field" data-tidx="${tIdx}" data-field="tripType">
+      data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="tripType">
       ${ENUMS.tripType.map(t => `<option value="${t}" ${trip.tripType===t?'selected':''}>${lbl(t)}</option>`).join('')}
     </select>
   </div>`;
@@ -1462,7 +1462,7 @@ function buildTripTimeField(tIdx, path, label, val, placeholder) {
   <div class="param-field">
     <span class="param-label">${label}</span>
     <input class="param-input" type="text" value="${esc(displayVal)}" placeholder="${esc(placeholder||'')}"
-      data-action="set-trip-time" data-tidx="${tIdx}" data-path="${path}">
+      data-action="set-trip-time" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
 
@@ -1471,7 +1471,7 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
   <div class="param-field">
     <span class="param-label">${label}</span>
     <input class="param-input" type="text" value="${esc(val||'')}" placeholder="${esc(placeholder||'')}"
-      data-action="set-trip-path" data-tidx="${tIdx}" data-path="${path}">
+      data-action="set-trip-path" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
 
@@ -1509,11 +1509,11 @@ const _paxEditOpen = new Set();
 // codes — no enum lookup; users type whatever their platform accepts.
 function buildReductionCardRow(pIdx, pi, ci, code, readOnly) {
   return `
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px" data-pax-reduction-row="${pIdx}-${pi}-${ci}">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px" data-pax-reduction-row="${esc(pIdx)}-${esc(pi)}-${esc(ci)}">
     <input class="param-input" type="text" value="${esc(code||'')}" placeholder="e.g. BC_50"
       style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px;max-width:260px"
-      data-action="set-pax-reduction" data-pidx="${pIdx}" data-pi="${pi}" data-cidx="${ci}" ${readOnly?'disabled':''}>
-    ${!readOnly ? `<button class="btn btn-sm" data-action="remove-pax-reduction" data-pidx="${pIdx}" data-pi="${pi}" data-cidx="${ci}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a" title="Remove">✕</button>` : ''}
+      data-action="set-pax-reduction" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-cidx="${esc(ci)}" ${readOnly?'disabled':''}>
+    ${!readOnly ? `<button class="btn btn-sm" data-action="remove-pax-reduction" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-cidx="${esc(ci)}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a" title="Remove">✕</button>` : ''}
   </div>`;
 }
 
@@ -1523,18 +1523,18 @@ function buildReductionCardRow(pIdx, pi, ci, code, readOnly) {
 function buildLoyaltyCardRow(pIdx, pi, ci, card, readOnly) {
   const c = card || {};
   return `
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap" data-pax-loyalty-row="${pIdx}-${pi}-${ci}">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap" data-pax-loyalty-row="${esc(pIdx)}-${esc(pi)}-${esc(ci)}">
     <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:#90a4ae">Carrier code
       <input class="param-input" type="text" value="${esc(c.carrierCode||'')}" placeholder="e.g. FR_SNCF"
         style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px;max-width:160px"
-        data-action="set-pax-loyalty" data-pidx="${pIdx}" data-pi="${pi}" data-cidx="${ci}" data-field="carrierCode" ${readOnly?'disabled':''}>
+        data-action="set-pax-loyalty" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-cidx="${esc(ci)}" data-field="carrierCode" ${readOnly?'disabled':''}>
     </label>
     <label style="display:flex;flex-direction:column;gap:2px;font-size:10px;color:#90a4ae">Card reference
       <input class="param-input" type="text" value="${esc(c.cardReference||'')}" placeholder="e.g. 9988-7766-5544"
         style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:12px;max-width:240px"
-        data-action="set-pax-loyalty" data-pidx="${pIdx}" data-pi="${pi}" data-cidx="${ci}" data-field="cardReference" ${readOnly?'disabled':''}>
+        data-action="set-pax-loyalty" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-cidx="${esc(ci)}" data-field="cardReference" ${readOnly?'disabled':''}>
     </label>
-    ${!readOnly ? `<button class="btn btn-sm" data-action="remove-pax-loyalty" data-pidx="${pIdx}" data-pi="${pi}" data-cidx="${ci}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a;align-self:flex-end" title="Remove">✕</button>` : ''}
+    ${!readOnly ? `<button class="btn btn-sm" data-action="remove-pax-loyalty" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-cidx="${esc(ci)}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a;align-self:flex-end" title="Remove">✕</button>` : ''}
   </div>`;
 }
 
@@ -1596,7 +1596,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
     // for vendors that treat gender as optional and reject synthetic values.
     const genderSelect = isHuman ? `
     <select class="param-input param-select" style="max-width:130px;font-size:12px"
-      data-action="set-pax" data-pidx="${pIdx}" data-pi="${pi}" data-field="gender" ${readOnly ? 'disabled' : ''}>
+      data-action="set-pax" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="gender" ${readOnly ? 'disabled' : ''}>
       <option value=""       ${!gender           ?'selected':''}>— None (omit) —</option>
       <option value="MALE"   ${gender==='MALE'   ?'selected':''}>Male</option>
       <option value="FEMALE" ${gender==='FEMALE' ?'selected':''}>Female</option>
@@ -1610,33 +1610,33 @@ function buildPassengersSection(idx, sc, paxGroup) {
     const reductionCards = Array.isArray(p.reductionCards) ? p.reductionCards : [];
     const loyaltyCards   = Array.isArray(p.loyaltyCards)   ? p.loyaltyCards   : [];
     const editPanel = `
-    <div class="pax-edit-panel" id="pax-edit-${pIdx}-${pi}" style="display:${isEditOpen?'block':'none'};padding:12px 16px 16px 40px;background:#fafbfc;border-bottom:1px solid #f0f0f0">
+    <div class="pax-edit-panel" id="pax-edit-${esc(pIdx)}-${esc(pi)}" style="display:${isEditOpen?'block':'none'};padding:12px 16px 16px 40px;background:#fafbfc;border-bottom:1px solid #f0f0f0">
       <!-- Personal details -->
       <div class="param-section" style="margin-bottom:10px">
         <div class="param-section-head" style="font-size:11px">👤 Personal details</div>
         <div style="padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 16px">
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">First name
             <input class="param-input" type="text" value="${esc(p.firstName||'')}"
-              data-action="set-pax-text" data-pidx="${pIdx}" data-pi="${pi}" data-field="firstName" ${readOnly?'disabled':''}>
+              data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="firstName" ${readOnly?'disabled':''}>
           </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Last name
             <input class="param-input" type="text" value="${esc(p.lastName||'')}"
-              data-action="set-pax-text" data-pidx="${pIdx}" data-pi="${pi}" data-field="lastName" ${readOnly?'disabled':''}>
+              data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="lastName" ${readOnly?'disabled':''}>
           </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Date of birth
             <input class="param-input" type="text" value="${esc(p.dateOfBirth||'')}" placeholder="YYYY-MM-DD"
-              data-action="set-pax-text" data-pidx="${pIdx}" data-pi="${pi}" data-field="dateOfBirth" ${readOnly?'disabled':''}>
+              data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="dateOfBirth" ${readOnly?'disabled':''}>
           </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Email
             <input class="param-input" type="email" value="${esc(p.email||'')}"
-              data-action="set-pax-text" data-pidx="${pIdx}" data-pi="${pi}" data-field="email" ${readOnly?'disabled':''}>
+              data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="email" ${readOnly?'disabled':''}>
           </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Phone
             <input class="param-input" type="text" value="${esc(p.phoneNumber||'')}"
-              data-action="set-pax-text" data-pidx="${pIdx}" data-pi="${pi}" data-field="phoneNumber" ${readOnly?'disabled':''}>
+              data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="phoneNumber" ${readOnly?'disabled':''}>
           </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Family group
-            <select class="param-input param-select" data-action="set-pax-family" data-pidx="${pIdx}" data-pi="${pi}" ${readOnly?'disabled':''}>
+            <select class="param-input param-select" data-action="set-pax-family" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" ${readOnly?'disabled':''}>
               <option value="" ${famN==null?'selected':''}>— no family —</option>
               ${familyGroups.map(g => `<option value="${g.n}" ${famN===g.n?'selected':''}>Family ${g.n}${g.lastName ? ' — ' + esc(g.lastName) : ''} (${g.count} member${g.count===1?'':'s'})</option>`).join('')}
               <option value="__new__" ${famN!=null && !familyGroups.some(g => g.n===famN) ? 'selected' : ''}>+ New family (Family ${nextFamilyNum})</option>
@@ -1648,17 +1648,17 @@ function buildPassengersSection(idx, sc, paxGroup) {
       <!-- Reduction cards — free text, vendor-specific codes -->
       <div class="param-section" style="margin-bottom:10px">
         <div class="param-section-head" style="font-size:11px">🏷️ Reduction cards <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0;margin-left:6px">vendor-specific codes — e.g. BC_50, SENIOR, CARTE_LIBERTE</span></div>
-        <div style="padding:10px 14px" id="pax-reductions-${pIdx}-${pi}">
+        <div style="padding:10px 14px" id="pax-reductions-${esc(pIdx)}-${esc(pi)}">
           ${reductionCards.map((code, ci) => buildReductionCardRow(pIdx, pi, ci, code, readOnly)).join('')}
-          ${!readOnly ? `<button class="btn btn-sm btn-secondary" data-action="add-pax-reduction" data-pidx="${pIdx}" data-pi="${pi}" style="font-size:11px;margin-top:6px">➕ Add reduction card</button>` : ''}
+          ${!readOnly ? `<button class="btn btn-sm btn-secondary" data-action="add-pax-reduction" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;margin-top:6px">➕ Add reduction card</button>` : ''}
         </div>
       </div>
       <!-- Loyalty cards — free-entry carrier code + card reference -->
       <div class="param-section">
         <div class="param-section-head" style="font-size:11px">⭐ Loyalty cards <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0;margin-left:6px">carrier code + card reference — vendor-specific format</span></div>
-        <div style="padding:10px 14px" id="pax-loyalties-${pIdx}-${pi}">
+        <div style="padding:10px 14px" id="pax-loyalties-${esc(pIdx)}-${esc(pi)}">
           ${loyaltyCards.map((card, ci) => buildLoyaltyCardRow(pIdx, pi, ci, card, readOnly)).join('')}
-          ${!readOnly ? `<button class="btn btn-sm btn-secondary" data-action="add-pax-loyalty" data-pidx="${pIdx}" data-pi="${pi}" style="font-size:11px;margin-top:6px">➕ Add loyalty card</button>` : ''}
+          ${!readOnly ? `<button class="btn btn-sm btn-secondary" data-action="add-pax-loyalty" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;margin-top:6px">➕ Add loyalty card</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -1666,17 +1666,17 @@ function buildPassengersSection(idx, sc, paxGroup) {
   <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:${isEditOpen?'none':'1px solid #f0f0f0'}">
     <span style="font-weight:700;color:#546e7a;font-size:12px;min-width:24px">#${pi+1}</span>
     <select class="param-input param-select" style="max-width:180px;font-size:12px"
-      data-action="change-pax-category" data-pidx="${pIdx}" data-pi="${pi}" data-scenidx="${idx}" ${readOnly ? 'disabled' : ''}>
+      data-action="change-pax-category" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-scenidx="${esc(idx)}" ${readOnly ? 'disabled' : ''}>
       ${catOptions.map(c =>
-        `<option value="${c}" ${c===cat?'selected':''}>${c.replace(/_/g,' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
+        `<option value="${esc(c)}" ${c===cat?'selected':''}>${c.replace(/_/g,' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
       ).join('')}
     </select>
     ${genderSelect}
-    <span style="font-size:12px;color:#78909c" data-pax-display="${pIdx}-${pi}">${esc(p.firstName||'')} ${esc(p.lastName||'')}</span>
-    ${famN != null ? `<span data-pax-family-badge="${pIdx}-${pi}" title="Part of Family ${famN} — shares last name with other family members" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8">👪 F${famN}</span>` : `<span data-pax-family-badge="${pIdx}-${pi}"></span>`}
+    <span style="font-size:12px;color:#78909c" data-pax-display="${esc(pIdx)}-${esc(pi)}">${esc(p.firstName||'')} ${esc(p.lastName||'')}</span>
+    ${famN != null ? `<span data-pax-family-badge="${esc(pIdx)}-${esc(pi)}" title="Part of Family ${famN} — shares last name with other family members" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8">👪 F${famN}</span>` : `<span data-pax-family-badge="${esc(pIdx)}-${esc(pi)}"></span>`}
     ${ageRange ? `<span style="font-size:11px;color:#90a4ae">age ${ageRange.min}-${ageRange.max}</span>` : ''}
-    <button class="btn btn-sm btn-secondary" data-action="toggle-pax-edit" data-pidx="${pIdx}" data-pi="${pi}" style="font-size:11px;padding:2px 8px;margin-left:auto" title="Edit full details, reduction cards, loyalty cards">${isEditOpen ? 'Edit ▴' : 'Edit ▾'}</button>
-    ${!readOnly && passengers.length > 1 ? `<button class="btn btn-sm" data-action="remove-pax" data-pidx="${pIdx}" data-pi="${pi}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a" title="Remove">✕</button>` : ''}
+    <button class="btn btn-sm btn-secondary" data-action="toggle-pax-edit" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;padding:2px 8px;margin-left:auto" title="Edit full details, reduction cards, loyalty cards">${isEditOpen ? 'Edit ▴' : 'Edit ▾'}</button>
+    ${!readOnly && passengers.length > 1 ? `<button class="btn btn-sm" data-action="remove-pax" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a" title="Remove">✕</button>` : ''}
   </div>
   ${editPanel}`;
   }).join('');
@@ -1689,10 +1689,10 @@ function buildPassengersSection(idx, sc, paxGroup) {
         ${rows || '<div style="color:#90a4ae;font-size:13px">No passengers defined.</div>'}
         ${!readOnly ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eceff1;display:flex;gap:8px;align-items:center">
-          <select id="add-pax-type-${pIdx}" class="param-input param-select" style="max-width:180px;font-size:12px">
-            ${allowedPaxCats.map(c => `<option value="${c}">${c.replace(/_/g,' ')}</option>`).join('')}
+          <select id="add-pax-type-${esc(pIdx)}" class="param-input param-select" style="max-width:180px;font-size:12px">
+            ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replace(/_/g,' ')}</option>`).join('')}
           </select>
-          <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${pIdx}" data-scenidx="${idx}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
+          <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${esc(pIdx)}" data-scenidx="${esc(idx)}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
           ${allowedPaxCats.length===0 ? '<span style="font-size:11px;color:#e65100">⚠ No passenger types in framework — configure Step 1 first.</span>' : ''}
         </div>` : ''}
       </div>
@@ -1763,7 +1763,7 @@ function buildPurchaserSection(idx, sc, purchGroup) {
   <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer">
     <input type="checkbox" ${isLinked?'checked':''} ${readOnly?'disabled':''}
       style="accent-color:#0090D4;width:16px;height:16px"
-      data-action="toggle-purchaser-is-pax" data-idx="${idx}" data-purch-idx="${prIdx}">
+      data-action="toggle-purchaser-is-pax" data-idx="${esc(idx)}" data-purch-idx="${esc(prIdx)}">
     <span>Purchaser is one of the passengers</span>
   </label>`;
 
@@ -1771,7 +1771,7 @@ function buildPurchaserSection(idx, sc, purchGroup) {
   <div class="param-field" style="max-width:320px;margin-top:8px">
     <span class="param-label">Which passenger?</span>
     <select class="param-input param-select"
-      data-action="set-purchaser-passenger" data-idx="${idx}" data-purch-idx="${prIdx}" ${readOnly?'disabled':''}>
+      data-action="set-purchaser-passenger" data-idx="${esc(idx)}" data-purch-idx="${esc(prIdx)}" ${readOnly?'disabled':''}>
       ${passengers.map(p => {
         const display = (p.firstName || p.reference || '?') + ' ' + (p.lastName || '') + ' — ' + (p.reference || '');
         return '<option value="' + esc(p.reference||'') + '"' + (p.reference===linkedRef?' selected':'') + '>' + esc(display) + '</option>';
@@ -1788,22 +1788,22 @@ function buildPurchaserSection(idx, sc, purchGroup) {
     <div class="param-field">
       <span class="param-label">First Name</span>
       <input class="param-input" type="text" value="${esc(purch.purchaserFirstName||'')}" placeholder="First name"
-        data-action="set-purchaser" data-purch-idx="${prIdx}" data-field="purchaserFirstName" ${disabledAttr}>
+        data-action="set-purchaser" data-purch-idx="${esc(prIdx)}" data-field="purchaserFirstName" ${disabledAttr}>
     </div>
     <div class="param-field">
       <span class="param-label">Last Name</span>
       <input class="param-input" type="text" value="${esc(purch.purchaserLastName||'')}" placeholder="Last name"
-        data-action="set-purchaser" data-purch-idx="${prIdx}" data-field="purchaserLastName" ${disabledAttr}>
+        data-action="set-purchaser" data-purch-idx="${esc(prIdx)}" data-field="purchaserLastName" ${disabledAttr}>
     </div>
     <div class="param-field">
       <span class="param-label">Email</span>
       <input class="param-input" type="email" value="${esc(purch.purchaserEmail||'')}" placeholder="purchaser@company.com"
-        data-action="set-purchaser" data-purch-idx="${prIdx}" data-field="purchaserEmail" ${disabledAttr}>
+        data-action="set-purchaser" data-purch-idx="${esc(prIdx)}" data-field="purchaserEmail" ${disabledAttr}>
     </div>
     <div class="param-field">
       <span class="param-label">Phone Number</span>
       <input class="param-input" type="text" value="${esc(purch.purchaserPhoneNumber||'')}" placeholder="+33600000000"
-        data-action="set-purchaser" data-purch-idx="${prIdx}" data-field="purchaserPhoneNumber" ${disabledAttr}>
+        data-action="set-purchaser" data-purch-idx="${esc(prIdx)}" data-field="purchaserPhoneNumber" ${disabledAttr}>
     </div>
   </div>
   ${isLinked ? '<div style="padding:0 14px 12px;font-size:11px;color:#78909c">These fields mirror the selected passenger. Edit the passenger to change them.</div>' : ''}`;
@@ -1865,25 +1865,25 @@ function buildOfferSection(idx, sc) {
       <div class="param-field">
         <span class="param-label">Offer Mode <span class="param-hint">(optional) — how offers are grouped</span></span>
         <select class="param-input param-select"
-          data-action="set-offer" data-idx="${idx}" data-field="offerMode">
+          data-action="set-offer" data-idx="${esc(idx)}" data-field="offerMode">
           ${modeOpts}
         </select>
       </div>
       <div class="param-field">
         <span class="param-label">Currency <span class="param-hint">(optional) — ISO 4217 code</span></span>
         <input class="param-input" type="text" maxlength="3" value="${esc(criteria.currency||'')}" placeholder="e.g. EUR, CZK, CHF"
-          data-action="set-offer-currency" data-idx="${idx}">
+          data-action="set-offer-currency" data-idx="${esc(idx)}">
       </div>
     </div>
 
     <div style="padding:4px 14px 2px;font-size:10px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px">
       Requested Offer Parts <span style="font-weight:400;text-transform:none">(optional) — what components to return</span>
     </div>
-    <div class="multi-check" id="offer-parts-${idx}">
+    <div class="multi-check" id="offer-parts-${esc(idx)}">
       ${offerPartsList.map(p => {
         const checked = (criteria.requestedOfferParts || []).includes(p);
         return `<label class="${checked?'checked':''}">
-          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${idx}" data-field="requestedOfferParts" data-val="${p}">
+          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${esc(idx)}" data-field="requestedOfferParts" data-val="${esc(p)}">
           ${esc(lbl(p))}
         </label>`;
       }).join('')}
@@ -1896,7 +1896,7 @@ function buildOfferSection(idx, sc) {
       ${serviceClassList.map(c => {
         const checked = (criteria.serviceClass || []).includes(c);
         return `<label class="${checked?'checked':''}">
-          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${idx}" data-field="serviceClass" data-val="${c}">
+          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${esc(idx)}" data-field="serviceClass" data-val="${esc(c)}">
           ${esc(c)}
         </label>`;
       }).join('')}
@@ -1909,7 +1909,7 @@ function buildOfferSection(idx, sc) {
       ${travelClassList.map(c => {
         const checked = (criteria.travelClass || []).includes(c);
         return `<label class="${checked?'checked':''}">
-          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${idx}" data-field="travelClass" data-val="${c}">
+          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${esc(idx)}" data-field="travelClass" data-val="${esc(c)}">
           ${esc(c)}
         </label>`;
       }).join('')}
@@ -1922,7 +1922,7 @@ function buildOfferSection(idx, sc) {
       ${flexibilityList.map(f => {
         const checked = (criteria.flexibilities || []).includes(f);
         return `<label class="${checked?'checked':''}">
-          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${idx}" data-field="flexibilities" data-val="${f}">
+          <input type="checkbox" ${checked?'checked':''} data-action="toggle-offer-array" data-idx="${esc(idx)}" data-field="flexibilities" data-val="${esc(f)}">
           ${esc(lbl(f))}
         </label>`;
       }).join('')}
@@ -1932,12 +1932,12 @@ function buildOfferSection(idx, sc) {
       <div class="param-field">
         <span class="param-label">Product Tags <span class="param-hint">(optional) — comma-separated tag list</span></span>
         <input class="param-input" type="text" value="${esc((criteria.productTags||[]).join(', '))}" placeholder="e.g. SEAT_ONLY, SLEEPER"
-          data-action="set-offer-tags" data-idx="${idx}">
+          data-action="set-offer-tags" data-idx="${esc(idx)}">
       </div>
       <div class="param-field">
         <span class="param-label">Inbound Date <span class="param-hint">(optional) — return trip date</span></span>
         <input class="param-input" type="datetime-local" value="${esc(criteria.inboundDate||'')}"
-          data-action="set-offer-inbound" data-idx="${idx}">
+          data-action="set-offer-inbound" data-idx="${esc(idx)}">
       </div>
     </div>
 
@@ -1946,7 +1946,7 @@ function buildOfferSection(idx, sc) {
     </div>
     <div style="padding:4px 14px 12px">
       <textarea class="param-input" rows="2" placeholder='[{"productId":"...","flexibilities":["NON_FLEXIBLE"]}]' style="font-family:monospace;font-size:11px;resize:vertical"
-        data-action="set-offer-selections" data-idx="${idx}">${esc(criteria.productSelections ? JSON.stringify(criteria.productSelections) : '')}</textarea>
+        data-action="set-offer-selections" data-idx="${esc(idx)}">${esc(criteria.productSelections ? JSON.stringify(criteria.productSelections) : '')}</textarea>
     </div>
 
     </div>
@@ -2457,7 +2457,7 @@ function renderWizardStep1() {
       <div style="margin:10px 0 6px;font-size:11px;color:#78909c">Optional (tick if your system supports it):</div>
       <div class="pill-group">
         ${WIZ_IROPS_OPTIONAL.map(c=>`
-          <div class="pill${codes.includes(c)?' selected':''}" data-action="fw-toggle-irops" data-type="${key}" data-code="${c}">
+          <div class="pill${codes.includes(c)?' selected':''}" data-action="fw-toggle-irops" data-type="${key}" data-code="${esc(c)}">
             ${c.replace(/_/g,' ')}
           </div>`).join('')}
       </div>
@@ -2598,7 +2598,7 @@ function renderWizardStep1() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Select supported passenger types</div>
       <div class="pill-group" style="margin-bottom:16px">
-        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${p}">${p.replace(/_/g,' ')}</div>`).join('')}
+        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${esc(p)}">${p.replace(/_/g,' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">
@@ -2610,13 +2610,13 @@ function renderWizardStep1() {
             const sel   = (fw.passengerTypes||[]).includes(p);
             const dflt  = WIZ_PAX_DEFAULT_AGES[p] || { min: 0, max: 99 };
             const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[p]) ? fw.passengerAgeRanges[p] : dflt;
-            return `<div class="pax-age-row" id="pax-age-${p}" style="${sel?'':'display:none'}">
+            return `<div class="pax-age-row" id="pax-age-${esc(p)}" style="${sel?'':'display:none'}">
               <span class="pax-age-label">${p.replace(/_/g,' ')}</span>
               <label class="pax-age-pair">Min age
-                <input type="number" min="0" max="120" value="${range.min}" data-action="fw-pax-age" data-paxtype="${p}" data-bound="min">
+                <input type="number" min="0" max="120" value="${range.min}" data-action="fw-pax-age" data-paxtype="${esc(p)}" data-bound="min">
               </label>
               <label class="pax-age-pair">Max age
-                <input type="number" min="0" max="120" value="${range.max}" data-action="fw-pax-age" data-paxtype="${p}" data-bound="max">
+                <input type="number" min="0" max="120" value="${range.max}" data-action="fw-pax-age" data-paxtype="${esc(p)}" data-bound="max">
               </label>
             </div>`;
           }).join('')}
@@ -2757,17 +2757,17 @@ function renderWizardStep2() {
     const sub = [d.vehicleNumber || d.trainId || '', route, times, classes].filter(Boolean).join('  ·  ');
     return `
     <div class="train-item">
-      <div class="train-row" data-action="toggle-train-detail" data-tidx="${tidx}">
+      <div class="train-row" data-action="toggle-train-detail" data-tidx="${esc(tidx)}">
         <div style="flex:1;min-width:0">
           <div class="train-row-label">${esc(t.label || '—')}</div>
           <div class="train-row-sub">${esc(sub)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
-          <span class="toggle-arrow" id="train-arrow-${tidx}">▶</span>
+          <span class="toggle-arrow" id="train-arrow-${esc(tidx)}">▶</span>
           <button class="row-delete-btn" data-action="wiz-delete-resource" data-id="${esc(t.id)}" title="Delete this train">🗑</button>
         </div>
       </div>
-      <div class="train-detail" id="train-detail-${tidx}"></div>
+      <div class="train-detail" id="train-detail-${esc(tidx)}"></div>
     </div>`;
   }).join('');
 
@@ -2837,41 +2837,41 @@ function buildTrainDetailHTML(tidx) {
         <!-- Row 1: Label | Vehicle Number -->
         <div class="param-field">
           <label class="param-label">Label <span class="param-hint">(short display name)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. ICE 123 Berlin→Paris">
-          <span class="field-error" id="tf-${tidx}-label-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. ICE 123 Berlin→Paris">
+          <span class="field-error" id="tf-${esc(tidx)}-label-err"></span>
         </div>
         <div class="param-field">
           <label class="param-label">Vehicle Number</label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="vehicleNumber" value="${esc(d.vehicleNumber || d.trainId || '')}" placeholder="e.g. ICE123">
-          <span class="field-error" id="tf-${tidx}-vehicleNumber-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="vehicleNumber" value="${esc(d.vehicleNumber || d.trainId || '')}" placeholder="e.g. ICE123">
+          <span class="field-error" id="tf-${esc(tidx)}-vehicleNumber-err"></span>
         </div>
         <!-- Row 2: Origin URN | Departure time -->
         <div class="param-field">
           <label class="param-label">Origin station URN</label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010">
-          <span class="field-error" id="tf-${tidx}-originURN-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010">
+          <span class="field-error" id="tf-${esc(tidx)}-originURN-err"></span>
         </div>
         <div class="param-field">
           <label class="param-label">Departure time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="departureTime" value="${esc(d.departureTime || '')}" placeholder="07:00:00+02:00">
-          <span class="field-error" id="tf-${tidx}-departureTime-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="departureTime" value="${esc(d.departureTime || '')}" placeholder="07:00:00+02:00">
+          <span class="field-error" id="tf-${esc(tidx)}-departureTime-err"></span>
         </div>
         <!-- Row 3: Destination URN | Arrival time -->
         <div class="param-field">
           <label class="param-label">Destination station URN</label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
-          <span class="field-error" id="tf-${tidx}-destinationURN-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
+          <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
         <div class="param-field">
           <label class="param-label">Arrival time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="arrivalTime" value="${esc(d.arrivalTime || '')}" placeholder="10:20:00+02:00">
-          <span class="field-error" id="tf-${tidx}-arrivalTime-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="arrivalTime" value="${esc(d.arrivalTime || '')}" placeholder="10:20:00+02:00">
+          <span class="field-error" id="tf-${esc(tidx)}-arrivalTime-err"></span>
         </div>
         <!-- Row 4: Operator Code (full width) -->
         <div class="param-field" style="grid-column:1/-1">
           <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN — operator's UIC RICS code)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${tidx}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184" style="max-width:280px">
-          <span class="field-error" id="tf-${tidx}-operatorCode-err"></span>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184" style="max-width:280px">
+          <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
         </div>
       </div>
     </div>
@@ -2883,23 +2883,23 @@ function buildTrainDetailHTML(tidx) {
     <div style="padding:12px 14px">
       <div class="fw-subsection">
         <div class="fw-subsection-label">Applicable ticket types</div>
-        <div class="pill-group" id="tf-${tidx}-ticketTypes">${pills(ttItems, 'ticketTypes')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-ticketTypes">${pills(ttItems, 'ticketTypes')}</div>
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Travel classes on this train</div>
-        <div class="pill-group" id="tf-${tidx}-travelClasses">${pills(WIZ_TRAVEL_CLASSES, 'travelClasses')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-travelClasses">${pills(WIZ_TRAVEL_CLASSES, 'travelClasses')}</div>
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Service classes on this train</div>
-        <div class="pill-group" id="tf-${tidx}-serviceClasses">${pills(WIZ_SERVICE_CLASSES, 'serviceClasses')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-serviceClasses">${pills(WIZ_SERVICE_CLASSES, 'serviceClasses')}</div>
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Accommodation types</div>
-        <div class="pill-group" id="tf-${tidx}-accommodations">${pills(WIZ_ACCOMMODATIONS, 'accommodations')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-accommodations">${pills(WIZ_ACCOMMODATIONS, 'accommodations')}</div>
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Ancillaries available</div>
-        <div class="pill-group" id="tf-${tidx}-ancillaries">${pills(WIZ_ANCILLARIES, 'ancillaries')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-ancillaries">${pills(WIZ_ANCILLARIES, 'ancillaries')}</div>
       </div>
     </div>
     </div>
@@ -2910,18 +2910,18 @@ function buildTrainDetailHTML(tidx) {
     <div style="padding:12px 14px">
       <div class="fw-subsection">
         <div class="fw-subsection-label">Fulfillment type</div>
-        <div class="pill-group" id="tf-${tidx}-fulfillmentTypes">${pills(WIZ_FULFIL_TYPES, 'fulfillmentTypes')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-fulfillmentTypes">${pills(WIZ_FULFIL_TYPES, 'fulfillmentTypes')}</div>
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Fulfillment media</div>
-        <div class="pill-group" id="tf-${tidx}-fulfillmentMedia">${pills(WIZ_FULFIL_MEDIA, 'fulfillmentMedia')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-fulfillmentMedia">${pills(WIZ_FULFIL_MEDIA, 'fulfillmentMedia')}</div>
       </div>
     </div>
     </div>
   </div>
   <div style="padding:0 14px">
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button class="btn btn-primary btn-sm" data-action="wiz-save-train" data-tidx="${tidx}">💾 Save Train</button>
+        <button class="btn btn-primary btn-sm" data-action="wiz-save-train" data-tidx="${esc(tidx)}">💾 Save Train</button>
       </div>
     </div>
   </div>`;
@@ -2955,7 +2955,7 @@ function readTrainDetailFields(tidx) {
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return null;
   const field = (f) => {
-    const el = detail.querySelector(`[data-tfield="${f}"]`);
+    const el = detail.querySelector(`[data-tfield="${esc(f)}"]`);
     return el ? el.value.trim() : '';
   };
   return {
@@ -2966,13 +2966,13 @@ function readTrainDetailFields(tidx) {
     departureTime: field('departureTime'),
     arrivalTime:   field('arrivalTime'),
     operatorCode:  field('operatorCode'),
-    ticketTypes:       getSelectedPills(`tf-${tidx}-ticketTypes`),
-    travelClasses:     getSelectedPills(`tf-${tidx}-travelClasses`),
-    serviceClasses:    getSelectedPills(`tf-${tidx}-serviceClasses`),
-    accommodations:    getSelectedPills(`tf-${tidx}-accommodations`),
-    ancillaries:       getSelectedPills(`tf-${tidx}-ancillaries`),
-    fulfillmentTypes:  getSelectedPills(`tf-${tidx}-fulfillmentTypes`),
-    fulfillmentMedia:  getSelectedPills(`tf-${tidx}-fulfillmentMedia`)
+    ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
+    travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
+    serviceClasses:    getSelectedPills(`tf-${esc(tidx)}-serviceClasses`),
+    accommodations:    getSelectedPills(`tf-${esc(tidx)}-accommodations`),
+    ancillaries:       getSelectedPills(`tf-${esc(tidx)}-ancillaries`),
+    fulfillmentTypes:  getSelectedPills(`tf-${esc(tidx)}-fulfillmentTypes`),
+    fulfillmentMedia:  getSelectedPills(`tf-${esc(tidx)}-fulfillmentMedia`)
   };
 }
 
@@ -2994,14 +2994,14 @@ function wizValidateTrain(tidx) {
   // Clear previous state
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
-    const err = document.getElementById(`tf-${tidx}-${c.tfield}-err`);
+    const err = document.getElementById(`tf-${esc(tidx)}-${c.tfield}-err`);
     if (el)  el.classList.remove('invalid');
     if (err) { err.textContent = ''; err.classList.remove('show'); }
   });
   let ok = true;
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
-    const err = document.getElementById(`tf-${tidx}-${c.tfield}-err`);
+    const err = document.getElementById(`tf-${esc(tidx)}-${c.tfield}-err`);
     if (!el) return;
     const val = el.value.trim();
     if (!c.test(val)) {
@@ -3310,7 +3310,7 @@ function renderWizardStep3() {
         <div class="param-field" style="min-width:180px">
           <label class="param-label">Desired flexibility</label>
           <select class="param-input param-select" data-action="wiz-flexibility">
-            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${f}" ${sc.desiredFlexibility===f?'selected':''}>${f.replace(/_/g,' ')}</option>`).join('')}
+            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replace(/_/g,' ')}</option>`).join('')}
           </select>
         </div>
         ${(() => {
@@ -3326,7 +3326,7 @@ function renderWizardStep3() {
           <label class="param-label">Overrule code <span class="param-hint">(IROPS reason)</span></label>
           <select class="param-input param-select" data-action="wiz-overrule">
             <option value="">— none —</option>
-            ${codes.map(c => `<option value="${c}" ${sc.overruleCode===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
+            ${codes.map(c => `<option value="${esc(c)}" ${sc.overruleCode===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
           </select>
           ${codes.length === 0 ? '<div style="font-size:11px;color:#e65100;margin-top:4px">⚠ No IROPS codes configured in Framework Step 1.</div>' : ''}
         </div>`;
@@ -3463,21 +3463,21 @@ function renderWizardStep3() {
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Requested offer parts</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_OFFER_PARTS, fw.offerCriteria && fw.offerCriteria.requestedOfferParts).map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${p}">${p}</div>`).join('')}
+        ${fwFilter(WIZ_OFFER_PARTS, fw.offerCriteria && fw.offerCriteria.requestedOfferParts).map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${esc(p)}">${esc(p)}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Service class</div>
       <div class="pill-group" style="margin-bottom:14px">
         ${availSC.length
-          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${c}">${c.replace(/_/g,' ')}</div>`).join('')
+          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${esc(c)}">${c.replace(/_/g,' ')}</div>`).join('')
           : '<span style="font-size:12px;color:#b0bec5">No service classes available — define them in Step 1 or select a train.</span>'}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Travel class</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${availTC.map(c=>`<div class="pill${(sc.travelClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="travelClasses" data-val="${c}">${c}</div>`).join('')}
+        ${availTC.map(c=>`<div class="pill${(sc.travelClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="travelClasses" data-val="${esc(c)}">${esc(c)}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${f}">${f.replace(/_/g,' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -4019,7 +4019,7 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation();
       const pIdx = parseInt(el.dataset.pidx);
       const scIdx = parseInt(el.dataset.scenidx);
-      const typeSelect = document.getElementById(`add-pax-type-${pIdx}`);
+      const typeSelect = document.getElementById(`add-pax-type-${esc(pIdx)}`);
       const category = typeSelect ? typeSelect.value : 'ADULT';
       const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
       const isHuman = WIZ_HUMAN_PAX_TYPES.includes(category);
@@ -4051,7 +4051,7 @@ document.body.addEventListener('click', function(e) {
       paxList.passengers.push(newPax);
       markDirty();
       // Re-render the detail for this scenario
-      const detail = document.getElementById(`detail-${scIdx}`);
+      const detail = document.getElementById(`detail-${esc(scIdx)}`);
       if (detail && detail.innerHTML) {
         detail.innerHTML = buildDetailHTML(scIdx);
         // Re-open the passengers section
@@ -4691,7 +4691,7 @@ document.body.addEventListener('change', function(e) {
       }
       markDirty();
       // Re-render the detail
-      const det = document.getElementById(`detail-${cpScIdx}`);
+      const det = document.getElementById(`detail-${esc(cpScIdx)}`);
       if (det && det.innerHTML) {
         det.innerHTML = buildDetailHTML(cpScIdx);
         det.querySelectorAll('.param-section-head').forEach(h => {
