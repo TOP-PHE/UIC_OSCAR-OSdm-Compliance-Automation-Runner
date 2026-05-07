@@ -21,6 +21,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { safeJoinUuid } = require('../utils/paths');
 const { run: dbRun, get, transaction } = require('../db/db');
 const {
   classifyCategory,
@@ -186,8 +187,10 @@ function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions)
  * @returns {{ suites: number, requests: number, assertions: number }}
  */
 function extractStructuredResults(runId, companyId) {
-  const jsonPath = path.join(ARTIFACTS_DIR, runId, '.bru_results.json');
-  if (!fs.existsSync(jsonPath)) return { suites: 0, requests: 0, assertions: 0 };
+  // Path-traversal guard — see src/utils/paths.js. runId originates from
+  // the server-issued UUID; reject anything else without touching the FS.
+  const jsonPath = safeJoinUuid(ARTIFACTS_DIR, runId, '.bru_results.json');
+  if (!jsonPath || !fs.existsSync(jsonPath)) return { suites: 0, requests: 0, assertions: 0 };
 
   // Bruno collections in OSDM are usually flat — entry.test.filename looks like
   // "01-System Infos Requests/00. GET System Version Check.yml" (only 2 levels).

@@ -25,6 +25,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { safeJoinUuid } = require('../utils/paths');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 
@@ -32,8 +33,11 @@ const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 // Key format: "{suiteName}|{requestName}|{assertionName}"
 // Value: { passed: bool, error: string|null }
 function parseResults(runId) {
-  const jsonPath = path.join(ARTIFACTS_DIR, runId, '.bru_results.json');
-  if (!fs.existsSync(jsonPath)) return null;
+  // Defence in depth against path traversal — see src/utils/paths.js.
+  // Routes already validate runId via the schema layer, but a function
+  // that reads the filesystem must not trust its caller.
+  const jsonPath = safeJoinUuid(ARTIFACTS_DIR, runId, '.bru_results.json');
+  if (!jsonPath || !fs.existsSync(jsonPath)) return null;
 
   const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
