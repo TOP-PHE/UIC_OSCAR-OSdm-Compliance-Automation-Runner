@@ -29,13 +29,23 @@ const { safeJoinUuid } = require('../utils/paths');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 
+// Inline UUID regex literally next to the filesystem access. Sonar's
+// taint analyzer (rule jssecurity:S6549, "filesystem oracle attacks")
+// does not follow taint through cross-module helper calls, so even
+// though safeJoinUuid validates the input via the same regex, Sonar
+// would still flag the fs.existsSync below. Repeating the validation
+// in this module keeps the sanitizer visible to the local analyzer.
+const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 // ── Parse .bru_results.json into a flat map of assertion outcomes ─────────────
 // Key format: "{suiteName}|{requestName}|{assertionName}"
 // Value: { passed: bool, error: string|null }
 function parseResults(runId) {
   // Defence in depth against path traversal — see src/utils/paths.js.
   // Routes already validate runId via the schema layer, but a function
-  // that reads the filesystem must not trust its caller.
+  // that reads the filesystem must not trust its caller. The inline
+  // regex makes the guard visible to Sonar's per-function analyzer.
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) return null;
   const jsonPath = safeJoinUuid(ARTIFACTS_DIR, runId, '.bru_results.json');
   if (!jsonPath || !fs.existsSync(jsonPath)) return null;
 

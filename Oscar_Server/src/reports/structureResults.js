@@ -23,6 +23,11 @@ const fs   = require('fs');
 const path = require('path');
 const { safeJoinUuid } = require('../utils/paths');
 const { run: dbRun, get, transaction } = require('../db/db');
+
+// Inline UUID regex (see comment in reports/diff.js) — Sonar's taint
+// analyzer (jssecurity:S6549) requires the validation to live in the
+// same function as the filesystem call to recognise it as a sanitizer.
+const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const {
   classifyCategory,
   classifyDomain,
@@ -187,8 +192,13 @@ function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions)
  * @returns {{ suites: number, requests: number, assertions: number }}
  */
 function extractStructuredResults(runId, companyId) {
-  // Path-traversal guard — see src/utils/paths.js. runId originates from
-  // the server-issued UUID; reject anything else without touching the FS.
+  // Inline path-traversal guard (Sonar S6549). The same regex lives in
+  // src/utils/paths.js for defence in depth, but Sonar's per-function
+  // analyzer needs to see the validation here, in the same function as
+  // the filesystem call, to flag the data flow as sanitised.
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+    return { suites: 0, requests: 0, assertions: 0 };
+  }
   const jsonPath = safeJoinUuid(ARTIFACTS_DIR, runId, '.bru_results.json');
   if (!jsonPath || !fs.existsSync(jsonPath)) return { suites: 0, requests: 0, assertions: 0 };
 

@@ -30,6 +30,11 @@ const log = require('../utils/logger').child({ module: 'runner' });
 const { fetchToken } = require('./auth-profiles');
 const { safeJoinUuid } = require('../utils/paths');
 
+// Inline UUID regex (see comment in reports/diff.js). Sonar's taint
+// analyzer (jssecurity:S6549) requires the regex to live in the same
+// module as each filesystem call for the sanitiser to be recognised.
+const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 // ── Config ────────────────────────────────────────────────────────────────────
 const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
 const BRU_CMD         = process.env.BRU_CMD || 'bru.cmd';
@@ -284,12 +289,14 @@ function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, 
 // symlinks, so we copy collection folders into the workspace. Async to avoid
 // blocking the EventLoop while copying multi-MB directory trees.
 async function createWorkspace(runId) {
-  // Path-traversal guard — runId originates from uuid.v4() at /v1/runs
-  // POST time and is stored on the runs row, so it should always be a
-  // canonical UUID. Defence in depth blocks any future path where a
-  // non-UUID value sneaks through.
+  // Inline path-traversal guard (Sonar S6549). runId originates from
+  // uuid.v4() at /v1/runs POST time; the inline regex check makes the
+  // sanitisation visible to Sonar's per-function analyzer.
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+    throw new Error('createWorkspace: invalid runId format');
+  }
   const workspaceDir = safeJoinUuid(WORKSPACES_DIR, runId);
-  if (!workspaceDir) throw new Error(`createWorkspace: invalid runId format`);
+  if (!workspaceDir) throw new Error('createWorkspace: invalid runId format');
   await fs.promises.mkdir(workspaceDir, { recursive: true });
 
   // Real directories for write targets (env file, reports, results)
@@ -324,9 +331,13 @@ async function createWorkspace(runId) {
 }
 
 async function cleanupWorkspace(runId) {
-  // Path-traversal guard. Same rationale as createWorkspace — never feed
-  // an unvalidated identifier into fs.promises.rm with recursive:true,
-  // even when the caller is internal.
+  // Inline path-traversal guard (Sonar S6549). Recursive remove on a
+  // tainted path is the most dangerous filesystem operation in this
+  // codebase — keep the sanitiser inline so the analyser sees it.
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+    log.error({ runId }, 'cleanupWorkspace: invalid runId format, refusing to remove');
+    return;
+  }
   const workspaceDir = safeJoinUuid(WORKSPACES_DIR, runId);
   if (!workspaceDir) {
     log.error({ runId }, 'cleanupWorkspace: invalid runId format, refusing to remove');
@@ -361,9 +372,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   );
   logEvent(runId, 'info', `[runner] Run started — company=${companyRow.slug} user=${userRow.email} auth_mode=${userRow.auth_mode}`);
 
-  // 2. Prepare artifact directory (path-traversal guarded — see utils/paths.js)
+  // 2. Prepare artifact directory — inline path-traversal guard (Sonar S6549)
+  if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+    throw new Error('executeRun: invalid runId format');
+  }
   const runArtifactDir = safeJoinUuid(ARTIFACTS_DIR, runId);
-  if (!runArtifactDir) throw new Error(`executeRun: invalid runId format`);
+  if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
   // 3. Resolve access token (per-tester credentials, per-tester token cache)
