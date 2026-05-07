@@ -78,7 +78,7 @@ describe('compareRuns — missing artifact files', () => {
   });
 
   test('throws when run A artifact is missing', () => {
-    expect(() => compareRuns('run-a-id', 'run-b-id')).toThrow(/run A/i);
+    expect(() => compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222')).toThrow(/run A/i);
   });
 
   test('throws when run B artifact is missing', () => {
@@ -86,11 +86,11 @@ describe('compareRuns — missing artifact files', () => {
       __dirname,
       '../../src/reports/../../data/artifacts'
     );
-    const pathA = path.join(ARTIFACTS_DIR, 'run-a', '.bru_results.json');
+    const pathA = path.join(ARTIFACTS_DIR, '11111111-1111-4111-8111-111111111111', '.bru_results.json');
 
     fs.existsSync.mockImplementation((p) => p === pathA);
     fs.readFileSync.mockReturnValue(JSON.stringify([]));
-    expect(() => compareRuns('run-a', 'run-b')).toThrow(/run B/i);
+    expect(() => compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222')).toThrow(/run B/i);
   });
 });
 
@@ -98,8 +98,8 @@ describe('compareRuns — missing artifact files', () => {
 
 describe('compareRuns — empty results', () => {
   test('empty results → zeroed summary with no items', () => {
-    mockTwoRunsFiles('ra', [], 'rb', []);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [], '22222222-2222-4222-8222-222222222222', []);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(0);
     expect(diff.items).toHaveLength(0);
   });
@@ -110,8 +110,8 @@ describe('compareRuns — empty results', () => {
 describe('compareRuns — UNCHANGED_PASS', () => {
   test('assertion passes in both runs → UNCHANGED_PASS', () => {
     const entry = makeEntry('Suite1', 'req1.bru', 'status code is 200', true);
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.unchanged_pass).toBe(1);
     expect(diff.summary.total).toBe(1);
     expect(diff.items[0].category).toBe('UNCHANGED_PASS');
@@ -121,8 +121,8 @@ describe('compareRuns — UNCHANGED_PASS', () => {
 describe('compareRuns — UNCHANGED_FAIL', () => {
   test('assertion fails in both runs → UNCHANGED_FAIL', () => {
     const entry = makeEntry('Suite1', 'req1.bru', 'status code is 200', false);
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.unchanged_fail).toBe(1);
     expect(diff.items[0].category).toBe('UNCHANGED_FAIL');
   });
@@ -132,8 +132,8 @@ describe('compareRuns — FAILED_TO_PASSED', () => {
   test('failed in A, passed in B → FAILED_TO_PASSED', () => {
     const entryA = makeEntry('Suite1', 'req1.bru', 'offer array exists', false);
     const entryB = makeEntry('Suite1', 'req1.bru', 'offer array exists', true);
-    mockTwoRunsFiles('ra', [entryA], 'rb', [entryB]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entryA], '22222222-2222-4222-8222-222222222222', [entryB]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.failed_to_passed).toBe(1);
     expect(diff.items[0].category).toBe('FAILED_TO_PASSED');
   });
@@ -143,8 +143,8 @@ describe('compareRuns — PASSED_TO_FAILED', () => {
   test('passed in A, failed in B → PASSED_TO_FAILED', () => {
     const entryA = makeEntry('Suite1', 'req1.bru', 'offer array exists', true);
     const entryB = makeEntry('Suite1', 'req1.bru', 'offer array exists', false);
-    mockTwoRunsFiles('ra', [entryA], 'rb', [entryB]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entryA], '22222222-2222-4222-8222-222222222222', [entryB]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.passed_to_failed).toBe(1);
     expect(diff.items[0].category).toBe('PASSED_TO_FAILED');
   });
@@ -153,8 +153,8 @@ describe('compareRuns — PASSED_TO_FAILED', () => {
 describe('compareRuns — ADDED', () => {
   test('assertion only in B → ADDED', () => {
     const entryB = makeEntry('SuiteNew', 'req2.bru', 'new assertion', true);
-    mockTwoRunsFiles('ra', [], 'rb', [entryB]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [], '22222222-2222-4222-8222-222222222222', [entryB]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.added).toBe(1);
     expect(diff.items[0].category).toBe('ADDED');
     expect(diff.items[0].run_a).toBeNull();
@@ -165,8 +165,8 @@ describe('compareRuns — ADDED', () => {
 describe('compareRuns — REMOVED', () => {
   test('assertion only in A → REMOVED', () => {
     const entryA = makeEntry('OldSuite', 'req3.bru', 'old assertion', true);
-    mockTwoRunsFiles('ra', [entryA], 'rb', []);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entryA], '22222222-2222-4222-8222-222222222222', []);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.removed).toBe(1);
     expect(diff.items[0].category).toBe('REMOVED');
     expect(diff.items[0].run_a).not.toBeNull();
@@ -192,8 +192,8 @@ describe('compareRuns — mixed categories', () => {
       makeEntry('S', 'f.bru', 'assertion-was-passing', false),   // regressed
       makeEntry('S', 'f.bru', 'assertion-added', true),
     ];
-    mockTwoRunsFiles('ra', entriesA, 'rb', entriesB);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', entriesA, '22222222-2222-4222-8222-222222222222', entriesB);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.unchanged_pass).toBe(1);
     expect(diff.summary.unchanged_fail).toBe(1);
     expect(diff.summary.failed_to_passed).toBe(1);
@@ -212,8 +212,8 @@ describe('compareRuns — mixed categories', () => {
       makeEntry('S', 'f.bru', 'regression', false),
       makeEntry('S', 'f.bru', 'stable-pass', true),
     ];
-    mockTwoRunsFiles('ra', entriesA, 'rb', entriesB);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', entriesA, '22222222-2222-4222-8222-222222222222', entriesB);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.items[0].category).toBe('PASSED_TO_FAILED');
     expect(diff.items[diff.items.length - 1].category).toBe('UNCHANGED_PASS');
   });
@@ -224,8 +224,8 @@ describe('compareRuns — mixed categories', () => {
 describe('compareRuns — item structure', () => {
   test('diff item has suite, request, assertion, run_a, run_b, category fields', () => {
     const entry = makeEntry('MySuite', 'myRequest.bru', 'my assertion text', true);
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     const item = diff.items[0];
     expect(item).toHaveProperty('key');
     expect(item).toHaveProperty('suite');
@@ -240,8 +240,8 @@ describe('compareRuns — item structure', () => {
 
   test('key format includes suite, filename (without extension), and assertion', () => {
     const entry = makeEntry('Suite', 'request.bru', 'assertion name', true);
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     // key = "{suite}|{filename_without_ext}|{assertion}"
     expect(diff.items[0].key).toContain('Suite');
     expect(diff.items[0].key).toContain('assertion name');
@@ -253,22 +253,22 @@ describe('compareRuns — item structure', () => {
 describe('compareRuns — Bruno CLI format variations', () => {
   test('raw array of results (v1 flat)', () => {
     const results = [makeEntry('S', 'f.bru', 'test', true)];
-    mockTwoRunsFiles('ra', results, 'rb', results);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', results, '22222222-2222-4222-8222-222222222222', results);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(1);
   });
 
   test('raw.results wrapper', () => {
     const results = { results: [makeEntry('S', 'f.bru', 'test', true)] };
-    mockTwoRunsFiles('ra', results, 'rb', results);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', results, '22222222-2222-4222-8222-222222222222', results);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(1);
   });
 
   test('raw.testResults wrapper', () => {
     const results = { testResults: [makeEntry('S', 'f.bru', 'test', true)] };
-    mockTwoRunsFiles('ra', results, 'rb', results);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', results, '22222222-2222-4222-8222-222222222222', results);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(1);
   });
 
@@ -279,8 +279,8 @@ describe('compareRuns — Bruno CLI format variations', () => {
       testResults: [{ name: 'assertion', status: 'passed' }],
       assertions: [],
     };
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(1);
   });
 
@@ -291,8 +291,8 @@ describe('compareRuns — Bruno CLI format variations', () => {
       tests: [],
       assertions: [{ name: 'http.status == 200', status: 'passed', passed: true }],
     };
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(1);
     expect(diff.summary.unchanged_pass).toBe(1);
   });
@@ -309,8 +309,8 @@ describe('compareRuns — auth URL filtering', () => {
       tests: [{ name: 'token obtained', status: 'passed' }],
       assertions: [],
     };
-    mockTwoRunsFiles('ra', [tokenEntry], 'rb', [tokenEntry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [tokenEntry], '22222222-2222-4222-8222-222222222222', [tokenEntry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(0);  // auth entry skipped
   });
 
@@ -322,8 +322,8 @@ describe('compareRuns — auth URL filtering', () => {
       tests: [{ name: 'login ok', status: 'passed' }],
       assertions: [],
     };
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(0);
   });
 
@@ -334,8 +334,8 @@ describe('compareRuns — auth URL filtering', () => {
       tests: [{ name: 'access token valid', status: 'passed' }],
       assertions: [],
     };
-    mockTwoRunsFiles('ra', [entry], 'rb', [entry]);
-    const diff = compareRuns('ra', 'rb');
+    mockTwoRunsFiles('11111111-1111-4111-8111-111111111111', [entry], '22222222-2222-4222-8222-222222222222', [entry]);
+    const diff = compareRuns('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222');
     expect(diff.summary.total).toBe(0);
   });
 });
