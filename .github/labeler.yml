@@ -1,0 +1,53 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Path-based PR labeler config. Triggered by .github/workflows/labeler.yml
+# on every PR open / sync. Saves the manual "tag this PR with `server`"
+# step and keeps the issue-board filtering accurate at zero cost.
+
+server:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Oscar_Server/**'
+
+collection:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Bruno_Collection/**'
+
+deploy:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'OSCAR_Deploy/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/dependabot.yml'
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Documentation/**'
+          - 'README.md'
+          - 'CHANGELOG.md'
+          - 'SECURITY.md'
+
+release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'compatibility.json'
+          - 'Oscar_Server/package.json'
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'SECURITY.md'
+          - 'Oscar_Server/src/api/middleware/auth.js'
+          - 'Oscar_Server/src/api/routes/auth.js'
+          - 'Oscar_Server/src/db/schema.sql'

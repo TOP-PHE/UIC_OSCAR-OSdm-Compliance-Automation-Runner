@@ -1,0 +1,74 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: SonarCloud
+
+# Runs on every push to main and on every PR targeting main, scoped to
+# server-relevant files. Sonar's PR decoration posts the quality-gate
+# verdict back as a check + a PR comment, so reviewers see issues
+# inline. Branch protection is what makes the gate actually blocking.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Oscar_Server/**'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonar.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Oscar_Server/**'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonar.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  sonar:
+    name: SonarCloud Code Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history for blame)
+        uses: actions/checkout@v4
+        with:
+          # Sonar needs the full Git history to attribute issues to commits
+          # for the "new code" period. Shallow clones produce blank blame.
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: Oscar_Server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: Oscar_Server
+        run: npm ci
+
+      - name: Run tests with coverage
+        # Sonar reads Oscar_Server/coverage/lcov.info to populate the
+        # Coverage on New Code metric. The thresholds here mirror ci-server.yml
+        # so a Sonar gate failure means the same regression as a CI failure.
+        working-directory: Oscar_Server
+        run: npx jest --coverage
+        env:
+          NODE_ENV: test
+          ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' }}
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v3
+        env:
+          # Provided automatically by GitHub for PR decoration (commit
+          # statuses, PR comments). Read-only.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Repository secret. Generate at https://sonarcloud.io/account/security
+          # and store under repo settings → secrets and variables → actions.
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

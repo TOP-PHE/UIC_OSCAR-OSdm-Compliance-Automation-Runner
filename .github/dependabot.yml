@@ -1,0 +1,82 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Dependabot configuration. Three ecosystems tracked:
+#   1. npm (Oscar_Server) — server runtime + dev deps, weekly
+#   2. docker (Oscar_Server/Dockerfile) — base image updates, weekly
+#   3. github-actions (.github/workflows) — action versions, monthly
+#
+# All updates open as PRs against main. Combined with branch protection
+# they go through CI + Sonar + CodeQL before merging, so a malicious
+# transitive dependency can't land on production silently.
+version: 2
+
+updates:
+  # ── npm: server runtime + dev ─────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /Oscar_Server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - server
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: scope
+    # Group minor/patch bumps to keep PR noise down. Majors stay one-per-PR
+    # so a breaking change is easy to see and revert if it breaks tests.
+    groups:
+      production-deps:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      dev-deps:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Major bumps come through as their own PR but are NOT auto-grouped —
+      # explicitly list any package whose major bumps you never want PRs for
+      # here. Currently we accept all majors as separate PRs.
+
+  # ── docker: base image (node:22-slim) ──────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /Oscar_Server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Paris"
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
+  # ── github-actions: action versions in workflows ───────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - "*"
