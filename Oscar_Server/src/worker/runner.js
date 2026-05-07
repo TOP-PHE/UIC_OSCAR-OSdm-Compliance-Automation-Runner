@@ -28,6 +28,7 @@ const { v4: uuidv4 } = require('uuid');
 const { get, run: dbRun, encrypt, decrypt, getConfig } = require('../db/db');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { fetchToken } = require('./auth-profiles');
+const { safeJoinUuid } = require('../utils/paths');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
@@ -283,7 +284,12 @@ function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, 
 // symlinks, so we copy collection folders into the workspace. Async to avoid
 // blocking the EventLoop while copying multi-MB directory trees.
 async function createWorkspace(runId) {
-  const workspaceDir = path.join(WORKSPACES_DIR, runId);
+  // Path-traversal guard — runId originates from uuid.v4() at /v1/runs
+  // POST time and is stored on the runs row, so it should always be a
+  // canonical UUID. Defence in depth blocks any future path where a
+  // non-UUID value sneaks through.
+  const workspaceDir = safeJoinUuid(WORKSPACES_DIR, runId);
+  if (!workspaceDir) throw new Error(`createWorkspace: invalid runId format`);
   await fs.promises.mkdir(workspaceDir, { recursive: true });
 
   // Real directories for write targets (env file, reports, results)
@@ -318,7 +324,14 @@ async function createWorkspace(runId) {
 }
 
 async function cleanupWorkspace(runId) {
-  const workspaceDir = path.join(WORKSPACES_DIR, runId);
+  // Path-traversal guard. Same rationale as createWorkspace — never feed
+  // an unvalidated identifier into fs.promises.rm with recursive:true,
+  // even when the caller is internal.
+  const workspaceDir = safeJoinUuid(WORKSPACES_DIR, runId);
+  if (!workspaceDir) {
+    log.error({ runId }, 'cleanupWorkspace: invalid runId format, refusing to remove');
+    return;
+  }
   try {
     await fs.promises.rm(workspaceDir, { recursive: true, force: true });
   } catch (err) {
@@ -348,8 +361,9 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   );
   logEvent(runId, 'info', `[runner] Run started — company=${companyRow.slug} user=${userRow.email} auth_mode=${userRow.auth_mode}`);
 
-  // 2. Prepare artifact directory
-  const runArtifactDir = path.join(ARTIFACTS_DIR, runId);
+  // 2. Prepare artifact directory (path-traversal guarded — see utils/paths.js)
+  const runArtifactDir = safeJoinUuid(ARTIFACTS_DIR, runId);
+  if (!runArtifactDir) throw new Error(`executeRun: invalid runId format`);
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
   // 3. Resolve access token (per-tester credentials, per-tester token cache)
