@@ -1,0 +1,32 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: PR labeler
+
+# Auto-applies labels to PRs based on the file paths they touch. Rules
+# live in .github/labeler.yml — keep that file as the single source of
+# truth for path-to-label mapping.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          # Don't remove labels a human added on top — only manage the ones
+          # produced by path matches.
+          sync-labels: false

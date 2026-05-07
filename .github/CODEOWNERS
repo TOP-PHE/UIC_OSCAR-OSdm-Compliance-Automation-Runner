@@ -1,0 +1,52 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# CODEOWNERS — auto-requests review from the right people based on the
+# files a PR touches. Combined with branch protection's "require review
+# from Code Owners" setting, this enforces that no Bruno scenario lands
+# without spec-team eyes, and no Dockerfile / workflow change without
+# ops-team eyes.
+#
+# IMPORTANT: replace these placeholder usernames / teams with actual UIC
+# accounts once the repo transfers. While the repo is on TOP-PHE, the
+# default owner is @TOP-PHE so every PR routes there.
+#
+# Order matters: more specific rules later in the file override earlier
+# generic ones.
+
+# ── Default owner — fallback for everything not matched below ────────────
+*                                              @TOP-PHE
+
+# ── Server (Node.js runner, REST API, admin UI) ──────────────────────────
+/Oscar_Server/                                 @TOP-PHE
+/Oscar_Server/src/db/                          @TOP-PHE
+/Oscar_Server/src/api/                         @TOP-PHE
+
+# ── Bruno collection — owned by the OSDM specification team ──────────────
+# Once UIC has the @UICrail/osdm-spec team, replace @TOP-PHE here:
+/Bruno_Collection/                             @TOP-PHE
+/Documentation/Bruno_Collection/               @TOP-PHE
+
+# ── Deployment, CI/CD, container supply chain — ops team ─────────────────
+/OSCAR_Deploy/                                 @TOP-PHE
+/.github/                                      @TOP-PHE
+/.github/workflows/                            @TOP-PHE
+/Documentation/Server_Operations/              @TOP-PHE
+
+# ── Compatibility matrix — release manager only ──────────────────────────
+# This file decides which server↔collection combination is "tested" and
+# therefore gates Watchtower's :stable rollout. A wrong entry can ship a
+# broken combo to all operators. Keep it on the maintainer's plate.
+/compatibility.json                            @TOP-PHE
+
+# ── Security policy — security team only ─────────────────────────────────
+/SECURITY.md                                   @TOP-PHE
+
+# ── Documentation (operator/architecture) — anyone but reviewed ──────────
+/Documentation/                                @TOP-PHE
+/README.md                                     @TOP-PHE
+/CHANGELOG.md                                  @TOP-PHE

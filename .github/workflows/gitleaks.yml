@@ -1,0 +1,49 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Gitleaks (secret scan)
+
+# Belt-and-braces secret scanner that runs alongside GitHub's native
+# secret-scanning + push-protection. Catches anything those rules miss
+# (custom token formats, generic high-entropy strings) before it lands
+# on main.
+#
+# fetch-depth: 0 makes Gitleaks scan the full Git history of the PR,
+# not just the most-recent commit, so a leak introduced 5 commits ago
+# is still caught when the PR is opened.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  scan:
+    name: Scan repo for secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write   # so the action can post a review comment on PRs
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: a Gitleaks Pro license unlocks SaaS scanning + extra
+          # rules. Free tier is plenty for OSCAR-sized repos. If you ever
+          # add the secret, the action will pick it up automatically.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
