@@ -17,22 +17,33 @@ name: Release · auto-tag on merge
 #   - Combined release tag: if compatibility.json#current_release differs from
 #     previous commit, create release-YYYY.MM (unless that tag already exists).
 #
-# IMPORTANT: tags pushed using the default GITHUB_TOKEN do NOT trigger
-# downstream tag-listening workflows (publish-image.yml, promote-release.yml).
-# This is a documented GitHub-Actions safeguard against recursive workflow
-# triggering. We work around it by pushing tags with a repository secret
-# `RELEASE_PAT` (fine-grained PAT scoped to this repo with Contents: write).
+# IMPORTANT — why a GitHub App, not the default GITHUB_TOKEN:
+# Tags pushed using the default GITHUB_TOKEN do NOT trigger downstream
+# tag-listening workflows (publish-image.yml, promote-release.yml). This
+# is a documented GitHub-Actions safeguard against recursive workflow
+# triggering. We work around it by minting a short-lived token from the
+# "OSCAR Release Bot" GitHub App.
 #
-# To create the PAT:
-#   1. https://github.com/settings/personal-access-tokens → New token
-#   2. Resource owner: TOP-PHE (or whoever owns this repo)
-#   3. Repository access: Only select repositories → UIC_OSCAR_Temporary
-#   4. Permissions: Repository permissions → Contents: Read and write
-#   5. Copy the token, then add it as a repo secret named RELEASE_PAT:
-#      gh secret set RELEASE_PAT --repo TOP-PHE/UIC_OSCAR_Temporary
+# Why a GitHub App and not a PAT:
+#   - 1-hour token lifetime (PAT lives 90+ days)
+#   - Independent of any human user (PAT dies if owner leaves)
+#   - Survives repo transfer to UICrail (just reinstall the App on the
+#     new org; no token regeneration needed)
+#   - Audit trail attributes pushes to "OSCAR Release Bot[bot]" rather
+#     than to a person
 #
-# When the PAT expires, rotate it and update the secret. No workflow change
-# needed.
+# Secrets required:
+#   OSCAR_RELEASE_APP_ID         — App ID (numeric) from
+#                                  https://github.com/settings/apps
+#   OSCAR_RELEASE_APP_PRIVATE_KEY — contents of the .pem file generated
+#                                  on the App's settings page
+#
+# To rotate the private key (recommended yearly, or immediately if leaked):
+#   1. https://github.com/settings/apps → OSCAR Release Bot → Private keys
+#   2. Generate a new key, download the .pem
+#   3. Update OSCAR_RELEASE_APP_PRIVATE_KEY repo secret
+#   4. Delete the old key from the App's settings page
+#   No workflow change needed.
 
 on:
   push:
@@ -47,23 +58,35 @@ concurrency:
   group: auto-tag-on-release
   cancel-in-progress: false
 
-permissions:
-  contents: write
-
 jobs:
   auto-tag:
     name: Detect bump and push tags
     runs-on: ubuntu-latest
 
+    # Job-level permissions only — no need for write access since the
+    # `git push` is done via the App-issued token, not GITHUB_TOKEN.
+    permissions:
+      contents: read
+
     steps:
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.OSCAR_RELEASE_APP_ID }}
+          private-key: ${{ secrets.OSCAR_RELEASE_APP_PRIVATE_KEY }}
+          # Token is implicitly scoped to whichever repos the App is
+          # installed on — for OSCAR Release Bot, only this repo.
+
       - name: Checkout (with previous commit for diff)
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-          # Use the PAT so subsequent `git push origin <tag>` triggers the
-          # tag-listening workflows. With the default GITHUB_TOKEN the push
-          # succeeds but downstream workflows would silently not fire.
-          token: ${{ secrets.RELEASE_PAT }}
+          # Use the App token so subsequent `git push origin <tag>`
+          # triggers the tag-listening workflows. With the default
+          # GITHUB_TOKEN the push succeeds but downstream workflows
+          # would silently not fire.
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Compute new tags from version diffs
         id: tags
@@ -112,8 +135,10 @@ jobs:
       - name: Configure git identity
         if: steps.tags.outputs.server_tag != '' || steps.tags.outputs.release_tag != ''
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # The App-issued token authenticates the push; the committer/tagger
+          # identity is cosmetic but should still attribute to the bot.
+          git config user.name  "OSCAR Release Bot[bot]"
+          git config user.email "oscar-release-bot[bot]@users.noreply.github.com"
 
       - name: Push server tag
         if: steps.tags.outputs.server_tag != ''
