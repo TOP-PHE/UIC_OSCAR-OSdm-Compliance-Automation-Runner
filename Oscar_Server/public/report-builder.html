@@ -810,7 +810,7 @@ function getFilteredLogs() {
  *   - The block closes on the first non-continuation line (or request change).
  */
 function looksLikeJsonOpener(msg) {
-  var s = (msg || '').trimRight();
+  var s = (msg || '').trimEnd();
   if (/^\s*\[JSON:[^\]]+\]/.test(s)) return true;          // explicit marker
   if (/[:=]\s*[\{\[]\s*$/.test(s)) return true;             // "Selected Offer: {"
   if (/^[A-Za-z_][\w\s]*:\s*[\{\[]\s*$/.test(s.trim())) return true;
