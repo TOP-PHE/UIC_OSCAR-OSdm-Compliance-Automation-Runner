@@ -41,6 +41,15 @@ FROM node:22-slim
 WORKDIR /app
 
 RUN npm install -g @usebruno/cli && \
+    # Force-update axios inside Bruno CLI's nested node_modules to clear the
+    # 4 axios HIGH CVEs (CVE-2026-42033, -42035, -42043, -42264 — prototype
+    # pollution / header injection / NO_PROXY bypass). Bruno's published
+    # version pins an older axios; replacing it with axios 1.15.2+ is API-
+    # compatible (axios 1.x is stable across minor bumps). Done in the same
+    # RUN as the install so the layer is self-contained.
+    cd /usr/local/lib/node_modules/@usebruno/cli && \
+    npm install axios@^1.15.2 --no-save --no-audit --no-fund && \
+    cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
            /usr/local/bin/npm \
