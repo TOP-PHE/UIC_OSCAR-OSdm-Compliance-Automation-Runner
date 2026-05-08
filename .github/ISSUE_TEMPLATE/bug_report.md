@@ -1,3 +1,11 @@
+---
+name: Bug report
+about: Something is broken or behaves unexpectedly
+title: "[bug] "
+labels: bug
+assignees: ''
+---
+
 <!--
 Copyright [2026] [International Union of Railways (UIC)]
 
@@ -6,13 +14,6 @@ Copyright [2026] [International Union of Railways (UIC)]
    You may obtain a copy of the License at
        http://www.apache.org/licenses/LICENSE-2.0
 -->
----
-name: Bug report
-about: Something is broken or behaves unexpectedly
-title: "[bug] "
-labels: bug
-assignees: ''
----
 
 ## Affected area
 
