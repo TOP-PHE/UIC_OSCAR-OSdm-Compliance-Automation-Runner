@@ -99,9 +99,14 @@ router.patch('/', (req, res) => {
     updates.push('oauth_custom_template = ?');
     values.push(oauth_custom_template || null);
   }
-  if (access_token)      { updates.push('access_token_enc = ?');      values.push(encrypt(access_token)); }
-  if (client_id)         { updates.push('client_id_enc = ?');         values.push(encrypt(client_id)); }
-  if (client_secret)     { updates.push('client_secret_enc = ?');     values.push(encrypt(client_secret)); }
+  // For credentials we accept three intentions:
+  //   key absent              → don't touch the field (keep existing)
+  //   key present, truthy     → encrypt and store the new value
+  //   key present, null/""    → clear the field (issue #16: tester wants to
+  //                             remove credentials at the end of a campaign)
+  if (access_token  !== undefined) { updates.push('access_token_enc = ?');  values.push(access_token  ? encrypt(access_token)  : null); }
+  if (client_id     !== undefined) { updates.push('client_id_enc = ?');     values.push(client_id     ? encrypt(client_id)     : null); }
+  if (client_secret !== undefined) { updates.push('client_secret_enc = ?'); values.push(client_secret ? encrypt(client_secret) : null); }
   if (requestor !== undefined) {
     updates.push('requestor_enc = ?');
     values.push(requestor ? encrypt(requestor) : null);
