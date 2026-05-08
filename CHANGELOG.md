@@ -10,7 +10,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (Phase 3 in progress)
+- (next cycle)
+
+---
+
+## [server-v1.3.0] — 2026-05-08
+
+### Security
+- **Spawn hardening (Sonar S4721)** — Bruno CLI `spawn()` now uses
+  `shell: false` on Linux/macOS (production); shell only retained on
+  Windows when launching `.cmd`/`.bat` shims. Args go straight to
+  `execve()` as `argv[]`, eliminating metacharacter-injection surface.
+- **Path-traversal guards** — central `safeJoinUuid` helper + inline
+  UUID-regex guard alongside every fs call that takes `runId`
+  (Sonar S6549). Test fixtures updated to valid UUIDs.
+- **DOM-XSS hardening (Sonar S5247)** — `esc()` wrappers added to all
+  remaining template-literal interpolations targeting `innerHTML`,
+  including numeric-index and short-loop-var sites.
+- **Dependency CVE remediation** — axios bumped to `^1.15.2` in *all
+  three* Bruno-internal locations (top-level + `@usebruno/js` +
+  `@usebruno/requests`), clearing 4 HIGH CVEs (CVE-2026-42033,
+  -42035, -42043, -42264). `express-rate-limit` bumped to 8.5.1
+  (ip-address XSS advisory).
+
+### Privacy & user management
+- **Per-company "Share reports with Certifier" toggle** — operators
+  opt in/out per company; default off.
+- **Test Manager user-management feature** — Test Managers can now
+  invite, suspend, and reset passwords for users within their
+  company without admin involvement.
+
+### CI/CD pipeline
+- **GHCR auto-publish + release-tag promotion** — `publish-image.yml`
+  builds and pushes Docker images on merge to `main` and on
+  `server-v*` tag.
+- **Watchtower-based auto-deployment** — switched to `nickfedor/watchtower`
+  (active fork) for automatic image rollover on the production VPS.
+- **SAST + secret scanning suite** — CodeQL, SonarCloud, Gitleaks,
+  Dependabot all wired in with required-status-check gating.
+- **Branch protection** — main is protected; all changes flow through
+  PR with 7 required green checks before merge.
+- **PR ergonomics** — labeler, CODEOWNERS, PR/issue templates,
+  SECURITY.md.
+- **Workflow path-filter fix** — required-check workflows no longer
+  use `paths:` filter on `pull_request` (was blocking PRs that
+  didn't touch the filtered paths).
+
+### Licensing
+- LICENSE year aligned to 2026; Apache-2.0 headers added across all
+  source files.
 
 ---
 
