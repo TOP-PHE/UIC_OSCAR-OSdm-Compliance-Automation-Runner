@@ -18,12 +18,11 @@ on:
       - 'Oscar_Server/**'
       - 'sonar-project.properties'
       - '.github/workflows/sonar.yml'
+  # No paths: filter on pull_request — Sonar is a required check in branch
+  # protection, and path-filtered required checks never report a status when
+  # paths don't match, blocking PR merges indefinitely.
   pull_request:
     branches: [main]
-    paths:
-      - 'Oscar_Server/**'
-      - 'sonar-project.properties'
-      - '.github/workflows/sonar.yml'
   workflow_dispatch:
 
 env:

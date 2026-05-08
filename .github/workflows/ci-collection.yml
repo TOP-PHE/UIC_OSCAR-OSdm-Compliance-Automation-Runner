@@ -7,8 +7,12 @@
 
 name: CI · Bruno collection
 
-# Runs only when the Bruno collection or this workflow itself changes.
-# Server / docs changes skip this entire pipeline.
+# On push to main: only run when the collection (or this workflow) changes —
+# saves CI minutes on server-only changes.
+# On pull_request: always run, because this workflow is a *required* status
+# check in branch protection. Path-filtered required checks never report a
+# status when paths don't match, blocking PR merges indefinitely.
+# The job itself is fast (~30s) so the unconditional PR run is cheap.
 on:
   push:
     branches: [main]
@@ -17,9 +21,6 @@ on:
       - '.github/workflows/ci-collection.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'Bruno_Collection/**'
-      - '.github/workflows/ci-collection.yml'
   workflow_dispatch:
 
 env:
