@@ -568,9 +568,17 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     for (const key of ALLOWED_ENV) {
       if (process.env[key] !== undefined) safeEnv[key] = process.env[key];
     }
+    // Shell mode is only required when BRU_CMD points at a Windows
+    // batch wrapper (.cmd / .bat) — direct execve cannot launch those.
+    // On Linux / macOS / Windows-with-.exe we use shell: false so
+    // arguments cannot be reinterpreted by sh -c (closes Sonar S4721
+    // command-injection hotspot). args remains an array either way; the
+    // change only affects whether the shell wraps the invocation.
+    const needsShell = process.platform === 'win32'
+      && /\.(cmd|bat)$/i.test(BRU_CMD);
     const proc = spawn(BRU_CMD, args, {
       cwd:   runCwd,
-      shell: true,
+      shell: needsShell,
       env:   safeEnv
     });
 
