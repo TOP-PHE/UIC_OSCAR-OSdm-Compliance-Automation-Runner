@@ -149,7 +149,8 @@ router.get('/comparisons/:id', (req, res) => {
   // companies so we don't disclose the comparison's existence.
   if (req.user.role === 'certification_user') {
     const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
-    if (c && (c.share_reports_with_certifier === 0 || c.share_reports_with_certifier === false)) {
+    // SQLite stores BOOLEAN as INTEGER (0/1); `=== false` was unreachable (Sonar S3403).
+    if (c && c.share_reports_with_certifier === 0) {
       return res.status(404).json({ status: 404, title: 'Comparison not found.' });
     }
   }
