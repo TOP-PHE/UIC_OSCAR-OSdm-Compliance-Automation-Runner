@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.3.3] — 2026-05-08 + collection-OTST_V2.0.2
+
+### Security
+- **Closes #17 — credential redaction in Bruno reports.** `mergeReport.js`
+  now strips sensitive header values (Authorization, Ocp-Apim-Subscription-Key,
+  X-API-Key, Cookie, etc.) from request and response header maps, and
+  redacts the entire request/response body for auth endpoints
+  (`/token`, `/login`, `/oauth`, …) which carry `client_secret` /
+  `access_token`. Anyone who downloaded a JSON report archive could
+  previously read every tester's credentials in plain text.
+
+### Fixed
+- **Closes #16 — cannot reset API credentials.** PATCH
+  `/v1/me/credentials` now accepts `null`/`""` to clear a credential
+  field (previously silently ignored due to a truthy check). Profile UI
+  gets a red 🗑 **Clear all credentials** button that wipes every
+  credential field in one call. Recommended workflow at the end of a
+  test campaign.
+
+### Operations
+- Bruno collection bumped to `OTST_V2.0.2` to record the redaction
+  change in the Git tag history.
+
+---
+
 ## [server-v1.3.2] — 2026-05-08
 
 ### Quality

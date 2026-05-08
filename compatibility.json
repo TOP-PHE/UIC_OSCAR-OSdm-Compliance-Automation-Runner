@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.11",
+  "current_release": "2026.12",
   "releases": [
+    {
+      "release": "2026.12",
+      "date": "2026-05-08",
+      "server": "1.3.3",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #16: testers can clear stored API credentials. Server-side me-credentials.js now accepts null/empty to wipe a field; profile UI gets a 🗑 Clear all credentials button.",
+        "Closes #17: Bruno mergeReport.js redacts sensitive headers (Authorization, X-Subscription-Key, etc.) and auth-endpoint request/response bodies before serialising into downloadable reports.",
+        "Bruno collection bumped to OTST_V2.0.2 to record the redaction change."
+      ]
+    },
     {
       "release": "2026.11",
       "date": "2026-05-08",
