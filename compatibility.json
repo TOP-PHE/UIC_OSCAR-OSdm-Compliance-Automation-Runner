@@ -1,8 +1,25 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.08",
+  "current_release": "2026.09",
   "releases": [
+    {
+      "release": "2026.09",
+      "date": "2026-05-08",
+      "server": "1.3.0",
+      "collection": "OTST_V2.0.1",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Spawn hardening (Sonar S4721): shell:false on Linux, conditional only on Windows .cmd/.bat shims.",
+        "Path-traversal guards on all fs calls taking runId (Sonar S6549): central safeJoinUuid helper + inline UUID-regex guard.",
+        "DOM-XSS hardening (Sonar S5247): esc() wrappers on all innerHTML template-literal interpolations.",
+        "axios bumped to ^1.15.2 in three Bruno-internal locations (top-level + @usebruno/js + @usebruno/requests) — clears 4 HIGH CVEs (CVE-2026-42033, -42035, -42043, -42264).",
+        "express-rate-limit bumped to 8.5.1 (ip-address XSS advisory).",
+        "Full SAST suite wired in: CodeQL + SonarCloud + Gitleaks + Dependabot, with branch protection enforcing 7 required green checks before merge.",
+        "Privacy toggle and Test Manager user-mgmt features carried over from 2026.08 — first release where they ship under the hardened pipeline."
+      ]
+    },
     {
       "release": "2026.08",
       "date": "2026-05-05",
