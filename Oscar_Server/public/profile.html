@@ -204,7 +204,17 @@ input[type=password]::placeholder{letter-spacing:2px}
       <input type="text" id="subscription_key" placeholder="your-subscription-key">
     </div>
 
-    <button class="btn btn-primary" id="save-btn">💾 Save Configuration</button>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="save-btn">💾 Save Configuration</button>
+      <button class="btn btn-secondary" id="clear-creds-btn"
+              style="background:#ef5350;color:white;border:none"
+              title="Wipes all stored credentials (bearer token, client id/secret, oauth_extra, requestor, subscription key, cached access token).">
+        🗑 Clear all credentials
+      </button>
+      <span id="clear-creds-help" style="font-size:11px;color:#90a4ae">
+        Recommended after a test campaign — your secrets are not retained.
+      </span>
+    </div>
   </div>
 
 </div>
@@ -402,9 +412,52 @@ async function saveConfig() {
   document.getElementById('oauth_extra').value  = '';
 }
 
+async function clearCredentials() {
+  if (!confirm('Wipe all stored credentials for your account?\n\n' +
+               'This removes: bearer token, OAuth client id/secret, OAuth extra, ' +
+               'requestor, subscription key, and any cached access token.\n\n' +
+               'You will need to re-enter them before running any new test.')) {
+    return;
+  }
+  // Send null for every credential field so the server clears each one.
+  // me-credentials.js distinguishes "field absent" (no change) from
+  // "field present and falsy" (clear).
+  const wipe = {
+    access_token: null,
+    client_id: null,
+    client_secret: null,
+    oauth_extra: null,
+    oauth_scope: null,
+    oauth_custom_template: null,
+    requestor: null,
+    subscription_key: null
+  };
+  const r = await fetch('/v1/me/credentials', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(wipe)
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    showMsg(d.detail || d.title || 'Clearing credentials failed.', false);
+    return;
+  }
+  // Reset the password fields visually + reload the profile so the
+  // configured-state badges/labels update.
+  document.getElementById('access_token').value      = '';
+  document.getElementById('client_id').value         = '';
+  document.getElementById('client_secret').value     = '';
+  document.getElementById('oauth_extra').value       = '';
+  document.getElementById('requestor').value         = '';
+  document.getElementById('subscription_key').value  = '';
+  showMsg('All credentials cleared.', true);
+  loadProfile();
+}
+
 document.getElementById('auth_mode').addEventListener('change', switchMode);
 document.getElementById('oauth_profile').addEventListener('change', switchProfile);
 document.getElementById('save-btn').addEventListener('click', saveConfig);
+document.getElementById('clear-creds-btn').addEventListener('click', clearCredentials);
 
 loadProfile();
 </script>
