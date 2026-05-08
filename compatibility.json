@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.12",
+  "current_release": "2026.13",
   "releases": [
+    {
+      "release": "2026.13",
+      "date": "2026-05-08",
+      "server": "1.3.4",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Sonar S5146 follow-up: req.url is now validated against a safe-local-path regex before being concatenated into the HTTPS-redirect Location header. Defense in depth on top of the Host: allow-list shipped in 2026.10."
+      ]
+    },
     {
       "release": "2026.12",
       "date": "2026-05-08",
