@@ -112,7 +112,16 @@ if (process.env.NODE_ENV === 'production') {
       if (ALLOWED_REDIRECT_HOSTS.length > 0 && !ALLOWED_REDIRECT_HOSTS.includes(host)) {
         return res.status(400).set('Connection', 'close').send('Bad Request: invalid Host header');
       }
-      return res.redirect(301, `https://${host}${req.url}`);
+      // Sonar S5146 (second flow) — validate `req.url` too. With Host:
+      // already allow-listed, the path component cannot pivot the redirect
+      // to another origin in practice, but defense in depth: insist on a
+      // safe local path (single leading "/", no protocol-relative "//evil",
+      // no backslashes that can confuse downstream HTTP parsers / browsers).
+      // Anything else falls back to "/".
+      const safePath = (typeof req.url === 'string' && /^\/(?!\/)[^\\]*$/.test(req.url))
+        ? req.url
+        : '/';
+      return res.redirect(301, `https://${host}${safePath}`);
     }
     next();
   });
