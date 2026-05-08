@@ -7,8 +7,12 @@
 
 name: CI · Server
 
-# Runs only when server code, deploy config, or this workflow itself changes.
-# Doc-only or collection-only PRs skip this entire pipeline.
+# On push to main: only run when server code, deploy config, or this
+# workflow itself changes — saves CI minutes on doc/collection-only commits.
+# On pull_request: always run, because these jobs (Lint+test, Docker build,
+# Trivy) are *required* status checks in branch protection. Path-filtered
+# required checks never report a status when paths don't match, blocking
+# PR merges indefinitely.
 on:
   push:
     branches: [main]
@@ -19,11 +23,6 @@ on:
       - '.github/workflows/ci-server.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'Oscar_Server/**'
-      - 'OSCAR_Deploy/**'
-      - 'compatibility.json'
-      - '.github/workflows/ci-server.yml'
   workflow_dispatch:
 
 # Force JS-based actions onto Node 24 ahead of GitHub's June 2026 deadline.
