@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.3.2] — 2026-05-08
+
+### Quality
+- **Sonar S7783** — replace deprecated `String#trimRight()` with the
+  standard `String#trimEnd()` in `report-builder.html:813`. One-character
+  substitution, no behaviour change. CRITICAL code-smell count: 40 → 39.
+
+### Operations
+- **First release cut via the auto-tag-on-merge automation** (Layer 2).
+  No manual `git tag … && git push origin …` step — tags created
+  automatically by the OSCAR Release Bot GitHub App when this commit
+  hits main.
+
+---
+
 ## [server-v1.3.1] — 2026-05-08
 
 ### Security
