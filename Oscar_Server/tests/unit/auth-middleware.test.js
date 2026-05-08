@@ -135,16 +135,22 @@ describe('requireRole', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  test('passes when user has the required role', (done) => {
+  test('passes when user has the required role', () => {
     const { req, res } = mockReqRes();
     req.user = { role: 'administrator' };
-    requireRole('administrator')(req, res, () => done());
+    let nextCalled = false;
+    requireRole('administrator')(req, res, () => { nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(0);
   });
 
-  test('accepts multiple allowed roles', (done) => {
+  test('accepts multiple allowed roles', () => {
     const { req, res } = mockReqRes();
     req.user = { role: 'certification_user' };
-    requireRole('administrator', 'certification_user')(req, res, () => done());
+    let nextCalled = false;
+    requireRole('administrator', 'certification_user')(req, res, () => { nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(0);
   });
 
   test('401 when no req.user', () => {
@@ -162,9 +168,12 @@ describe('requireNotRole', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  test('passes when user role is NOT excluded', (done) => {
+  test('passes when user role is NOT excluded', () => {
     const { req, res } = mockReqRes();
     req.user = { role: 'company_user' };
-    requireNotRole('certification_user')(req, res, () => done());
+    let nextCalled = false;
+    requireNotRole('certification_user')(req, res, () => { nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(res.statusCode).toBe(0);
   });
 });
