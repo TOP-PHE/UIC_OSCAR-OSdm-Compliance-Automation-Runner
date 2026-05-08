@@ -94,7 +94,9 @@ function companyShareWithCertifier(companyId) {
   try {
     const row = get('SELECT share_reports_with_certifier AS s FROM companies WHERE id = ?', [companyId]);
     if (!row) return true;
-    return row.s === 1 || row.s === true;
+    // SQLite stores BOOLEAN as INTEGER (0/1); the `=== true` branch was
+    // unreachable and flagged by Sonar S3403. Treat 1 as "shares".
+    return row.s === 1;
   } catch (_e) {
     return true;
   }

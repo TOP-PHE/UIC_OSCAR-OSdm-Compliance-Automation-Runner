@@ -89,7 +89,8 @@ function validateRunOwnership(runId, companyId, req) {
   // v15 certifier privacy guard
   if (req && req.user && req.user.role === 'certification_user') {
     const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
-    if (c && (c.share_reports_with_certifier === 0 || c.share_reports_with_certifier === false)) {
+    // SQLite stores BOOLEAN as INTEGER (0/1); `=== false` was unreachable (Sonar S3403).
+    if (c && c.share_reports_with_certifier === 0) {
       return null;   // hide existence — same shape as "not found"
     }
   }

@@ -931,7 +931,10 @@ async function extractFromDatafile(datafile) {
     const passengerTypes = [...new Set(
       (datafile.passengersList||[]).flatMap(pl =>
         (pl.passengers||[]).map(p => {
-          if (p.type === 'PERSON') return p.dateOfBirth ? 'ADULT' : 'ADULT';
+          // TODO: classify ADULT vs CHILD/SENIOR from p.dateOfBirth when
+          // age-based passenger types become required by OSDM.
+          // For now both branches return ADULT — Sonar S3923 simplified.
+          if (p.type === 'PERSON') return 'ADULT';
           return p.type || 'ADULT';
         })
       )
@@ -2178,8 +2181,11 @@ async function saveDatafile() {
     const verified = await verifyRes.json();
 
     // Check scenariosToRun matches what we sent
-    const sentCodes     = JSON.stringify([...(state.scenariosToRun || [])].sort());
-    const receivedCodes = JSON.stringify([...(verified.scenariosToRun || [])].sort());
+    // Explicit string compare silences Sonar S2871 (missing compare fn);
+    // semantically identical to the default sort for this string-array equality check.
+    const byCode = (a, b) => String(a).localeCompare(String(b));
+    const sentCodes     = JSON.stringify([...(state.scenariosToRun || [])].sort(byCode));
+    const receivedCodes = JSON.stringify([...(verified.scenariosToRun || [])].sort(byCode));
     if (sentCodes !== receivedCodes) {
       showSaveError(
         `Mismatch after save! Sent ${state.scenariosToRun.length} scenario(s) to run, ` +
@@ -3646,7 +3652,9 @@ function wizGenCode() {
     }
   });
   const paxStr = paxParts.length > 0 ? paxParts.join('_') : '1PAX';
-  const legStr = `${sc.trainResourceId ? 1 : 1}LEG`;
+  // TODO: encode actual leg count once multi-leg scenarios are supported.
+  // Currently always 1 — Sonar S3923 simplified.
+  const legStr = '1LEG';
 
   return [slug, typePart, actionPart, paxStr, legStr].filter(Boolean).join('_');
 }

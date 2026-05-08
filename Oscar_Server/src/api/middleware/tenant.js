@@ -32,8 +32,10 @@ function enforceTenant(req, res, next) {
       // Privacy guard (v15): a certification_user targeting a specific
       // company that opted out of certifier sharing is refused. Administrators
       // are unaffected — they always have unconditional read access.
+      // SQLite stores BOOLEAN as INTEGER (0/1); the `=== false` branch was
+      // unreachable and flagged by Sonar S3403.
       if (req.user.role === 'certification_user' &&
-          (company.share_reports_with_certifier === 0 || company.share_reports_with_certifier === false)) {
+          company.share_reports_with_certifier === 0) {
         return res.status(403).json({
           status: 403, title: 'Forbidden',
           detail: 'This company does not share reports with certifiers.'
