@@ -17,11 +17,11 @@ on:
     paths:
       - 'Oscar_Server/**'
       - '.github/workflows/codeql.yml'
+  # No paths: filter on pull_request — CodeQL is a required check in branch
+  # protection, and path-filtered required checks never report a status when
+  # paths don't match, blocking PR merges indefinitely.
   pull_request:
     branches: [main]
-    paths:
-      - 'Oscar_Server/**'
-      - '.github/workflows/codeql.yml'
   schedule:
     # Weekly Monday 05:00 UTC scan even without commits — catches CVEs in
     # the underlying CodeQL ruleset that get published after our merge.
