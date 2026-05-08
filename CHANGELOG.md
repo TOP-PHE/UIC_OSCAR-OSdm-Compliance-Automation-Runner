@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.3.1] — 2026-05-08
+
+### Security
+- **Open-redirect guard (Sonar S5146)** — the HTTPS-enforcement middleware
+  no longer echoes `req.headers.host` directly into the `Location:` header.
+  New `ALLOWED_REDIRECT_HOSTS` env-var allow-list rejects forged Host
+  headers with `400 Bad Request`. nginx already filters Host upstream in
+  production, but this gives the app server its own guard for cases where
+  the proxy is bypassed.
+
+### Quality
+- **Sonar BUG count: 8 → 0** — closed all S3403 (`=== 0 || === false`
+  unreachable branch on SQLite booleans), S3923 (identical-branch ternary),
+  and S2871 (sort without compare fn) issues.
+- **Sonar BLOCKER code-smell count: 3 → 0** — auth-middleware tests now
+  use explicit `expect()` assertions instead of the `done()` callback
+  pattern (S2699).
+- **3 Sonar S5696 XSS findings marked as False Positive** — every dynamic
+  interpolation in the flagged `innerHTML` sites is already wrapped in
+  the `esc()` helper; Sonar's heuristic fires regardless.
+
+### Operations
+- New `ALLOWED_REDIRECT_HOSTS` documented in `OSCAR_Deploy/.env.example`.
+
+---
+
 ## [server-v1.3.0] — 2026-05-08
 
 ### Security

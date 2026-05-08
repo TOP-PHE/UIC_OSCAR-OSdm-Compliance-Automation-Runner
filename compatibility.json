@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.09",
+  "current_release": "2026.10",
   "releases": [
+    {
+      "release": "2026.10",
+      "date": "2026-05-08",
+      "server": "1.3.1",
+      "collection": "OTST_V2.0.1",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Open-redirect guard in HTTPS middleware (Sonar S5146) — set ALLOWED_REDIRECT_HOSTS in .env to activate.",
+        "Sonar BUG count 8 → 0 (S3403 / S3923 / S2871 mechanical fixes).",
+        "Sonar BLOCKER code-smell count 3 → 0 (explicit expect() in auth-middleware tests, S2699)."
+      ]
+    },
     {
       "release": "2026.09",
       "date": "2026-05-08",
