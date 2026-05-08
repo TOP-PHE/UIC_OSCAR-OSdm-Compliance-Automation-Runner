@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.3.4] — 2026-05-08
+
+### Security
+- **Sonar S5146 follow-up**: validate `req.url` is a safe local path
+  before concatenating into the HTTPS-redirect `Location` header. The
+  `Host:` allow-list shipped in 2026.10 covered the host source of the
+  open redirect; SonarCloud's post-merge full scan then surfaced the
+  remaining `req.url` taint flow. Now path must match
+  `/^\/(?!\/)[^\\]*$/` (single leading `/`, no `//evil.com`, no
+  backslashes) — anything else falls back to `/`.
+
+---
+
 ## [server-v1.3.3] — 2026-05-08 + collection-OTST_V2.0.2
 
 ### Security
