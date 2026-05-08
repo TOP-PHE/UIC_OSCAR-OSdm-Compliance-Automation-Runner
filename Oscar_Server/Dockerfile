@@ -41,14 +41,23 @@ FROM node:22-slim
 WORKDIR /app
 
 RUN npm install -g @usebruno/cli && \
-    # Force-update axios inside Bruno CLI's nested node_modules to clear the
-    # 4 axios HIGH CVEs (CVE-2026-42033, -42035, -42043, -42264 — prototype
-    # pollution / header injection / NO_PROXY bypass). Bruno's published
-    # version pins an older axios; replacing it with axios 1.15.2+ is API-
-    # compatible (axios 1.x is stable across minor bumps). Done in the same
-    # RUN as the install so the layer is self-contained.
-    cd /usr/local/lib/node_modules/@usebruno/cli && \
-    npm install axios@^1.15.2 --no-save --no-audit --no-fund && \
+    # Force-update axios inside Bruno CLI to clear 4 axios HIGH CVEs
+    # (CVE-2026-42033, -42035, -42043, -42264 — prototype pollution /
+    # header injection / NO_PROXY bypass). Bruno's published version
+    # pins an older axios in THREE places — top-level + two nested
+    # sub-packages (@usebruno/js and @usebruno/requests each have their
+    # own node_modules/axios). All three need updating; npm doesn't
+    # auto-deduplicate when re-installing axios in just one location.
+    # axios 1.x is API-stable across minor bumps so 1.15.2 is a drop-in.
+    for owner in \
+        /usr/local/lib/node_modules/@usebruno/cli \
+        /usr/local/lib/node_modules/@usebruno/cli/node_modules/@usebruno/js \
+        /usr/local/lib/node_modules/@usebruno/cli/node_modules/@usebruno/requests; do \
+      if [ -f "$owner/package.json" ]; then \
+        rm -rf "$owner/node_modules/axios" && \
+        cd "$owner" && npm install axios@^1.15.2 --no-save --no-audit --no-fund; \
+      fi; \
+    done && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
