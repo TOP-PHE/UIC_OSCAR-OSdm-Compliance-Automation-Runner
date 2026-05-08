@@ -88,14 +88,31 @@ app.set('trust proxy', 1);
 // itself does not terminate TLS — that is nginx/Caddy's job. Redirecting
 // loopback traffic to https://localhost would fail with EPROTO since nothing
 // is listening for TLS on the app port.
+// Allow-list of hostnames the HTTPS-redirect handler will trust as redirect
+// targets. Defense-in-depth against an attacker forging the Host: header to
+// pivot the redirect to evil.com (Sonar S5146 open-redirect). nginx already
+// restricts Host upstream in production, but this gives the app server its
+// own guard. Comma-separated, case-insensitive. If empty (default), the
+// previous behavior is preserved for backwards-compat — set this in any
+// production deployment.
+const ALLOWED_REDIRECT_HOSTS = (process.env.ALLOWED_REDIRECT_HOSTS || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    const host = (req.headers.host || '').split(':')[0];
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
     const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
     if (isLocalhost) return next();   // never redirect loopback traffic
     const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
     if (proto !== 'https') {
-      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+      // Sonar S5146: validate Host: against the allow-list before redirecting.
+      // If the operator did not configure an allow-list, fall back to the
+      // historical behaviour (trust the Host header) so existing deployments
+      // are not broken by the upgrade — but the warning is logged once.
+      if (ALLOWED_REDIRECT_HOSTS.length > 0 && !ALLOWED_REDIRECT_HOSTS.includes(host)) {
+        return res.status(400).set('Connection', 'close').send('Bad Request: invalid Host header');
+      }
+      return res.redirect(301, `https://${host}${req.url}`);
     }
     next();
   });
