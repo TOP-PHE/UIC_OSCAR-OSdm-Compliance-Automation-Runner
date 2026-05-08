@@ -1,0 +1,154 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Release · auto-tag on merge
+
+# Watches main for release-bumping commits and creates the matching Git tags
+# automatically. Eliminates the manual `git tag … && git push origin …` step
+# from the release procedure (Layer 2 of the release-automation roadmap).
+#
+# Detection logic:
+#   - Server tag: if Oscar_Server/package.json#version differs from previous
+#     commit, create server-vX.Y.Z (unless that tag already exists).
+#   - Combined release tag: if compatibility.json#current_release differs from
+#     previous commit, create release-YYYY.MM (unless that tag already exists).
+#
+# IMPORTANT: tags pushed using the default GITHUB_TOKEN do NOT trigger
+# downstream tag-listening workflows (publish-image.yml, promote-release.yml).
+# This is a documented GitHub-Actions safeguard against recursive workflow
+# triggering. We work around it by pushing tags with a repository secret
+# `RELEASE_PAT` (fine-grained PAT scoped to this repo with Contents: write).
+#
+# To create the PAT:
+#   1. https://github.com/settings/personal-access-tokens → New token
+#   2. Resource owner: TOP-PHE (or whoever owns this repo)
+#   3. Repository access: Only select repositories → UIC_OSCAR_Temporary
+#   4. Permissions: Repository permissions → Contents: Read and write
+#   5. Copy the token, then add it as a repo secret named RELEASE_PAT:
+#      gh secret set RELEASE_PAT --repo TOP-PHE/UIC_OSCAR_Temporary
+#
+# When the PAT expires, rotate it and update the secret. No workflow change
+# needed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Oscar_Server/package.json'
+      - 'compatibility.json'
+
+# Single concurrent run on main — avoids racing if two release PRs land
+# in quick succession (would create the same tag twice and explode).
+concurrency:
+  group: auto-tag-on-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  auto-tag:
+    name: Detect bump and push tags
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with previous commit for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          # Use the PAT so subsequent `git push origin <tag>` triggers the
+          # tag-listening workflows. With the default GITHUB_TOKEN the push
+          # succeeds but downstream workflows would silently not fire.
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Compute new tags from version diffs
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # ── Server version bump? ─────────────────────────────────────────
+          new_server=$(jq -r '.version' Oscar_Server/package.json 2>/dev/null || echo "")
+          old_server=$(git show HEAD~1:Oscar_Server/package.json 2>/dev/null \
+                       | jq -r '.version' 2>/dev/null || echo "")
+
+          server_tag=""
+          if [[ -n "$new_server" && "$new_server" != "null" \
+                && "$new_server" != "$old_server" ]]; then
+            candidate="server-v${new_server}"
+            if git ls-remote --tags origin "refs/tags/${candidate}" \
+                 | grep -q "refs/tags/${candidate}$"; then
+              echo "::notice::Server tag ${candidate} already exists on origin — skipping."
+            else
+              server_tag="$candidate"
+              echo "::notice::Will create server tag ${candidate}"
+            fi
+          fi
+          echo "server_tag=${server_tag}" >> "$GITHUB_OUTPUT"
+
+          # ── Combined release label bump? ─────────────────────────────────
+          new_release=$(jq -r '.current_release' compatibility.json 2>/dev/null || echo "")
+          old_release=$(git show HEAD~1:compatibility.json 2>/dev/null \
+                        | jq -r '.current_release' 2>/dev/null || echo "")
+
+          release_tag=""
+          if [[ -n "$new_release" && "$new_release" != "null" \
+                && "$new_release" != "$old_release" ]]; then
+            candidate="release-${new_release}"
+            if git ls-remote --tags origin "refs/tags/${candidate}" \
+                 | grep -q "refs/tags/${candidate}$"; then
+              echo "::notice::Release tag ${candidate} already exists on origin — skipping."
+            else
+              release_tag="$candidate"
+              echo "::notice::Will create release tag ${candidate}"
+            fi
+          fi
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git identity
+        if: steps.tags.outputs.server_tag != '' || steps.tags.outputs.release_tag != ''
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Push server tag
+        if: steps.tags.outputs.server_tag != ''
+        run: |
+          tag="${{ steps.tags.outputs.server_tag }}"
+          msg="Auto-tagged on merge of $(git log -1 --pretty=format:'%h %s' HEAD)"
+          git tag -a "$tag" -m "$msg"
+          git push origin "$tag"
+
+      - name: Push release tag
+        if: steps.tags.outputs.release_tag != ''
+        # Push release tag *after* the server tag — promote-release.yml
+        # rebuilds :stable and will pull whichever server tag is freshest;
+        # we want the new server image to exist before the promote runs.
+        run: |
+          tag="${{ steps.tags.outputs.release_tag }}"
+          msg="Auto-tagged on merge of $(git log -1 --pretty=format:'%h %s' HEAD)"
+          git tag -a "$tag" -m "$msg"
+          git push origin "$tag"
+
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Release auto-tag"
+            echo ""
+            if [[ -n "${{ steps.tags.outputs.server_tag }}" ]]; then
+              echo "- Server tag pushed: \`${{ steps.tags.outputs.server_tag }}\` → triggers \`publish-image.yml\`"
+            else
+              echo "- No server version bump detected on this commit."
+            fi
+            if [[ -n "${{ steps.tags.outputs.release_tag }}" ]]; then
+              echo "- Release tag pushed: \`${{ steps.tags.outputs.release_tag }}\` → triggers \`promote-release.yml\` → updates \`:stable\` → Watchtower rolls over the VPS within ~5 min."
+            else
+              echo "- No \`current_release\` change detected on this commit."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
