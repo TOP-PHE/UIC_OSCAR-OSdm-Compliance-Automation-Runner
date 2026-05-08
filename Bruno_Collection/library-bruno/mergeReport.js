@@ -102,37 +102,83 @@ function isAuthRequest(bruEntry) {
   return /\/(token|login|auth|logon|oauth)/.test(url) || /access.?token/i.test(name);
 }
 
+// ─── Credential-redaction helpers (issue #17) ─────────────────────────────────
+// Strip header values that carry secrets (bearer token, API key, subscription
+// key, custom requestor headers used by some operators) before they get
+// serialised into the merged HTML/JSON report — without these, anyone who
+// downloads a report archive can read every tester's credentials in plain
+// text. We replace the value with a fixed marker so the *presence* of the
+// header is still visible (useful when debugging "did the auth header reach
+// the server?") but the secret itself is not.
+const SENSITIVE_HEADER_NAMES = new Set([
+  'authorization',
+  'proxy-authorization',
+  'x-subscription-key',
+  'ocp-apim-subscription-key',
+  'apikey',
+  'api-key',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'x-requestor',          // custom OSDM operator header (carries identity)
+  'cookie',               // sessions are credentials too
+  'set-cookie'
+]);
+const REDACTED = '[REDACTED — credential]';
+function redactHeaders(h) {
+  if (!h || typeof h !== 'object') return h;
+  const out = {};
+  for (const [k, v] of Object.entries(h)) {
+    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? REDACTED : v;
+  }
+  return out;
+}
+
 // ─── Build merged request list ────────────────────────────────────────────────
 const mergedRequests = bruResults.map((entry, i) => {
-  const body    = findBody(entry);
-  const tests   = getTests(entry);
-  const status  = (entry.response && entry.response.status) || (body && body.responseStatus) || 0;
-  const method  = (entry.request && entry.request.method)  || (body && body.requestMethod)  || '';
-  const url     = (entry.request && entry.request.url)     || (body && body.requestUrl)      || '';
+  const body     = findBody(entry);
+  const tests    = getTests(entry);
+  const status   = (entry.response && entry.response.status) || (body && body.responseStatus) || 0;
+  const method   = (entry.request && entry.request.method)  || (body && body.requestMethod)  || '';
+  const url      = (entry.request && entry.request.url)     || (body && body.requestUrl)      || '';
+  const isAuth   = isAuthRequest(entry);
 
-  // Request body: prefer Bruno's captured data, fall back to our tmp
+  // Request body: prefer Bruno's captured data, fall back to our tmp.
+  // Auth-endpoint requests (token/login/oauth) carry client_secret /
+  // password in the form body — never persist that to a downloadable
+  // report (issue #17).
   let reqBody = '';
-  if (entry.request && entry.request.data != null) {
+  if (isAuth) {
+    reqBody = REDACTED + ' (auth-endpoint request body — typically client_id / client_secret / grant_type)';
+  } else if (entry.request && entry.request.data != null) {
     reqBody = typeof entry.request.data === 'string' ? entry.request.data : JSON.stringify(entry.request.data, null, 2);
   } else if (body && body.requestBody) {
     reqBody = body.requestBody;
   }
 
-  // Request headers
-  let reqHeaders = {};
-  if (entry.request && entry.request.headers) reqHeaders = entry.request.headers;
+  // Request headers — strip Authorization / API-key / subscription / cookie
+  // values regardless of whether this is an auth request. OSDM endpoints
+  // also receive an Authorization: Bearer header on every call.
+  const reqHeaders = redactHeaders(
+    (entry.request && entry.request.headers) || {}
+  );
 
-  // Response body: prefer Bruno's, fall back to our tmp
+  // Response body: prefer Bruno's, fall back to our tmp.
+  // Auth-endpoint responses contain the issued access_token / refresh_token —
+  // redact those too (issue #17).
   let resBody = '';
-  if (entry.response && entry.response.data != null) {
+  if (isAuth) {
+    resBody = REDACTED + ' (auth-endpoint response body — typically access_token / refresh_token)';
+  } else if (entry.response && entry.response.data != null) {
     resBody = typeof entry.response.data === 'string' ? entry.response.data : JSON.stringify(entry.response.data, null, 2);
   } else if (body && body.responseBody) {
     resBody = body.responseBody;
   }
 
-  // Response headers
-  let resHeaders = {};
-  if (entry.response && entry.response.headers) resHeaders = entry.response.headers;
+  // Response headers — Set-Cookie may carry session credentials.
+  const resHeaders = redactHeaders(
+    (entry.response && entry.response.headers) || {}
+  );
 
   // Display name: "FolderName \ RequestName"
   const suite = (entry.suiteName || '').trim();
@@ -150,7 +196,7 @@ const mergedRequests = bruResults.map((entry, i) => {
     resHeaders,
     resBody,
     tests,
-    group:        isAuthRequest(entry) ? 'auth' : 'osdm',
+    group:        isAuth ? 'auth' : 'osdm',
     error:        entry.error || null
   };
 });
