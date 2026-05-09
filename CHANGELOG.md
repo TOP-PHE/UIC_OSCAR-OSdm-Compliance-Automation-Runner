@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.4.1] — 2026-05-09
+
+### Security
+- **Closes #17 server-side leak.** `structureResults.js` now redacts
+  sensitive headers (`Authorization`, `Ocp-Apim-Subscription-Key`,
+  `X-API-Key`, `Cookie`, etc.) and auth-endpoint request/response
+  bodies BEFORE storing in `run_requests`. PR #21 had closed the same
+  class of leak in the Bruno-side merged report — this PR closes the
+  matching server-side path that fed the Report Builder UI.
+- **Migration v17: retroactive scrub.** Walks every existing
+  `run_requests` row and re-redacts in place using the same logic.
+  Idempotent. Wraps per-row updates in a transaction so the scrub
+  is atomic. Boot log shows
+  `[db] migration v17 — scrubbed credentials from N of M run_requests rows`.
+
+### Operations
+- **Hands-off release deploy.** `refresh-collection.yml` now also fires
+  on `compatibility.json` changes (was previously `Bruno_Collection/**`
+  only). `promote-release.yml` SSHes the VPS after pushing `:stable`
+  as defense in depth. Combined effect: the manual
+  `ssh + git pull + restart` ritual after every release is gone —
+  Watchtower's normal poll cycle handles container recreate, and the
+  host file is fresh by the time it does.
+- **Repo-level auto-merge enabled.** Future release PRs are armed with
+  `gh pr merge --auto` so they merge as soon as CI is green; no more
+  forgotten merge-button clicks.
+
+---
+
 ## [server-v1.4.0] — 2026-05-08
 
 Minor bump rather than patch — adds new public auth endpoints, two new

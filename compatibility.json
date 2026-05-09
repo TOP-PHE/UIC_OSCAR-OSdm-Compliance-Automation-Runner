@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.14",
+  "current_release": "2026.15",
   "releases": [
+    {
+      "release": "2026.15",
+      "date": "2026-05-09",
+      "server": "1.4.1",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #17 server-side leak: structureResults.js now redacts sensitive headers (Authorization, Ocp-Apim-Subscription-Key, etc.) and auth-endpoint request/response bodies BEFORE storing in run_requests. New runs never accumulate plaintext credentials.",
+        "DB migration v17 retroactively scrubs every existing run_requests row using the same redaction logic. Idempotent. Boot logs show '[db] migration v17 — scrubbed credentials from N of M run_requests rows' once.",
+        "Deploy automation: refresh-collection.yml now also fires on compatibility.json changes; promote-release.yml SSHes the VPS after :stable push to refresh the host repo. Eliminates the manual 'ssh + git pull' that was needed after every release."
+      ]
+    },
     {
       "release": "2026.14",
       "date": "2026-05-08",
