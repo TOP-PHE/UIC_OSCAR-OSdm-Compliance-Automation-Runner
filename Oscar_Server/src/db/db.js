@@ -255,6 +255,104 @@ const MIGRATIONS = [
         db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user  ON password_reset_tokens(user_id)');
       } catch (_e) { /* benign if already exists */ }
   }},
+
+  { version: 17, name: 'scrub-historical-credentials-from-run-requests', up: () => {
+      // Issue #17 retroactive scrub. PR #29 stops NEW runs from storing
+      // credentials in run_requests, but rows that pre-date that fix still
+      // hold plaintext Authorization / Ocp-Apim-Subscription-Key / etc. in
+      // request_headers + response_headers, AND client_secret / access_token
+      // bodies on /token POSTs. Walk every row and re-redact in place.
+      //
+      // Self-contained — does NOT import from src/reports/* on purpose:
+      // migrations should keep working even if the importable code drifts.
+      // Helpers here are an exact copy of the runtime redaction in
+      // structureResults.js as of PR #29.
+      const SENSITIVE = new Set([
+        'authorization', 'proxy-authorization',
+        'x-subscription-key', 'ocp-apim-subscription-key',
+        'apikey', 'api-key', 'x-api-key',
+        'x-auth-token', 'x-access-token',
+        'x-requestor', 'cookie', 'set-cookie'
+      ]);
+      const REDACTED = '[REDACTED — credential]';
+      function redactObj(obj) {
+        if (!obj || typeof obj !== 'object') return obj;
+        const out = Array.isArray(obj) ? [] : {};
+        for (const [k, v] of Object.entries(obj)) {
+          out[k] = SENSITIVE.has(String(k).toLowerCase()) ? REDACTED : v;
+        }
+        return out;
+      }
+      function redactHeadersJsonString(s) {
+        if (s === null || s === undefined || s === '') return s;
+        try {
+          const parsed = JSON.parse(s);
+          return JSON.stringify(redactObj(parsed));
+        } catch (_e) {
+          // Not JSON — assume already a marker / stringified value, leave it.
+          return s;
+        }
+      }
+      function isAuthUrl(u) { return /\/(token|login|auth|logon|oauth)/i.test(String(u || '')); }
+
+      let rows;
+      try {
+        rows = db.prepare(`
+          SELECT id, http_url, request_headers, response_headers,
+                 request_body, response_body
+            FROM run_requests
+           WHERE request_headers  IS NOT NULL
+              OR response_headers IS NOT NULL
+              OR request_body     IS NOT NULL
+              OR response_body    IS NOT NULL
+        `).all();
+      } catch (_e) {
+        // Table doesn't exist (fresh install before run_requests migration ran)
+        // or columns absent — nothing to scrub.
+        return;
+      }
+
+      if (rows.length === 0) {
+        console.log('[db] migration v17 — no run_requests rows to scrub');
+        return;
+      }
+
+      const upd = db.prepare(`
+        UPDATE run_requests
+           SET request_headers = ?, response_headers = ?,
+               request_body    = ?, response_body    = ?
+         WHERE id = ?
+      `);
+
+      let scrubbed = 0;
+      db.exec('BEGIN');
+      try {
+        for (const r of rows) {
+          const auth = isAuthUrl(r.http_url);
+          const newReqHdr = redactHeadersJsonString(r.request_headers);
+          const newResHdr = redactHeadersJsonString(r.response_headers);
+          const newReqBody = auth
+            ? `${REDACTED} (auth-endpoint request body — typically client_id / client_secret / grant_type)`
+            : r.request_body;
+          const newResBody = auth
+            ? `${REDACTED} (auth-endpoint response body — typically access_token / refresh_token)`
+            : r.response_body;
+
+          if (newReqHdr   !== r.request_headers
+           || newResHdr   !== r.response_headers
+           || newReqBody  !== r.request_body
+           || newResBody  !== r.response_body) {
+            upd.run(newReqHdr, newResHdr, newReqBody, newResBody, r.id);
+            scrubbed++;
+          }
+        }
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+      console.log(`[db] migration v17 — scrubbed credentials from ${scrubbed} of ${rows.length} run_requests rows`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
