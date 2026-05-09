@@ -23,7 +23,7 @@ const jwt     = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
-const { sendVerificationEmail, isSmtpConfigured } = require('../../utils/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const { validate, v } = require('../middleware/validate');
 const log = require('../../utils/logger').child({ module: 'auth' });
@@ -261,6 +261,153 @@ router.post('/register/confirm',
     company: { id: company.id, name: company.name, slug: company.slug }
   });
 });
+
+// ── Password reset (issue #15) ───────────────────────────────────────────────
+// Three-step self-service reset that mirrors the verified-registration flow:
+//   1. POST /password-reset/request    { email }            → email a reset URL
+//   2. GET  /password-reset/check-token?token=...           → token still valid?
+//   3. POST /password-reset/confirm    { token, password }  → set new password
+//
+// Privacy: the request endpoint always returns a generic 200 — never
+// discloses whether the email is registered. Tokens are single-use UUIDs
+// stored in password_reset_tokens with a 24h expiry.
+
+const PASSWORD_RESET_EXPIRY_HOURS = 24;
+
+// Tight rate limit on the request endpoint — the only way to mass-mail
+// from this surface. 5 attempts per IP per hour is generous for legitimate
+// re-tries after a typo.
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many password-reset requests. Try again later.' }
+});
+
+router.post('/password-reset/request',
+  passwordResetLimiter,
+  validate([
+    v.body('email').isString().withMessage('email is required')
+      .isEmail().withMessage('email must be a valid address')
+      .isLength({ max: 254 }).withMessage('email is too long'),
+  ]),
+  async (req, res) => {
+    const lowerEmail = String(req.body.email || '').toLowerCase().trim();
+    const requestedIp = req.ip || null;
+
+    // Generic-success response — never leak whether the email is registered.
+    const genericResponse = {
+      message: 'If an account exists for this email, a password-reset link has been sent.'
+    };
+
+    const user = get('SELECT id, email FROM users WHERE email = ?', [lowerEmail]);
+    if (!user) {
+      log.warn({ email: lowerEmail }, 'Password-reset request for non-existent email — returning generic success');
+      return res.json(genericResponse);
+    }
+
+    // Wipe any previous outstanding token for this user (one active link at a time)
+    run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+
+    const token     = uuidv4();
+    const id        = uuidv4();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+    run(
+      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, ?)',
+      [id, user.id, token, expiresAt, requestedIp]
+    );
+
+    const appUrl   = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const resetUrl = `${appUrl}/reset-password.html?token=${token}`;
+
+    try {
+      const result = await sendPasswordResetEmail({ to: user.email, resetUrl });
+      logAuthEvent({ userId: user.id, companyId: null, email: user.email, eventType: 'password_reset_requested' });
+
+      // Dev-mode passthrough mirrors the registration flow.
+      if (result && result.devMode) {
+        log.info({ email: user.email }, 'Dev mode — returning password-reset URL directly (no email sent)');
+        return res.json({
+          message: 'DEV MODE — SMTP not configured. Reset URL returned directly.',
+          resetUrl
+        });
+      }
+      log.info({ email: user.email }, 'Password-reset email sent');
+    } catch (err) {
+      // Don't roll back the token row — leaving it lets the admin
+      // still hand the user a reset URL via the admin "generate reset
+      // link" workaround if SMTP is broken. Log loudly.
+      log.error({ email: user.email, err: err.message }, 'Password-reset email send FAILED — token retained for admin workaround');
+    }
+
+    return res.json(genericResponse);
+  }
+);
+
+router.get('/password-reset/check-token', (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'token is required.' });
+
+  const row = get(
+    `SELECT prt.expires_at, u.email
+       FROM password_reset_tokens prt
+       JOIN users u ON u.id = prt.user_id
+      WHERE prt.token = ?`,
+    [token]
+  );
+  if (!row) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Invalid or already used reset link.' });
+  }
+  if (new Date(row.expires_at) < new Date()) {
+    run('DELETE FROM password_reset_tokens WHERE token = ?', [token]);
+    return res.status(410).json({ status: 410, title: 'Link Expired', detail: 'This reset link has expired (24h limit). Request a new one.' });
+  }
+  return res.json({ email: row.email });
+});
+
+router.post('/password-reset/confirm',
+  validate([
+    v.body('token').isString().withMessage('token is required')
+      .matches(/^[0-9a-fA-F-]{36}$/).withMessage('token must be a UUID'),
+    v.body('password').isString().withMessage('password is required')
+      .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
+      .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
+      .matches(/[a-z]/).withMessage('password must include a lowercase letter')
+      .matches(/[0-9]/).withMessage('password must include a digit'),
+  ]),
+  async (req, res) => {
+    const { token, password } = req.body || {};
+    const row = get(
+      'SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token = ?',
+      [token]
+    );
+    if (!row) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Invalid or already used reset link.' });
+    if (new Date(row.expires_at) < new Date()) {
+      run('DELETE FROM password_reset_tokens WHERE token = ?', [token]);
+      return res.status(410).json({ status: 410, title: 'Link Expired', detail: 'This reset link has expired (24h limit). Request a new one.' });
+    }
+
+    const user = get('SELECT id, email FROM users WHERE id = ?', [row.user_id]);
+    if (!user) {
+      run('DELETE FROM password_reset_tokens WHERE id = ?', [row.id]);
+      return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User no longer exists.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    transaction(() => {
+      run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, user.id]);
+      // Single-use: token is consumed
+      run('DELETE FROM password_reset_tokens WHERE id = ?', [row.id]);
+    });
+
+    logAuthEvent({ userId: user.id, companyId: null, email: user.email, eventType: 'password_reset_confirmed' });
+    log.info({ email: user.email }, 'Password reset confirmed — user can now sign in with new password');
+
+    return res.json({ message: 'Password reset successful. You can now sign in with your new password.' });
+  }
+);
 
 // ── GET /v1/auth/register/check-token ────────────────────────────────────────
 // Called by verify-email.html on page load to show email/company before password entry

@@ -274,6 +274,46 @@ router.post('/users/:id/reset-password', async (req, res) => {
   return res.json({ id: userId, email: user.email, password_reset: true });
 });
 
+// ── POST /v1/admin/users/:id/generate-reset-link (issue #15 workaround) ──────
+// Generates a self-service password-reset URL and returns it directly to the
+// admin instead of emailing it to the user. Used when SMTP is misconfigured
+// (issue #14) but a user still needs to reset their password — admin pastes
+// the URL into Slack / Teams / in-person, user clicks it, sets new password.
+//
+// Same token table (password_reset_tokens), same 24h expiry, same single-
+// use semantics as /v1/auth/password-reset/request — we just bypass the
+// email send. Audit-logged so the trail of who-issued-what is recoverable.
+router.post('/users/:id/generate-reset-link', (req, res) => {
+  const userId = req.params.id;
+  const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
+  if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+
+  // Wipe any previous outstanding token for this user (one active link at a time)
+  run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+
+  const token     = require('uuid').v4();
+  const id        = require('uuid').v4();
+  const PASSWORD_RESET_EXPIRY_HOURS = 24;
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+  run(
+    'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, ?)',
+    [id, user.id, token, expiresAt, req.ip || null]
+  );
+
+  const appUrl   = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const resetUrl = `${appUrl}/reset-password.html?token=${token}`;
+
+  auditLog(req.user.id, null, req.user.email, `admin_generated_reset_link:${user.email}`);
+  return res.json({
+    id: userId,
+    email: user.email,
+    resetUrl,
+    expires_at: expiresAt,
+    note: 'Share this link with the user out-of-band (Slack/Teams/in-person). Single-use; expires in 24h.'
+  });
+});
+
 router.delete('/users/:id', (req, res) => {
   const userId = req.params.id;
 

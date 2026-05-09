@@ -477,6 +477,7 @@ async function loadUsers() {
       <td>
         <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
         <button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
+        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>
         <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
       </td>
     </tr>
@@ -542,6 +543,37 @@ async function resetPwd(userId, email) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Password reset failed.', false); return; }
   showMsg(`Password reset for ${email}`, true);
+}
+
+// Admin-only "out-of-band" reset helper (issue #15 workaround when SMTP is
+// broken). Generates the same single-use reset URL the user would normally
+// receive by email and shows it in a dialog so the admin can copy + deliver
+// it via Slack / Teams / in person.
+async function generateResetLink(userId, email) {
+  if (!confirm(
+    `Generate a self-service password-reset link for ${email}?\n\n` +
+    `The user can click it to set their own new password.\n` +
+    `Single-use; expires in 24 hours. Any previously-issued reset link for this user is invalidated.`
+  )) return;
+  const res = await fetch(`/v1/admin/users/${userId}/generate-reset-link`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showMsg(data.detail || data.title || 'Failed to generate reset link.', false);
+    return;
+  }
+  // Use prompt() so the URL is pre-selected and easy to copy. The dialog
+  // also makes it harder to forget you generated one (vs. flashing a toast).
+  prompt(
+    `Reset link for ${email}\n` +
+    `Expires: ${new Date(data.expires_at).toLocaleString()}\n\n` +
+    `Copy and send this URL out-of-band (Slack/Teams/in-person):`,
+    data.resetUrl
+  );
+  showMsg(`Reset link generated for ${email}. Copy it from the dialog and share with the user.`, true);
 }
 
 async function deleteUser(userId, email) {
@@ -940,6 +972,7 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   var userId = el.getAttribute('data-user-id');
   if (action === 'save-user') saveUser(userId);
   else if (action === 'reset-pwd') resetPwd(userId, el.getAttribute('data-email'));
+  else if (action === 'reset-link') generateResetLink(userId, el.getAttribute('data-email'));
   else if (action === 'delete-user') deleteUser(userId, el.getAttribute('data-email'));
 });
 document.getElementById('users-tbody').addEventListener('change', function(e) {
