@@ -94,6 +94,49 @@ function getHeaders(obj) {
   return null;
 }
 
+// ─── Credential redaction (issue #17 server-side path) ────────────────────────
+// PR #21 redacted secrets in mergeReport.js (the Bruno-side merged HTML/JSON
+// report), but the OSCAR server ALSO captures full request/response data into
+// run_requests for the Report Builder (report-builder.html). That second path
+// was leaking the same secrets — Authorization, Ocp-Apim-Subscription-Key,
+// and the client_secret/access_token bodies of /token POSTs all rendered in
+// clear text in the Report Builder's Headers / Body tabs.
+//
+// We redact at WRITE time (here) so the DB never holds the plaintext secret
+// in run_requests — old data with the secret stays until overwritten by a
+// new run, but no new data accumulates.
+const SENSITIVE_HEADER_NAMES = new Set([
+  'authorization',
+  'proxy-authorization',
+  'x-subscription-key',
+  'ocp-apim-subscription-key',
+  'apikey',
+  'api-key',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'x-requestor',          // custom OSDM operator header (carries identity)
+  'cookie',
+  'set-cookie'
+]);
+const REDACTED_MARKER = '[REDACTED — credential]';
+
+function redactHeaders(headersObj) {
+  if (!headersObj || typeof headersObj !== 'object') return headersObj;
+  const out = {};
+  for (const [k, v] of Object.entries(headersObj)) {
+    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? REDACTED_MARKER : v;
+  }
+  return out;
+}
+
+// Auth endpoints (URL matches /token | /login | /auth | /logon | /oauth) carry
+// client_id / client_secret / password in the request body, and access_token /
+// refresh_token in the response body. Strip the entire body for these.
+function isAuthRequestUrl(url) {
+  return /\/(token|login|auth|logon|oauth)/i.test(String(url || ''));
+}
+
 /**
  * Heuristic linkage for the "navigate up/down through message chain" feature.
  *
@@ -292,10 +335,20 @@ function extractStructuredResults(runId, companyId) {
         // can show req/res content + headers and let users navigate the message
         // chain. Bodies are JSON-serialized; when already a string they pass
         // through unchanged. Headers are stored as JSON objects.
-        const reqBody = serializeBounded(getRequestBody(entry));
-        const resBody = serializeBounded(getResponseBody(entry));
-        const reqHeaders = serializeBounded(getHeaders(entry.request));
-        const resHeaders = serializeBounded(getHeaders(entry.response));
+        //
+        // Issue #17 — redact credentials BEFORE serialisation so they never
+        // hit the DB. Headers: filter sensitive header values. Bodies: when
+        // the URL is an auth endpoint, the body carries client_secret /
+        // access_token — replace it entirely.
+        const isAuth = isAuthRequestUrl(url);
+        const reqBody = isAuth
+          ? `${REDACTED_MARKER} (auth-endpoint request body — typically client_id / client_secret / grant_type)`
+          : serializeBounded(getRequestBody(entry));
+        const resBody = isAuth
+          ? `${REDACTED_MARKER} (auth-endpoint response body — typically access_token / refresh_token)`
+          : serializeBounded(getResponseBody(entry));
+        const reqHeaders = serializeBounded(redactHeaders(getHeaders(entry.request)));
+        const resHeaders = serializeBounded(redactHeaders(getHeaders(entry.response)));
 
         // Heuristic parent linkage: when this is a /bookings, /refund-offers,
         // /exchange-offers, or /fulfillments call, look up the most recent
