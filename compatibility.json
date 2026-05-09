@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.17",
+  "current_release": "2026.18",
   "releases": [
+    {
+      "release": "2026.18",
+      "date": "2026-05-09",
+      "server": "1.4.4",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #34 UI gap: dashboard batch header rows now have a select-all checkbox. Click once to select every scenario in the batch (instead of expanding the batch and ticking each scenario individually). Indeterminate gray-dash state when some children are selected. Applies to testers, test_managers, and admins."
+      ]
+    },
     {
       "release": "2026.17",
       "date": "2026-05-09",
