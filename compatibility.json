@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.16",
+  "current_release": "2026.17",
   "releases": [
+    {
+      "release": "2026.17",
+      "date": "2026-05-09",
+      "server": "1.4.3",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #34: test_manager can now soft-delete any run in their own company (matches the elevated privileges they already had over /v1/company/users and the share_reports_with_certifier toggle). Tenant filter still enforces company boundary — cross-company delete remains impossible. Bulk-admin-action (purge) stays administrator-only."
+      ]
+    },
     {
       "release": "2026.16",
       "date": "2026-05-09",

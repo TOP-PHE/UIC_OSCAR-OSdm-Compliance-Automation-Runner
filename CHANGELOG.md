@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.4.3] — 2026-05-09
+
+### Fixed
+- **Closes #34** — Test Manager can now soft-delete any run in their
+  own company. Previously the soft-delete handlers
+  (`POST /v1/runs/bulk-delete` and `DELETE /v1/runs/:id`) gated
+  past-tenant ownership behind `role === 'administrator'`, so test
+  managers were treated as regular testers and could only delete
+  runs they personally started — even though they already had
+  elevated privileges over user management and the privacy toggle.
+  Tenant filter still enforces the company boundary; cross-company
+  delete remains impossible. Bulk-admin-action (which includes
+  irreversible `purge`) intentionally stays administrator-only.
+
+---
+
 ## [server-v1.4.2] — 2026-05-09
 
 ### Security
