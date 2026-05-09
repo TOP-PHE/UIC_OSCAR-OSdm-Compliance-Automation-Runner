@@ -331,6 +331,12 @@ router.post('/bulk-delete', (req, res) => {
   }
 
   const isAdmin  = req.user.role === 'administrator';
+  // test_manager has elevated privileges within their company (mirrors the
+  // privilege they already have over /v1/company/users): can delete any run
+  // in their own company, not only runs they personally started. Tenant
+  // middleware has already constrained req.companyId to the test_manager's
+  // company, so this check cannot reach across companies. Closes #34.
+  const isElevated = isAdmin || req.user.role === 'test_manager';
   const newStatus = isAdmin ? 'DELETED_BY_ADMIN' : 'DELETION_REQUESTED';
 
   const deleted  = [];
@@ -362,7 +368,7 @@ router.post('/bulk-delete', (req, res) => {
       skipped.push({ id, reason: `Run is already in deletion state (${runRow.status})` });
       continue;
     }
-    if (!isAdmin && runRow.user_id !== req.user.id) {
+    if (!isElevated && runRow.user_id !== req.user.id) {
       skipped.push({ id, reason: 'Not the run owner' });
       continue;
     }
@@ -816,6 +822,10 @@ router.delete('/:id', (req, res) => {
   }
 
   const isAdmin = req.user.role === 'administrator';
+  // See bulk-delete handler (#34): test_manager has elevated privileges
+  // within their company. Tenant middleware constrains req.companyId so
+  // cross-company deletion is impossible regardless of role.
+  const isElevated = isAdmin || req.user.role === 'test_manager';
   const runRow  = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
@@ -829,7 +839,7 @@ router.delete('/:id', (req, res) => {
   if (DELETION_STATUSES.includes(runRow.status)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run is already in deletion state (${runRow.status}).` });
   }
-  if (!isAdmin && runRow.user_id !== req.user.id) {
+  if (!isElevated && runRow.user_id !== req.user.id) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Testers can only delete their own runs.' });
   }
 
