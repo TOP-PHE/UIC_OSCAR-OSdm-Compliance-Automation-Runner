@@ -297,6 +297,24 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
         <button class="btn btn-primary" id="btn-save-config">Save Configuration</button>
       </div>
     </div>
+
+    <div class="card">
+      <h3>Test SMTP Email</h3>
+      <p style="font-size:12px;color:#78909c;margin-bottom:14px">
+        Sends a small test message using the SMTP settings above. Use this after editing
+        SMTP config to verify Brevo / your relay accepts the credentials and your sender
+        domain. Rate-limited to 6 sends per 5 minutes.
+      </p>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:240px">
+          <label for="test-email-to" style="display:block;font-size:12px;font-weight:700;color:#546e7a;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Send to</label>
+          <input type="email" id="test-email-to" placeholder="you@example.org"
+                 style="width:100%;padding:9px 11px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px">
+        </div>
+        <button class="btn btn-primary" id="btn-test-email">📧 Send Test Email</button>
+      </div>
+      <pre id="test-email-result" style="margin-top:14px;padding:12px;border-radius:6px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;display:none"></pre>
+    </div>
   </section>
 </div>
 
@@ -347,8 +365,19 @@ function showMsg(text, ok) {
   setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
+// HTML-escape that's safe for BOTH text content and ALL attribute contexts.
+// Previously escaped only & < >, which is enough for innerHTML text but lets
+// values containing " or ' break out of an attribute. CodeQL flagged
+// js/incomplete-html-attribute-sanitization on the new "Reset Link" button
+// (and the same pattern was already present on neighbouring buttons —
+// hardening esc() fixes them all in one place).
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
 }
 
 function fmtDate(ts) {
@@ -459,6 +488,7 @@ async function loadUsers() {
       <td>
         <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
         <button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
+        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>
         <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
       </td>
     </tr>
@@ -524,6 +554,37 @@ async function resetPwd(userId, email) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Password reset failed.', false); return; }
   showMsg(`Password reset for ${email}`, true);
+}
+
+// Admin-only "out-of-band" reset helper (issue #15 workaround when SMTP is
+// broken). Generates the same single-use reset URL the user would normally
+// receive by email and shows it in a dialog so the admin can copy + deliver
+// it via Slack / Teams / in person.
+async function generateResetLink(userId, email) {
+  if (!confirm(
+    `Generate a self-service password-reset link for ${email}?\n\n` +
+    `The user can click it to set their own new password.\n` +
+    `Single-use; expires in 24 hours. Any previously-issued reset link for this user is invalidated.`
+  )) return;
+  const res = await fetch(`/v1/admin/users/${userId}/generate-reset-link`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    showMsg(data.detail || data.title || 'Failed to generate reset link.', false);
+    return;
+  }
+  // Use prompt() so the URL is pre-selected and easy to copy. The dialog
+  // also makes it harder to forget you generated one (vs. flashing a toast).
+  prompt(
+    `Reset link for ${email}\n` +
+    `Expires: ${new Date(data.expires_at).toLocaleString()}\n\n` +
+    `Copy and send this URL out-of-band (Slack/Teams/in-person):`,
+    data.resetUrl
+  );
+  showMsg(`Reset link generated for ${email}. Copy it from the dialog and share with the user.`, true);
 }
 
 async function deleteUser(userId, email) {
@@ -922,6 +983,7 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   var userId = el.getAttribute('data-user-id');
   if (action === 'save-user') saveUser(userId);
   else if (action === 'reset-pwd') resetPwd(userId, el.getAttribute('data-email'));
+  else if (action === 'reset-link') generateResetLink(userId, el.getAttribute('data-email'));
   else if (action === 'delete-user') deleteUser(userId, el.getAttribute('data-email'));
 });
 document.getElementById('users-tbody').addEventListener('change', function(e) {
@@ -1082,6 +1144,90 @@ function formatUptime(seconds) {
 
 // Wire up save config button (avoids inline onclick blocked by CSP)
 document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+
+// ─── Test Email (admin diagnostic) ────────────────────────────────────────────
+async function sendTestEmail() {
+  const toEl    = document.getElementById('test-email-to');
+  const btn     = document.getElementById('btn-test-email');
+  const out     = document.getElementById('test-email-result');
+  const to      = (toEl.value || '').trim();
+  if (!to) { toEl.focus(); return; }
+
+  btn.disabled = true;
+  const prevLabel = btn.textContent;
+  btn.textContent = '⏳ Sending…';
+  out.style.display = 'block';
+  out.style.background = '#eceff1';
+  out.style.color = '#37474f';
+  out.style.border = '1px solid #cfd8dc';
+  out.textContent  = `Attempting send to ${to} …`;
+
+  try {
+    const r = await fetch('/v1/admin/test-email', {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to })
+    });
+    const data = await r.json();
+
+    if (!r.ok) {
+      // 4xx — input or pre-check failure (not configured, bad email, rate limit)
+      out.style.background = '#ffebee';
+      out.style.color      = '#c62828';
+      out.style.border     = '1px solid #ef9a9a';
+      out.textContent      = `❌ ${data.title || 'Error'}: ${data.detail || JSON.stringify(data, null, 2)}`;
+      return;
+    }
+
+    if (data.ok) {
+      // SMTP accepted the message
+      out.style.background = '#e8f5e9';
+      out.style.color      = '#1b5e20';
+      out.style.border     = '1px solid #a5d6a7';
+      out.textContent =
+        `✅ Sent to ${data.to}\n` +
+        `   message-id: ${data.messageId || '(none)'}\n` +
+        `   accepted:   ${JSON.stringify(data.accepted || [])}\n` +
+        `   rejected:   ${JSON.stringify(data.rejected || [])}\n` +
+        `   response:   ${data.response || ''}\n\n` +
+        `Check the inbox (and spam folder).`;
+    } else {
+      // Server reached the SMTP relay but the relay rejected
+      out.style.background = '#ffebee';
+      out.style.color      = '#c62828';
+      out.style.border     = '1px solid #ef9a9a';
+      out.textContent =
+        `❌ SMTP rejected the message.\n\n` +
+        `   to:           ${data.to}\n` +
+        `   error:        ${data.error}\n` +
+        `   code:         ${data.code || '(none)'}\n` +
+        `   command:      ${data.command || '(none)'}\n` +
+        `   responseCode: ${data.responseCode || '(none)'}\n` +
+        `   response:     ${data.response || '(none)'}\n\n` +
+        `Common causes:\n` +
+        `  • 535 → wrong SMTP_PASSWORD (Brevo: must be your SMTP key, not account password)\n` +
+        `  • 550 sender not allowed → SMTP_FROM domain not verified in your relay's senders\n` +
+        `  • ECONNREFUSED / timeout → SMTP_HOST or SMTP_PORT wrong, or VPS firewall`;
+    }
+  } catch (err) {
+    out.style.background = '#ffebee';
+    out.style.color      = '#c62828';
+    out.style.border     = '1px solid #ef9a9a';
+    out.textContent      = `❌ Network error talking to /v1/admin/test-email: ${err.message || err}`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+}
+
+// Default the "Send to" field to the logged-in admin's own email so the
+// usual "send to myself, check inbox" loop is one click.
+(function preloadTestEmailTo() {
+  const el = document.getElementById('test-email-to');
+  if (el && user && user.email) el.value = user.email;
+})();
+
+document.getElementById('btn-test-email').addEventListener('click', sendTestEmail);
 
 (async function init(){
   try {
