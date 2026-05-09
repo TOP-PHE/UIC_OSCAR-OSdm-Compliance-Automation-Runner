@@ -1,0 +1,21 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Tells Grafana to load every JSON file under /var/lib/grafana/dashboards
+# (mounted from grafana/dashboards/ in the host) as a provisioned dashboard.
+# Provisioned dashboards can't be edited from the UI — they reload on the
+# next container restart, so the source of truth stays the JSON file in Git.
+
+apiVersion: 1
+
+providers:
+  - name: 'oscar'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
