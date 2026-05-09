@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.4.4] — 2026-05-09
+
+### Fixed
+- **Closes #34 UI gap.** Dashboard batch header rows now have a
+  "select-all" checkbox. v1.4.3 unblocked the server-side permission
+  for test_managers, but the dashboard still required users to expand
+  every batch and tick each scenario individually before deletion —
+  prohibitively tedious for batches with many scenarios. One click on
+  the batch checkbox now selects all child scenarios at once. An
+  indeterminate (gray dash) state appears when some children are
+  selected. Applies to all roles that can delete (tester,
+  test_manager, administrator).
+
+---
+
 ## [server-v1.4.3] — 2026-05-09
 
 ### Fixed
