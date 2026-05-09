@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.13",
+  "current_release": "2026.14",
   "releases": [
+    {
+      "release": "2026.14",
+      "date": "2026-05-08",
+      "server": "1.4.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #15: self-service password reset. Login page gets a 'Forgot password?' link, two new public pages (/forgot-password.html and /reset-password.html), three new public endpoints under /v1/auth/password-reset/*, schema migration v16 (password_reset_tokens table).",
+        "Closes #14 diagnostic gap: new admin 'Test SMTP Email' button on Server Config tab — verify SMTP end-to-end with verbatim relay error displayed in the UI, no SSH needed.",
+        "Admin escape hatch for #14: 'Reset Link' button on each user row generates a self-service reset URL the admin can deliver out-of-band when SMTP is misconfigured.",
+        "UI hardening (#16 follow-up): Token URL, Scope, Requestor Header, Ocp-Apim-Subscription-Key inputs are now type=password (visible only as dots while typing).",
+        "esc() helper hardened to escape '\"' and \"'\" in addition to & < > — safe for both text and attribute contexts (CodeQL js/incomplete-html-attribute-sanitization, defense in depth on existing buttons).",
+        "Auth rate limiting: password-reset/check-token and /confirm now share a 30 / 15 min / IP limiter (CodeQL js/missing-rate-limiting)."
+      ]
+    },
     {
       "release": "2026.13",
       "date": "2026-05-08",
