@@ -26,6 +26,7 @@ const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
 const { validate, v } = require('../middleware/validate');
+const { sendTestEmail, isSmtpConfigured } = require('../../utils/mailer');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -271,6 +272,46 @@ router.post('/users/:id/reset-password', async (req, res) => {
   auditLog(req.user.id, null, req.user.email, `password_reset:${user.email}`);
 
   return res.json({ id: userId, email: user.email, password_reset: true });
+});
+
+// ── POST /v1/admin/users/:id/generate-reset-link (issue #15 workaround) ──────
+// Generates a self-service password-reset URL and returns it directly to the
+// admin instead of emailing it to the user. Used when SMTP is misconfigured
+// (issue #14) but a user still needs to reset their password — admin pastes
+// the URL into Slack / Teams / in-person, user clicks it, sets new password.
+//
+// Same token table (password_reset_tokens), same 24h expiry, same single-
+// use semantics as /v1/auth/password-reset/request — we just bypass the
+// email send. Audit-logged so the trail of who-issued-what is recoverable.
+router.post('/users/:id/generate-reset-link', (req, res) => {
+  const userId = req.params.id;
+  const user = get('SELECT id, email FROM users WHERE id = ?', [userId]);
+  if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+
+  // Wipe any previous outstanding token for this user (one active link at a time)
+  run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
+
+  const token     = require('uuid').v4();
+  const id        = require('uuid').v4();
+  const PASSWORD_RESET_EXPIRY_HOURS = 24;
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+
+  run(
+    'INSERT INTO password_reset_tokens (id, user_id, token, expires_at, requested_ip) VALUES (?, ?, ?, ?, ?)',
+    [id, user.id, token, expiresAt, req.ip || null]
+  );
+
+  const appUrl   = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const resetUrl = `${appUrl}/reset-password.html?token=${token}`;
+
+  auditLog(req.user.id, null, req.user.email, `admin_generated_reset_link:${user.email}`);
+  return res.json({
+    id: userId,
+    email: user.email,
+    resetUrl,
+    expires_at: expiresAt,
+    note: 'Share this link with the user out-of-band (Slack/Teams/in-person). Single-use; expires in 24h.'
+  });
 });
 
 router.delete('/users/:id', (req, res) => {
@@ -565,6 +606,75 @@ router.post('/rotate-jwt-secret', (req, res) => {
   process.env.JWT_SECRET = newSecret;
   auditLog(req.user.id, null, req.user.email, 'jwt_secret_rotated');
   return res.json({ rotated: true, message: 'JWT secret rotated. All existing sessions are now invalid.' });
+});
+
+// ── POST /v1/admin/test-email ────────────────────────────────────────────────
+// Sends a small fixed-content email using the current SMTP config so the
+// admin can verify end-to-end delivery without going through registration.
+// Closes the diagnostic gap that issue #14 surfaced (only way to test SMTP
+// was to attempt registration and SSH into the container for the log).
+//
+// Rate-limited to 6 sends per 5 minutes per admin user — generous for normal
+// "configure-and-verify" loops, but blocks turning the endpoint into a small
+// outbound spam relay if an admin account is ever compromised.
+const testEmailLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `test-email:${req.user && req.user.id}`,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Test-email rate limit: 6 per 5 minutes per admin.' }
+});
+
+router.post('/test-email',
+  testEmailLimiter,
+  // Use express-validator's isEmail() — same library and complexity-bounded
+  // regex used everywhere else in this codebase. Avoids the polynomial-ReDoS
+  // risk CodeQL flagged on a hand-rolled `[^\s@]+@[^\s@]+\.[^\s@]+` pattern
+  // (multiple unbounded quantifiers on overlapping negated classes).
+  validate([
+    v.body('to').isString().withMessage('"to" is required')
+      .isEmail().withMessage('"to" must be a valid email address')
+      .isLength({ max: 254 }).withMessage('"to" is too long'),
+  ]),
+  async (req, res) => {
+  const to = String(req.body.to).trim().toLowerCase();
+
+  if (!isSmtpConfigured()) {
+    auditLog(req.user.id, null, req.user.email, `test_email:not_configured:${to}`);
+    return res.status(409).json({
+      status: 409, title: 'SMTP Not Configured',
+      detail: 'SMTP_HOST, SMTP_USER and SMTP_PASS must all be set on the Server Config tab before sending a test email.'
+    });
+  }
+
+  try {
+    const info = await sendTestEmail({ to, requestedBy: req.user.email });
+    auditLog(req.user.id, null, req.user.email, `test_email:sent:${to}`);
+    return res.json({
+      ok: true,
+      to,
+      messageId: info.messageId,
+      response:  info.response,
+      accepted:  info.accepted,
+      rejected:  info.rejected
+    });
+  } catch (err) {
+    // Don't 5xx — this is a diagnostic endpoint and the failure detail is
+    // the entire point. Return 200 with ok:false so the UI can surface the
+    // specific SMTP error verbatim ("535 Authentication failed", etc.) to
+    // the admin trying to debug their config.
+    auditLog(req.user.id, null, req.user.email, `test_email:failed:${to}:${err.code || 'UNKNOWN'}`);
+    return res.json({
+      ok: false,
+      to,
+      error: err.message || String(err),
+      code:  err.code || null,
+      command: err.command || null,
+      responseCode: err.responseCode || null,
+      response: err.response || null
+    });
+  }
 });
 
 module.exports = router;

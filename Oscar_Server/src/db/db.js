@@ -234,6 +234,27 @@ const MIGRATIONS = [
       // privacy, not opt-out, since most users will expect today's behaviour.
       _safeAlter('ALTER TABLE companies ADD COLUMN share_reports_with_certifier INTEGER NOT NULL DEFAULT 1');
   }},
+
+  { version: 16, name: 'password-reset-tokens', up: () => {
+      // Self-service password reset (issue #15). User submits email →
+      // server generates a single-use UUID token, stores it here with a
+      // 24h expiry, and emails the recipient a /reset-password.html?token=...
+      // link. On confirm we update users.password_hash and DELETE the
+      // token row (single-use). Cascading FK ensures stale tokens are
+      // cleaned up if a user is deleted.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id           TEXT PRIMARY KEY,
+          user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token        TEXT NOT NULL UNIQUE,
+          expires_at   TEXT NOT NULL,
+          requested_ip TEXT,
+          created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        )`);
+        db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user  ON password_reset_tokens(user_id)');
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
