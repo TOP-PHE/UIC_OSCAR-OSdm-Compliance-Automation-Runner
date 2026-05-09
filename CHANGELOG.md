@@ -14,6 +14,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.4.0] — 2026-05-08
+
+Minor bump rather than patch — adds new public auth endpoints, two new
+public HTML pages, and a DB schema migration.
+
+### Added
+- **Self-service password reset (closes #15).** Login page gets a
+  "Forgot password?" link. Two new public pages (`/forgot-password.html`,
+  `/reset-password.html`) backed by three new endpoints under
+  `/v1/auth/password-reset/*` (request, check-token, confirm). 24h
+  single-use UUID tokens, anti-enumeration generic-success on request,
+  same password-strength rule as registration (12+ chars, upper/lower/
+  digit). Schema migration v16 adds `password_reset_tokens` table.
+- **Admin "Test SMTP Email" button (closes #14 diagnostic gap).** New
+  card on the Server Config tab. Pre-filled with the admin's own
+  email, rate-limited 6/5min/admin, returns the verbatim SMTP relay
+  response inline so misconfigurations are diagnosable without SSH.
+- **Admin escape hatch for password reset.** New "Reset Link" button on
+  each user row in the admin Users tab → generates a self-service
+  reset URL the admin can deliver out-of-band (Slack/Teams/in-person)
+  when SMTP is broken. Audit-logged.
+
+### Changed
+- **All credential-bearing UI fields are now masked (#16 follow-up).**
+  Token URL, Scope, Requestor Header, and Ocp-Apim-Subscription-Key
+  switched from `type=text` (visible while typing) to `type=password`,
+  matching the existing Bearer Token / Client ID / Client Secret /
+  Extra Credential fields.
+- **Hardened admin-panel `esc()` helper** to escape `"` and `'` in
+  addition to `& < >`. Safe for both text content and attribute
+  contexts. Closes a CodeQL `js/incomplete-html-attribute-sanitization`
+  finding on the new "Reset Link" button and retroactively closes the
+  same latent surface on Reset PWD / Delete buttons.
+
+### Security
+- **Rate limiting on password-reset token endpoints.** Both
+  `/check-token` and `/confirm` now share a 30 / 15 min / IP limiter.
+  Tokens are 122-bit UUIDs (brute-force infeasible on its merits) but
+  the limit is defense in depth and closes the CodeQL
+  `js/missing-rate-limiting` rule on auth endpoints.
+- **Replaced hand-rolled email-format regex** in the admin test-email
+  endpoint with `express-validator`'s `isEmail()` — same library used
+  elsewhere in the codebase. Closes CodeQL `js/polynomial-redos`.
+
+---
+
 ## [server-v1.3.4] — 2026-05-08
 
 ### Security
