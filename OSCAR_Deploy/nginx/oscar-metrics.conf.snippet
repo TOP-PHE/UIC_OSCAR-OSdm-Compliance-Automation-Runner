@@ -1,0 +1,45 @@
+# OSCAR metrics + Grafana — nginx snippet to add inside the existing
+# `server { listen 443 ssl; server_name oscar.uic.org; ... }` block.
+#
+# Two pieces:
+#   1. Block external access to OSCAR's /metrics endpoint (returns 404).
+#   2. Reverse-proxy /grafana/ to the local Grafana container, fronted
+#      with HTTP basic auth so the dashboards aren't world-readable.
+#
+# To install:
+#   1. Create the htpasswd file (one-time):
+#        sudo apt-get install -y apache2-utils
+#        sudo htpasswd -c /etc/nginx/.htpasswd-grafana <admin-username>
+#      (you'll be prompted for the password)
+#   2. Copy the two `location` blocks below into your existing oscar.uic.org
+#      server block, anywhere alongside the existing `location /` (which
+#      proxies the OSCAR app).
+#   3. Reload nginx:
+#        sudo nginx -t && sudo systemctl reload nginx
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Block external scrapes of /metrics — only the in-cluster Prometheus
+# (which talks directly to oscar:3001 over the docker bridge) should
+# read them. Anyone hitting https://oscar.uic.org/metrics gets a 404
+# that doesn't even reveal the endpoint exists.
+location = /metrics {
+    return 404;
+}
+
+# Grafana — reverse-proxied under /grafana/ with basic auth.
+# Grafana's GF_SERVER_SERVE_FROM_SUB_PATH is set to true in the compose
+# overlay so internal Grafana links work correctly under this prefix.
+location /grafana/ {
+    auth_basic           "OSCAR Metrics — Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd-grafana;
+
+    proxy_pass         http://127.0.0.1:3000/;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    # Grafana live (websockets) — required for the live tail / alert pages.
+    proxy_http_version 1.1;
+    proxy_set_header   Upgrade           $http_upgrade;
+    proxy_set_header   Connection        "upgrade";
+}

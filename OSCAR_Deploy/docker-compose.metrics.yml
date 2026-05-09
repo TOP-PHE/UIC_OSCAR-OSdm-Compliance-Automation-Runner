@@ -1,0 +1,67 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OPT-IN metrics overlay: Prometheus + Grafana
+# Default deployments don't need this. To turn metrics on:
+#   docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
+# To turn off:
+#   docker compose -f docker-compose.yml -f docker-compose.metrics.yml down prometheus grafana
+#   docker compose -f docker-compose.yml up -d
+#
+# Adds ~300 MB RAM steady state + ~500 MB disk over 15 days at default
+# scrape interval. Detail in Documentation/Server_Operations/metrics-and-monitoring.md.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: oscar-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      # Listen only on the docker network — never bind to a host port.
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    # IMPORTANT: no `ports:` block. Prometheus is reachable only from other
+    # containers in the same compose network (specifically Grafana). External
+    # access goes through Grafana, which serves the dashboards.
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: oscar-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      # Sub-path so nginx can serve under https://oscar.uic.org/grafana/
+      GF_SERVER_ROOT_URL:        '%(protocol)s://%(domain)s/grafana/'
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      # Disable Grafana's own auth — nginx basic auth is in front of /grafana/.
+      # If you'd rather use Grafana's login, set these three to false / your-password.
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Viewer'
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      # Don't phone home or check for new versions
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      # Bound to localhost — exposed externally via nginx /grafana/ block.
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  prometheus-data:
+  grafana-data:

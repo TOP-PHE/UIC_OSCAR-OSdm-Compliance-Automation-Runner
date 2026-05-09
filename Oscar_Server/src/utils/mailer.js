@@ -20,6 +20,7 @@
 const nodemailer = require('nodemailer');
 const { getConfig } = require('../db/db');
 const log = require('./logger').child({ module: 'mailer' });
+const { smtpSends } = require('./metrics');
 
 function isSmtpConfigured() {
   return !!(getConfig('SMTP_HOST', '') && getConfig('SMTP_USER', '') && getConfig('SMTP_PASS', ''));
@@ -105,6 +106,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
       accepted:  info.accepted,
       rejected:  info.rejected,
     }, 'Email sent successfully');
+    smtpSends.inc({ result: 'success', kind: 'verification' });
     return info;
   } catch (sendErr) {
     log.error({
@@ -114,6 +116,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
       responseCode:  sendErr.responseCode,
       response:      sendErr.response,
     }, 'Email send FAILED');
+    smtpSends.inc({ result: 'failure', kind: 'verification' });
     throw sendErr;
   }
 }
@@ -203,11 +206,17 @@ You can safely delete this message.
     smtpUser: getConfig('SMTP_USER', ''),
   }, 'SMTP test email send attempt');
 
-  const info = await transporter.sendMail({
-    from, to,
-    subject: 'OSCAR — SMTP test email',
-    text, html
-  });
+  let info;
+  try {
+    info = await transporter.sendMail({
+      from, to,
+      subject: 'OSCAR — SMTP test email',
+      text, html
+    });
+  } catch (e) {
+    smtpSends.inc({ result: 'failure', kind: 'test' });
+    throw e;
+  }
 
   log.info({
     messageId: info.messageId,
@@ -215,6 +224,7 @@ You can safely delete this message.
     accepted:  info.accepted,
     rejected:  info.rejected,
   }, 'SMTP test email sent successfully');
+  smtpSends.inc({ result: 'success', kind: 'test' });
 
   return info;
 }
@@ -297,12 +307,14 @@ If you did not request this reset, ignore this email — your password is unchan
   try {
     const info = await transporter.sendMail({ from, to, subject: 'OSCAR — Password reset request', text, html });
     log.info({ messageId: info.messageId, response: info.response, accepted: info.accepted, rejected: info.rejected }, 'Password-reset email sent');
+    smtpSends.inc({ result: 'success', kind: 'password_reset' });
     return info;
   } catch (sendErr) {
     log.error({
       err: sendErr.message, code: sendErr.code, command: sendErr.command,
       responseCode: sendErr.responseCode, response: sendErr.response,
     }, 'Password-reset email send FAILED');
+    smtpSends.inc({ result: 'failure', kind: 'password_reset' });
     throw sendErr;
   }
 }
