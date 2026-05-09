@@ -20,6 +20,39 @@ unless otherwise agreed by UIC."
 
 module.exports = { initReport, appendRequest };
 
+// ─── Credential redaction (issue #17) ────────────────────────────────────────
+// Same shape as the helpers in mergeReport.js and structureResults.js — kept
+// inline rather than imported because Bruno's sandbox can't load arbitrary
+// modules, and we want this file self-contained.
+const _SENSITIVE_HEADERS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'x-subscription-key',
+  'ocp-apim-subscription-key',
+  'apikey',
+  'api-key',
+  'x-api-key',
+  'x-auth-token',
+  'x-access-token',
+  'x-requestor',
+  'cookie',
+  'set-cookie'
+]);
+const _REDACTED_MARKER = '[REDACTED — credential]';
+
+function _redactHeaders(h) {
+  if (!h || typeof h !== 'object') return h;
+  const out = {};
+  for (const [k, v] of Object.entries(h)) {
+    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _REDACTED_MARKER : v;
+  }
+  return out;
+}
+
+function _isAuthRequestUrl(url) {
+  return /\/(token|login|auth|logon|oauth)/i.test(String(url || ''));
+}
+
 // ─── Lazy native-module accessors ────────────────────────────────────────────
 // require('fs') / require('path') are kept INSIDE functions so that this module
 // can be loaded in Bruno's default (safe) sandbox without throwing.
@@ -151,16 +184,25 @@ function appendRequest(data) {
     }
 
     // ── Append request entry ──────────────────────────────────────────────
+    // Issue #17: redact credentials before they hit either the JSON
+    // accumulator file OR the HTML report. mergeReport.js had this fix
+    // first; reportGenerator.js (this file — generates the per-scenario
+    // /artifacts/<runId>/report_<scenario>.html) was a third leak path.
     const _url = data.requestUrl || '';
+    const _isAuth = data.group === 'auth' || _isAuthRequestUrl(_url);
     reportData.requests.push({
       requestName:     data.requestName     || '',
       requestMethod:   data.requestMethod   || '',
       requestUrl:      _url,
-      requestHeaders:  data.requestHeaders  || {},
-      requestBody:     data.requestBody     || '',
+      requestHeaders:  _redactHeaders(data.requestHeaders  || {}),
+      requestBody:     _isAuth
+        ? '[REDACTED — credential] (auth-endpoint request body — typically client_id / client_secret / grant_type)'
+        : (data.requestBody || ''),
       responseStatus:  data.responseStatus  || 0,
-      responseHeaders: data.responseHeaders || {},
-      responseBody:    data.responseBody    || '',
+      responseHeaders: _redactHeaders(data.responseHeaders || {}),
+      responseBody:    _isAuth
+        ? '[REDACTED — credential] (auth-endpoint response body — typically access_token / refresh_token)'
+        : (data.responseBody || ''),
       responseTime:    data.responseTime    || 0,
       group:           data.group           || 'osdm',
       runType:         data.group === 'auth' ? 'Authentication' : _deriveRunType(_url),
