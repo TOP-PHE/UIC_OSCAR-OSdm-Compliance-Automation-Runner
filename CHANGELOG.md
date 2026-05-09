@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.4.2] — 2026-05-09
+
+### Security
+- **Closes #17 third leak path** — `Bruno_Collection/library-bruno/reportGenerator.js`
+  now redacts sensitive headers and auth-endpoint bodies before writing
+  the per-scenario HTML report (`/artifacts/<runId>/report_<sc>.html`).
+  Same shape as the redaction added in PR #21 (mergeReport.js) and PR
+  #29 (structureResults.js). Three render paths now all consistent.
+- **Migration v17** — retroactive scrub of historical `run_requests`
+  rows. Re-applied here via PR #32 (was effectively missed by PR #29's
+  squash-merge). Boot logs show
+  `[db] migration v17 — scrubbed credentials from N of M run_requests rows`.
+
+### Operations
+- Old `report_*.html` files on disk are NOT auto-cleaned (filesystem,
+  not DB; v17 scrub doesn't reach them). Optional one-time cleanup
+  documented in PR #31.
+
+---
+
 ## [server-v1.4.1] — 2026-05-09
 
 ### Security
