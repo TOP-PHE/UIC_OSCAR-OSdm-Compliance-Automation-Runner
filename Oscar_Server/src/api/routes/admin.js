@@ -26,6 +26,7 @@ const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
 const { validate, v } = require('../middleware/validate');
+const { sendTestEmail, isSmtpConfigured } = require('../../utils/mailer');
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -565,6 +566,73 @@ router.post('/rotate-jwt-secret', (req, res) => {
   process.env.JWT_SECRET = newSecret;
   auditLog(req.user.id, null, req.user.email, 'jwt_secret_rotated');
   return res.json({ rotated: true, message: 'JWT secret rotated. All existing sessions are now invalid.' });
+});
+
+// ── POST /v1/admin/test-email ────────────────────────────────────────────────
+// Sends a small fixed-content email using the current SMTP config so the
+// admin can verify end-to-end delivery without going through registration.
+// Closes the diagnostic gap that issue #14 surfaced (only way to test SMTP
+// was to attempt registration and SSH into the container for the log).
+//
+// Rate-limited to 6 sends per 5 minutes per admin user — generous for normal
+// "configure-and-verify" loops, but blocks turning the endpoint into a small
+// outbound spam relay if an admin account is ever compromised.
+const testEmailLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `test-email:${req.user && req.user.id}`,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Test-email rate limit: 6 per 5 minutes per admin.' }
+});
+
+router.post('/test-email', testEmailLimiter, async (req, res) => {
+  const to = (req.body && req.body.to ? String(req.body.to).trim() : '').toLowerCase();
+
+  // Basic email-shape validation — keep it lenient (RFC 5322 is full of
+  // exotic forms) but reject obvious garbage.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return res.status(400).json({
+      status: 400, title: 'Bad Request',
+      detail: '"to" must be a valid email address.'
+    });
+  }
+
+  if (!isSmtpConfigured()) {
+    auditLog(req.user.id, null, req.user.email, `test_email:not_configured:${to}`);
+    return res.status(409).json({
+      status: 409, title: 'SMTP Not Configured',
+      detail: 'SMTP_HOST, SMTP_USER and SMTP_PASS must all be set on the Server Config tab before sending a test email.'
+    });
+  }
+
+  try {
+    const info = await sendTestEmail({ to, requestedBy: req.user.email });
+    auditLog(req.user.id, null, req.user.email, `test_email:sent:${to}`);
+    return res.json({
+      ok: true,
+      to,
+      messageId: info.messageId,
+      response:  info.response,
+      accepted:  info.accepted,
+      rejected:  info.rejected
+    });
+  } catch (err) {
+    // Don't 5xx — this is a diagnostic endpoint and the failure detail is
+    // the entire point. Return 200 with ok:false so the UI can surface the
+    // specific SMTP error verbatim ("535 Authentication failed", etc.) to
+    // the admin trying to debug their config.
+    auditLog(req.user.id, null, req.user.email, `test_email:failed:${to}:${err.code || 'UNKNOWN'}`);
+    return res.json({
+      ok: false,
+      to,
+      error: err.message || String(err),
+      code:  err.code || null,
+      command: err.command || null,
+      responseCode: err.responseCode || null,
+      response: err.response || null
+    });
+  }
 });
 
 module.exports = router;

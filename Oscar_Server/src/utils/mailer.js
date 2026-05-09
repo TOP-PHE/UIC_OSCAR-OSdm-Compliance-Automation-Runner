@@ -122,4 +122,101 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-module.exports = { sendVerificationEmail, isSmtpConfigured };
+/**
+ * Diagnostic — sends a small fixed-content email using the current SMTP
+ * config. Used by the admin "Test Email" button to validate end-to-end
+ * delivery without going through the registration flow.
+ *
+ * Returns the nodemailer info object on success, OR throws the underlying
+ * error so the caller can surface the precise SMTP rejection (auth failure,
+ * unverified sender, port closed, etc.) to the admin.
+ */
+async function sendTestEmail({ to, requestedBy }) {
+  if (!isSmtpConfigured()) {
+    const err = new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS first.');
+    err.code = 'NOT_CONFIGURED';
+    throw err;
+  }
+
+  const from = getConfig('SMTP_FROM', 'OSCAR Platform <noreply@oscar.uic.org>');
+  const sentAt = new Date().toISOString();
+
+  const text =
+`OSCAR — SMTP test email
+
+This is a test email sent from the OSCAR admin panel to verify the
+current SMTP configuration is working end-to-end.
+
+Requested by: ${requestedBy || 'unknown admin'}
+Sent at:      ${sentAt}
+SMTP host:    ${getConfig('SMTP_HOST', '')}
+SMTP port:    ${getConfig('SMTP_PORT', '587')}
+SMTP user:    ${getConfig('SMTP_USER', '')}
+From address: ${from}
+
+If you received this, your SMTP relay is reachable, authenticated, and
+your sender domain is accepted by the relay. Registration emails will
+also work.
+
+You can safely delete this message.
+
+— OSCAR
+`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"></head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f9;margin:0;padding:30px 16px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden">
+    <div style="background:#0090D4;padding:24px 32px">
+      <span style="color:#fff;font-size:22px;font-weight:900;letter-spacing:1px">OSCAR</span>
+      <span style="color:#b3e0f7;font-size:13px;margin-left:10px">SMTP test email</span>
+    </div>
+    <div style="padding:32px">
+      <h2 style="color:#37474f;font-size:18px;margin:0 0 14px">✅ SMTP delivery confirmed</h2>
+      <p style="color:#546e7a;font-size:14px;line-height:1.55;margin:0 0 14px">
+        This is a test email sent from the OSCAR admin panel to verify
+        the current SMTP configuration is working end-to-end.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;color:#37474f">
+        <tr><td style="padding:6px 8px;color:#90a4ae;width:140px">Requested by</td><td style="padding:6px 8px"><code>${escHtml(requestedBy)}</code></td></tr>
+        <tr><td style="padding:6px 8px;color:#90a4ae">Sent at</td><td style="padding:6px 8px"><code>${escHtml(sentAt)}</code></td></tr>
+        <tr><td style="padding:6px 8px;color:#90a4ae">SMTP host</td><td style="padding:6px 8px"><code>${escHtml(getConfig('SMTP_HOST', ''))}</code></td></tr>
+        <tr><td style="padding:6px 8px;color:#90a4ae">SMTP port</td><td style="padding:6px 8px"><code>${escHtml(getConfig('SMTP_PORT', '587'))}</code></td></tr>
+        <tr><td style="padding:6px 8px;color:#90a4ae">SMTP user</td><td style="padding:6px 8px"><code>${escHtml(getConfig('SMTP_USER', ''))}</code></td></tr>
+        <tr><td style="padding:6px 8px;color:#90a4ae">From</td><td style="padding:6px 8px"><code>${escHtml(from)}</code></td></tr>
+      </table>
+      <p style="color:#90a4ae;font-size:12px;margin:24px 0 0">
+        If you received this, registration emails will also work. You can safely delete this message.
+      </p>
+    </div>
+  </div>
+</body></html>`;
+
+  const transporter = createTransport();
+
+  log.info({
+    to, from, requestedBy,
+    smtpHost: getConfig('SMTP_HOST', ''),
+    smtpPort: getConfig('SMTP_PORT', '587'),
+    smtpSecure: getConfig('SMTP_SECURE', 'false'),
+    smtpUser: getConfig('SMTP_USER', ''),
+  }, 'SMTP test email send attempt');
+
+  const info = await transporter.sendMail({
+    from, to,
+    subject: 'OSCAR — SMTP test email',
+    text, html
+  });
+
+  log.info({
+    messageId: info.messageId,
+    response:  info.response,
+    accepted:  info.accepted,
+    rejected:  info.rejected,
+  }, 'SMTP test email sent successfully');
+
+  return info;
+}
+
+module.exports = { sendVerificationEmail, sendTestEmail, isSmtpConfigured };
