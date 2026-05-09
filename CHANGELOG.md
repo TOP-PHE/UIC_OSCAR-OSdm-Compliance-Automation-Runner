@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.5.0] — 2026-05-09
+
+Minor bump — new dependency (`prom-client`), new public-ish endpoint
+(`/metrics`), new optional infrastructure components (Prometheus + Grafana).
+
+### Added
+- **Prometheus + Grafana integration (opt-in).** New
+  `/metrics` endpoint on the server exposes Node.js process metrics
+  (CPU, memory, GC, event-loop lag) plus OSCAR-specific counters:
+  - `oscar_http_request_duration_seconds` (Histogram, by route + status)
+  - `oscar_runs_total` (Counter, by terminal status)
+  - `oscar_queue_depth` / `oscar_active_runs` (Gauges, refreshed every 5s)
+  - `oscar_login_attempts_total` (Counter)
+  - `oscar_smtp_send_total` (Counter)
+- **Compose overlay `OSCAR_Deploy/docker-compose.metrics.yml`** — start
+  Prometheus + Grafana with one extra `-f` flag, leave the existing
+  `oscar` container untouched. Default deployments unaffected.
+- **Auto-provisioned Grafana dashboard** ("OSCAR · Overview") with 10
+  panels: live snapshots (active runs, queue depth, HTTP rate, P95
+  latency), latency percentiles, status-code rate, run throughput,
+  auth + SMTP rates, process memory, CPU + event-loop lag.
+- **nginx snippet** (`OSCAR_Deploy/nginx/oscar-metrics.conf.snippet`)
+  blocks external access to `/metrics` (returns 404) and reverse-proxies
+  `/grafana/` with HTTP basic auth.
+- **Operator guide**: `Documentation/Server_Operations/metrics-and-monitoring.md`
+  covers architecture, one-time setup, day-to-day commands, resource
+  budget (~270 MB RAM, ~550 MB disk over 15d), how to add a new metric,
+  troubleshooting.
+
+### Notes
+- The `/metrics` endpoint is always-on at the app layer (no auth) but
+  not externally reachable (nginx 404). Only the in-cluster Prometheus
+  scrapes it.
+- Grafana defaults to Anonymous Viewer mode internally, with HTTP basic
+  auth at the nginx layer — operators see one auth prompt, not two.
+
+---
+
 ## [server-v1.4.4] — 2026-05-09
 
 ### Fixed

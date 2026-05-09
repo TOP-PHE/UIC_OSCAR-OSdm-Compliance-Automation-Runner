@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.18",
+  "current_release": "2026.19",
   "releases": [
+    {
+      "release": "2026.19",
+      "date": "2026-05-09",
+      "server": "1.5.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(metrics): Prometheus + Grafana integration (opt-in). New /metrics endpoint exposes Node.js process metrics + OSCAR-specific counters (HTTP duration histogram, runs by status, queue depth, active runs, login attempts, SMTP sends).",
+        "Optional metrics stack via OSCAR_Deploy/docker-compose.metrics.yml — Prometheus (15s scrape, 15d retention) + Grafana (with auto-provisioned 10-panel OSCAR Overview dashboard). Grafana served at /grafana/ behind nginx basic auth.",
+        "Default deployments unaffected — opt-in via the compose overlay. Resource cost when enabled: ~270 MB RAM + ~550 MB disk (15d).",
+        "Operator guide: Documentation/Server_Operations/metrics-and-monitoring.md."
+      ]
+    },
     {
       "release": "2026.18",
       "date": "2026-05-09",
