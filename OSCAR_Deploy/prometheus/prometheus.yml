@@ -1,0 +1,28 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Scrape config for OSCAR. Scrapes the OSCAR container via the docker-compose
+# internal hostname (resolves to whatever IP the bridge network gives `oscar`).
+# nginx blocks /metrics for external requests, so this is the only path that
+# can reach it.
+
+global:
+  scrape_interval:     15s     # default poll cadence
+  scrape_timeout:      10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: oscar-server
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['oscar:3001']
+        labels:
+          service: oscar
+          env: production
+
+  # Prometheus's own self-metrics — useful for monitoring the monitor.
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: prometheus

@@ -65,9 +65,32 @@ process.env.JWT_SECRET = jwtRow.value;
 
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
+const metricsForQueue = require('./utils/metrics');
 queue.on('started',   ({ runId }) => log.info({ runId }, 'Run started'));
-queue.on('completed', ({ runId, exitCode }) => log.info({ runId, exitCode }, 'Run completed'));
-queue.on('failed',    ({ runId, error   }) => log.error({ runId, error }, 'Run failed'));
+queue.on('completed', ({ runId, exitCode }) => {
+  log.info({ runId, exitCode }, 'Run completed');
+  metricsForQueue.runsTotal.inc({ status: exitCode === 0 ? 'COMPLETED' : 'FAILED' });
+});
+queue.on('failed', ({ runId, error }) => {
+  log.error({ runId, error }, 'Run failed');
+  metricsForQueue.runsTotal.inc({ status: 'FAILED' });
+});
+
+// Periodically refresh queue depth + active-runs gauges from the queue's
+// own state. Every 5s — well below Prometheus's typical 15s scrape interval,
+// so a scrape never sees a totally stale value.
+setInterval(() => {
+  try {
+    if (typeof queue.depth === 'number')   metricsForQueue.queueDepth.set(queue.depth);
+    if (typeof queue.running === 'number') metricsForQueue.activeRuns.set(queue.running);
+  } catch (_e) { /* never let metric collection crash the server */ }
+}, 5000).unref();   // .unref() so the interval doesn't keep Node alive on shutdown
+
+// ── Prometheus metrics ────────────────────────────────────────────────────────
+// Registry + custom counters/gauges/histograms used by the rest of the codebase.
+// Endpoint is exposed below; nginx blocks /metrics externally so only the
+// Prometheus container in the same Docker network can scrape it.
+const metrics = require('./utils/metrics');
 
 // ── Express app ───────────────────────────────────────────────────────────────
 const app = express();
@@ -75,6 +98,10 @@ const app = express();
 // Trust the first proxy (nginx/Apache on VPS) so express-rate-limit reads
 // the real client IP from X-Forwarded-For instead of always seeing 127.0.0.1.
 app.set('trust proxy', 1);
+
+// Record HTTP request duration on every response (Histogram). Mounted as
+// early as possible so the timing covers any subsequent middleware too.
+app.use(metrics.httpDurationMiddleware);
 
 // ── Security: HTTPS enforcement (production only) ────────────────────────────
 // In production, redirect any HTTP request to HTTPS. This is belt-and-suspenders
@@ -165,6 +192,22 @@ app.use('/data', express.static(DATAFILES_DIR));
 // This allows the browser to open HTML reports directly in a new tab.
 const ARTIFACTS_DIR = path.resolve(__dirname, '../data/artifacts');
 app.use('/artifacts', express.static(ARTIFACTS_DIR));
+
+// ── Prometheus scrape endpoint ────────────────────────────────────────────────
+// Returns the entire metrics registry in Prometheus exposition format.
+// No auth on the route itself; nginx is configured to return 404 on /metrics
+// for external requests, so only the Prometheus container in the same Docker
+// network (which reaches OSCAR via the internal hostname `oscar:3001`) can
+// actually scrape this. See Documentation/Server_Operations/metrics-and-monitoring.md.
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.set('Content-Type', metrics.register.contentType);
+    res.end(await metrics.register.metrics());
+  } catch (err) {
+    log.error({ err: err.message }, 'Failed to render /metrics');
+    res.status(500).send('# Failed to render metrics\n');
+  }
+});
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/v1/auth',            require('./api/routes/auth'));

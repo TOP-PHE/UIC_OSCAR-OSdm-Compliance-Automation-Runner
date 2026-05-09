@@ -1,0 +1,17 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Auto-provisions the Prometheus datasource in Grafana on startup. Without
+# this, an operator would have to click through the Grafana UI to configure
+# it once. With this, the datasource is preconfigured the moment the
+# container boots — clean across container recreations.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

@@ -25,6 +25,7 @@ const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
+const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
 const log = require('../../utils/logger').child({ module: 'auth' });
 
@@ -503,12 +504,14 @@ router.post('/login',
   const user = get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
   if (!user) {
     logAuthEvent({ email: normalizedEmail, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    loginAttempts.inc({ result: 'failure' });
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
   }
 
   const match = await bcrypt.compare(password, user.password_hash);
   if (!match) {
     logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    loginAttempts.inc({ result: 'failure' });
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
   }
 
@@ -516,6 +519,7 @@ router.post('/login',
   const token   = signToken(user, company);
 
   logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_success', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+  loginAttempts.inc({ result: 'success' });
 
   setSessionCookie(res, token);
   return res.json({
