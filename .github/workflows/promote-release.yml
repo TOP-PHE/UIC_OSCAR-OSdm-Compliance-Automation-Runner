@@ -84,8 +84,31 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
+      # ── Defense in depth: also refresh the host repo on the VPS ─────────────
+      # refresh-collection.yml already pulls when compatibility.json changes
+      # on main — but a release-tag push without an immediately-prior main
+      # commit (rare, e.g. promoting an old release tag manually) would
+      # otherwise leave the host repo stale. This step makes the
+      # release-tag → host-repo-fresh invariant hold regardless of how the
+      # release was triggered. Idempotent: if the host repo is already up
+      # to date, the remote `git pull` is a no-op.
+      - name: Set up SSH for host refresh
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Refresh host repo on VPS
+        # The remote authorized_keys entry forces the locked-down
+        # refresh-collection.sh script regardless of the command we send,
+        # so this is safe to run from any workflow holding the deploy key.
+        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/opt/OSCAR/OSCAR_Deploy/scripts/refresh-collection.sh"
+
       - name: Summary
         run: |
           echo "Promoted ${{ steps.ref.outputs.ref }} to :stable" >> "$GITHUB_STEP_SUMMARY"
+          echo "Refreshed host repo on oscar.uic.org so the new container reads the freshest compatibility.json at boot." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Production Watchtower will pick up the new image within its poll interval (default 5 min)." >> "$GITHUB_STEP_SUMMARY"

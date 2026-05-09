@@ -7,12 +7,23 @@
 
 name: Refresh · Bruno collection on production VPS
 
-# Triggered when main is updated and the change touched only the Bruno
-# collection (no server / deploy / doc changes that would warrant a real
-# release). SSHes into the production VPS and runs `git pull`. The
-# collection is bind-mounted read-only into the container, so no rebuild
-# or container restart is needed — OSCAR sees the new .bru files on the
-# next run.
+# Triggered when main is updated and the change touched the Bruno collection
+# OR compatibility.json. SSHes into the production VPS and runs `git pull`.
+#
+# Why compatibility.json: the file is bind-mounted read-only from the host's
+# /opt/OSCAR repo. OSCAR reads it at boot to render the version chip
+# (release / server / collection) and the green/amber compatibility dot. If
+# the host repo isn't pulled before the next container restart, the new
+# image boots with an old compatibility.json that doesn't list the running
+# combo — chip falls back to amber. Pulling here closes that gap so the
+# host file is always fresh by the time Watchtower swaps in the new
+# :stable image.
+#
+# Bind-mounted files don't need a container restart for OSDM-test-data
+# changes (collection .bru files), but DO need a restart for compatibility.json
+# (read-once-at-boot). Watchtower handles that restart on its next poll
+# when a new :stable digest lands — so this workflow only needs to update
+# the on-disk file.
 #
 # Production server image is NOT touched here — that lives behind the
 # release-tag promotion workflow.
@@ -21,6 +32,7 @@ on:
     branches: [main]
     paths:
       - 'Bruno_Collection/**'
+      - 'compatibility.json'
   workflow_dispatch:
 
 env:
