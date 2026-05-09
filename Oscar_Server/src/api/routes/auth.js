@@ -285,6 +285,20 @@ const passwordResetLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many password-reset requests. Try again later.' }
 });
 
+// Rate limit the token-validation endpoints (check-token + confirm). Tokens
+// are 36-char UUIDs (122 bits of entropy) so brute-force is infeasible on
+// its merits, but rate-limiting is defense in depth and what CodeQL's
+// js/missing-rate-limiting rule expects on auth endpoints. 30 per 15 min
+// per IP is generous for a real user clicking through the flow (typos +
+// retries) and tight enough to make bulk enumeration pointless.
+const passwordResetTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many password-reset token attempts. Try again later.' }
+});
+
 router.post('/password-reset/request',
   passwordResetLimiter,
   validate([
@@ -346,7 +360,7 @@ router.post('/password-reset/request',
   }
 );
 
-router.get('/password-reset/check-token', (req, res) => {
+router.get('/password-reset/check-token', passwordResetTokenLimiter, (req, res) => {
   const { token } = req.query;
   if (!token) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'token is required.' });
 
@@ -368,6 +382,7 @@ router.get('/password-reset/check-token', (req, res) => {
 });
 
 router.post('/password-reset/confirm',
+  passwordResetTokenLimiter,
   validate([
     v.body('token').isString().withMessage('token is required')
       .matches(/^[0-9a-fA-F-]{36}$/).withMessage('token must be a UUID'),

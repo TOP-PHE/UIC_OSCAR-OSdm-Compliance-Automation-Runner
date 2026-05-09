@@ -365,8 +365,19 @@ function showMsg(text, ok) {
   setTimeout(() => { el.style.display = 'none'; }, 4000);
 }
 
+// HTML-escape that's safe for BOTH text content and ALL attribute contexts.
+// Previously escaped only & < >, which is enough for innerHTML text but lets
+// values containing " or ' break out of an attribute. CodeQL flagged
+// js/incomplete-html-attribute-sanitization on the new "Reset Link" button
+// (and the same pattern was already present on neighbouring buttons —
+// hardening esc() fixes them all in one place).
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
 }
 
 function fmtDate(ts) {

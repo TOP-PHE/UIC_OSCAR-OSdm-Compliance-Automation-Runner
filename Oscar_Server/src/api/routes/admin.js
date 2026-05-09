@@ -626,17 +626,19 @@ const testEmailLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Test-email rate limit: 6 per 5 minutes per admin.' }
 });
 
-router.post('/test-email', testEmailLimiter, async (req, res) => {
-  const to = (req.body && req.body.to ? String(req.body.to).trim() : '').toLowerCase();
-
-  // Basic email-shape validation — keep it lenient (RFC 5322 is full of
-  // exotic forms) but reject obvious garbage.
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-    return res.status(400).json({
-      status: 400, title: 'Bad Request',
-      detail: '"to" must be a valid email address.'
-    });
-  }
+router.post('/test-email',
+  testEmailLimiter,
+  // Use express-validator's isEmail() — same library and complexity-bounded
+  // regex used everywhere else in this codebase. Avoids the polynomial-ReDoS
+  // risk CodeQL flagged on a hand-rolled `[^\s@]+@[^\s@]+\.[^\s@]+` pattern
+  // (multiple unbounded quantifiers on overlapping negated classes).
+  validate([
+    v.body('to').isString().withMessage('"to" is required')
+      .isEmail().withMessage('"to" must be a valid email address')
+      .isLength({ max: 254 }).withMessage('"to" is too long'),
+  ]),
+  async (req, res) => {
+  const to = String(req.body.to).trim().toLowerCase();
 
   if (!isSmtpConfigured()) {
     auditLog(req.user.id, null, req.user.email, `test_email:not_configured:${to}`);
