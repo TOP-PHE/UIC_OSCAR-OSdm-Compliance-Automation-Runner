@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.15",
+  "current_release": "2026.16",
   "releases": [
+    {
+      "release": "2026.16",
+      "date": "2026-05-09",
+      "server": "1.4.2",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Closes #17 third leak path: per-scenario HTML report at /artifacts/<runId>/report_<scenario>.html now redacts sensitive headers and auth-endpoint bodies (Bruno_Collection/library-bruno/reportGenerator.js, mirrors mergeReport.js + structureResults.js redaction).",
+        "Migration v17 retroactive scrub of run_requests is also now in place (was rolled into v1.4.1 via re-applied PR #32). Boot logs show '[db] migration v17 — scrubbed credentials from N of M run_requests rows' once.",
+        "Old report_*.html files in /artifacts/ are NOT auto-cleaned (file system, not DB). Optional one-time cleanup: 'sudo find /opt/OSCAR/Oscar_Server/data/artifacts -name report_*.html -delete' (forces re-run of affected scenarios)."
+      ]
+    },
     {
       "release": "2026.15",
       "date": "2026-05-09",
