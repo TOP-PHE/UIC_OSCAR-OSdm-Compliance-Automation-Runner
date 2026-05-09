@@ -140,14 +140,14 @@ h2{color:#0090D4;font-size:20px}
   <!-- Main runs card -->
   <div class="card">
     <div class="runs-header">
-      <div></div>
+      <div id="hdr-delete-col" style="text-align:center;font-size:14px" title="Tick a checkbox to select runs for deletion">🗑</div>
       <div>Run / Environment</div>
       <div>Status</div>
       <div>Endpoint</div>
       <div>Date</div>
       <div>Duration</div>
       <div>Scenarios</div>
-      <div>Compare</div>
+      <div style="text-align:center" title="Tick checkboxes to compare runs">⚖</div>
     </div>
     <div id="runs-list"><div class="empty">Loading…</div></div>
   </div>
@@ -197,6 +197,16 @@ const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 // logout() provided by nav.js
 
 const canDelete = user.role === 'administrator' || user.role === 'company_user' || user.role === 'test_manager';
+
+// Hide the delete-column trash icon header for roles that cannot delete
+// (certification_user). The header column itself stays in the grid so
+// columns line up with the rows; just blank the icon.
+if (!canDelete) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const h = document.getElementById('hdr-delete-col');
+    if (h) h.textContent = '';
+  });
+}
 
 let selected  = new Set();   // runs selected for deletion
 let compared  = new Set();   // runs selected for comparison
