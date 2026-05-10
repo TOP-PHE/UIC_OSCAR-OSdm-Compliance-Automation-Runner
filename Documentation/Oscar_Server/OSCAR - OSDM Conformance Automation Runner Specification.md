@@ -67,10 +67,10 @@ The outcome is a page listing the differences between both report what failed an
 It als highlight added of suppresed scenarios.
 
 ## 5. Non-Functional Requirements
-- Reliability: idempotent run submission and retry-safe worker execution.
+- Reliability: idempotent run submission and retry-safe worker execution. **Container-level health checks + autoheal sidecar** (since v1.8) restart any unhealthy OSCAR container automatically.
 - Scalability: horizontal worker scale based on queue depth.
-- Security: TLS everywhere, strict secret handling, role-based access.
-- Observability: structured logs, run traces, health probes, metrics.
+- Security: TLS everywhere, strict secret handling, role-based access. **Credentials redacted from persisted run artefacts** (since v1.6 — issue #17 retroactive scrub migration covers historical rows). **Self-service password reset** with single-use 24 h tokens (since v1.6).
+- Observability: structured logs, run traces, health probes, metrics. **Prometheus + Grafana + Loki** observability overlay (opt-in since v1.5/v1.7). **Alertmanager-based email alerting to admins** for service-down / restart-loop / queue-stuck / failure-spike / SMTP-degraded / login-attack-burst (since v1.8).
 - Portability: containerized components deployable on major cloud providers.
 
 ## 6. Suggested Minimal Deployment

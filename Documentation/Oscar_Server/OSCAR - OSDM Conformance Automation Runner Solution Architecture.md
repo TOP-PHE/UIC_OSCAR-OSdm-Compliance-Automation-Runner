@@ -339,6 +339,34 @@ Support runbooks:
 - Report diff troubleshooting.
 - Secret rotation process.
 
+### 10.1 Production Observability and Self-Healing Stack (since v1.7 / v1.8)
+
+The reference deployment ships an opt-in observability + watchdog overlay
+co-located on the same host as OSCAR. All components are open-source, all
+share the same SSO provided by OSCAR (no separate logins).
+
+| Concern | Component | Role |
+|---|---|---|
+| Metrics scraping | **Prometheus** | Pulls `oscar_*` metrics every 15 s (15-day TSDB retention). |
+| Log aggregation | **Loki + Promtail** | Promtail tails container stdout/stderr via the Docker socket; Loki indexes by container/stream labels. |
+| Visualisation | **Grafana** | Pre-provisioned **OSCAR · Overview** + **OSCAR · Logs** dashboards. SSO via `auth.proxy` + nginx `auth_request`. |
+| Container health probe | **Docker `healthcheck`** | Hits `/health` every 30 s, requires DB + queue + data dir all OK. |
+| Auto-restart | **Autoheal sidecar** | Restarts any `autoheal=true`-labelled container that Docker reports `unhealthy` (transient hangs heal without paging a human). |
+| Alert routing & email | **Alertmanager** | Receives Prometheus alerts, dedupes, groups, emails OSCAR admins via the production SMTP relay. Re-pages criticals every 1 h, warnings every 4 h. |
+
+**Default alert ruleset:** server unreachable, restart loop, queue stuck,
+sustained run failure rate, SMTP degradation, login attack burst, memory
+leak, event-loop lag. Each alert carries a `runbook` annotation pointing
+to the relevant section of the admin guide. Operators silence alerts
+during planned maintenance via `amtool` or the Grafana silences UI.
+
+The full overlay adds **~415 MB RAM** and **~600 MB disk after 30 days**
+on top of the base OSCAR footprint — sized for a small VPS.
+
+Detailed setup, troubleshooting, and rule definitions:
+- [`Documentation/Server_Operations/metrics-and-monitoring.md`](../Server_Operations/metrics-and-monitoring.md)
+- [`Documentation/Server_Operations/OSCAR - Server Admin Guide.md` § 13–14](../Server_Operations/OSCAR%20-%20Server%20Admin%20Guide.md)
+
 ## 11. Delivery Roadmap
 
 Phase 1 (MVP) — see Section 14 for detailed MVP architecture

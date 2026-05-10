@@ -1,0 +1,119 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# OSCAR alert rules — evaluated every 15 s by Prometheus, fired alerts shipped
+# to Alertmanager which emails OSCAR administrators (see alertmanager.yml).
+#
+# Severity convention:
+#   critical — page now, requires human action (server unreachable, runs failing en masse)
+#   warning  — investigate within the day (resource pressure, mailer degraded)
+#
+# Tuning notes:
+#   - `for:` adds dwell time so transient blips don't page. Tune up if noisy.
+#   - Each alert carries a `runbook` annotation pointing to the admin guide
+#     section that explains the typical root cause + fix.
+
+groups:
+  - name: oscar.app
+    interval: 30s
+    rules:
+
+      - alert: OscarServerDown
+        expr: up{job="oscar-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OSCAR server is unreachable"
+          description: "Prometheus has been unable to scrape the OSCAR /metrics endpoint for 2 minutes. The container is either down, deadlocked, or its network bridge is broken. The autoheal sidecar will restart it automatically if Docker reports it unhealthy — verify with `docker ps`. If autoheal didn't kick in, the process may still be answering /health while malfunctioning elsewhere; restart manually."
+          runbook: "Documentation/Server_Operations/OSCAR - Server Admin Guide.md#operational-monitoring--alerting"
+
+      - alert: OscarRestartLoop
+        # process_start_time_seconds resets on every container start. More than
+        # 3 starts in 10 min == the autoheal sidecar is repeatedly restarting
+        # OSCAR but the underlying problem isn't healing. Page so an operator
+        # SSHes in to check logs (likely DB corruption, OOM, or a config bug).
+        expr: changes(oscar_node_process_start_time_seconds{job="oscar-server"}[10m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OSCAR is in a restart loop ({{ $value }} restarts in 10 min)"
+          description: "Autoheal is restarting OSCAR but it keeps failing its healthcheck. Likely causes: corrupted SQLite DB, full data volume, missing env var after a deploy, or migration failure on boot. Check `docker logs oscar` and the OSCAR · Logs Grafana dashboard."
+          runbook: "Documentation/Server_Operations/OSCAR - Server Admin Guide.md#operational-monitoring--alerting"
+
+      - alert: OscarQueueStuck
+        # Work is queued but no run has completed in 10 min — the worker is
+        # not draining the queue. Most common root cause: a Bruno child
+        # process hung past RUN_TIMEOUT_MS without releasing its slot.
+        expr: oscar_queue_depth > 0 and rate(oscar_runs_total[10m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OSCAR queue has work but no runs are completing"
+          description: "Queue depth is {{ $value }} but no runs reached a terminal status in the last 10 min. Check Server Activity tab + OSCAR · Logs for stuck Bruno processes. Restarting the OSCAR container clears any zombie children."
+          runbook: "Documentation/Server_Operations/OSCAR - Server Admin Guide.md#operational-monitoring--alerting"
+
+      - alert: OscarRunFailureRateHigh
+        # >50% of runs failing over a 15 min window — vendor outage, expired
+        # credentials, or the test collection is broken.
+        expr: |
+          (
+            rate(oscar_runs_total{status="FAILED"}[15m])
+            /
+            (rate(oscar_runs_total[15m]) > 0)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 50% of Bruno runs failing ({{ $value | humanizePercentage }})"
+          description: "Sustained high failure rate over 15 minutes. Typically a vendor API outage, expired OAuth credentials for one or more companies, or a regression in the Bruno collection just deployed. Triage via the Reports tab + Server Activity view."
+
+      - alert: OscarSmtpDegraded
+        # Any SMTP failure in the last 10 min triggers a warning — mail is the
+        # backbone of the password-reset + alerting flows, so silent SMTP
+        # failure is bad enough to surface even at low volume.
+        expr: increase(oscar_smtp_send_total{result="failure"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMTP send failures detected ({{ $value }} in last 10 min)"
+          description: "OSCAR could not send one or more emails (verification, password reset, or test). Check SMTP credentials on the Server Config tab and the OSCAR · Logs dashboard for the underlying error (typically auth, quota, or DNS)."
+
+      - alert: OscarLoginAttackBurst
+        # Spike in failed logins — possible credential-stuffing or brute force.
+        expr: increase(oscar_login_attempts_total{result="failure"}[5m]) > 50
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Failed login burst: {{ $value }} attempts in 5 min"
+          description: "Unusual number of failed logins. Check auth_events on the Server Activity tab, identify source IP, consider blocking at nginx / firewall level."
+
+  - name: oscar.host
+    interval: 30s
+    rules:
+
+      - alert: OscarHighMemory
+        # Node RSS > 1 GB sustained — typical signal of a leak (the steady
+        # state is ~150 MB even under load).
+        expr: oscar_node_process_resident_memory_bytes{job="oscar-server"} > 1073741824
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OSCAR memory usage above 1 GB for 15 min ({{ $value | humanize1024 }}B)"
+          description: "Sustained high memory may indicate a leak. Capture a heap snapshot before restarting if you want to keep the diagnostic state."
+
+      - alert: OscarEventLoopLag
+        # Event loop lag > 200 ms p99 means the server is stalling on CPU work.
+        expr: histogram_quantile(0.99, rate(oscar_node_nodejs_eventloop_lag_seconds_bucket[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OSCAR event loop lag > 200 ms (p99)"
+          description: "The Node event loop is being blocked. Likely a heavy synchronous report-builder query or a tight loop. Check active runs + report rendering load."

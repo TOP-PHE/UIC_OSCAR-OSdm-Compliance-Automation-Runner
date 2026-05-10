@@ -11,6 +11,19 @@ global:
   scrape_timeout:      10s
   evaluation_interval: 15s
 
+# ── Alerting (PR — v1.8.0) ───────────────────────────────────────────────────
+# Prometheus pushes firing alerts to Alertmanager, which routes them to email
+# (or any other channel configured in alertmanager/alertmanager.yml).
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Alert rules — see alerts/oscar-alerts.yml for the full ruleset
+# (oscar down, restart loop, queue stuck, high failure rate, host resources).
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
 scrape_configs:
   - job_name: oscar-server
     metrics_path: /metrics

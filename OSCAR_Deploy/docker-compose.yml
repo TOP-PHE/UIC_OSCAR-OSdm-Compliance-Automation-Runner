@@ -39,10 +39,45 @@ services:
       # Monorepo compatibility matrix — read-only.
       - ../compatibility.json:/app/compatibility.json:ro
     restart: unless-stopped
+    # ── Health check (PR — v1.8.0) ──────────────────────────────────────────
+    # Hits OSCAR's /health endpoint, which itself probes the SQLite DB, the
+    # data dir, and the queue. Three consecutive failures (90 s total at the
+    # 30 s interval) flip the container to "unhealthy", which the autoheal
+    # sidecar picks up and restarts. start_period gives the app room to boot
+    # — migrations on a large DB can take 5–10 s.
+    healthcheck:
+      # Use node's built-in fetch (Node 22) — wget/curl are not in the slim image.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     labels:
       # Tells Watchtower (below) to monitor THIS container for new versions
       # of the :stable tag. Containers without this label are ignored.
       com.centurylinklabs.watchtower.enable: "true"
+      # Opts this container in to the autoheal sidecar — see service below.
+      autoheal: "true"
+
+  # ── Autoheal — restart sidecar (PR — v1.8.0) ──────────────────────────────
+  # Watches the Docker socket every AUTOHEAL_INTERVAL seconds; any container
+  # carrying the `autoheal=true` label that Docker reports as `unhealthy`
+  # gets restarted. Tiny image (~5 MB), no per-container config beyond the
+  # label + healthcheck above. Combined with Alertmanager (metrics overlay)
+  # for the alert side, this gives self-healing + paging without a heavy
+  # external monitoring stack.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    container_name: oscar-autoheal
+    restart: always
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: "30"          # poll every 30 s
+      AUTOHEAL_START_PERIOD: "0"       # respect each container's own start_period
+      AUTOHEAL_DEFAULT_STOP_TIMEOUT: "20"
+      TZ: UTC
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   # ── Auto-update agent ──────────────────────────────────────────────────────
   # Watchtower polls GHCR every 5 minutes and pulls + recreates the oscar

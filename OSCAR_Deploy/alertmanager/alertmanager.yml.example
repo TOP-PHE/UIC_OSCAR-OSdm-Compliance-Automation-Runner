@@ -1,0 +1,63 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Alertmanager config for OSCAR — example. Copy to alertmanager.yml and fill in
+# the SMTP credentials + admin recipient list (use the same SMTP relay you
+# configured on the OSCAR Server Config tab — Brevo, SendGrid, etc.).
+#
+#   cp alertmanager.yml.example alertmanager.yml
+#   $EDITOR alertmanager.yml
+#   docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d alertmanager
+#
+# Reload after edits without restart:
+#   docker exec oscar-alertmanager kill -HUP 1
+#
+# Test the wiring with the helper script:
+#   ./scripts/test-alert.sh
+# (fires a synthetic alert through Alertmanager → exercises the email path).
+
+global:
+  resolve_timeout: 5m
+  # SMTP defaults — every receiver below inherits these unless it overrides.
+  smtp_smarthost:    'smtp-relay.brevo.com:587'
+  smtp_from:         'OSCAR Alerts <noreply@oscar.uic.org>'
+  smtp_auth_username: 'YOUR_SMTP_USERNAME_HERE'
+  smtp_auth_password: 'YOUR_SMTP_PASSWORD_HERE'
+  smtp_require_tls:   true
+
+# ── Routing tree ─────────────────────────────────────────────────────────────
+# All alerts go to the oscar-admins receiver. Critical alerts repeat every
+# hour until acknowledged or resolved; warnings repeat every 4 h.
+route:
+  receiver: oscar-admins
+  group_by: ['alertname', 'severity']
+  group_wait:      30s     # wait 30 s for related alerts to batch
+  group_interval:  5m      # wait 5 min between updates for same group
+  repeat_interval: 4h      # warnings re-page every 4 h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: oscar-admins
+      repeat_interval: 1h  # criticals re-page every 1 h
+
+# ── Receivers ────────────────────────────────────────────────────────────────
+receivers:
+  - name: oscar-admins
+    email_configs:
+      # Replace with your admin distribution list — or list each admin email
+      # individually. The OSCAR admin guide explains how to keep this in sync
+      # with the actual administrator accounts in OSCAR's user table.
+      - to: 'oscar-admins@uic.org'
+        send_resolved: true   # also email when an alert clears
+        headers:
+          Subject: '[OSCAR {{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+
+# ── Inhibitions ──────────────────────────────────────────────────────────────
+# When OSCAR is down (critical), suppress the dependent warning alerts
+# (queue stuck, failure rate, etc.) so we don't email storm the admins.
+inhibit_rules:
+  - source_matchers:
+      - alertname = "OscarServerDown"
+    target_matchers:
+      - severity = "warning"
+    equal: ['service']

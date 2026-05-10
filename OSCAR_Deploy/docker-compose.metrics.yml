@@ -34,12 +34,39 @@ services:
       - '--web.route-prefix=/'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts:/etc/prometheus/alerts:ro
       - prometheus-data:/prometheus
     ports:
       # Bound to localhost only — exposed externally via nginx /prometheus/
       # block, gated by OSCAR SSO (admin). Inside the docker network, Grafana
       # still reaches Prometheus via http://prometheus:9090 (the bridge name).
       - "127.0.0.1:9090:9090"
+    depends_on:
+      - alertmanager
+
+  # ── Alertmanager — alert routing + email delivery (PR — v1.8.0) ───────────
+  # Receives firing alerts from Prometheus, dedupes / groups them, and sends
+  # email to OSCAR administrators using the same SMTP relay configured in
+  # the OSCAR Server Config tab (Brevo, etc.). Operator copies
+  # alertmanager/alertmanager.yml.example → alertmanager.yml and fills in
+  # SMTP credentials + admin email list before bringing the stack up.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: oscar-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=https://oscar.uic.org/alertmanager/'
+      - '--web.route-prefix=/'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      # Bound to localhost — Prometheus reaches it inside the bridge network
+      # via http://alertmanager:9093. Optional nginx /alertmanager/ block can
+      # expose the silences UI to admins (gated by SSO, same as /prometheus/).
+      - "127.0.0.1:9093:9093"
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -130,3 +157,4 @@ volumes:
   grafana-data:
   loki-data:
   promtail-data:
+  alertmanager-data:
