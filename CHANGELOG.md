@@ -14,6 +14,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.8.0] — 2026-05-10
+
+Minor bump — operational watchdog and email alerting layer on top of the
+existing Prometheus + Grafana + Loki observability stack. Ships a
+self-healing sidecar (autoheal) plus Alertmanager wired to admin email
+through the same SMTP relay used by OSCAR itself.
+
+### Added
+- **Docker `healthcheck` on the OSCAR container** — probes `GET /health`
+  every 30 s using Node's built-in `fetch` (no extra binaries needed in
+  the slim image). Three failures in a row → container marked
+  `unhealthy`. The `oscar` service is now labelled `autoheal=true`.
+- **`willfarrell/autoheal` sidecar** in `docker-compose.yml` — watches
+  the Docker socket every 30 s, restarts any `autoheal=true`-labelled
+  container that goes unhealthy. ~5 MB image. Most transient hangs heal
+  themselves without paging a human.
+- **`prom/alertmanager` service** in `docker-compose.metrics.yml` —
+  receives alerts from Prometheus, dedupes / groups, emails OSCAR
+  administrators via the existing SMTP relay (Brevo, SendGrid, etc.).
+  Re-pages criticals every 1 h, warnings every 4 h. Bound to
+  127.0.0.1:9093.
+- **Default alert ruleset** in `OSCAR_Deploy/prometheus/alerts/oscar-alerts.yml`:
+  - `OscarServerDown` — `/metrics` unscrapeable for 2 min (critical)
+  - `OscarRestartLoop` — > 3 container restarts in 10 min (critical)
+  - `OscarQueueStuck` — queue depth > 0 + no run completed in 10 min (warning)
+  - `OscarRunFailureRateHigh` — > 50 % of runs FAILED over 15 min (warning)
+  - `OscarSmtpDegraded` — any SMTP failure in last 10 min (warning)
+  - `OscarLoginAttackBurst` — > 50 failed logins in 5 min (warning)
+  - `OscarHighMemory` — RSS > 1 GB for 15 min (warning)
+  - `OscarEventLoopLag` — p99 lag > 200 ms for 10 min (warning)
+- **Two news entries on welcome page**:
+  - "Operational monitoring upgrade — live dashboards, centralised logs,
+    and an automatic watchdog with email alerts"
+  - "Three big quality-of-life features now live: credential redaction,
+    self-service report deletion, and password reset by email"
+
+### Documentation
+- **`OSCAR - Server Admin Guide.md`** — new § 13 (Admin Web Tools:
+  Manage Users / Companies / Server Activity / Server Config / Admin
+  Dashboard tiles) + new § 14 (Operational Monitoring & Alerting:
+  what's wired up, default alert table, first-time setup, end-to-end
+  email-path test, silencing during planned maintenance, recipient list
+  sync). § 7 also clarifies which `.env` settings are now editable at
+  runtime via the Server Config tab.
+- **Solution Architecture (§ 10.1)** — new "Production Observability
+  and Self-Healing Stack" section covering the full Prometheus / Loki /
+  Grafana / autoheal / Alertmanager topology, default alert ruleset,
+  and resource budget.
+- **Specification (§ 5)** — Non-Functional Requirements updated to
+  mention container healthchecks + autoheal (reliability), credential
+  redaction + self-service password reset (security), Prometheus +
+  Grafana + Loki + Alertmanager email alerting (observability).
+- **`metrics-and-monitoring.md`** — resource table updated to ~415 MB
+  RAM (adds autoheal + alertmanager), four new troubleshooting rows
+  for the watchdog stack.
+
+### Migration
+After Watchtower rolls over to v1.8.0:
+```bash
+ssh ubuntu@oscar.uic.org
+sudo -u ubuntu git -C /opt/OSCAR pull
+cd /opt/OSCAR/OSCAR_Deploy
+
+# 1. Create the alertmanager config from the example, fill in SMTP + recipients.
+sudo cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
+sudo $EDITOR alertmanager/alertmanager.yml
+#    └── set: smtp_smarthost, smtp_auth_username, smtp_auth_password, recipient `to:`
+
+# 2. Bring the new services up. `oscar` is recreated to pick up the
+#    healthcheck + autoheal label; existing data is untouched.
+sudo docker compose \
+     -f docker-compose.yml \
+     -f docker-compose.metrics.yml \
+     up -d --force-recreate oscar autoheal alertmanager prometheus
+
+# 3. Verify.
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+#    └── oscar should now show "(healthy)" after ~30 s
+```
+Smoke-test the email path with the synthetic-alert curl in
+`Server Admin Guide § 14.4`.
+
+---
+
 ## [server-v1.7.0] — 2026-05-10
 
 Minor bump — adds Loki / Promtail to the metrics stack and bakes the

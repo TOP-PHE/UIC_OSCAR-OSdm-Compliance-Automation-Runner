@@ -198,7 +198,9 @@ node src/server.js
 
 ## 7. Configuration — The `.env` File
 
-All server configuration is in `oscar-server\.env`. The server reads this file on startup — changes require a restart.
+All **boot-time** server configuration is in `oscar-server\.env`. The server reads this file on startup.
+
+> **Since v1.7.0**, most operational settings (`MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`, all `SMTP_*`) are also editable at runtime from **Admin → Server Config** in the web UI, **without a restart**. The DB value takes precedence over the matching `.env` value as soon as you save it. The `.env` file is still used to seed the database on first boot, and to hold the secrets that must exist before the DB is even open (`ENCRYPTION_KEY`, `JWT_SECRET`, `OSCAR_DB_PATH`, `PORT`).
 
 ```ini
 # Port the server listens on
@@ -650,3 +652,158 @@ bru --version
 | Backup database | `Copy-Item data\oscar.db data\oscar.db.backup` |
 | Fix stuck runs | See Section 9.3 |
 | Generate new encryption key | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+
+---
+
+## 13. Admin Web Tools (v1.6+)
+
+Once you log in as **administrator**, the top navigation exposes a set of admin-only screens. None of them require SSH access — everything below is doable from a browser.
+
+### 13.1 Manage Users / Companies
+
+`/admin.html?tab=users` and `?tab=companies`. Create, rename, reassign, soft-delete users and companies. Notable details:
+
+- **Reset password** for any user (since v1.6) — choose between sending an email reset link (requires SMTP configured) or generating an out-of-band link you copy-paste into Slack/Teams (works even when SMTP is down — issue #15 workaround).
+- **Privacy toggle** on each company (`share_reports_with_certifier`) controls whether `certification_user` accounts can see that company's runs. Default = on, matching legacy behaviour.
+
+### 13.2 Server Activity
+
+`/admin.html?tab=activity`. Live counters: total runs / users / companies, runs in last 24 h, login successes vs. failures, top submitters, latest 50 auth events. Refreshes on tab-switch.
+
+### 13.3 Server Config (v1.7)
+
+`/admin.html?tab=config`. Two cards:
+
+- **Runtime Config** — change `MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`, and all `SMTP_*` settings. Save applies immediately — the worker queue re-reads on every drain, the runner re-reads per run, and `LOG_LEVEL` swaps the active pino sink. **No restart needed.** Audit-logged.
+- **Server Info** — read-only: version, Node version, platform, uptime, collection path, Bruno binary path, DB path. Useful when filing a bug or talking to support.
+
+There is also a **Send test email** button — exercises the current SMTP config end-to-end and shows the verbatim SMTP error if delivery fails. Closes the diagnostic gap that issue #14 surfaced.
+
+A **Rotate JWT Secret** button is available too — generates a fresh secret, invalidates every active session immediately. Use after a suspected token leak.
+
+### 13.4 Admin Dashboard (Grafana / Prometheus / Logs)
+
+`/admin-dashboard.html`. Three tiles:
+
+| Tile | Backed by | What it shows |
+|---|---|---|
+| **Grafana** | grafana/grafana | Live operational dashboards — HTTP latency, run throughput, queue depth, process resources. Pre-provisioned **OSCAR · Overview** dashboard. |
+| **Prometheus** | prom/prometheus | Raw metrics database. Useful for ad-hoc PromQL, scrape-target health (`/prometheus/targets`), confirming alert state under `/prometheus/alerts`. |
+| **Logs (Loki)** | grafana/loki + grafana/promtail | Centralised log aggregation across OSCAR + Bruno workers. Pre-provisioned **OSCAR · Logs** dashboard with errors-only view, full live tail, per-container filter. |
+
+All three are gated by **OSCAR SSO** — your OSCAR admin login auto-signs you in. No separate Grafana/Prometheus passwords. Non-admin accounts see a 401 if they try to navigate there.
+
+These tiles are **opt-in**. They light up only if the operator brought the metrics overlay up:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
+```
+
+Full setup notes: [`metrics-and-monitoring.md`](metrics-and-monitoring.md).
+
+---
+
+## 14. Operational Monitoring & Alerting (v1.8)
+
+OSCAR ships a self-healing + paging stack so production incidents get caught and (where possible) fixed before an admin notices.
+
+### 14.1 What's wired up
+
+| Layer | Component | Behaviour |
+|---|---|---|
+| **Health probe** | Docker `healthcheck` on the `oscar` container | Hits `GET /health` every 30 s. Three failures in a row → container marked `unhealthy`. |
+| **Auto-restart** | `willfarrell/autoheal` sidecar (~5 MB) | Polls Docker every 30 s. Any container labelled `autoheal=true` that goes unhealthy is restarted. No human action needed for transient hangs. |
+| **Metrics** | `prom/prometheus` (existing since v1.5) | Scrapes `/metrics` every 15 s. Evaluates the alert rules in `prometheus/alerts/oscar-alerts.yml`. |
+| **Routing + email** | `prom/alertmanager` (new in v1.8) | Receives firing alerts, dedupes, groups, and emails the OSCAR admin distribution list. Re-pages criticals every 1 h until acknowledged, warnings every 4 h. |
+| **Logs** | Loki + Promtail (since v1.7) | Centralised log aggregation — query via Grafana to triage what an alert actually meant. |
+
+### 14.2 The default alert rules
+
+| Alert | Severity | Fires when | Typical fix |
+|---|---|---|---|
+| `OscarServerDown` | critical | `/metrics` unscrapeable for 2 min | Autoheal usually restarts within 60 s. If it didn't, `docker ps` + `docker logs oscar`. |
+| `OscarRestartLoop` | critical | >3 container restarts in 10 min | Persistent boot-time failure — DB corruption, full disk, broken migration, missing env var. Stop autoheal first, debug, fix, restart. |
+| `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run completed in 10 min | Hung Bruno child. Restart the OSCAR container — kills zombie children. |
+| `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min | Vendor outage, expired OAuth credentials, or a bad collection update. |
+| `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Check SMTP creds in Server Config tab. Use **Send test email** to reproduce. |
+| `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. |
+| `OscarHighMemory` | warning | RSS >1 GB for 15 min | Likely a leak. Snapshot heap before restarting if you want to investigate. |
+| `OscarEventLoopLag` | warning | p99 lag >200 ms for 10 min | Heavy synchronous work — usually a giant report-builder query. Check active runs. |
+
+Rule definitions live in `OSCAR_Deploy/prometheus/alerts/oscar-alerts.yml`. Edit, then `docker exec oscar-prometheus kill -HUP 1` to reload without restart.
+
+### 14.3 First-time setup (one-shot per VPS)
+
+After you `git pull` v1.8.0 on the VPS:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+
+# 1. Create the alertmanager config from the example, fill in SMTP + recipients.
+sudo cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
+sudo $EDITOR alertmanager/alertmanager.yml
+#    └── set: smtp_smarthost, smtp_auth_username, smtp_auth_password, recipient `to:`
+
+# 2. Bring the new services up (autoheal + alertmanager).
+#    Existing containers are unaffected; oscar gets recreated to pick up
+#    the healthcheck + autoheal label.
+sudo docker compose \
+     -f docker-compose.yml \
+     -f docker-compose.metrics.yml \
+     up -d --force-recreate oscar autoheal alertmanager prometheus
+
+# 3. Verify.
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+#    └── oscar should now show "(healthy)" after ~30 s
+curl -s http://127.0.0.1:9093/api/v2/status | head -20
+#    └── alertmanager should respond
+```
+
+### 14.4 Verifying the email path
+
+The fastest end-to-end test is to manually fire a synthetic alert:
+
+```bash
+# Fire a fake critical alert — should email admins within ~1 min.
+curl -XPOST http://127.0.0.1:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{
+  "labels": { "alertname": "OscarTestAlert", "severity": "critical" },
+  "annotations": { "summary": "Synthetic test alert — please ignore" }
+}]'
+```
+
+Within ~30 s the alert appears in `https://oscar.uic.org/prometheus/alerts` (state: firing → wait for grouping window) → admin inbox.
+
+If no email arrives:
+
+1. `docker logs oscar-alertmanager --tail 50` — SMTP errors appear verbatim here.
+2. Wrong recipient list? Edit `alertmanager.yml`, `docker exec oscar-alertmanager kill -HUP 1`, replay the curl.
+3. SMTP working in OSCAR (test email succeeds) but not in Alertmanager? Different config files — Alertmanager has its own copy of credentials in its yml; they don't share with OSCAR's Server Config DB.
+
+### 14.5 Silencing alerts during planned maintenance
+
+```bash
+# 4-hour silence for any alert matching alertname=OscarServerDown.
+docker exec oscar-alertmanager amtool silence add \
+    alertname=OscarServerDown \
+    --duration=4h \
+    --comment "Planned upgrade — PHE 2026-05-10" \
+    --author "patrick.heuguet@trackonpath.com"
+
+# List active silences
+docker exec oscar-alertmanager amtool silence query
+
+# Remove a silence by ID
+docker exec oscar-alertmanager amtool silence expire <silence-id>
+```
+
+Or use the silences UI inside Grafana → Alerting → Silences.
+
+### 14.6 Keeping the admin recipient list in sync
+
+Two patterns work:
+
+- **(Recommended) Single distribution list** — point Alertmanager `to:` at e.g. `oscar-admins@uic.org` and manage membership in your mail provider. Lets you add/remove humans without touching VPS files.
+- **Explicit list** — comma-separated emails in `alertmanager.yml`. Edit the file + `kill -HUP 1` after every admin add/remove. Higher friction but fully self-contained.
+
+Future enhancement (tracked in backlog): a small endpoint that regenerates `alertmanager.yml` from OSCAR's `users` table on demand.

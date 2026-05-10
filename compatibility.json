@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.22",
+  "current_release": "2026.23",
   "releases": [
+    {
+      "release": "2026.23",
+      "date": "2026-05-10",
+      "server": "1.8.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(ops): operational watchdog + email alerting. Docker healthcheck on the OSCAR container probes /health every 30 s; willfarrell/autoheal sidecar restarts any unhealthy container automatically. Prometheus alert rules ship for: oscar down, restart loop, queue stuck, sustained run-failure rate, SMTP degraded, login attack burst, memory leak, event-loop lag. Alertmanager routes firing alerts to admin email via the existing SMTP relay.",
+        "feat(ops): two news entries on welcome page — operations monitoring upgrade, and recap of credential redaction + self-service report deletion + password reset by email.",
+        "docs: solution architecture (§ 10.1), specification NFRs (§ 5), and admin guide (new §§ 13–14) updated with the full observability + watchdog stack. metrics-and-monitoring.md gets new troubleshooting rows for autoheal + alertmanager.",
+        "Operator action required after rollover: (1) cp OSCAR_Deploy/alertmanager/alertmanager.yml.example → alertmanager.yml on the host, fill in SMTP credentials + recipient list. (2) docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d --force-recreate oscar autoheal alertmanager prometheus. Resource cost rises from ~380 MB to ~415 MB RAM. Full guide in Documentation/Server_Operations/OSCAR - Server Admin Guide.md § 14."
+      ]
+    },
     {
       "release": "2026.22",
       "date": "2026-05-10",
