@@ -594,7 +594,21 @@ router.post('/logout', requireAuth, (req, res) => {
 // JWT itself has a max-age of (typically) 24h baked into its `exp`
 // claim, so even a "stale 200" reuses a token that the underlying
 // requireAuth would still accept.
-router.get('/sso-check', requireAuth, (req, res) => {
+//
+// Rate limit: 600 / 5 min / IP — generous because nginx fires this on
+// EVERY proxied request to /grafana/ or /prometheus/ (one Grafana page
+// load can trigger 20+ asset requests). Tighter than that risks 429s
+// on legitimate dashboard browsing. Looser than 600 doesn't add abuse
+// surface — requireAuth still rejects bad tokens, this just caps total
+// validation work. Closes CodeQL js/missing-rate-limiting on this PR.
+const ssoCheckLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'SSO check rate limit exceeded.' }
+});
+router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
   const role = normalizeRole(req.user && req.user.role);
   if (role !== 'administrator') {
     return res.status(401).set('Cache-Control', 'no-store').json({
