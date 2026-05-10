@@ -127,6 +127,12 @@ const ALLOWED_REDIRECT_HOSTS = (process.env.ALLOWED_REDIRECT_HOSTS || '')
 
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
+    // /metrics is scraped by Prometheus over plain HTTP from inside the
+    // Docker network using the internal hostname (oscar:3001). It is never
+    // reached from the public internet — nginx returns 404 for /metrics
+    // externally. Forcing HTTPS on this path produced a 301 → https://oscar/metrics
+    // redirect loop because Prometheus can't speak TLS to the app port.
+    if (req.path === '/metrics') return next();
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
     const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
     if (isLocalhost) return next();   // never redirect loopback traffic
