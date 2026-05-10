@@ -1,0 +1,145 @@
+{
+  "annotations": { "list": [] },
+  "description": "OSCAR · Logs — live tail and search across the OSCAR app, Bruno workers, and the metrics stack.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "id": 99,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "## How to use\n\n- **Container** dropdown (top right) picks one or more OSCAR containers. Default is `oscar` (the main app).\n- **Search** box does substring filter (case-sensitive). Empty = show everything.\n- **Time range** (top right) — bump up for incident triage.\n- The two panels below show errors-only and the full live tail. They reload automatically every 5 seconds.\n\nFor ad-hoc queries see Grafana → **Explore** (top-left menu) → choose Loki → write LogQL like `{container=\"oscar\"} |= \"ERROR\"` or `{container=\"oscar\", stream=\"stderr\"}`.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.4.0",
+      "title": "How to use",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 10 } ] }, "unit": "short" } },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "id": 1,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\"} |~ \"(?i)error|fatal|panic\" [$__range]))", "queryType": "range", "refId": "A" }
+      ],
+      "title": "Errors in range",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }, "unit": "short" } },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\"} [$__range]))", "queryType": "range", "refId": "A" }
+      ],
+      "title": "Total log lines",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "bars", "fillOpacity": 100, "lineWidth": 0, "showPoints": "never" }, "unit": "short" } },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum by (container) (count_over_time({container=~\"$container\"} [$__interval]))", "queryType": "range", "refId": "A" }
+      ],
+      "title": "Log rate by container",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\"} |~ \"(?i)error|fatal|panic\"", "queryType": "range", "refId": "A" }
+      ],
+      "title": "Errors only",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 20 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\"} |= \"$search\"", "queryType": "range", "refId": "A" }
+      ],
+      "title": "All logs (filtered by search box)",
+      "type": "logs"
+    }
+  ],
+  "preload": false,
+  "refresh": "5s",
+  "schemaVersion": 40,
+  "tags": ["oscar", "logs"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "oscar", "value": "oscar" },
+        "datasource": { "type": "loki", "uid": "loki" },
+        "definition": "label_values({compose_project=~\".+\"}, container)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Container",
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": "label_values({compose_project=~\".+\"}, container)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "hide": 0,
+        "label": "Search",
+        "name": "search",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "OSCAR · Logs",
+  "uid": "oscar-logs",
+  "version": 1,
+  "weekStart": ""
+}

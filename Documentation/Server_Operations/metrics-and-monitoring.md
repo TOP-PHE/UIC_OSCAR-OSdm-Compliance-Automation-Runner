@@ -11,8 +11,9 @@ this version of the repo.
 
 ## What you get
 
-A live operational dashboard at **`https://oscar.uic.org/grafana/`** showing:
+Two pre-built Grafana dashboards at **`https://oscar.uic.org/grafana/`**:
 
+**OSCAR · Overview** — runtime metrics:
 - Active runs / queue depth (current snapshot)
 - HTTP request rate and P95 latency
 - HTTP latency percentiles (p50/p95/p99) over time
@@ -22,8 +23,15 @@ A live operational dashboard at **`https://oscar.uic.org/grafana/`** showing:
 - Process memory (RSS, heap used, heap total)
 - Process CPU + Node.js event-loop lag
 
-All metrics are scraped from OSCAR's `/metrics` endpoint at 15s intervals
-and retained for 15 days.
+**OSCAR · Logs** — centralised log aggregation:
+- Errors-only view (regex-matches ERROR / FATAL / PANIC)
+- Full live tail (5s refresh) with substring search box
+- Per-container filter (variable dropdown)
+- Log rate timeseries by container
+
+All metrics scraped from OSCAR's `/metrics` at 15s intervals (15-day retention).
+All logs shipped via Promtail from container stdout/stderr (indefinite retention by
+default — adjust in `OSCAR_Deploy/loki/loki-config.yaml` if disk pressure).
 
 ---
 
@@ -127,11 +135,13 @@ sudo docker compose -f docker-compose.yml up -d                # restarts WITHOU
 
 Steady state on a small VPS:
 
-| Container | RAM | Disk (15d retention) |
-|-----------|-----|----------------------|
-| Prometheus | ~150 MB | ~500 MB |
+| Container | RAM | Disk |
+|-----------|-----|------|
+| Prometheus | ~150 MB | ~500 MB (15d retention) |
 | Grafana | ~120 MB | ~50 MB |
-| **Total added** | **~270 MB** | **~550 MB** |
+| Loki | ~80 MB | grows ~5-50 MB/day depending on log volume |
+| Promtail | ~30 MB | minimal (positions file) |
+| **Total added** | **~380 MB** | **~600 MB after 30d typical** |
 
 ### Where data lives
 
