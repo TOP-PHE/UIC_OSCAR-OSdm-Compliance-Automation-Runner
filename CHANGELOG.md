@@ -10,7 +10,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (next cycle)
+- (next cycle — Loki / centralised logs)
+
+---
+
+## [server-v1.6.0] — 2026-05-10
+
+Minor bump — new SSO endpoint, new public page, replaces the htpasswd
+basic-auth model that v1.5.x shipped.
+
+### Added
+- **SSO into Grafana via OSCAR JWT.** New `GET /v1/auth/sso-check`
+  endpoint validates the `oscar_session` cookie and returns
+  `X-User-Email` + `X-User-Role` if the user is an administrator,
+  401 otherwise. nginx's `auth_request` directive uses this to gate
+  `/grafana/` (and `/prometheus/`, see below). Grafana auto-creates
+  a matching user (Viewer role) on first visit via its `auth.proxy`
+  module. No more htpasswd file to manage.
+- **Prometheus web UI exposed at `/prometheus/`** behind the same SSO
+  gate. Useful for raw PromQL queries and scrape-target health
+  inspection. Bound to `127.0.0.1:9090` on the host; only nginx (with
+  the SSO check) can reach it externally.
+- **New "Admin Dashboard" nav entry** (administrator only) → page at
+  `/admin-dashboard.html` with three tiles: 📈 Grafana, 🔍 Prometheus,
+  📝 Logs (Loki) — the Loki tile is a disabled placeholder for the
+  next iteration.
+
+### Fixed
+- **Bake post-v1.5.0 production fixes into source** —
+  `GF_SERVER_DOMAIN: 'oscar.uic.org'` + hardcoded `GF_SERVER_ROOT_URL`,
+  Grafana datasource `uid: prometheus`, nginx `proxy_pass http://127.0.0.1:3000;`
+  (no trailing slash). These were patched on the production VPS during
+  the v1.5.0 / v1.5.1 rollouts; baking them into source means
+  `refresh-collection.sh` stops failing on a dirty working tree.
+
+### Security
+- **`/v1/auth/sso-check` rate-limited** 600/5min/IP (CodeQL
+  `js/missing-rate-limiting`). Generous because nginx fires this on
+  every proxied request to `/grafana/` or `/prometheus/`.
+
+### Migration steps for existing deployments
+After Watchtower rolls over to v1.6.0:
+1. `git -C /opt/OSCAR pull` (now clean — the v1.5.1-era manual edits
+   match what's in source)
+2. Replace the OLD `location /grafana/` block in your nginx site config
+   with the new 3-block snippet from
+   `OSCAR_Deploy/nginx/oscar-metrics.conf.snippet` (one `auth_request`
+   helper + `/grafana/` + `/prometheus/`)
+3. `sudo nginx -t && sudo systemctl reload nginx`
+4. `sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d --force-recreate grafana prometheus`
+
+The old `/etc/nginx/.htpasswd-grafana` file is no longer referenced —
+leave it on disk (harmless) or `sudo rm` it.
 
 ---
 
