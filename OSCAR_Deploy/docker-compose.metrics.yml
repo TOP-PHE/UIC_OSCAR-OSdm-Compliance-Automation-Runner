@@ -52,14 +52,30 @@ services:
       GF_SERVER_DOMAIN:               'oscar.uic.org'
       GF_SERVER_ROOT_URL:             'https://oscar.uic.org/grafana/'
       GF_SERVER_SERVE_FROM_SUB_PATH:  'true'
-      # Disable Grafana's own auth — nginx basic auth is in front of /grafana/.
-      # If you'd rather use Grafana's login, set these three to false / your-password.
-      GF_AUTH_ANONYMOUS_ENABLED:      'true'
-      GF_AUTH_ANONYMOUS_ORG_ROLE:     'Viewer'
-      GF_AUTH_DISABLE_LOGIN_FORM:     'true'
+      # ── SSO via OSCAR (PR #46) ───────────────────────────────────────────
+      # nginx fronts /grafana/ with auth_request → OSCAR /v1/auth/sso-check.
+      # On 200 nginx forwards X-WEBAUTH-USER (the user's OSCAR email) here.
+      # Grafana auto-creates a matching user on first visit. Replaces the
+      # earlier basic-auth + anonymous-viewer setup from v1.5.0.
+      GF_AUTH_PROXY_ENABLED:                 'true'
+      GF_AUTH_PROXY_HEADER_NAME:             'X-WEBAUTH-USER'
+      GF_AUTH_PROXY_HEADER_PROPERTY:         'username'
+      GF_AUTH_PROXY_AUTO_SIGN_UP:            'true'
+      # Map the X-User-Email header back into the Grafana user record so
+      # avatars / share emails / alert recipients resolve.
+      GF_AUTH_PROXY_HEADERS:                 'Email:X-User-Email Role:X-User-Role'
+      GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN:      'true'
+      # Disable basic auth + anonymous + login form — only the proxy header gets in.
+      GF_AUTH_ANONYMOUS_ENABLED:             'false'
+      GF_AUTH_BASIC_ENABLED:                 'false'
+      GF_AUTH_DISABLE_LOGIN_FORM:            'true'
+      # New users created via auth.proxy default to Viewer. Promote individuals
+      # to Editor / Admin in the Grafana UI as needed.
+      GF_USERS_AUTO_ASSIGN_ORG:              'true'
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE:         'Viewer'
       # Don't phone home or check for new versions
-      GF_ANALYTICS_REPORTING_ENABLED: 'false'
-      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED:        'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES:        'false'
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
