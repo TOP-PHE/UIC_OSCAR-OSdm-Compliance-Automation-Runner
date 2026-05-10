@@ -10,7 +10,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (next cycle — Loki / centralised logs)
+- (next cycle)
+
+---
+
+## [server-v1.7.0] — 2026-05-10
+
+Minor bump — adds Loki / Promtail to the metrics stack and bakes the
+auth_request fix from v1.6.0 into source.
+
+### Added
+- **Centralised logs via Loki + Promtail** — operators click 📝 Logs
+  on the Admin Dashboard → land in a pre-built "OSCAR · Logs" Grafana
+  dashboard with errors-only view, full live tail (5s refresh),
+  per-container filter, and ad-hoc substring search. Promtail uses
+  Docker SD to discover containers, so any new container in the
+  compose project is picked up automatically with zero config.
+  - Loki 3.4.1 — single-binary, filesystem store, bound to localhost:3100
+  - Promtail 3.4.1 — Docker SD, ships stdout/stderr to Loki
+  - Loki datasource auto-provisioned in Grafana (`uid: loki`)
+  - New `OSCAR · Logs` dashboard JSON provisioned alongside Overview
+- **Loki tile activated** in Admin Dashboard (was disabled
+  "Coming soon" placeholder in v1.6.0)
+
+### Fixed
+- **SSO `auth_request` 500 Internal Server Error** —
+  `OSCAR_Deploy/nginx/oscar-metrics.conf.snippet` now ships with the
+  two extra headers required to bypass OSCAR's HTTPS-redirect
+  middleware on the internal SSO check (`Host: localhost` and
+  `X-Forwarded-Proto: https`). Was applied live on the VPS during the
+  v1.6.0 rollout; baking into source means new deployers don't hit it.
+
+### Operations
+- `Documentation/Server_Operations/metrics-and-monitoring.md` —
+  troubleshooting table now covers every gotcha hit during v1.5.0 →
+  v1.7.0 rollout. Resource budget bumped to ~380 MB RAM / ~600 MB
+  disk after 30d (was ~270 MB / ~550 MB without Loki+Promtail).
+- `Documentation/Server_Operations/auto-deploy-setup.md` — new
+  "When refresh-collection.sh fails with 'working tree dirty'"
+  recovery section.
+
+### Migration
+After Watchtower rolls over to v1.7.0:
+```bash
+ssh ubuntu@oscar.uic.org
+sudo -u ubuntu git -C /opt/OSCAR pull
+cd /opt/OSCAR/OSCAR_Deploy
+sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d loki promtail
+sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d --force-recreate grafana
+```
+The force-recreate of Grafana picks up the new Loki datasource. After
+that, Admin Dashboard → 📝 Logs tile lands in OSCAR · Logs dashboard
+with live container output streaming in.
 
 ---
 
