@@ -1,19 +1,24 @@
 # OSCAR metrics + Grafana — nginx snippet to add inside the existing
 # `server { listen 443 ssl; server_name oscar.uic.org; ... }` block.
 #
-# Two pieces:
+# Three pieces:
 #   1. Block external access to OSCAR's /metrics endpoint (returns 404).
-#   2. Reverse-proxy /grafana/ to the local Grafana container, fronted
-#      with HTTP basic auth so the dashboards aren't world-readable.
+#   2. Internal SSO check that proxies to OSCAR's /v1/auth/sso-check.
+#      Used by `auth_request` directives below to gate Grafana access.
+#   3. Reverse-proxy /grafana/ to the local Grafana container, gated by
+#      OSCAR SSO (admin role required). Grafana's auth.proxy module
+#      reads the X-WEBAUTH-USER header set from the SSO check.
+#
+# Replaces the basic-auth setup from v1.5.0. After this is in place,
+# any user signed in to OSCAR as administrator can click through to
+# Grafana with no second login. Non-admins get 401.
 #
 # To install:
-#   1. Create the htpasswd file (one-time):
-#        sudo apt-get install -y apache2-utils
-#        sudo htpasswd -c /etc/nginx/.htpasswd-grafana <admin-username>
-#      (you'll be prompted for the password)
-#   2. Copy the two `location` blocks below into your existing oscar.uic.org
-#      server block, anywhere alongside the existing `location /` (which
-#      proxies the OSCAR app).
+#   1. (Old basic-auth file is no longer used; you can leave or delete
+#      /etc/nginx/.htpasswd-grafana — it's no longer referenced.)
+#   2. Copy the three `location` blocks below into your existing
+#      oscar.uic.org server block, anywhere alongside the existing
+#      `location /` (which proxies the OSCAR app).
 #   3. Reload nginx:
 #        sudo nginx -t && sudo systemctl reload nginx
 # ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +31,28 @@ location = /metrics {
     return 404;
 }
 
-# Grafana — reverse-proxied under /grafana/ with basic auth.
+# Internal SSO check — called by `auth_request` below, NOT directly
+# reachable from clients. nginx forwards the user's oscar_session cookie
+# (and any Authorization: Bearer header) to OSCAR /v1/auth/sso-check,
+# which validates the JWT and returns 200 + X-User-Email + X-User-Role
+# if the user is an administrator, 401 otherwise.
+#
+# `internal` ensures this location can only be invoked via auth_request
+# from within the nginx config — never from an outside HTTP request.
+location = /auth/sso-check {
+    internal;
+    proxy_pass              http://127.0.0.1:3001/v1/auth/sso-check;
+    proxy_pass_request_body off;
+    proxy_set_header        Content-Length "";
+    proxy_set_header        Host            $host;
+    proxy_set_header        X-Original-URI  $request_uri;
+    # Forward the user's auth context — both the cookie (browser
+    # navigation) and any Authorization header (curl / scripted access).
+    proxy_set_header        Cookie          $http_cookie;
+    proxy_set_header        Authorization   $http_authorization;
+}
+
+# Grafana — reverse-proxied under /grafana/, gated by OSCAR SSO.
 # Grafana's GF_SERVER_SERVE_FROM_SUB_PATH is set to true in the compose
 # overlay so internal Grafana links work correctly under this prefix.
 #
@@ -36,16 +62,58 @@ location = /metrics {
 # /grafana/ in the URL — leading to an infinite redirect loop. PR #45
 # bake-in — was diagnosed live in production after v1.5.0 shipped.
 location /grafana/ {
-    auth_basic           "OSCAR Metrics — Restricted";
-    auth_basic_user_file /etc/nginx/.htpasswd-grafana;
+    # Call the SSO check — on 200 the request continues, on 401 the user
+    # is bounced to OSCAR's login page (where they sign in normally and
+    # then come back to /grafana/ via the menu link).
+    auth_request        /auth/sso-check;
+    error_page 401 = @sso_login;
 
-    proxy_pass         http://127.0.0.1:3000;
-    proxy_set_header   Host              $host;
-    proxy_set_header   X-Real-IP         $remote_addr;
-    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header   X-Forwarded-Proto $scheme;
+    # Capture the X-User-Email + X-User-Role from the auth_request
+    # response and pass them upstream as X-WEBAUTH-USER + X-User-Role
+    # so Grafana's auth.proxy can use them.
+    auth_request_set    $sso_user  $upstream_http_x_user_email;
+    auth_request_set    $sso_role  $upstream_http_x_user_role;
+    proxy_set_header    X-WEBAUTH-USER  $sso_user;
+    proxy_set_header    X-User-Email    $sso_user;
+    proxy_set_header    X-User-Role     $sso_role;
+
+    proxy_pass          http://127.0.0.1:3000;
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header    X-Forwarded-Proto $scheme;
     # Grafana live (websockets) — required for the live tail / alert pages.
-    proxy_http_version 1.1;
-    proxy_set_header   Upgrade           $http_upgrade;
-    proxy_set_header   Connection        "upgrade";
+    proxy_http_version  1.1;
+    proxy_set_header    Upgrade           $http_upgrade;
+    proxy_set_header    Connection        "upgrade";
+}
+
+# Prometheus — reverse-proxied under /prometheus/, gated by the same
+# OSCAR SSO check used by Grafana. Useful for admins who want to write
+# raw PromQL queries or inspect scrape-target health without going
+# through Grafana.
+#
+# Prometheus is started with --web.external-url=https://oscar.uic.org/prometheus/
+# so its internal asset / API URLs work correctly under this prefix.
+location /prometheus/ {
+    auth_request        /auth/sso-check;
+    error_page 401 = @sso_login;
+
+    # Strip the /prometheus prefix before forwarding (Prometheus's
+    # --web.route-prefix is left at "/" so the upstream URL space is
+    # the standard one).
+    rewrite             ^/prometheus/(.*) /$1 break;
+
+    proxy_pass          http://127.0.0.1:9090;
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header    X-Forwarded-Proto $scheme;
+}
+
+# Where the SSO check sends users who are not signed in (or not admins):
+# back to OSCAR's login page with a return-to query string so they land
+# on the requested resource after logging in.
+location @sso_login {
+    return 302 /index.html?next=$request_uri;
 }
