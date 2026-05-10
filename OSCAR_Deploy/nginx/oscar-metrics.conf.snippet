@@ -88,6 +88,29 @@ location /grafana/ {
     proxy_set_header    Connection        "upgrade";
 }
 
+# Prometheus — reverse-proxied under /prometheus/, gated by the same
+# OSCAR SSO check used by Grafana. Useful for admins who want to write
+# raw PromQL queries or inspect scrape-target health without going
+# through Grafana.
+#
+# Prometheus is started with --web.external-url=https://oscar.uic.org/prometheus/
+# so its internal asset / API URLs work correctly under this prefix.
+location /prometheus/ {
+    auth_request        /auth/sso-check;
+    error_page 401 = @sso_login;
+
+    # Strip the /prometheus prefix before forwarding (Prometheus's
+    # --web.route-prefix is left at "/" so the upstream URL space is
+    # the standard one).
+    rewrite             ^/prometheus/(.*) /$1 break;
+
+    proxy_pass          http://127.0.0.1:9090;
+    proxy_set_header    Host              $host;
+    proxy_set_header    X-Real-IP         $remote_addr;
+    proxy_set_header    X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header    X-Forwarded-Proto $scheme;
+}
+
 # Where the SSO check sends users who are not signed in (or not admins):
 # back to OSCAR's login page with a return-to query string so they land
 # on the requested resource after logging in.
