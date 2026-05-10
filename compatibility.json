@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.21",
+  "current_release": "2026.22",
   "releases": [
+    {
+      "release": "2026.22",
+      "date": "2026-05-10",
+      "server": "1.7.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(loki): centralised log aggregation via Loki + Promtail (PR #52). Admin Dashboard tile 📝 Logs is now live and deep-links to a pre-built 'OSCAR · Logs' Grafana dashboard with errors-only view, full live tail, per-container filter, and ad-hoc search. All container stdout/stderr is shipped automatically — picks up new containers without config changes.",
+        "fix(sso): bake the auth_request Host: localhost + X-Forwarded-Proto fix into source nginx snippet (PR #51) — was applied live on the VPS during v1.6.0 rollout. New deployers no longer hit the 500 Internal Server Error on first /grafana/ visit.",
+        "Operator action required after rollover: docker compose up -d loki promtail (and recreate grafana) to start the logs stack. Existing metrics stack unaffected. Resource cost rises from ~270 MB to ~380 MB RAM. Full guide in Documentation/Server_Operations/metrics-and-monitoring.md."
+      ]
+    },
     {
       "release": "2026.21",
       "date": "2026-05-10",
