@@ -89,6 +89,44 @@ services:
       # Bound to localhost — exposed externally via nginx /grafana/ block.
       - "127.0.0.1:3000:3000"
 
+  # ── Loki — log aggregation backend (PR #52) ────────────────────────────────
+  # Stores logs shipped by Promtail. Bound to localhost:3100 so Grafana can
+  # use a stable datasource URL. NOT exposed externally — operators query
+  # logs through the Grafana "OSCAR · Logs" dashboard provisioned alongside
+  # the Overview dashboard.
+  loki:
+    image: grafana/loki:3.4.1
+    container_name: oscar-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+
+  # ── Promtail — ships container stdout/stderr to Loki (PR #52) ──────────────
+  # Discovers containers via Docker service-discovery (mounted socket),
+  # tags each log line with container name + stream, and pushes to Loki.
+  # No host-side file paths to maintain — picks up any new container that
+  # docker compose adds to this project automatically.
+  promtail:
+    image: grafana/promtail:3.4.1
+    container_name: oscar-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    depends_on:
+      - loki
+    volumes:
+      - ./promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      # Read container log files (canonical paths).
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # Docker socket — for SD discovery + container metadata.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - promtail-data:/promtail
+
 volumes:
   prometheus-data:
   grafana-data:
+  loki-data:
+  promtail-data:

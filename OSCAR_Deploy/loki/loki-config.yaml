@@ -1,0 +1,54 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Minimal single-binary Loki config for OSCAR. Filesystem storage, no
+# multi-tenancy, no auth (the only client is Grafana inside the same
+# docker network — and externally the Loki port isn't exposed).
+#
+# Default retention: indefinite. To cap, add a `compactor` block with
+# `retention_enabled: true` and a `limits_config.retention_period: 30d`.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+# Per-tenant ingestion limits (kept loose — single-tenant deployment).
+limits_config:
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  max_global_streams_per_user: 5000
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h   # 7 days
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Disable the alerting rule manager — we don't have an Alertmanager wired in.
+ruler:
+  alertmanager_url: ""
+
+# Phone home opt-out.
+analytics:
+  reporting_enabled: false

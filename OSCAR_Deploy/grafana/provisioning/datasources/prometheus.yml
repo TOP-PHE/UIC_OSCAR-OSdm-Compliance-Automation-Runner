@@ -20,3 +20,13 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+
+  - name: Loki
+    # Loki datasource for the OSCAR · Logs dashboard (PR #52). Same
+    # UID-stability principle as Prometheus above.
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false

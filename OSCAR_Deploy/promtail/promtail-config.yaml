@@ -1,0 +1,49 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Promtail config for OSCAR. Discovers Docker containers via the mounted
+# socket, scrapes their stdout/stderr, and pushes to the local Loki.
+#
+# Labels every log line with:
+#   - container       (e.g. "oscar", "oscar-grafana", "watchtower")
+#   - compose_project (e.g. "oscar_deploy")
+#   - compose_service (e.g. "oscar")
+#   - stream          (stdout | stderr)
+#
+# Filter in Grafana / LogQL with selectors like:
+#   {container="oscar"}                               — just the OSCAR app
+#   {compose_project="oscar_deploy"}                  — everything OSCAR-related
+#   {container="oscar"} |= "ERROR"                    — text grep
+#   {container="oscar", stream="stderr"}              — only stderr
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  # Where Promtail tracks its read cursor per file. Persists across restarts
+  # so we don't re-ship old logs every container recreate.
+  filename: /promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Container name: Docker prefixes with /, strip it.
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # docker compose labels — present on any container started via compose.
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'compose_project'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      # stdout vs stderr — Loki splits on this for filtering.
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
