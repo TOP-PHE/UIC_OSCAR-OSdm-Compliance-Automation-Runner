@@ -179,10 +179,21 @@ Three steps:
 |---|---|---|
 | Grafana 502 from nginx | Grafana container down or wrong port | `docker logs oscar-grafana` |
 | Empty graphs in Grafana | Prometheus can't reach OSCAR | `docker exec oscar-prometheus wget -qO- http://oscar:3001/metrics \| head` |
-| `/grafana/` redirect loop | `GF_SERVER_SERVE_FROM_SUB_PATH` wrong | Verify env in `docker-compose.metrics.yml` |
-| External `https://oscar.uic.org/metrics` returns OSCAR HTML | nginx snippet not installed | Re-do step 3 above, reload nginx |
-| External `https://oscar.uic.org/metrics` returns the metrics in clear | nginx snippet not installed correctly | Re-do step 3, **immediate fix** |
+| `/grafana/` redirect loop on first login | `GF_SERVER_DOMAIN` defaulted to `localhost` | Source has it hardcoded since v1.6.0 — verify env via `docker exec oscar-grafana env \| grep GF_SERVER` |
+| `/grafana/` ERR_TOO_MANY_REDIRECTS | nginx `proxy_pass http://127.0.0.1:3000/;` has trailing slash | Remove the `/` — source has the correct form since v1.6.0 |
+| `/grafana/` returns 500 from nginx | `auth_request` got a 3xx redirect (only 2xx/401/403 accepted) | The `/auth/sso-check` location must send `Host: localhost` AND `X-Forwarded-Proto: https`. Source snippet has both since v1.6.1 |
+| Grafana panels show "No data" with red triangles | Datasource UID mismatch | Datasource provisioning must set `uid: prometheus` (source has it since v1.6.0) |
+| Grafana panels show "No data" without errors | Prometheus has no data (target down) — see next row | |
+| Prometheus `oscar-server` target down with 400 / ECONNREFUSED | OSCAR's HTTPS-redirect intercepting plain-HTTP scrape | v1.5.1+ exempts `/metrics` from the redirect — make sure you're on v1.5.1 or later |
+| External `https://oscar.uic.org/metrics` returns OSCAR HTML | nginx snippet not installed | Re-do nginx step, reload nginx |
+| External `https://oscar.uic.org/metrics` returns the metrics in clear | nginx snippet not installed correctly | Re-do nginx step, **immediate fix** |
+| `refresh-collection.sh` fails with "working tree dirty" on the deploy workflow | Local edits in `/opt/OSCAR/` block `git pull` | `sudo -u ubuntu git -C /opt/OSCAR status` to see what's dirty; `git checkout -- .` to discard tracked-file edits; `rm /opt/OSCAR/FETCH_HEAD` if that's the only "untracked" entry |
 
-The last two are minor security concerns — not catastrophic (no
-secrets in the metrics) but expose internal counters and request
-patterns. Worth fixing immediately.
+### Operator note: dirty-tree on the host
+
+`refresh-collection.sh` refuses to `git pull` when the host's working tree has any uncommitted edits OR untracked files (treated as "dirty"). Two common sources:
+
+- **Manual debugging edits** — common during incident response. Once the equivalent fix lands in source via a PR, discard the local edit with `git checkout -- <file>` to let auto-pull resume.
+- **Stray `FETCH_HEAD`** at the repo root — git creates this file during a fetch from a non-standard working dir; it's usually `.git/FETCH_HEAD` (which git ignores) but can land at the repo root in some shells. Safe to delete.
+
+After cleaning, the next release-tagged push will auto-refresh the host repo via `refresh-collection.yml` + `promote-release.yml` (both SSH the host, both run the same script).
