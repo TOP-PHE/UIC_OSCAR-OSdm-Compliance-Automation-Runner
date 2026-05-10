@@ -36,16 +36,27 @@ and retained for 15 days.
 └─────┬───────┘                       └────────────┘
       │ datasource
       ▼
-┌─────────────┐                       ┌────────────┐
-│   Grafana   │ ◀─── basic auth ──── │   nginx    │
-│ (port 3000) │   /grafana/           │  (public)  │
-└─────────────┘                       └────────────┘
+┌─────────────┐    auth_request      ┌────────────┐
+│   Grafana   │ ◀──── /grafana/ ──── │   nginx    │
+│ (port 3000) │     X-WEBAUTH-USER   │  (public)  │
+└─────────────┘                       └─────┬──────┘
+       ↑                                    │  /v1/auth/sso-check
+       │                                    ▼
+       │                              ┌────────────┐
+       │     X-WEBAUTH-USER set if    │   oscar    │
+       └─── role==administrator ─────│ JWT cookie │
+                                      └────────────┘
 ```
 
 - `/metrics` endpoint: **no auth** in the app, but **404'd by nginx**
   for external requests. Only Prometheus (in the same Docker network
   as `oscar`) can reach it.
-- Grafana: behind nginx with HTTP basic auth at `https://oscar.uic.org/grafana/`.
+- Grafana: gated by **OSCAR SSO** at `https://oscar.uic.org/grafana/`.
+  When you click the menu link, nginx's `auth_request` calls OSCAR's
+  `/v1/auth/sso-check`. If your JWT cookie says `role=administrator`,
+  the request continues with the `X-WEBAUTH-USER` header carrying your
+  email — Grafana auto-creates a matching user (Viewer by default,
+  promote to Editor / Admin in the Grafana UI).
 - Prometheus has no public port at all.
 
 ---
@@ -59,18 +70,11 @@ ssh ubuntu@oscar.uic.org
 sudo -u ubuntu git -C /opt/OSCAR pull
 ```
 
-### 2. Create the htpasswd file for Grafana
+### 2. SSO instead of htpasswd
 
-```bash
-sudo apt-get install -y apache2-utils
-sudo htpasswd -c /etc/nginx/.htpasswd-grafana <admin-username>
-# Prompts for the password. Hash stored in /etc/nginx/.htpasswd-grafana.
-```
+Grafana is now SSO'd through OSCAR — no separate password file. Anyone signed in to OSCAR as **administrator** lands directly in Grafana when they click the menu link or visit `https://oscar.uic.org/grafana/`. Non-admins get bounced back to the OSCAR login page.
 
-To add more users later, drop the `-c` flag:
-```bash
-sudo htpasswd /etc/nginx/.htpasswd-grafana <another-username>
-```
+(If you previously installed an `/etc/nginx/.htpasswd-grafana` file for the v1.5.0 / v1.5.1 basic-auth setup, you can leave it on disk — it's no longer referenced — or remove it: `sudo rm /etc/nginx/.htpasswd-grafana`.)
 
 ### 3. Add the nginx snippet
 

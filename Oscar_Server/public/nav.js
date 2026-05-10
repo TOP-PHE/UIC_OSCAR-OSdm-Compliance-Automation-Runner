@@ -193,6 +193,7 @@
         { href: '/admin.html?tab=reports',   label: 'All Reports',      page: 'admin-reports'   },
         { href: '/admin.html?tab=activity',  label: 'Server Activity',  page: 'admin-activity'  },
         { href: '/admin.html?tab=config',    label: 'Server Config',    page: 'admin-config'    },
+        { href: '/admin-dashboard.html',     label: 'Admin Dashboard',  page: 'admin-dashboard' },
         { href: '/report-builder.html',      label: 'Report Builder',   page: 'report-builder'  },
       ];
     } else if (isCertif) {

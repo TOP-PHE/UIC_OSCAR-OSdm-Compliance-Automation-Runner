@@ -572,4 +572,56 @@ router.post('/logout', requireAuth, (req, res) => {
   return res.json({ logged_out: true });
 });
 
+// ── GET /v1/auth/sso-check ───────────────────────────────────────────────────
+// Internal endpoint called by nginx's `auth_request` directive to gate
+// access to the admin observability stack (/grafana/, /prometheus/).
+//
+// Behaviour:
+//   - Reads the oscar_session cookie or Authorization: Bearer header
+//   - Validates the JWT (same path as requireAuth)
+//   - If user.role === 'administrator' → 200 + X-User-Email + X-User-Role
+//   - Else (no token, expired, wrong role) → 401
+//
+// nginx receives the 200/401 from this call and decides whether to allow
+// the proxy_pass through. On 200 it forwards the X-User-Email back to
+// the upstream (Grafana) as X-WEBAUTH-USER, which Grafana's auth.proxy
+// module accepts as the authenticated identity (auto-creates the user
+// on first visit).
+//
+// Restricted to administrators for v1 — easier to expand than retract.
+//
+// Cache headers: no-cache so nginx never caches the auth result. The
+// JWT itself has a max-age of (typically) 24h baked into its `exp`
+// claim, so even a "stale 200" reuses a token that the underlying
+// requireAuth would still accept.
+//
+// Rate limit: 600 / 5 min / IP — generous because nginx fires this on
+// EVERY proxied request to /grafana/ or /prometheus/ (one Grafana page
+// load can trigger 20+ asset requests). Tighter than that risks 429s
+// on legitimate dashboard browsing. Looser than 600 doesn't add abuse
+// surface — requireAuth still rejects bad tokens, this just caps total
+// validation work. Closes CodeQL js/missing-rate-limiting on this PR.
+const ssoCheckLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'SSO check rate limit exceeded.' }
+});
+router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
+  const role = normalizeRole(req.user && req.user.role);
+  if (role !== 'administrator') {
+    return res.status(401).set('Cache-Control', 'no-store').json({
+      status: 401, title: 'Unauthorized',
+      detail: 'SSO into the admin observability stack is restricted to administrators.'
+    });
+  }
+  // requireAuth has already populated req.user; use the email straight from there.
+  return res
+    .set('Cache-Control', 'no-store')
+    .set('X-User-Email', req.user.email || '')
+    .set('X-User-Role',  role)
+    .json({ ok: true });
+});
+
 module.exports = router;
