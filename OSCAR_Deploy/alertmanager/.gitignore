@@ -1,0 +1,3 @@
+# Real config carries SMTP credentials — keep out of git. Operator copies
+# alertmanager.yml.example → alertmanager.yml on the host and fills in.
+alertmanager.yml
