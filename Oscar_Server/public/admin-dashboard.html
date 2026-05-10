@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<!--
+Copyright [2026] [International Union of Railways (UIC)]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR — Admin Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-size:14px;display:flex;flex-direction:column;min-height:100vh}
+.uic-banner{background:#fff;border-bottom:3px solid #00A2AF;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.uic-banner-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between}
+.uic-banner-left{display:flex;align-items:center;gap:12px}
+.uic-banner-logo{height:46px;width:auto}
+.uic-banner-right{display:flex;align-items:center;justify-content:flex-end}
+.osdm-banner-logo{height:34px;width:auto;display:block}
+.uic-banner-nav{padding:0 24px;display:flex;align-items:center;gap:2px;border-top:1px solid #eceff1;min-height:40px;background:#fafbfc}
+.uic-banner-nav .brand{font-size:15px;font-weight:900;color:#3C3C3B;letter-spacing:2px;margin-right:8px;display:flex;align-items:center;gap:6px;text-decoration:none}
+.uic-banner-nav .brand img{height:22px;width:auto}
+.uic-nav-sep{color:#cfd8dc;margin:0 2px;user-select:none;font-size:13px}
+.uic-banner-nav a{color:#455a64;text-decoration:none;font-size:13px;font-weight:600;padding:5px 10px;border-radius:4px;transition:background .15s,color .15s}
+.uic-banner-nav a:hover,.uic-banner-nav a.active{background:#e8f4fb;color:#0090D4}
+.uic-banner-nav .spacer{flex:1}
+.uic-banner-nav .nav-user{font-size:12px;color:#78909c}
+.container{max-width:960px;margin:32px auto;padding:0 16px;flex:1}
+h1{color:#0090D4;font-size:24px;margin-bottom:8px}
+.subtitle{color:#90a4ae;font-size:13px;margin-bottom:28px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;display:flex;flex-direction:column;gap:12px;transition:transform .15s,box-shadow .15s;text-decoration:none;color:inherit;border-top:4px solid transparent}
+.card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.card.grafana   {border-top-color:#f46800}
+.card.prometheus{border-top-color:#e6522c}
+.card.loki      {border-top-color:#0090D4}
+.card.disabled  {opacity:.55;cursor:not-allowed}
+.card-icon{font-size:36px;line-height:1}
+.card-title{font-weight:800;color:#1a2e40;font-size:16px}
+.card-desc{font-size:13px;color:#546e7a;line-height:1.55;flex:1}
+.card-cta{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#0090D4;font-size:13px;margin-top:auto}
+.card.disabled .card-cta{color:#90a4ae}
+.notice{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:14px 18px;margin-bottom:24px;font-size:13px;color:#bf360c;display:none}
+.site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
+</style>
+</head>
+<body>
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uic.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'admin-dashboard');</script>
+</header>
+
+<div class="container">
+  <h1>📊 Admin Dashboard</h1>
+  <p class="subtitle">Operational tooling for OSCAR. Each tile opens in a new tab; sign-in is single-sign-on through your OSCAR session.</p>
+
+  <div id="non-admin-notice" class="notice">
+    ⚠️ The admin observability stack is restricted to <strong>administrator</strong> accounts. You may see authentication errors when clicking the tiles below.
+  </div>
+
+  <div class="cards">
+
+    <a href="/grafana/" target="_blank" rel="noopener" class="card grafana">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Grafana</div>
+      <div class="card-desc">
+        Live operational dashboards — HTTP latency, run throughput, queue depth,
+        process resources. Comes with the OSCAR · Overview dashboard out of the
+        box; build more in the Grafana UI.
+      </div>
+      <div class="card-cta">Open Grafana →</div>
+    </a>
+
+    <a href="/prometheus/" target="_blank" rel="noopener" class="card prometheus">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">Prometheus</div>
+      <div class="card-desc">
+        Raw metrics database. Useful for ad-hoc PromQL queries, scrape-target
+        health (<code>/prometheus/targets</code>), and confirming the ingestion
+        path when a Grafana panel looks wrong.
+      </div>
+      <div class="card-cta">Open Prometheus →</div>
+    </a>
+
+    <div class="card loki disabled" title="Coming in a future release">
+      <div class="card-icon">📝</div>
+      <div class="card-title">Logs (Loki)</div>
+      <div class="card-desc">
+        Centralised log aggregation across OSCAR + Bruno workers. Search, tail,
+        and correlate with metrics from the same Grafana session.
+      </div>
+      <div class="card-cta">Coming soon</div>
+    </div>
+
+  </div>
+</div>
+
+<footer class="site-footer">
+  &copy; UIC — International Union of Railways. 2026.
+</footer>
+
+<script>
+// Show the access notice if the logged-in user isn't an administrator —
+// they CAN navigate to this page but the SSO check will reject them at the
+// Grafana / Prometheus boundary.
+(function() {
+  try {
+    var user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+    if (user.role !== 'administrator') {
+      document.getElementById('non-admin-notice').style.display = 'block';
+    }
+  } catch (_e) { /* ignore */ }
+})();
+</script>
+</body>
+</html>
