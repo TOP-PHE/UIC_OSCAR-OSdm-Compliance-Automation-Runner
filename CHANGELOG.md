@@ -14,6 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.5.1] — 2026-05-10
+
+### Fixed
+- **`/metrics` scrape blocked in production (regression from v1.5.0).**
+  PR #41 added the Prometheus endpoint, but the existing HTTPS-redirect
+  middleware (PRs #7 / #23) intercepted Prometheus's plain-HTTP scrape
+  from inside the Docker network — returning 400 Bad Request, or 301
+  to a TLS port that doesn't exist depending on `ALLOWED_REDIRECT_HOSTS`.
+  Both modes left the Grafana dashboard empty.
+  Fix: skip the HTTPS-redirect middleware when `req.path === '/metrics'`.
+  Endpoint is firewalled at the nginx layer for external requests
+  (returns 404), so this exemption adds no security exposure.
+
+  Operators who added `oscar` to `ALLOWED_REDIRECT_HOSTS` as a workaround
+  can revert that change — no longer required. The standard
+  `prometheus.yml` shipped in v1.5.0 works as-is.
+
+---
+
 ## [server-v1.5.0] — 2026-05-09
 
 Minor bump — new dependency (`prom-client`), new public-ish endpoint
