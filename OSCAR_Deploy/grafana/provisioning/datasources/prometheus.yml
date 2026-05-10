@@ -10,6 +10,11 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    # Explicit UID so dashboard JSON files can reference it by a stable
+    # string. Without this, Grafana auto-generates a UID like "aabXz123"
+    # and dashboards that hardcode `"uid": "prometheus"` show "No data".
+    # PR #45 bake-in — was discovered after v1.5.0 shipped.
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
