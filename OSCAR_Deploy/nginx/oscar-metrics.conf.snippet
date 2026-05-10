@@ -39,17 +39,31 @@ location = /metrics {
 #
 # `internal` ensures this location can only be invoked via auth_request
 # from within the nginx config — never from an outside HTTP request.
+#
+# Two non-obvious headers (PR #51, baked in after live debugging in v1.6.0):
+#   - Host: localhost          — OSCAR's HTTPS-redirect middleware (PR #7
+#                                / #23) skips loopback hosts. Without this
+#                                we'd send Host: oscar.uic.org, which IS
+#                                in ALLOWED_REDIRECT_HOSTS, and OSCAR would
+#                                301 us to https://. nginx's auth_request
+#                                only understands 2xx/401/403, so any 3xx
+#                                surfaces as 500 to the client.
+#   - X-Forwarded-Proto https  — belt-and-suspenders. Even if the Host
+#                                check changes, this header also bypasses
+#                                the redirect (proto check short-circuits
+#                                when proto IS https).
 location = /auth/sso-check {
     internal;
     proxy_pass              http://127.0.0.1:3001/v1/auth/sso-check;
     proxy_pass_request_body off;
-    proxy_set_header        Content-Length "";
-    proxy_set_header        Host            $host;
-    proxy_set_header        X-Original-URI  $request_uri;
+    proxy_set_header        Content-Length    "";
+    proxy_set_header        Host              localhost;
+    proxy_set_header        X-Forwarded-Proto https;
+    proxy_set_header        X-Original-URI    $request_uri;
     # Forward the user's auth context — both the cookie (browser
     # navigation) and any Authorization header (curl / scripted access).
-    proxy_set_header        Cookie          $http_cookie;
-    proxy_set_header        Authorization   $http_authorization;
+    proxy_set_header        Cookie            $http_cookie;
+    proxy_set_header        Authorization     $http_authorization;
 }
 
 # Grafana — reverse-proxied under /grafana/, gated by OSCAR SSO.

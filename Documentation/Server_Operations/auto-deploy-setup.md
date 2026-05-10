@@ -154,6 +154,35 @@ git tag collection-OTST_V2.0.2
 git push origin main collection-OTST_V2.0.2
 ```
 
+### When `refresh-collection.sh` fails with "working tree dirty"
+
+The deploy workflows (`refresh-collection.yml` and `promote-release.yml`) both
+SSH the VPS and run `refresh-collection.sh`, which refuses to `git pull` if
+`/opt/OSCAR/` has any uncommitted edits OR untracked files. Two common
+sources during incident response:
+
+- **You edited config files directly on the VPS** to debug something
+  (e.g. `OSCAR_Deploy/docker-compose.metrics.yml`, the nginx snippet, a
+  Grafana provisioning YAML). Once the fix lands in source via a follow-up
+  PR, the host's local edit becomes "clean" content-wise but git still
+  sees uncommitted changes.
+
+- **Stray `FETCH_HEAD`** at the repo root (not under `.git/`) — happens
+  when someone runs `git fetch` from an unusual working dir.
+
+Recovery:
+```bash
+ssh ubuntu@oscar.uic.org
+sudo -u ubuntu git -C /opt/OSCAR status     # see what's dirty
+sudo -u ubuntu git -C /opt/OSCAR diff       # confirm content is now upstream
+sudo -u ubuntu git -C /opt/OSCAR checkout -- .   # discard tracked-file edits
+rm -f /opt/OSCAR/FETCH_HEAD                 # remove stray fetch artifact
+sudo -u ubuntu git -C /opt/OSCAR status     # should now be clean
+sudo -u ubuntu git -C /opt/OSCAR pull       # manual catch-up
+```
+
+After this, the next release-tagged push will auto-refresh the host normally.
+
 ### Rolling back production
 
 If the latest `:stable` image is broken, on the VPS:
