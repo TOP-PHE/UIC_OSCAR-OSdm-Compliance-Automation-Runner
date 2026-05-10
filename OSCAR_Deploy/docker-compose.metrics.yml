@@ -43,14 +43,20 @@ services:
     depends_on:
       - prometheus
     environment:
-      # Sub-path so nginx can serve under https://oscar.uic.org/grafana/
-      GF_SERVER_ROOT_URL:        '%(protocol)s://%(domain)s/grafana/'
-      GF_SERVER_SERVE_FROM_SUB_PATH: 'true'
+      # Public URL Grafana uses to build absolute links (login redirects, share
+      # buttons, etc.). Hardcoded to the canonical hostname — the
+      # %(protocol)s://%(domain)s/grafana/ template only works if both
+      # GF_SERVER_DOMAIN is set AND Grafana correctly reads X-Forwarded-Proto.
+      # Hardcoding eliminates a class of redirect-loop bugs (PR #45 — was
+      # diagnosed live in production after v1.5.0 shipped).
+      GF_SERVER_DOMAIN:               'oscar.uic.org'
+      GF_SERVER_ROOT_URL:             'https://oscar.uic.org/grafana/'
+      GF_SERVER_SERVE_FROM_SUB_PATH:  'true'
       # Disable Grafana's own auth — nginx basic auth is in front of /grafana/.
       # If you'd rather use Grafana's login, set these three to false / your-password.
-      GF_AUTH_ANONYMOUS_ENABLED: 'true'
-      GF_AUTH_ANONYMOUS_ORG_ROLE: 'Viewer'
-      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      GF_AUTH_ANONYMOUS_ENABLED:      'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE:     'Viewer'
+      GF_AUTH_DISABLE_LOGIN_FORM:     'true'
       # Don't phone home or check for new versions
       GF_ANALYTICS_REPORTING_ENABLED: 'false'
       GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
