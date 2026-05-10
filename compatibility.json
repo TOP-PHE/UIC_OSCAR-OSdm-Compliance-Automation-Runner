@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.19",
+  "current_release": "2026.20",
   "releases": [
+    {
+      "release": "2026.20",
+      "date": "2026-05-10",
+      "server": "1.5.1",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(metrics): skip HTTPS-redirect middleware for /metrics. PR #41/v1.5.0 added the endpoint, but PR #7/#23's HTTPS-redirect intercepted Prometheus's docker-internal scrape (400 Bad Request OR 301 → ECONNREFUSED depending on ALLOWED_REDIRECT_HOSTS). Now skipped per-path. Operators do NOT need to add 'oscar' to ALLOWED_REDIRECT_HOSTS — the standard prometheus.yml shipped in v1.5.0 works as-is."
+      ]
+    },
     {
       "release": "2026.19",
       "date": "2026-05-09",
