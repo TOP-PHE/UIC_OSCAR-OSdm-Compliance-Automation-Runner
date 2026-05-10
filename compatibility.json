@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.20",
+  "current_release": "2026.21",
   "releases": [
+    {
+      "release": "2026.21",
+      "date": "2026-05-10",
+      "server": "1.6.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(sso): Grafana + Prometheus now SSO'd through OSCAR — admin role required, no separate password. New /v1/auth/sso-check endpoint validates the OSCAR JWT cookie and feeds X-WEBAUTH-USER to Grafana's auth.proxy. Replaces the htpasswd basic-auth setup from v1.5.0/v1.5.1.",
+        "feat(metrics): Prometheus web UI exposed at /prometheus/ behind same SSO gate. Useful for raw PromQL queries / scrape-target health.",
+        "feat(admin-ui): new 'Admin Dashboard' nav entry (admin-only) → /admin-dashboard.html with Grafana / Prometheus / Loki tiles. Loki tile is a placeholder for the next iteration.",
+        "fix(metrics): also bakes post-v1.5.0 fixes into source (GF_SERVER_DOMAIN, datasource UID, nginx proxy_pass trailing-slash) so refresh-collection.sh stops failing on dirty working tree.",
+        "fix(security): /v1/auth/sso-check rate-limited 600/5min/IP (CodeQL js/missing-rate-limiting).",
+        "Operator action required after rollover: replace the OLD nginx /grafana/ block with the new 3-block snippet (auth_request + /grafana/ + /prometheus/), reload nginx, recreate Grafana to pick up new env vars. Full instructions in Documentation/Server_Operations/metrics-and-monitoring.md."
+      ]
+    },
     {
       "release": "2026.20",
       "date": "2026-05-10",
