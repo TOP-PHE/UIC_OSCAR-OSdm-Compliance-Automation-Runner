@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.24",
+  "current_release": "2026.25",
   "releases": [
+    {
+      "release": "2026.25",
+      "date": "2026-05-11",
+      "server": "1.9.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(alerting): unified SMTP + alerting config in the admin UI. Server Config tab gains an Alerting card (ALERT_RECIPIENTS, ALERT_REPEAT_CRITICAL, ALERT_REPEAT_WARNING) plus a one-click 'Apply alerting config' button that templates alertmanager.yml from the same SMTP_* values OSCAR uses, writes it to a shared volume, and hot-reloads Alertmanager via /-/reload — no SSH or VPS file edit needed.",
+        "feat(smtp-ux): SMTP fields renamed for clarity (SMTP Login vs Display 'From' Address) with inline help text + soft-validation warnings when SMTP_FROM looks like a relay-internal authentication identity (e.g. *@smtp-brevo.com) or duplicates SMTP_USER. Closes the diagnostic gap that produced the SMTP_USER-pasted-into-SMTP_FROM incident.",
+        "feat(auth-ux): global fetch interceptor in nav.js detects 401 from any authenticated API call, clears stale localStorage, and redirects to login with a friendly 'Your session has expired' notice. Replaces the v1.8.1 'dead UI after cookie expiry' state with a clean re-auth flow.",
+        "Operator action required after rollover: docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d --force-recreate oscar alertmanager (recreates with the new alertmanager-config shared volume). Then in OSCAR Server Config tab → fill in ALERT_RECIPIENTS → Save → click 'Apply alerting config'. The host-edited /opt/OSCAR/OSCAR_Deploy/alertmanager/alertmanager.yml can be deleted after this — it's no longer used."
+      ]
+    },
     {
       "release": "2026.24",
       "date": "2026-05-11",

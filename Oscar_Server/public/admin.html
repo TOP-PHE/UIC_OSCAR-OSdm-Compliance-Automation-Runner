@@ -1041,9 +1041,12 @@ const CONFIG_LABELS = {
   SMTP_HOST:   'SMTP Host',
   SMTP_PORT:   'SMTP Port',
   SMTP_SECURE: 'SMTP Secure (TLS)',
-  SMTP_USER:   'SMTP User',
+  SMTP_USER:   'SMTP Login',
   SMTP_PASS:   'SMTP Password',
-  SMTP_FROM:   'SMTP From Address',
+  SMTP_FROM:   'Display "From" Address',
+  ALERT_RECIPIENTS:      'Alert Recipients',
+  ALERT_REPEAT_CRITICAL: 'Re-page Critical Every',
+  ALERT_REPEAT_WARNING:  'Re-page Warning Every',
 };
 
 async function loadConfig() {
@@ -1066,9 +1069,10 @@ async function loadConfig() {
        </div>`;
 
   // Config form — group by category
-  const smtpKeys    = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');
-  const loggingKeys = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'logging');
-  const runnerKeys  = Object.entries(data.config).filter(([_, cfg]) => !cfg.group);
+  const smtpKeys     = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');
+  const loggingKeys  = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'logging');
+  const alertingKeys = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'alerting');
+  const runnerKeys   = Object.entries(data.config).filter(([_, cfg]) => !cfg.group);
 
   function configRow([key, cfg]) {
     const isNum = cfg.type === 'number';
@@ -1107,8 +1111,77 @@ async function loadConfig() {
     html += loggingKeys.map(configRow).join('');
   }
   html += '<div style="font-size:13px;font-weight:700;color:#0090D4;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">SMTP / Email Settings</div>';
+  html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px;padding:10px 14px;background:#f5fcff;border-left:3px solid #0090D4;border-radius:4px">' +
+    '💡 <strong>One SMTP for everything.</strong> These credentials are used by OSCAR for password-reset / email-verification emails AND by Alertmanager for admin alerts (after you click "Apply" in the Alerting section below). One source of truth — no separate VPS file edits.</div>';
   html += smtpKeys.map(configRow).join('');
+  if (alertingKeys.length) {
+    html += '<div style="font-size:13px;font-weight:700;color:#bf360c;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">🔔 Alerting</div>';
+    html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px">Saving these values does NOT automatically push them to Alertmanager — that requires writing the YAML and reloading. Use the button below after editing.</div>';
+    html += alertingKeys.map(configRow).join('');
+    html += '<div style="margin:14px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary" id="btn-apply-alertmanager" style="background:#bf360c">⚡ Apply alerting config to Alertmanager</button>' +
+      '<span style="font-size:12px;color:#78909c">Templates <code>alertmanager.yml</code> from these values, writes it to the shared volume, hot-reloads Alertmanager. No SSH, no VPS edits.</span>' +
+      '</div>' +
+      '<pre id="apply-alertmanager-result" style="margin-top:6px;padding:12px;border-radius:6px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;display:none"></pre>';
+  }
   document.getElementById('config-form').innerHTML = html;
+
+  // Wire the alertmanager apply button (re-bound on every loadConfig because
+  // the button is re-rendered into the DOM each time)
+  const amBtn = document.getElementById('btn-apply-alertmanager');
+  if (amBtn) amBtn.addEventListener('click', applyAlertmanagerConfig);
+}
+
+async function applyAlertmanagerConfig() {
+  const out = document.getElementById('apply-alertmanager-result');
+  const btn = document.getElementById('btn-apply-alertmanager');
+  if (!out || !btn) return;
+  out.style.display = 'block';
+  out.style.background = '#fff8e1';
+  out.style.color = '#7c5800';
+  out.textContent = '⏳ Templating alertmanager.yml + reloading…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/v1/admin/alertmanager/apply', {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' }
+    });
+    const data = await r.json();
+    if (data.ok) {
+      out.style.background = '#e8f5e9';
+      out.style.color = '#2e7d32';
+      out.textContent = `✅ Alertmanager reloaded successfully.
+
+  Config written to:  ${data.configPath}
+  Reload endpoint:    ${data.reloadUrl}
+  Reload status:      ${data.reloadStatus}
+
+The new config is live. Trigger a synthetic alert to verify end-to-end:
+  curl -XPOST http://127.0.0.1:9093/api/v2/alerts -H 'Content-Type: application/json' -d '[{"labels":{"alertname":"TestAlert","severity":"critical"},"annotations":{"summary":"Test"}}]'`;
+    } else {
+      out.style.background = '#ffebee';
+      out.style.color = '#c62828';
+      out.textContent = `❌ Apply failed.
+
+  Error: ${data.error || 'Unknown error'}
+
+  Config written:    ${data.written ? 'yes' : 'no'}
+  Reload attempted:  ${data.reloaded ? 'yes' : 'no'}
+  Reload status:     ${data.reloadStatus || 'n/a'}
+  Reload body:       ${data.reloadBody || 'n/a'}
+
+Common causes:
+  • SMTP_HOST or ALERT_RECIPIENTS empty — fill them in above and re-save first
+  • alertmanager-config volume not mounted into the OSCAR container (operator action — see Admin Guide § 14)
+  • Alertmanager container not running or unreachable on http://alertmanager:9093`;
+    }
+  } catch (err) {
+    out.style.background = '#ffebee';
+    out.style.color = '#c62828';
+    out.textContent = `❌ Network error talking to /v1/admin/alertmanager/apply: ${err.message || err}`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function saveConfig() {
@@ -1126,9 +1199,14 @@ async function saveConfig() {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || 'Failed to save config', false); return; }
   if (data.errors && data.errors.length > 0) {
-    showMsg('Saved with warnings: ' + data.errors.join('; '), false);
+    showMsg('Saved with errors: ' + data.errors.join('; '), false);
+  } else if (data.warnings && data.warnings.length > 0) {
+    // Soft warnings (typically the SMTP_FROM / SMTP_USER mix-up) — saved
+    // successfully but flagged for the admin to double-check.
+    const warnText = data.warnings.map(w => `${w.key}: ${w.message}`).join('\n\n');
+    showMsg('Saved — but please review:\n\n' + warnText, false);
   } else {
-    showMsg('Configuration saved — changes take effect immediately.', true);
+    showMsg('Configuration saved — changes take effect immediately. (For Alerting changes, click "Apply alerting config" below.)', true);
   }
   _configCache = data.config;
 }

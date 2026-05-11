@@ -176,6 +176,19 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
+// One-shot session-expired notice. Set by the global fetch interceptor in
+// nav.js when an authenticated API call returns 401 — picked up here on
+// the next page load and surfaced as an inline notice above the login form.
+(function showSessionExpiredNotice() {
+  try {
+    const msg = sessionStorage.getItem('oscar_login_message');
+    if (msg) {
+      sessionStorage.removeItem('oscar_login_message');
+      showError(msg);
+    }
+  } catch (_e) { /* sessionStorage unavailable — silently skip */ }
+})();
+
 async function doLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('l-btn');
