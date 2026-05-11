@@ -320,8 +320,8 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 
 <script>
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-const token = localStorage.getItem('oscar_token');
-if (!token) window.location.href = '/';
+const token = localStorage.getItem('oscar_token') || '';
+if (!localStorage.getItem('oscar_user')) window.location.href = '/';
 
 const isAdmin   = user.role === 'administrator';
 const isCertif  = user.role === 'certification_user';

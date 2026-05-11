@@ -156,8 +156,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 
 <script>
 // ── Auth guard ────────────────────────────────────────────────────────────────
-const token = localStorage.getItem('oscar_token');
-if (!token) window.location.href = '/';
+// Auth guard — the source of truth is the httpOnly oscar_session cookie set
+// at login / verify-email. JS can't read it (httpOnly), so we use the
+// presence of oscar_user in localStorage as the client-side proxy for "I
+// have a session". Bearer-header fetches still use oscar_token if present
+// (legacy flows), but the cookie auth handles everything else.
+const token = localStorage.getItem('oscar_token') || '';
+if (!localStorage.getItem('oscar_user')) window.location.href = '/';
 
 const user    = JSON.parse(localStorage.getItem('oscar_user')    || '{}');
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
