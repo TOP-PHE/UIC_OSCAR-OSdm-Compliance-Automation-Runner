@@ -409,6 +409,13 @@ function _safeAlter(sql) {
     SMTP_FROM:   process.env.SMTP_FROM   || 'OSCAR Platform <noreply@oscar.uic.org>',
     // Logging level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
     LOG_LEVEL:   process.env.LOG_LEVEL   || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    // Alerting (v1.9.0) — used by src/utils/alertmanagerConfig.js to regenerate
+    // alertmanager.yml from a single source of truth (this DB). Empty by
+    // default so the alerting card on the Server Config tab prompts the
+    // operator to fill it in before clicking "Apply alerting config".
+    ALERT_RECIPIENTS:      process.env.ALERT_RECIPIENTS      || '',
+    ALERT_REPEAT_CRITICAL: process.env.ALERT_REPEAT_CRITICAL || '1h',
+    ALERT_REPEAT_WARNING:  process.env.ALERT_REPEAT_WARNING  || '4h',
   };
   for (const [key, val] of Object.entries(defaults)) {
     const exists = db.prepare('SELECT key FROM server_config WHERE key = ?').get(key);
