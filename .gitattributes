@@ -1,0 +1,29 @@
+# Force binary handling for files git might otherwise mis-classify as text
+# (and apply CRLF conversion to). Critical for PDFs, images, archives, etc.
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.svg  binary
+*.zip  binary
+*.tar  binary
+*.tgz  binary
+*.gz   binary
+*.db   binary
+*.sqlite binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+
+# Source files: normalize to LF in the repo, check out platform-native
+*.js   text eol=lf
+*.ts   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.sh   text eol=lf
