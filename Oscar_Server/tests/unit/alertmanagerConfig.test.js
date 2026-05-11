@@ -22,7 +22,6 @@
 
 const fs   = require('fs');
 const path = require('path');
-const os   = require('os');
 
 const { run } = require('../../src/db/db');
 const am = require('../../src/utils/alertmanagerConfig');

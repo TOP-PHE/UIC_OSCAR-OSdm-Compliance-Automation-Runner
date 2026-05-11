@@ -38,13 +38,6 @@ const CONFIG_PATH = process.env.ALERTMANAGER_CONFIG_PATH || '/etc/oscar-managed/
 const RELOAD_URL  = process.env.ALERTMANAGER_RELOAD_URL  || 'http://alertmanager:9093/-/reload';
 
 /**
- * Indent every line of `s` by `prefix` (used for nested YAML scalars).
- */
-function indent(s, prefix) {
-  return String(s || '').split('\n').map(l => prefix + l).join('\n');
-}
-
-/**
  * YAML scalar quoting — wraps in single quotes and escapes embedded single
  * quotes by doubling them (the YAML 1.2 escape rule for single-quoted scalars).
  * Safe for arbitrary user input — no template injection possible.
