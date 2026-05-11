@@ -14,6 +14,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.9.0] — 2026-05-11
+
+Minor bump — closes three operational pain points discovered during v1.8.x
+rollout: scattered SMTP config, error-prone SMTP field labels, and the
+"dead UI after cookie expiry" fallout from the v1.8.1 hotfix.
+
+### Added
+- **Unified SMTP / alerting config in the admin UI**. Server Config tab
+  gains an Alerting card with three new keys:
+  - `ALERT_RECIPIENTS` (comma- or newline-separated admin emails)
+  - `ALERT_REPEAT_CRITICAL` (default `1h`)
+  - `ALERT_REPEAT_WARNING` (default `4h`)
+  Plus a one-click **"Apply alerting config to Alertmanager"** button
+  that templates `alertmanager.yml` from current `SMTP_*` + `ALERT_*`
+  values, writes it to a docker-shared volume mounted into the
+  Alertmanager container at `/etc/alertmanager`, and hot-reloads via
+  Alertmanager's built-in `POST /-/reload` endpoint. No SSH, no VPS
+  file edits, no Docker socket exposure.
+- **`POST /v1/admin/alertmanager/apply`** new admin endpoint surfacing
+  the verbatim outcome of every step (file written, reload status,
+  reload body) so the UI can self-diagnose partial failures.
+- **Best-effort startup seed** in `server.js` — if the
+  `alertmanager-config` volume is mounted (env var present) AND
+  Server Config has SMTP + recipients filled in, OSCAR templates
+  + reloads on boot. Eliminates the chicken-and-egg "Alertmanager
+  refuses to start with empty config" problem on fresh metrics-stack
+  rollouts.
+- **Soft-validation warnings on SMTP_FROM** — saved-with-warning when
+  the value looks like a relay-internal authentication identity
+  (e.g. `*@smtp-brevo.com`, `*@smtp.sendgrid.net`) or duplicates
+  `SMTP_USER`. Shown inline in the UI without blocking the save.
+
+### Changed
+- **SMTP field labels rewritten** for clarity:
+  - `SMTP_USER` → "SMTP Login" (with help text: *"Authentication
+    identity, often a relay-internal id like `a731f1001@smtp-brevo.com`
+    — NOT the address recipients see"*)
+  - `SMTP_FROM` → "Display 'From' Address" (with help text: *"Sender
+    shown in the From: header, must be an address your relay has
+    verified"*)
+  Closes the diagnostic gap that produced the `SMTP_USER`-pasted-into-
+  `SMTP_FROM` incident.
+- **`docker-compose.metrics.yml` switched from host-file mount to
+  shared volume** for `alertmanager.yml`. Old host file under
+  `OSCAR_Deploy/alertmanager/alertmanager.yml` is no longer used and
+  can be deleted after the v1.9.0 rollout.
+
+### Fixed
+- **"Dead UI" after cookie expiry** (v1.8.1 follow-up). nav.js's global
+  fetch interceptor now detects 401 from any authenticated API call,
+  clears stale localStorage, and bounces to login with a one-shot
+  "Your session has expired" notice. The previous behaviour (silent
+  button failures, no redirect) ended whenever the next page-render
+  hit the legacy `oscar_user` guard, which could be never on a
+  long-lived dashboard tab.
+
+### Operations
+- Single source of truth for SMTP credentials. The same Brevo / SendGrid
+  / etc. login configured once in OSCAR's Server Config now drives
+  password resets, email verification, test emails, AND alert delivery.
+- The host-mounted `OSCAR_Deploy/alertmanager/alertmanager.yml` becomes
+  legacy. Operators can delete it after the rollover; OSCAR generates
+  the live config into the `alertmanager-config` named volume.
+
+### Migration
+After Watchtower rolls over to v1.9.0:
+```bash
+ssh ubuntu@oscar.uic.org
+sudo -u ubuntu git -C /opt/OSCAR pull
+cd /opt/OSCAR/OSCAR_Deploy
+
+# Recreate oscar + alertmanager so they pick up the new shared volume mount.
+sudo docker compose \
+     -f docker-compose.yml \
+     -f docker-compose.metrics.yml \
+     up -d --force-recreate oscar alertmanager
+
+# In OSCAR UI:
+#   1. Server Config tab → Alerting → fill in ALERT_RECIPIENTS → Save
+#   2. Click "Apply alerting config to Alertmanager"
+#   3. (Optional) sudo rm OSCAR_Deploy/alertmanager/alertmanager.yml — no longer used
+```
+
+---
+
 ## [server-v1.8.1] — 2026-05-11
 
 Hotfix — clears a redirect loop ("blinking welcome page") for users whose

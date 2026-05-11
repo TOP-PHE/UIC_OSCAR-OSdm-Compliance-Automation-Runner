@@ -495,13 +495,20 @@ const CONFIG_SCHEMA = {
     options: ['error', 'warn', 'info', 'debug', 'trace'],
     group: 'logging'
   },
-  // SMTP settings
+  // SMTP settings — single source of truth, used by OSCAR (password reset,
+  // verification, test email) AND by Alertmanager (after the operator clicks
+  // "Apply alerting config" in the Alerting section, which regenerates
+  // alertmanager.yml from these same values).
   SMTP_HOST:   { description: 'SMTP server hostname (e.g. smtp-relay.brevo.com)',      type: 'string', group: 'smtp' },
   SMTP_PORT:   { description: 'SMTP port (587 for STARTTLS, 465 for SSL)',             type: 'number', min: 1, max: 65535, group: 'smtp' },
-  SMTP_SECURE: { description: 'Use SSL/TLS — true or false',                          type: 'string', group: 'smtp' },
-  SMTP_USER:   { description: 'SMTP username / login email',                           type: 'string', group: 'smtp' },
-  SMTP_PASS:   { description: 'SMTP password or app password',                         type: 'string', group: 'smtp', sensitive: true },
-  SMTP_FROM:   { description: 'From address (e.g. OSCAR Platform <admin@uic.org>)',    type: 'string', group: 'smtp' },
+  SMTP_SECURE: { description: 'Use SSL/TLS — "true" for port 465, "false" for 587 (STARTTLS)', type: 'string', group: 'smtp' },
+  SMTP_USER:   { description: 'SMTP authentication identity (often a relay-internal id like a731f1001@smtp-brevo.com — NOT the address recipients see)', type: 'string', group: 'smtp', label: 'SMTP login' },
+  SMTP_PASS:   { description: 'SMTP password / API key (e.g. Brevo SMTP key starting with xsmtpsib-...)', type: 'string', group: 'smtp', sensitive: true, label: 'SMTP password' },
+  SMTP_FROM:   { description: 'Sender shown in the From: header (must be an address your SMTP relay has verified — e.g. OSCAR Platform <noreply@yourdomain.com>)', type: 'string', group: 'smtp', label: 'Display "From" address' },
+  // Alerting (v1.9) — used by alertmanagerConfig.js to regenerate alertmanager.yml.
+  ALERT_RECIPIENTS:       { description: 'Admin emails to receive alerts — comma or newline separated. Same SMTP relay as above.', type: 'string', group: 'alerting' },
+  ALERT_REPEAT_CRITICAL:  { description: 'How often to re-page critical alerts until acknowledged (e.g. 1h, 30m)', type: 'string', group: 'alerting' },
+  ALERT_REPEAT_WARNING:   { description: 'How often to re-page warning alerts until acknowledged (e.g. 4h, 12h)', type: 'string', group: 'alerting' },
 };
 
 router.get('/config', (req, res) => {
@@ -528,10 +535,32 @@ router.get('/config', (req, res) => {
   return res.json({ config, server_info: serverInfo });
 });
 
+// Soft-validation hints for SMTP — NOT errors that block the save (the operator
+// might genuinely want an unusual setup), but warnings surfaced in the response
+// body so the UI can highlight likely-mistakes inline. Closes the diagnostic
+// gap that produced the SMTP_USER-pasted-into-SMTP_FROM incident.
+const INTERNAL_RELAY_DOMAINS = [
+  'smtp-brevo.com', 'smtp.sendgrid.net', 'smtp-sendgrid.net',
+  'smtp.mailgun.org', 'smtp.postmarkapp.com', 'smtp.mailtrap.io'
+];
+function smtpFromWarnings(value, allValues) {
+  const w = [];
+  const v = String(value || '').toLowerCase();
+  if (INTERNAL_RELAY_DOMAINS.some(d => v.endsWith('@' + d) || v.includes('@' + d + '>'))) {
+    w.push("This looks like an SMTP relay's internal authentication identity, not a sender address. Recipients will see this in the From: header and most receiving mail servers will reject the message. Use an address on a domain your relay has verified (e.g. noreply@yourdomain.com).");
+  }
+  const userVal = String(allValues.SMTP_USER || allValues.smtp_user || '').toLowerCase();
+  if (userVal && (v === userVal || v.includes('<' + userVal + '>'))) {
+    w.push('SMTP "From" address is the same as the SMTP login. These are usually different — the login authenticates you to the relay, the From: is what recipients see.');
+  }
+  return w;
+}
+
 router.patch('/config', (req, res) => {
   const body = req.body || {};
   const updated = [];
   const errors  = [];
+  const warnings = [];
 
   for (const [key, rawValue] of Object.entries(body)) {
     const schema = CONFIG_SCHEMA[key];
@@ -572,6 +601,11 @@ router.patch('/config', (req, res) => {
     if (key === 'LOG_LEVEL') {
       try { require('../../utils/logger').setLevel(String(value)); } catch (_) { /* ignore */ }
     }
+    // Soft warnings for the SMTP_FROM gotcha — surfaced to the UI so admins
+    // see them inline next to the field, but do not block the save.
+    if (key === 'SMTP_FROM') {
+      smtpFromWarnings(value, body).forEach(msg => warnings.push({ key, message: msg }));
+    }
 
     updated.push({ key, value: schema.sensitive ? '****' : String(value) });
   }
@@ -588,7 +622,23 @@ router.patch('/config', (req, res) => {
     config[key] = { value: getConfig(key, ''), ...schema };
   }
 
-  return res.json({ updated, errors, config });
+  return res.json({ updated, errors, warnings, config });
+});
+
+// ── POST /v1/admin/alertmanager/apply (v1.9.0) ───────────────────────────────
+// Regenerate alertmanager.yml from current Server Config (SMTP_* + ALERT_*),
+// write it to the shared volume mounted into the alertmanager container, and
+// hot-reload Alertmanager via its built-in /-/reload endpoint. No SSH or VPS
+// file edits needed. Surfaces the verbatim outcome of every step so admins
+// can self-diagnose if anything goes wrong.
+const alertmanagerConfig = require('../../utils/alertmanagerConfig');
+router.post('/alertmanager/apply', async (req, res) => {
+  const result = await alertmanagerConfig.applyConfig();
+  auditLog(req.user.id, null, req.user.email,
+    `alertmanager_apply:${result.ok ? 'ok' : 'failed'}:${result.error || ''}`);
+  // 200 even on partial failure (file written, reload failed) — the response
+  // carries the diagnostic detail. The UI surfaces it inline regardless.
+  return res.json(result);
 });
 
 // ── POST /v1/admin/rotate-jwt-secret — invalidate all sessions ───────────────

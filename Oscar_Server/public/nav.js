@@ -42,7 +42,27 @@
         if (!hdrs.has('Authorization')) hdrs.set('Authorization', 'Bearer ' + bearer);
         init.headers = hdrs;
       }
-      return _origFetch(input, init);
+      return _origFetch(input, init).then(function(res) {
+        // ── Session-expiry handler (v1.9.0) ────────────────────────────────
+        // 401 from any authenticated API call means the cookie expired or the
+        // bearer token was rejected — clear stale localStorage, drop a friendly
+        // banner, and bounce to login. Avoids the "dead UI" state where users
+        // see the page render but every button silently fails.
+        // Skipped for explicit auth endpoints so we don't loop on the login form.
+        try {
+          var url = (typeof input === 'string') ? input : (input && input.url) || '';
+          var isAuthEndpoint = /\/v1\/auth\/(login|register|password-reset|verify)/.test(url);
+          if (res.status === 401 && !isAuthEndpoint && localStorage.getItem('oscar_user')) {
+            localStorage.removeItem('oscar_user');
+            localStorage.removeItem('oscar_token');
+            localStorage.removeItem('oscar_company');
+            // One-shot toast via sessionStorage; index.html reads & clears it.
+            sessionStorage.setItem('oscar_login_message', 'Your session has expired. Please sign in again.');
+            global.location.href = '/';
+          }
+        } catch (_e) { /* never let the interceptor break the original response */ }
+        return res;
+      });
     };
     global.__oscarFetchPatched = true;
   }

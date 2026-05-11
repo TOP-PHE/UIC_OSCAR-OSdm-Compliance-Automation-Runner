@@ -336,6 +336,22 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, () => {
   log.info({ port: PORT, collection: process.env.COLLECTION_PATH, bru: process.env.BRU_CMD, dataDir: DATAFILES_DIR },
     'OSCAR — OSDM Conformance Automation Runner started');
+
+  // ── Best-effort Alertmanager config seed (v1.9.0) ────────────────────────
+  // If the operator has configured SMTP + ALERT_RECIPIENTS and the
+  // alertmanager-config volume is mounted (env var present), template
+  // alertmanager.yml from current DB values and try to reload Alertmanager.
+  // Fire-and-forget — failure is logged but never blocks startup. The
+  // common case where this matters: a fresh metrics-stack rollout with an
+  // empty volume → without this, alertmanager would refuse to start
+  // because there's no config file. With this, OSCAR seeds it on boot.
+  if (process.env.ALERTMANAGER_CONFIG_PATH) {
+    const amCfg = require('./utils/alertmanagerConfig');
+    amCfg.applyConfig().then(r => {
+      if (r.ok) log.info({ configPath: r.configPath }, 'Alertmanager config seeded + reloaded on startup');
+      else log.warn({ result: r }, 'Alertmanager config seed on startup did not fully succeed (typically: SMTP/recipients not yet configured, or alertmanager not yet running) — admin can re-run via Server Config tab');
+    }).catch(err => log.warn({ err: err.message }, 'Alertmanager config seed on startup threw'));
+  }
 });
 
 module.exports = app;

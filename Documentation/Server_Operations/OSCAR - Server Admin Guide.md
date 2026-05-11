@@ -735,30 +735,40 @@ Rule definitions live in `OSCAR_Deploy/prometheus/alerts/oscar-alerts.yml`. Edit
 
 ### 14.3 First-time setup (one-shot per VPS)
 
-After you `git pull` v1.8.0 on the VPS:
+**Since v1.9.0 the alerting recipient list and SMTP credentials are managed
+entirely from the Server Config tab in OSCAR.** No more host-file editing.
+
+After you `git pull` v1.9.0 on the VPS:
 
 ```bash
 cd /opt/OSCAR/OSCAR_Deploy
 
-# 1. Create the alertmanager config from the example, fill in SMTP + recipients.
-sudo cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml
-sudo $EDITOR alertmanager/alertmanager.yml
-#    └── set: smtp_smarthost, smtp_auth_username, smtp_auth_password, recipient `to:`
-
-# 2. Bring the new services up (autoheal + alertmanager).
-#    Existing containers are unaffected; oscar gets recreated to pick up
-#    the healthcheck + autoheal label.
+# 1. Bring the stack up (autoheal + alertmanager + a shared `alertmanager-config`
+#    volume between OSCAR and Alertmanager). Force-recreate oscar + alertmanager
+#    so they pick up the new mount.
 sudo docker compose \
      -f docker-compose.yml \
      -f docker-compose.metrics.yml \
      up -d --force-recreate oscar autoheal alertmanager prometheus
 
-# 3. Verify.
+# 2. Verify the containers.
 docker ps --format 'table {{.Names}}\t{{.Status}}'
-#    └── oscar should now show "(healthy)" after ~30 s
+#    └── oscar should show "(healthy)" after ~30 s
 curl -s http://127.0.0.1:9093/api/v2/status | head -20
-#    └── alertmanager should respond
+#    └── alertmanager should respond (may show "no config" briefly until step 3)
 ```
+
+**Then in the OSCAR web UI:**
+
+1. Log in as administrator → **Server Config tab**
+2. Under **SMTP / Email Settings** — fill in `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` (relay login), `SMTP_PASS`, `SMTP_FROM` (verified sender). Click *Save*.
+3. Click **Send test email** to confirm SMTP is healthy end-to-end (uses these credentials → if you get the test email, alerts will work too).
+4. Under **Alerting** — fill in `ALERT_RECIPIENTS` (comma-separated admin emails) and accept the default `1h` / `4h` re-page intervals. Click *Save*.
+5. Click **⚡ Apply alerting config to Alertmanager**. The button generates `alertmanager.yml` from the same SMTP credentials you set above, writes it to the shared docker volume, hot-reloads Alertmanager, and surfaces the verbatim result inline.
+
+**Legacy cleanup (optional):** the v1.8.x host file
+`/opt/OSCAR/OSCAR_Deploy/alertmanager/alertmanager.yml` is no longer
+mounted or used. Safe to delete after the rollover.
 
 ### 14.4 Verifying the email path
 
@@ -801,9 +811,12 @@ Or use the silences UI inside Grafana → Alerting → Silences.
 
 ### 14.6 Keeping the admin recipient list in sync
 
-Two patterns work:
+**Since v1.9.0** — edit `ALERT_RECIPIENTS` directly in the Server Config tab,
+click *Save*, click *Apply alerting config*. Done in 10 seconds, audit-logged,
+no VPS access needed. Two complementary patterns:
 
-- **(Recommended) Single distribution list** — point Alertmanager `to:` at e.g. `oscar-admins@uic.org` and manage membership in your mail provider. Lets you add/remove humans without touching VPS files.
-- **Explicit list** — comma-separated emails in `alertmanager.yml`. Edit the file + `kill -HUP 1` after every admin add/remove. Higher friction but fully self-contained.
-
-Future enhancement (tracked in backlog): a small endpoint that regenerates `alertmanager.yml` from OSCAR's `users` table on demand.
+- **Distribution list** (lowest maintenance) — set `ALERT_RECIPIENTS` to a single
+  list like `oscar-admins@uic.org` and manage membership in your mail provider.
+- **Explicit list** — comma- or newline-separated emails. Add / remove members
+  from the UI. Each save is audit-logged so the trail of who-added-whom is
+  recoverable.
