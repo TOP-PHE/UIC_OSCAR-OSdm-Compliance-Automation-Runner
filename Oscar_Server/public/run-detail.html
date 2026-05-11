@@ -168,8 +168,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 </div>
 
 <script>
-const token = localStorage.getItem('oscar_token');
-if (!token) window.location.href = '/';
+const token = localStorage.getItem('oscar_token') || '';
+if (!localStorage.getItem('oscar_user')) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 // logout() provided by nav.js

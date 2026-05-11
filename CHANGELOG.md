@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.8.1] — 2026-05-11
+
+Hotfix — clears a redirect loop ("blinking welcome page") for users whose
+session is cookie-only.
+
+### Fixed
+- **Auth guard redirect loop on cookie-only sessions** — seven web pages
+  (welcome, admin, compare, dashboard, profile, run-detail, run) still
+  asserted the presence of `localStorage.oscar_token` to consider the
+  user logged in. The auth model migrated to an httpOnly `oscar_session`
+  cookie a while back; the verify-email and forgot-password flows
+  correctly write `oscar_user` to localStorage but no longer write
+  `oscar_token`. Result: any freshly-verified user landing on those
+  pages bounced to `/`, `/` saw `oscar_user` and bounced back to
+  `/welcome.html`, repeating indefinitely (visible "blinking").
+  Guards now use `oscar_user` as the client-side session-presence proxy;
+  `oscar_token` is still read for legacy Bearer-header fetches when
+  present. Existing administrator sessions were not affected because
+  they retained `oscar_token` from before the cookie migration.
+
+### Migration
+None — Watchtower picks up the new image and the fix is live the moment
+the page reloads. No DB change, no compose change, no config edit.
+
+---
+
 ## [server-v1.8.0] — 2026-05-10
 
 Minor bump — operational watchdog and email alerting layer on top of the

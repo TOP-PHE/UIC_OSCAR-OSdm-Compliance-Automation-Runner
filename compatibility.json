@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.23",
+  "current_release": "2026.24",
   "releases": [
+    {
+      "release": "2026.24",
+      "date": "2026-05-11",
+      "server": "1.8.1",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(auth): redirect-loop on welcome.html (and 6 other pages) for users whose session is cookie-only — typically anyone freshly created via the email-verification flow. The auth guards still checked localStorage.oscar_token (the legacy bearer-token model), but the verify-email flow only writes the httpOnly cookie + oscar_user — leaving oscar_token absent and bouncing the page back to / which bounced back to /welcome.html (visible 'blinking' on the welcome banner). Guards now use oscar_user as the session presence proxy; oscar_token is preserved for legacy Bearer-header fetches when present. Affects welcome.html, admin.html, compare.html, dashboard.html, profile.html, run-detail.html, run.html.",
+        "Existing administrator sessions were unaffected because they retained oscar_token in localStorage from before the cookie migration."
+      ]
+    },
     {
       "release": "2026.23",
       "date": "2026-05-10",

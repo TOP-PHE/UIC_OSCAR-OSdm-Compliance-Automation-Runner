@@ -220,8 +220,8 @@ input[type=password]::placeholder{letter-spacing:2px}
 </div>
 
 <script>
-const token = localStorage.getItem('oscar_token');
-if (!token) window.location.href = '/';
+const token = localStorage.getItem('oscar_token') || '';
+if (!localStorage.getItem('oscar_user')) window.location.href = '/';
 const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 
