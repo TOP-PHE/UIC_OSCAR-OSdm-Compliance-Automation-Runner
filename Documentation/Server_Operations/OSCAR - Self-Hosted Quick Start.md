@@ -271,14 +271,17 @@ browser yet. The bootstrap token from Step 2 unlocks one-time admin
 creation.
 
 ```bash
-# Create your first admin user (replace email and password)
+# Create your first admin user (replace email and password).
+# Note: the bootstrap token goes in the X-Platform-Bootstrap-Token HEADER,
+# not in the JSON body. Password policy: minimum 12 chars, must include
+# uppercase, lowercase, and a digit.
 curl -X POST https://oscar.example.org/v1/auth/bootstrap/platform-user \
   -H 'Content-Type: application/json' \
+  -H 'X-Platform-Bootstrap-Token: PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE' \
   -d '{
-    "bootstrap_token": "PASTE_PLATFORM_BOOTSTRAP_TOKEN_HERE",
-    "email":           "you@example.org",
-    "password":        "ChooseAStrongPasswordHere123!",
-    "role":            "administrator"
+    "email":    "you@example.org",
+    "password": "ChooseAStrongPasswordHere123!",
+    "role":     "administrator"
   }'
 ```
 
