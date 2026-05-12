@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.25",
+  "current_release": "2026.26",
   "releases": [
+    {
+      "release": "2026.26",
+      "date": "2026-05-11",
+      "server": "1.9.1",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(ux #19): Test Config save confirmation is now a fixed-position toast pinned to the top of the viewport regardless of scroll. Previously the in-flow message rendered at the very top of the page so an admin saving from the bottom of the long Test Config form had no visual confirmation that the save succeeded.",
+        "feat(ux #18): dashboard batch summary replaces the single 'X/Y done' pill with three side-by-side counters (✓ passed, ✗ failed, ⌛ running) so failures are immediately visible at a glance instead of being hidden behind a deceptive 'progress' wording.",
+        "ops: GitHub Action re-renders the Self-Hosted Quick Start PDF whenever its markdown source changes on main and commits the regenerated file back. Eliminates manual PDF regeneration.",
+        "Closes #14 (no code change — root cause was misconfigured SMTP_FROM, hardened in v1.9.0 with field renaming + soft-validation warnings + Send test email button)."
+      ]
+    },
     {
       "release": "2026.25",
       "date": "2026-05-11",

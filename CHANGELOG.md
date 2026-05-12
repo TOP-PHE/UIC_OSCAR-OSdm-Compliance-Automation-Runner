@@ -14,6 +14,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.9.1] — 2026-05-11
+
+Patch release — UX polish bundling three small wins from the open-issue
+backlog plus a docs-pipeline improvement.
+
+### Fixed
+- **Issue #19** — *Test Config save confirmation invisible without
+  scrolling.* The `.msg` element rendered at the top of the page in
+  normal document flow; admins saving from the bottom of the long Test
+  Config form had no visible feedback that the save succeeded. Switched
+  to a fixed-position toast pinned to the top-centre of the viewport
+  regardless of scroll, with a slide-in animation. Standard 5-second
+  auto-dismiss preserved. Affects every flow that calls `showMsg()` in
+  `scenarios.html` (framework save, scenario save, train save, datafile
+  upload, deletion confirmations, …).
+
+### Added
+- **Issue #18** — *Dashboard batch summary split into per-outcome
+  counters.* The previous "X/Y done" pill was misread by users as
+  "nothing has finished" when in fact every scenario had failed (the
+  word "done" implied success). Replaced with up to three pills
+  side-by-side: green `✓ N` (passed), red `✗ N` (failed), amber `⌛ N`
+  (still running). Empty batches show a neutral em-dash. Failures are
+  now immediately legible at a glance without parsing a fraction.
+- **`render-docs-pdf.yml` workflow** — re-renders the Self-Hosted Quick
+  Start PDF whenever its markdown source changes on `main`, commits the
+  regenerated file back. Uses Python 3.12 + reportlab + xhtml2pdf, same
+  toolchain that produced the initial PDF. Loop-safe (skips itself on
+  github-actions[bot] commits).
+
+### Closed
+- **Issue #14** — *Requesting a new user does not work, email never
+  received.* Closed with comment: root cause was misconfigured
+  `SMTP_FROM` (relay-internal authentication identity used as the
+  display sender). v1.9.0 already hardened this with field renaming +
+  soft-validation warnings + Send test email button — no further code
+  change needed.
+
+### Migration
+None — pull v1.9.1, hard-refresh the browser (Ctrl+Shift+R) to bust
+cached HTML/CSS, and the new pills + sticky toast are live. No DB
+change, no compose change, no operator action.
+
+---
+
 ## [server-v1.9.0] — 2026-05-11
 
 Minor bump — closes three operational pain points discovered during v1.8.x

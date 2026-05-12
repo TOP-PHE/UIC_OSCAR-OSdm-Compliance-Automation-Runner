@@ -37,9 +37,36 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .btn:disabled{opacity:.45;cursor:not-allowed}
 
 /* ── Messages ───────────────────────────────────────────────────────────── */
-.msg{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:14px;display:none}
+/* Issue #19 — Test Config save toast must be visible from any scroll
+   position. The page is long (framework + resources + scenarios + actions),
+   and Save & Apply often runs after the user has scrolled half-way down to
+   edit a scenario; the in-flow .msg used to render at the very top and was
+   invisible without manually scrolling back up. Switched to a fixed-position
+   toast that pins to the top-centre of the viewport regardless of scroll.
+   z-index 9999 so it floats over the sticky header / wizard panels. */
+.msg{
+  position:fixed;
+  top:88px;                  /* sits just below the OSCAR top banner */
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9999;
+  min-width:340px;
+  max-width:min(90vw, 720px);
+  padding:12px 18px;
+  border-radius:6px;
+  font-size:13px;
+  font-weight:600;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);
+  text-align:center;
+  display:none;
+  animation: oscar-toast-slide-in .25s ease-out;
+}
 .msg-ok {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
 .msg-err{background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
+@keyframes oscar-toast-slide-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to   { opacity: 1; transform: translate(-50%,   0  ); }
+}
 
 /* ── Scenario selector list ─────────────────────────────────────────────── */
 .scenario-selector{display:flex;flex-direction:column;gap:0}
