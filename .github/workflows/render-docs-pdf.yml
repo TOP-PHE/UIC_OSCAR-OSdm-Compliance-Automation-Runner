@@ -1,0 +1,145 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+# Licensed under the Apache License, Version 2.0
+#
+# Auto-renders the operator-facing PDFs from their markdown sources whenever
+# a maintainer pushes an edit to one of the listed .md files. Commits the
+# regenerated PDF back to the branch so the downloadable artifact never
+# drifts from the source.
+#
+# Currently watches: Documentation/Server_Operations/OSCAR - Self-Hosted Quick Start.md
+# To add another doc: add the .md path under `paths:` AND in the `for` loop.
+#
+# The workflow is a no-op on PRs from forks (it can't push back), and skips
+# itself on commits authored by the action user (avoids infinite loop).
+
+name: Render docs PDFs
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Documentation/Server_Operations/OSCAR - Self-Hosted Quick Start.md'
+      - '.github/workflows/render-docs-pdf.yml'
+  workflow_dispatch:   # manual run from the Actions tab
+
+permissions:
+  contents: write      # needed to commit the regenerated PDF back
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    # Skip when the action itself created the commit — otherwise the push
+    # of the new PDF would re-trigger this workflow indefinitely.
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need write-token for the commit-back step
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install renderer dependencies
+        run: pip install --quiet markdown reportlab pygments xhtml2pdf
+
+      - name: Render PDFs from markdown
+        run: |
+          python <<'PY'
+          import re, sys
+          from pathlib import Path
+          import markdown
+          from xhtml2pdf import pisa
+
+          DOCS = [
+              "Documentation/Server_Operations/OSCAR - Self-Hosted Quick Start.md",
+          ]
+          EMOJI_STRIP = {
+              "📊": "", "🔍": "", "📝": "", "🛡️": "", "🏢": "", "📋": "", "📡": "",
+              "⭐": "", "🚀": "", "▶️": "", "⚙️": "", "🧪": "", "⚖️": "", "👥": "",
+              "📈": "", "📧": "", "💡": "", "🌐": "", "🔒": "", "🔔": "", "⚡": "",
+              "✅": "[OK]", "❌": "[X]", "⚠️": "[!]", "→": "->", "←": "<-",
+              "—": "-", "–": "-", "·": "-", "🤖": "",
+          }
+          CSS = """
+          @page { size: A4; margin: 2cm; @frame footer_frame {
+            -pdf-frame-content: footer_content; left:2cm; right:2cm;
+            top:27.7cm; height:1cm; } }
+          body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt;
+                 line-height: 1.45; color: #222; }
+          h1 { font-size: 22pt; color: #0090D4;
+               border-bottom: 2px solid #0090D4; padding-bottom: 4pt;
+               margin-top: 16pt; margin-bottom: 12pt; }
+          h2 { font-size: 15pt; color: #1a2e40;
+               border-bottom: 1px solid #cfd8dc; padding-bottom: 3pt;
+               margin-top: 18pt; margin-bottom: 8pt; }
+          h3 { font-size: 12pt; color: #1a2e40; margin-top: 12pt; margin-bottom: 6pt; }
+          h4 { font-size: 11pt; color: #455a64; margin-top: 10pt; margin-bottom: 4pt; }
+          p { margin: 4pt 0; text-align: justify; }
+          a { color: #0090D4; text-decoration: none; }
+          strong { color: #1a2e40; }
+          hr { border: 0; border-top: 1px dashed #cfd8dc; margin: 16pt 0; }
+          blockquote { border-left: 3px solid #0090D4; margin: 6pt 0;
+                       padding: 4pt 10pt; background-color: #f5fcff;
+                       color: #455a64; font-style: italic; }
+          code { font-family: Courier, monospace; font-size: 9pt;
+                 background-color: #f4f4f4; padding: 1pt 3pt; color: #c2185b; }
+          pre { font-family: Courier, monospace; font-size: 8.5pt;
+                background-color: #f7f7f7; border: 1px solid #e0e0e0;
+                padding: 6pt 8pt; margin: 6pt 0; }
+          pre code { background: transparent; padding: 0; color: #222; }
+          table { border-collapse: collapse; margin: 8pt 0;
+                  width: 100%; font-size: 9pt; }
+          th { background-color: #0090D4; color: white; font-weight: bold;
+               padding: 4pt 6pt; text-align: left; border: 1px solid #0090D4; }
+          td { padding: 4pt 6pt; border: 1px solid #cfd8dc; vertical-align: top; }
+          tr:nth-child(even) td { background-color: #fafbfc; }
+          ul, ol { margin: 4pt 0 4pt 18pt; padding: 0; }
+          li { margin: 2pt 0; }
+          .toc { background-color: #f5fcff; border: 1px solid #b3e0ed;
+                 padding: 10pt 14pt; margin: 12pt 0; font-size: 9.5pt; }
+          """
+          rc = 0
+          for md_path in DOCS:
+              p = Path(md_path)
+              if not p.exists():
+                  print(f"SKIP (missing): {md_path}", file=sys.stderr); continue
+              src = p.read_text(encoding="utf-8")
+              for ch, repl in EMOJI_STRIP.items(): src = src.replace(ch, repl)
+              body = markdown.markdown(
+                  src,
+                  extensions=["extra", "sane_lists", "toc", "codehilite"],
+                  extension_configs={
+                      "codehilite": {"noclasses": True, "pygments_style": "tango"},
+                      "toc":        {"title": "Contents"},
+                  },
+              )
+              footer = (f'<div id="footer_content" '
+                        f'style="font-size:8pt;color:#90a4ae;text-align:center;">'
+                        f'{p.stem} | Page <pdf:pagenumber/> of <pdf:pagecount/></div>')
+              html = (f'<!DOCTYPE html><html><head><meta charset="utf-8">'
+                      f'<style>{CSS}</style></head><body>{footer}{body}</body></html>')
+              out = p.with_suffix(".pdf")
+              with out.open("wb") as f:
+                  res = pisa.CreatePDF(html, dest=f, encoding="utf-8")
+              if res.err:
+                  print(f"FAIL {md_path}: {res.err} errors", file=sys.stderr); rc = 1
+              else:
+                  print(f"OK {md_path} -> {out} ({out.stat().st_size:,} bytes)")
+          sys.exit(rc)
+          PY
+
+      - name: Commit regenerated PDFs (if any changed)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'Documentation/Server_Operations/'*.pdf
+          if git diff --cached --quiet; then
+            echo "No PDF changes — nothing to commit."
+            exit 0
+          fi
+          git commit -m "docs: re-render PDFs from markdown sources [skip ci]"
+          git push
