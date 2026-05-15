@@ -23,23 +23,19 @@
 
 const fs     = require('fs');
 const path   = require('path');
-const os     = require('os');
 const crypto = require('crypto');
+const at     = require('../../src/utils/at-rest');
 
-// CodeQL js/insecure-temporary-file flags creates under os.tmpdir() with any
-// caller-influenced path component. The runtime safety here is fine — we
-// create a per-suite scratch dir with an unguessable name AND mode 0700 —
-// but CodeQL's static analysis treats os.tmpdir() as inherently hostile.
-// We satisfy the rule by setting OSCAR_AT_REST_WRITE_ROOT (which extends the
-// allowed-writes prefix list in at-rest.js) BEFORE requiring the helper.
-// Combined with the random-suffix scratch dir, writes are race-impossible.
-const SCRATCH = path.join(os.tmpdir(), `oscar-at-rest-test-${crypto.randomBytes(16).toString('hex')}`);
+// Scratch dir under the project's data/artifacts/ tree (already in the
+// at-rest helper's allowlist — no env-var extension needed). The
+// per-suite name is a 32-hex random suffix so concurrent test runs
+// don't collide and a symlink hijack is race-impossible. CRITICALLY,
+// no path here comes from os.tmpdir() — that's what was leading CodeQL
+// to flag every write as insecure-temporary-file, even with mode 0700.
+const SCRATCH = path.resolve(__dirname, '../../data/artifacts',
+                              `_test_${crypto.randomBytes(16).toString('hex')}`);
 fs.mkdirSync(SCRATCH, { mode: 0o700, recursive: true });
-process.env.OSCAR_AT_REST_WRITE_ROOT = SCRATCH;
 
-const at = require('../../src/utils/at-rest');
-
-// lgtm[js/insecure-temporary-file] — random per-suite dir, 0700, allowlist-gated.
 const TMP = (name) => path.join(SCRATCH, name);
 
 afterAll(() => {
@@ -141,8 +137,6 @@ describe('encryptToFile / decryptFromFile (sync)', () => {
   });
   test('decryptFromFile passes through legacy plaintext file unchanged', () => {
     const f = TMP('legacy.bin');
-    // Random per-suite scratch dir (mode 0700), no caller-influenced naming.
-    // lgtm[js/insecure-temporary-file]
     fs.writeFileSync(f, 'old plaintext file');
     expect(at.decryptFromFile(f).toString('utf8')).toBe('old plaintext file');
   });
@@ -168,7 +162,6 @@ describe('copyAndEncryptFileAsync', () => {
   test('copies plaintext source to encrypted destination, leaves source untouched', async () => {
     const src = TMP('copysrc.txt');
     const dst = TMP('copydst.bin');
-    // Random per-suite scratch dir. lgtm[js/insecure-temporary-file]
     fs.writeFileSync(src, 'source content stays plaintext');
     await at.copyAndEncryptFileAsync(src, dst);
     // Source unchanged

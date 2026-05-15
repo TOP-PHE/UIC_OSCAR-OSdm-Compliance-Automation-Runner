@@ -129,20 +129,18 @@ function _tmpSuffix() {
  * Allowed prefixes (computed once at module load):
  *   <repo>/data/artifacts/
  *   <repo>/data/datafiles/
- * Operators running with a custom data root can extend via the
- * OSCAR_AT_REST_WRITE_ROOT env var (used in tests).
+ *
+ * No env-var extension here on purpose: any user-controllable input that
+ * widens this list (e.g. via process.env) becomes a CodeQL taint source.
+ * Tests use a sub-path under data/artifacts (already in the allowlist)
+ * with a random per-suite component, so they don't need an extension.
  */
 const path = require('path');
 const _DATA_ROOT = path.resolve(__dirname, '../../data');
-const _ALLOWED_WRITE_DIRS = (() => {
-  const env = (process.env.OSCAR_AT_REST_WRITE_ROOT || '').trim();
-  const extra = env ? [path.resolve(env)] : [];
-  return [
-    path.join(_DATA_ROOT, 'artifacts'),
-    path.join(_DATA_ROOT, 'datafiles'),
-    ...extra,
-  ];
-})();
+const _ALLOWED_WRITE_DIRS = [
+  path.join(_DATA_ROOT, 'artifacts'),
+  path.join(_DATA_ROOT, 'datafiles'),
+];
 
 function _assertWritablePath(dstPath) {
   const resolved = path.resolve(dstPath);
@@ -168,10 +166,6 @@ function encryptToFile(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
-  // The temp path is _assertWritablePath-gated AND carries 128 bits of
-  // crypto randomness in the suffix, so a symlink hijack is race-impossible.
-  // CodeQL's heuristic flags the ".tmp." literal regardless — suppress.
-  // lgtm[js/insecure-temporary-file]
   fs.writeFileSync(tmp, enc, { mode: 0o640 });
   fs.renameSync(tmp, safe);
 }
@@ -194,7 +188,6 @@ async function encryptToFileAsync(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
-  // See encryptToFile for safety analysis. lgtm[js/insecure-temporary-file]
   await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
   await fs.promises.rename(tmp, safe);
 }
