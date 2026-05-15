@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.29",
+  "current_release": "2026.30",
   "releases": [
+    {
+      "release": "2026.30",
+      "date": "2026-05-15",
+      "server": "1.11.2",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(security #60): vendor data sovereignty Phase 3 — operational policy. Closes the trilogy. Phase 1 was application-level access control (v1.10.0), Phase 2 at-rest encryption (v1.11.0+.1), Phase 3 is the organisational policy that defines who has root SSH on production, how the four long-lived secrets are managed and rotated, backup encryption posture, the SEV-1 incident playbook, and the procedure when a vendor reports data-leak suspicion.",
+        "New file: Documentation/Server_Operations/OSCAR - Security Operations Policy.md. Includes a worked example using this morning's v19 migration outage as a concrete SEV-1 case study with timeline + action items.",
+        "Admin Guide § 15.5 updated — Phase 3 marked complete, cross-reference to the policy doc.",
+        "Operator action required: none. Docs-only release; OSCAR image unchanged in substance (just the version bump). Watchtower's next pull is a no-op."
+      ]
+    },
     {
       "release": "2026.29",
       "date": "2026-05-15",
