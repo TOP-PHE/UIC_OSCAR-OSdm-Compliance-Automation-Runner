@@ -240,17 +240,27 @@ app.get('/data/:filename', (req, res) => {
     if (user.companyId !== company.id) return res.status(403).send('Forbidden');
   }
 
-  // Stream the file.
+  // Resolve, traversal-guard, decrypt, send.
+  // The datafile is encrypted at rest (Phase 2 of issue #60). Bruno on the
+  // loopback path receives plaintext over the localhost connection — at the
+  // application layer it is identical to legacy plaintext on disk; the
+  // protection is against sysadmins reading the raw file.
   const filePath = path.resolve(DATAFILES_DIR, filename);
-  // Defence in depth — confirm the resolved path is still under DATAFILES_DIR
-  // (catches any sanitiser miss; the regex already prevents traversal).
   if (!filePath.startsWith(DATAFILES_DIR + path.sep)) {
     return res.status(400).send('Bad request');
   }
+  const fs = require('fs');
+  if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+  let plaintext;
+  try {
+    const { decryptFromFile } = require('./utils/at-rest');
+    plaintext = decryptFromFile(filePath);
+  } catch (err) {
+    return res.status(500).send('Decryption failed: ' + err.message);
+  }
   res.setHeader('Content-Type', 'application/json');
-  return require('fs').createReadStream(filePath)
-    .on('error', () => res.status(404).send('Not found'))
-    .pipe(res);
+  res.setHeader('Content-Length', String(plaintext.length));
+  return res.end(plaintext);
 });
 
 // ── Serve run artifacts (HTML reports, JSON results) ─────────────────────────
@@ -294,10 +304,28 @@ app.get('/artifacts/:runId/:filename', (req, res) => {
   const fs = require('fs');
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
 
+  // Phase 2 of issue #60 (v1.11.0): files are encrypted at rest with the
+  // OSCAR1 envelope (AES-256-GCM). decryptFromFile() handles both the new
+  // encrypted format AND legacy plaintext (no MAGIC header → returned
+  // as-is) so artifacts written before v1.11 keep working without forced
+  // re-encryption. The whole-file approach is fine because artifacts are
+  // bounded (HTML reports < 1 MB) — small enough to buffer in memory.
+  const { decryptFromFile } = require('./utils/at-rest');
+  let plaintext;
+  try {
+    plaintext = decryptFromFile(filePath);
+  } catch (err) {
+    // AES-GCM tag failure is a security alert — likely tampering or key
+    // mismatch. Surface a 500 (not 404) so an operator notices.
+    require('./utils/logger').error({ err: err.message, runId, filename }, 'artifact decrypt failed');
+    return res.status(500).send('Artifact decryption failed');
+  }
+
   const isHtml = filename.toLowerCase().endsWith('.html');
   res.setHeader('Content-Type', isHtml ? 'text/html; charset=utf-8' : 'application/json');
   res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-  return fs.createReadStream(filePath).pipe(res);
+  res.setHeader('Content-Length', String(plaintext.length));
+  return res.end(plaintext);
 });
 
 // ── Prometheus scrape endpoint ────────────────────────────────────────────────

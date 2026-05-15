@@ -14,6 +14,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.0] — 2026-05-15
+
+Minor bump — **vendor data sovereignty Phase 2 (issue #60)**:
+**at-rest encryption**. Closes the gap Phase 1 deferred: the same SSH-
+equipped sysadmin who could not browse vendor data through the UI could
+still `sudo cat /opt/OSCAR/.../data/oscar.db | strings` and read every
+log line, HTTP body, scenario, and test framework in plaintext. After
+v1.11.0 the bytes on disk are AES-256-GCM ciphertext envelopes; the
+plaintext exists only inside the OSCAR process while it runs.
+
+This is **Phase 2 of three**:
+- ✅ Phase 1 (v1.10.0) — application-level access control + per-run share
+- ✅ Phase 2 (this) — at-rest encryption
+- ⏳ Phase 3 — operational policy (who has root SSH on production)
+
+### Added
+- **`src/utils/at-rest.js`** — file-level AES-256-GCM helper. Uses the
+  same `ENCRYPTION_KEY` envelope OSCAR already uses for credentials.
+  Format: `OSCAR1` magic (6 B) + IV (12 B) + tag (16 B) + ciphertext.
+  Sync + async variants for both buffers and files. 22 unit tests
+  cover round-trip, magic-header detection, legacy plaintext fall-
+  through, tampering rejection, atomic temp+rename writes.
+- **`db.colEncrypt()` / `db.colDecrypt()`** — column-level wrappers
+  around the existing `encrypt()`/`decrypt()` with an `enc:v1:` prefix
+  marker. Mixed-state safe: any row without the prefix is treated as
+  legacy plaintext and returned unchanged.
+
+### Changed (security)
+The following **content** columns and files are now encrypted at rest.
+Schema, structural columns (status, timestamps, http_method, http_status,
+suite_name, etc.) remain plaintext so SQL filtering / sorting / counting
+keeps working without per-row decrypt cost.
+
+| What | Where | Encrypted? |
+|---|---|---|
+| HTML report files | `data/artifacts/<runId>/report*.html` | ✅ new |
+| JSON results files | `data/artifacts/<runId>/.bru_results.json` | ✅ new |
+| Company datafiles | `data/datafiles/<slug>-datafile.json` | ✅ new |
+| Log line content | `run_events.message` | ✅ new |
+| HTTP request body | `run_requests.request_body` | ✅ new |
+| HTTP request headers | `run_requests.request_headers` | ✅ new |
+| HTTP response body | `run_requests.response_body` | ✅ new |
+| HTTP response headers | `run_requests.response_headers` | ✅ new |
+| Per-call context JSON | `run_requests.context` | ✅ new |
+| Test framework JSON | `test_frameworks.config` | ✅ new |
+| Test resources JSON | `test_resources.data` | ✅ new |
+| Per-tester credentials | `users.*_enc` columns | ✅ already (v12) |
+| Cached OAuth tokens | `users.cached_token_enc` | ✅ already (v11) |
+
+### Migration
+Schema migration **v19** runs automatically on first boot and encrypts
+existing plaintext rows in the columns above. Per-table transactions;
+rollback on failure; logs row counts. Idempotent: rows already carrying
+the `enc:v1:` prefix are skipped on subsequent runs.
+
+**Files on disk are NOT touched by the DB migration.** Existing artifact
+HTML and datafile JSON files remain plaintext until they're re-written
+by a new run / upload — at which point they get encrypted. This is fine
+because the read helpers transparently handle both formats. An optional
+one-time bulk-encrypt operator script lives at
+`OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh` — strictly cleanup,
+not required.
+
+### Fixed (latent bug — incidental)
+- `/v1/reports/requests/:id/messages` queried four non-existent columns
+  (`req_body`, `req_headers`, `resp_body`, `resp_headers`) — the real
+  names are `request_*` / `response_*`. The HTTP message-chain viewer
+  in Report Builder was silently empty. Fixed alongside the encryption
+  work since both touch the same query.
+
+### Search behaviour change
+The `?search=...` filter on `GET /v1/runs/:id/logs` previously used
+SQL `LIKE` against the message column. Now that `run_events.message`
+is encrypted, server-side LIKE no longer matches ciphertext — the
+endpoint fetches a wider window (5×, capped at 5000 rows) and filters
+post-decrypt in Node. Query time is microseconds slower for the
+post-decrypt scan; user-visible behaviour is unchanged.
+
+### Threat coverage matrix (updated)
+
+| Threat | v1.10 | v1.11 |
+|---|---|---|
+| Admin browsing UI sees vendor reports | ✅ | ✅ |
+| Anonymous artifact download via UUID guess | ✅ | ✅ |
+| Sysadmin `sudo cat oscar.db \| strings` reveals log + HTTP content | ❌ | ✅ |
+| Sysadmin `sudo cat report.html` reveals vendor results | ❌ | ✅ |
+| Sysadmin `sudo cat datafile.json` reveals scenarios | ❌ | ✅ |
+| Backup tape leak (cold storage) | ❌ | ✅ |
+| Sysadmin attaches debugger to running OSCAR process | ❌ | ❌ Phase 3 |
+
+### Migration after Watchtower rolls over to v1.11.0
+**No operator action required.**
+- v19 migration runs on first boot
+- Existing files remain readable; new writes are encrypted
+- All endpoints continue to work — the read helpers are transparent
+- The optional `encrypt-existing-artifacts.sh` is operator's choice
+
+---
+
 ## [server-v1.10.0] — 2026-05-15
 
 Minor bump — **vendor data sovereignty (Phase 1, issue #60)**. Restructures

@@ -98,6 +98,11 @@ function fileHash(filePath) {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
+// At-rest encryption for company datafiles (Phase 2 of issue #60, v1.11.0).
+// Helpers used by the upload / JSON-save / serve paths below to keep the
+// datafile encrypted on disk while preserving plaintext-content hashing.
+const { encryptToFileAsync, decryptFromFileAsync } = require('../../utils/at-rest');
+
 // ── GET /v1/company ───────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   const targetCompanyId = resolveCompanyScope(req, res);
@@ -200,7 +205,7 @@ function requireTestManager(req, res) {
 }
 
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
-router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), (req, res) => {
+router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), async (req, res) => {
   if (!requireTestManager(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
@@ -213,15 +218,31 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), (re
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No file uploaded. Use field name "datafile".' });
   }
 
-  // Validate it's parseable JSON
+  // Validate it's parseable JSON, hash the plaintext, then encrypt-and-store.
+  // The hash is computed on plaintext so testers can independently verify
+  // the contents (sha256 of the file they uploaded — the encryption is
+  // transparent to them). The file on disk is the OSCAR1 envelope.
+  let plaintext;
   try {
-    JSON.parse(fs.readFileSync(req.file.path, 'utf8'));
+    plaintext = fs.readFileSync(req.file.path);
+    JSON.parse(plaintext.toString('utf8'));
   } catch (_e) {
-    fs.unlinkSync(req.file.path);
+    try { fs.unlinkSync(req.file.path); } catch (_) { /* best effort */ }
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Uploaded file is not valid JSON.' });
   }
 
-  const hash = fileHash(req.file.path);
+  const hash = crypto.createHash('sha256').update(plaintext).digest('hex');
+  // multer stored the upload under a random temp name in the multer dir.
+  // We re-write the encrypted version under the same path so the existing
+  // companies.datafile_path column doesn't need to change shape, and remove
+  // the plaintext temp by overwriting it.
+  try {
+    await encryptToFileAsync(plaintext, req.file.path);
+  } catch (err) {
+    log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
+  }
+
   run(
     `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
     [req.file.path, hash, targetCompanyId]
@@ -231,7 +252,7 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), (re
 
   return res.json({
     filename:   req.file.filename,
-    size:       req.file.size,
+    size:       plaintext.length,
     hash,
     uploaded_at: new Date().toISOString()
   });
@@ -285,10 +306,14 @@ router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
 
   const filePath = path.join(dir, `${company.slug}-datafile.json`);
   const content  = JSON.stringify(body, null, 4);
+  // Hash the plaintext (so the hash matches the user-visible file content),
+  // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
+  // helper guarantees that a crash mid-write leaves the previous datafile
+  // intact (matters because Bruno reads it during runs).
   try {
-    await fs.promises.writeFile(filePath, content, 'utf8');
+    await encryptToFileAsync(content, filePath);
   } catch (err) {
-    log.error({ err, companyId: targetCompanyId }, 'Failed to write datafile to disk');
+    log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
   }
 
@@ -338,7 +363,7 @@ router.delete('/datafile', (req, res) => {
 });
 
 // ── GET /v1/company/datafile ──────────────────────────────────────────────────
-router.get('/datafile', (req, res) => {
+router.get('/datafile', async (req, res) => {
   // Issue #60 (v1.10.0) — datafile is test data. Administrators no longer
   // have read access; certifiers never had a use case here.
   if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
@@ -353,9 +378,19 @@ router.get('/datafile', (req, res) => {
   if (!company || !company.datafile_path || !fs.existsSync(company.datafile_path)) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No data file uploaded yet.' });
   }
+  // Datafile is encrypted at rest (Phase 2 of issue #60). Decrypt before
+  // streaming. The helper handles legacy plaintext files (no MAGIC header)
+  // transparently.
+  let plaintext;
+  try { plaintext = await decryptFromFileAsync(company.datafile_path); }
+  catch (err) {
+    log.error({ err, companyId: targetCompanyId }, 'Failed to decrypt datafile');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Datafile decryption failed.' });
+  }
   res.setHeader('Content-Disposition', `attachment; filename="${company.slug}-datafile.json"`);
   res.setHeader('Content-Type', 'application/json');
-  fs.createReadStream(company.datafile_path).pipe(res);
+  res.setHeader('Content-Length', String(plaintext.length));
+  return res.end(plaintext);
 });
 
 module.exports = router;

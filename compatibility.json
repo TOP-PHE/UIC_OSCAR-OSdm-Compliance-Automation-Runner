@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.27",
+  "current_release": "2026.28",
   "releases": [
+    {
+      "release": "2026.28",
+      "date": "2026-05-15",
+      "server": "1.11.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(security #60): vendor data sovereignty Phase 2 — at-rest encryption. Sensitive content on disk is now AES-256-GCM encrypted using the existing ENCRYPTION_KEY: HTML reports, JSON results, company datafiles, plus the contents of run_events.message, run_requests.{request_body,request_headers,response_body,response_headers,context}, test_frameworks.config, test_resources.data. Anyone running `cat` on the file or `sqlite3 .dump` on the DB sees the OSCAR1 envelope (file) or 'enc:v1:' prefix + base64 ciphertext (column) — never plaintext.",
+        "Backward-compat preserved end-to-end: legacy plaintext files (no OSCAR1 magic header) and legacy plaintext rows (no enc:v1: prefix) remain readable forever — the read helpers detect them and pass through unchanged. The v19 migration backfill is idempotent and can be skipped on small instances if desired.",
+        "Schema migration v19 — encrypts existing plaintext rows in run_events, run_requests, test_frameworks, test_resources. Per-table transactions; rollback on failure; logs row counts. Idempotent: rows already prefixed are skipped on subsequent runs.",
+        "Threat coverage extended: sysadmin running `sudo cat /opt/OSCAR/.../data/oscar.db | strings` now reveals only structural metadata (status, timestamps, http_status, suite_name) — never log content, HTTP traffic, scenarios, or test framework. Same for artifact + datafile reads. The remaining gap is operator-side: a sysadmin attaching a debugger to the running OSCAR process can extract the in-memory key. That's covered by Phase 3 (operational policy doc, no code).",
+        "fix(reports): pre-existing latent bug — the /v1/reports/requests/:id/messages endpoint queried four columns (req_body, req_headers, resp_body, resp_headers) that don't exist in the schema (real names are request_*/response_*). The HTTP message viewer in Report Builder was silently empty. Fixed alongside the encryption work since both touch the same query.",
+        "Operator action required after rollover: none. v19 migration runs automatically on first boot; existing artifacts and datafiles remain readable as-is. New writes are encrypted. An optional one-time backfill script for existing artifact files lives in OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh — purely cleanup, not required."
+      ]
+    },
     {
       "release": "2026.27",
       "date": "2026-05-15",

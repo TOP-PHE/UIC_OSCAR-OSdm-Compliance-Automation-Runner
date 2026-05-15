@@ -904,36 +904,56 @@ admin-override with extra audit logging — not implemented in Phase 1.)
 - 401 auto-logout, sticky session toast, rate limiting
 - CodeQL / SonarCloud / Gitleaks / Trivy on every commit
 
+#### Defended in code (since v1.11.0 — Phase 2 at-rest encryption)
+
+| Threat | Defence |
+|---|---|
+| Sysadmin with `sudo cat /opt/OSCAR/.../data/oscar.db \| strings` | Sensitive content columns (message, bodies, headers, scenarios, framework JSON) are AES-256-GCM ciphertext with `enc:v1:` prefix. Strings command yields only structural metadata (status, timestamps, http_status, suite_name). |
+| Sysadmin `cat /opt/OSCAR/.../data/artifacts/<run>/report.html` | File starts with OSCAR1 magic + IV + tag; payload is ciphertext. `head -c 6` reveals `OSCAR1`, the rest is gibberish. |
+| Sysadmin `cat /opt/OSCAR/.../data/datafiles/<slug>-datafile.json` | Same OSCAR1 envelope — JSON contents unreadable without the key. |
+| Backup / cloud snapshot leaks | Same as live disk — every sensitive byte is ciphertext at rest. |
+
 #### NOT defended in code (operational policy required)
 
 | Threat | Why software cannot stop it | Mitigation |
 |---|---|---|
-| Sysadmin with `sudo cat /opt/OSCAR/.../data/oscar.db` reads everything | The database file is unencrypted; OSCAR needs to read it to function | **Phase 2** of issue #60 — at-rest DB encryption (SQLCipher); plus restrict who has root SSH on production |
-| Sysadmin attaches a debugger to the running OSCAR process | The process must decrypt to use; an attacker with PID-level access can read decrypted memory | Restrict who has root SSH; audit `sudo` usage |
-| Backup / cloud snapshot leaks | Same as above — the file on disk is plaintext until Phase 2 lands | Encrypt backups at rest; restrict backup access |
-| Compromised OSCAR host with read access to artifact directory | `data/artifacts/*.html` files are plaintext on disk | Restrict filesystem permissions (chmod 600, owned by `oscar` uid only — but root still bypasses) |
+| Sysadmin attaches a debugger to the running OSCAR process | The process must decrypt to use; an attacker with PID-level access can extract `ENCRYPTION_KEY` from memory | **Phase 3** — operational policy: restrict who has root SSH; audit `sudo` usage; consider hardware-backed key storage (HSM / SGX) for higher-tier deployments |
+| Sysadmin reads `/proc/<oscar_pid>/environ` | The key is passed via env var; visible to root via `/proc` | Same as above. Phase 3. |
+| Compromised application code that exfiltrates the key | An attacker who can ship code into OSCAR can do anything the process can do | Branch protection, code review, signed commits, restricted CI. Already in place. |
 
-### 15.5 Roadmap — Phase 2 + Phase 3
+### 15.5 Roadmap — Phase 3 (Phase 2 shipped in v1.11.0)
 
-**Phase 2 (next release)** — at-rest encryption:
-- Migrate from `node:sqlite` to SQLCipher or equivalent
-- Encrypt artifact files at write time using the same envelope key
-- Tighten filesystem permissions in the Docker container
+**Phase 2 — at-rest encryption** ✅ shipped in v1.11.0. Uses
+application-level AES-256-GCM rather than SQLCipher, which:
+- Reuses the existing `ENCRYPTION_KEY` infrastructure (no new key to manage)
+- Avoids the Docker build complexity of native SQLCipher
+- Encrypts both DB columns and artifact / datafile files in one design
+- Same protection level: bytes on disk are ciphertext regardless of
+  who opens them. See [`src/utils/at-rest.js`](../../Oscar_Server/src/utils/at-rest.js)
+  + the `colEncrypt`/`colDecrypt` helpers in `db.js`.
+- Keeps structural metadata (status, timestamps, http_status, suite
+  names) in plaintext so SQL queries continue to work without per-row
+  decrypt cost.
 
 **Phase 3 (operational, no code)** — a one-page security policy
 documenting:
 - Who has SSH / sudo on the production VPS
-- Key management for `ENCRYPTION_KEY` and the future SQLCipher key
-- Backup encryption posture
+- Key management for `ENCRYPTION_KEY` (rotation procedure, escrow)
+- Backup encryption posture (the at-rest layer protects backups already,
+  but key management still applies)
 - Incident response procedure if a vendor reports a leak suspicion
 
-The honest truth: software gets you to the trust boundary at the application
-layer. Beyond that, **only operational policy + organisational discipline**
-prevent a privileged sysadmin from reading data they shouldn't.
+The honest truth: software gets you to the trust boundary at the
+application layer + the on-disk layer. Beyond that — a sysadmin
+attaching a debugger to the running OSCAR process and reading
+`ENCRYPTION_KEY` out of memory — **only operational policy +
+organisational discipline** prevent a privileged sysadmin from reading
+data they shouldn't. Phase 3 documents that policy.
 
 ### 15.6 Verifying the model on your deployment
 
-After v1.10.0 deploys, three quick checks confirm the new model is active:
+After v1.10.0 deploys, three quick checks confirm the application-level
+controls are active:
 
 ```bash
 # 1. Authenticated artifact download — should require login.
@@ -951,5 +971,34 @@ curl -s -H "Cookie: oscar_session=<paste>" https://oscar.example.org/v1/runs | p
 #   DELETION_REQUESTED / DELETED_BY_ADMIN status.
 ```
 
-If all three behave as expected, the code-level part of issue #60 is in
-effect. The data-at-rest part is Phase 2.
+After **v1.11.0** deploys, three more checks confirm the at-rest
+encryption is active. Run these from the OSCAR host (need shell access
+to the data directory):
+
+```bash
+# 4. Database — sensitive content should now be enc:v1: prefixed ciphertext.
+sudo sqlite3 /opt/OSCAR/.../data/oscar.db "SELECT message FROM run_events LIMIT 1;"
+# Expected (post-v1.11): "enc:v1:<base64 ciphertext>"
+# (If you see plaintext, either the row pre-dates v1.11 — fine, the read
+#  path handles it — or the v19 migration hasn't run yet.)
+
+# 5. Artifact file — should start with the OSCAR1 magic header.
+sudo head -c 6 /opt/OSCAR/.../data/artifacts/<any-runid>/report.html
+# Expected (for runs after v1.11): "OSCAR1"
+
+# 6. Datafile — same envelope.
+sudo head -c 6 /opt/OSCAR/.../data/datafiles/anyslug-datafile.json
+# Expected (for datafiles uploaded after v1.11): "OSCAR1"
+```
+
+For belt-and-suspenders coverage of files that pre-date v1.11.0, run the
+optional bulk-encrypt script:
+
+```bash
+sudo docker exec -it oscar /opt/OSCAR/OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh
+# Output:  ........... Backfill complete — encrypted: N, already encrypted: M, errors: 0
+```
+
+If all six behave as expected, Phase 1 + Phase 2 of issue #60 are in
+effect. The remaining gap is the running-process memory threat — Phase 3
+(operational policy).

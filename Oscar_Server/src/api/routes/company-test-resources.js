@@ -18,7 +18,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run } = require('../../db/db');
+const { get, all, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
@@ -57,9 +57,11 @@ router.get('/test-resources', (req, res) => {
     'SELECT * FROM test_resources WHERE company_id = ? ORDER BY created_at ASC',
     [targetCompanyId]
   );
+  // Phase 2 of issue #60 (v1.11.0): data column is encrypted at rest.
+  // colDecrypt() handles legacy plaintext rows transparently.
   const resources = rows.map(r => {
     let data = {};
-    try { data = JSON.parse(r.data); } catch (_) {}
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
     return { id: r.id, resource_type: r.resource_type, label: r.label, data, created_at: r.created_at, updated_at: r.updated_at };
   });
   return res.json(resources);
@@ -82,11 +84,11 @@ router.post('/test-resources', (req, res) => {
   const id = uuidv4();
   run(
     `INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, ?, ?, ?)`,
-    [id, targetCompanyId, resource_type, label.trim(), JSON.stringify(data || {})]
+    [id, targetCompanyId, resource_type, label.trim(), colEncrypt(JSON.stringify(data || {}))]
   );
   const saved = get('SELECT * FROM test_resources WHERE id = ?', [id]);
   let parsedData = {};
-  try { parsedData = JSON.parse(saved.data); } catch (_) {}
+  try { parsedData = JSON.parse(colDecrypt(saved.data)); } catch (_) {}
   return res.status(201).json({
     id: saved.id, resource_type: saved.resource_type, label: saved.label,
     data: parsedData, created_at: saved.created_at, updated_at: saved.updated_at
@@ -106,11 +108,11 @@ router.put('/test-resources/:id', (req, res) => {
 
   run(
     `UPDATE test_resources SET label = ?, data = ?, updated_at = datetime('now') WHERE id = ?`,
-    [label ? label.trim() : row.label, JSON.stringify(data || {}), req.params.id]
+    [label ? label.trim() : row.label, colEncrypt(JSON.stringify(data || {})), req.params.id]
   );
   const updated = get('SELECT * FROM test_resources WHERE id = ?', [req.params.id]);
   let parsedData = {};
-  try { parsedData = JSON.parse(updated.data); } catch (_) {}
+  try { parsedData = JSON.parse(colDecrypt(updated.data)); } catch (_) {}
   return res.json({
     id: updated.id, resource_type: updated.resource_type, label: updated.label,
     data: parsedData, created_at: updated.created_at, updated_at: updated.updated_at

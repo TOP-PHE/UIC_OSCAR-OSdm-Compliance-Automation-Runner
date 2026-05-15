@@ -38,7 +38,7 @@ const path    = require('path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run: dbRun, transaction } = require('../../db/db');
+const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
@@ -596,7 +596,13 @@ router.get('/:id/logs', (req, res) => {
 
   const since  = req.query.since_id ? parseInt(req.query.since_id, 10) : 0;
 
-  // Build query with optional filters (backward-compatible)
+  // Build query with optional filters (backward-compatible).
+  // NOTE (Phase 2 of issue #60, v1.11.0): the `message` column is now
+  // encrypted at rest. Server-side LIKE no longer matches encrypted
+  // ciphertext, so when ?search= is present we fetch a wider window and
+  // filter post-decrypt in Node. Metadata filters (category/phase/suite)
+  // remain plaintext and continue to work in SQL — that's the whole point
+  // of leaving structural columns unencrypted.
   let sql = `SELECT id, ts, level, message, category, phase, suite_name, request_name, http_status
              FROM run_events WHERE run_id = ? AND id > ?`;
   const params = [req.params.id, since];
@@ -604,11 +610,24 @@ router.get('/:id/logs', (req, res) => {
   if (req.query.category) { sql += ' AND category = ?'; params.push(req.query.category); }
   if (req.query.phase)    { sql += ' AND phase = ?';    params.push(req.query.phase); }
   if (req.query.suite)    { sql += ' AND suite_name = ?'; params.push(req.query.suite); }
-  if (req.query.search)   { sql += ' AND message LIKE ?'; params.push(`%${req.query.search}%`); }
 
-  sql += ' ORDER BY id ASC LIMIT 500';
-  const events = all(sql, params);
-  return res.json({ run_id: req.params.id, status: runRow.status, events });
+  // When searching, pull a wider window (5×) and post-filter in Node after
+  // decrypting message. Caps the fetch at 5000 rows so a runaway log
+  // doesn't blow up memory.
+  const wantSearch = !!req.query.search;
+  sql += wantSearch ? ' ORDER BY id ASC LIMIT 5000' : ' ORDER BY id ASC LIMIT 500';
+
+  const rows = all(sql, params);
+  // Transparent decrypt of the message column (handles legacy plaintext).
+  const events = rows.map(r => ({ ...r, message: colDecrypt(r.message) }));
+
+  let filtered = events;
+  if (wantSearch) {
+    const needle = String(req.query.search).toLowerCase();
+    filtered = events.filter(e => String(e.message || '').toLowerCase().includes(needle)).slice(0, 500);
+  }
+
+  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered });
 });
 
 // ── GET /v1/runs/:id/assertions ──────────────────────────────────────────────
@@ -627,7 +646,11 @@ router.get('/:id/assertions', (req, res) => {
   suiteSql += ' ORDER BY id ASC';
   const suites = all(suiteSql, suiteParams);
 
-  // Build nested response
+  // Build nested response.
+  // Phase 2 of issue #60 (v1.11.0): HTTP body + header columns are
+  // encrypted at rest. colDecrypt() handles both new (encrypted) and
+  // legacy plaintext rows transparently — we apply it to every output
+  // request row so the UI/Report Builder gets readable content.
   const result = suites.map(s => {
     const requests = all('SELECT * FROM run_requests WHERE suite_id = ? ORDER BY id ASC', [s.id]);
 
@@ -640,7 +663,15 @@ router.get('/:id/assertions', (req, res) => {
       if (domain) { assertSql += ' AND domain = ?'; assertParams.push(domain); }
       assertSql += ' ORDER BY id ASC';
       const assertions = all(assertSql, assertParams);
-      return { ...r, assertions };
+      return {
+        ...r,
+        request_body:     colDecrypt(r.request_body),
+        request_headers:  colDecrypt(r.request_headers),
+        response_body:    colDecrypt(r.response_body),
+        response_headers: colDecrypt(r.response_headers),
+        context:          colDecrypt(r.context),
+        assertions
+      };
     });
 
     return { ...s, requests: enrichedRequests };
@@ -758,6 +789,15 @@ router.get('/:id/requests/:reqId', (req, res) => {
   );
   if (!reqRow) return res.status(404).json({ status: 404, title: 'Request not found.' });
 
+  // Decrypt the at-rest-encrypted body + header + context columns before
+  // shaping the response (Phase 2 of issue #60). Legacy plaintext rows
+  // pass through colDecrypt() unchanged.
+  reqRow.request_body     = colDecrypt(reqRow.request_body);
+  reqRow.request_headers  = colDecrypt(reqRow.request_headers);
+  reqRow.response_body    = colDecrypt(reqRow.response_body);
+  reqRow.response_headers = colDecrypt(reqRow.response_headers);
+  reqRow.context          = colDecrypt(reqRow.context);
+
   // Parent (if any) — compact summary
   let parent = null;
   if (reqRow.parent_request_id) {
@@ -814,10 +854,21 @@ router.get('/:id/artifacts/:aid', (req, res) => {
   }
   if (!fs.existsSync(safePath)) return res.status(404).json({ status: 404, title: 'Artifact file missing on server.' });
 
+  // Phase 2 of issue #60 (v1.11.0) — artifacts are encrypted at rest. The
+  // helper handles both new (encrypted) and legacy plaintext files
+  // transparently via the OSCAR1 magic-header check.
+  const { decryptFromFile } = require('../../utils/at-rest');
+  let plaintext;
+  try { plaintext = decryptFromFile(safePath); }
+  catch (err) {
+    return res.status(500).json({ status: 500, title: 'Decryption failed', detail: err.message });
+  }
+
   const mime = artifact.type === 'html_report' ? 'text/html' : 'application/json';
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Disposition', `inline; filename="${artifact.filename}"`);
-  fs.createReadStream(safePath).pipe(res);
+  res.setHeader('Content-Length', String(plaintext.length));
+  return res.end(plaintext);
 });
 
 // ── POST /v1/runs/:id/share — share THIS run with certifiers (v1.10.0) ──────

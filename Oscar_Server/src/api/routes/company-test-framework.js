@@ -17,7 +17,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, run } = require('../../db/db');
+const { get, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
@@ -56,8 +56,10 @@ router.get('/test-framework', (req, res) => {
   const row = get('SELECT * FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
   if (!row) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No test framework configured yet.' });
 
+  // Phase 2 of issue #60 (v1.11.0): config is encrypted at rest. Decrypt
+  // before parsing. Legacy plaintext rows pass through colDecrypt() as-is.
   let config = {};
-  try { config = JSON.parse(row.config); } catch (_) {}
+  try { config = JSON.parse(colDecrypt(row.config)); } catch (_) {}
   return res.json({ id: row.id, config, created_at: row.created_at, updated_at: row.updated_at });
 });
 
@@ -72,9 +74,10 @@ router.put('/test-framework', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Body must be a JSON object.' });
   }
 
-  // Accept either { config: {...} } (from wizard) or a bare config object
+  // Accept either { config: {...} } (from wizard) or a bare config object.
+  // Phase 2 of issue #60: encrypt the config JSON at rest.
   const configPayload = (body.config && typeof body.config === 'object') ? body.config : body;
-  const configJson = JSON.stringify(configPayload);
+  const configJson = colEncrypt(JSON.stringify(configPayload));
   const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
 
   if (existing) {
