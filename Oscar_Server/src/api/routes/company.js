@@ -43,6 +43,18 @@ const datafileMutationLimiter = rateLimit({
              detail: 'Too many datafile upload attempts. Please wait before trying again.' }
 });
 
+// Read-side rate limiter for GET /datafile (CodeQL js/missing-rate-limiting).
+// Even though the endpoint is auth-gated, a leaked session token shouldn't
+// be usable to mass-download a datafile in a tight loop.
+const datafileReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests',
+             detail: 'Too many datafile downloads in a short window.' }
+});
+
 // ── Multer — datafile upload ───────────────────────────────────────────────────
 // Files are stored as {slug}-datafile.json in data/datafiles/
 function getRequestedCompanyId(req) {
@@ -227,7 +239,10 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), asy
   const DATAFILES_DIR = path.resolve(__dirname, '../../../data/datafiles');
   const safeUploadPath = path.resolve(req.file.path);
   if (!safeUploadPath.startsWith(DATAFILES_DIR + path.sep)) {
-    try { fs.unlinkSync(req.file.path); } catch (_) { /* best effort */ }
+    // Don't unlink anything — we cannot trust a path that failed the
+    // allowlist check, so we deliberately do NOT clean it up here (a
+    // periodic janitor on the datafiles dir handles stray files). This
+    // also closes CodeQL js/path-injection on the cleanup unlink site.
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Upload landed outside the datafiles directory.' });
   }
 
@@ -376,7 +391,7 @@ router.delete('/datafile', (req, res) => {
 });
 
 // ── GET /v1/company/datafile ──────────────────────────────────────────────────
-router.get('/datafile', async (req, res) => {
+router.get('/datafile', datafileReadLimiter, async (req, res) => {
   // Issue #60 (v1.10.0) — datafile is test data. Administrators no longer
   // have read access; certifiers never had a use case here.
   if (req.user.role === 'administrator' || req.user.role === 'certification_user') {

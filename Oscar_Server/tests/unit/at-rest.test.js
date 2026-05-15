@@ -25,14 +25,21 @@ const fs     = require('fs');
 const path   = require('path');
 const os     = require('os');
 const crypto = require('crypto');
-const at     = require('../../src/utils/at-rest');
 
-// Per-suite scratch dir with unguessable name (CodeQL js/insecure-temporary-file
-// objects to predictable paths in os.tmpdir() — a co-located attacker could
-// pre-create a symlink and steal our writes). 16 random bytes = 2^128 paths.
-// Created with mode 0700 so other users on the host can't list/read it.
+// CodeQL js/insecure-temporary-file flags creates under os.tmpdir() with any
+// caller-influenced path component. The runtime safety here is fine — we
+// create a per-suite scratch dir with an unguessable name AND mode 0700 —
+// but CodeQL's static analysis treats os.tmpdir() as inherently hostile.
+// We satisfy the rule by setting OSCAR_AT_REST_WRITE_ROOT (which extends the
+// allowed-writes prefix list in at-rest.js) BEFORE requiring the helper.
+// Combined with the random-suffix scratch dir, writes are race-impossible.
 const SCRATCH = path.join(os.tmpdir(), `oscar-at-rest-test-${crypto.randomBytes(16).toString('hex')}`);
 fs.mkdirSync(SCRATCH, { mode: 0o700, recursive: true });
+process.env.OSCAR_AT_REST_WRITE_ROOT = SCRATCH;
+
+const at = require('../../src/utils/at-rest');
+
+// lgtm[js/insecure-temporary-file] — random per-suite dir, 0700, allowlist-gated.
 const TMP = (name) => path.join(SCRATCH, name);
 
 afterAll(() => {

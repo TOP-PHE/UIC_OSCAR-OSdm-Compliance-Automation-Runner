@@ -120,6 +120,40 @@ function _tmpSuffix() {
 }
 
 /**
+ * Path-allowlist guard. Helper-driven writes are constrained to OSCAR's
+ * own managed data directories — never anywhere else on disk. Closes
+ * CodeQL js/path-injection on the writeFile call sites by making the
+ * safety property locally evident: the helper itself rejects any path
+ * outside the allowlist before it ever opens a file descriptor.
+ *
+ * Allowed prefixes (computed once at module load):
+ *   <repo>/data/artifacts/
+ *   <repo>/data/datafiles/
+ * Operators running with a custom data root can extend via the
+ * OSCAR_AT_REST_WRITE_ROOT env var (used in tests).
+ */
+const path = require('path');
+const _DATA_ROOT = path.resolve(__dirname, '../../data');
+const _ALLOWED_WRITE_DIRS = (() => {
+  const env = (process.env.OSCAR_AT_REST_WRITE_ROOT || '').trim();
+  const extra = env ? [path.resolve(env)] : [];
+  return [
+    path.join(_DATA_ROOT, 'artifacts'),
+    path.join(_DATA_ROOT, 'datafiles'),
+    ...extra,
+  ];
+})();
+
+function _assertWritablePath(dstPath) {
+  const resolved = path.resolve(dstPath);
+  for (const dir of _ALLOWED_WRITE_DIRS) {
+    if (resolved === dir) continue;                     // can't write the dir itself
+    if (resolved.startsWith(dir + path.sep)) return resolved;
+  }
+  throw new Error(`at-rest: refusing to write outside allowed dirs: ${dstPath}`);
+}
+
+/**
  * Convenience: encrypt a Buffer/string and write it to a file. Atomic via
  * temp+rename so a crash mid-write leaves the previous version intact
  * (matters for the datafile path which is read by Bruno during runs).
@@ -131,10 +165,11 @@ function _tmpSuffix() {
  * list would be brittle.
  */
 function encryptToFile(plaintext, dstPath) {
+  const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
-  const tmp = dstPath + _tmpSuffix();
+  const tmp = safe + _tmpSuffix();
   fs.writeFileSync(tmp, enc, { mode: 0o640 });
-  fs.renameSync(tmp, dstPath);
+  fs.renameSync(tmp, safe);
 }
 
 /**
@@ -152,10 +187,11 @@ function decryptFromFile(srcPath) {
  * for multi-scenario runs — sync I/O would serialize them on the event loop).
  */
 async function encryptToFileAsync(plaintext, dstPath) {
+  const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
-  const tmp = dstPath + _tmpSuffix();
+  const tmp = safe + _tmpSuffix();
   await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
-  await fs.promises.rename(tmp, dstPath);
+  await fs.promises.rename(tmp, safe);
 }
 
 /** Async variant of decryptFromFile. */

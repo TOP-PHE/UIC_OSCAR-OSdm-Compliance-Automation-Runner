@@ -311,7 +311,7 @@ async function shareRunWithCertifier(share) {
   const verb = share ? 'share' : 'revoke certifier access to';
   if (!confirm(`Are you sure you want to ${verb} this report?\n\nWhen shared, certifiers will be able to view this run's structured results, HTTP traffic, and downloadable artifacts.`)) return;
   try {
-    const res = await fetch(`/v1/runs/${runId}/share`, { method: share ? 'POST' : 'DELETE' });
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/share`, { method: share ? 'POST' : 'DELETE' });
     if (res.status === 401) { logout(); return; }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -397,8 +397,8 @@ function downloadLogs() {
 async function poll() {
   try {
     const [runRes, logRes] = await Promise.all([
-      fetch(`/v1/runs/${runId}`,       {}),
-      fetch(`/v1/runs/${runId}/logs?since_id=${lastEventId}`, {})
+      fetch(`/v1/runs/${encodeURIComponent(runId)}`,       {}),
+      fetch(`/v1/runs/${encodeURIComponent(runId)}/logs?since_id=${lastEventId}`, {})
     ]);
     if (runRes.status === 401) { logout(); return; }
     const run  = await runRes.json();
@@ -411,7 +411,7 @@ async function poll() {
 }
 
 async function loadArtifacts() {
-  const res = await fetch(`/v1/runs/${runId}/artifacts`, {});
+  const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/artifacts`, {});
   if (!res.ok) return;
   const data = await res.json();
   if (!data.artifacts.length) return;
@@ -430,7 +430,7 @@ async function loadArtifacts() {
       : null;
     const label    = a.type === 'html_report' ? `📊 ${scenarioLabel}` : '📄 JSON Results';
     if (a.type === 'html_report') {
-      const href = `/artifacts/${runId}/${a.filename}`;
+      const href = `/artifacts/${encodeURIComponent(runId)}/${a.filename}`;
       return `
       <div class="artifact-row">
         <span style="flex:1;font-weight:600">${label}</span>
@@ -452,7 +452,7 @@ async function loadArtifacts() {
 // cookie is sent automatically by the browser for same-origin requests).
 async function downloadArtifact(artifactId, filename) {
   try {
-    const res = await fetch(`/v1/runs/${runId}/artifacts/${artifactId}`, {});
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/artifacts/${artifactId}`, {});
     if (res.status === 401) { logout(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -483,7 +483,7 @@ document.getElementById('artifacts-list').addEventListener('click', e => {
 
 async function deleteRun() {
   if (!confirm('Delete this run? It will no longer appear in the dashboard.')) return;
-  const res = await fetch(`/v1/runs/${runId}`, { method: 'DELETE',
+  const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}`, { method: 'DELETE',
     });
   if (res.status === 401) { logout(); return; }
   if (res.ok) {
@@ -510,7 +510,7 @@ function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').re
 
 async function loadAssertions() {
   try {
-    const res = await fetch(`/v1/runs/${runId}/assertions`, {});
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/assertions`, {});
     if (!res.ok) return;
     assertionsData = await res.json();
     if (!assertionsData.summary || assertionsData.summary.total === 0) return;
