@@ -141,6 +141,8 @@ describe('encryptToFile / decryptFromFile (sync)', () => {
   });
   test('decryptFromFile passes through legacy plaintext file unchanged', () => {
     const f = TMP('legacy.bin');
+    // Random per-suite scratch dir (mode 0700), no caller-influenced naming.
+    // lgtm[js/insecure-temporary-file]
     fs.writeFileSync(f, 'old plaintext file');
     expect(at.decryptFromFile(f).toString('utf8')).toBe('old plaintext file');
   });
@@ -166,6 +168,7 @@ describe('copyAndEncryptFileAsync', () => {
   test('copies plaintext source to encrypted destination, leaves source untouched', async () => {
     const src = TMP('copysrc.txt');
     const dst = TMP('copydst.bin');
+    // Random per-suite scratch dir. lgtm[js/insecure-temporary-file]
     fs.writeFileSync(src, 'source content stays plaintext');
     await at.copyAndEncryptFileAsync(src, dst);
     // Source unchanged

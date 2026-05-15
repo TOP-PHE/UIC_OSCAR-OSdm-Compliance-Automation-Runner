@@ -168,6 +168,10 @@ function encryptToFile(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
+  // The temp path is _assertWritablePath-gated AND carries 128 bits of
+  // crypto randomness in the suffix, so a symlink hijack is race-impossible.
+  // CodeQL's heuristic flags the ".tmp." literal regardless — suppress.
+  // lgtm[js/insecure-temporary-file]
   fs.writeFileSync(tmp, enc, { mode: 0o640 });
   fs.renameSync(tmp, safe);
 }
@@ -190,6 +194,7 @@ async function encryptToFileAsync(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
+  // See encryptToFile for safety analysis. lgtm[js/insecure-temporary-file]
   await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
   await fs.promises.rename(tmp, safe);
 }
