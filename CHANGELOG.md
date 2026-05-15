@@ -14,6 +14,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.10.0] — 2026-05-15
+
+Minor bump — **vendor data sovereignty (Phase 1, issue #60)**. Restructures
+the trust model so a company's test configuration and reports stay private
+to its own testers and test_managers until the test_manager explicitly opts
+in to sharing specific runs with the UIC certification team. Strips the
+administrator role of all test-data read access; closes an anonymous
+static-serve bypass that previously let any unauthenticated user download
+an artifact knowing only the run UUID.
+
+This is **Phase 1 of three**:
+- Phase 1 (this release) — application-level access control + per-run share
+- Phase 2 (next release) — at-rest DB encryption (SQLCipher)
+- Phase 3 — operational policy (who has root SSH on production)
+
+### Added
+- **Per-run share-with-certifier toggle** — test_managers explicitly pick
+  which terminal runs (COMPLETED / FAILED / CANCELLED) become visible to
+  certifiers, via a new button on each run-detail page. Replaces the
+  legacy company-wide all-or-nothing toggle as the gating mechanism.
+  - `POST /v1/runs/:id/share` — share this run with certifiers
+  - `DELETE /v1/runs/:id/share` — revoke certifier access to this run
+  - Both audit-logged with the test_manager's email and the run id.
+- **`canUserSeeRun()` helper** at `src/api/helpers/run-access.js` — single
+  source of truth for "is this user allowed to see this run". Every
+  endpoint that returns run-scoped data now flows through it.
+
+### Changed (BREAKING)
+- **Administrator role no longer reads test data**. The role becomes
+  operations + security only — users, companies (metadata), server
+  config, alerts, audit log, observability stack. Specifically removed:
+  - `GET /v1/runs/:id` and all sub-endpoints (logs / artifacts /
+    assertions / requests) → 404 for admin
+  - `GET /v1/company/test-framework` → 403 for admin
+  - `GET /v1/company/datafile` → 403 for admin
+  - `GET /v1/company/test-resources` → 403 for admin
+  - `GET /v1/runs` returns ONLY the data-lifecycle queue
+    (DELETION_REQUESTED + DELETED_BY_ADMIN status) — metadata only,
+    no per-run content. Aggregate counts still available via
+    `/v1/admin/activity`.
+  - `POST /v1/company/datafile`, `PUT /datafile/json`,
+    `DELETE /datafile`, `PUT /test-framework`, `POST /test-resources` →
+    test_manager only (was test_manager OR isPlatformRole).
+- **Certifier visibility tightened**. Certifiers no longer see every run
+  of a vendor that has the legacy company-wide toggle on; they see ONLY
+  runs the test_manager has explicitly shared via the new per-run flag.
+  The legacy `companies.share_reports_with_certifier` toggle becomes a
+  master kill switch — when set to 0 it overrides every per-run share.
+- **Migration v18** backfills `shared_with_certifier_at` for every
+  terminal run of a company whose legacy toggle was on. Existing
+  certifier workflows continue uninterrupted on rollover; the new
+  per-run model applies to NEW runs going forward.
+
+### Fixed (security)
+- **`/artifacts/:runId/:filename`** — was served by `express.static` with
+  no auth. Anyone able to reach OSCAR (or guess a run UUID) could
+  download a vendor's HTML report or JSON results. Now gated by
+  authenticated session + per-run-ownership check via `canUserSeeRun()`.
+  The HTML-report `<a href>` continues to work because browsers send the
+  httpOnly session cookie automatically for same-origin GETs.
+- **`/data/:filename`** — same `express.static` exposure. Now requires
+  authenticated session whose company owns the slug, OR a true-loopback
+  request with no `X-Forwarded-For` (Bruno subprocess on the same
+  host). Nginx-proxied external traffic always carries
+  `X-Forwarded-For`, so the loopback path is unreachable from outside.
+
+### Documentation
+- New `Server Admin Guide § 15 — Vendor Data Sovereignty` documenting
+  the trust model, the threat model (what code defends against vs. what
+  requires operational policy), and the Phase 2/3 roadmap.
+- Welcome news entry summarising the change for end users.
+
+### Migration
+After Watchtower rolls over to v1.10.0:
+- **No operator action required.** v18 migration runs automatically on
+  first boot; the backfill preserves every existing certifier workflow.
+- The legacy company-wide `share_reports_with_certifier` toggle remains
+  in the UI as a master kill switch.
+- Test managers should familiarise themselves with the new per-run share
+  button on the run-detail page.
+- Administrators may notice that the "All Reports" tab now shows only
+  the data-lifecycle queue, not every run on the platform — this is
+  intentional (issue #60).
+
+---
+
 ## [server-v1.9.1] — 2026-05-11
 
 Patch release — UX polish bundling three small wins from the open-issue

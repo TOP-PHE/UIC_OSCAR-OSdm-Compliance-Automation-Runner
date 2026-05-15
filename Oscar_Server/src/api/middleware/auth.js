@@ -116,4 +116,39 @@ function requireNotRole(...excludedRoles) {
   };
 }
 
-module.exports = { requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove };
+/**
+ * Sync helper for non-middleware callers (e.g. raw GET handlers in server.js
+ * that need to gate access without sitting behind the regular requireAuth
+ * pipeline). Returns the same { id, email, companyId, role } object that
+ * requireAuth() puts on req.user, OR null on any failure (no token, invalid,
+ * expired, revoked). Never throws.
+ *
+ * Cookie path is the source of truth (httpOnly, browser sends automatically);
+ * Bearer is the dev/HTTP fallback. Mirrors requireAuth's lookup order so the
+ * two stay in lock-step.
+ */
+function userFromRequest(req) {
+  try {
+    const cookies = parseCookies(req.headers.cookie);
+    const cookieToken = cookies.oscar_session || null;
+    const header      = req.headers['authorization'] || '';
+    const bearerToken = header.startsWith('Bearer ') ? header.slice(7) : null;
+    const token = cookieToken || bearerToken;
+    if (!token) return null;
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (payload.jti) {
+      const revoked = get('SELECT jti FROM token_blacklist WHERE jti = ?', [payload.jti]);
+      if (revoked) return null;
+    }
+    return {
+      id:        payload.sub,
+      email:     payload.email,
+      companyId: payload.companyId,
+      role:      normalizeRole(payload.role),
+    };
+  } catch (_err) {
+    return null;
+  }
+}
+
+module.exports = { requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove, userFromRequest };

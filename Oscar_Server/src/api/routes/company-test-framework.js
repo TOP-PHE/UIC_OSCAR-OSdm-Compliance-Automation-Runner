@@ -25,10 +25,23 @@ const { resolveCompanyScope } = require('../helpers/shared');
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
-// ── Role guard: test config write operations require test_manager or above ────
+// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
+// Test framework is the company's vendor capability declaration. It is test
+// data, not platform data — administrators no longer have read or write
+// access. Certifiers never had a use case here. Tightened from
+// "test_manager OR isPlatformRole" to a strict role allow-list.
+function denyAdminAndCertifier(req, res) {
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Administrators and certifiers do not have access to test configuration (issue #60).' });
+    return true;
+  }
+  return false;
+}
 function requireTestManager(req, res) {
-  if (!isTestManagerOrAbove(req.user.role) && !isPlatformRole(req.user.role)) {
-    res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers can modify test configuration.' });
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only Test Managers can modify test configuration.' });
     return false;
   }
   return true;
@@ -36,6 +49,7 @@ function requireTestManager(req, res) {
 
 // ── GET /v1/company/test-framework ────────────────────────────────────────────
 router.get('/test-framework', (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 

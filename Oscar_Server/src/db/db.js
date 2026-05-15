@@ -353,6 +353,54 @@ const MIGRATIONS = [
       }
       console.log(`[db] migration v17 — scrubbed credentials from ${scrubbed} of ${rows.length} run_requests rows`);
   }},
+
+  { version: 18, name: 'runs-per-run-share-with-certifier', up: () => {
+      // Per-run share-with-certifier toggle (issue #60, v1.10.0).
+      //
+      // Replaces the all-or-nothing companies.share_reports_with_certifier
+      // toggle as the gating mechanism for certifier visibility. The company-
+      // wide toggle becomes a master kill switch: when set to 0 it overrides
+      // every per-run share, allowing a vendor to revoke ALL certifier access
+      // in one click. When set to 1 (default), per-run sharing decides.
+      //
+      // shared_with_certifier_at: ISO 8601 UTC timestamp of when the test
+      //   manager opted to share. NULL = not shared (the safe default).
+      // shared_with_certifier_by: email of the test manager who shared (for
+      //   audit). NULL when not shared.
+      _safeAlter('ALTER TABLE runs ADD COLUMN shared_with_certifier_at TEXT');
+      _safeAlter('ALTER TABLE runs ADD COLUMN shared_with_certifier_by TEXT');
+
+      // Backfill: any company that today has share_reports_with_certifier=1
+      // (the legacy v15 toggle) gets ALL its terminal runs marked shared, so
+      // existing certifier workflows don't suddenly go dark on rollover.
+      // After v1.10.0 ships, test managers explicitly pick which NEW runs to
+      // share — the bulk-share is purely a backward-compat preservation.
+      try {
+        db.exec(`
+          UPDATE runs
+             SET shared_with_certifier_at = COALESCE(completed_at, queued_at),
+                 shared_with_certifier_by = 'system_migration_v18'
+           WHERE shared_with_certifier_at IS NULL
+             AND status IN ('COMPLETED', 'FAILED', 'CANCELLED')
+             AND company_id IN (
+               SELECT id FROM companies WHERE share_reports_with_certifier = 1
+             )
+        `);
+        const cnt = db.prepare(
+          "SELECT COUNT(*) AS n FROM runs WHERE shared_with_certifier_by = 'system_migration_v18'"
+        ).get();
+        console.log(`[db] migration v18 — backfilled ${cnt.n} terminal runs as 'shared with certifier' (legacy company-wide toggle preserved)`);
+      } catch (e) {
+        console.error('[db] v18 backfill failed:', e.message);
+        throw e;
+      }
+
+      // Partial index for the certifier list-query: "all runs visible to me"
+      // → WHERE shared_with_certifier_at IS NOT NULL ORDER BY shared_at DESC
+      try {
+        db.exec('CREATE INDEX IF NOT EXISTS idx_runs_shared_with_certifier ON runs(shared_with_certifier_at) WHERE shared_with_certifier_at IS NOT NULL');
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

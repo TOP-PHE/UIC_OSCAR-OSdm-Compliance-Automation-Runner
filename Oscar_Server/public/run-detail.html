@@ -58,6 +58,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .btn-dl:hover{background:#005A8A}
 .site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
 .btn-danger{background:#c62828;color:#fff}.btn-danger:hover{background:#b71c1c}
+.btn-primary{background:#0090D4;color:#fff}.btn-primary:hover{background:#00557A}
+.btn-warn{background:#ff9800;color:#fff}.btn-warn:hover{background:#e68900}
 .btn-sm{padding:5px 12px;font-size:12px;background:#eceff1;color:#455a64}
 .artifact-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #f5f5f5}
 .artifact-row:first-child{border-top:none}
@@ -114,6 +116,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 <div class="container">
   <div class="top-bar">
     <h2 id="run-title">Run Detail</h2>
+    <span id="share-btn-wrap"></span>
     <span id="delete-btn-wrap"></span>
     <span id="status-badge" class="status">-</span>
   </div>
@@ -266,8 +269,54 @@ function updateStatus(run) {
     if (canDelete && !wrap.querySelector('button')) {
       wrap.innerHTML = '<button class="btn btn-danger" data-action="delete-run">🗑 Delete Run</button>';
     }
+
+    // ── Per-run share-with-certifier toggle (issue #60, v1.10.0) ─────────────
+    // Test managers explicitly choose which terminal runs are visible to
+    // certifiers. Replaces the company-wide all-or-nothing toggle.
+    // Visible only to test_managers; the button text + colour reflect the
+    // current shared state, which the run object now carries via the
+    // shared_with_certifier_at timestamp (null = not shared).
+    if (user.role === 'test_manager') {
+      const shareWrap = document.getElementById('share-btn-wrap');
+      if (shareWrap) {
+        const isShared = !!run.shared_with_certifier_at;
+        const sharedAt = isShared
+          ? new Date(run.shared_with_certifier_at + 'Z').toLocaleString()
+          : '';
+        const sharedBy = run.shared_with_certifier_by || '';
+        shareWrap.innerHTML = isShared
+          ? `<button class="btn btn-warn" data-action="unshare-run"
+                title="Shared on ${escHtml(sharedAt)} by ${escHtml(sharedBy)} — click to revoke certifier access">
+              🔓 Shared with certifiers — click to revoke
+            </button>`
+          : `<button class="btn btn-primary" data-action="share-run"
+                title="Make this report visible to UIC certifiers">
+              🤝 Share this report with certifiers
+            </button>`;
+      }
+    }
   }
 }
+
+// ── Share / unshare with certifier (issue #60, v1.10.0) ──────────────────────
+async function shareRunWithCertifier(share) {
+  const verb = share ? 'share' : 'revoke certifier access to';
+  if (!confirm(`Are you sure you want to ${verb} this report?\n\nWhen shared, certifiers will be able to view this run's structured results, HTTP traffic, and downloadable artifacts.`)) return;
+  try {
+    const res = await fetch(`/v1/runs/${runId}/share`, { method: share ? 'POST' : 'DELETE' });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(`Action failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`);
+      return;
+    }
+    // Reload the page to refresh the share button + the run banner.
+    location.reload();
+  } catch (err) {
+    alert(`Network error: ${err.message || err}`);
+  }
+}
+
 
 let activeLogLevel = 'all';
 let logSearchTerm = '';
@@ -439,6 +488,10 @@ async function deleteRun() {
 
 document.getElementById('delete-btn-wrap').addEventListener('click', function(e) {
   if (e.target.closest('[data-action="delete-run"]')) deleteRun();
+});
+document.getElementById('share-btn-wrap').addEventListener('click', function(e) {
+  if (e.target.closest('[data-action="share-run"]'))   shareRunWithCertifier(true);
+  if (e.target.closest('[data-action="unshare-run"]')) shareRunWithCertifier(false);
 });
 
 // ── Assertions ──────────────────────────────────────────────────────────────

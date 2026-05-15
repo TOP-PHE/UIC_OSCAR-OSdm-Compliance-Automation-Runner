@@ -691,6 +691,23 @@ async function fetchAllRuns() {
 }
 
 async function loadReports() {
+  // Surface the v1.10.0 (issue #60) admin scope notice once per page load.
+  // The first fetch returns a `notice` field whenever admin is hitting an
+  // endpoint with restricted visibility — show it as a sticky banner above
+  // the report list so the operator understands why the list is shorter.
+  const firstPage = await fetch('/v1/runs?limit=1&offset=0', { headers: authHeaders }).then(r => r.json()).catch(() => ({}));
+  if (firstPage.notice) {
+    let banner = document.getElementById('admin-scope-notice');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'admin-scope-notice';
+      banner.style.cssText = 'background:#fff3e0;border-left:4px solid #ff9800;padding:12px 16px;margin-bottom:14px;border-radius:4px;font-size:13px;color:#bf360c';
+      const panel = document.getElementById('panel-reports');
+      if (panel) panel.insertBefore(banner, panel.firstChild);
+    }
+    banner.textContent = '🔒 ' + firstPage.notice;
+  }
+
   const [allRuns, cmpRes] = await Promise.all([
     fetchAllRuns(),
     fetch('/v1/reports/comparisons', { headers: authHeaders })

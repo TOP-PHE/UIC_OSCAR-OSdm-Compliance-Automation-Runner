@@ -18,6 +18,8 @@
  * GET  /v1/runs/:id/logs                — log events for a run
  * GET  /v1/runs/:id/artifacts           — list artifacts
  * GET  /v1/runs/:id/artifacts/:aid      — download an artifact
+ * POST /v1/runs/:id/share               — test_manager: share THIS run with certifiers (v1.10.0, issue #60)
+ * DELETE /v1/runs/:id/share             — test_manager: revoke certifier access to THIS run
  * DELETE /v1/runs/:id/cancel            — cancel a queued run (not yet started)
  * DELETE /v1/runs/:id                   — tester soft-delete (→ DELETION_REQUESTED)
  *                                         admin soft-delete  (→ DELETED_BY_ADMIN)
@@ -39,6 +41,7 @@ const { v4: uuidv4 } = require('uuid');
 const { get, all, run: dbRun, transaction } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
+const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
 
 const router = express.Router();
@@ -73,28 +76,19 @@ function isRunStale(runRow) {
  * Return the run row if it exists and is not permanently deleted.
  * companyId = null means platform-role caller (admin/certifier) — no tenant filter.
  *
- * Pass `req` (optional) to apply the v15 certifier privacy guard: a
- * certification_user accessing a run from a company that opted out of
- * sharing is treated as a 404 (we don't disclose existence to certifiers
- * who shouldn't see the company's data at all).
+ * v1.10.0 (issue #60): delegates to canUserSeeRun() — the consolidated
+ * visibility helper that enforces:
+ *   - tenant isolation (tester / test_manager scoped to own company)
+ *   - administrator strict-mode (no read access to test data)
+ *   - certifier per-run share gate (shared_with_certifier_at must be set
+ *     AND the company-wide kill switch must not be flipped)
+ * Returning null means "treat as not-found" — never disclose existence to
+ * a user who shouldn't see the run.
  */
-function validateRunOwnership(runId, companyId, req) {
-  let row;
-  if (!companyId) {
-    row = get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [runId]);
-  } else {
-    row = get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [runId, companyId]);
-  }
-  if (!row) return null;
-  // v15 certifier privacy guard
-  if (req && req.user && req.user.role === 'certification_user') {
-    const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
-    // SQLite stores BOOLEAN as INTEGER (0/1); `=== false` was unreachable (Sonar S3403).
-    if (c && c.share_reports_with_certifier === 0) {
-      return null;   // hide existence — same shape as "not found"
-    }
-  }
-  return row;
+const { canUserSeeRun } = require('../helpers/run-access');
+function validateRunOwnership(runId, _companyId, req) {
+  if (!req || !req.user) return null;
+  return canUserSeeRun(runId, req.user);
 }
 
 /**
@@ -237,6 +231,36 @@ router.get('/', (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '50',  10), 200);
   const offset = parseInt(req.query.offset || '0',  10);
 
+  // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
+  // ONE narrow exception: the operational data-lifecycle queue. Admins must
+  // be able to see the LIST of runs awaiting their decision (DELETION_REQUESTED
+  // from testers, DELETED_BY_ADMIN flagged) so they can confirm purges or
+  // restore. The list returns metadata only — when the admin tries to drill
+  // into any single run, /v1/runs/:id returns 404 (canUserSeeRun blocks the
+  // role). Aggregate counts live in /v1/admin/activity.
+  if (req.user.role === 'administrator') {
+    const adminRows = all(
+      `SELECT r.id, r.company_id, c.name AS company_name, r.status,
+              r.queued_at, r.started_at, r.completed_at, r.exit_code,
+              r.deleted_by, r.previous_status, r.batch_id, r.scenario_code,
+              u.email AS submitted_by
+       FROM runs r
+       JOIN users u ON u.id = r.user_id
+       JOIN companies c ON c.id = r.company_id
+       WHERE r.status IN ('DELETION_REQUESTED', 'DELETED_BY_ADMIN')
+       ORDER BY r.queued_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+    const adminTotal = get(
+      "SELECT COUNT(*) AS n FROM runs WHERE status IN ('DELETION_REQUESTED', 'DELETED_BY_ADMIN')"
+    );
+    return res.json({
+      total: adminTotal.n, limit, offset, runs: adminRows,
+      notice: 'Administrators see the data-lifecycle queue only (pending deletions, admin-flagged runs). Per-run content access was removed in v1.10.0 (issue #60). Use the Server Activity tab for aggregate counts.'
+    });
+  }
+
   const isPlatform = isPlatformRole(req.user.role);
   let rows, total;
 
@@ -258,12 +282,12 @@ router.get('/', (req, res) => {
        ) rs ON rs.run_id = r.id`;
 
   if (isPlatform && !req.companyId) {
-    // Admin / certifier: see everything except permanently deleted.
-    //
-    // Certifier-only restriction (v15): exclude runs from companies that
-    // have opted out of certifier sharing. Administrators are unaffected.
+    // Certifier list: per-run share gate (v1.10.0, issue #60). The
+    // certifier sees ONLY runs the test_manager has explicitly shared,
+    // gated additionally by the company-wide kill switch. Administrators
+    // are short-circuited above.
     const certifierFilter = req.user.role === 'certification_user'
-      ? 'AND c.share_reports_with_certifier = 1'
+      ? 'AND r.shared_with_certifier_at IS NOT NULL AND c.share_reports_with_certifier = 1'
       : '';
     rows = all(
       `SELECT r.id, r.company_id, c.name AS company_name, r.status,
@@ -794,6 +818,68 @@ router.get('/:id/artifacts/:aid', (req, res) => {
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Disposition', `inline; filename="${artifact.filename}"`);
   fs.createReadStream(safePath).pipe(res);
+});
+
+// ── POST /v1/runs/:id/share — share THIS run with certifiers (v1.10.0) ──────
+// Test manager opt-in: mark a single completed run as visible to certifiers.
+// Replaces the all-or-nothing companies.share_reports_with_certifier toggle
+// as the gating mechanism for certifier visibility (issue #60).
+//
+// Restrictions:
+//   - Only test_manager role of the run's owning company can share.
+//   - Run must be in a terminal status (COMPLETED / FAILED / CANCELLED).
+//     Sharing in-progress runs is meaningless and would leak partial state.
+//   - The company-wide share_reports_with_certifier toggle remains a master
+//     kill switch: when set to 0 it overrides per-run shares.
+//
+// Audit-logged with the run id and the actor's email.
+router.post('/:id/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can share runs with certifiers.' });
+  }
+  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
+  if (!runRow || runRow.status === 'DELETED') {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  // Tenant scope: a test_manager can only share their OWN company's runs.
+  if (runRow.company_id !== req.user.companyId) {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(runRow.status)) {
+    return res.status(409).json({ status: 409, title: 'Conflict',
+      detail: `Run is ${runRow.status} — sharing is only allowed once a run reaches a terminal status.` });
+  }
+
+  dbRun(
+    `UPDATE runs
+        SET shared_with_certifier_at = datetime('now'),
+            shared_with_certifier_by = ?
+      WHERE id = ?`,
+    [req.user.email, req.params.id]
+  );
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_shared_with_certifier:${req.params.id}`);
+  const updated = get('SELECT id, shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [req.params.id]);
+  return res.json({ ok: true, run: updated });
+});
+
+// ── DELETE /v1/runs/:id/share — revoke certifier access to THIS run ──────────
+// Test manager unshare: certifiers immediately lose access. Audit-logged.
+router.delete('/:id/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can revoke certifier access.' });
+  }
+  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
+  if (!runRow || runRow.status === 'DELETED' || runRow.company_id !== req.user.companyId) {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  dbRun(
+    `UPDATE runs SET shared_with_certifier_at = NULL, shared_with_certifier_by = NULL WHERE id = ?`,
+    [req.params.id]
+  );
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_certifier:${req.params.id}`);
+  return res.json({ ok: true, run: { id: req.params.id, shared_with_certifier_at: null } });
 });
 
 // ── DELETE /v1/runs/:id/cancel ────────────────────────────────────────────────

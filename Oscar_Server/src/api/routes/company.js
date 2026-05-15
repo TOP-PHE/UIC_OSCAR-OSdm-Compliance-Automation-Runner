@@ -186,10 +186,14 @@ router.patch('/', (req, res) => {
   return res.json(safeCompany(updated));
 });
 
-// ── Role guard: test config write operations require test_manager or above ────
+// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
+// Datafile is test data. Tightened from "test_manager OR isPlatformRole" to
+// strict test_manager only — administrators no longer have read or write
+// access to a vendor's test configuration.
 function requireTestManager(req, res) {
-  if (!isTestManagerOrAbove(req.user.role) && !isPlatformRole(req.user.role)) {
-    res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers can modify test configuration.' });
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only Test Managers can modify the data file.' });
     return false;
   }
   return true;
@@ -335,12 +339,15 @@ router.delete('/datafile', (req, res) => {
 
 // ── GET /v1/company/datafile ──────────────────────────────────────────────────
 router.get('/datafile', (req, res) => {
+  // Issue #60 (v1.10.0) — datafile is test data. Administrators no longer
+  // have read access; certifiers never had a use case here.
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Administrators and certifiers do not have access to company data files (issue #60).' });
+  }
+
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
-
-  if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required for platform users.' });
-  }
 
   const company = get('SELECT datafile_path, slug FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company || !company.datafile_path || !fs.existsSync(company.datafile_path)) {

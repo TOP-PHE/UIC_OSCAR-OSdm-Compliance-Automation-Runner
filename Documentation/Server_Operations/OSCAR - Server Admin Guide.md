@@ -820,3 +820,136 @@ no VPS access needed. Two complementary patterns:
 - **Explicit list** — comma- or newline-separated emails. Add / remove members
   from the UI. Each save is audit-logged so the trail of who-added-whom is
   recoverable.
+
+---
+
+## 15. Vendor Data Sovereignty (v1.10+)
+
+This section documents the trust model OSCAR implements as of v1.10.0
+(issue #60), and is honest about what software-only mechanisms can and
+cannot defend against.
+
+### 15.1 The trust model
+
+| Asset | Visible to | Not visible to |
+|---|---|---|
+| Test framework configuration (Wizard Step 1) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
+| Data file (`{slug}-datafile.json`) | Tester + Test Manager of the owning company; Bruno subprocess on loopback | Other companies, Certifiers, Administrators |
+| Test resources (Wizard Step 2) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
+| Scenarios (personal) | The tester who created them | Everyone else |
+| Scenarios (shared) | All testers + Test Managers of the owning company | Other companies, Certifiers, Administrators |
+| Run results, artifacts, HTTP traffic | Tester + Test Manager of the owning company | Other companies, Administrators |
+|  | **Plus** Certifiers — but ONLY for runs where the Test Manager has clicked "Share with certifiers" on that specific run | Certifiers without explicit per-run share |
+| API credentials (per-tester) | The owning tester only — encrypted at rest | Everyone else, including admins, even on the database |
+| Audit log | Administrator only | Everyone else |
+
+### 15.2 The two share gates for certifiers
+
+Certifier visibility of a run requires **both** to be true:
+
+1. **Per-run share** — `runs.shared_with_certifier_at` is set. The Test
+   Manager flips this with the **Share with certifiers** button on the
+   run-detail page. Audit-logged.
+2. **Master kill switch** — `companies.share_reports_with_certifier`
+   (the legacy v15 toggle) is `1`. Setting it to `0` overrides every
+   per-run share, instantly revoking all certifier access to the
+   company's runs. Useful for emergency lockout.
+
+Both gates can be flipped by a Test Manager of the company. Neither can
+be flipped by an Administrator, a Certifier, or another company.
+
+### 15.3 What the Administrator role can and cannot do (v1.10+)
+
+| Allowed | Not allowed |
+|---|---|
+| Create / edit / delete users and companies | Read any company's run results |
+| Reset passwords, generate one-shot reset links | Read any company's HTTP traffic / artifacts |
+| Configure the server (SMTP, alerts, runtime tuning) | Read any company's test framework or data file |
+| View aggregate run counts (Server Activity tab) | Read any company's test scenarios |
+| Confirm or restore tester-flagged deletions | Read any company's per-tester credentials (always encrypted) |
+| Browse the audit log | Bypass the per-run share gate for certifiers |
+| Configure observability (Prometheus / Grafana / Loki) | |
+
+The **All Reports** tab in the admin panel, which previously showed every
+run on the platform, now shows only the data-lifecycle queue: runs
+testers have requested deletion of (`DELETION_REQUESTED`) and runs the
+Administrator has flagged (`DELETED_BY_ADMIN`). Per-run content is
+unreachable to the Administrator from this view; they can only act on
+the lifecycle metadata (confirm deletion, restore).
+
+If a genuine support case requires an Administrator to inspect a
+specific report, the current procedure is to ask the company's Test
+Manager to share the run with a designated certifier-role account
+operated by support. (A future release may add a break-glass
+admin-override with extra audit logging — not implemented in Phase 1.)
+
+### 15.4 Threat model — what we defend against, what we don't
+
+#### Defended in code (v1.10.0)
+
+| Threat | Defence |
+|---|---|
+| Administrator browsing the UI sees a vendor's reports | `canUserSeeRun()` returns null for admin role; LIST endpoint short-circuits to data-lifecycle queue only |
+| Anonymous user downloads `/artifacts/<uuid>/report.html` | Static-serve replaced with authenticated handler that calls `canUserSeeRun()` |
+| Anonymous user downloads `/data/<slug>-datafile.json` | Static-serve replaced with handler that requires authenticated session matching the slug, OR a true-loopback request from Bruno |
+| Certifier sees a run the Test Manager didn't share | Two-gate check: per-run flag AND master kill switch |
+| Certifier from one company sees another company's data they shouldn't | Tenant scoping at the database query layer; certifier requests targeting opted-out companies return 404 (existence not disclosed) |
+| Tester from company A reads company B's runs | Tenant middleware hard-pins `req.companyId` to the user's own company; cross-company query parameters are ignored for non-platform roles |
+
+#### Defended in code (since earlier releases)
+
+- API credentials encrypted at rest (AES-256-GCM, since v12)
+- Credentials redacted from persisted reports (since v17 retroactive scrub)
+- Self-service password reset, JWT rotation, granular roles
+- 401 auto-logout, sticky session toast, rate limiting
+- CodeQL / SonarCloud / Gitleaks / Trivy on every commit
+
+#### NOT defended in code (operational policy required)
+
+| Threat | Why software cannot stop it | Mitigation |
+|---|---|---|
+| Sysadmin with `sudo cat /opt/OSCAR/.../data/oscar.db` reads everything | The database file is unencrypted; OSCAR needs to read it to function | **Phase 2** of issue #60 — at-rest DB encryption (SQLCipher); plus restrict who has root SSH on production |
+| Sysadmin attaches a debugger to the running OSCAR process | The process must decrypt to use; an attacker with PID-level access can read decrypted memory | Restrict who has root SSH; audit `sudo` usage |
+| Backup / cloud snapshot leaks | Same as above — the file on disk is plaintext until Phase 2 lands | Encrypt backups at rest; restrict backup access |
+| Compromised OSCAR host with read access to artifact directory | `data/artifacts/*.html` files are plaintext on disk | Restrict filesystem permissions (chmod 600, owned by `oscar` uid only — but root still bypasses) |
+
+### 15.5 Roadmap — Phase 2 + Phase 3
+
+**Phase 2 (next release)** — at-rest encryption:
+- Migrate from `node:sqlite` to SQLCipher or equivalent
+- Encrypt artifact files at write time using the same envelope key
+- Tighten filesystem permissions in the Docker container
+
+**Phase 3 (operational, no code)** — a one-page security policy
+documenting:
+- Who has SSH / sudo on the production VPS
+- Key management for `ENCRYPTION_KEY` and the future SQLCipher key
+- Backup encryption posture
+- Incident response procedure if a vendor reports a leak suspicion
+
+The honest truth: software gets you to the trust boundary at the application
+layer. Beyond that, **only operational policy + organisational discipline**
+prevent a privileged sysadmin from reading data they shouldn't.
+
+### 15.6 Verifying the model on your deployment
+
+After v1.10.0 deploys, three quick checks confirm the new model is active:
+
+```bash
+# 1. Authenticated artifact download — should require login.
+curl -i https://oscar.example.org/artifacts/00000000-0000-0000-0000-000000000000/report.html
+# Expected: HTTP/1.1 401 Unauthorized
+
+# 2. Datafile download — same.
+curl -i https://oscar.example.org/data/anyslug-datafile.json
+# Expected: HTTP/1.1 401 Unauthorized  (or 404 if slug doesn't exist)
+
+# 3. Admin run list — should show only data-lifecycle entries plus the notice.
+#    Login as admin first, copy the oscar_session cookie, then:
+curl -s -H "Cookie: oscar_session=<paste>" https://oscar.example.org/v1/runs | python3 -m json.tool | head
+# Expected: JSON with "notice" field about issue #60 and runs only in
+#   DELETION_REQUESTED / DELETED_BY_ADMIN status.
+```
+
+If all three behave as expected, the code-level part of issue #60 is in
+effect. The data-at-rest part is Phase 2.

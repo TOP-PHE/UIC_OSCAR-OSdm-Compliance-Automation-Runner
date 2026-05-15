@@ -189,15 +189,116 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Serve data files (Bruno fetches these during runs) ────────────────────────
 // Route: GET /data/:filename  →  data/datafiles/:filename
+//
+// SECURITY (issue #60, v1.10.0): previously served via express.static with no
+// auth at all. Anyone reaching the /data path could download any company's
+// datafile if they guessed the slug. Now requires EITHER:
+//   (a) an authenticated session whose company owns the file (slug match), OR
+//   (b) a true-loopback request with no X-Forwarded-For — i.e. the Bruno
+//       subprocess fetching from the same host. Nginx-proxied external
+//       traffic always carries X-Forwarded-For, so the loopback path can't
+//       be reached from outside the host.
 const DATAFILES_DIR = path.resolve(__dirname, '../data/datafiles');
-app.use('/data', express.static(DATAFILES_DIR));
+
+// Filename sanitiser: only allow `{slug}-datafile.json`-style names.
+// Rejects anything containing path separators, parent traversal, or hidden
+// dotfiles. The slug itself is taken from the filename and looked up in DB
+// to confirm a company exists with that slug (defence in depth — even if
+// the regex slips, the DB lookup catches forged inputs).
+const SAFE_DATAFILE_RE = /^([a-z0-9][a-z0-9-]*)-datafile\.json$/;
+
+function isLoopbackBrunoCall(req) {
+  // Bruno subprocess on the same host. No proxy hops in front of it.
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return false;                       // proxied = not direct loopback
+  const ip = (req.ip || '').replace(/^::ffff:/, '');
+  return ip === '127.0.0.1' || ip === '::1';
+}
+
+app.get('/data/:filename', (req, res) => {
+  const filename = String(req.params.filename || '');
+  const m = SAFE_DATAFILE_RE.exec(filename);
+  if (!m) return res.status(400).send('Bad request');
+
+  const slug = m[1];
+  const company = dbGet('SELECT id, slug FROM companies WHERE slug = ?', [slug]);
+  if (!company) return res.status(404).send('Not found');
+
+  // Loopback Bruno subprocess — bypass session auth (no cookie/Bearer
+  // available to a spawned child process).
+  if (!isLoopbackBrunoCall(req)) {
+    // Public-facing request — must carry a valid session AND belong to the
+    // company that owns the slug. Tester / test_manager only — no certifier
+    // / admin direct-download path here (they consume reports through
+    // /v1/runs endpoints which apply the per-run share gate).
+    let user;
+    try {
+      const cookieAuth = require('./api/middleware/auth');
+      user = cookieAuth.userFromRequest(req);  // returns parsed JWT or null
+    } catch (_e) { /* fall through to 401 */ }
+    if (!user) return res.status(401).send('Unauthorized');
+    if (user.companyId !== company.id) return res.status(403).send('Forbidden');
+  }
+
+  // Stream the file.
+  const filePath = path.resolve(DATAFILES_DIR, filename);
+  // Defence in depth — confirm the resolved path is still under DATAFILES_DIR
+  // (catches any sanitiser miss; the regex already prevents traversal).
+  if (!filePath.startsWith(DATAFILES_DIR + path.sep)) {
+    return res.status(400).send('Bad request');
+  }
+  res.setHeader('Content-Type', 'application/json');
+  return require('fs').createReadStream(filePath)
+    .on('error', () => res.status(404).send('Not found'))
+    .pipe(res);
+});
 
 // ── Serve run artifacts (HTML reports, JSON results) ─────────────────────────
 // Route: GET /artifacts/:runId/:filename
-// No auth required — the run UUID in the path is unguessable (128-bit random).
-// This allows the browser to open HTML reports directly in a new tab.
+//
+// SECURITY (issue #60, v1.10.0): previously served via express.static with no
+// auth — anyone who guessed (or saw in a log) a run UUID could download the
+// report. The "UUID is unguessable" defence was lazy: UUIDs leak into logs,
+// browser history, screenshots, audit trails. Now every request is gated by
+// the same per-run-ownership check used for the JSON results endpoint, which
+// covers per-company tenant isolation AND the v1.10 per-run share-with-
+// certifier flag (commit 2 of this PR).
 const ARTIFACTS_DIR = path.resolve(__dirname, '../data/artifacts');
-app.use('/artifacts', express.static(ARTIFACTS_DIR));
+const SAFE_RUNID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+app.get('/artifacts/:runId/:filename', (req, res) => {
+  const { runId, filename } = req.params;
+  if (!SAFE_RUNID_RE.test(runId || '')) return res.status(400).send('Bad request');
+  // Filename: report*.html, *.json, no path separators, no parent traversal
+  if (!/^[A-Za-z0-9._-]+$/.test(filename || '')) return res.status(400).send('Bad request');
+
+  let user;
+  try {
+    const cookieAuth = require('./api/middleware/auth');
+    user = cookieAuth.userFromRequest(req);
+  } catch (_e) { /* fall through to 401 */ }
+  if (!user) return res.status(401).send('Unauthorized');
+
+  // Reuse the same ownership-check the /v1/runs endpoints apply. A miss
+  // returns 404 (not 403) so existence is not disclosed — same shape as
+  // the existing v15 certifier privacy guard.
+  const { canUserSeeRun } = require('./api/helpers/run-access');
+  const run = canUserSeeRun(runId, user);
+  if (!run) return res.status(404).send('Not found');
+
+  // Resolve + path-traversal guard (defence in depth)
+  const filePath = path.resolve(ARTIFACTS_DIR, runId, filename);
+  if (!filePath.startsWith(ARTIFACTS_DIR + path.sep)) {
+    return res.status(400).send('Bad request');
+  }
+  const fs = require('fs');
+  if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
+
+  const isHtml = filename.toLowerCase().endsWith('.html');
+  res.setHeader('Content-Type', isHtml ? 'text/html; charset=utf-8' : 'application/json');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+  return fs.createReadStream(filePath).pipe(res);
+});
 
 // ── Prometheus scrape endpoint ────────────────────────────────────────────────
 // Returns the entire metrics registry in Prometheus exposition format.
