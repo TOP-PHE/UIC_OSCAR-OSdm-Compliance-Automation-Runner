@@ -109,13 +109,30 @@ function decryptBuffer(buf) {
 }
 
 /**
+ * Generate an unguessable temp-file suffix. CodeQL js/insecure-temporary-file
+ * objects to predictable patterns like pid+Date.now() because a co-located
+ * attacker could pre-create the file as a symlink to /etc/shadow and wait
+ * for our writer to overwrite it. crypto.randomBytes makes that race
+ * impossible — 16 random bytes = 2^128 possible suffixes.
+ */
+function _tmpSuffix() {
+  return '.tmp.' + crypto.randomBytes(16).toString('hex');
+}
+
+/**
  * Convenience: encrypt a Buffer/string and write it to a file. Atomic via
  * temp+rename so a crash mid-write leaves the previous version intact
  * (matters for the datafile path which is read by Bruno during runs).
+ *
+ * dstPath must be an absolute path under one of OSCAR's writable
+ * directories (data/artifacts, data/datafiles). Caller is responsible
+ * for that — we don't re-validate here because the helper is called
+ * from many sites with their own scoping logic; adding a global allow-
+ * list would be brittle.
  */
 function encryptToFile(plaintext, dstPath) {
   const enc = encryptBuffer(plaintext);
-  const tmp = dstPath + '.tmp.' + process.pid + '.' + Date.now();
+  const tmp = dstPath + _tmpSuffix();
   fs.writeFileSync(tmp, enc, { mode: 0o640 });
   fs.renameSync(tmp, dstPath);
 }
@@ -136,7 +153,7 @@ function decryptFromFile(srcPath) {
  */
 async function encryptToFileAsync(plaintext, dstPath) {
   const enc = encryptBuffer(plaintext);
-  const tmp = dstPath + '.tmp.' + process.pid + '.' + Date.now();
+  const tmp = dstPath + _tmpSuffix();
   await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
   await fs.promises.rename(tmp, dstPath);
 }

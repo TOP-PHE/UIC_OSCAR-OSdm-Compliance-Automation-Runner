@@ -21,20 +21,24 @@
  *   - Corruption / truncation handling
  */
 
-const fs   = require('fs');
-const path = require('path');
-const os   = require('os');
-const at   = require('../../src/utils/at-rest');
+const fs     = require('fs');
+const path   = require('path');
+const os     = require('os');
+const crypto = require('crypto');
+const at     = require('../../src/utils/at-rest');
 
-const TMP = (name) => path.join(os.tmpdir(), `oscar-at-rest-test-${process.pid}-${name}`);
+// Per-suite scratch dir with unguessable name (CodeQL js/insecure-temporary-file
+// objects to predictable paths in os.tmpdir() — a co-located attacker could
+// pre-create a symlink and steal our writes). 16 random bytes = 2^128 paths.
+// Created with mode 0700 so other users on the host can't list/read it.
+const SCRATCH = path.join(os.tmpdir(), `oscar-at-rest-test-${crypto.randomBytes(16).toString('hex')}`);
+fs.mkdirSync(SCRATCH, { mode: 0o700, recursive: true });
+const TMP = (name) => path.join(SCRATCH, name);
 
 afterAll(() => {
-  // Best-effort cleanup of any test artifacts that survived
-  for (const f of fs.readdirSync(os.tmpdir())) {
-    if (f.startsWith(`oscar-at-rest-test-${process.pid}-`)) {
-      try { fs.unlinkSync(path.join(os.tmpdir(), f)); } catch (_) { /* ignore */ }
-    }
-  }
+  // Best-effort cleanup — the whole scratch dir.
+  try { fs.rmSync(SCRATCH, { recursive: true, force: true }); }
+  catch (_) { /* ignore */ }
 });
 
 describe('encryptBuffer / decryptBuffer — round-trip', () => {

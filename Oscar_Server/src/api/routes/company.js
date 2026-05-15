@@ -218,16 +218,29 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), asy
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No file uploaded. Use field name "datafile".' });
   }
 
+  // Defence in depth (CodeQL js/path-injection): re-validate that
+  // multer's req.file.path is a child of our managed datafiles directory.
+  // multer's filename callback already restricts to {slug}-datafile.json
+  // where the slug comes from a DB lookup, so this should always hold —
+  // but the check makes the safety property local to this handler rather
+  // than relying on multer config knowledge.
+  const DATAFILES_DIR = path.resolve(__dirname, '../../../data/datafiles');
+  const safeUploadPath = path.resolve(req.file.path);
+  if (!safeUploadPath.startsWith(DATAFILES_DIR + path.sep)) {
+    try { fs.unlinkSync(req.file.path); } catch (_) { /* best effort */ }
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Upload landed outside the datafiles directory.' });
+  }
+
   // Validate it's parseable JSON, hash the plaintext, then encrypt-and-store.
   // The hash is computed on plaintext so testers can independently verify
   // the contents (sha256 of the file they uploaded — the encryption is
   // transparent to them). The file on disk is the OSCAR1 envelope.
   let plaintext;
   try {
-    plaintext = fs.readFileSync(req.file.path);
+    plaintext = fs.readFileSync(safeUploadPath);
     JSON.parse(plaintext.toString('utf8'));
   } catch (_e) {
-    try { fs.unlinkSync(req.file.path); } catch (_) { /* best effort */ }
+    try { fs.unlinkSync(safeUploadPath); } catch (_) { /* best effort */ }
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Uploaded file is not valid JSON.' });
   }
 
@@ -237,7 +250,7 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), asy
   // companies.datafile_path column doesn't need to change shape, and remove
   // the plaintext temp by overwriting it.
   try {
-    await encryptToFileAsync(plaintext, req.file.path);
+    await encryptToFileAsync(plaintext, safeUploadPath);
   } catch (err) {
     log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
@@ -245,7 +258,7 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), asy
 
   run(
     `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    [req.file.path, hash, targetCompanyId]
+    [safeUploadPath, hash, targetCompanyId]
   );
 
   auditLog(req.user.id, targetCompanyId, req.user.email, 'datafile_uploaded');

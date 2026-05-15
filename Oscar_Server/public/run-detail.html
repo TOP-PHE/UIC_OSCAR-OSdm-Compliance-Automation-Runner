@@ -177,8 +177,16 @@ const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 // logout() provided by nav.js
 
-const runId = new URLSearchParams(location.search).get('id');
-if (!runId) window.location.href = '/dashboard.html';
+// runId is interpolated into authenticated fetch URLs throughout this page,
+// so we strictly validate it's a UUID before doing anything. Closes a
+// CodeQL js/request-forgery flag (raw query-string value used as URL
+// fragment) and prevents a crafted ?id= from escaping to a foreign URL.
+const RUNID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const _rawRunId = new URLSearchParams(location.search).get('id');
+if (!_rawRunId || !RUNID_RE.test(_rawRunId)) {
+  window.location.href = '/dashboard.html';
+}
+const runId = _rawRunId;
 
 let lastEventId = 0;
 let polling     = true;

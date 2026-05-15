@@ -963,7 +963,16 @@ router.delete('/:id', (req, res) => {
   // within their company. Tenant middleware constrains req.companyId so
   // cross-company deletion is impossible regardless of role.
   const isElevated = isAdmin || req.user.role === 'test_manager';
-  const runRow  = validateRunOwnership(req.params.id, req.companyId, req);
+  // Issue #60 (v1.10+): admin can no longer SEE run content (canUserSeeRun
+  // returns null for admin), but admin still operates on the data lifecycle
+  // — flagging runs as DELETED_BY_ADMIN, purging on confirmation, etc.
+  // Look up the run directly for admin's lifecycle ops, bypassing the
+  // content-access guard. The metadata exposure (status, company, user) is
+  // narrower than what admin already sees on /v1/runs (lifecycle queue) so
+  // no new information is disclosed.
+  const runRow = isAdmin
+    ? get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [req.params.id])
+    : validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   if (runRow.status === 'QUEUED' || runRow.status === 'RUNNING') {

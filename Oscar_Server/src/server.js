@@ -187,6 +187,22 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));  // 5 MB — covers largest expected datafile
 app.use(express.urlencoded({ extended: true }));
 
+// ── File-download rate limiter (CodeQL js/missing-rate-limiting) ──────────────
+// Both /data/:filename and /artifacts/:runId/:filename perform filesystem
+// reads. Even though both are auth-gated, defence-in-depth caps the request
+// rate so a leaked session token cannot be used to enumerate / scrape every
+// vendor's reports at speed. The cap is generous (300 file fetches per
+// minute per IP) so legitimate UI use — opening a multi-scenario report
+// dashboard — never trips it.
+const fileDownloadLimiter = require('express-rate-limit')({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests',
+             detail: 'Too many file downloads in a short window. Slow down or wait a minute.' }
+});
+
 // ── Serve data files (Bruno fetches these during runs) ────────────────────────
 // Route: GET /data/:filename  →  data/datafiles/:filename
 //
@@ -215,7 +231,7 @@ function isLoopbackBrunoCall(req) {
   return ip === '127.0.0.1' || ip === '::1';
 }
 
-app.get('/data/:filename', (req, res) => {
+app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
   if (!m) return res.status(400).send('Bad request');
@@ -276,7 +292,7 @@ app.get('/data/:filename', (req, res) => {
 const ARTIFACTS_DIR = path.resolve(__dirname, '../data/artifacts');
 const SAFE_RUNID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-app.get('/artifacts/:runId/:filename', (req, res) => {
+app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
   const { runId, filename } = req.params;
   if (!SAFE_RUNID_RE.test(runId || '')) return res.status(400).send('Bad request');
   // Filename: report*.html, *.json, no path separators, no parent traversal
