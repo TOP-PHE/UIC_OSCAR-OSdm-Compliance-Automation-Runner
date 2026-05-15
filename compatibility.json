@@ -1,8 +1,41 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.26",
+  "current_release": "2026.28",
   "releases": [
+    {
+      "release": "2026.28",
+      "date": "2026-05-15",
+      "server": "1.11.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(security #60): vendor data sovereignty Phase 2 — at-rest encryption. Sensitive content on disk is now AES-256-GCM encrypted using the existing ENCRYPTION_KEY: HTML reports, JSON results, company datafiles, plus the contents of run_events.message, run_requests.{request_body,request_headers,response_body,response_headers,context}, test_frameworks.config, test_resources.data. Anyone running `cat` on the file or `sqlite3 .dump` on the DB sees the OSCAR1 envelope (file) or 'enc:v1:' prefix + base64 ciphertext (column) — never plaintext.",
+        "Backward-compat preserved end-to-end: legacy plaintext files (no OSCAR1 magic header) and legacy plaintext rows (no enc:v1: prefix) remain readable forever — the read helpers detect them and pass through unchanged. The v19 migration backfill is idempotent and can be skipped on small instances if desired.",
+        "Schema migration v19 — encrypts existing plaintext rows in run_events, run_requests, test_frameworks, test_resources. Per-table transactions; rollback on failure; logs row counts. Idempotent: rows already prefixed are skipped on subsequent runs.",
+        "Threat coverage extended: sysadmin running `sudo cat /opt/OSCAR/.../data/oscar.db | strings` now reveals only structural metadata (status, timestamps, http_status, suite_name) — never log content, HTTP traffic, scenarios, or test framework. Same for artifact + datafile reads. The remaining gap is operator-side: a sysadmin attaching a debugger to the running OSCAR process can extract the in-memory key. That's covered by Phase 3 (operational policy doc, no code).",
+        "fix(reports): pre-existing latent bug — the /v1/reports/requests/:id/messages endpoint queried four columns (req_body, req_headers, resp_body, resp_headers) that don't exist in the schema (real names are request_*/response_*). The HTTP message viewer in Report Builder was silently empty. Fixed alongside the encryption work since both touch the same query.",
+        "Operator action required after rollover: none. v19 migration runs automatically on first boot; existing artifacts and datafiles remain readable as-is. New writes are encrypted. An optional one-time backfill script for existing artifact files lives in OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh — purely cleanup, not required."
+      ]
+    },
+    {
+      "release": "2026.27",
+      "date": "2026-05-15",
+      "server": "1.10.0",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(security #60): vendor data sovereignty — Phase 1. Introduces a per-run share-with-certifier toggle (replaces the all-or-nothing company-wide flag), strips the administrator role of all read access to test data (test config, datafile, runs, artifacts, assertions), and closes a static-serve bypass that previously let any anonymous user download an artifact knowing only the run UUID.",
+        "BREAKING (admin role): administrators can no longer read /v1/runs (per-run content), /v1/runs/:id, /v1/runs/:id/artifacts, /v1/company/test-framework, /v1/company/datafile, /v1/company/test-resources. The role becomes operations + security only (users, companies metadata, server config, alerts, audit log, observability stack). Aggregate run counts remain visible via /v1/admin/activity. Pending-deletion lifecycle queue remains visible (DELETION_REQUESTED + DELETED_BY_ADMIN status only).",
+        "BREAKING (certifier visibility): certifiers no longer see all of a vendor's runs based on the company-wide share toggle. They see ONLY runs the test_manager has explicitly shared via the new 'Share with certifiers' button on each run-detail page. The legacy companies.share_reports_with_certifier toggle becomes a master kill switch — when 0, it overrides every per-run share. v18 migration backfills all terminal runs of currently-shared companies as 'shared' so existing certifier workflows don't break on rollover.",
+        "fix(critical): /artifacts/<runId>/<filename> and /data/<filename> were served by express.static with no auth — anyone able to reach OSCAR could download artifacts knowing only a run UUID. Both routes now require authenticated session + per-run-ownership check (artifacts) or company-slug match (datafile). Bruno's loopback fetch of /data continues to work via a no-X-Forwarded-For exception.",
+        "Schema migration v18 — runs gains shared_with_certifier_at + shared_with_certifier_by columns; partial index on shared_with_certifier_at; backfill of legacy company-wide-share runs. Idempotent and run-once.",
+        "Operator action required after rollover: none for the canonical UIC deployment — every existing certifier-visible run is preserved by the v18 backfill. Per-run sharing becomes the model for all NEW runs; test_managers can revoke or extend access run-by-run via the new UI button. Self-hosters: nothing extra.",
+        "Threat model (documented in admin guide § 15): defends against admin-browsing-UI access, anonymous artifact bypass, per-company leakage, and certifier overreach. Does NOT defend against root SSH access reading raw oscar.db on disk (Phase 2 — at-rest DB encryption — separate release)."
+      ]
+    },
     {
       "release": "2026.26",
       "date": "2026-05-11",

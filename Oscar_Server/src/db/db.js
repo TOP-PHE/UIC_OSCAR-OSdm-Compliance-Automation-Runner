@@ -353,6 +353,127 @@ const MIGRATIONS = [
       }
       console.log(`[db] migration v17 — scrubbed credentials from ${scrubbed} of ${rows.length} run_requests rows`);
   }},
+
+  { version: 18, name: 'runs-per-run-share-with-certifier', up: () => {
+      // Per-run share-with-certifier toggle (issue #60, v1.10.0).
+      //
+      // Replaces the all-or-nothing companies.share_reports_with_certifier
+      // toggle as the gating mechanism for certifier visibility. The company-
+      // wide toggle becomes a master kill switch: when set to 0 it overrides
+      // every per-run share, allowing a vendor to revoke ALL certifier access
+      // in one click. When set to 1 (default), per-run sharing decides.
+      //
+      // shared_with_certifier_at: ISO 8601 UTC timestamp of when the test
+      //   manager opted to share. NULL = not shared (the safe default).
+      // shared_with_certifier_by: email of the test manager who shared (for
+      //   audit). NULL when not shared.
+      _safeAlter('ALTER TABLE runs ADD COLUMN shared_with_certifier_at TEXT');
+      _safeAlter('ALTER TABLE runs ADD COLUMN shared_with_certifier_by TEXT');
+
+      // Backfill: any company that today has share_reports_with_certifier=1
+      // (the legacy v15 toggle) gets ALL its terminal runs marked shared, so
+      // existing certifier workflows don't suddenly go dark on rollover.
+      // After v1.10.0 ships, test managers explicitly pick which NEW runs to
+      // share — the bulk-share is purely a backward-compat preservation.
+      try {
+        db.exec(`
+          UPDATE runs
+             SET shared_with_certifier_at = COALESCE(completed_at, queued_at),
+                 shared_with_certifier_by = 'system_migration_v18'
+           WHERE shared_with_certifier_at IS NULL
+             AND status IN ('COMPLETED', 'FAILED', 'CANCELLED')
+             AND company_id IN (
+               SELECT id FROM companies WHERE share_reports_with_certifier = 1
+             )
+        `);
+        const cnt = db.prepare(
+          "SELECT COUNT(*) AS n FROM runs WHERE shared_with_certifier_by = 'system_migration_v18'"
+        ).get();
+        console.log(`[db] migration v18 — backfilled ${cnt.n} terminal runs as 'shared with certifier' (legacy company-wide toggle preserved)`);
+      } catch (e) {
+        console.error('[db] v18 backfill failed:', e.message);
+        throw e;
+      }
+
+      // Partial index for the certifier list-query: "all runs visible to me"
+      // → WHERE shared_with_certifier_at IS NOT NULL ORDER BY shared_at DESC
+      try {
+        db.exec('CREATE INDEX IF NOT EXISTS idx_runs_shared_with_certifier ON runs(shared_with_certifier_at) WHERE shared_with_certifier_at IS NOT NULL');
+      } catch (_e) { /* benign if already exists */ }
+  }},
+
+  { version: 19, name: 'at-rest-encrypt-sensitive-columns', up: () => {
+      // Phase 2 of issue #60 (v1.11.0). Encrypts content of every existing
+      // plaintext row in the sensitive columns by prepending the 'enc:v1:'
+      // marker and AES-256-GCM ciphertext (same envelope as colEncrypt()).
+      //
+      // Idempotent — rows already carrying the prefix are skipped. Rows
+      // with NULL stay NULL. Migration is wrapped in transactions per
+      // table so a crash mid-migration leaves a half-encrypted state
+      // that the helper handles transparently (colDecrypt's prefix check).
+      //
+      // Artifact + datafile files on disk are NOT touched by this DB
+      // migration — they're encrypted-on-next-write by the runner /
+      // company-routes. A separate operator script (in OSCAR_Deploy/scripts/)
+      // can backfill those if desired, but it's not required: the read
+      // helpers handle plaintext files transparently.
+      const COL_PREFIX = 'enc:v1:';
+      const tables = [
+        { name: 'run_events',     col: 'message' },
+        { name: 'run_requests',   col: 'request_body'    },
+        { name: 'run_requests',   col: 'request_headers' },
+        { name: 'run_requests',   col: 'response_body'   },
+        { name: 'run_requests',   col: 'response_headers'},
+        { name: 'run_requests',   col: 'context'         },
+        { name: 'test_frameworks', col: 'config'          },
+        { name: 'test_resources',  col: 'data'            },
+      ];
+
+      for (const { name, col } of tables) {
+        let rows;
+        try {
+          rows = db.prepare(
+            `SELECT rowid, "${col}" AS v FROM "${name}" WHERE "${col}" IS NOT NULL AND "${col}" != ''`
+          ).all();
+        } catch (_e) {
+          // Table or column doesn't exist on this DB (typically a fresh
+          // install where some rows haven't been created yet). Skip.
+          continue;
+        }
+        if (rows.length === 0) {
+          console.log(`[db] migration v19 — ${name}.${col}: no rows to encrypt`);
+          continue;
+        }
+
+        const upd = db.prepare(`UPDATE "${name}" SET "${col}" = ? WHERE rowid = ?`);
+        let encrypted = 0;
+        let skipped = 0;
+        db.exec('BEGIN');
+        try {
+          for (const r of rows) {
+            const v = r.v;
+            if (typeof v !== 'string' || v.startsWith(COL_PREFIX)) {
+              skipped++;
+              continue;
+            }
+            // Inline AES-256-GCM encrypt + prefix (mirrors colEncrypt)
+            const iv = crypto.randomBytes(12);
+            const cipher = crypto.createCipheriv('aes-256-gcm', _key(), iv);
+            const enc = Buffer.concat([cipher.update(v, 'utf8'), cipher.final()]);
+            const tag = cipher.getAuthTag();
+            const stored = COL_PREFIX + Buffer.concat([iv, tag, enc]).toString('base64');
+            upd.run(stored, r.rowid);
+            encrypted++;
+          }
+          db.exec('COMMIT');
+        } catch (e) {
+          db.exec('ROLLBACK');
+          console.error(`[db] migration v19 ${name}.${col} FAILED:`, e.message);
+          throw e;
+        }
+        console.log(`[db] migration v19 — ${name}.${col}: encrypted ${encrypted} rows (skipped ${skipped} already-encrypted)`);
+      }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
@@ -473,6 +594,51 @@ function run(sql, params = []) {
   return db.prepare(sql).run(...params);
 }
 
+// ── At-rest column encryption (Phase 2 of issue #60, v1.11.0) ───────────────
+// Wraps the existing encrypt()/decrypt() with a versioned prefix marker so
+// reads can transparently distinguish "encrypted v1" rows from legacy
+// plaintext rows. The forward-compat read path (colDecrypt) is what makes
+// migration v19 optional — even before backfill, mixed plaintext/encrypted
+// rows render correctly.
+//
+// Used for sensitive content columns where SSH-level read access would
+// otherwise reveal vendor data:
+//   - run_events.message              (log stream content)
+//   - run_requests.request_body       (HTTP traffic in)
+//   - run_requests.request_headers    (sensitive headers)
+//   - run_requests.response_body      (HTTP traffic out)
+//   - run_requests.response_headers
+//   - test_frameworks.config          (vendor capability declaration)
+//   - test_resources.data             (test trains / trips definitions)
+//
+// NOT applied to columns we still need to query/sort/filter on (status,
+// timestamps, company_id, http_status, suite_name, etc.). Those remain
+// plaintext — but they're metadata, not vendor data.
+
+const COL_PREFIX = 'enc:v1:';
+
+function colEncrypt(plaintext) {
+  if (plaintext == null || plaintext === '') return plaintext;
+  return COL_PREFIX + encrypt(String(plaintext));
+}
+
+function colDecrypt(stored) {
+  if (stored == null || stored === '') return stored;
+  if (typeof stored !== 'string') return stored;
+  if (!stored.startsWith(COL_PREFIX)) return stored;   // legacy plaintext
+  try {
+    return decrypt(stored.slice(COL_PREFIX.length));
+  } catch (err) {
+    // AES-GCM auth-tag failure on a value with our prefix is a real
+    // security alert — either the row was tampered with, or the
+    // ENCRYPTION_KEY rotated without re-encryption. Surface but never
+    // crash the request — return null so the caller keeps working with
+    // missing data instead of a 500.
+    console.error('[db.colDecrypt] decryption failed for prefixed value:', err.message);
+    return null;
+  }
+}
+
 // ── Server config helper ─────────────────────────────────────────────────────
 // Reads from server_config table first, falls back to env var, then default.
 // This allows runtime changes via the admin UI without server restart.
@@ -493,4 +659,4 @@ function transaction(fn) {
   }
 }
 
-module.exports = { db, all, get, run, transaction, encrypt, decrypt, getConfig };
+module.exports = { db, all, get, run, transaction, encrypt, decrypt, colEncrypt, colDecrypt, getConfig };

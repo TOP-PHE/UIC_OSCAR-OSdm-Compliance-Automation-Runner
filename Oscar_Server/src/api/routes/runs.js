@@ -18,6 +18,8 @@
  * GET  /v1/runs/:id/logs                — log events for a run
  * GET  /v1/runs/:id/artifacts           — list artifacts
  * GET  /v1/runs/:id/artifacts/:aid      — download an artifact
+ * POST /v1/runs/:id/share               — test_manager: share THIS run with certifiers (v1.10.0, issue #60)
+ * DELETE /v1/runs/:id/share             — test_manager: revoke certifier access to THIS run
  * DELETE /v1/runs/:id/cancel            — cancel a queued run (not yet started)
  * DELETE /v1/runs/:id                   — tester soft-delete (→ DELETION_REQUESTED)
  *                                         admin soft-delete  (→ DELETED_BY_ADMIN)
@@ -36,9 +38,10 @@ const path    = require('path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run: dbRun, transaction } = require('../../db/db');
+const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
+const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
 
 const router = express.Router();
@@ -73,28 +76,19 @@ function isRunStale(runRow) {
  * Return the run row if it exists and is not permanently deleted.
  * companyId = null means platform-role caller (admin/certifier) — no tenant filter.
  *
- * Pass `req` (optional) to apply the v15 certifier privacy guard: a
- * certification_user accessing a run from a company that opted out of
- * sharing is treated as a 404 (we don't disclose existence to certifiers
- * who shouldn't see the company's data at all).
+ * v1.10.0 (issue #60): delegates to canUserSeeRun() — the consolidated
+ * visibility helper that enforces:
+ *   - tenant isolation (tester / test_manager scoped to own company)
+ *   - administrator strict-mode (no read access to test data)
+ *   - certifier per-run share gate (shared_with_certifier_at must be set
+ *     AND the company-wide kill switch must not be flipped)
+ * Returning null means "treat as not-found" — never disclose existence to
+ * a user who shouldn't see the run.
  */
-function validateRunOwnership(runId, companyId, req) {
-  let row;
-  if (!companyId) {
-    row = get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [runId]);
-  } else {
-    row = get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [runId, companyId]);
-  }
-  if (!row) return null;
-  // v15 certifier privacy guard
-  if (req && req.user && req.user.role === 'certification_user') {
-    const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
-    // SQLite stores BOOLEAN as INTEGER (0/1); `=== false` was unreachable (Sonar S3403).
-    if (c && c.share_reports_with_certifier === 0) {
-      return null;   // hide existence — same shape as "not found"
-    }
-  }
-  return row;
+const { canUserSeeRun } = require('../helpers/run-access');
+function validateRunOwnership(runId, _companyId, req) {
+  if (!req || !req.user) return null;
+  return canUserSeeRun(runId, req.user);
 }
 
 /**
@@ -237,6 +231,36 @@ router.get('/', (req, res) => {
   const limit  = Math.min(parseInt(req.query.limit  || '50',  10), 200);
   const offset = parseInt(req.query.offset || '0',  10);
 
+  // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
+  // ONE narrow exception: the operational data-lifecycle queue. Admins must
+  // be able to see the LIST of runs awaiting their decision (DELETION_REQUESTED
+  // from testers, DELETED_BY_ADMIN flagged) so they can confirm purges or
+  // restore. The list returns metadata only — when the admin tries to drill
+  // into any single run, /v1/runs/:id returns 404 (canUserSeeRun blocks the
+  // role). Aggregate counts live in /v1/admin/activity.
+  if (req.user.role === 'administrator') {
+    const adminRows = all(
+      `SELECT r.id, r.company_id, c.name AS company_name, r.status,
+              r.queued_at, r.started_at, r.completed_at, r.exit_code,
+              r.deleted_by, r.previous_status, r.batch_id, r.scenario_code,
+              u.email AS submitted_by
+       FROM runs r
+       JOIN users u ON u.id = r.user_id
+       JOIN companies c ON c.id = r.company_id
+       WHERE r.status IN ('DELETION_REQUESTED', 'DELETED_BY_ADMIN')
+       ORDER BY r.queued_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+    const adminTotal = get(
+      "SELECT COUNT(*) AS n FROM runs WHERE status IN ('DELETION_REQUESTED', 'DELETED_BY_ADMIN')"
+    );
+    return res.json({
+      total: adminTotal.n, limit, offset, runs: adminRows,
+      notice: 'Administrators see the data-lifecycle queue only (pending deletions, admin-flagged runs). Per-run content access was removed in v1.10.0 (issue #60). Use the Server Activity tab for aggregate counts.'
+    });
+  }
+
   const isPlatform = isPlatformRole(req.user.role);
   let rows, total;
 
@@ -258,12 +282,12 @@ router.get('/', (req, res) => {
        ) rs ON rs.run_id = r.id`;
 
   if (isPlatform && !req.companyId) {
-    // Admin / certifier: see everything except permanently deleted.
-    //
-    // Certifier-only restriction (v15): exclude runs from companies that
-    // have opted out of certifier sharing. Administrators are unaffected.
+    // Certifier list: per-run share gate (v1.10.0, issue #60). The
+    // certifier sees ONLY runs the test_manager has explicitly shared,
+    // gated additionally by the company-wide kill switch. Administrators
+    // are short-circuited above.
     const certifierFilter = req.user.role === 'certification_user'
-      ? 'AND c.share_reports_with_certifier = 1'
+      ? 'AND r.shared_with_certifier_at IS NOT NULL AND c.share_reports_with_certifier = 1'
       : '';
     rows = all(
       `SELECT r.id, r.company_id, c.name AS company_name, r.status,
@@ -572,7 +596,13 @@ router.get('/:id/logs', (req, res) => {
 
   const since  = req.query.since_id ? parseInt(req.query.since_id, 10) : 0;
 
-  // Build query with optional filters (backward-compatible)
+  // Build query with optional filters (backward-compatible).
+  // NOTE (Phase 2 of issue #60, v1.11.0): the `message` column is now
+  // encrypted at rest. Server-side LIKE no longer matches encrypted
+  // ciphertext, so when ?search= is present we fetch a wider window and
+  // filter post-decrypt in Node. Metadata filters (category/phase/suite)
+  // remain plaintext and continue to work in SQL — that's the whole point
+  // of leaving structural columns unencrypted.
   let sql = `SELECT id, ts, level, message, category, phase, suite_name, request_name, http_status
              FROM run_events WHERE run_id = ? AND id > ?`;
   const params = [req.params.id, since];
@@ -580,11 +610,24 @@ router.get('/:id/logs', (req, res) => {
   if (req.query.category) { sql += ' AND category = ?'; params.push(req.query.category); }
   if (req.query.phase)    { sql += ' AND phase = ?';    params.push(req.query.phase); }
   if (req.query.suite)    { sql += ' AND suite_name = ?'; params.push(req.query.suite); }
-  if (req.query.search)   { sql += ' AND message LIKE ?'; params.push(`%${req.query.search}%`); }
 
-  sql += ' ORDER BY id ASC LIMIT 500';
-  const events = all(sql, params);
-  return res.json({ run_id: req.params.id, status: runRow.status, events });
+  // When searching, pull a wider window (5×) and post-filter in Node after
+  // decrypting message. Caps the fetch at 5000 rows so a runaway log
+  // doesn't blow up memory.
+  const wantSearch = !!req.query.search;
+  sql += wantSearch ? ' ORDER BY id ASC LIMIT 5000' : ' ORDER BY id ASC LIMIT 500';
+
+  const rows = all(sql, params);
+  // Transparent decrypt of the message column (handles legacy plaintext).
+  const events = rows.map(r => ({ ...r, message: colDecrypt(r.message) }));
+
+  let filtered = events;
+  if (wantSearch) {
+    const needle = String(req.query.search).toLowerCase();
+    filtered = events.filter(e => String(e.message || '').toLowerCase().includes(needle)).slice(0, 500);
+  }
+
+  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered });
 });
 
 // ── GET /v1/runs/:id/assertions ──────────────────────────────────────────────
@@ -603,7 +646,11 @@ router.get('/:id/assertions', (req, res) => {
   suiteSql += ' ORDER BY id ASC';
   const suites = all(suiteSql, suiteParams);
 
-  // Build nested response
+  // Build nested response.
+  // Phase 2 of issue #60 (v1.11.0): HTTP body + header columns are
+  // encrypted at rest. colDecrypt() handles both new (encrypted) and
+  // legacy plaintext rows transparently — we apply it to every output
+  // request row so the UI/Report Builder gets readable content.
   const result = suites.map(s => {
     const requests = all('SELECT * FROM run_requests WHERE suite_id = ? ORDER BY id ASC', [s.id]);
 
@@ -616,7 +663,15 @@ router.get('/:id/assertions', (req, res) => {
       if (domain) { assertSql += ' AND domain = ?'; assertParams.push(domain); }
       assertSql += ' ORDER BY id ASC';
       const assertions = all(assertSql, assertParams);
-      return { ...r, assertions };
+      return {
+        ...r,
+        request_body:     colDecrypt(r.request_body),
+        request_headers:  colDecrypt(r.request_headers),
+        response_body:    colDecrypt(r.response_body),
+        response_headers: colDecrypt(r.response_headers),
+        context:          colDecrypt(r.context),
+        assertions
+      };
     });
 
     return { ...s, requests: enrichedRequests };
@@ -734,6 +789,15 @@ router.get('/:id/requests/:reqId', (req, res) => {
   );
   if (!reqRow) return res.status(404).json({ status: 404, title: 'Request not found.' });
 
+  // Decrypt the at-rest-encrypted body + header + context columns before
+  // shaping the response (Phase 2 of issue #60). Legacy plaintext rows
+  // pass through colDecrypt() unchanged.
+  reqRow.request_body     = colDecrypt(reqRow.request_body);
+  reqRow.request_headers  = colDecrypt(reqRow.request_headers);
+  reqRow.response_body    = colDecrypt(reqRow.response_body);
+  reqRow.response_headers = colDecrypt(reqRow.response_headers);
+  reqRow.context          = colDecrypt(reqRow.context);
+
   // Parent (if any) — compact summary
   let parent = null;
   if (reqRow.parent_request_id) {
@@ -790,10 +854,83 @@ router.get('/:id/artifacts/:aid', (req, res) => {
   }
   if (!fs.existsSync(safePath)) return res.status(404).json({ status: 404, title: 'Artifact file missing on server.' });
 
+  // Phase 2 of issue #60 (v1.11.0) — artifacts are encrypted at rest. The
+  // helper handles both new (encrypted) and legacy plaintext files
+  // transparently via the OSCAR1 magic-header check.
+  const { decryptFromFile } = require('../../utils/at-rest');
+  let plaintext;
+  try { plaintext = decryptFromFile(safePath); }
+  catch (err) {
+    return res.status(500).json({ status: 500, title: 'Decryption failed', detail: err.message });
+  }
+
   const mime = artifact.type === 'html_report' ? 'text/html' : 'application/json';
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Disposition', `inline; filename="${artifact.filename}"`);
-  fs.createReadStream(safePath).pipe(res);
+  res.setHeader('Content-Length', String(plaintext.length));
+  return res.end(plaintext);
+});
+
+// ── POST /v1/runs/:id/share — share THIS run with certifiers (v1.10.0) ──────
+// Test manager opt-in: mark a single completed run as visible to certifiers.
+// Replaces the all-or-nothing companies.share_reports_with_certifier toggle
+// as the gating mechanism for certifier visibility (issue #60).
+//
+// Restrictions:
+//   - Only test_manager role of the run's owning company can share.
+//   - Run must be in a terminal status (COMPLETED / FAILED / CANCELLED).
+//     Sharing in-progress runs is meaningless and would leak partial state.
+//   - The company-wide share_reports_with_certifier toggle remains a master
+//     kill switch: when set to 0 it overrides per-run shares.
+//
+// Audit-logged with the run id and the actor's email.
+router.post('/:id/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can share runs with certifiers.' });
+  }
+  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
+  if (!runRow || runRow.status === 'DELETED') {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  // Tenant scope: a test_manager can only share their OWN company's runs.
+  if (runRow.company_id !== req.user.companyId) {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(runRow.status)) {
+    return res.status(409).json({ status: 409, title: 'Conflict',
+      detail: `Run is ${runRow.status} — sharing is only allowed once a run reaches a terminal status.` });
+  }
+
+  dbRun(
+    `UPDATE runs
+        SET shared_with_certifier_at = datetime('now'),
+            shared_with_certifier_by = ?
+      WHERE id = ?`,
+    [req.user.email, req.params.id]
+  );
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_shared_with_certifier:${req.params.id}`);
+  const updated = get('SELECT id, shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [req.params.id]);
+  return res.json({ ok: true, run: updated });
+});
+
+// ── DELETE /v1/runs/:id/share — revoke certifier access to THIS run ──────────
+// Test manager unshare: certifiers immediately lose access. Audit-logged.
+router.delete('/:id/share', (req, res) => {
+  if (req.user.role !== 'test_manager') {
+    return res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only test_manager can revoke certifier access.' });
+  }
+  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
+  if (!runRow || runRow.status === 'DELETED' || runRow.company_id !== req.user.companyId) {
+    return res.status(404).json({ status: 404, title: 'Run not found.' });
+  }
+  dbRun(
+    `UPDATE runs SET shared_with_certifier_at = NULL, shared_with_certifier_by = NULL WHERE id = ?`,
+    [req.params.id]
+  );
+  auditLog(req.user.id, runRow.company_id, req.user.email, `run_unshared_with_certifier:${req.params.id}`);
+  return res.json({ ok: true, run: { id: req.params.id, shared_with_certifier_at: null } });
 });
 
 // ── DELETE /v1/runs/:id/cancel ────────────────────────────────────────────────
@@ -826,7 +963,16 @@ router.delete('/:id', (req, res) => {
   // within their company. Tenant middleware constrains req.companyId so
   // cross-company deletion is impossible regardless of role.
   const isElevated = isAdmin || req.user.role === 'test_manager';
-  const runRow  = validateRunOwnership(req.params.id, req.companyId, req);
+  // Issue #60 (v1.10+): admin can no longer SEE run content (canUserSeeRun
+  // returns null for admin), but admin still operates on the data lifecycle
+  // — flagging runs as DELETED_BY_ADMIN, purging on confirmation, etc.
+  // Look up the run directly for admin's lifecycle ops, bypassing the
+  // content-access guard. The metadata exposure (status, company, user) is
+  // narrower than what admin already sees on /v1/runs (lifecycle queue) so
+  // no new information is disclosed.
+  const runRow = isAdmin
+    ? get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [req.params.id])
+    : validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
   if (runRow.status === 'QUEUED' || runRow.status === 'RUNNING') {
