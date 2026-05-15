@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.2] — 2026-05-15
+
+Docs-only. Ships Phase 3 of issue #60 — the operational policy that
+closes the part of "vendor data sovereignty" that software cannot
+enforce on its own.
+
+### Added
+- **`Documentation/Server_Operations/OSCAR - Security Operations Policy.md`**
+  — the policy document that defines:
+  - Access tiers (Tier A platform operator with root SSH; Tier B
+    OSCAR administrator; Tier C certification reviewer)
+  - Strict separation rule — a person with Tier A access must not
+    hold Tier B/C on the same identity
+  - Key management inventory + rotation procedures for all four
+    long-lived secrets (`ENCRYPTION_KEY`, `JWT_SECRET`,
+    `PLATFORM_BOOTSTRAP_TOKEN`, Brevo SMTP key)
+  - Backup policy: daily snapshots, 14-day rolling retention,
+    quarterly cold archives, GPG-encrypted backup tarballs
+  - SEV-1 → SEV-4 severity levels and target response times
+  - SEV-1 incident playbook (with the verified commands that worked
+    during the 2026-05-15 v19 outage)
+  - Procedure when a vendor reports a data-leak suspicion
+  - Periodic review cadence (weekly to yearly) with explicit owners
+  - Known operational risks NOT closed by code, with mitigations
+  - A worked example of the 2026-05-15 v19 migration outage —
+    timeline, what worked, what didn't, four concrete action items
+  - Reading guide mapping situations to docs
+
+### Changed
+- **Admin Guide § 15.5** — Phase 3 marker flipped from ⏳ to ✅;
+  cross-reference to the policy doc added.
+
+### Operator action
+None. Docs-only. Watchtower picks up v1.11.2 and the recreate is a
+no-op against the running v1.11.1 schema state.
+
+### Status of issue #60
+| Phase | Status |
+|---|---|
+| 1 — Application-level access control + per-run sharing | ✅ v1.10.0 |
+| 2 — At-rest encryption (DB columns + artifact files) | ✅ v1.11.0 + v1.11.1 hotfix |
+| 3 — Operational policy | ✅ v1.11.2 (this) |
+
+Issue #60 closeable.
+
+---
+
 ## [server-v1.11.1] — 2026-05-15
 
 Critical hotfix. v1.11.0 shipped with a broken v19 migration that crashed

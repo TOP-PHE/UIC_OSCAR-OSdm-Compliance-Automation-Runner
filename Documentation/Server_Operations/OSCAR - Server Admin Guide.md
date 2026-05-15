@@ -935,20 +935,24 @@ application-level AES-256-GCM rather than SQLCipher, which:
   names) in plaintext so SQL queries continue to work without per-row
   decrypt cost.
 
-**Phase 3 (operational, no code)** — a one-page security policy
-documenting:
-- Who has SSH / sudo on the production VPS
-- Key management for `ENCRYPTION_KEY` (rotation procedure, escrow)
-- Backup encryption posture (the at-rest layer protects backups already,
-  but key management still applies)
-- Incident response procedure if a vendor reports a leak suspicion
+**Phase 3 — operational policy (no code)** ✅ shipped in v1.11.2 as
+[`OSCAR - Security Operations Policy.md`](OSCAR%20-%20Security%20Operations%20Policy.md).
+That document defines who has SSH access to production, how the
+four long-lived secrets (ENCRYPTION_KEY, JWT_SECRET, SMTP key,
+bootstrap token) are managed and rotated, backup encryption posture,
+the SEV-1 incident playbook, the procedure when a vendor reports
+data-leak suspicion, and a worked example using the 2026-05-15 v19
+migration outage. It also records the operational risks the code
+cannot defend against — debugger access by a Tier A operator, host
+compromise, build supply chain — with concrete mitigations.
 
 The honest truth: software gets you to the trust boundary at the
 application layer + the on-disk layer. Beyond that — a sysadmin
 attaching a debugger to the running OSCAR process and reading
 `ENCRYPTION_KEY` out of memory — **only operational policy +
 organisational discipline** prevent a privileged sysadmin from reading
-data they shouldn't. Phase 3 documents that policy.
+data they shouldn't. The Security Operations Policy is that
+discipline, written down.
 
 ### 15.6 Verifying the model on your deployment
 
