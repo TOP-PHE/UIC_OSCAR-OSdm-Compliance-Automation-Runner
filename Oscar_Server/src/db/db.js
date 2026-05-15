@@ -431,9 +431,16 @@ const MIGRATIONS = [
 
       for (const { name, col } of tables) {
         let rows;
+        // v1.11.1 fix: use explicit `id` primary key instead of `rowid`.
+        // Node 22's built-in node:sqlite (DatabaseSync) does NOT expose
+        // `rowid` as a row property when SELECTed without alias — `r.rowid`
+        // comes back undefined and binding it fails with
+        // "Provided value cannot be bound to SQLite parameter 2".
+        // All four tables (run_events, run_requests, test_frameworks,
+        // test_resources) have an `id` PK column, so this is uniform.
         try {
           rows = db.prepare(
-            `SELECT rowid, "${col}" AS v FROM "${name}" WHERE "${col}" IS NOT NULL AND "${col}" != ''`
+            `SELECT id, "${col}" AS v FROM "${name}" WHERE "${col}" IS NOT NULL AND "${col}" != ''`
           ).all();
         } catch (_e) {
           // Table or column doesn't exist on this DB (typically a fresh
@@ -445,9 +452,10 @@ const MIGRATIONS = [
           continue;
         }
 
-        const upd = db.prepare(`UPDATE "${name}" SET "${col}" = ? WHERE rowid = ?`);
+        const upd = db.prepare(`UPDATE "${name}" SET "${col}" = ? WHERE id = ?`);
         let encrypted = 0;
         let skipped = 0;
+        let perRowErrors = 0;
         db.exec('BEGIN');
         try {
           for (const r of rows) {
@@ -456,20 +464,34 @@ const MIGRATIONS = [
               skipped++;
               continue;
             }
-            // Inline AES-256-GCM encrypt + prefix (mirrors colEncrypt)
-            const iv = crypto.randomBytes(12);
-            const cipher = crypto.createCipheriv('aes-256-gcm', _key(), iv);
-            const enc = Buffer.concat([cipher.update(v, 'utf8'), cipher.final()]);
-            const tag = cipher.getAuthTag();
-            const stored = COL_PREFIX + Buffer.concat([iv, tag, enc]).toString('base64');
-            upd.run(stored, r.rowid);
-            encrypted++;
+            try {
+              // Inline AES-256-GCM encrypt + prefix (mirrors colEncrypt)
+              const iv = crypto.randomBytes(12);
+              const cipher = crypto.createCipheriv('aes-256-gcm', _key(), iv);
+              const enc = Buffer.concat([cipher.update(v, 'utf8'), cipher.final()]);
+              const tag = cipher.getAuthTag();
+              const stored = COL_PREFIX + Buffer.concat([iv, tag, enc]).toString('base64');
+              upd.run(stored, r.id);
+              encrypted++;
+            } catch (rowErr) {
+              // Per-row isolation: a single bad row (NULL id, oversized value,
+              // unbindable type) should not abort the whole table's migration.
+              // Logged and counted; the row stays plaintext and will be
+              // encrypted on its next natural write via colEncrypt.
+              perRowErrors++;
+              if (perRowErrors <= 5) {
+                console.error(`[db] v19 row encrypt failed (${name}.${col} id=${r.id}): ${rowErr.message}`);
+              }
+            }
           }
           db.exec('COMMIT');
         } catch (e) {
           db.exec('ROLLBACK');
           console.error(`[db] migration v19 ${name}.${col} FAILED:`, e.message);
           throw e;
+        }
+        if (perRowErrors > 0) {
+          console.warn(`[db] migration v19 ${name}.${col} — ${perRowErrors} rows could not be encrypted (left as plaintext, will encrypt on next write)`);
         }
         console.log(`[db] migration v19 — ${name}.${col}: encrypted ${encrypted} rows (skipped ${skipped} already-encrypted)`);
       }
