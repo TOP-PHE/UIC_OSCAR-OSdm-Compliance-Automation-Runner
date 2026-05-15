@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.28",
+  "current_release": "2026.29",
   "releases": [
+    {
+      "release": "2026.29",
+      "date": "2026-05-15",
+      "server": "1.11.1",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(critical): v19 migration crash on boot, leaving OSCAR in restart-loop. Migration used SELECT rowid + UPDATE WHERE rowid = ?, but Node 22's built-in node:sqlite does not expose rowid as a row property — r.rowid was undefined and binding failed with 'Provided value cannot be bound to SQLite parameter 2'. Switched to the explicit `id` primary key (uniform across all four affected tables). Also added per-row error isolation so a single unbindable row doesn't abort the whole table's migration.",
+        "Took down production for ~15 minutes when v1.11.0 :stable rolled out via Watchtower; recovered by pinning to the :edge image tag temporarily. v1.11.1 fixes the migration cleanly. v18 was already applied (additive ALTER TABLE columns survive cleanly across version skews).",
+        "Operator action after rollover: docker compose pull oscar && docker compose up -d --force-recreate oscar. The v19 migration will then run successfully, encrypting existing plaintext rows on first boot."
+      ]
+    },
     {
       "release": "2026.28",
       "date": "2026-05-15",
