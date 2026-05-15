@@ -25,7 +25,8 @@ const path        = require('path');
 const fs          = require('fs');
 const { spawn }   = require('child_process');
 const { v4: uuidv4 } = require('uuid');
-const { get, run: dbRun, encrypt, decrypt, getConfig } = require('../db/db');
+const { get, run: dbRun, encrypt, decrypt, colEncrypt, getConfig } = require('../db/db');
+const { copyAndEncryptFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { fetchToken } = require('./auth-profiles');
 const { safeJoinUuid } = require('../utils/paths');
@@ -70,7 +71,7 @@ function logEvent(runId, level, message, meta) {
     try {
       dbRun(
         `INSERT INTO run_events (run_id, level, message, event_kind) VALUES (?, ?, ?, ?)`,
-        [runId, 'warn', `[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`, 'log']
+        [runId, 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
       );
     } catch (_) { /* swallow */ }
     return;
@@ -81,12 +82,16 @@ function logEvent(runId, level, message, meta) {
       category, phase, suite_name, request_name, http_status,
       event_kind, attempt_index, attempt_total, scenario_name,
     } = meta || {};
+    // Phase 2 of issue #60: encrypt log message content (only the message
+    // body — metadata columns like category/phase/suite_name/http_status
+    // remain plaintext so the structured-log filtering UI keeps working
+    // without per-row decrypt/comparison cost).
     dbRun(
       `INSERT INTO run_events (run_id, level, message,
          category, phase, suite_name, request_name, http_status,
          event_kind, attempt_index, attempt_total, scenario_name)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [runId, level, String(message).slice(0, 4000),
+      [runId, level, colEncrypt(String(message).slice(0, 4000)),
        category || null, phase || null, suite_name || null, request_name || null, http_status || null,
        event_kind || 'log',
        Number.isInteger(attempt_index) ? attempt_index : null,
@@ -696,7 +701,10 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
         const artifactFilename = `report_${scenarioCode}.html`;
         const srcHtml  = path.join(valDir, cand.name);
         const destHtml = path.join(runArtifactDir, artifactFilename);
-        await fs.promises.copyFile(srcHtml, destHtml);
+        // Encrypt at write — Phase 2 of issue #60. Plaintext source is
+        // read once, ciphertext written via atomic temp+rename. Anyone
+        // running `cat <destHtml>` from SSH sees the OSCAR1 envelope only.
+        await copyAndEncryptFileAsync(srcHtml, destHtml);
         dbRun(
           `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', ?, ?)`,
           [uuidv4(), runId, artifactFilename, destHtml]
@@ -741,7 +749,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       const mergeHtmlPath = path.join(valDir, mergeReportName);
       if (await fsExists(mergeHtmlPath)) {
         const destHtml = path.join(runArtifactDir, `report.html`);
-        await fs.promises.copyFile(mergeHtmlPath, destHtml);
+        await copyAndEncryptFileAsync(mergeHtmlPath, destHtml);
         dbRun(
           `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'html_report', 'report.html', ?)`,
           [uuidv4(), runId, destHtml]
@@ -753,7 +761,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // Copy the raw JSON results into the run artifact dir, then clean up source
     if (await fsExists(bruJsonAbsPath)) {
       const destJson = path.join(runArtifactDir, '.bru_results.json');
-      await fs.promises.copyFile(bruJsonAbsPath, destJson);
+      await copyAndEncryptFileAsync(bruJsonAbsPath, destJson);
       dbRun(
         `INSERT INTO run_artifacts (id, run_id, type, filename, path) VALUES (?, ?, 'json_results', '.bru_results.json', ?)`,
         [uuidv4(), runId, destJson]

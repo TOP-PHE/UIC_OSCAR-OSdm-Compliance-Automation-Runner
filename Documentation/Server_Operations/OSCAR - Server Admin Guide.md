@@ -820,3 +820,185 @@ no VPS access needed. Two complementary patterns:
 - **Explicit list** — comma- or newline-separated emails. Add / remove members
   from the UI. Each save is audit-logged so the trail of who-added-whom is
   recoverable.
+
+---
+
+## 15. Vendor Data Sovereignty (v1.10+)
+
+This section documents the trust model OSCAR implements as of v1.10.0
+(issue #60), and is honest about what software-only mechanisms can and
+cannot defend against.
+
+### 15.1 The trust model
+
+| Asset | Visible to | Not visible to |
+|---|---|---|
+| Test framework configuration (Wizard Step 1) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
+| Data file (`{slug}-datafile.json`) | Tester + Test Manager of the owning company; Bruno subprocess on loopback | Other companies, Certifiers, Administrators |
+| Test resources (Wizard Step 2) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
+| Scenarios (personal) | The tester who created them | Everyone else |
+| Scenarios (shared) | All testers + Test Managers of the owning company | Other companies, Certifiers, Administrators |
+| Run results, artifacts, HTTP traffic | Tester + Test Manager of the owning company | Other companies, Administrators |
+|  | **Plus** Certifiers — but ONLY for runs where the Test Manager has clicked "Share with certifiers" on that specific run | Certifiers without explicit per-run share |
+| API credentials (per-tester) | The owning tester only — encrypted at rest | Everyone else, including admins, even on the database |
+| Audit log | Administrator only | Everyone else |
+
+### 15.2 The two share gates for certifiers
+
+Certifier visibility of a run requires **both** to be true:
+
+1. **Per-run share** — `runs.shared_with_certifier_at` is set. The Test
+   Manager flips this with the **Share with certifiers** button on the
+   run-detail page. Audit-logged.
+2. **Master kill switch** — `companies.share_reports_with_certifier`
+   (the legacy v15 toggle) is `1`. Setting it to `0` overrides every
+   per-run share, instantly revoking all certifier access to the
+   company's runs. Useful for emergency lockout.
+
+Both gates can be flipped by a Test Manager of the company. Neither can
+be flipped by an Administrator, a Certifier, or another company.
+
+### 15.3 What the Administrator role can and cannot do (v1.10+)
+
+| Allowed | Not allowed |
+|---|---|
+| Create / edit / delete users and companies | Read any company's run results |
+| Reset passwords, generate one-shot reset links | Read any company's HTTP traffic / artifacts |
+| Configure the server (SMTP, alerts, runtime tuning) | Read any company's test framework or data file |
+| View aggregate run counts (Server Activity tab) | Read any company's test scenarios |
+| Confirm or restore tester-flagged deletions | Read any company's per-tester credentials (always encrypted) |
+| Browse the audit log | Bypass the per-run share gate for certifiers |
+| Configure observability (Prometheus / Grafana / Loki) | |
+
+The **All Reports** tab in the admin panel, which previously showed every
+run on the platform, now shows only the data-lifecycle queue: runs
+testers have requested deletion of (`DELETION_REQUESTED`) and runs the
+Administrator has flagged (`DELETED_BY_ADMIN`). Per-run content is
+unreachable to the Administrator from this view; they can only act on
+the lifecycle metadata (confirm deletion, restore).
+
+If a genuine support case requires an Administrator to inspect a
+specific report, the current procedure is to ask the company's Test
+Manager to share the run with a designated certifier-role account
+operated by support. (A future release may add a break-glass
+admin-override with extra audit logging — not implemented in Phase 1.)
+
+### 15.4 Threat model — what we defend against, what we don't
+
+#### Defended in code (v1.10.0)
+
+| Threat | Defence |
+|---|---|
+| Administrator browsing the UI sees a vendor's reports | `canUserSeeRun()` returns null for admin role; LIST endpoint short-circuits to data-lifecycle queue only |
+| Anonymous user downloads `/artifacts/<uuid>/report.html` | Static-serve replaced with authenticated handler that calls `canUserSeeRun()` |
+| Anonymous user downloads `/data/<slug>-datafile.json` | Static-serve replaced with handler that requires authenticated session matching the slug, OR a true-loopback request from Bruno |
+| Certifier sees a run the Test Manager didn't share | Two-gate check: per-run flag AND master kill switch |
+| Certifier from one company sees another company's data they shouldn't | Tenant scoping at the database query layer; certifier requests targeting opted-out companies return 404 (existence not disclosed) |
+| Tester from company A reads company B's runs | Tenant middleware hard-pins `req.companyId` to the user's own company; cross-company query parameters are ignored for non-platform roles |
+
+#### Defended in code (since earlier releases)
+
+- API credentials encrypted at rest (AES-256-GCM, since v12)
+- Credentials redacted from persisted reports (since v17 retroactive scrub)
+- Self-service password reset, JWT rotation, granular roles
+- 401 auto-logout, sticky session toast, rate limiting
+- CodeQL / SonarCloud / Gitleaks / Trivy on every commit
+
+#### Defended in code (since v1.11.0 — Phase 2 at-rest encryption)
+
+| Threat | Defence |
+|---|---|
+| Sysadmin with `sudo cat /opt/OSCAR/.../data/oscar.db \| strings` | Sensitive content columns (message, bodies, headers, scenarios, framework JSON) are AES-256-GCM ciphertext with `enc:v1:` prefix. Strings command yields only structural metadata (status, timestamps, http_status, suite_name). |
+| Sysadmin `cat /opt/OSCAR/.../data/artifacts/<run>/report.html` | File starts with OSCAR1 magic + IV + tag; payload is ciphertext. `head -c 6` reveals `OSCAR1`, the rest is gibberish. |
+| Sysadmin `cat /opt/OSCAR/.../data/datafiles/<slug>-datafile.json` | Same OSCAR1 envelope — JSON contents unreadable without the key. |
+| Backup / cloud snapshot leaks | Same as live disk — every sensitive byte is ciphertext at rest. |
+
+#### NOT defended in code (operational policy required)
+
+| Threat | Why software cannot stop it | Mitigation |
+|---|---|---|
+| Sysadmin attaches a debugger to the running OSCAR process | The process must decrypt to use; an attacker with PID-level access can extract `ENCRYPTION_KEY` from memory | **Phase 3** — operational policy: restrict who has root SSH; audit `sudo` usage; consider hardware-backed key storage (HSM / SGX) for higher-tier deployments |
+| Sysadmin reads `/proc/<oscar_pid>/environ` | The key is passed via env var; visible to root via `/proc` | Same as above. Phase 3. |
+| Compromised application code that exfiltrates the key | An attacker who can ship code into OSCAR can do anything the process can do | Branch protection, code review, signed commits, restricted CI. Already in place. |
+
+### 15.5 Roadmap — Phase 3 (Phase 2 shipped in v1.11.0)
+
+**Phase 2 — at-rest encryption** ✅ shipped in v1.11.0. Uses
+application-level AES-256-GCM rather than SQLCipher, which:
+- Reuses the existing `ENCRYPTION_KEY` infrastructure (no new key to manage)
+- Avoids the Docker build complexity of native SQLCipher
+- Encrypts both DB columns and artifact / datafile files in one design
+- Same protection level: bytes on disk are ciphertext regardless of
+  who opens them. See [`src/utils/at-rest.js`](../../Oscar_Server/src/utils/at-rest.js)
+  + the `colEncrypt`/`colDecrypt` helpers in `db.js`.
+- Keeps structural metadata (status, timestamps, http_status, suite
+  names) in plaintext so SQL queries continue to work without per-row
+  decrypt cost.
+
+**Phase 3 (operational, no code)** — a one-page security policy
+documenting:
+- Who has SSH / sudo on the production VPS
+- Key management for `ENCRYPTION_KEY` (rotation procedure, escrow)
+- Backup encryption posture (the at-rest layer protects backups already,
+  but key management still applies)
+- Incident response procedure if a vendor reports a leak suspicion
+
+The honest truth: software gets you to the trust boundary at the
+application layer + the on-disk layer. Beyond that — a sysadmin
+attaching a debugger to the running OSCAR process and reading
+`ENCRYPTION_KEY` out of memory — **only operational policy +
+organisational discipline** prevent a privileged sysadmin from reading
+data they shouldn't. Phase 3 documents that policy.
+
+### 15.6 Verifying the model on your deployment
+
+After v1.10.0 deploys, three quick checks confirm the application-level
+controls are active:
+
+```bash
+# 1. Authenticated artifact download — should require login.
+curl -i https://oscar.example.org/artifacts/00000000-0000-0000-0000-000000000000/report.html
+# Expected: HTTP/1.1 401 Unauthorized
+
+# 2. Datafile download — same.
+curl -i https://oscar.example.org/data/anyslug-datafile.json
+# Expected: HTTP/1.1 401 Unauthorized  (or 404 if slug doesn't exist)
+
+# 3. Admin run list — should show only data-lifecycle entries plus the notice.
+#    Login as admin first, copy the oscar_session cookie, then:
+curl -s -H "Cookie: oscar_session=<paste>" https://oscar.example.org/v1/runs | python3 -m json.tool | head
+# Expected: JSON with "notice" field about issue #60 and runs only in
+#   DELETION_REQUESTED / DELETED_BY_ADMIN status.
+```
+
+After **v1.11.0** deploys, three more checks confirm the at-rest
+encryption is active. Run these from the OSCAR host (need shell access
+to the data directory):
+
+```bash
+# 4. Database — sensitive content should now be enc:v1: prefixed ciphertext.
+sudo sqlite3 /opt/OSCAR/.../data/oscar.db "SELECT message FROM run_events LIMIT 1;"
+# Expected (post-v1.11): "enc:v1:<base64 ciphertext>"
+# (If you see plaintext, either the row pre-dates v1.11 — fine, the read
+#  path handles it — or the v19 migration hasn't run yet.)
+
+# 5. Artifact file — should start with the OSCAR1 magic header.
+sudo head -c 6 /opt/OSCAR/.../data/artifacts/<any-runid>/report.html
+# Expected (for runs after v1.11): "OSCAR1"
+
+# 6. Datafile — same envelope.
+sudo head -c 6 /opt/OSCAR/.../data/datafiles/anyslug-datafile.json
+# Expected (for datafiles uploaded after v1.11): "OSCAR1"
+```
+
+For belt-and-suspenders coverage of files that pre-date v1.11.0, run the
+optional bulk-encrypt script:
+
+```bash
+sudo docker exec -it oscar /opt/OSCAR/OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh
+# Output:  ........... Backfill complete — encrypted: N, already encrypted: M, errors: 0
+```
+
+If all six behave as expected, Phase 1 + Phase 2 of issue #60 are in
+effect. The remaining gap is the running-process memory threat — Phase 3
+(operational policy).

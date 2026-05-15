@@ -17,7 +17,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, run } = require('../../db/db');
+const { get, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
@@ -25,10 +25,23 @@ const { resolveCompanyScope } = require('../helpers/shared');
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
-// ── Role guard: test config write operations require test_manager or above ────
+// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
+// Test framework is the company's vendor capability declaration. It is test
+// data, not platform data — administrators no longer have read or write
+// access. Certifiers never had a use case here. Tightened from
+// "test_manager OR isPlatformRole" to a strict role allow-list.
+function denyAdminAndCertifier(req, res) {
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Administrators and certifiers do not have access to test configuration (issue #60).' });
+    return true;
+  }
+  return false;
+}
 function requireTestManager(req, res) {
-  if (!isTestManagerOrAbove(req.user.role) && !isPlatformRole(req.user.role)) {
-    res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers can modify test configuration.' });
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only Test Managers can modify test configuration.' });
     return false;
   }
   return true;
@@ -36,14 +49,17 @@ function requireTestManager(req, res) {
 
 // ── GET /v1/company/test-framework ────────────────────────────────────────────
 router.get('/test-framework', (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 
   const row = get('SELECT * FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
   if (!row) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No test framework configured yet.' });
 
+  // Phase 2 of issue #60 (v1.11.0): config is encrypted at rest. Decrypt
+  // before parsing. Legacy plaintext rows pass through colDecrypt() as-is.
   let config = {};
-  try { config = JSON.parse(row.config); } catch (_) {}
+  try { config = JSON.parse(colDecrypt(row.config)); } catch (_) {}
   return res.json({ id: row.id, config, created_at: row.created_at, updated_at: row.updated_at });
 });
 
@@ -58,9 +74,10 @@ router.put('/test-framework', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Body must be a JSON object.' });
   }
 
-  // Accept either { config: {...} } (from wizard) or a bare config object
+  // Accept either { config: {...} } (from wizard) or a bare config object.
+  // Phase 2 of issue #60: encrypt the config JSON at rest.
   const configPayload = (body.config && typeof body.config === 'object') ? body.config : body;
-  const configJson = JSON.stringify(configPayload);
+  const configJson = colEncrypt(JSON.stringify(configPayload));
   const existing = get('SELECT id FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
 
   if (existing) {

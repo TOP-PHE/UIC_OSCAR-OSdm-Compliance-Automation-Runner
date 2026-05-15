@@ -14,6 +14,191 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.0] — 2026-05-15
+
+Minor bump — **vendor data sovereignty Phase 2 (issue #60)**:
+**at-rest encryption**. Closes the gap Phase 1 deferred: the same SSH-
+equipped sysadmin who could not browse vendor data through the UI could
+still `sudo cat /opt/OSCAR/.../data/oscar.db | strings` and read every
+log line, HTTP body, scenario, and test framework in plaintext. After
+v1.11.0 the bytes on disk are AES-256-GCM ciphertext envelopes; the
+plaintext exists only inside the OSCAR process while it runs.
+
+This is **Phase 2 of three**:
+- ✅ Phase 1 (v1.10.0) — application-level access control + per-run share
+- ✅ Phase 2 (this) — at-rest encryption
+- ⏳ Phase 3 — operational policy (who has root SSH on production)
+
+### Added
+- **`src/utils/at-rest.js`** — file-level AES-256-GCM helper. Uses the
+  same `ENCRYPTION_KEY` envelope OSCAR already uses for credentials.
+  Format: `OSCAR1` magic (6 B) + IV (12 B) + tag (16 B) + ciphertext.
+  Sync + async variants for both buffers and files. 22 unit tests
+  cover round-trip, magic-header detection, legacy plaintext fall-
+  through, tampering rejection, atomic temp+rename writes.
+- **`db.colEncrypt()` / `db.colDecrypt()`** — column-level wrappers
+  around the existing `encrypt()`/`decrypt()` with an `enc:v1:` prefix
+  marker. Mixed-state safe: any row without the prefix is treated as
+  legacy plaintext and returned unchanged.
+
+### Changed (security)
+The following **content** columns and files are now encrypted at rest.
+Schema, structural columns (status, timestamps, http_method, http_status,
+suite_name, etc.) remain plaintext so SQL filtering / sorting / counting
+keeps working without per-row decrypt cost.
+
+| What | Where | Encrypted? |
+|---|---|---|
+| HTML report files | `data/artifacts/<runId>/report*.html` | ✅ new |
+| JSON results files | `data/artifacts/<runId>/.bru_results.json` | ✅ new |
+| Company datafiles | `data/datafiles/<slug>-datafile.json` | ✅ new |
+| Log line content | `run_events.message` | ✅ new |
+| HTTP request body | `run_requests.request_body` | ✅ new |
+| HTTP request headers | `run_requests.request_headers` | ✅ new |
+| HTTP response body | `run_requests.response_body` | ✅ new |
+| HTTP response headers | `run_requests.response_headers` | ✅ new |
+| Per-call context JSON | `run_requests.context` | ✅ new |
+| Test framework JSON | `test_frameworks.config` | ✅ new |
+| Test resources JSON | `test_resources.data` | ✅ new |
+| Per-tester credentials | `users.*_enc` columns | ✅ already (v12) |
+| Cached OAuth tokens | `users.cached_token_enc` | ✅ already (v11) |
+
+### Migration
+Schema migration **v19** runs automatically on first boot and encrypts
+existing plaintext rows in the columns above. Per-table transactions;
+rollback on failure; logs row counts. Idempotent: rows already carrying
+the `enc:v1:` prefix are skipped on subsequent runs.
+
+**Files on disk are NOT touched by the DB migration.** Existing artifact
+HTML and datafile JSON files remain plaintext until they're re-written
+by a new run / upload — at which point they get encrypted. This is fine
+because the read helpers transparently handle both formats. An optional
+one-time bulk-encrypt operator script lives at
+`OSCAR_Deploy/scripts/encrypt-existing-artifacts.sh` — strictly cleanup,
+not required.
+
+### Fixed (latent bug — incidental)
+- `/v1/reports/requests/:id/messages` queried four non-existent columns
+  (`req_body`, `req_headers`, `resp_body`, `resp_headers`) — the real
+  names are `request_*` / `response_*`. The HTTP message-chain viewer
+  in Report Builder was silently empty. Fixed alongside the encryption
+  work since both touch the same query.
+
+### Search behaviour change
+The `?search=...` filter on `GET /v1/runs/:id/logs` previously used
+SQL `LIKE` against the message column. Now that `run_events.message`
+is encrypted, server-side LIKE no longer matches ciphertext — the
+endpoint fetches a wider window (5×, capped at 5000 rows) and filters
+post-decrypt in Node. Query time is microseconds slower for the
+post-decrypt scan; user-visible behaviour is unchanged.
+
+### Threat coverage matrix (updated)
+
+| Threat | v1.10 | v1.11 |
+|---|---|---|
+| Admin browsing UI sees vendor reports | ✅ | ✅ |
+| Anonymous artifact download via UUID guess | ✅ | ✅ |
+| Sysadmin `sudo cat oscar.db \| strings` reveals log + HTTP content | ❌ | ✅ |
+| Sysadmin `sudo cat report.html` reveals vendor results | ❌ | ✅ |
+| Sysadmin `sudo cat datafile.json` reveals scenarios | ❌ | ✅ |
+| Backup tape leak (cold storage) | ❌ | ✅ |
+| Sysadmin attaches debugger to running OSCAR process | ❌ | ❌ Phase 3 |
+
+### Migration after Watchtower rolls over to v1.11.0
+**No operator action required.**
+- v19 migration runs on first boot
+- Existing files remain readable; new writes are encrypted
+- All endpoints continue to work — the read helpers are transparent
+- The optional `encrypt-existing-artifacts.sh` is operator's choice
+
+---
+
+## [server-v1.10.0] — 2026-05-15
+
+Minor bump — **vendor data sovereignty (Phase 1, issue #60)**. Restructures
+the trust model so a company's test configuration and reports stay private
+to its own testers and test_managers until the test_manager explicitly opts
+in to sharing specific runs with the UIC certification team. Strips the
+administrator role of all test-data read access; closes an anonymous
+static-serve bypass that previously let any unauthenticated user download
+an artifact knowing only the run UUID.
+
+This is **Phase 1 of three**:
+- Phase 1 (this release) — application-level access control + per-run share
+- Phase 2 (next release) — at-rest DB encryption (SQLCipher)
+- Phase 3 — operational policy (who has root SSH on production)
+
+### Added
+- **Per-run share-with-certifier toggle** — test_managers explicitly pick
+  which terminal runs (COMPLETED / FAILED / CANCELLED) become visible to
+  certifiers, via a new button on each run-detail page. Replaces the
+  legacy company-wide all-or-nothing toggle as the gating mechanism.
+  - `POST /v1/runs/:id/share` — share this run with certifiers
+  - `DELETE /v1/runs/:id/share` — revoke certifier access to this run
+  - Both audit-logged with the test_manager's email and the run id.
+- **`canUserSeeRun()` helper** at `src/api/helpers/run-access.js` — single
+  source of truth for "is this user allowed to see this run". Every
+  endpoint that returns run-scoped data now flows through it.
+
+### Changed (BREAKING)
+- **Administrator role no longer reads test data**. The role becomes
+  operations + security only — users, companies (metadata), server
+  config, alerts, audit log, observability stack. Specifically removed:
+  - `GET /v1/runs/:id` and all sub-endpoints (logs / artifacts /
+    assertions / requests) → 404 for admin
+  - `GET /v1/company/test-framework` → 403 for admin
+  - `GET /v1/company/datafile` → 403 for admin
+  - `GET /v1/company/test-resources` → 403 for admin
+  - `GET /v1/runs` returns ONLY the data-lifecycle queue
+    (DELETION_REQUESTED + DELETED_BY_ADMIN status) — metadata only,
+    no per-run content. Aggregate counts still available via
+    `/v1/admin/activity`.
+  - `POST /v1/company/datafile`, `PUT /datafile/json`,
+    `DELETE /datafile`, `PUT /test-framework`, `POST /test-resources` →
+    test_manager only (was test_manager OR isPlatformRole).
+- **Certifier visibility tightened**. Certifiers no longer see every run
+  of a vendor that has the legacy company-wide toggle on; they see ONLY
+  runs the test_manager has explicitly shared via the new per-run flag.
+  The legacy `companies.share_reports_with_certifier` toggle becomes a
+  master kill switch — when set to 0 it overrides every per-run share.
+- **Migration v18** backfills `shared_with_certifier_at` for every
+  terminal run of a company whose legacy toggle was on. Existing
+  certifier workflows continue uninterrupted on rollover; the new
+  per-run model applies to NEW runs going forward.
+
+### Fixed (security)
+- **`/artifacts/:runId/:filename`** — was served by `express.static` with
+  no auth. Anyone able to reach OSCAR (or guess a run UUID) could
+  download a vendor's HTML report or JSON results. Now gated by
+  authenticated session + per-run-ownership check via `canUserSeeRun()`.
+  The HTML-report `<a href>` continues to work because browsers send the
+  httpOnly session cookie automatically for same-origin GETs.
+- **`/data/:filename`** — same `express.static` exposure. Now requires
+  authenticated session whose company owns the slug, OR a true-loopback
+  request with no `X-Forwarded-For` (Bruno subprocess on the same
+  host). Nginx-proxied external traffic always carries
+  `X-Forwarded-For`, so the loopback path is unreachable from outside.
+
+### Documentation
+- New `Server Admin Guide § 15 — Vendor Data Sovereignty` documenting
+  the trust model, the threat model (what code defends against vs. what
+  requires operational policy), and the Phase 2/3 roadmap.
+- Welcome news entry summarising the change for end users.
+
+### Migration
+After Watchtower rolls over to v1.10.0:
+- **No operator action required.** v18 migration runs automatically on
+  first boot; the backfill preserves every existing certifier workflow.
+- The legacy company-wide `share_reports_with_certifier` toggle remains
+  in the UI as a master kill switch.
+- Test managers should familiarise themselves with the new per-run share
+  button on the run-detail page.
+- Administrators may notice that the "All Reports" tab now shows only
+  the data-lifecycle queue, not every run on the platform — this is
+  intentional (issue #60).
+
+---
+
 ## [server-v1.9.1] — 2026-05-11
 
 Patch release — UX polish bundling three small wins from the open-issue

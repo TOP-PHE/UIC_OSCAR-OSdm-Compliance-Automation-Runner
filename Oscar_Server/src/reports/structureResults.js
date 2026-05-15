@@ -22,7 +22,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { safeJoinUuid } = require('../utils/paths');
-const { run: dbRun, get, transaction } = require('../db/db');
+const { run: dbRun, get, transaction, colEncrypt } = require('../db/db');
 
 // Inline UUID regex (see comment in reports/diff.js) — Sonar's taint
 // analyzer (jssecurity:S6549) requires the validation to live in the
@@ -360,7 +360,14 @@ function extractStructuredResults(runId, companyId) {
           parentRequestId = inferParentRequestId(url, runId, scenario);
         } catch (_e) { /* linkage is best-effort */ }
 
-        // Insert request row (now with bodies + headers + parent link)
+        // Insert request row. Phase 2 of issue #60: HTTP traffic columns
+        // (request_body, request_headers, response_body, response_headers)
+        // are encrypted at rest with the same enc:v1: prefix used elsewhere.
+        // Structural columns (http_method, http_url, http_status, duration)
+        // remain plaintext so the UI can sort/filter without decrypt cost.
+        // The `context` column is JSON-extracted intent metadata (e.g.
+        // refund mode, paxCount) — encrypted because it can carry custom
+        // per-call values the vendor would prefer to keep private.
         const reqResult = dbRun(
           `INSERT INTO run_requests
              (suite_id, run_id, company_id, request_name, http_method, http_url,
@@ -368,8 +375,11 @@ function extractStructuredResults(runId, companyId) {
               request_body, request_headers, response_body, response_headers,
               parent_request_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [suiteId, runId, companyId, reqName, method, url, httpStatus, duration, context,
-           reqBody, reqHeaders, resBody, resHeaders, parentRequestId]
+          [suiteId, runId, companyId, reqName, method, url, httpStatus, duration,
+           colEncrypt(context),
+           colEncrypt(reqBody), colEncrypt(reqHeaders),
+           colEncrypt(resBody), colEncrypt(resHeaders),
+           parentRequestId]
         );
         const requestId = reqResult.lastInsertRowid;
         const reqTotals = { total: 0, passed: 0, failed: 0 };

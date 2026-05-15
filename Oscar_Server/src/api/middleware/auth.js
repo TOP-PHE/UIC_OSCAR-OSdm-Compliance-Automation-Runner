@@ -38,13 +38,25 @@ function isPlatformRole(role) {
 }
 
 // Parse a raw Cookie header into a key→value map (no dependency on cookie-parser).
+//
+// Security note (CodeQL js/remote-property-injection): the key half of every
+// cookie pair is attacker-controlled, so an unfiltered assignment like
+// `out[key] = ...` could overwrite Object.prototype slots (`__proto__`,
+// `constructor`, etc.) and leak through later lookups. Two defences here:
+//   1. `Object.create(null)` — `out` has no prototype, so a prototype-
+//      polluting key name has nowhere to land.
+//   2. Strict cookie-name allow-list — only cookies whose name matches
+//      RFC 6265 token characters are kept. Everything else is silently
+//      dropped, which closes the rule cleanly.
+const COOKIE_NAME_RE = /^[!#$%&'*+\-.0-9A-Z^_`a-z|~]+$/;   // RFC 6265 cookie-name token
 function parseCookies(cookieHeader) {
-  const out = {};
+  const out = Object.create(null);
   if (!cookieHeader) return out;
   cookieHeader.split(';').forEach(pair => {
     const idx = pair.indexOf('=');
     if (idx < 0) return;
     const key = pair.slice(0, idx).trim();
+    if (!COOKIE_NAME_RE.test(key)) return;   // drop anything that isn't a valid cookie name
     out[key]  = decodeURIComponent(pair.slice(idx + 1).trim());
   });
   return out;
@@ -116,4 +128,39 @@ function requireNotRole(...excludedRoles) {
   };
 }
 
-module.exports = { requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove };
+/**
+ * Sync helper for non-middleware callers (e.g. raw GET handlers in server.js
+ * that need to gate access without sitting behind the regular requireAuth
+ * pipeline). Returns the same { id, email, companyId, role } object that
+ * requireAuth() puts on req.user, OR null on any failure (no token, invalid,
+ * expired, revoked). Never throws.
+ *
+ * Cookie path is the source of truth (httpOnly, browser sends automatically);
+ * Bearer is the dev/HTTP fallback. Mirrors requireAuth's lookup order so the
+ * two stay in lock-step.
+ */
+function userFromRequest(req) {
+  try {
+    const cookies = parseCookies(req.headers.cookie);
+    const cookieToken = cookies.oscar_session || null;
+    const header      = req.headers['authorization'] || '';
+    const bearerToken = header.startsWith('Bearer ') ? header.slice(7) : null;
+    const token = cookieToken || bearerToken;
+    if (!token) return null;
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    if (payload.jti) {
+      const revoked = get('SELECT jti FROM token_blacklist WHERE jti = ?', [payload.jti]);
+      if (revoked) return null;
+    }
+    return {
+      id:        payload.sub,
+      email:     payload.email,
+      companyId: payload.companyId,
+      role:      normalizeRole(payload.role),
+    };
+  } catch (_err) {
+    return null;
+  }
+}
+
+module.exports = { requireAuth, requireRole, requireNotRole, normalizeRole, isPlatformRole, isTestManagerOrAbove, userFromRequest };

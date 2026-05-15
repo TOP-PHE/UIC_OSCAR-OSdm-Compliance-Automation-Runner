@@ -17,7 +17,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run: dbRun } = require('../../db/db');
+const { get, all, run: dbRun, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { compareRuns } = require('../../reports/diff');
@@ -390,7 +390,9 @@ router.post('/configured', (req, res) => {
         http_status:   r.http_status,
         vendor_capability: r.vendor_capability,
         result:        r.result,
-        context:       r.context ? safeJsonParse(r.context) : null,
+        // Phase 2 of issue #60 (v1.11.0): context column is encrypted at
+        // rest. Decrypt before parsing. Legacy plaintext rows pass through.
+        context:       r.context ? safeJsonParse(colDecrypt(r.context)) : null,
         // Include the DB row id so the UI can call /reports/requests/:id/messages
         // to fetch the raw HTTP exchange. rq_id may be replaced by a better-ranked
         // row in a later iteration — that's fine, we always expose the worst one.
@@ -432,11 +434,18 @@ router.get('/requests/:id/messages', (req, res) => {
 
   // Fetch the target row together with its suite's scenario_name and the run's
   // company_id so we can enforce tenant ownership in one query.
+  // NOTE: real column names are request_body / request_headers / response_body
+  // / response_headers (per schema.sql + migration v13). Earlier code here
+  // queried req_body / resp_body which are not defined anywhere — selecting
+  // them returns undefined, which made this whole endpoint silently empty.
+  // Phase 2 also encrypts the four content columns at rest; colDecrypt() at
+  // the response-shaping step below handles both legacy plaintext and new
+  // encrypted rows transparently.
   const row = get(
     `SELECT rq.id, rq.run_id, rq.suite_id, rq.company_id,
             rq.request_name, rq.http_method, rq.http_url, rq.http_status,
             rq.result, rq.duration_ms,
-            rq.req_headers, rq.req_body, rq.resp_headers, rq.resp_body,
+            rq.request_headers, rq.request_body, rq.response_headers, rq.response_body,
             rs.suite_name, rs.scenario_name
      FROM run_requests rq
      JOIN run_suites rs ON rs.id = rq.suite_id
@@ -499,10 +508,14 @@ router.get('/requests/:id/messages', (req, res) => {
     http_status:   row.http_status,
     result:        row.result,
     duration_ms:   row.duration_ms,
-    req_headers:   safeParseHeaders(row.req_headers),
-    req_body:      row.req_body || null,
-    resp_headers:  safeParseHeaders(row.resp_headers),
-    resp_body:     row.resp_body || null,
+    // Decrypt at-rest-encrypted body + header columns before returning.
+    // The UI keeps the historical req_/resp_ field names in the response
+    // shape so any client code already using them continues to work; the
+    // SOURCE columns are now correctly named (request_*/response_*).
+    req_headers:   safeParseHeaders(colDecrypt(row.request_headers)),
+    req_body:      colDecrypt(row.request_body)  || null,
+    resp_headers:  safeParseHeaders(colDecrypt(row.response_headers)),
+    resp_body:     colDecrypt(row.response_body) || null,
     // Chain navigation
     prev_id:       prevRow ? prevRow.id : null,
     next_id:       nextRow ? nextRow.id : null,

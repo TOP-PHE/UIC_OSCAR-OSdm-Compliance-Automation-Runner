@@ -18,7 +18,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run } = require('../../db/db');
+const { get, all, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
@@ -26,10 +26,22 @@ const { resolveCompanyScope } = require('../helpers/shared');
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
-// ── Role guard: test config write operations require test_manager or above ────
+// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
+// Test resources are test data — administrators no longer have read or write
+// access. Certifiers never had a use case. Tightened from
+// "test_manager OR isPlatformRole" to a strict role allow-list.
+function denyAdminAndCertifier(req, res) {
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Administrators and certifiers do not have access to test resources (issue #60).' });
+    return true;
+  }
+  return false;
+}
 function requireTestManager(req, res) {
-  if (!isTestManagerOrAbove(req.user.role) && !isPlatformRole(req.user.role)) {
-    res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers can modify test configuration.' });
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only Test Managers can modify test resources.' });
     return false;
   }
   return true;
@@ -37,6 +49,7 @@ function requireTestManager(req, res) {
 
 // ── GET /v1/company/test-resources ────────────────────────────────────────────
 router.get('/test-resources', (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 
@@ -44,9 +57,11 @@ router.get('/test-resources', (req, res) => {
     'SELECT * FROM test_resources WHERE company_id = ? ORDER BY created_at ASC',
     [targetCompanyId]
   );
+  // Phase 2 of issue #60 (v1.11.0): data column is encrypted at rest.
+  // colDecrypt() handles legacy plaintext rows transparently.
   const resources = rows.map(r => {
     let data = {};
-    try { data = JSON.parse(r.data); } catch (_) {}
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
     return { id: r.id, resource_type: r.resource_type, label: r.label, data, created_at: r.created_at, updated_at: r.updated_at };
   });
   return res.json(resources);
@@ -69,11 +84,11 @@ router.post('/test-resources', (req, res) => {
   const id = uuidv4();
   run(
     `INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, ?, ?, ?)`,
-    [id, targetCompanyId, resource_type, label.trim(), JSON.stringify(data || {})]
+    [id, targetCompanyId, resource_type, label.trim(), colEncrypt(JSON.stringify(data || {}))]
   );
   const saved = get('SELECT * FROM test_resources WHERE id = ?', [id]);
   let parsedData = {};
-  try { parsedData = JSON.parse(saved.data); } catch (_) {}
+  try { parsedData = JSON.parse(colDecrypt(saved.data)); } catch (_) {}
   return res.status(201).json({
     id: saved.id, resource_type: saved.resource_type, label: saved.label,
     data: parsedData, created_at: saved.created_at, updated_at: saved.updated_at
@@ -93,11 +108,11 @@ router.put('/test-resources/:id', (req, res) => {
 
   run(
     `UPDATE test_resources SET label = ?, data = ?, updated_at = datetime('now') WHERE id = ?`,
-    [label ? label.trim() : row.label, JSON.stringify(data || {}), req.params.id]
+    [label ? label.trim() : row.label, colEncrypt(JSON.stringify(data || {})), req.params.id]
   );
   const updated = get('SELECT * FROM test_resources WHERE id = ?', [req.params.id]);
   let parsedData = {};
-  try { parsedData = JSON.parse(updated.data); } catch (_) {}
+  try { parsedData = JSON.parse(colDecrypt(updated.data)); } catch (_) {}
   return res.json({
     id: updated.id, resource_type: updated.resource_type, label: updated.label,
     data: parsedData, created_at: updated.created_at, updated_at: updated.updated_at
