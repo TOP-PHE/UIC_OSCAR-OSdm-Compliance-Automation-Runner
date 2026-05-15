@@ -14,6 +14,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.1] — 2026-05-15
+
+Critical hotfix. v1.11.0 shipped with a broken v19 migration that crashed
+OSCAR on first boot, leaving production in a restart loop. Recovery was
+pinning to the previous (`:edge`) image while this fix was prepared.
+
+### Fixed
+- **v19 migration crash** — `Provided value cannot be bound to SQLite
+  parameter 2`. The migration ran `SELECT rowid, ... FROM <table>` and
+  then `UPDATE ... WHERE rowid = ?`, but Node 22's built-in
+  `node:sqlite` (DatabaseSync) does not surface `rowid` as a row
+  property when SELECTed without an explicit alias — `r.rowid` came
+  back `undefined` and the bind failed. Switched to the explicit `id`
+  primary key, which exists on all four affected tables
+  (`run_events`, `run_requests`, `test_frameworks`, `test_resources`).
+- **Per-row error isolation** added to v19 — a single unbindable row
+  (corrupt data, oversized payload, etc.) no longer aborts the whole
+  table's migration. The offending row is left plaintext and gets
+  encrypted on its next natural write via `colEncrypt`. Counts logged
+  for operator visibility.
+
+### Migration
+Schema migration v18 was already applied during the failed v1.11.0
+boot (ALTER TABLE ADD COLUMN is durable across crashes), so v1.11.1's
+boot sees `schema_version = 18` and applies only the now-fixed v19.
+No manual DB intervention required.
+
+### Operator action
+After Watchtower rolls over to v1.11.1, or after a manual:
+```bash
+sudo docker compose pull oscar
+sudo docker compose up -d --force-recreate oscar
+```
+the migration runs cleanly. Existing plaintext rows are encrypted on
+first boot, and OSCAR resumes normal operation with the full v1.11.0
+feature set (per-run share, admin role tightening, at-rest encryption).
+
+---
+
 ## [server-v1.11.0] — 2026-05-15
 
 Minor bump — **vendor data sovereignty Phase 2 (issue #60)**:
