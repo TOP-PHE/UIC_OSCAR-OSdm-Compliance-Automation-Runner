@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.30",
+  "current_release": "2026.31",
   "releases": [
+    {
+      "release": "2026.31",
+      "date": "2026-05-15",
+      "server": "1.11.3",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(ux): dashboard now shows the submitter email under each run label for test_manager and administrator roles. Closes the gap left by Phase 1 (v1.10.0) — test_managers triaging their company's runs need to know who in the team kicked off each one. Testers see only their own runs so the subtitle is redundant for them.",
+        "feat(security): test_manager's delete is now a permanent delete (status DELETED), not a soft delete awaiting admin approval. Follow-on to issue #60 Phase 1: administrators no longer read vendor test data, so the soft-delete → admin-review → permanent-delete flow is stale for company-internal cleanups. Test_managers are the data owners for their company and decide directly. Testers still soft-delete (DELETION_REQUESTED) for the safety net.",
+        "feat(ux): delete confirmation modal text + button label adapt to user role. Test_managers get a clear ⚠️ warning that the deletion is permanent and cannot be undone. Testers continue to see the soft-delete language. Administrators see the flagging language.",
+        "Operator action required: none. UI change picked up on next page reload. Existing pending DELETION_REQUESTED runs remain in admin's lifecycle queue."
+      ]
+    },
     {
       "release": "2026.30",
       "date": "2026-05-15",

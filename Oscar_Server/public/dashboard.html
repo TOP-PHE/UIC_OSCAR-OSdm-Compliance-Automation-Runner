@@ -142,8 +142,8 @@ h2{color:#0090D4;font-size:20px}
 
   <!-- Delete action bar (shown when 1+ runs selected and canDelete) -->
   <div id="delete-bar" class="action-bar action-bar-delete" style="display:none">
-    <span id="delete-label" style="flex:1">Select runs to request deletion</span>
-    <button class="btn btn-danger" id="delete-btn" disabled>🗑 Request Deletion</button>
+    <span id="delete-label" style="flex:1">Select runs to delete</span>
+    <button class="btn btn-danger" id="delete-btn" disabled>🗑 Delete Selected</button>
   </div>
 
   <!-- Main runs card -->
@@ -173,18 +173,21 @@ h2{color:#0090D4;font-size:20px}
   </div>
 </div>
 
-<!-- Soft-delete confirmation modal -->
+<!-- Delete confirmation modal — text is populated at runtime per user role:
+     - tester: soft delete (DELETION_REQUESTED), reviewable by test_manager
+     - test_manager: permanent delete (DELETED), cannot be undone
+     - administrator: lifecycle flag (DELETED_BY_ADMIN), visible to tester -->
 <div id="delete-modal" class="modal-overlay" style="display:none">
   <div class="modal">
-    <h3>🗑 Request Run Deletion</h3>
-    <p>You are about to request deletion of <strong id="modal-count">N</strong> run(s).</p>
-    <div class="modal-note">
-      ℹ️ <strong>This is a soft delete.</strong> The selected runs will be removed from your dashboard and queued for administrator review. Only an Administrator can permanently delete data from OSCAR.
+    <h3 id="modal-title">🗑 Delete Runs</h3>
+    <p>You are about to delete <strong id="modal-count">N</strong> run(s).</p>
+    <div class="modal-note" id="modal-note">
+      <!-- Populated at runtime — see openDeleteModal() in script below -->
     </div>
-    <p>The runs will no longer appear in your dashboard once submitted.</p>
+    <p id="modal-tail">The runs will no longer appear in your dashboard once submitted.</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
-      <button class="btn btn-danger" id="modal-confirm-btn">Confirm — Request Deletion</button>
+      <button class="btn btn-danger" id="modal-confirm-btn">Confirm</button>
     </div>
   </div>
 </div>
@@ -241,6 +244,19 @@ function renderRunRow(r, opts) {
   const label = isBatchChild
     ? (r.scenario_code || r.env_name_used || r.id.slice(0,8))
     : (r.env_name_used || r.id.slice(0,8));
+
+  // Multi-user roles (test_manager, administrator) see the submitter's
+  // email as a subtitle under the run label — they need to know who in
+  // the company kicked off each run when triaging failures or pending
+  // deletions. Testers see only their own runs, so the subtitle would
+  // be redundant. The submitted_by field comes from the runs.user JOIN
+  // in the LIST endpoint (already present in the response payload).
+  const showSubmitter = (user.role === 'test_manager' || user.role === 'administrator')
+                        && r.submitted_by;
+  const submitterLine = showSubmitter
+    ? `<div style="color:#78909c;font-size:11px;margin-top:2px">👤 ${r.submitted_by}</div>`
+    : '';
+
   return `
     <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
       <div class="cb-cell">
@@ -248,7 +264,10 @@ function renderRunRow(r, opts) {
           ? `<input type="checkbox" value="${r.id}" data-action="select" ${selected.has(r.id)?'checked':''}>`
           : ''}
       </div>
-      <div style="font-weight:600;color:#1a3a6b;font-size:13px">${label}</div>
+      <div>
+        <div style="font-weight:600;color:#1a3a6b;font-size:13px">${label}</div>
+        ${submitterLine}
+      </div>
       <div><span class="status s-${r.status}">${r.status === 'RUNNING' ? '<span class="spin">⟳</span> ' : ''}${r.status}</span></div>
       <div class="url" title="${r.api_base_used || ''}">${r.api_base_used || '-'}</div>
       <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
@@ -472,9 +491,47 @@ function goCompare() {
   window.location.href = `/compare.html?a=${a}&b=${b}`;
 }
 
-// ── Soft-delete modal ─────────────────────────────────────────────────────────
+// ── Delete confirmation modal — role-aware ───────────────────────────────────
+// Three different consequences depending on actor:
+//   tester       → soft delete (DELETION_REQUESTED), test_manager can restore
+//   test_manager → permanent delete (DELETED), CANNOT be undone — since v1.11.3
+//                  (issue #60 follow-up: admin no longer reads test data,
+//                  so the soft-delete-awaits-admin-review flow doesn't apply)
+//   administrator→ flag (DELETED_BY_ADMIN), still visible to tester
+// The modal text + button label adapt accordingly so users understand what
+// they're committing to.
+const DELETE_MODAL_TEXT = {
+  test_manager: {
+    title:   '🗑 Permanently Delete Runs',
+    note:    '⚠️ <strong>This is a permanent delete.</strong> The selected runs and all their reports, logs, and artifacts will be removed from OSCAR. <strong>This cannot be undone.</strong>',
+    tail:    'Confirm only if you are certain. Consider exporting a comparison report first if you may need this data again.',
+    button:  'Confirm — Permanently Delete',
+  },
+  administrator: {
+    title:   '🗑 Flag Runs for Deletion',
+    note:    'ℹ️ As administrator, this <strong>flags</strong> the runs (DELETED_BY_ADMIN). Testers still see them marked. Final purge is a separate action.',
+    tail:    'The flagged runs are visible to their owner with a warning badge.',
+    button:  'Confirm — Flag for Deletion',
+  },
+  tester: {
+    title:   '🗑 Request Run Deletion',
+    note:    'ℹ️ <strong>This is a soft delete.</strong> The selected runs are removed from your dashboard and queued for your Test Manager to review. They can restore them if you change your mind.',
+    tail:    'The runs will no longer appear in your dashboard once submitted.',
+    button:  'Confirm — Request Deletion',
+  },
+};
+
 function openDeleteModal() {
   if (selected.size === 0) return;
+  // company_user is the legacy role name for "tester" in the JWT payload.
+  const variant = user.role === 'test_manager'  ? 'test_manager'
+                : user.role === 'administrator' ? 'administrator'
+                : 'tester';
+  const t = DELETE_MODAL_TEXT[variant];
+  document.getElementById('modal-title').textContent     = t.title;
+  document.getElementById('modal-note').innerHTML        = t.note;
+  document.getElementById('modal-tail').textContent      = t.tail;
+  document.getElementById('modal-confirm-btn').textContent = t.button;
   document.getElementById('modal-count').textContent = selected.size;
   document.getElementById('delete-modal').style.display = 'flex';
 }

@@ -355,13 +355,25 @@ router.post('/bulk-delete', (req, res) => {
   }
 
   const isAdmin  = req.user.role === 'administrator';
+  const isTestManager = req.user.role === 'test_manager';
   // test_manager has elevated privileges within their company (mirrors the
   // privilege they already have over /v1/company/users): can delete any run
   // in their own company, not only runs they personally started. Tenant
   // middleware has already constrained req.companyId to the test_manager's
   // company, so this check cannot reach across companies. Closes #34.
-  const isElevated = isAdmin || req.user.role === 'test_manager';
-  const newStatus = isAdmin ? 'DELETED_BY_ADMIN' : 'DELETION_REQUESTED';
+  const isElevated = isAdmin || isTestManager;
+  // Since issue #60 Phase 1, the administrator role no longer reads
+  // vendor test data — confirming deletes of content they cannot see is
+  // a nonsensical step. Test_manager is the data owner for their
+  // company, so their delete is now permanent (status='DELETED'), not
+  // soft-deletion-requested. Testers keep the soft-delete safety net
+  // (DELETION_REQUESTED) since they may delete by accident; their
+  // test_manager will pick up the pending queue and confirm or restore.
+  const newStatus = isAdmin
+    ? 'DELETED_BY_ADMIN'
+    : isTestManager
+      ? 'DELETED'
+      : 'DELETION_REQUESTED';
 
   const deleted  = [];
   const skipped  = [];
@@ -959,10 +971,11 @@ router.delete('/:id', (req, res) => {
   }
 
   const isAdmin = req.user.role === 'administrator';
+  const isTestManager = req.user.role === 'test_manager';
   // See bulk-delete handler (#34): test_manager has elevated privileges
   // within their company. Tenant middleware constrains req.companyId so
   // cross-company deletion is impossible regardless of role.
-  const isElevated = isAdmin || req.user.role === 'test_manager';
+  const isElevated = isAdmin || isTestManager;
   // Issue #60 (v1.10+): admin can no longer SEE run content (canUserSeeRun
   // returns null for admin), but admin still operates on the data lifecycle
   // — flagging runs as DELETED_BY_ADMIN, purging on confirmation, etc.
@@ -989,7 +1002,15 @@ router.delete('/:id', (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Testers can only delete their own runs.' });
   }
 
-  const newStatus = isAdmin ? 'DELETED_BY_ADMIN' : 'DELETION_REQUESTED';
+  // Since issue #60 Phase 1, admin doesn't read vendor data, so confirming
+  // soft-deletes admin can't see is a stale workflow. Test_manager is the
+  // data owner — their delete is permanent. Testers keep DELETION_REQUESTED
+  // (their test_manager picks up the queue and confirms / restores).
+  const newStatus = isAdmin
+    ? 'DELETED_BY_ADMIN'
+    : isTestManager
+      ? 'DELETED'
+      : 'DELETION_REQUESTED';
   dbRun(
     `UPDATE runs SET status = ?, deleted_by = ?, previous_status = ? WHERE id = ?`,
     [newStatus, req.user.email, runRow.status, req.params.id]
