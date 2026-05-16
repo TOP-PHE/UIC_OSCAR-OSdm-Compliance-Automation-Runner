@@ -168,9 +168,17 @@ router.post('/', runSubmitLimiter, (req, res) => {
   const concurrentLimit = fwConfig.concurrentSessionLimit || 1;
 
   // ── Parallel mode: one run per scenario ──────────────────────────────────
+  //
+  // v1.11.5 fix: since v1.11.0 (Phase 2 of issue #60) the datafile on disk
+  // is AES-256-GCM encrypted (OSCAR1 envelope). Reading it directly with
+  // fs.readFileSync + JSON.parse returns the ciphertext and chokes on the
+  // magic header ("Unexpected token 'O', \"OSCAR1...\""). Use the
+  // decryptFromFile helper which handles both new (encrypted) and legacy
+  // plaintext files transparently via the OSCAR1 magic-header check.
   let datafile;
   try {
-    datafile = JSON.parse(fs.readFileSync(company.datafile_path, 'utf8'));
+    const { decryptFromFile } = require('../../utils/at-rest');
+    datafile = JSON.parse(decryptFromFile(company.datafile_path).toString('utf8'));
   } catch (err) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Could not parse data file: ' + err.message });
   }
