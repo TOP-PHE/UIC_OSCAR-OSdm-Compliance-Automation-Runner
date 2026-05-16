@@ -360,6 +360,9 @@ function renderRuns(runs) {
       </div>
       <div style="font-weight:700;color:#0090D4">
         <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)
+        ${(user.role === 'test_manager' || user.role === 'administrator') && batchRuns[0].submitted_by
+          ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${batchRuns[0].submitted_by}</div>`
+          : ''}
       </div>
       <div class="batch-counts" title="${completed} passed, ${failed} failed${running ? ', ' + running + ' still running' : ''}">
         ${completed > 0 ? `<span class="count count-pass">&#10003; ${completed}</span>` : ''}

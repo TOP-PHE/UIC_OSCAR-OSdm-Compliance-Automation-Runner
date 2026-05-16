@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.31",
+  "current_release": "2026.32",
   "releases": [
+    {
+      "release": "2026.32",
+      "date": "2026-05-16",
+      "server": "1.11.4",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(ux): batch header rows on the dashboard now show the submitter for test_manager + administrator roles, alongside the per-run submitter subtitle shipped in v1.11.3. A test_manager triaging the queue can now see at a glance who in their team launched each batch, without needing to expand it. Within a batch all runs are submitted by the same user; the header pulls submitted_by from the first child."
+      ]
+    },
     {
       "release": "2026.31",
       "date": "2026-05-15",
