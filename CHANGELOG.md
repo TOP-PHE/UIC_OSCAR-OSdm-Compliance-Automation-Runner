@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.3] — 2026-05-15
+
+Dashboard UX adjustments that fall out of the issue #60 access-control
+restructure. Test managers are the data owners for their company; the UI
+now reflects that.
+
+### Added
+- **Submitter shown on dashboard** for `test_manager` and `administrator`
+  roles. Renders as a small `👤 email@vendor` subtitle under each run's
+  environment label. Lets a test manager see at a glance which of their
+  testers kicked off each run when triaging failures or reviewing the
+  queue. Testers see only their own runs so the subtitle is omitted for
+  them (no redundant data).
+
+### Changed
+- **Test manager's delete is now a permanent delete** (status `DELETED`)
+  instead of `DELETION_REQUESTED`. Affects both the single-run delete
+  endpoint and the bulk-delete endpoint. Rationale: since v1.10.0 the
+  administrator role no longer reads vendor data, so the
+  soft-delete → admin-review → permanent-delete flow doesn't apply for
+  intra-company cleanups. Test managers are the data owners for their
+  company and decide directly. Testers still get `DELETION_REQUESTED`
+  (the soft-delete safety net) since they may click by accident.
+- **Delete confirmation modal is role-aware**. Test managers see a
+  ⚠️ warning that the deletion is permanent and cannot be undone, with
+  the confirm button labelled "Permanently Delete". Testers continue to
+  see the soft-delete language ("queued for your Test Manager to
+  review"). Administrators see the flagging language.
+
+### Operator action
+None. Dashboard UI change picks up on next page reload (hard-refresh
+with Ctrl+Shift+R if browser cached). Existing pending
+`DELETION_REQUESTED` runs remain in the administrator's lifecycle
+queue.
+
+---
+
 ## [server-v1.11.2] — 2026-05-15
 
 Docs-only. Ships Phase 3 of issue #60 — the operational policy that
