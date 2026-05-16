@@ -38,6 +38,10 @@ services:
     image: prom/prometheus:v3.1.0
     container_name: oscar-prometheus
     restart: unless-stopped
+    environment:
+      # Wall-clock TZ for log lines. Storage of samples stays UTC (always
+      # has, Prometheus rule). Default Europe/Paris; override via OSCAR_TZ.
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -70,6 +74,8 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: oscar-alertmanager
     restart: unless-stopped
+    environment:
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
@@ -128,6 +134,14 @@ services:
       # Don't phone home or check for new versions
       GF_ANALYTICS_REPORTING_ENABLED:        'false'
       GF_ANALYTICS_CHECK_FOR_UPDATES:        'false'
+      # Wall-clock TZ for Grafana's internal logs. Dashboards render in the
+      # viewer's browser timezone by default — admins can flip an individual
+      # dashboard's "Timezone" picker to "browser" / "utc" / explicit zone.
+      TZ: ${OSCAR_TZ:-Europe/Paris}
+      # Default for newly-created dashboards. "browser" matches the user's
+      # local clock; switch to an explicit IANA zone here if you want every
+      # dashboard to render in the same TZ regardless of viewer.
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE:     'browser'
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -146,6 +160,8 @@ services:
     container_name: oscar-loki
     restart: unless-stopped
     command: -config.file=/etc/loki/loki-config.yaml
+    environment:
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki-data:/loki
@@ -162,6 +178,8 @@ services:
     container_name: oscar-promtail
     restart: unless-stopped
     command: -config.file=/etc/promtail/promtail-config.yaml
+    environment:
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     depends_on:
       - loki
     volumes:
