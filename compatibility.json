@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.33",
+  "current_release": "2026.34",
   "releases": [
+    {
+      "release": "2026.34",
+      "date": "2026-05-16",
+      "server": "1.11.6",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(ops): every container in the stack (oscar, loki, promtail, grafana, prometheus, alertmanager, autoheal, watchtower) now defaults to Europe/Paris wall-clock time. Was UTC. Affects log timestamps, audit log entries, 'Sent at' lines in emails, run start/finish times rendered in the dashboard. Storage stays UTC ISO-8601 in the JSON layer (correct, unchanged).",
+        "Operator override: set OSCAR_TZ=<IANA zone> in .env (e.g. America/New_York, Asia/Tokyo). Defaults to Europe/Paris because that's where the canonical UIC OSCAR deployment is hosted.",
+        "Operator action required: pull the latest OSCAR_Deploy/ on the VPS (git pull) and re-up the stack — docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d. Existing containers are recreated with the new TZ env var. Watchtower won't auto-pick this up because the change is in the compose YAML, not the image."
+      ]
+    },
     {
       "release": "2026.33",
       "date": "2026-05-16",

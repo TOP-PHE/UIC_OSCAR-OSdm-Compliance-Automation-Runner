@@ -26,6 +26,14 @@ services:
       # Path to the monorepo-level compatibility matrix mounted below.
       COMPATIBILITY_FILE: /app/compatibility.json
       NODE_ENV: production
+      # Process timezone — affects every Date object the Node process
+      # constructs (log timestamps, audit log entries, "Sent at" in emails,
+      # run start/finish times rendered for the dashboard). Storage stays
+      # UTC ISO-8601 in the JSON layer (correct); only the wall-clock the
+      # process sees changes. Default Europe/Paris because that's where
+      # the canonical OSCAR deployment is hosted; override via OSCAR_TZ
+      # in .env if you self-host elsewhere (e.g. OSCAR_TZ=America/New_York).
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     ports:
       # Bind to localhost only — front with nginx for HTTPS termination.
       - "127.0.0.1:3001:3001"
@@ -75,7 +83,9 @@ services:
       AUTOHEAL_INTERVAL: "30"          # poll every 30 s
       AUTOHEAL_START_PERIOD: "0"       # respect each container's own start_period
       AUTOHEAL_DEFAULT_STOP_TIMEOUT: "20"
-      TZ: UTC
+      # Match the OSCAR app's TZ so "Container restarted at HH:MM" lines
+      # the autoheal logs read in the same timezone as everything else.
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
@@ -102,7 +112,7 @@ services:
       WATCHTOWER_POLL_INTERVAL: "300"      # 5 minutes
       WATCHTOWER_INCLUDE_RESTARTING: "false"
       WATCHTOWER_NOTIFICATIONS: ""         # add slack/email here later if wanted
-      TZ: UTC
+      TZ: ${OSCAR_TZ:-Europe/Paris}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Read GHCR creds set up on the host with `docker login ghcr.io`.
