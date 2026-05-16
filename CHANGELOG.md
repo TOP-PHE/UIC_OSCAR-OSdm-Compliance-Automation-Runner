@@ -14,6 +14,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.6] — 2026-05-16
+
+Stack-wide timezone alignment. OSCAR's canonical deployment runs in
+Europe/Paris, but every container in the compose stack was using its
+image-default timezone — usually UTC. Result: log lines, audit entries,
+email "Sent at" headers, and run timestamps all read in UTC, which is
+correct for storage but inconvenient for operators reading dashboards
+in real time.
+
+### Changed
+- `OSCAR_Deploy/docker-compose.yml`: `oscar`, `autoheal`, `watchtower`
+  services now set `TZ: ${OSCAR_TZ:-Europe/Paris}`. The autoheal and
+  watchtower services were previously hardcoded to UTC; flipped.
+- `OSCAR_Deploy/docker-compose.metrics.yml`: `prometheus`,
+  `alertmanager`, `grafana`, `loki`, `promtail` likewise. Grafana
+  additionally gets `GF_DATE_FORMATS_DEFAULT_TIMEZONE=browser` so
+  dashboards default to the viewer's local clock.
+- `OSCAR_Deploy/.env.example`: new `OSCAR_TZ` variable, documented
+  with IANA zone examples.
+
+Storage is unchanged — every timestamp in SQLite / artifact JSON /
+audit log stays UTC ISO-8601, as it always has. Only the wall-clock
+the processes see (and therefore the log line prefixes Pino / Loki
+emit) changes.
+
+### Operator action
+After pulling the latest `OSCAR_Deploy/`:
+
+```bash
+cd /opt/OSCAR
+git pull
+docker compose -f OSCAR_Deploy/docker-compose.yml \
+               -f OSCAR_Deploy/docker-compose.metrics.yml up -d
+```
+
+The `up -d` will recreate containers whose env vars changed (all eight
+of them). To override the default, add `OSCAR_TZ=America/New_York` (or
+any IANA zone) to `OSCAR_Deploy/.env` before the `up -d`.
+
+---
+
 ## [server-v1.11.5] — 2026-05-16
 
 Hotfix for a critical Phase 2 (issue #60) follow-up bug: three file-reader
