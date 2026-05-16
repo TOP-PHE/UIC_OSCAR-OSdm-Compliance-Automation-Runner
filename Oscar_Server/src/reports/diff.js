@@ -49,7 +49,12 @@ function parseResults(runId) {
   const jsonPath = safeJoinUuid(ARTIFACTS_DIR, runId, '.bru_results.json');
   if (!jsonPath || !fs.existsSync(jsonPath)) return null;
 
-  const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  // v1.11.5 — since v1.11.0 artifact files on disk are AES-256-GCM
+  // encrypted (OSCAR1 envelope). Use the at-rest helper which decrypts
+  // OSCAR1-wrapped files and passes legacy plaintext files through
+  // unchanged (the backward-compat fall-through).
+  const { decryptFromFile } = require('../utils/at-rest');
+  const raw = JSON.parse(decryptFromFile(jsonPath).toString('utf8'));
 
   // Handle Bruno CLI v1 / v2 output format variations
   const results = Array.isArray(raw)             ? raw

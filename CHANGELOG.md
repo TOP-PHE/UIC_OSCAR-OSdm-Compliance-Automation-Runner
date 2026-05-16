@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.5] — 2026-05-16
+
+Hotfix for a critical Phase 2 (issue #60) follow-up bug: three file-reader
+code paths were missed during the v1.11.0 at-rest encryption rollout and
+were still reading OSCAR1-encrypted artifacts directly into `JSON.parse`.
+Reported by a Paxone tester after the first run worked, the test config
+was saved, and the second run failed with
+`Could not parse data file: Unexpected token 'O', "OSCAR1b8mF"... is not valid JSON`.
+
+### Fixed
+- **`src/api/routes/runs.js`** (parallel-mode datafile loader, ~line 173).
+  The runs endpoint loaded the company's datafile via
+  `JSON.parse(fs.readFileSync(company.datafile_path))`. Since v1.11.0
+  the datafile is AES-256-GCM encrypted with the OSCAR1 envelope on
+  disk, so the raw ciphertext was being fed to the JSON parser. Now
+  goes through `utils/at-rest.decryptFromFile()`.
+- **`src/reports/diff.js`** (Bruno results comparison, ~line 52). Same
+  pattern — `JSON.parse(fs.readFileSync(.bru_results.json))` against an
+  encrypted artifact. Replaced with `decryptFromFile`. This was the
+  failure mode for the "compare two runs" dashboard action.
+- **`src/reports/structureResults.js`** (Bruno raw results parser,
+  ~line 255). Same pattern, same fix. This was the failure mode for
+  rendering an individual run's structured report after v1.11.0.
+
+The `decryptFromFile` helper transparently handles both
+OSCAR1-encrypted files (post-v1.11.0) and legacy plaintext files
+(pre-v1.11.0 backfill fall-through), so no data migration is needed.
+
+### Operator action
+None. Watchtower picks up `:stable` automatically.
+
+---
+
 ## [server-v1.11.4] — 2026-05-16
 
 Tiny follow-up to v1.11.3 — the submitter subtitle now also appears on

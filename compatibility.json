@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.32",
+  "current_release": "2026.33",
   "releases": [
+    {
+      "release": "2026.33",
+      "date": "2026-05-16",
+      "server": "1.11.5",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(critical #60 Phase 2 follow-up): three file-reader sites still read OSCAR1-encrypted artifacts/datafiles directly via fs.readFileSync, then handed the ciphertext to JSON.parse. Result: 'Could not parse data file: Unexpected token O, \"OSCAR1...\" is not valid JSON' when a tester re-ran a test config after v1.11.0, or when the dashboard compared two runs. Reported by a Paxone tester after running a test config a second time.",
+        "Fixed sites: src/api/routes/runs.js (parallel-mode datafile loader), src/reports/diff.js (Bruno results comparison), src/reports/structureResults.js (Bruno raw results parser). All three now go through utils/at-rest.decryptFromFile() which transparently handles both OSCAR1-encrypted files (post-v1.11.0) and legacy plaintext files (pre-v1.11.0 backfill fall-through).",
+        "Operator action required: none. Watchtower picks up :stable automatically. No data migration; the helper transparently handles both file shapes."
+      ]
+    },
     {
       "release": "2026.32",
       "date": "2026-05-16",

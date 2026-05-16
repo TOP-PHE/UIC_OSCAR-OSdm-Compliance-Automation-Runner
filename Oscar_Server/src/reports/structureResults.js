@@ -252,7 +252,10 @@ function extractStructuredResults(runId, companyId) {
   const runRow = get('SELECT scenario_code FROM runs WHERE id = ?', [runId]);
   const runScenarioCode = (runRow && runRow.scenario_code) || null;
 
-  const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  // v1.11.5 — artifact files are OSCAR1-encrypted since v1.11.0. The
+  // helper handles both encrypted and legacy plaintext files transparently.
+  const { decryptFromFile } = require('../utils/at-rest');
+  const raw = JSON.parse(decryptFromFile(jsonPath).toString('utf8'));
 
   // Handle Bruno CLI output format variations (array wrapper, iterations, etc.)
   let results;
