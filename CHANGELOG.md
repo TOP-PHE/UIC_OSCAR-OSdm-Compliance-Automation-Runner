@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.4] — 2026-05-16
+
+Tiny follow-up to v1.11.3 — the submitter subtitle now also appears on
+the **collapsed batch header**, not just on the expanded per-run rows.
+
+### Fixed
+- Dashboard batch headers (`Batch 16/05/2026 05:21 (7 scenarios)`)
+  now carry a `👤 submitter@company` subtitle for test_manager +
+  administrator viewers. Within a batch every run is submitted by
+  the same user, so the header pulls `submitted_by` from the first
+  child. Before this fix, you had to expand the batch to find out
+  who launched it.
+
+---
+
 ## [server-v1.11.3] — 2026-05-15
 
 Dashboard UX adjustments that fall out of the issue #60 access-control
