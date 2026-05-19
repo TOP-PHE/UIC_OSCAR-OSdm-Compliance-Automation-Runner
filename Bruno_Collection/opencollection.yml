@@ -303,19 +303,22 @@ request:
               // scenarioTarget mode: never advance the index — same scenario re-runs
               // until the user changes scenarioTarget.
               bru.setEnvVar('scenariosToRunIndex', _idxNow);
-            } else {
-              // Sequential mode: getScenarioData() advanced index to idx+1.
-              // If we've reached the end of the list, wrap back to 0 so the
-              // next Send starts from the first scenario again.
-              try {
-                const _scList = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
-                const _nextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
-                if (_scList.length > 0 && _nextIdx >= _scList.length) {
-                  bru.setEnvVar('scenariosToRunIndex', '0');
-                  console.log('[INFO] 🔁 Last scenario reached — scenariosToRunIndex reset to 0 for next Send');
-                }
-              } catch (_we) { /* ignore */ }
             }
+            // v1.11.10: the previous wrap-to-0 branch was REMOVED here. In an
+            // OSCAR collection run, the terminal .bru steps (e.g. "14. GET
+            // Booking after Patch Refund") and the multi-scenario loop-back in
+            // loopback.js / "01. POST Get Offer" decide between looping back
+            // and stopping by comparing `scenariosToRunIndex < __scenariosList.length`.
+            // Wrapping the index back to 0 here defeated that check: the
+            // condition was always true and the run looped forever, only
+            // ending via SIGTERM from RUN_TIMEOUT_MS (which also prevented
+            // Bruno from flushing its --reporter-json file, breaking the
+            // JSON download). For unitary Bruno-UI use it is acceptable for
+            // the index to grow past the list length: the parseScenarioData()
+            // branch in scenarioParser.js handles "idx >= length" by either
+            // calling stopExecution() (multi-scenario completed) or wrapping
+            // to 0 (fresh / unitary). Letting that branch own the decision
+            // keeps the OSCAR runner's terminal-stop machinery working.
             // Store _idxNow (the index that was CONSUMED), NOT the post-load value.
             // This way the next Send sees _idxNow !== _lastUnitaryIdx and reloads.
             bru.setEnvVar('__unitaryLoadedIdx', _idxNow);

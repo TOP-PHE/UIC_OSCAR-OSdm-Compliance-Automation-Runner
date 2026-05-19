@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.37",
+  "current_release": "2026.38",
   "releases": [
+    {
+      "release": "2026.38",
+      "date": "2026-05-19",
+      "server": "1.11.10",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(bruno): stop the infinite-loop regression that #68 introduced and that #70/#71 only partially masked. Symptom: a 1-scenario run of OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG against Sqills executed the same scenario 27 times in ~3 minutes before being killed by RUN_TIMEOUT_MS / manual cancel, with no terminal stopExecution() ever firing. Two minimal changes: (1) Bruno_Collection/library-bruno/scenarioParser.js now sets __unitaryLoadedIdx in lock-step with scenariosToRunIndex whenever it advances the index, so the unitary-load wrapper in opencollection.yml sees no spurious change between /versions and request #2 of the same iteration and stops re-firing on every request. (2) Bruno_Collection/opencollection.yml removes the wrap-to-0 in the wrapper's post-load sequential-mode branch — that wrap defeated the terminal-step check `scenariosToRunIndex < __scenariosList.length` and turned a one-shot halt into an infinite loop-back. Side-effect: JSON report download (.bru_results_<runId>.json) is restored, since Bruno CLI now exits normally and gets to flush its --reporter-json output. Full root-cause trace in Documentation/Bruno_Collection/PR68-loop-regression-root-cause.md.",
+        "Operator action required: none. Bruno collection refreshes automatically via the refresh-collection workflow on merge; testers see the fix on their next run."
+      ]
+    },
     {
       "release": "2026.37",
       "date": "2026-05-19",

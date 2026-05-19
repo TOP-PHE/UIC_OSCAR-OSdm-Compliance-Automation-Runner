@@ -360,6 +360,18 @@ function parseScenarioData(jsonData) {
     const nextIdx = idx + 1;
     bru.setEnvVar("scenariosToRunIndex", String(nextIdx));
 
+    // v1.11.10: keep the unitary-load wrapper in opencollection.yml synchronised
+    // with the index we just consumed. The wrapper's reload condition is
+    //   (_targetNow === '' && _lastUnitaryIdx !== _idxNow)
+    // which fires on every non-/versions request in an OSCAR collection run
+    // when __unitaryLoadedIdx is undefined while scenariosToRunIndex is post-
+    // advance. Setting __unitaryLoadedIdx here (i.e. wherever the parser is
+    // invoked — /versions, loop-back, or the wrapper itself) keeps the
+    // wrapper from re-firing on requests #2..N within the same scenario
+    // iteration. See Documentation/Bruno_Collection/PR68-loop-regression-
+    // root-cause.md for the full trace.
+    bru.setEnvVar("__unitaryLoadedIdx", String(nextIdx));
+
     validationLogger(
       `[INFO] 🎯 scenariosToRun [${idx + 1}/${effectiveList.length}]: selected "${scenarioCode}"` +
       (nextIdx >= effectiveList.length ? ` — last in list, run will stop after this scenario` : ` — next will pick index ${nextIdx}`)
