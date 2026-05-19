@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.34",
+  "current_release": "2026.35",
   "releases": [
+    {
+      "release": "2026.35",
+      "date": "2026-05-19",
+      "server": "1.11.7",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): Dockerfile runtime stage now runs apt-get update && apt-get upgrade -y before installing Bruno CLI. Clears three Debian-12 HIGH CVEs that Trivy started flagging after 2026-05-16: CVE-2026-0861 (glibc memalign integer overflow → heap corruption, fixed in 2.36-9+deb12u14), CVE-2026-4878 (libcap2 TOCTOU privilege escalation, fixed in 1:2.66-4+deb12u3), CVE-2026-29111 (systemd arbitrary code execution / DoS, fixed in 252.39-1~deb12u2). None reachable in OSCAR's runtime path — OS-level libraries linked by node:22-slim — but Trivy gates the CI pipeline on HIGH/CRITICAL findings, so every PR opened after the Debian security tracker updated was being blocked.",
+        "Operator action required: none. Watchtower picks up :stable automatically after promote-release republishes the image."
+      ]
+    },
     {
       "release": "2026.34",
       "date": "2026-05-16",
