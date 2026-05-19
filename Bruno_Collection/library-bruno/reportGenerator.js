@@ -111,6 +111,16 @@ function _ensureDir(dir) {
  * Resets accumulated report data so the HTML file starts fresh.
  * libraryBase parameter kept for backward compatibility but no longer used
  * (path is derived from __dirname instead).
+ *
+ * Loop-back-aware (v1.11.9): when an existing tmp file is for the SAME
+ * scenarioCode that is about to start, we KEEP it. Rationale: a single
+ * scenario run that fails partway (e.g. /offers returns 5xx) triggers a
+ * loop-back retry of the SAME scenarioCode in the .bru chain. Before this
+ * guard, the loop-back wiped the System Information requests + the first
+ * attempt of /offers — the final HTML only contained the retry attempt,
+ * giving the (incorrect) impression that "system endpoints were never run".
+ * For a genuinely new scenario starting in a multi-scenario sequential run,
+ * the codes differ and we still clear, preserving the original behaviour.
  */
 function initReport(libraryBase) {
   try {
@@ -119,8 +129,27 @@ function initReport(libraryBase) {
     _ensureDir(dir);
     const tmp = _tmpFile();
     if (fs.existsSync(tmp)) {
-      fs.unlinkSync(tmp);
-      console.log('[reportGenerator] 🗑️  Previous run data cleared.');
+      // Read the existing tmp's scenarioCode and compare with the one the
+      // caller is about to start (sourced from the bru env var, which the
+      // .bru scenario-start script has already set to the new scenario).
+      let prevScenarioCode = null;
+      try {
+        const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
+        prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
+      } catch (_re) { /* corrupt tmp → treat as different; safe to clear */ }
+      let currentScenarioCode = null;
+      try {
+        if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
+          currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
+        }
+      } catch (_be) { /* no bru context (running outside Bruno) → fall through to clear */ }
+
+      if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
+        console.log('[reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
+      } else {
+        fs.unlinkSync(tmp);
+        console.log('[reportGenerator] 🗑️  Previous run data cleared.');
+      }
     }
     console.log('[reportGenerator] ✅ Report directory: ' + dir);
   } catch (e) {
