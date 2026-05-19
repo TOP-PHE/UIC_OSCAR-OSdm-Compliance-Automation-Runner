@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.36",
+  "current_release": "2026.37",
   "releases": [
+    {
+      "release": "2026.37",
+      "date": "2026-05-19",
+      "server": "1.11.9",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(bruno): two report-side latent bugs surfaced this week. (1) reportGenerator.js initReport() now preserves the accumulated .report_tmp.json when a scenario loop-back retry of the SAME scenarioCode starts — previously the wipe deleted the System Information requests and the first /offers attempt, leaving the final HTML with only the retry attempt. (2) mergeReport.js now unwraps Bruno CLI's iteration-array reporter output ([{ iterationIndex, results, summary }]) — previously the outer array was mapped as if it were a single phantom request, producing 1-request / 0-assertion merged reports. Neither bug is caused by #68; both are pre-existing and only surfaced because (a) Bileto's /offers is currently returning 500 (triggers loop-back) and (b) #69's Docker rebuild pulled a fresher @usebruno/cli that emits the iteration wrapper.",
+        "Operator action required: none. Bruno collection refreshes automatically via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.36",
       "date": "2026-05-19",

@@ -41,14 +41,31 @@ const tmpData = fs.existsSync(TMP_JSON)
   ? JSON.parse(fs.readFileSync(TMP_JSON, 'utf8'))
   : { meta: {}, requests: [] };
 
-// ─── Parse Bruno JSON reporter (handle both v1 and v2 formats) ───────────────
-// Bruno CLI may emit { results: [...] } or { testResults: [...] } or just [...]
-const bruResults = Array.isArray(bruRaw)              ? bruRaw
+// ─── Parse Bruno JSON reporter (handle iteration wrapper + v1/v2 shapes) ─────
+// Bruno CLI shapes seen in the wild, in order of precedence:
+//   [{ iterationIndex, results: [...], summary: {...} }, ...]   ← current CLI
+//   { results: [...], summary: {...} }                          ← older single-iter
+//   { testResults: [...] }                                       ← legacy
+//   [...]                                                        ← legacy raw
+//
+// v1.11.9 fix: previously the iteration wrapper was misread — Array.isArray
+// returned true for the outer array, so `bruResults` became the 1-element
+// wrapper list itself and the per-entry map() treated the iteration object as
+// a single phantom request. Symptom: "1 request | 0 assertions" reports
+// regardless of how many requests actually ran. structureResults.js server-
+// side already handles this shape; mergeReport.js was missing the unwrap.
+const _isIterWrap = Array.isArray(bruRaw)
+  && bruRaw.length > 0
+  && bruRaw[0]
+  && Array.isArray(bruRaw[0].results);
+
+const bruResults = _isIterWrap                        ? bruRaw[0].results
+                 : Array.isArray(bruRaw)              ? bruRaw
                  : Array.isArray(bruRaw.results)      ? bruRaw.results
                  : Array.isArray(bruRaw.testResults)  ? bruRaw.testResults
                  : [];
 
-const bruSummary = bruRaw.summary || {};
+const bruSummary = (_isIterWrap ? bruRaw[0].summary : null) || bruRaw.summary || {};
 
 // ─── Build lookup of captured bodies by request URL (normalized) ──────────────
 function normUrl(u) { return (u || '').split('?')[0].replace(/\/+$/, '').toLowerCase(); }

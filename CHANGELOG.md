@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.9] — 2026-05-19
+
+Two report-side fixes in the Bruno library. Both bugs are pre-existing
+latent issues — neither is caused by #68's content (audited: the merge
+commit touches zero lines of report code) — but they only began surfacing
+this week:
+
+- The first surfaced because Bileto's `/offers` is currently returning
+  500, triggering the Bruno loop-back retry path that exposes the latent
+  `initReport()` wipe behaviour.
+- The second surfaced because #69's Docker rebuild pulled a fresher
+  `@usebruno/cli` whose `--reporter-json` output uses the iteration-array
+  wrapper. The OSCAR server's `structureResults.js` was already prepared
+  for that shape; `mergeReport.js` was not.
+
+### Fixed
+- `Bruno_Collection/library-bruno/reportGenerator.js`: `initReport()`
+  now reads the existing `.report_tmp.json`'s `meta.scenarioCode` and
+  compares it with the current `bru.getEnvVar('scenarioCode')` before
+  unlinking. If they match (loop-back retry of the same scenario), the
+  tmp file is preserved so accumulated System Information requests and
+  earlier attempts of the failing OSDM call remain in the final HTML
+  report. For genuinely new scenarios starting in a multi-scenario
+  sequential run, codes differ and the clear still happens —
+  preserving the original between-scenarios reset behaviour.
+- `Bruno_Collection/library-bruno/mergeReport.js`: detect Bruno CLI's
+  iteration-array wrapper (`[{ iterationIndex, results, summary }]`)
+  before falling back to the legacy `Array.isArray(bruRaw)` /
+  `bruRaw.results` / `bruRaw.testResults` chain. Without this, every
+  merged report rendered as "1 request | 0 assertions" because the
+  iteration object was being mapped as if it were a single request.
+
+### Operator action
+None. Bruno collection refreshes via the refresh-collection workflow
+on merge; the next run will use the fixed scripts.
+
+### Verified against
+The Bileto run captured in the failure report (System Info: 11 requests,
+POST `/offers` × 2 attempts, loop-back retry triggered between them). With
+the fix, the final HTML report contains all 11 System Information rows
+plus both `/offers` attempts — instead of just the retry attempt.
+
+---
+
 ## [server-v1.11.8] — 2026-05-19
 
 Runtime hotfix for a regression introduced by #68 ("Merge Bruno Lib").
