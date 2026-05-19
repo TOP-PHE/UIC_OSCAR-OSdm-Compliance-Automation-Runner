@@ -35,7 +35,7 @@ function resolveAjvConstructor() {
 function setAuthToken(responseBody) {
   try {
     let jsonData;
-    validationLogger("[INFO] Token Resp body",jsonData);
+    validationLogger("[INFO] Token Resp body", jsonData);
     if (responseBody) {
       jsonData = typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody;
     } else if (typeof res !== 'undefined' && typeof res.getBody === 'function') {
@@ -329,12 +329,15 @@ function validateDataFileJsonWithTemplate(jsonData) {
           if (propertySchema.type === "object" && propertySchema.properties) {
             const requiredFields = propertySchema.required || [];
             for (let subKey in propertySchema.properties) {
-              validateValueAgainstSchema(
-                subKey,
-                value[subKey],
-                propertySchema.properties[subKey],
-                fullPath
-              );
+              if (value.hasOwnProperty(subKey)) {
+                validateValueAgainstSchema(
+                  subKey,
+                  value[subKey],
+                  propertySchema.properties[subKey],
+                  fullPath
+                );
+              }
+
             }
             for (let reqKey of requiredFields) {
               if (!(reqKey in value)) {

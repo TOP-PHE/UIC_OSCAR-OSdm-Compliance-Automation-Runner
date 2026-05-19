@@ -1,19 +1,19 @@
-name: OTST_Benerail_Env
+name: OTST_Bileto_Env
 variables:
   - secret: true
-    name: Ocp-Apim-Subscription-Key
+    name: client_id
   - secret: true
-    name: requestor
+    name: client_secret
   - secret: true
     name: access_token
-  - name: x-bnds-backend
-    value: c03
+  - name: api-host
+    value: https://osdm-5.platform.bileto.zone/api
   - name: api_base
-    value: https://benerail-stg-apim.azure-api.net/acc/osdm
+    value: https://osdm-5.platform.bileto.zone/api
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/benerail_datafile.json
+    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/bileto_datafile.json
   - name: json_schema
     value: http://localhost:8080/collections-bruno/OTST_V2.0.1/json_validator/datafile.schema.json
   - name: scenariosToRunIndex

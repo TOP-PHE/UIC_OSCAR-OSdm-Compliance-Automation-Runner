@@ -1,19 +1,21 @@
-name: OTST_Benerail_Env
+name: OTST_Sqills_Env
 variables:
   - secret: true
-    name: Ocp-Apim-Subscription-Key
+    name: agent.username
   - secret: true
-    name: requestor
+    name: agent.password
+  - secret: true
+    name: auth.key_secret
   - secret: true
     name: access_token
-  - name: x-bnds-backend
-    value: c03
+  - name: api-host
+    value: https://api.sqills-osdm-test.cloud.sqills.com
   - name: api_base
-    value: https://benerail-stg-apim.azure-api.net/acc/osdm
+    value: https://sqills-osdm-test.osdm-s3-adapter.s3p.cloud
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/benerail_datafile.json
+    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/sqills_datafile.json
   - name: json_schema
     value: http://localhost:8080/collections-bruno/OTST_V2.0.1/json_validator/datafile.schema.json
   - name: scenariosToRunIndex

@@ -246,22 +246,60 @@ request:
         // ── Load scenario data for unitary runs (no /versions trigger) ───────
         // When a single OSDM request is run outside a full collection run,
         // getScenarioData() never fires via the /versions route.
-        // If scenarioCode is absent, load from data file now using index 0
-        // (first scenario in scenariosToRun list) without advancing the counter.
+        // Fires when:
+        //   - scenarioCode is not set yet (first Send after env load), OR
+        //   - scenariosToRunIndex changed since the last unitary load
+        //     (user manually set a different index to pick a specific scenario).
+        // The index is NOT advanced — repeated "Send" on the same request re-runs
+        // the same scenario. The user must change scenariosToRunIndex manually
+        // to switch to a different scenario in unitary mode.
         try {
           const _rqUrlForScenario = String(req.getUrl ? req.getUrl() : (req.url || '')).toLowerCase();
           const _rqNameForScenario = String(req.getName ? req.getName() : '').toLowerCase();
           const _isAuthReq = /\/(token|login|auth|logon|oauth)/.test(_rqUrlForScenario)
             || _rqNameForScenario.includes('token') || _rqNameForScenario.includes('access');
 
-          if (!_isAuthReq && !bru.getEnvVar('scenarioCode')) {
-            console.log('[INFO] 🔄 scenarioCode not set — loading first scenario for unitary run (index 0)...');
-            const _savedIdx = bru.getEnvVar('scenariosToRunIndex') || '0';
-            bru.setEnvVar('scenariosToRunIndex', '0');
+          const _idxNow = bru.getEnvVar('scenariosToRunIndex') || '0';
+          const _targetNow = (bru.getEnvVar('scenarioTarget') || '').trim();
+          const _lastUnitaryIdx = bru.getEnvVar('__unitaryLoadedIdx');
+          const _lastUnitaryTarget = bru.getEnvVar('__unitaryLoadedTarget') || '';
+          const _isScenarioStartLocal = /\/versions(\?|$)/.test(_rqUrlForScenario)
+            || _rqNameForScenario.includes('system version check');
+
+          // Reload when:
+          //   - scenarioCode not yet set (first Send after env load), OR
+          //   - scenarioTarget changed (user typed a new name/index), OR
+          //   - scenarioTarget is empty AND scenariosToRunIndex changed
+          const _needsLoad = !bru.getEnvVar('scenarioCode')
+            || (_targetNow !== '' && _targetNow !== _lastUnitaryTarget)
+            || (_targetNow === '' && _lastUnitaryIdx !== _idxNow);
+
+          if (!_isAuthReq && !_isScenarioStartLocal && _needsLoad) {
+            const _loadDesc = _targetNow !== '' ? ('target="' + _targetNow + '"') : ('index ' + _idxNow);
+            console.log('[INFO] 🔄 Loading scenario for unitary run (' + _loadDesc + ')...');
             await getScenarioData();
-            // Restore index so subsequent collection runs are not disrupted
-            bru.setEnvVar('scenariosToRunIndex', _savedIdx);
-            console.log('[INFO] ✅ Unitary run — scenario loaded: ' + bru.getEnvVar('scenarioCode'));
+            if (_targetNow !== '') {
+              // scenarioTarget mode: never advance the index — same scenario re-runs
+              // until the user changes scenarioTarget.
+              bru.setEnvVar('scenariosToRunIndex', _idxNow);
+            } else {
+              // Sequential mode: getScenarioData() advanced index to idx+1.
+              // If we've reached the end of the list, wrap back to 0 so the
+              // next Send starts from the first scenario again.
+              try {
+                const _scList = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+                const _nextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+                if (_scList.length > 0 && _nextIdx >= _scList.length) {
+                  bru.setEnvVar('scenariosToRunIndex', '0');
+                  console.log('[INFO] 🔁 Last scenario reached — scenariosToRunIndex reset to 0 for next Send');
+                }
+              } catch (_we) { /* ignore */ }
+            }
+            // Store _idxNow (the index that was CONSUMED), NOT the post-load value.
+            // This way the next Send sees _idxNow !== _lastUnitaryIdx and reloads.
+            bru.setEnvVar('__unitaryLoadedIdx', _idxNow);
+            bru.setEnvVar('__unitaryLoadedTarget', _targetNow);
+            console.log('[INFO] ✅ Unitary run — scenario loaded: ' + bru.getEnvVar('scenarioCode') + ' (' + _loadDesc + ') — next index: ' + bru.getEnvVar('scenariosToRunIndex'));
           }
         } catch (_uErr) {
           console.log('[WARNING] Unitary run scenario load: ' + (_uErr && _uErr.message));
