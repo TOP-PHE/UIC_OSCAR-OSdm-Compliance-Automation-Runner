@@ -14,6 +14,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.10] — 2026-05-19
+
+Final hotfix in the #68 ("Merge Bruno Lib") regression chain. #70 prevented
+the immediate `stopExecution()` halt; #71 fixed two report-side bugs that
+were latent and surfaced this week. Neither addressed the underlying loop:
+a 1-scenario run of `OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG` against Sqills
+executed the same scenario **27 times in ~3 minutes** before being killed
+by `RUN_TIMEOUT_MS` (or manual cancel), with the terminal-step
+`stopExecution()` **never** firing. That is also what was breaking the
+`.bru_results_<runId>.json` artifact download — Bruno CLI was being
+SIGTERM'd before it could flush its `--reporter-json` output.
+
+### Root cause (short)
+1. `Bruno_Collection/opencollection.yml`'s PR68 unitary-load wrapper re-fires
+   on every non-`/versions` request in an OSCAR collection run, because
+   `__unitaryLoadedIdx` is never synchronised when `/versions` (or the
+   loop-back in `01. POST Get Offer`) consumes a scenario via
+   `parseScenarioData()`.
+2. The same wrapper's sequential-mode post-load branch wraps
+   `scenariosToRunIndex` back to `0` whenever it equals
+   `__scenariosList.length`. The terminal `.bru` steps and
+   `loopback.js` decide between loop-back and stop by comparing
+   `scenariosToRunIndex < __scenariosList.length` — which is now
+   permanently true. The intended one-shot halt becomes an infinite loop.
+
+#70's defensive clamp landed in the same wrapper. It prevented the
+immediate `stopExecution()` halt by resetting the index from `length` to
+`0` before `getScenarioData()`, but `getScenarioData()` then advanced
+the index back to `length`, and the wrap-to-0 fired anyway — so the
+clamp + wrap together converted "halt at request 3" into "loop forever".
+
+#71's two fixes were correct in scope but addressed downstream symptoms:
+`mergeReport.js` iteration-wrapper unwrap and `reportGenerator.js`
+loop-back tmp-file preservation. Neither changed the runner's
+termination condition.
+
+### Fixed
+- `Bruno_Collection/library-bruno/scenarioParser.js` —
+  `parseScenarioData()`'s sequential-mode branch now sets
+  `__unitaryLoadedIdx` to the post-advance value of `scenariosToRunIndex`
+  immediately after advancing it. The wrapper's reload condition
+  (`_lastUnitaryIdx !== _idxNow`) now evaluates to false on requests
+  #2..N of the same scenario iteration, so the wrapper no longer fires
+  spuriously in OSCAR collection mode.
+- `Bruno_Collection/opencollection.yml` — removed the wrap-to-0 branch in
+  the unitary-load wrapper's sequential-mode post-load block. Letting
+  `scenariosToRunIndex` grow past `__scenariosList.length` is required
+  for the terminal `.bru` steps (e.g. `14. GET Booking after Patch
+  Refund.yml` lines 67–74) and for `loopback.js` to call
+  `stopExecution()`. The "wrap so the next manual Send re-starts at 0"
+  unitary-UI affordance can be reintroduced later, but only with a
+  guard that distinguishes OSCAR-driven runs from Bruno-UI single-send
+  runs.
+
+### Side effect (recovered functionality)
+- `.bru_results_<runId>.json` artifact download in the run-detail page
+  works again. Bruno CLI now exits normally instead of being SIGTERM'd
+  by `RUN_TIMEOUT_MS`, so its `--reporter-json` writer reaches its
+  end-of-run flush. The `if (await fsExists(bruJsonAbsPath))` block in
+  `Oscar_Server/src/worker/runner.js:762` now finds the file and
+  registers the `json_results` artifact row.
+
+### Verified against
+The `run-d96e282e-logs.txt` capture supplied by the operator:
+- 27 `scenariosToRun [1/1]` lines (pre-fix) → expected 1 (post-fix).
+- 26 `REFUND+PATCH complete — looping` lines (pre-fix) → expected 0
+  (post-fix; terminal step calls `stopExecution()` instead).
+- 27 `Loading scenario for unitary run` lines (pre-fix; wrapper firing
+  per request) → expected 0 (post-fix; wrapper no longer triggers in
+  OSCAR mode).
+
+### Documentation
+- New: `Documentation/Bruno_Collection/PR68-loop-regression-root-cause.md`
+  — full forensic trace + reproduction notes + suggested follow-ups for
+  the original PR68 author.
+
+### Unrelated (mentioned for completeness)
+- Bileto `POST /api/offers` is returning HTTP 500 after ~42 s with a
+  generic Spring Boot error body. This is an **upstream** problem at
+  `osdm-5.platform.bileto.zone`; not in OSCAR's runtime path and not
+  caused by #68. Worth pinging Bileto operators separately.
+
+### Operator action
+None. Bruno collection refreshes automatically via the
+refresh-collection workflow on merge; testers see the fix on their next
+run. Watchtower picks up `:stable` after the image is rebuilt.
+
+---
+
 ## [server-v1.11.9] — 2026-05-19
 
 Two report-side fixes in the Bruno library. Both bugs are pre-existing
