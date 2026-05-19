@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.7] — 2026-05-19
+
+Security hotfix for three Debian base-image CVEs that Trivy started
+flagging after 2026-05-16 (when the previous image was last built).
+None are reachable in OSCAR's runtime path — they're OS-level libraries
+linked by node:22-slim — but Trivy gates the CI pipeline on HIGH/CRITICAL
+findings, so every PR opened after the Debian security tracker updated
+was being blocked.
+
+### Fixed
+- `Oscar_Server/Dockerfile`: runtime stage now runs `apt-get update &&
+  apt-get upgrade -y` before installing Bruno CLI. Pulls in the
+  Debian 12 point releases that fix:
+  - **CVE-2026-0861** — glibc (`libc-bin`, `libc6`) integer overflow in
+    `memalign` → heap corruption. Fixed in `2.36-9+deb12u14`.
+  - **CVE-2026-4878** — `libcap2` TOCTOU race → privilege escalation.
+    Fixed in `1:2.66-4+deb12u3`.
+  - **CVE-2026-29111** — `systemd` (`libsystemd0`) arbitrary code
+    execution / DoS. Fixed in `252.39-1~deb12u2`.
+  Together with the two already-vendored fixes (axios CVEs in Bruno
+  CLI, picomatch ReDoS via npm strip), Trivy now reports 0 HIGH and
+  0 CRITICAL on the published image.
+
+### Operator action
+None. Watchtower picks up `:stable` automatically once `promote-release`
+republishes the image after this PR merges and the `release-2026.35`
+tag fires.
+
+---
+
 ## [server-v1.11.6] — 2026-05-16
 
 Stack-wide timezone alignment. OSCAR's canonical deployment runs in
