@@ -259,7 +259,7 @@ request:
           const _isAuthReq = /\/(token|login|auth|logon|oauth)/.test(_rqUrlForScenario)
             || _rqNameForScenario.includes('token') || _rqNameForScenario.includes('access');
 
-          const _idxNow = bru.getEnvVar('scenariosToRunIndex') || '0';
+          let   _idxNow = bru.getEnvVar('scenariosToRunIndex') || '0';
           const _targetNow = (bru.getEnvVar('scenarioTarget') || '').trim();
           const _lastUnitaryIdx = bru.getEnvVar('__unitaryLoadedIdx');
           const _lastUnitaryTarget = bru.getEnvVar('__unitaryLoadedTarget') || '';
@@ -275,6 +275,27 @@ request:
             || (_targetNow === '' && _lastUnitaryIdx !== _idxNow);
 
           if (!_isAuthReq && !_isScenarioStartLocal && _needsLoad) {
+            // Defensive clamp: if scenariosToRunIndex is at or past the end of
+            // __scenariosList (typically because /versions just advanced it on
+            // a 1-scenario list), reset it to 0 BEFORE calling getScenarioData.
+            // Without this, getScenarioData() detects idx >= length and calls
+            // bru.runner.stopExecution(), which halts every subsequent request
+            // in the run — observed on Bileto/Sqills where the run silently
+            // truncated after /coach-deck-layouts. Only applies in sequential
+            // mode; scenarioTarget mode looks up by name/explicit index and
+            // does not depend on scenariosToRunIndex being in-range.
+            if (_targetNow === '') {
+              try {
+                const _scList0 = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+                const _idxInt = parseInt(_idxNow, 10) || 0;
+                if (_scList0.length > 0 && _idxInt >= _scList0.length) {
+                  bru.setEnvVar('scenariosToRunIndex', '0');
+                  _idxNow = '0';
+                  console.log('[INFO] ↩ scenariosToRunIndex was at/past end of __scenariosList — clamped to 0 before unitary load');
+                }
+              } catch (_ce) { /* ignore — fallthrough lets getScenarioData handle malformed list */ }
+            }
+
             const _loadDesc = _targetNow !== '' ? ('target="' + _targetNow + '"') : ('index ' + _idxNow);
             console.log('[INFO] 🔄 Loading scenario for unitary run (' + _loadDesc + ')...');
             await getScenarioData();
