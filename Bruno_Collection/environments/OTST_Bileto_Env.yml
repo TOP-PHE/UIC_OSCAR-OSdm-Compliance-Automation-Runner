@@ -13,9 +13,9 @@ variables:
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/bileto_datafile.json
+    value: http://localhost:8080/data_base/bileto_datafile.json
   - name: json_schema
-    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/json_validator/datafile.schema.json
+    value: http://localhost:8080/json_validator/datafile.schema.json
   - name: scenariosToRunIndex
     value: "0"
   - name: scenarioTarget

@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.37",
+  "current_release": "2026.39",
   "releases": [
+    {
+      "release": "2026.39",
+      "date": "2026-05-19",
+      "server": "1.11.11",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(ux): dashboard now shows the submitter email on every row and batch-header for every role (not only test_manager / administrator). Previously the field was hidden from testers under the assumption that 'testers see only their own runs', but the tester list endpoint is company-scoped — testers do see teammates' runs. Per-row checkbox is now disabled for runs the current user is not authorised to delete, with a tooltip naming the actual owner; selecting and then clicking Delete used to produce a 'Not the run owner' toast at API time. Same logic applied to the batch-select checkbox (single-owner per batch).",
+        "fix(bruno-env): repaired stale local-dev data-file paths across all five vendor environment files (OTST_Benerail_Env.yml, OTST_Bileto_Env.yml, OTST_Paxone_Env.yml, OTST_Sqills_Env.yml, OTST_Turnit_Env.yml). Four of them still pointed at the pre-PR-#68 external-repo convention (http://localhost:8080/collections-bruno/OTST_V2.0.1/...); Turnit had a non-matching Bruno_Collection/ URL prefix. All five now follow the same http://localhost:8080/data_base/<vendor>_datafile.json and http://localhost:8080/json_validator/datafile.schema.json pattern. Chaps was already on the same convention and is unchanged. Local Bruno-UI workflow: cd Bruno_Collection && python -m http.server 8080. Production OSCAR runs are unaffected: the worker writes an ephemeral env file overriding data_base with its internal http://localhost:3001/data/... URL regardless of what the repo template says.",
+        "chore(bruno-env): also stripped accidentally-committed Bruno session-state vars from OTST_Sqills_Env.yml (__reportInitDone, productListHasValidData, productListCandidateIds). These get auto-written by Bruno when a developer runs requests locally; they belong in the developer's working copy, not in main. Paxone and Turnit env files still carry similar cruft and are flagged for a follow-up cleanup PR.",
+        "Operator action required: none. Bruno collection refreshes automatically via the refresh-collection workflow on merge; the dashboard change is in public/dashboard.html so it's picked up on the next page hard-reload after Watchtower promotes :stable."
+      ]
+    },
     {
       "release": "2026.37",
       "date": "2026-05-19",
