@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.35",
+  "current_release": "2026.36",
   "releases": [
+    {
+      "release": "2026.36",
+      "date": "2026-05-19",
+      "server": "1.11.8",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(bruno): clamp scenariosToRunIndex before calling getScenarioData() in the unitary-load wrapper (Bruno_Collection/opencollection.yml). Without the clamp, the wrapper passed an out-of-range index into getScenarioData(), which in turn called bru.runner.stopExecution() and silently halted the run partway through. Symptom on Bileto/Sqills: only the two System Information requests fired (versions + coach-deck-layouts), everything after was truncated.",
+        "Operator action required: none. Bruno collection refreshes via the refresh-collection workflow on merge; testers see the fix on their next run."
+      ]
+    },
     {
       "release": "2026.35",
       "date": "2026-05-19",

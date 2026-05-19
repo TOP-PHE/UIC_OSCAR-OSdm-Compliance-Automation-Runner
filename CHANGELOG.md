@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.8] — 2026-05-19
+
+Runtime hotfix for a regression introduced by #68 ("Merge Bruno Lib").
+Bruno runs on Bileto and Sqills silently truncated after the second
+request (`/coach-deck-layouts`): every subsequent request in the
+scenario was skipped. No error banner, no failed assertion — the
+run just stopped, with only the two System Information requests
+showing up in the HTML report.
+
+### Root cause
+The new unitary-run wrapper in `Bruno_Collection/opencollection.yml`
+calls `getScenarioData()` whenever `scenariosToRunIndex` differs from
+`__unitaryLoadedIdx`. On the first non-`/versions` request of a fresh
+session, `__unitaryLoadedIdx` is empty and `scenariosToRunIndex` is
+already at the end of `__scenariosList` (the `/versions` handler just
+advanced it for a one-scenario list). Inside `getScenarioData()`,
+`scenarioParser.js` sees `idx >= effectiveList.length` and calls
+`bru.runner.stopExecution()` — halting the runner before request 3
+fires. The pre-#68 wrapper avoided this by forcibly setting
+`scenariosToRunIndex` to `'0'` before the load; the rewrite removed
+that guard.
+
+### Fixed
+- `Bruno_Collection/opencollection.yml`: inside the unitary-load
+  branch (`_needsLoad === true`, sequential mode), clamp
+  `scenariosToRunIndex` to `0` when it is at or past the length of
+  `__scenariosList` before calling `getScenarioData()`. The clamp is
+  skipped in `scenarioTarget` mode (which looks up by name/explicit
+  index and doesn't depend on `scenariosToRunIndex` being in-range).
+
+### Operator action
+None. Watchtower picks up `:stable` automatically. The Bruno
+collection ships from this repo via the refresh-collection workflow
+on merge, so testers see the fix on their next run with no manual
+deploy.
+
+---
+
 ## [server-v1.11.7] — 2026-05-19
 
 Security hotfix for three Debian base-image CVEs that Trivy started
