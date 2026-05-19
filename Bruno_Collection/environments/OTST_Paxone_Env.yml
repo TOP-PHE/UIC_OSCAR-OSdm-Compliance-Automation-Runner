@@ -10,14 +10,83 @@ variables:
     value: https://staging.sandbox.paxone.app/api/v1/auth/user/token
   - name: api_base
     value: https://staging.sandbox.paxone.app/api/osdm
-  - name: data_file
-    value: <own value here>
-    disabled: true
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/data_base/paxone_datafile.json
+    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/data_base/paxone_datafile.json
   - name: json_schema
-    value: https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/Bruno-Enhancements/json_validator/datafile.schema.json
+    value: http://localhost:8080/collections-bruno/OTST_V2.0.1/json_validator/datafile.schema.json
   - name: scenariosToRunIndex
     value: "0"
+  - name: scenarioTarget
+    value: OTST_EXCH_SRCH_CRIT_1ADT_1LEG
+  - name: __reportInitDone
+    value: "true"
+  - name: __scenariosList
+    value: ""
+  - name: osdmVersion
+    value: "3.5"
+  - name: loggingType
+    value: INFO
+  - name: scenarioCode
+    value: OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG
+  - name: scenarioType
+    value: SALE
+  - name: scenarioAction
+    value: PATCH
+  - name: overruleCode
+    value: PAYMENT_FAILURE
+  - name: salesFlow_patchPassengers
+    value: "true"
+  - name: salesFlow_placeSelection
+    value: "true"
+  - name: salesFlow_addAncillary
+    value: "true"
+  - name: salesFlow_getBooking
+    value: "true"
+  - name: salesFlow_deleteAncillary
+    value: "true"
+  - name: TripType
+    value: SEARCH
+  - name: tripStartStopPlaceRef
+    value: urn:uic:stn:0088140010
+  - name: tripEndStopPlaceRef
+    value: urn:uic:stn:0070154005
+  - name: tripStartDatetime
+    value: 2026-05-17T11:00:00Z+02:00
+  - name: tripEndDatetime
+    value: 2026-05-17T15:20:00Z+02:00
+  - name: offerTripSearchCriteria
+    value: '{"departureTime":"2026-05-17T11:00:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0088140010"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0070154005"}}'
+  - name: bookingPurchaserSpecifications
+    value: '{"detail":{"firstName":"johnpurchaser","lastName":"doepurchaser","contact":{"email":"emailPurchaser@email.com","phoneNumber":"+33699999999"}}}'
+  - name: offerPassengerSpecifications
+    value: '[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1999-01-01","gender":"X"}]'
+  - name: bookingPassengerSpecifications
+    value: '[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1999-01-01","gender":"X","detail":{"firstName":"john","lastName":"doe","contact":{"email":"email@email.com","phoneNumber":"+33612345678"}}}]'
+  - name: bookingPassengerReferences
+    value: '["00001"]'
+  - name: passengerAdditionalData
+    value: '[{"updateFirstName":"johnupdate","updateLastName":"doeupdate","updateDateOfBirth":"1999-01-02","updateEmail":"email@email.com","updatePhoneNumber":"+33612345679","updateGender":"MALE"}]'
+  - name: updateFirstName_0
+    value: johnupdate
+  - name: updateLastName_0
+    value: doeupdate
+  - name: updateDateOfBirth_0
+    value: 1999-01-02
+  - name: updateEmail_0
+    value: email@email.com
+  - name: updatePhoneNumber_0
+    value: "+33612345679"
+  - name: updateGender_0
+    value: MALE
+  - name: offerSearchCriteria
+    value: '{"currency":"EUR","offerMode":"INDIVIDUAL"}'
+  - name: __unitaryLoadedIdx
+    value: "0"
+  - name: __unitaryLoadedTarget
+    value: ""
+  - name: OfferCollectionRequest
+    value: '{"tripSearchCriteria":{"departureTime":"2026-05-17T11:00:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0088140010"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0070154005"}},"anonymousPassengerSpecifications":[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1999-01-01","gender":"X"}],"offerSearchCriteria":{"currency":"EUR","offerMode":"INDIVIDUAL"}}'
+  - name: __offerRetryCount
+    value: "1"

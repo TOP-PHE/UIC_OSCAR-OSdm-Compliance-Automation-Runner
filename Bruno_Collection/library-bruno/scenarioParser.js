@@ -73,7 +73,9 @@ function resetScenarioEnvVars() {
     "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
     // Misc
     "data_base_tmp", "scriptContent", "swaggerJson",
-    "scenarioCode"
+    "scenarioCode",
+    // Offer retry
+    "__offerRetryCount"
   ];
   deleteList.forEach(function(key) { bru.deleteEnvVar(key); });
   validationLogger('[INFO] resetScenarioEnvVars: all business env vars cleared');
@@ -178,7 +180,7 @@ async function getScenarioData() {
 
   if (!hasDataFile) {
     const dataBase = bru.getEnvVar("data_base");
-    validationLogger("[INFO] 🌐 Data file was not set, grabbing data base url from environment : " + dataBase);
+    validationLogger("[INFO] 🌐 Grabbing data base url from environment : " + dataBase);
 
     if (!/^https?:\/\//i.test(String(dataBase || ""))) {
       throw new Error(`data_base must be an absolute http(s) URL. Got: ${dataBase}`);
@@ -301,39 +303,68 @@ function parseScenarioData(jsonData) {
   // loop back for the next scenario or truly stop the runner.
   bru.setEnvVar('__scenariosList', JSON.stringify(effectiveList));
 
-  // Read current index (persists across collection runs via env var)
-  let idx = parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
-  if (isNaN(idx) || idx < 0) idx = 0;
-  // If index exceeds list length, all scenarios have been attempted.
-  // In a loopback context (__loopback was recently true), stop execution.
-  // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
-  if (idx >= effectiveList.length) {
-    if (effectiveList.length > 0 && bru.getEnvVar('__scenariosList')) {
-      // Multi-scenario run completed — stop gracefully
-      console.log('✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
-      bru.runner.stopExecution();
-      return;
+  // ── scenarioTarget override (manual unitary targeting) ───────────────────
+  // If scenarioTarget is set (non-empty), it takes absolute priority over
+  // scenariosToRunIndex. Accepts either:
+  //   - a numeric index (e.g. "0", "2") into effectiveList
+  //   - a scenario code string (e.g. "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG")
+  // scenariosToRunIndex is NOT advanced when scenarioTarget is set, so
+  // the normal multi-scenario sequence is not disrupted.
+  const _scenarioTarget = (bru.getEnvVar('scenarioTarget') || '').trim();
+  if (_scenarioTarget !== '') {
+    const _asNum = parseInt(_scenarioTarget, 10);
+    if (!isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
+      // Numeric index
+      if (_asNum < 0 || _asNum >= effectiveList.length) {
+        throw new Error(
+          `[ERROR] ❌ scenarioTarget index ${_asNum} is out of range. ` +
+          `effectiveList has ${effectiveList.length} entries (0–${effectiveList.length - 1}).`
+        );
+      }
+      scenarioCode = effectiveList[_asNum];
+      validationLogger(`[INFO] 🎯 scenarioTarget (index ${_asNum}): "${scenarioCode}" — scenariosToRunIndex NOT advanced`);
+    } else {
+      // Scenario code string
+      if (!allCodes.includes(_scenarioTarget)) {
+        throw new Error(
+          `[ERROR] ❌ scenarioTarget "${_scenarioTarget}" not found in scenarios list. ` +
+          `Available: ${allCodes.join(', ')}`
+        );
+      }
+      scenarioCode = _scenarioTarget;
+      validationLogger(`[INFO] 🎯 scenarioTarget (name): "${scenarioCode}" — scenariosToRunIndex NOT advanced`);
     }
-    // Fresh run or stale index from previous session — wrap to 0
-    console.log('[INFO] Index ' + idx + ' exceeds list length ' + effectiveList.length + ' — resetting to 0');
-    idx = 0;
+    // scenariosToRunIndex is intentionally left unchanged
+  } else {
+    // ── Normal sequential mode — read and advance scenariosToRunIndex ───────
+    let idx = parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
+    if (isNaN(idx) || idx < 0) idx = 0;
+    // If index exceeds list length, all scenarios have been attempted.
+    // In a loopback context (__loopback was recently true), stop execution.
+    // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
+    if (idx >= effectiveList.length) {
+      if (effectiveList.length > 0 && bru.getEnvVar('__scenariosList')) {
+        // Multi-scenario run completed — stop gracefully
+        console.log('✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
+        bru.runner.stopExecution();
+        return;
+      }
+      // Fresh run or stale index from previous session — wrap to 0
+      console.log('[INFO] Index ' + idx + ' exceeds list length ' + effectiveList.length + ' — resetting to 0');
+      idx = 0;
+    }
+
+    scenarioCode = effectiveList[idx];
+
+    // Advance index WITHOUT wrapping back to 0.
+    const nextIdx = idx + 1;
+    bru.setEnvVar("scenariosToRunIndex", String(nextIdx));
+
+    validationLogger(
+      `[INFO] 🎯 scenariosToRun [${idx + 1}/${effectiveList.length}]: selected "${scenarioCode}"` +
+      (nextIdx >= effectiveList.length ? ` — last in list, run will stop after this scenario` : ` — next will pick index ${nextIdx}`)
+    );
   }
-
-  scenarioCode = effectiveList[idx];
-
-  // Advance index WITHOUT wrapping back to 0.
-  // When nextIdx reaches effectiveList.length the loopback checks in the
-  // terminal .bru files evaluate (_scNextIdx < _scList.length) = false and
-  // call bru.runner.stopExecution() correctly.
-  // Wrapping to 0 caused an infinite loop because 0 < length is always true
-  // and the run never stopped after the last scenario.
-  const nextIdx = idx + 1;
-  bru.setEnvVar("scenariosToRunIndex", String(nextIdx));
-
-  validationLogger(
-    `[INFO] 🎯 scenariosToRun [${idx + 1}/${effectiveList.length}]: selected "${scenarioCode}"` +
-    (nextIdx >= effectiveList.length ? ` — last in list, run will stop after this scenario` : ` — next will pick index ${nextIdx}`)
-  );
 
   let dataFileIndex = 0;
   const dataFileLength = (jsonData.scenarios || []).length;
@@ -344,6 +375,7 @@ function parseScenarioData(jsonData) {
 
     if (scenario.code === scenarioCode) {
       // Set environment variables for the scenario
+      bru.setEnvVar("osdmVersion", ["", "null"].includes(scenario.osdmVersion) ? null : scenario.osdmVersion);
       bru.setEnvVar("loggingType", ["", "null"].includes(scenario.loggingType) ? null : scenario.loggingType);
       bru.setEnvVar("scenarioCode", scenario.code);
       bru.setEnvVar("scenarioType", ["", "null"].includes(scenario.scenarioType) ? null : scenario.scenarioType);
@@ -352,14 +384,10 @@ function parseScenarioData(jsonData) {
       // osdmVersion priority: scenario value (data file) > environment file value > null
       // The data file is the per-scenario source of truth; the env file is the fallback
       // when the scenario does not explicitly define an osdmVersion.
-      const _envFileOsdmVersion = bru.getEnvVar("osdmVersion");
-      const _scenarioOsdmVersion = (scenario.osdmVersion && !["", "null"].includes(String(scenario.osdmVersion)))
-        ? String(scenario.osdmVersion)
-        : null;
-      const _effectiveOsdmVersion = _scenarioOsdmVersion || _envFileOsdmVersion || null;
-      bru.setEnvVar("osdmVersion", _effectiveOsdmVersion);
-      validationLogger(`[INFO] 🔢 osdmVersion — data file: "${_scenarioOsdmVersion}", env file: "${_envFileOsdmVersion}", effective: "${_effectiveOsdmVersion}" (data file takes priority)`);
-      validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${_effectiveOsdmVersion}"`);
+      //const _scenarioOsdmVersion = (scenario.osdmVersion && !["", "null"].includes(String(scenario.osdmVersion)))
+      //  ? String(scenario.osdmVersion)
+      //  : null;
+      validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${bru.getEnvVar("osdmVersion")}"`);
       bru.setEnvVar("desiredFlexibility", ["", "null"].includes(scenario.desiredFlexibility) ? null : scenario.desiredFlexibility);
       bru.setEnvVar("accommodationSelection", ["", "null"].includes(scenario.accommodationSelection) ? null : scenario.accommodationSelection);
       bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
@@ -597,10 +625,19 @@ function parseScenarioData(jsonData) {
         }
       });
 
-      // Offer search criteria (inline on scenario)
-      // Defaults only apply when offerSearchCriteria is entirely absent (legacy scenarios).
-      // When present, each field is sent only if explicitly set — empty/null = not sent.
-      const criteria = scenario.offerSearchCriteria;
+      // Offer search criteria
+      // Priority: inline offerSearchCriteria > offerSearchCriteriaListId reference > legacy defaults
+      let criteria = scenario.offerSearchCriteria || null;
+
+      // Resolve offerSearchCriteriaListId reference when no inline criteria
+      if (!criteria && scenario.offerSearchCriteriaListId != null && Array.isArray(jsonData.offerSearchCriteriaList)) {
+        const listEntry = jsonData.offerSearchCriteriaList.find(e => e.id === scenario.offerSearchCriteriaListId);
+        if (listEntry && Array.isArray(listEntry.offerSearchCriteria) && listEntry.offerSearchCriteria.length > 0) {
+          criteria = listEntry.offerSearchCriteria[0];
+          validationLogger(`[INFO] offerSearchCriteria resolved from offerSearchCriteriaListId=${scenario.offerSearchCriteriaListId}`);
+        }
+      }
+
       if (criteria && typeof criteria === 'object') {
         osdmOfferSearchCriteria(
           criteria.currency || null,
@@ -614,7 +651,7 @@ function parseScenarioData(jsonData) {
           criteria.inboundDate || null
         );
       } else {
-        // Legacy scenario without inline offerSearchCriteria — use safe defaults
+        // Legacy scenario without any offerSearchCriteria — use safe defaults
         validationLogger(`[WARN] No offerSearchCriteria on scenario '${scenario.code}' — using defaults.`);
         osdmOfferSearchCriteria('EUR', 'INDIVIDUAL', ['ADMISSION', 'RESERVATION'],
           null, null, null, null, null, null);
