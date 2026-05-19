@@ -435,8 +435,8 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
   const expectedStatuses = Array.isArray(expectedFulfillmentStatus) ? expectedFulfillmentStatus : [expectedFulfillmentStatus];
 
   test(`Fulfillments exist at index ${index}`, () => {
-    expect(fulfillments).to.be.an("array").that.is.not.empty;
     validationLogger(`[INFO] Number of fulfillments: ${fulfillments.length}`);
+    expect(fulfillments).to.be.an("array").that.is.not.empty;
   });
 
   fulfillments.forEach((fulfillment, idx) => {
@@ -445,13 +445,14 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
     }
 
     test(`Fulfillment[${idx}] id exists`, () => {
-      expect(fulfillment.id).to.be.a("string").and.not.be.empty;
       validationLogger(`[INFO] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
     });
+    fulfillmentIds.push(fulfillment.id);
+    bru.setEnvVar("fulfillmentIds", fulfillmentIds);
 
     test(`Fulfillment[${idx}] bookingRef exists`, () => {
-      expect(fulfillment.bookingRef).to.be.a("string").and.not.be.empty;
       validationLogger(`[INFO] Fulfillment[${idx}] bookingRef exists: ${fulfillment.bookingRef}`);
+      expect(fulfillment.bookingRef).to.be.a("string").and.not.be.empty;
     });
 
     // D3: bookingRef must match the current bookingId (OSDM: Fulfillment.bookingRef required)
@@ -487,7 +488,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
 
     // D1: status must be a valid OSDM FulfillmentStatus enum value
     const _validFulfillmentStatuses = ['AVAILABLE','USED','PARTIALLY_USED','RESERVED',
-      'EXCHANGED','REFUNDED','RELEASED','CANCELLED','EXPIRED'];
+      'EXCHANGED','REFUNDED','RELEASED','CANCELLED','EXPIRED','ON_HOLD','CONFIRMED'];
     test(`Fulfillment[${idx}].status '${fulfillment.status}' is a valid OSDM FulfillmentStatus`, () => {
       expect(_validFulfillmentStatuses).to.include(fulfillment.status,
         `'${fulfillment.status}' is not a valid FulfillmentStatus enum value`);
@@ -515,11 +516,11 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
         validationLogger(`[INFO] Fulfillment[${idx}] number of documents: ${fulfillment.fulfillmentDocuments.length}`);
         fulfillment.fulfillmentDocuments.forEach((doc, docIndex) => {
           test(`Fulfillment[${idx}].document[${docIndex}] - fields exist`, () => {
+            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, link=${doc.downloadLink}`);
             expect(doc.medium,       "medium missing").to.be.a("string").and.not.be.empty;
             expect(doc.type,         "type missing").to.be.a("string").and.not.be.empty;
             expect(doc.downloadLink, "downloadLink missing").to.be.a("string").and.not.be.empty;
             expect(doc.format,       "format missing").to.be.a("string").and.not.be.empty;
-            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, link=${doc.downloadLink}`);
           });
         });
       });

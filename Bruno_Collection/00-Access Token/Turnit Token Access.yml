@@ -12,9 +12,9 @@ http:
       - name: grant_type
         value: client_credentials
       - name: client_id
-        value: "{{client.id}}"
+        value: "{{client_id}}"
       - name: client_secret
-        value: "{{client.secret}}"
+        value: "{{client_secret}}"
       - name: scope
         value: retailer-api
 

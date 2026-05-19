@@ -292,7 +292,8 @@ function selectAndSetOffer(jsonData) {
   // it renders the block as one collapsible pill instead of ~30 stdout rows.
   // JSON.stringify also serialises at full depth (no [Array] / [Object] truncation
   // from Node's util.inspect default depth=2).
-  console.log(`[JSON:selectedOffer] ${JSON.stringify(selectedOffer)}`);
+  //console.log(`[JSON:selectedOffer] ${JSON.stringify(selectedOffer)}`);
+  console.log("[INFO] 🔍 Selected Offer:", selectedOffer);
 
   // Store selected offer and related info in environment
   bru.setEnvVar("offer", selectedOffer);
