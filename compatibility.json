@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.50",
+  "current_release": "2026.51",
   "releases": [
+    {
+      "release": "2026.51",
+      "date": "2026-05-20",
+      "server": "1.11.23",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "security(audit #87): removed the hardcoded Benerail credential from source. In Bruno_Collection/00-Access Token/Benerail Access Token.yml the jwt-bearer 'assertion' (a signed, expiring JWT) and 'scope' (uic_osdm, effectively an account id) were committed literals; they now reference secret env vars {{benerail_assertion}} / {{benerail_scope}}, matching how all other vendors source secrets. environments/OTST_Benerail_Env.yml declares benerail_assertion and benerail_scope as secret:true (name only, no value) so the values stay in Bruno's local secret store and are never committed — same as Ocp-Apim-Subscription-Key / requestor / access_token. Both committed files are now credential-free. The previously-committed JWT remains in git history and should be allowed to lapse / rotated on the Benerail side.",
+        "Operator action required: local Bruno testers of Benerail must set the secret env vars benerail_assertion (the jwt-bearer assertion) and benerail_scope (uic_osdm) in the OTST_Benerail_Env environment; Bruno keeps secret values local. No change for OSCAR-server runs (auth handled server-side)."
+      ]
+    },
     {
       "release": "2026.50",
       "date": "2026-05-20",

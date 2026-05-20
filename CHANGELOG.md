@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.23] — 2026-05-20
+
+Audit P2 (issue #87, security) — remove the hardcoded Benerail credential.
+
+### Security
+- **`Bruno_Collection/00-Access Token/Benerail Access Token.yml`** — the
+  `jwt-bearer` **`assertion`** (a signed, expiring JWT) and the **`scope`**
+  (effectively an account identifier) were hardcoded in the request body, i.e.
+  a credential committed in source. They now reference secret env vars
+  `{{benerail_assertion}}` / `{{benerail_scope}}`, matching how every other
+  vendor's access-token request already sources its secrets via `{{…}}`.
+- **`Bruno_Collection/environments/OTST_Benerail_Env.yml`** — declares
+  `benerail_assertion` and `benerail_scope` as `secret: true` (name only, no
+  value); the actual values live in Bruno's local secret store and are never
+  written to the repo — same mechanism as `Ocp-Apim-Subscription-Key`,
+  `requestor`, `access_token`.
+- Net effect: both committed files are now credential-free, so
+  `Benerail Access Token.yml` no longer needs to be excluded from commits.
+  (The previously-committed JWT remains in git history and should be allowed
+  to lapse / rotated on the Benerail side as hygiene.)
+
+### Operator action
+Local Bruno testers of Benerail: set the **secret** env vars
+`benerail_assertion` (your current jwt-bearer assertion) and `benerail_scope`
+(`uic_osdm`) in the `OTST_Benerail_Env` environment. Bruno keeps secret values
+local, so they are not committed/synced. No change for OSCAR-server runs (auth
+is handled server-side).
+
+---
+
 ## [server-v1.11.22] — 2026-05-20
 
 Audit P2 (issue #88) — fix the CodeQL HIGH file-system race.

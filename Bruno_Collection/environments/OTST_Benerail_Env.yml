@@ -6,6 +6,10 @@ variables:
     name: requestor
   - secret: true
     name: access_token
+  - secret: true
+    name: benerail_assertion
+  - secret: true
+    name: benerail_scope
   - name: x-bnds-backend
     value: c03
   - name: api_base
