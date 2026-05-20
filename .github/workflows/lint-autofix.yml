@@ -1,0 +1,64 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# One-shot helper for issue #86. The dev host has no Node, so this runs
+# `eslint src/ --fix` on a GitHub runner and uploads the resulting diff as an
+# artifact for review + manual application. It is READ-ONLY: no contents:write,
+# no commit, no push. Scoped to the fix/86-style-sweep branch and removed from
+# the branch before the PR is finalized, so it never reaches main.
+name: Lint autofix (one-shot · #86)
+
+on:
+  push:
+    branches: ['fix/86-style-sweep']
+
+permissions:
+  contents: read
+
+jobs:
+  autofix:
+    name: eslint src/ --fix → patch artifact
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Oscar_Server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: Oscar_Server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: eslint src/ --fix
+        # --fix exits non-zero if unfixable warnings/errors remain; we still
+        # want the (partial) fixes captured, so don't fail the step.
+        run: npx eslint src/ --fix || true
+
+      - name: Build patch + summary
+        working-directory: .
+        run: |
+          git diff > eslint-fixes.patch
+          {
+            echo '### eslint --fix changed files';
+            echo '```';
+            git --no-pager diff --stat || true;
+            echo '```';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-fixes
+          path: eslint-fixes.patch
+          if-no-files-found: warn
