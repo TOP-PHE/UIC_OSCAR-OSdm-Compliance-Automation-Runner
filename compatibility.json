@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.39",
+  "current_release": "2026.40",
   "releases": [
+    {
+      "release": "2026.40",
+      "date": "2026-05-20",
+      "server": "1.11.12",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(critical): dashboard stuck on 'Loading…' for all roles in v1.11.11. fmtDate() in public/dashboard.html called parseServerTs(), a TZ-normalisation helper that lives on the unmerged fix/v1.11.7-frontend-timestamp-tz branch and is NOT defined in the shipped nav.js. The call leaked into #73 from an uncommitted working-tree edit. Result: ReferenceError: parseServerTs is not defined thrown inside renderRuns() on every row, before el.innerHTML was set — so the runs list never replaced its 'Loading…' placeholder, and loadRuns() has no try/catch. Reverted fmtDate() to plain new Date(d).toLocaleString(...). The TZ-normalisation will return properly when the v1.11.7 branch (which defines parseServerTs in nav.js) merges as a unit.",
+        "Operator action required: none. Watchtower picks up :stable automatically after the image rebuild; hard-refresh the dashboard once live."
+      ]
+    },
     {
       "release": "2026.39",
       "date": "2026-05-19",
