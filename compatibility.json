@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.40",
+  "current_release": "2026.42",
   "releases": [
+    {
+      "release": "2026.42",
+      "date": "2026-05-20",
+      "server": "1.11.14",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(auth): login rate-limiter tuning. (1) /logout removed from the limiter — it carries no credential to brute-force and counting it in the same IP bucket as /login halved the effective login budget during rapid user-switching (each switch is logout+login). (2) Default cap raised 20 → 50 per 15-minute window and made env-tunable via AUTH_RATE_LIMIT_MAX. A conformance-testing platform invites rapid switching across many vendor accounts; 20/15min tripped legitimate testers ('Too many attempts. Please try again later.') after ~10 login/logout cycles. 50/15min is still far below a useful brute-force rate. /login, /register, /bootstrap remain protected.",
+        "Operator action required: none. Optional: set AUTH_RATE_LIMIT_MAX in OSCAR_Deploy/.env to override the default of 50. Picked up after Watchtower promotes :stable.",
+        "Numbering note: assumes #75 (server 1.11.13 / release-2026.41) merges first. If merge order is reversed, renumber to 1.11.13 / 2026.41."
+      ]
+    },
     {
       "release": "2026.40",
       "date": "2026-05-20",
