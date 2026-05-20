@@ -432,7 +432,6 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
   const fulfillmentIds   = [];
   const _bookedPartIdsRaw = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
   const bookedPartIds    = Array.isArray(_bookedPartIdsRaw) ? _bookedPartIdsRaw : JSON.parse(_bookedPartIdsRaw || "[]");
-  const expectedStatuses = Array.isArray(expectedFulfillmentStatus) ? expectedFulfillmentStatus : [expectedFulfillmentStatus];
 
   test(`Fulfillments exist at index ${index}`, () => {
     validationLogger(`[INFO] Number of fulfillments: ${fulfillments.length}`);

@@ -1,6 +1,6 @@
 // Import needed library files
-const display = require('./displays.js');
-const requestsBuilder = require('./requestsBuilder.js');
+require('./displays.js');
+require('./requestsBuilder.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');

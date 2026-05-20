@@ -3682,7 +3682,6 @@ function genDateOfBirth(minAge, maxAge) {
 function wizGenPassengers() {
   const fw    = wizData.framework || emptyFramework();
   const sc    = wizScenario;
-  const email = wizProfile.email || (user && user.email) || 'tester@example.com';
   const passengers = [];
   let refNum = 1;
 

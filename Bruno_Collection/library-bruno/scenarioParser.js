@@ -1,7 +1,7 @@
 // Import needed library files
-const display = require('./displays.js');
-const validators = require('./validators.js');
-const models = require('./model.js');
+require('./displays.js');
+require('./validators.js');
+require('./model.js');
 
 // scenarioParser-bruno.js
 

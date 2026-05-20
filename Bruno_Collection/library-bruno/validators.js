@@ -1,5 +1,5 @@
 // Import needed library files
-const display = require('./displays.js');
+require('./displays.js');
 
 
 module.exports = {

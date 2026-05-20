@@ -23,7 +23,7 @@ const crypto    = require('crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
 const { get, all, run } = require('../../db/db');
-const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
+const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope } = require('../helpers/shared');
 const log = require('../../utils/logger').child({ module: 'company' });
@@ -104,11 +104,6 @@ function safeCompany(c) {
     created_at:                   c.created_at,
     updated_at:                   c.updated_at
   };
-}
-
-function fileHash(filePath) {
-  const content = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 // At-rest encryption for company datafiles (Phase 2 of issue #60, v1.11.0).

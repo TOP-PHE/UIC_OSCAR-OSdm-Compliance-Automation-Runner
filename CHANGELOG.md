@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.24] — 2026-05-20
+
+Audit P2 (issue #86) — dead-code cleanup (unused vars / imports).
+
+### Changed
+- Removed confirmed-dead locals & imports flagged by CodeQL/ESLint
+  (`js/unused-local-variable`), behaviour-neutral:
+  - **`src/api/routes/`** — dropped unused destructured imports
+    (`isPlatformRole`/`isTestManagerOrAbove` in `company-test-framework.js` &
+    `company-test-resources.js`; `isTestManagerOrAbove` in `company.js`) and the
+    unused `fileHash()` helper in `company.js` (`crypto`/`fs` remain used).
+  - **`Bruno_Collection/library-bruno/`** — the unused top-level
+    `const x = require('./…')` bindings (`display` in scenarioParser/offers/
+    refunds/validators/fulfillments/exchanges; `requestsBuilder` in offers;
+    `validators`/`models` in scenarioParser) are now **bare `require('./…')`**
+    calls — the binding is gone but the module's side-effect (its
+    `Object.assign(globalThis, …)` exposure) is preserved, so engine behaviour
+    is unchanged. Also removed a dead `expectedStatuses` local in `bookings.js`.
+  - **`public/`** — removed dead `batchStatus` (`dashboard.html`) and `email`
+    (`scenarios.js`) locals.
+
+### Note
+The ~140 Sonar "auto-fixable" style suggestions (optional chaining, etc.) are
+SonarLint *IDE* quick-fixes, not ESLint-fixable — `eslint src/ --fix` is a
+no-op on this codebase (already const/quote/semicolon-clean). They are left as
+non-blocking advisories. A few unused imports in **test files** were left as-is
+(ambiguous identifier, zero runtime impact).
+
+### Operator action
+None. Bruno collection refreshes via the refresh-collection workflow on merge.
+
+---
+
 ## [server-v1.11.23] — 2026-05-20
 
 Audit P2 (issue #87, security) — remove the hardcoded Benerail credential.
