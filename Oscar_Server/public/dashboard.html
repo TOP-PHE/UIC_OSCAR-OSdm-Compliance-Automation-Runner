@@ -240,6 +240,26 @@ function fmtDate(d) {
   return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
 }
 
+// Certifier-share line for one run. The wrapping div carries a stable
+// data-share-line attribute so toggleShare() can replace just this element
+// after a share/unshare — no full re-render, so expanded batches and scroll
+// position are preserved. Default private; only terminal-status runs are
+// shareable (mirrors backend 409); non-test_manager roles see the badge
+// read-only and get no control.
+function shareLineFor(r) {
+  const isShared   = !!r.shared_with_certifier_at;
+  const isTM       = user.role === 'test_manager';
+  const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
+  let inner = '';
+  if (isShared) {
+    inner = `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + r.shared_with_certifier_by : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+      + (isTM ? ` <a href="#" data-action="unshare-run" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a>` : '');
+  } else if (isTM && isTerminal) {
+    inner = `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a>`;
+  }
+  return `<div data-share-line="${r.id}" style="margin-top:${inner ? '3px' : '0'};font-size:11px">${inner}</div>`;
+}
+
 // ── Render a single run row (used for both unbatched and batch-child rows) ───
 function renderRunRow(r, opts) {
   const isBatchChild = opts && opts.batchChild;
@@ -282,22 +302,9 @@ function renderRunRow(r, opts) {
     : '';
 
   // ── Certifier sharing (v1.11.15) — per-report, test_manager-only ──────────
-  // The test_manager decides which individual runs certifiers may see, right
-  // here on the dashboard. Default is private. Only terminal-status runs are
-  // shareable (mirrors the backend 409). Non-TM roles see the badge read-only.
-  const isShared   = !!r.shared_with_certifier_at;
-  const isTM       = user.role === 'test_manager';
-  const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
-  let shareLine = '';
-  if (isShared) {
-    shareLine = `<div style="margin-top:3px;font-size:11px">`
-      + `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + r.shared_with_certifier_by : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
-      + (isTM ? ` <a href="#" data-action="unshare-run" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a>` : '')
-      + `</div>`;
-  } else if (isTM && isTerminal) {
-    shareLine = `<div style="margin-top:3px;font-size:11px">`
-      + `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a></div>`;
-  }
+  // Built via shareLineFor() so a share/unshare can update just this row in
+  // place (toggleShare) without re-rendering — and collapsing — the whole list.
+  const shareLine = shareLineFor(r);
 
   return `
     <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
@@ -683,7 +690,23 @@ async function toggleShare(runId, share) {
       alert(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
       return;
     }
-    await loadRuns();
+    const data    = await res.json().catch(() => ({}));
+    const updated = data.run || {};
+    // Update the in-memory model and swap ONLY this row's share line. We
+    // deliberately avoid loadRuns() here: a full re-render collapses any
+    // expanded batches and jumps the scroll position — the "dashboard
+    // collapses on share" UX bug. Event delegation on #runs-list keeps the
+    // new <a> working after the swap.
+    const r = allRuns.find(x => x.id === runId);
+    if (r) {
+      r.shared_with_certifier_at = updated.shared_with_certifier_at || null;
+      r.shared_with_certifier_by = updated.shared_with_certifier_by || null;
+      const el = document.querySelector(`[data-share-line="${runId}"]`);
+      if (el) el.outerHTML = shareLineFor(r);
+      else await loadRuns();   // fallback: row not currently in the DOM
+    } else {
+      await loadRuns();        // fallback: model out of sync
+    }
   } catch (e) {
     alert('Network error while updating sharing: ' + e.message);
   }
