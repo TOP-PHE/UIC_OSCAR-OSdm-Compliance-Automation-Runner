@@ -76,6 +76,21 @@ queue.on('failed', ({ runId, error }) => {
   metricsForQueue.runsTotal.inc({ status: 'FAILED' });
 });
 
+// ── Startup reconciliation — fail runs orphaned by the previous process exit ──
+// The queue above is in-memory: on boot its pending list is empty, so any run
+// still RUNNING/QUEUED in the DB was orphaned by the previous exit (deploy,
+// crash, SIGTERM, docker restart) and would otherwise occupy company
+// concurrency slots forever — wedging the queue (observed after a Watchtower
+// deploy landed mid-batch: 4 orphaned RUNNING rows pinned all 4 slots, 2
+// QUEUED could never start). Mark them FAILED so slots free and the dashboard
+// reflects reality. Synchronous and safe here: DB migrations already ran
+// (require('./db/db') above) and no job has been enqueued yet.
+try {
+  require('./worker/reconcile').reconcileOrphanedRuns();
+} catch (e) {
+  log.error({ err: e.message }, 'Startup run reconciliation threw (non-fatal)');
+}
+
 // Periodically refresh queue depth + active-runs gauges from the queue's
 // own state. Every 5s — well below Prometheus's typical 15s scrape interval,
 // so a scrape never sees a totally stale value.

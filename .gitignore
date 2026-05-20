@@ -18,11 +18,22 @@ Oscar_Server/data/
 # ── Editor / OS ─────────────────────────────────────────────────────────
 .vscode/
 .idea/
+.vs/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Visual Studio / VS Code code-index caches — machine-local, never commit.
+# These are the files OneDrive repeatedly fails to sync ("in use by another
+# program") because the editor holds them open; keeping them out of git also
+# stops them riding along in commits.
+*.vsidx
+*.db-shm
+*.db-wal
+CodeChunks.db
+SemanticSymbols.db
 
 # ── Logs ────────────────────────────────────────────────────────────────
 *.log
