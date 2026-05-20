@@ -232,7 +232,10 @@ function duration(start, end) {
 }
 function fmtDate(d) {
   if (!d) return '-';
-  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
+  // v1.11.7 — parseServerTs (defined in nav.js) normalises SQLite's TZ-less
+  // UTC strings to ISO+Z so toLocaleString converts to the viewer's local TZ.
+  // Without it the browser misreads "2026-05-16 08:44:24" as 08:44 LOCAL.
+  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
 }
 
 // ── Render a single run row (used for both unbatched and batch-child rows) ───
@@ -245,25 +248,40 @@ function renderRunRow(r, opts) {
     ? (r.scenario_code || r.env_name_used || r.id.slice(0,8))
     : (r.env_name_used || r.id.slice(0,8));
 
-  // Multi-user roles (test_manager, administrator) see the submitter's
-  // email as a subtitle under the run label — they need to know who in
-  // the company kicked off each run when triaging failures or pending
-  // deletions. Testers see only their own runs, so the subtitle would
-  // be redundant. The submitted_by field comes from the runs.user JOIN
-  // in the LIST endpoint (already present in the response payload).
-  const showSubmitter = (user.role === 'test_manager' || user.role === 'administrator')
-                        && r.submitted_by;
+  // Submitter subtitle. Originally rendered only for test_manager /
+  // administrator on the assumption that "testers see only their own
+  // runs" — but the list endpoint (Oscar_Server/src/api/routes/runs.js
+  // tester branch) is company-scoped, not user-scoped, so testers do
+  // see teammates' runs. Without a visible submitter they have no way
+  // to tell whose run is whose, then click Delete and get a confusing
+  // "Not the run owner" toast. v1.11.11: show it to everyone, mark the
+  // current user's own runs with "(you)" so they can still scan quickly.
+  // The submitted_by field comes from the runs.user JOIN in the LIST
+  // endpoint (already present in the response payload).
+  const showSubmitter = !!r.submitted_by;
+  const isOwnRun = r.user_id && user.id && r.user_id === user.id;
+  const submitterSuffix = isOwnRun ? ' <span style="color:#0090D4">(you)</span>' : '';
   const submitterLine = showSubmitter
-    ? `<div style="color:#78909c;font-size:11px;margin-top:2px">👤 ${r.submitted_by}</div>`
+    ? `<div style="color:#78909c;font-size:11px;margin-top:2px">👤 ${r.submitted_by}${submitterSuffix}</div>`
+    : '';
+
+  // Per-row delete authorisation. Backend rule (runs.js bulk-delete):
+  //   administrator + test_manager → may delete any run in their company
+  //   anyone else → may delete only runs they personally started
+  // The list endpoint returns r.user_id only on the tester branch (not
+  // in the certifier branch), which is fine — non-elevated certifiers
+  // already have canDelete=false at the column level.
+  const isElevated = user.role === 'administrator' || user.role === 'test_manager';
+  const canDeleteThisRow = canDelete && (isElevated || isOwnRun);
+  const checkboxCell = canDelete
+    ? (canDeleteThisRow
+        ? `<input type="checkbox" value="${r.id}" data-action="select" ${selected.has(r.id)?'checked':''}>`
+        : `<input type="checkbox" disabled title="Only ${r.submitted_by || 'the run owner'} or a test_manager can delete this run">`)
     : '';
 
   return `
     <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
-      <div class="cb-cell">
-        ${canDelete
-          ? `<input type="checkbox" value="${r.id}" data-action="select" ${selected.has(r.id)?'checked':''}>`
-          : ''}
-      </div>
+      <div class="cb-cell">${checkboxCell}</div>
       <div>
         <div style="font-weight:600;color:#1a3a6b;font-size:13px">${label}</div>
         ${submitterLine}
@@ -345,23 +363,34 @@ function renderRuns(runs) {
     // Issue #34: previously had no checkbox, forcing the user to expand
     // every batch and tick each child individually before deleting. Now
     // includes a "select all in batch" checkbox (when canDelete) that
-    // mirrors selection state of all child runs. Only rendered for roles
-    // that can delete; testers/test_managers/admins all see it.
-    const batchChildIds = batchRuns.map(r => r.id);
-    const batchAllSelected  = canDelete && batchChildIds.every(id => selected.has(id));
-    const batchSomeSelected = canDelete && !batchAllSelected && batchChildIds.some(id => selected.has(id));
+    // mirrors selection state of all child runs.
+    // v1.11.11: gate the checkbox by ownership. All runs in a batch
+    // share the same submitter (batchRuns[0].user_id), so we can decide
+    // once for the whole batch. Submitter line is now visible to all
+    // roles for symmetry with the per-row change above.
+    const batchChildIds   = batchRuns.map(r => r.id);
+    const batchOwnerId    = batchRuns[0].user_id;
+    const batchIsOwn      = batchOwnerId && user.id && batchOwnerId === user.id;
+    const batchIsElevated = user.role === 'administrator' || user.role === 'test_manager';
+    const batchCanDelete  = canDelete && (batchIsElevated || batchIsOwn);
+    const batchAllSelected  = batchCanDelete && batchChildIds.every(id => selected.has(id));
+    const batchSomeSelected = batchCanDelete && !batchAllSelected && batchChildIds.some(id => selected.has(id));
+    const batchSubmitterSuffix = batchIsOwn ? ' <span style="color:#0090D4">(you)</span>' : '';
+    const batchCheckboxCell = canDelete
+      ? (batchCanDelete
+          ? `<input type="checkbox" data-action="select-batch" data-batch-id="${batchId}"
+              ${batchAllSelected ? 'checked' : ''}
+              ${batchSomeSelected ? 'data-indeterminate="1"' : ''}
+              title="Select all ${batchRuns.length} scenarios in this batch">`
+          : `<input type="checkbox" disabled title="Only ${batchRuns[0].submitted_by || 'the batch owner'} or a test_manager can delete this batch">`)
+      : '';
     html += `
     <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
-      <div class="cb-cell" data-action="batch-cb-cell">
-        ${canDelete ? `<input type="checkbox" data-action="select-batch" data-batch-id="${batchId}"
-            ${batchAllSelected ? 'checked' : ''}
-            ${batchSomeSelected ? 'data-indeterminate="1"' : ''}
-            title="Select all ${batchRuns.length} scenarios in this batch">` : ''}
-      </div>
+      <div class="cb-cell" data-action="batch-cb-cell">${batchCheckboxCell}</div>
       <div style="font-weight:700;color:#0090D4">
         <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)
-        ${(user.role === 'test_manager' || user.role === 'administrator') && batchRuns[0].submitted_by
-          ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${batchRuns[0].submitted_by}</div>`
+        ${batchRuns[0].submitted_by
+          ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${batchRuns[0].submitted_by}${batchSubmitterSuffix}</div>`
           : ''}
       </div>
       <div class="batch-counts" title="${completed} passed, ${failed} failed${running ? ', ' + running + ' still running' : ''}">

@@ -14,6 +14,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.11] — 2026-05-19
+
+Two small UX-and-config polish items, both surfaced by hands-on testing
+this evening. Neither is in the same regression chain as
+v1.11.10 (PR #72) — that PR fixes the actual scenario loop. These are
+the cleanup items that came out of the audit.
+
+> Numbering note: this PR pre-bumps to 1.11.11 / release-2026.39 on the
+> assumption that #72 (v1.11.10 / release-2026.38) lands first. If the
+> merge order is reversed, the maintainer should bump this down to
+> 1.11.10 / release-2026.38.
+
+### Fixed
+- **`Oscar_Server/public/dashboard.html`** — dashboard now shows the
+  submitter email on every run row and every batch-header for **every**
+  role, with a small "(you)" badge next to the current user's own runs.
+  Previously the subtitle was hidden from testers under the comment
+  *"testers see only their own runs, so the subtitle would be redundant"*
+  — but the tester branch of the list endpoint
+  (`runs.js` `GET /v1/runs`) is scoped by `r.company_id`, not by
+  `r.user_id`. Testers therefore did see teammates' runs, with no way
+  to tell whose run was whose, then clicked Delete and got a confusing
+  *"Not the run owner"* toast from the bulk-delete endpoint at
+  `runs.js:415`.
+
+- **`Oscar_Server/public/dashboard.html`** — per-row and per-batch
+  delete checkboxes are now **disabled** for runs the current user is
+  not authorised to delete (i.e. they're not the run owner and they're
+  not a `test_manager` / `administrator`). Disabled checkboxes carry a
+  tooltip naming the actual owner. Backend authorisation rule is
+  unchanged; this is purely a frontend cue so the impossible action
+  isn't presented as available.
+
+- **All five vendor environment files** — repaired stale local-dev
+  `data_base` and `json_schema` URLs across
+  `OTST_Benerail_Env.yml`, `OTST_Bileto_Env.yml`, `OTST_Paxone_Env.yml`,
+  `OTST_Sqills_Env.yml`, `OTST_Turnit_Env.yml`. Four of them still
+  pointed at the pre-PR-#68 external-repo convention
+  (`http://localhost:8080/collections-bruno/OTST_V2.0.1/...`), and
+  Turnit had a non-matching `Bruno_Collection/` URL prefix. All five
+  now follow the same
+  `http://localhost:8080/data_base/<vendor>_datafile.json` pattern
+  (Chaps was already on this convention and is unchanged). Local-dev
+  workflow: `cd Bruno_Collection && python -m http.server 8080`.
+  Production OSCAR runs are not affected — the worker's ephemeral env
+  file overrides `data_base` with its internal
+  `http://localhost:3001/data/...` URL.
+
+### Chore
+- **`Bruno_Collection/environments/OTST_Sqills_Env.yml`** — removed
+  accidentally-committed Bruno session-state vars (`__reportInitDone`,
+  `productListHasValidData`, `productListCandidateIds`). Bruno auto-writes
+  these to the env file as a side effect of running requests; they
+  belong in the developer's local working copy, not in `main`. The
+  same cruft is present in OTST_Paxone_Env.yml and OTST_Turnit_Env.yml
+  and is flagged for a follow-up cleanup PR (deferred here to keep this
+  diff scoped).
+
+### Not addressed in this PR (deliberate)
+- The list endpoint's scoping inconsistency (company-wide visibility +
+  per-user delete) was kept as-is — there's a reasonable case that
+  testers *should* see teammates' runs (read-only audit). This PR only
+  surfaces the constraint in the UI; tightening or relaxing the
+  underlying authorisation is a product decision for the
+  test_manager / administrator roles.
+
+### Operator action
+None. Watchtower picks up `:stable` after the image is rebuilt. Bruno
+collection refreshes automatically via the refresh-collection workflow.
+Dashboard change is in `public/`, so hard-refresh the dashboard page
+once the new image is live.
+
+---
+
 ## [server-v1.11.10] — 2026-05-19
 
 Final hotfix in the #68 ("Merge Bruno Lib") regression chain. #70 prevented
