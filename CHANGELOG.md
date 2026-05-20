@@ -40,6 +40,14 @@ Audit P1 (issue #84) — Bruno engine: stop swallowing exceptions.
   existing `bruno-envutils` / `bruno-requestsbuilder` Jest suites still pass
   (the changed paths preserve their outputs). Completes the second half of #84
   (the `JSON.parse` hardening shipped in v1.11.18 / #91).
+- **Clearer data-load failures** — when the data file can't be loaded,
+  `getScenarioData` (network / HTTP / non-absolute `data_base`) and the
+  `parseEnvJson` "required scenario variable … not set" message now name the
+  `data_base` URL and suggest checking that the **data-file server is running**
+  (e.g. `python -m http.server 8000` in `Bruno_Collection/data_base`). Reported
+  from running the collection locally in the Bruno UI, where a failed data load
+  previously surfaced only as the downstream "offerPassengerSpecifications not
+  set" symptom.
 
 ### Operator action
 None. Bruno collection refreshes via the refresh-collection workflow on merge.
