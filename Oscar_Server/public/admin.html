@@ -382,7 +382,8 @@ function esc(s) {
 
 function fmtDate(ts) {
   if (!ts) return '-';
-  return new Date(ts).toLocaleString();
+  // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+  return parseServerTs(ts).toLocaleString();
 }
 
 var TAB_TITLES = { users: 'Manage Users', companies: 'Manage Companies', reports: 'All Reports', activity: 'Server Activity', config: 'Server Config' };
@@ -580,7 +581,7 @@ async function generateResetLink(userId, email) {
   // also makes it harder to forget you generated one (vs. flashing a toast).
   prompt(
     `Reset link for ${email}\n` +
-    `Expires: ${new Date(data.expires_at).toLocaleString()}\n\n` +
+    `Expires: ${parseServerTs(data.expires_at).toLocaleString()}\n\n` +
     `Copy and send this URL out-of-band (Slack/Teams/in-person):`,
     data.resetUrl
   );
