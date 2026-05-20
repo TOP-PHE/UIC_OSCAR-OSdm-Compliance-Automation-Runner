@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.18] — 2026-05-20
+
+Audit P1 (issue #84) — Bruno scenario-engine error-handling hardening.
+
+> Numbering note: assumes #90 (1.11.17 / release-2026.45) merges first.
+
+### Fixed
+- **`Bruno_Collection/library-bruno/envUtils.js`** (new) — exports
+  `parseEnvJson(name[, fallback])`, a safe accessor for the scenario env
+  vars set by `getScenarioData()`. The **17** `JSON.parse(bru.getEnvVar(...))`
+  sites in `requestsBuilder.js` (15), `loopback.js` (1) and `offers.js` (1)
+  now use it. Previously a missing/empty variable became
+  `JSON.parse(undefined)` → *"Unexpected token u in JSON at position 0"*
+  with no hint which variable or why (the exact cryptic failure hit when
+  running a vendor locally). Now it throws an **actionable** error naming
+  the variable and the likely cause (data file didn't load / no matching
+  data set); malformed JSON names the variable plus a value snippet.
+  - Happy path unchanged (valid JSON parses identically).
+  - Required vs optional preserved: `parseEnvJson(x)` (required) vs
+    `parseEnvJson(x, [])` (the old `|| '[]'` default).
+
+### Deferred (still part of #84)
+- The broader `S2486` swallowed-exception cleanup (~30 sites) is held back
+  to land with the `library-bruno` Jest harness (#85), so the changes can
+  be verified rather than shipped blind into a layer with no tests.
+
+### Operator action
+None. Bruno collection refreshes via the refresh-collection workflow on
+merge.
+
+---
+
 ## [server-v1.11.16] — 2026-05-20
 
 Follow-up to v1.11.15. The per-report sharing feature shipped, but two

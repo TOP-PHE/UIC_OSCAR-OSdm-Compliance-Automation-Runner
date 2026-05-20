@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.44",
+  "current_release": "2026.46",
   "releases": [
+    {
+      "release": "2026.46",
+      "date": "2026-05-20",
+      "server": "1.11.18",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(bruno #84): hardened the scenario engine's env-var JSON parsing. New library-bruno/envUtils.js exports parseEnvJson(name[,fallback]); the 17 JSON.parse(bru.getEnvVar(...)) sites in requestsBuilder.js, loopback.js and offers.js now use it. A missing/empty variable (previously JSON.parse(undefined) → cryptic 'Unexpected token u in JSON' with no clue which var) now throws an actionable error naming the variable and the likely cause (data file didn't load); malformed JSON names the variable + a value snippet. Happy path unchanged; required vs optional (fallback) behaviour preserved. This is the exact cryptic-failure class hit when running a vendor locally. The broader S2486 swallowed-exception cleanup is deferred to pair with the library-bruno test harness (#85) so changes can be verified.",
+        "Numbering note: assumes #90 (server 1.11.17 / release-2026.45, esc single-quote hardening) merges first. If merge order differs, renumber.",
+        "Operator action required: none. Bruno collection refreshes via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.44",
       "date": "2026-05-20",
