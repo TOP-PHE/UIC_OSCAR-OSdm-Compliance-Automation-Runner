@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.17] — 2026-05-20
+
+Audit P0 follow-up (issue #82).
+
+### Fixed
+- `Oscar_Server/public/js/scenarios.js` — hardened the `esc()` HTML-entity
+  encoder to also escape single quotes (`'` → `&#39;`), so interpolated
+  values are safe in single-quoted attributes too (not just double-quoted
+  attributes and text content). Defense-in-depth.
+
+### Note — the 3 Sonar S5696 "DOM-XSS" BLOCKERs are false positives
+Every value interpolated into `innerHTML` in `scenarios.js` already passes
+through `esc()` (a correct HTML-entity encoder); composed fragments
+(`ownerBadge`, `versionBadge`, `scenarioTypeBadge`) are themselves `esc()`'d
+or static. Sonar's taint engine does not recognise the custom `esc()` as a
+sanitiser, so it flags the sinks. These should be marked **Safe** in
+SonarCloud with that justification (issue #82). No exploitable XSS exists.
+
+### Operator action
+None. Picked up after Watchtower promotes `:stable`; hard-refresh the Test
+Config page.
+
+---
+
 ## [server-v1.11.16] — 2026-05-20
 
 Follow-up to v1.11.15. The per-report sharing feature shipped, but two

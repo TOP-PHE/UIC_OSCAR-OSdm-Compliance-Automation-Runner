@@ -87,8 +87,14 @@ const LABELS = {
 
 function lbl(val) { return val == null ? '— none —' : (LABELS[val] || val); }
 function esc(s) {
+  // HTML-context entity encoder for every value interpolated into innerHTML.
+  // Escapes the full set incl. single quote (&#39;) so values are safe in BOTH
+  // double- and single-quoted attributes and in text content. (Sonar S5696 may
+  // still flag innerHTML sinks here — it doesn't recognise this custom encoder
+  // as a sanitiser; those alerts are false positives, see issue #82.)
   return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
