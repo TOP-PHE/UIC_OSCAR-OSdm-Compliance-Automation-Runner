@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.46",
+  "current_release": "2026.47",
   "releases": [
+    {
+      "release": "2026.47",
+      "date": "2026-05-20",
+      "server": "1.11.19",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(ops): startup reconciliation of orphaned runs. New src/worker/reconcile.js + a boot hook in src/server.js mark any run still RUNNING or QUEUED in the DB as FAILED on startup. The run queue (worker/queue.js) is in-memory, so on a process exit (Watchtower deploy promoting :stable, crash, RUN_TIMEOUT_MS SIGTERM, docker restart) in-flight/pending jobs are lost but their DB rows survive — RUNNING never resumes (Bruno child gone) and QUEUED is never dispatched (in-memory queue empty on boot). Both keep occupying the company concurrency slots, wedging the Company Queue so no new run can start. Observed live: a release auto-deployed mid-batch left 4 orphaned RUNNING rows pinning all 4 slots and 2 QUEUED stuck. Reconciliation frees the slots. RUNNING→FAILED (unresumable); QUEUED→FAILED (resubmit) — auto-re-dispatch deliberately not chosen, to avoid firing vendor API calls unattended after every deploy. Idempotent; runs after migrations and before listen. Covered by tests/unit/reconcile.test.js (injected-run unit + real-schema test).",
+        "Operator action required: none. After Watchtower promotes :stable, runs stuck RUNNING/QUEUED from a prior restart show as FAILED ('interrupted by a server restart') and can be deleted normally; resubmit if still needed."
+      ]
+    },
     {
       "release": "2026.46",
       "date": "2026-05-20",

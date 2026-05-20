@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.19] — 2026-05-20
+
+Operational hardening — orphaned-run reconciliation on startup.
+
+### Fixed
+- **`Oscar_Server/src/worker/reconcile.js`** (new) + boot hook in
+  `src/server.js` — on startup, any run still `RUNNING` or `QUEUED` in the DB
+  is marked `FAILED`. The run queue (`worker/queue.js`) is an **in-memory**
+  singleton, so when the process exits — a Watchtower deploy promoting
+  `:stable`, a crash, the `RUN_TIMEOUT_MS` SIGTERM, or `docker restart` — every
+  in-flight / pending job is lost, but the DB rows survive. Nothing ever
+  advances them again: `RUNNING` rows stay `RUNNING` (their Bruno child is
+  gone) and `QUEUED` rows are never dispatched (the in-memory queue is empty on
+  boot). Both keep occupying the company's concurrency slots, so the **Company
+  Queue wedges at its limit and no new run can start**. Observed live: a release
+  auto-deployed mid-batch left 4 orphaned `RUNNING` rows pinning all 4 slots
+  with 2 `QUEUED` runs unable to start. The boot reconciliation frees the slots
+  and makes the dashboard reflect reality.
+  - `RUNNING` → `FAILED` (process gone — unresumable).
+  - `QUEUED` → `FAILED` (require resubmit). Auto-re-dispatch was **deliberately
+    not** chosen: re-running would fire vendor API calls unattended after every
+    deploy, possibly with stale tokens.
+  - Idempotent; runs synchronously after migrations and before `app.listen`,
+    so it can only ever act on genuine orphans (the queue holds nothing yet).
+  - Covered by `tests/unit/reconcile.test.js` (injected-`run` unit tests +
+    a real-schema test proving terminal runs are untouched and the pass is
+    idempotent).
+
+### Operator action
+None. After Watchtower promotes `:stable`, any runs that were stuck `RUNNING`/
+`QUEUED` from a prior restart will show as `FAILED` ("interrupted by a server
+restart") and can be deleted normally; resubmit if still needed.
+
+---
+
 ## [server-v1.11.18] — 2026-05-20
 
 Audit P1 (issue #84) — Bruno scenario-engine error-handling hardening.
