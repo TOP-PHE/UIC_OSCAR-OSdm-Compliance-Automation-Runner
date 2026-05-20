@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.22] — 2026-05-20
+
+Audit P2 (issue #88) — fix the CodeQL HIGH file-system race.
+
+### Fixed
+- **`Bruno_Collection/library-bruno/reportGenerator.js`** — removed the
+  `fs.existsSync(tmpFile)` check before reading/writing the per-run report
+  accumulator (CodeQL **HIGH** `js/file-system-race`, a time-of-check-to-
+  time-of-use race between the `existsSync` and the later `writeFileSync`).
+  The load path now just attempts the read and treats a missing file
+  (`ENOENT`) or corrupt JSON as "start fresh" — no pre-check, identical
+  behaviour, race eliminated.
+
+### Note
+The ~21 `js/unused-local-variable` "note"-severity findings bundled in #88
+are deferred to **#86** (the auto-fixable Sonar/eslint sweep): several are
+destructured imports where only one identifier is unused, which `eslint --fix`
+resolves safely — preferable to hand-editing import lines blind.
+
+### Operator action
+None. Bruno collection refreshes via the refresh-collection workflow on merge.
+
+---
+
 ## [server-v1.11.21] — 2026-05-20
 
 Audit P1 (issue #84) — Bruno engine: stop swallowing exceptions.
