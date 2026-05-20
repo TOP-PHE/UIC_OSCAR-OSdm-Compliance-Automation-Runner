@@ -65,8 +65,19 @@ const runSubmitLimiter = rateLimit({
 const DELETION_STATUSES = ['DELETION_REQUESTED', 'DELETED_BY_ADMIN'];
 const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 
+// v1.11.13 — parse started_at as UTC. SQLite's datetime('now') returns a
+// TZ-less UTC string ("2026-05-16 08:44:24"). Since #67 the oscar container
+// runs TZ=Europe/Paris, so new Date("2026-05-16 08:44:24") was interpreted as
+// Paris-local — making a run that started minutes ago look 1–2h old and
+// wrongly flagging it stale (auto-cancelled on delete). Append 'Z' when the
+// string carries no TZ marker so it parses as UTC regardless of container TZ.
+function parseUtcTs(s) {
+  if (!s) return NaN;
+  if (/[Z]$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
+  return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
+}
 function isRunStale(runRow) {
-  const startedAt = runRow.started_at ? new Date(runRow.started_at).getTime() : 0;
+  const startedAt = runRow.started_at ? parseUtcTs(runRow.started_at) : 0;
   return !runRow.started_at || (Date.now() - startedAt > STALE_RUN_MS);
 }
 
@@ -319,6 +330,19 @@ router.get('/', (req, res) => {
        WHERE r.status != 'DELETED' ${certifierFilter}`
     );
   } else {
+    // Company-scoped list. Visibility within a company depends on role:
+    //   - test_manager → all runs in the company (they triage/own the
+    //     company's test data and can delete any run; see bulk-delete).
+    //   - plain tester (company_user) → ONLY their own runs (v1.11.13).
+    //     A tester previously saw teammates' runs (company-scoped) but
+    //     could only delete their own, which surfaced as a confusing
+    //     "Not the run owner" toast and leaked who-ran-what across the
+    //     team. Testers now see strictly what they submitted.
+    // (administrator is short-circuited above into the lifecycle queue;
+    //  certifier is handled in the platform-role branch.)
+    const isElevatedViewer = req.user.role === 'test_manager' || req.user.role === 'administrator';
+    const ownScope = isElevatedViewer ? '' : ' AND r.user_id = ?';
+    const ownScopeCount = isElevatedViewer ? '' : ' AND user_id = ?';
     // Tester: hide DELETION_REQUESTED (they already "deleted" it) and permanently DELETED,
     // but show DELETED_BY_ADMIN (flagged) so they know admin has marked it
     rows = all(
@@ -333,14 +357,14 @@ router.get('/', (req, res) => {
        FROM runs r
        JOIN users u ON u.id = r.user_id
        JOIN companies c ON c.id = r.company_id${agg}
-       WHERE r.company_id = ? AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
+       WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
        ORDER BY r.queued_at DESC
        LIMIT ? OFFSET ?`,
-      [req.companyId, limit, offset]
+      isElevatedViewer ? [req.companyId, limit, offset] : [req.companyId, req.user.id, limit, offset]
     );
     total = get(
-      "SELECT COUNT(*) AS n FROM runs WHERE company_id = ? AND status NOT IN ('DELETION_REQUESTED', 'DELETED')",
-      [req.companyId]
+      `SELECT COUNT(*) AS n FROM runs WHERE company_id = ?${ownScopeCount} AND status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
+      isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     );
   }
 

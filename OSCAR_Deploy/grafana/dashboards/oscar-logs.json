@@ -29,7 +29,7 @@
       "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "11.4.0",
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\"} |~ \"(?i)error|fatal|panic\" [$__range]))", "queryType": "range", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "sum(count_over_time({container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} |~ \"(?i)error|fatal|panic\" [$__range]))", "queryType": "range", "refId": "A" }
       ],
       "title": "Errors in range",
       "type": "stat"
@@ -74,7 +74,7 @@
         "wrapLogMessage": true
       },
       "targets": [
-        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\"} |~ \"(?i)error|fatal|panic\"", "queryType": "range", "refId": "A" }
+        { "datasource": { "type": "loki", "uid": "loki" }, "editorMode": "code", "expr": "{container=~\"$container\", container!~\"oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager\"} |~ \"(?i)error|fatal|panic\"", "queryType": "range", "refId": "A" }
       ],
       "title": "Errors only",
       "type": "logs"
