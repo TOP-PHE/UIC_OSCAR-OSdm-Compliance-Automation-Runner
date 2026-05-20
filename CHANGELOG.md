@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.16] — 2026-05-20
+
+Follow-up to v1.11.15. The per-report sharing feature shipped, but two
+small follow-ups were committed minutes **after** #77 had already been
+squash-merged, so they missed that release. This ships them.
+
+### Fixed
+- `Oscar_Server/public/dashboard.html` — clicking **Share with
+  certifiers** / **Unshare** now updates just that run's share line **in
+  place** (via `shareLineFor()` + a stable `data-share-line` anchor)
+  instead of calling `loadRuns()`. The full re-render collapsed any
+  expanded batches and jumped the scroll to the top — reported as "the
+  dashboard collapses when I click share". `loadRuns()` remains only as
+  a fallback when the row isn't in the DOM.
+
+### Added
+- The **"per-report certifier sharing"** news entry that was meant to
+  ship with v1.11.15.
+
+### Operator action
+None. Picked up after Watchtower promotes `:stable`; hard-refresh the
+dashboard.
+
+---
+
 ## [server-v1.11.15] — 2026-05-20
 
 Certifier report sharing is now **per-report**, decided by the
