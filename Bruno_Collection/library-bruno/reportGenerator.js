@@ -186,11 +186,20 @@ function appendRequest(data) {
     const tmpFile = _tmpFile();
 
     // ── Load existing accumulated data ────────────────────────────────────
+    // No fs.existsSync() gate here (CodeQL js/file-system-race / TOCTOU): the
+    // check-then-read/write on tmpFile was a time-of-check-to-time-of-use race.
+    // Instead just attempt the read and treat a missing file (ENOENT) or
+    // corrupt JSON as "start fresh" — behaviour is identical, no pre-check.
     let reportData = { meta: null, requests: [] };
-    if (fs.existsSync(tmpFile)) {
-      try {
-        reportData = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
-      } catch (_e) { /* corrupt tmp → start fresh */ }
+    try {
+      reportData = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
+    } catch (e) {
+      // A caught value is always defined, so no redundant `e &&` guard
+      // (CodeQL js/useless-conditional). ENOENT ("no tmp yet") is normal →
+      // stay silent; anything else (corrupt JSON, perms) is logged.
+      if (e.code !== 'ENOENT') {
+        console.log('[reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
+      }
     }
 
     // ── Initialize or update metadata ────────────────────────────────────

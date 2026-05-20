@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.49",
+  "current_release": "2026.50",
   "releases": [
+    {
+      "release": "2026.50",
+      "date": "2026-05-20",
+      "server": "1.11.22",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(audit #88): removed the CodeQL HIGH js/file-system-race in library-bruno/reportGenerator.js. The per-run report accumulator did fs.existsSync(tmpFile) then later fs.readFileSync / fs.writeFileSync on the same path — a time-of-check-to-time-of-use race. The load path now just attempts the read and treats a missing file (ENOENT) or corrupt JSON as 'start fresh', with no pre-check; behaviour is identical and the race is eliminated. The ~21 js/unused-local-variable note-severity findings also bundled in #88 are deferred to #86 (eslint --fix), since several are destructured imports where only one identifier is unused.",
+        "Operator action required: none. Bruno collection refreshes via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.49",
       "date": "2026-05-20",
