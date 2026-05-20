@@ -14,6 +14,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.13] — 2026-05-20
+
+A bundle of follow-ups from the post-incident audit: tester report
+visibility, a full timezone-handling sanity pass, the Grafana
+false-positive fix, and Bruno env-file cleanup.
+
+### Fixed — tester report visibility (security)
+- `Oscar_Server/src/api/routes/runs.js` (`GET /v1/runs`) — a plain
+  tester (`company_user`) now sees **only their own runs**, not every
+  run in their company. `test_manager` and `administrator` keep
+  company-wide visibility (they triage and may delete any run).
+  Previously the tester list was company-scoped while delete was
+  own-only, which leaked who-ran-what across the team and produced the
+  confusing "Not the run owner" toast when a tester tried to delete a
+  teammate's run.
+
+### Fixed — timezone handling (full sanity pass after #67)
+Background: v1.11.6 (#67) gave the `oscar` container `TZ=Europe/Paris`
+(was UTC). The audit checked storage, server-side parsing, frontend
+display, and Bruno.
+
+- **Storage** — verified consistently UTC (`datetime('now')` is UTC;
+  `.toISOString()` is UTC+Z; no `'localtime'` modifier anywhere). No
+  change needed.
+- **Server bug** — `isRunStale()` in `runs.js` parsed SQLite's TZ-less
+  `started_at` with `new Date()`, which under `TZ=Europe/Paris` was
+  read as Paris-local. A run started minutes ago looked 1–2h old and
+  got auto-cancelled when someone tried to delete a fresh QUEUED/RUNNING
+  run. Now parsed as UTC via a local `parseUtcTs()` helper.
+- **Frontend** — `nav.js` gains `parseServerTs()`, which normalises
+  TZ-less UTC strings to ISO+Z so the browser localises correctly to
+  each viewer. Every timestamp render site now uses it:
+  `dashboard.html`, `run-detail.html`, `compare.html`,
+  `report-builder.html`, `run.html`, `admin.html`, `js/scenarios.js`.
+  `run-detail.html` previously used an ad-hoc `+ 'Z'` hack — replaced
+  with `parseServerTs`. (This is the same helper whose caller leaked
+  prematurely in v1.11.11 and was reverted in v1.11.12; it now ships
+  **together with its nav.js definition** as a single unit.)
+- **Bruno** — `toOffsetDateTime`/`toLocalDateTime` and the
+  departure-date calc in `scenarioParser.js` operate on data-file
+  payloads (OSDM request formatting), not server timestamps — audited,
+  correct, unchanged.
+
+Storage stays UTC throughout; only display localises.
+
+### Fixed — Grafana false positives
+- `OSCAR_Deploy/grafana/dashboards/oscar-logs.json` — the "Errors in
+  range" and "Errors only" panels now exclude
+  `oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager`.
+  They were matching Grafana's own `tsdb.loki` query logs (which embed
+  the literal `error|fatal|panic` LogQL pattern), producing
+  self-referential noise.
+
+### Chore — Bruno env-file cleanup
+- `OTST_Paxone_Env.yml`, `OTST_Turnit_Env.yml` — stripped
+  accidentally-committed Bruno session-state vars (`__loopback`,
+  `__unitaryLoadedIdx`, `OfferCollectionRequest`, passenger/trip state,
+  etc.). Followup to 2026.39, which fixed only their data-file paths.
+  Both are now config-only templates matching Benerail/Sqills; Paxone's
+  stray pinned `scenarioTarget` was reset to empty.
+
+### Operator action
+None. Server change picked up after Watchtower promotes `:stable`
+(hard-refresh the dashboard). Bruno collection + Grafana dashboards
+refresh automatically on merge.
+
+---
+
 ## [server-v1.11.12] — 2026-05-20
 
 Critical hotfix: the dashboard was stuck on **"Loading…"** for every role
