@@ -332,5 +332,5 @@ module.exports = exported;
 try {
   Object.assign(globalThis, exported);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

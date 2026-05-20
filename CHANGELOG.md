@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.21] — 2026-05-20
+
+Audit P1 (issue #84) — Bruno engine: stop swallowing exceptions.
+
+### Fixed
+- **`Bruno_Collection/library-bruno/*`** — the 16 `S2486` "ignored exception"
+  sites in the scenario engine no longer swallow errors silently. Each now
+  **logs** the caught error (so a failure is visible in the run log) while
+  preserving the **exact same** control flow / fallback:
+  - 9 trailing `try { Object.assign(globalThis, …) } catch {}` module-exposure
+    blocks (`envUtils`, `bookings`, `displays`, `exchanges`, `fulfillments`,
+    `model`, `offers`, `passengers`, `refunds`) → log on the (near-impossible)
+    failure instead of `// no-op`.
+  - `envUtils.parseEnvJson` — a throwing `bru.getEnvVar` is logged before the
+    fall-back to "unset".
+  - `reportGenerator` — an unreadable previous tmp / missing bru context are
+    logged.
+  - `displays.addReportLog` — a failed report-log accumulation is logged.
+  - `offers` preflight — header / body resolution failures are logged.
+  - `mergeReport.prettyJson` — now checks whether a value *looks* like JSON
+    before parsing, so a plain string is returned as-is instead of routing
+    through an expected throw; a genuinely malformed JSON-like value is logged.
+  Caller behaviour is unchanged — only error **visibility** improves. The
+  existing `bruno-envutils` / `bruno-requestsbuilder` Jest suites still pass
+  (the changed paths preserve their outputs). Completes the second half of #84
+  (the `JSON.parse` hardening shipped in v1.11.18 / #91).
+- **Clearer data-load failures** — when the data file can't be loaded,
+  `getScenarioData` (network / HTTP / non-absolute `data_base`) and the
+  `parseEnvJson` "required scenario variable … not set" message now name the
+  `data_base` URL and suggest checking that the **data-file server is running**
+  (e.g. `python -m http.server 8000` in `Bruno_Collection/data_base`). Reported
+  from running the collection locally in the Bruno UI, where a failed data load
+  previously surfaced only as the downstream "offerPassengerSpecifications not
+  set" symptom.
+
+### Operator action
+None. Bruno collection refreshes via the refresh-collection workflow on merge.
+
+---
+
 ## [server-v1.11.20] — 2026-05-20
 
 Run-control — dashboard / admin **Emergency Stop**.
