@@ -1,3 +1,5 @@
+const { parseEnvJson } = require('./envUtils.js');
+
 module.exports = {
   buildOfferCollectionRequest,
   buildBookingRequest,
@@ -21,13 +23,13 @@ function buildOfferCollectionRequest() {
   // (additionalProperties: false) — sending it causes VALIDATION_ERROR on strict implementations.
 
   if (tripType === "SPECIFICATION") {
-    body.tripSpecifications = JSON.parse(bru.getEnvVar("offerTripSpecifications"));
+    body.tripSpecifications = parseEnvJson("offerTripSpecifications");
   } else if (tripType === "SEARCH") {
-    body.tripSearchCriteria = JSON.parse(bru.getEnvVar("offerTripSearchCriteria"));
+    body.tripSearchCriteria = parseEnvJson("offerTripSearchCriteria");
   }
 
-  body.anonymousPassengerSpecifications = JSON.parse(bru.getEnvVar("offerPassengerSpecifications"));
-  body.offerSearchCriteria = JSON.parse(bru.getEnvVar("offerSearchCriteria"));
+  body.anonymousPassengerSpecifications = parseEnvJson("offerPassengerSpecifications");
+  body.offerSearchCriteria = parseEnvJson("offerSearchCriteria");
 
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
   const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
@@ -45,17 +47,17 @@ function buildBookingRequest() {
   validationLogger("[INFO] ➤ buildBookingRequest");
   accommodationAndPlaceSelection();
 
-  const bookingPassengerSpecifications = JSON.parse(bru.getEnvVar("bookingPassengerSpecifications"));
+  const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
   const firstPassenger = bookingPassengerSpecifications[0];
   const passengerSpecifications = (firstPassenger?.detail?.firstName && firstPassenger?.detail?.lastName)
     ? bookingPassengerSpecifications
-    : JSON.parse(bru.getEnvVar("offerPassengerSpecifications"));
+    : parseEnvJson("offerPassengerSpecifications");
 
-  const placeSelections = JSON.parse(bru.getEnvVar("placeSelections") || "[]");
+  const placeSelections = parseEnvJson("placeSelections", []);
 
   const offer = {
     offerId: bru.getEnvVar("offerId"),
-    passengerRefs: JSON.parse(bru.getEnvVar("bookingPassengerReferences"))
+    passengerRefs: parseEnvJson("bookingPassengerReferences")
   };
   if (placeSelections.length > 0) {
     offer.placeSelections = placeSelections;
@@ -63,7 +65,7 @@ function buildBookingRequest() {
 
   const body = {
     offers: [offer],
-    purchaser: JSON.parse(bru.getEnvVar("bookingPurchaserSpecifications")),
+    purchaser: parseEnvJson("bookingPurchaserSpecifications"),
     passengerSpecifications
   };
 
@@ -87,10 +89,10 @@ function accommodationAndPlaceSelection() {
     return;
   }
 
-  const tripLegCoverageArr = JSON.parse(bru.getEnvVar("tripLegCoverage") || "[]");
+  const tripLegCoverageArr = parseEnvJson("tripLegCoverage", []);
   const tripId = tripLegCoverageArr.length > 0 ? tripLegCoverageArr[0].tripId : "";
   const legId = tripLegCoverageArr.length > 0 ? tripLegCoverageArr[0].legId : "";
-  const passengerRefs = JSON.parse(bru.getEnvVar("bookingPassengerReferences"));
+  const passengerRefs = parseEnvJson("bookingPassengerReferences");
 
   const placeSelection = {
     reservationId: bru.getEnvVar("reservationId"),
@@ -147,7 +149,7 @@ function requestExchangeOffersBody(overruleCode) {
   // Previously hardcoded to index 0 only — any additional passengers were silently dropped.
   let anonymousPassengerSpecifications;
   try {
-    const passengerSpecs = JSON.parse(bru.getEnvVar('offerPassengerSpecifications') || '[]');
+    const passengerSpecs = parseEnvJson('offerPassengerSpecifications', []);
     if (!Array.isArray(passengerSpecs) || passengerSpecs.length === 0) {
       throw new Error('offerPassengerSpecifications is empty or not an array');
     }
@@ -177,8 +179,8 @@ function requestExchangeOffersBody(overruleCode) {
 
   const body = {
     fulfillmentIds: parseFulfillmentIds(),
-    tripSearchCriteria: JSON.parse(bru.getEnvVar('offerTripSearchCriteria')),
-    offerSearchCriteria: JSON.parse(bru.getEnvVar('offerSearchCriteria')),
+    tripSearchCriteria: parseEnvJson('offerTripSearchCriteria'),
+    offerSearchCriteria: parseEnvJson('offerSearchCriteria'),
     anonymousPassengerSpecifications,
     ...(overruleCode != null && { overruleCode })
   };
@@ -194,7 +196,7 @@ function requestExchangeOperationsBody() {
   const body = {
     exchangeOffers: [{
       offerId: bru.getEnvVar('exchangeOffersOfferId'),
-      passengerRefs: JSON.parse(bru.getEnvVar('bookingPassengerReferences'))
+      passengerRefs: parseEnvJson('bookingPassengerReferences')
     }]
   };
 
