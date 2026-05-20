@@ -194,8 +194,11 @@ function appendRequest(data) {
     try {
       reportData = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
     } catch (e) {
-      if (e && e.code !== 'ENOENT') {
-        console.log('[reportGenerator] previous tmp unreadable (' + (e && e.message) + ') — starting fresh.');
+      // A caught value is always defined, so no redundant `e &&` guard
+      // (CodeQL js/useless-conditional). ENOENT ("no tmp yet") is normal →
+      // stay silent; anything else (corrupt JSON, perms) is logged.
+      if (e.code !== 'ENOENT') {
+        console.log('[reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
       }
     }
 
