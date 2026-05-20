@@ -281,12 +281,31 @@ function renderRunRow(r, opts) {
         : `<input type="checkbox" disabled title="Only ${r.submitted_by || 'the run owner'} or a test_manager can delete this run">`)
     : '';
 
+  // ── Certifier sharing (v1.11.15) — per-report, test_manager-only ──────────
+  // The test_manager decides which individual runs certifiers may see, right
+  // here on the dashboard. Default is private. Only terminal-status runs are
+  // shareable (mirrors the backend 409). Non-TM roles see the badge read-only.
+  const isShared   = !!r.shared_with_certifier_at;
+  const isTM       = user.role === 'test_manager';
+  const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
+  let shareLine = '';
+  if (isShared) {
+    shareLine = `<div style="margin-top:3px;font-size:11px">`
+      + `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + r.shared_with_certifier_by : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+      + (isTM ? ` <a href="#" data-action="unshare-run" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a>` : '')
+      + `</div>`;
+  } else if (isTM && isTerminal) {
+    shareLine = `<div style="margin-top:3px;font-size:11px">`
+      + `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a></div>`;
+  }
+
   return `
     <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
       <div class="cb-cell">${checkboxCell}</div>
       <div>
         <div style="font-weight:600;color:#1a3a6b;font-size:13px">${label}</div>
         ${submitterLine}
+        ${shareLine}
       </div>
       <div><span class="status s-${r.status}">${r.status === 'RUNNING' ? '<span class="spin">⟳</span> ' : ''}${r.status}</span></div>
       <div class="url" title="${r.api_base_used || ''}">${r.api_base_used || '-'}</div>
@@ -624,6 +643,16 @@ document.getElementById('delete-modal').addEventListener('click', function(e) {
 document.getElementById('runs-list').addEventListener('click', function(e) {
   if (e.target.type === 'checkbox') return; // let change handler deal with it
 
+  // Certifier share / unshare (v1.11.15) — test_manager only. Must run BEFORE
+  // the row-navigation fallthrough so it doesn't open run-detail.
+  const shareEl = e.target.closest('[data-action="share-run"],[data-action="unshare-run"]');
+  if (shareEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleShare(shareEl.dataset.runId, shareEl.dataset.action === 'share-run');
+    return;
+  }
+
   // Batch header toggle
   const el = e.target.closest('[data-action="toggle-batch"]');
   if (el) {
@@ -639,6 +668,26 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
   const row = e.target.closest('.run-row');
   if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
 });
+
+// Share / unshare a single run with certifiers (test_manager only).
+// Wired to POST/DELETE /v1/runs/:id/share. Reloads the list on success so
+// the badge + toggle reflect the new state.
+async function toggleShare(runId, share) {
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/share`, {
+      method: share ? 'POST' : 'DELETE'
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
+      return;
+    }
+    await loadRuns();
+  } catch (e) {
+    alert('Network error while updating sharing: ' + e.message);
+  }
+}
 document.getElementById('runs-list').addEventListener('change', function(e) {
   if (e.target.dataset.action === 'select')        toggleSelect(e.target);
   if (e.target.dataset.action === 'select-batch')  toggleBatchSelect(e.target);

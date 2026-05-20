@@ -302,11 +302,12 @@ router.get('/', (req, res) => {
 
   if (isPlatform && !req.companyId) {
     // Certifier list: per-run share gate (v1.10.0, issue #60). The
-    // certifier sees ONLY runs the test_manager has explicitly shared,
-    // gated additionally by the company-wide kill switch. Administrators
-    // are short-circuited above.
+    // certifier sees ONLY runs the test_manager has explicitly shared.
+    // v1.11.15: the company-wide kill-switch was removed — per-report
+    // sharing (shared_with_certifier_at) is now the sole gate.
+    // Administrators are short-circuited above.
     const certifierFilter = req.user.role === 'certification_user'
-      ? 'AND r.shared_with_certifier_at IS NOT NULL AND c.share_reports_with_certifier = 1'
+      ? 'AND r.shared_with_certifier_at IS NOT NULL'
       : '';
     rows = all(
       `SELECT r.id, r.company_id, c.name AS company_name, r.status,
@@ -350,6 +351,7 @@ router.get('/', (req, res) => {
               r.auth_mode_used, r.api_base_used, r.env_name_used,
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
+              r.shared_with_certifier_at, r.shared_with_certifier_by,
               u.email AS submitted_by,
               COALESCE(ra.artifact_count, 0) AS artifact_count,
               COALESCE(rs.scenario_count,  0) AS scenario_count,
@@ -917,15 +919,15 @@ router.get('/:id/artifacts/:aid', (req, res) => {
 
 // ── POST /v1/runs/:id/share — share THIS run with certifiers (v1.10.0) ──────
 // Test manager opt-in: mark a single completed run as visible to certifiers.
-// Replaces the all-or-nothing companies.share_reports_with_certifier toggle
-// as the gating mechanism for certifier visibility (issue #60).
+// As of v1.11.15 this is the SOLE certifier-visibility mechanism — the old
+// company-wide share_reports_with_certifier toggle was removed, so a run is
+// certifier-visible iff shared_with_certifier_at IS NOT NULL. Driven from the
+// dashboard per-row share control (and still available on the run-detail page).
 //
 // Restrictions:
 //   - Only test_manager role of the run's owning company can share.
 //   - Run must be in a terminal status (COMPLETED / FAILED / CANCELLED).
 //     Sharing in-progress runs is meaningless and would leak partial state.
-//   - The company-wide share_reports_with_certifier toggle remains a master
-//     kill switch: when set to 0 it overrides per-run shares.
 //
 // Audit-logged with the run id and the actor's email.
 router.post('/:id/share', (req, res) => {

@@ -62,18 +62,12 @@ function canUserSeeRun(runId, user) {
   }
 
   // Certifier: only sees runs the test_manager has explicitly shared.
-  // Both gates must pass:
-  //   1. The per-run shared_with_certifier_at column is set (commit 2 of
-  //      this PR introduces it; until the migration runs, this is null and
-  //      every certifier read returns null — matches "default private").
-  //   2. The company-wide share_reports_with_certifier toggle hasn't been
-  //      flipped to 0 (the legacy v15 toggle now acts as a master kill
-  //      switch — overrides per-run shares for backward compatibility).
+  // Sole gate (v1.11.15): the per-run shared_with_certifier_at column is set.
+  // The legacy company-wide share_reports_with_certifier master toggle was
+  // removed — sharing is now decided per-report by the test_manager from the
+  // dashboard. Default is private (column null → certifier sees nothing).
   if (user.role === 'certification_user') {
-    if (!run.shared_with_certifier_at) return null;
-    const co = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [run.company_id]);
-    if (co && co.share_reports_with_certifier === 0) return null;
-    return run;
+    return run.shared_with_certifier_at ? run : null;
   }
 
   // Unknown role — fail closed.
