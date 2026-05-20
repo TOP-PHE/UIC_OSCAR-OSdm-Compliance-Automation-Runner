@@ -65,6 +65,40 @@ hard-refresh the dashboard. See the behaviour-change note above.
 
 ---
 
+## [server-v1.11.14] — 2026-05-20
+
+Login rate-limiter tuning. A tester hit "Too many attempts. Please try
+again later." after ~10 login/logout cycles while switching between
+vendor accounts — legitimate use on a conformance-testing platform, not
+an attack.
+
+> Numbering note: assumes #75 (server 1.11.13 / release-2026.41) merges
+> first. If the merge order is reversed, renumber to 1.11.13 / 2026.41.
+
+### Root cause
+`authLimiter` in `Oscar_Server/src/api/routes/auth.js` allowed 20
+requests per 15-minute window, keyed on IP, and the bucket was **shared**
+across `/login`, `/register`, `/bootstrap` **and `/logout`**. Each
+"switch user" is two requests (logout + login), so ~10 switches = 20
+requests = the cap.
+
+### Fixed
+- Removed `/logout` from `authLimiter`. Logout carries no credential to
+  brute-force (it just revokes the caller's own session); counting it
+  halved the usable login budget during rapid switching.
+- Raised the default cap 20 → 50 per 15-minute window, and made it
+  env-tunable via `AUTH_RATE_LIMIT_MAX`. 50/15min is still far below a
+  useful brute-force rate. `/login`, `/register`, `/bootstrap` remain
+  rate-limited.
+
+### Operator action
+None required. Optional: set `AUTH_RATE_LIMIT_MAX=<n>` in
+`OSCAR_Deploy/.env` to override the default of 50. Picked up after
+Watchtower promotes `:stable`. To clear an active lockout immediately,
+`docker compose restart oscar` (the limiter uses the in-memory store).
+
+---
+
 ## [server-v1.11.13] — 2026-05-20
 
 A bundle of follow-ups from the post-incident audit: tester report

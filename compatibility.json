@@ -13,8 +13,19 @@
       "notes": [
         "feat(sharing): certifier report sharing is now PER-REPORT, decided by the test_manager from the dashboard. Removed the company-wide share_reports_with_certifier master toggle (was in API Config / profile). A test_manager now sees a 'Share with certifiers' / 'Unshare' control on each terminal-status run row on the dashboard, plus a 'Shared with certifiers' badge; certifiers see ONLY the individual runs explicitly shared. Default is private (nothing shared). The per-run mechanism (POST/DELETE /v1/runs/:id/share, shared_with_certifier_at) already existed since v1.10.0 but was only reachable from the single-run detail page and was gated by the now-removed company toggle.",
         "refactor(security): the certifier-visibility gate is now solely shared_with_certifier_at IS NOT NULL, applied consistently across run-access.js (single-run), runs.js (list), reports.js (comparisons — BOTH underlying runs must be shared), and the tenant middleware (no longer refuses certifiers at the company boundary). company.js no longer reads/writes the toggle and rejects it with a 400 + pointer if an old client sends it. The companies.share_reports_with_certifier DB column is retained (no destructive migration) but unused.",
-        "Operator action required: none. IMPORTANT behaviour change: any reports that were visible to certifiers purely because the old company toggle was ON are now private until a test_manager explicitly shares them. Communicate this to test_managers. Picked up after Watchtower promotes :stable; hard-refresh the dashboard.",
-        "Numbering note: assumes #76 (server 1.11.14 / release-2026.42, auth rate-limit) merges first. If merge order differs, renumber accordingly."
+        "Operator action required: none. IMPORTANT behaviour change: any reports that were visible to certifiers purely because the old company toggle was ON are now private until a test_manager explicitly shares them. Communicate this to test_managers. Picked up after Watchtower promotes :stable; hard-refresh the dashboard."
+      ]
+    },
+    {
+      "release": "2026.42",
+      "date": "2026-05-20",
+      "server": "1.11.14",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(auth): login rate-limiter tuning. (1) /logout removed from the limiter — it carries no credential to brute-force and counting it in the same IP bucket as /login halved the effective login budget during rapid user-switching (each switch is logout+login). (2) Default cap raised 20 → 50 per 15-minute window and made env-tunable via AUTH_RATE_LIMIT_MAX. A conformance-testing platform invites rapid switching across many vendor accounts; 20/15min tripped legitimate testers ('Too many attempts. Please try again later.') after ~10 login/logout cycles. 50/15min is still far below a useful brute-force rate. /login, /register, /bootstrap remain protected.",
+        "Operator action required: none. Optional: set AUTH_RATE_LIMIT_MAX in OSCAR_Deploy/.env to override the default of 50. Picked up after Watchtower promotes :stable."
       ]
     },
     {
