@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.12] — 2026-05-20
+
+Critical hotfix: the dashboard was stuck on **"Loading…"** for every role
+in v1.11.11 (#73).
+
+### Root cause
+`fmtDate()` in `public/dashboard.html` was calling `parseServerTs()` — a
+timezone-normalisation helper that lives on the **unmerged**
+`fix/v1.11.7-frontend-timestamp-tz` branch and is **not defined** in the
+nav.js that actually shipped. The call leaked into #73 from an
+uncommitted working-tree edit (the file was `git add`-ed while that WIP
+was present). `fmtDate()` runs for every run row and batch header, so
+`renderRuns()` threw `ReferenceError: parseServerTs is not defined`
+before it set `el.innerHTML`. Because `loadRuns()` has no `try/catch`,
+the `runs-list` placeholder was never replaced — hence the perpetual
+"Loading…".
+
+### Fixed
+- `Oscar_Server/public/dashboard.html` — reverted `fmtDate()` to
+  `new Date(d).toLocaleString(...)`. The dashboard renders again for all
+  roles. The minor pre-v1.11.7 quirk (SQLite's TZ-less timestamps read
+  as local instead of UTC) returns, and will be fixed properly when the
+  v1.11.7 branch — which ships `parseServerTs` in `nav.js` alongside its
+  callers — merges as a single unit.
+
+### Lesson / guard for next time
+This is the second issue caused by editing files that already had
+unrelated uncommitted changes in the working tree. When committing for a
+focused PR, diff each touched file against the base branch (not just
+`git add` it) to confirm only the intended hunks are staged.
+
+### Operator action
+None. Watchtower picks up `:stable` after the image rebuild; hard-refresh
+the dashboard once it's live.
+
+---
+
 ## [server-v1.11.11] — 2026-05-19
 
 Two small UX-and-config polish items, both surfaced by hands-on testing

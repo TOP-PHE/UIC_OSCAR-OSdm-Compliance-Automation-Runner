@@ -232,10 +232,13 @@ function duration(start, end) {
 }
 function fmtDate(d) {
   if (!d) return '-';
-  // v1.11.7 — parseServerTs (defined in nav.js) normalises SQLite's TZ-less
-  // UTC strings to ISO+Z so toLocaleString converts to the viewer's local TZ.
-  // Without it the browser misreads "2026-05-16 08:44:24" as 08:44 LOCAL.
-  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
+  // NOTE: the v1.11.7 parseServerTs() TZ-normalisation helper lives on the
+  // fix/v1.11.7-frontend-timestamp-tz branch and is NOT yet merged — nav.js
+  // here does not define it. A caller leaked into v1.11.11 (#73) and crashed
+  // renderRuns() with "parseServerTs is not defined", leaving the dashboard
+  // stuck on "Loading…". Reverted to plain new Date() until the v1.11.7 work
+  // (which ships parseServerTs in nav.js) lands as a unit.
+  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
 }
 
 // ── Render a single run row (used for both unbatched and batch-child rows) ───
