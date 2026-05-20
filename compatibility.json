@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.47",
+  "current_release": "2026.48",
   "releases": [
+    {
+      "release": "2026.48",
+      "date": "2026-05-20",
+      "server": "1.11.20",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(ops): 'Emergency Stop' kill switch for active runs. New POST /v1/runs/stop-all (src/api/routes/runs.js): QUEUED runs are purged from the in-memory queue (queue.purge) then marked CANCELLED; RUNNING runs have their Bruno child killed via runner.killRun (SIGTERM then SIGKILL after a 3s grace) then marked CANCELLED. The runner's final status write is now guarded with AND status='RUNNING' so a killed run is never resurrected from CANCELLED to FAILED. Scope is deliberately restrictive — only the platform admin can stop other users' runs: company_user AND test_manager stop only the runs they personally launched (red 'Emergency Stop' button on the dashboard Company Queue panel); administrator stops ALL active runs across EVERY company (platform-wide, from a new control in the admin console Server Config tab); certification_user is forbidden (403). Confirmation dialog + audit log. Covered by tests/integration/runs-stop-all.test.js.",
+        "Operator action required: none. After Watchtower promotes :stable (hard-refresh to pick up the UI): a per-user Emergency Stop button appears on the dashboard Company Queue panel, and an admin-only platform-wide 'Stop ALL running scenarios' control appears in the admin console Server Config tab."
+      ]
+    },
     {
       "release": "2026.47",
       "date": "2026-05-20",

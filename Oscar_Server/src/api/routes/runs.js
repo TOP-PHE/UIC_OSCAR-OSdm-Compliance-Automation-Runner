@@ -43,6 +43,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
+const runner = require('../../worker/runner');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -594,6 +595,85 @@ router.get('/queue-status', (req, res) => {
       queued_at:       r.queued_at,
       started_at:      r.started_at
     }))
+  });
+});
+
+// ── POST /v1/runs/stop-all ────────────────────────────────────────────────────
+// Emergency stop: forcibly terminate active runs "hard but sure".
+//   - QUEUED  → purged from the in-memory queue so they never start, then
+//               marked CANCELLED.
+//   - RUNNING → the Bruno child process is killed (SIGTERM → SIGKILL after a
+//               grace period via runner.killRun), then marked CANCELLED.
+// Scope (deliberately restrictive — only the platform admin can touch other
+// users' runs):
+//   - certification_user → 403 (cannot run or stop runs)
+//   - company_user (tester) AND test_manager → only the runs THEY launched
+//   - administrator → ALL active runs across EVERY company (platform-wide)
+// There is no per-company "stop everyone's runs": the only cross-user power is
+// the platform administrator's, and it spans the whole platform by design.
+// Registered BEFORE /:id so Express doesn't treat "stop-all" as a run id.
+router.post('/stop-all', (req, res) => {
+  if (req.user.role === 'certification_user') {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot stop runs.' });
+  }
+
+  const companyId = req.companyId || req.user.companyId;
+  const isAdmin   = req.user.role === 'administrator';
+  const scope     = isAdmin ? 'platform' : 'own';
+
+  // Active = QUEUED or RUNNING. Admin → platform-wide (no company/user filter);
+  // everyone else → only the runs they personally started. enforceTenant has
+  // already hard-locked a non-admin's company_id to their own; we also pin
+  // user_id, so a tester or test_manager can never reach a teammate's run.
+  const activeRuns = isAdmin
+    ? all(`SELECT id, status FROM runs WHERE status IN ('QUEUED','RUNNING')`)
+    : all(`SELECT id, status FROM runs WHERE company_id = ? AND user_id = ? AND status IN ('QUEUED','RUNNING')`,
+        [companyId, req.user.id]);
+
+  if (activeRuns.length === 0) {
+    return res.json({ stopped: 0, running_cancelled: 0, queued_cancelled: 0, processes_killed: 0, scope });
+  }
+
+  const ids = new Set(activeRuns.map(r => r.id));
+
+  // 1. Drop matching QUEUED jobs from the in-memory queue so the next drain
+  //    cannot launch a run we are about to cancel.
+  queue.purge(job => ids.has(job.runId));
+
+  // 2. Kill running processes + mark every targeted run CANCELLED. The DB write
+  //    is guarded so a run that finished between the SELECT and now is left as
+  //    its real terminal status.
+  let processesKilled = 0;
+  let queuedCancelled = 0;
+  let runningCancelled = 0;
+  transaction(() => {
+    for (const r of activeRuns) {
+      if (r.status === 'RUNNING') {
+        if (runner.killRun(r.id)) processesKilled++;
+        runningCancelled++;
+      } else {
+        queuedCancelled++;
+      }
+      dbRun(
+        `UPDATE runs SET status = 'CANCELLED', completed_at = datetime('now'), error_message = ?
+         WHERE id = ? AND status IN ('QUEUED','RUNNING')`,
+        [`Emergency-stopped by ${req.user.email}`, r.id]
+      );
+    }
+  });
+
+  // Audit is best-effort — never let a logging hiccup block the stop.
+  try {
+    auditLog(req.user.id, companyId || null, req.user.email,
+      `emergency_stop:${scope}:running=${runningCancelled},queued=${queuedCancelled}`);
+  } catch (_) { /* ignore */ }
+
+  return res.json({
+    stopped:          activeRuns.length,
+    running_cancelled: runningCancelled,
+    queued_cancelled:  queuedCancelled,
+    processes_killed:  processesKilled,
+    scope
   });
 });
 

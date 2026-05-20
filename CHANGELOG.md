@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.20] — 2026-05-20
+
+Run-control — dashboard / admin **Emergency Stop**.
+
+### Added
+- **"🛑 Emergency Stop"** — a force-stop for active runs, for when a run goes
+  nowhere and you don't want to wait out `RUN_TIMEOUT_MS` or hand-edit the DB.
+  `POST /v1/runs/stop-all` (`src/api/routes/runs.js`):
+  - `QUEUED` runs are purged from the in-memory queue (`queue.purge`) so the
+    next drain can't launch them, then marked `CANCELLED`.
+  - `RUNNING` runs have their Bruno child process killed —
+    `runner.killRun()` sends `SIGTERM`, then `SIGKILL` after a 3 s grace —
+    then marked `CANCELLED`. The runner's final status write is now guarded
+    with `AND status = 'RUNNING'` so a killed run can't be resurrected from
+    `CANCELLED` to `FAILED`.
+  - **Scope is deliberately restrictive — only the platform admin can stop
+    other users' runs:** `company_user` **and** `test_manager` stop only the
+    runs **they personally launched** (red button on the dashboard Company
+    Queue panel); `administrator` stops **ALL active runs across every company**
+    (platform-wide, from a new control in the admin console → Server Config);
+    `certification_user` is forbidden (403). Confirmation dialog + audit-logged.
+  - Covered by `tests/integration/runs-stop-all.test.js` (401 / 403 / tester
+    own-only / test_manager own-only / admin platform-wide cross-company /
+    terminal-untouched / no-op).
+
+### Operator action
+None. After Watchtower promotes `:stable` (hard-refresh to pick up the UI): a
+per-user **Emergency Stop** button appears on the dashboard Company Queue panel
+when there are active runs; administrators get a separate **platform-wide**
+"Stop ALL running scenarios" control in the admin console → Server Config.
+
+---
+
 ## [server-v1.11.19] — 2026-05-20
 
 Operational hardening — orphaned-run reconciliation on startup.

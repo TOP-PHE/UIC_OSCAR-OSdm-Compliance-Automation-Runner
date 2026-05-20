@@ -315,6 +315,19 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
       </div>
       <pre id="test-email-result" style="margin-top:14px;padding:12px;border-radius:6px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;display:none"></pre>
     </div>
+
+    <div class="card" style="border:2px solid #ffcdd2">
+      <h3 style="color:#c62828">🛑 Emergency Stop (platform-wide)</h3>
+      <p style="font-size:13px;color:#546e7a;margin:6px 0 12px">
+        Force-cancels <strong>every</strong> RUNNING and QUEUED scenario across
+        <strong>all companies</strong> — running Bruno processes are killed
+        immediately (SIGTERM → SIGKILL). Use only to recover a stuck platform.
+        This cannot be undone. (Testers and test managers can stop only their own
+        runs from the dashboard; this all-companies stop is administrator-only.)
+      </p>
+      <button class="btn btn-danger" id="btn-emergency-stop-all">🛑 Stop ALL running scenarios (platform-wide)</button>
+      <span id="emergency-stop-result" style="margin-left:10px;font-size:13px;color:#546e7a"></span>
+    </div>
   </section>
 </div>
 
@@ -363,6 +376,29 @@ function showMsg(text, ok) {
   el.style.display = 'block';
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// Platform-wide emergency stop (administrator only). The /v1/runs/stop-all
+// endpoint stops ALL companies' active runs when the caller is an administrator.
+async function emergencyStopAllPlatform() {
+  if (!confirm('🛑 PLATFORM-WIDE EMERGENCY STOP\n\nThis force-cancels EVERY running and queued scenario across ALL companies.\nRunning processes are killed immediately. This cannot be undone.\n\nProceed?')) return;
+  const btn = document.getElementById('btn-emergency-stop-all');
+  const out = document.getElementById('emergency-stop-result');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/v1/runs/stop-all', { method: 'POST', headers: authHeaders });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showMsg(`Emergency stop failed (${res.status}): ${data.detail || data.title || 'error'}`, false);
+      return;
+    }
+    showMsg(`Platform stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`, true);
+    if (out) out.textContent = `Stopped ${data.stopped || 0} (running ${data.running_cancelled || 0}, queued ${data.queued_cancelled || 0}).`;
+  } catch (e) {
+    showMsg('Network error during emergency stop: ' + e.message, false);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // HTML-escape that's safe for BOTH text content and ALL attribute contexts.
@@ -1324,6 +1360,7 @@ async function sendTestEmail() {
 })();
 
 document.getElementById('btn-test-email').addEventListener('click', sendTestEmail);
+document.getElementById('btn-emergency-stop-all').addEventListener('click', emergencyStopAllPlatform);
 
 (async function init(){
   try {

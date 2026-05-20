@@ -125,6 +125,27 @@ class RunQueue extends EventEmitter {
   }
 
   /**
+   * Remove pending (not-yet-started) jobs matching `predicate` from the queue.
+   * Used by the emergency-stop route to drop QUEUED runs so the next drain
+   * never launches them. Does NOT touch jobs already running — those are killed
+   * via runner.killRun(); their slot frees when the process exits and the
+   * _launchJob promise settles.
+   * @param {(job:object)=>boolean} predicate
+   * @returns {object[]} the removed jobs
+   */
+  purge(predicate) {
+    const removed = [];
+    this._queue = this._queue.filter(job => {
+      if (predicate(job)) { removed.push(job); return false; }
+      return true;
+    });
+    if (removed.length) {
+      log.warn({ removed: removed.length, remaining: this._queue.length }, 'Queue purged (emergency stop)');
+    }
+    return removed;
+  }
+
+  /**
    * Returns queue status for a specific company (used by queue-status API).
    */
   queueStatus(companyId) {
