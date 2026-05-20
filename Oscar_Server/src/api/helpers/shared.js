@@ -81,26 +81,9 @@ function resolveCompanyScope(req, res) {
   return req.user.companyId;
 }
 
-/**
- * Returns true if the given company shares its run reports with the
- * certification_user role. Defaults to true (matches schema default and
- * historical behaviour) for any company missing the column or row.
- *
- * Used by the tenant guard and the runs/reports listings to decide
- * whether to expose this company's data to certifiers.
- */
-function companyShareWithCertifier(companyId) {
-  if (!companyId) return true;
-  try {
-    const row = get('SELECT share_reports_with_certifier AS s FROM companies WHERE id = ?', [companyId]);
-    if (!row) return true;
-    // SQLite stores BOOLEAN as INTEGER (0/1); the `=== true` branch was
-    // unreachable and flagged by Sonar S3403. Treat 1 as "shares".
-    return row.s === 1;
-  } catch (_e) {
-    return true;
-  }
-}
+// v1.11.15: companyShareWithCertifier() removed — the company-wide
+// certifier-sharing toggle was retired in favour of per-report sharing
+// (runs.shared_with_certifier_at). The helper had no remaining callers.
 
 module.exports = {
   ALLOWED_ROLES,
