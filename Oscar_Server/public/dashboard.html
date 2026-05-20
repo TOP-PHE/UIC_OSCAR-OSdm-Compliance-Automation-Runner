@@ -130,6 +130,9 @@ h2{color:#0090D4;font-size:20px}
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <strong style="color:#0090D4;font-size:13px">Company Queue</strong>
       <span id="qi-slots" style="font-size:12px;color:#546e7a"></span>
+      <button id="emergency-stop-btn"
+              style="display:none;margin-left:auto;background:#c62828;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer"
+              title="Force-stop active runs (running scenarios are killed immediately)">🛑 Emergency Stop</button>
     </div>
     <div id="qi-runs" style="font-size:12px"></div>
   </div>
@@ -730,8 +733,15 @@ async function pollQueueInfo() {
     if (!res.ok) return;
     const data = await res.json();
     const panel = document.getElementById('queue-info');
-    if (data.runs.length === 0) { panel.style.display = 'none'; return; }
+    const stopBtn = document.getElementById('emergency-stop-btn');
+    if (data.runs.length === 0) {
+      panel.style.display = 'none';
+      if (stopBtn) stopBtn.style.display = 'none';
+      return;
+    }
     panel.style.display = 'block';
+    // Certifiers can't run or stop runs; everyone else gets the kill switch.
+    if (stopBtn) stopBtn.style.display = (user.role !== 'certification_user') ? 'inline-block' : 'none';
     document.getElementById('qi-slots').textContent =
       `${data.slots_used}/${data.concurrent_limit} slots used — ${data.slots_available} available`;
     const rows = data.runs.map(r => {
@@ -750,6 +760,40 @@ async function pollQueueInfo() {
 }
 setInterval(pollQueueInfo, 3000);
 pollQueueInfo();
+
+// ── Emergency stop ────────────────────────────────────────────────────────────
+// Force-cancel active runs. Tester → own runs; test_manager/admin → whole
+// company. Running Bruno processes are killed server-side (SIGTERM→SIGKILL),
+// queued runs are purged before they start. Irreversible.
+async function emergencyStopAll() {
+  // Dashboard scope is always own-runs-only (testers + test_managers). Only the
+  // platform administrator can stop other users' runs, and that lives in the
+  // admin console, not here.
+  if (!confirm('🛑 Emergency stop\n\nThis will forcibly cancel YOUR running and queued scenarios.\nRunning scenarios are killed immediately. This cannot be undone.\n\nContinue?')) return;
+
+  const btn = document.getElementById('emergency-stop-btn');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Stopping…';
+  try {
+    const res = await fetch('/v1/runs/stop-all', { method: 'POST' });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(`Emergency stop failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`);
+      return;
+    }
+    alert(`Emergency stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`);
+    pollQueueInfo();
+    loadRuns();
+  } catch (e) {
+    alert('Network error during emergency stop: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+document.getElementById('emergency-stop-btn').addEventListener('click', emergencyStopAll);
 </script>
 </body>
 </html>
