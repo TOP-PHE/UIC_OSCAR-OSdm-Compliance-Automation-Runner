@@ -30,7 +30,9 @@ function parseEnvJson(name, fallback) {
     raw = (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function')
       ? bru.getEnvVar(name)
       : undefined;
-  } catch (_e) {
+  } catch (e) {
+    // bru.getEnvVar threw (no / broken bru context) — treat the var as unset.
+    console.log('[envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e && e.message));
     raw = undefined;
   }
 
@@ -64,5 +66,5 @@ module.exports = { parseEnvJson };
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }
