@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.43",
+  "current_release": "2026.44",
   "releases": [
+    {
+      "release": "2026.44",
+      "date": "2026-05-20",
+      "server": "1.11.16",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(ux): clicking 'Share with certifiers' / 'Unshare' on the dashboard now updates just that run's share state in place, instead of re-rendering the whole list. The full re-render (loadRuns) collapsed any expanded batches and jumped the scroll to the top — reported as 'the dashboard collapses when I click share'. Follow-up to v1.11.15: the per-report sharing feature shipped, but this UX polish + the matching news entry were committed minutes after #77 was already squash-merged, so they missed that release.",
+        "docs: added the 'per-report certifier sharing' news entry that was meant to ship with v1.11.15.",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the dashboard."
+      ]
+    },
     {
       "release": "2026.43",
       "date": "2026-05-20",
