@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.51",
+  "current_release": "2026.52",
   "releases": [
+    {
+      "release": "2026.52",
+      "date": "2026-05-20",
+      "server": "1.11.24",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "chore(audit #86): dead-code cleanup of CodeQL/ESLint js/unused-local-variable findings, behaviour-neutral. src/api/routes: removed unused destructured imports (isPlatformRole/isTestManagerOrAbove in company-test-framework.js & company-test-resources.js; isTestManagerOrAbove in company.js) and the unused fileHash() helper in company.js (crypto/fs still used). library-bruno: unused top-level 'const x = require()' bindings (display in scenarioParser/offers/refunds/validators/fulfillments/exchanges; requestsBuilder in offers; validators/models in scenarioParser — the latter shadowed by a local re-require) converted to bare require('./…') so each module's globalThis side-effect is preserved with no binding; removed a dead expectedStatuses local in bookings.js. public: removed dead batchStatus (dashboard.html) and email (scenarios.js) locals. The ~140 Sonar 'auto-fixable' style suggestions (optional chaining etc.) are SonarLint IDE quick-fixes, not eslint-fixable (eslint src/ --fix is a no-op here), left as non-blocking advisories; a few ambiguous test-file imports left as-is.",
+        "Operator action required: none. Bruno collection refreshes via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.51",
       "date": "2026-05-20",

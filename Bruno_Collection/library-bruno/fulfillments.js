@@ -1,5 +1,5 @@
 // Import needed library files
-const display = require('./displays.js');
+require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 
 module.exports = {

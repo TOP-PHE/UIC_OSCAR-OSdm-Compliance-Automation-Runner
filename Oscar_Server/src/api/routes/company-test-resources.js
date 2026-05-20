@@ -19,7 +19,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { get, all, run, colEncrypt, colDecrypt } = require('../../db/db');
-const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
 

@@ -374,7 +374,6 @@ function renderRuns(runs) {
     const batchRuns = batched[batchId].sort(
       (a, b) => new Date(a.queued_at) - new Date(b.queued_at)
     );
-    const batchStatus = batchSummaryStatus(batchRuns);
     const completed = batchRuns.filter(r => r.status === 'COMPLETED').length;
     // Issue #18 — split the single "X/Y done" status into separate
     // success / failure / in-progress counters. The old pill ("0/1 done")
