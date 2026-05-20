@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.44",
+  "current_release": "2026.45",
   "releases": [
+    {
+      "release": "2026.45",
+      "date": "2026-05-20",
+      "server": "1.11.17",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security/audit #82): hardened the esc() HTML-entity encoder in public/js/scenarios.js to also escape single quotes ('→&#39;), so interpolated values are safe in single-quoted attributes as well as double-quoted attributes and text. Defense-in-depth following the audit. The 3 Sonar S5696 DOM-XSS BLOCKERs flagged on this file are FALSE POSITIVES — every dynamic value already passes through esc(); Sonar's taint engine does not recognise the custom encoder. They should be marked Safe in SonarCloud (see issue #82).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page."
+      ]
+    },
     {
       "release": "2026.44",
       "date": "2026-05-20",
