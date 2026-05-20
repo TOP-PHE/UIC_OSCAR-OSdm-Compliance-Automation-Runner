@@ -126,7 +126,8 @@ const LABELS = {
   UNCHANGED_PASS:   '✔ Unchanged (Pass)'
 };
 
-function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
+// v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
 
 function renderDiff(data) {
   const s = data.summary;

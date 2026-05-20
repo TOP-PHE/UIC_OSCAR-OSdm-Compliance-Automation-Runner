@@ -506,7 +506,8 @@ function escHtml(s) {
 }
 function fmtDate(d) {
   if (!d) return '-';
-  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
+  // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
 }
 function runScenarioLabel(r) {
   // What identifies this run for a human? Prefer the actual scenario(s) executed:
@@ -875,7 +876,7 @@ function renderMilestone(e) {
   var attempt = (e.attempt_index && e.attempt_total)
     ? 'attempt ' + e.attempt_index + '/' + e.attempt_total
     : '';
-  var ts = e.ts ? new Date(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+  var ts = e.ts ? parseServerTs(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
   return '<div class="log-milestone ' + def.cls + '">'
     + '<span class="mile-label">' + escHtml(def.text) + '</span>'
     + '<span class="mile-scenario">' + escHtml(e.scenario_name || '(unknown scenario)') + '</span>'
@@ -965,7 +966,7 @@ function renderLogs() {
         if (item.__jsonBlock) {
           var o = item.event;
           var lvl = (o.level || 'stdout').toLowerCase();
-          var ts  = o.ts ? new Date(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var ts  = o.ts ? parseServerTs(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
           var label = jsonBlockLabel(o);
           var lineCount = item.body.split('\n').length;
           var bodyId = 'json-body-' + (o.id || Math.random().toString(36).slice(2));
@@ -985,7 +986,7 @@ function renderLogs() {
         } else {
           var e2 = item;
           var lvl2 = (e2.level || 'stdout').toLowerCase();
-          var ts2  = e2.ts ? new Date(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var ts2  = e2.ts ? parseServerTs(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
           html += '<div class="log-row">'
             + '<span class="log-ts">' + escHtml(ts2) + '</span>'
             + '<span class="log-level l-' + escHtml(lvl2) + '">' + escHtml(lvl2) + '</span>'

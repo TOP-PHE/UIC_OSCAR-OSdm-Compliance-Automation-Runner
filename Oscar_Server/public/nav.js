@@ -280,6 +280,30 @@
 
   global.renderOscarNav = renderOscarNav;
 
+  // ── Server-timestamp parser (v1.11.7) ────────────────────────────────────────
+  // SQLite's `datetime('now')` returns UTC timestamps WITHOUT a TZ marker
+  // (e.g. "2026-05-16 08:44:24"). The OSCAR server passes these through to
+  // the browser unchanged. `new Date("2026-05-16 08:44:24")` in JavaScript
+  // then interprets the string as LOCAL time (not UTC), which causes the
+  // dashboard to display the UTC value as if it were local — i.e. a 10:44
+  // Paris event shows as "08:44" because the browser thinks 08:44 is local.
+  //
+  // This helper detects the missing TZ marker and normalises to ISO with 'Z'
+  // so the browser correctly converts UTC → viewer's local timezone. Storage
+  // stays UTC (correct); display localises to whoever is viewing the page.
+  //
+  // Use everywhere a server-side timestamp is rendered:
+  //   parseServerTs(run.queued_at).toLocaleString()
+  //
+  // Already-marked ISO strings (ending in Z or with ±HH:MM offset) pass
+  // through unchanged.
+  global.parseServerTs = function parseServerTs(s) {
+    if (s instanceof Date) return s;
+    if (typeof s !== 'string' || !s) return new Date(s);
+    if (/Z$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s);
+    return new Date(s.replace(' ', 'T') + 'Z');
+  };
+
   // ── Global logout helper ─────────────────────────────────────────────────────
   // Revokes the session token on the server (clears httpOnly cookie), then clears
   // client-side session storage and redirects to the login page.

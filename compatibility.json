@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.40",
+  "current_release": "2026.41",
   "releases": [
+    {
+      "release": "2026.41",
+      "date": "2026-05-20",
+      "server": "1.11.13",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security/visibility): a plain tester (company_user) now sees ONLY their own runs in GET /v1/runs, not every run in their company. test_manager and administrator keep company-wide visibility (they triage and can delete any run). Previously the tester list was company-scoped while delete was own-only, which both leaked who-ran-what across the team and produced a confusing 'Not the run owner' toast when a tester tried to delete a teammate's run. Change is in Oscar_Server/src/api/routes/runs.js (GET / handler).",
+        "fix(tz): full timezone-handling sanity pass after #67 (Europe/Paris container TZ). (1) Server: isRunStale() in runs.js parsed SQLite's TZ-less datetime('now') string with new Date(), which under TZ=Europe/Paris was read as Paris-local — making a just-started run look 1-2h old and get auto-cancelled on delete. Now parsed as UTC. (2) Frontend: nav.js gains parseServerTs() which normalises TZ-less UTC strings to ISO+Z before display; every timestamp render site (dashboard, run-detail, compare, report-builder, run, admin, scenarios.js) now uses it so times localise correctly to each viewer. Storage stays UTC throughout; only display localises. Bruno date helpers (toOffsetDateTime/toLocalDateTime) audited — correct, unchanged.",
+        "fix(observability): Grafana OSCAR Logs dashboard 'Errors in range' + 'Errors only' panels now exclude the metrics-stack containers (oscar-grafana|oscar-prometheus|oscar-loki|oscar-promtail|oscar-alertmanager). They were matching Grafana's own tsdb.loki query logs — which contain the literal error|fatal|panic LogQL pattern — producing self-referential false positives.",
+        "chore(bruno-env): stripped accidentally-committed Bruno session-state vars from OTST_Paxone_Env.yml and OTST_Turnit_Env.yml (followup to 2026.39 which fixed only their data-file paths). Both are now config-only templates matching Benerail/Sqills; Paxone's stray pinned scenarioTarget was reset to empty.",
+        "Operator action required: none. Server change picked up after Watchtower promotes :stable (hard-refresh the dashboard). Bruno collection + Grafana dashboards refresh automatically on merge."
+      ]
+    },
     {
       "release": "2026.40",
       "date": "2026-05-20",

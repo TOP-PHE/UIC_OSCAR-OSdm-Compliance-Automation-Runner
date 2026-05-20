@@ -2137,7 +2137,8 @@ function showSaveConfirm(data) {
   document.getElementById('sc-torun-count').textContent = data.to_run_count;
   document.getElementById('sc-torun-list').innerHTML = (data.to_run || [])
     .map(code => `<li>${esc(code)}</li>`).join('');
-  document.getElementById('sc-saved-at').textContent = new Date(data.saved_at).toLocaleString();
+  // v1.11.7 — parseServerTs (nav.js) normalises SQLite's TZ-less UTC strings.
+  document.getElementById('sc-saved-at').textContent = parseServerTs(data.saved_at).toLocaleString();
   document.getElementById('sc-hash').textContent = (data.hash || '').slice(0, 16) + '…';
   document.getElementById('save-confirm').style.display = 'block';
   document.getElementById('save-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });

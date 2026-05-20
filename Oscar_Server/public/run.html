@@ -238,14 +238,14 @@ async function loadProfile() {
         dfEl.innerHTML =
           `<span class="badge ${toRunBadgeClass}">✓ Configured</span> ` +
           `<span style="color:#546e7a;font-size:12px"> · ${toRunDesc}</span>` +
-          `<div style="font-size:11px;color:#90a4ae;margin-top:4px">Saved ${new Date(c.datafile_updated_at).toLocaleString()}</div>`;
+          `<div style="font-size:11px;color:#90a4ae;margin-top:4px">Saved ${parseServerTs(c.datafile_updated_at).toLocaleString()}</div>`;
         dfEl.classList.remove('missing');
       } else {
         dfEl.innerHTML = '<span class="badge badge-warn">⚠ File missing on server</span>';
         warnings.push('Test Configuration file is missing on the server — go to <a href="/scenarios.html">Test Config</a> to re-upload.');
       }
     } catch(_) {
-      dfEl.innerHTML = `<span class="badge badge-warn">Uploaded ${new Date(c.datafile_updated_at).toLocaleString()}</span>`;
+      dfEl.innerHTML = `<span class="badge badge-warn">Uploaded ${parseServerTs(c.datafile_updated_at).toLocaleString()}</span>`;
       dfEl.classList.remove('missing');
       testReady = true;
     }
