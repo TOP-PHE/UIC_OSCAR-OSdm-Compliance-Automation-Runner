@@ -12,8 +12,10 @@
  *   return;   // <-- important: exit the script cleanly after calling this
  */
 
+const { parseEnvJson } = require('./envUtils.js');
+
 function loopbackOrStop(label) {
-  const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+  const _scList    = parseEnvJson('__scenariosList', []);
   const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
 
   if (_scList.length > 0 && _scNextIdx < _scList.length) {

@@ -3,6 +3,7 @@ const display = require('./displays.js');
 const requestsBuilder = require('./requestsBuilder.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
+const { parseEnvJson } = require('./envUtils.js');
 
 module.exports = {
   checkWarningsAndProblems,
@@ -1042,7 +1043,7 @@ function validateAncillaries(selectedOffer) {
   let admissionReservationAncillaryOfferPartsAftersalesConditions = Number(bru.getEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions") || 0);
 
   // Capture referenced ancillary IDs from environment
-  const referencedAncillaryIdsArray = JSON.parse(bru.getEnvVar("referencedAncillaryIds") || "[]");
+  const referencedAncillaryIdsArray = parseEnvJson("referencedAncillaryIds", []);
   const referencedAncillaryIds = new Set(referencedAncillaryIdsArray);
 
   if (ancillaryParts.length > 0) {
