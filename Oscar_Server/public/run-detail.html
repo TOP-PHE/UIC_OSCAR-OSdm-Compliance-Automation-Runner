@@ -191,7 +191,8 @@ const runId = _rawRunId;
 let lastEventId = 0;
 let polling     = true;
 
-function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
+// v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
 function duration(a, b) {
   if (!a || !b) return '-';
   const s = Math.round((new Date(b) - new Date(a)) / 1000);
@@ -289,7 +290,7 @@ function updateStatus(run) {
       if (shareWrap) {
         const isShared = !!run.shared_with_certifier_at;
         const sharedAt = isShared
-          ? new Date(run.shared_with_certifier_at + 'Z').toLocaleString()
+          ? parseServerTs(run.shared_with_certifier_at).toLocaleString()
           : '';
         const sharedBy = run.shared_with_certifier_by || '';
         shareWrap.innerHTML = isShared
