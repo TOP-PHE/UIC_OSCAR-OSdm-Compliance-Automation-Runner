@@ -14,6 +14,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.15] — 2026-05-20
+
+Certifier report sharing is now **per-report**, decided by the
+**test_manager** from the **dashboard** — replacing the company-wide
+all-or-nothing toggle that lived in API Config.
+
+> Numbering note: assumes #76 (1.11.14 / release-2026.42, auth
+> rate-limit) merges first. If the order differs, renumber accordingly.
+
+### Added
+- **Dashboard per-run share control (test_manager only).** Each
+  terminal-status run row now shows a **"Share with certifiers" /
+  "Unshare"** link and, when shared, a green **"✓ Shared with
+  certifiers"** badge (visible read-only to all roles). Wired to the
+  existing `POST`/`DELETE /v1/runs/:id/share`. `Oscar_Server/public/dashboard.html`.
+
+### Changed
+- **Per-report sharing is now the SOLE certifier-visibility gate.** A
+  run is visible to a certifier iff `shared_with_certifier_at IS NOT
+  NULL`. Applied consistently in:
+  - `api/helpers/run-access.js` (single-run access)
+  - `api/routes/runs.js` (certifier list)
+  - `api/routes/reports.js` (comparisons — **both** underlying runs must
+    be shared, else the comparison stays hidden)
+  - `api/middleware/tenant.js` (no longer refuses a certifier at the
+    company boundary — they simply see only shared runs)
+- The list endpoint now returns `shared_with_certifier_at` /
+  `shared_with_certifier_by` to the dashboard so it can render badge +
+  control.
+
+### Removed
+- **The company-wide `share_reports_with_certifier` toggle** — gone from
+  the API Config UI (`profile.html`) and from `company.js`
+  (GET no longer returns it; PATCH rejects it with a 400 + pointer to
+  the per-report model). The dead `companyShareWithCertifier()` helper
+  in `shared.js` was removed. The `companies.share_reports_with_certifier`
+  DB column is **retained** (no destructive migration) but unused.
+
+### ⚠️ Behaviour change for operators
+Reports that were visible to certifiers **only** because the old company
+toggle was ON are now **private until a test_manager explicitly shares
+them**. The per-run share flag (`shared_with_certifier_at`) is unchanged,
+so anything previously shared per-run stays shared. Worth a heads-up to
+test_managers: "decide which reports to share, from the dashboard."
+
+### Operator action
+None mechanical. Picked up after Watchtower promotes `:stable`;
+hard-refresh the dashboard. See the behaviour-change note above.
+
+---
+
 ## [server-v1.11.14] — 2026-05-20
 
 Login rate-limiter tuning. A tester hit "Too many attempts. Please try

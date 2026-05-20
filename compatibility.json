@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.42",
+  "current_release": "2026.43",
   "releases": [
+    {
+      "release": "2026.43",
+      "date": "2026-05-20",
+      "server": "1.11.15",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(sharing): certifier report sharing is now PER-REPORT, decided by the test_manager from the dashboard. Removed the company-wide share_reports_with_certifier master toggle (was in API Config / profile). A test_manager now sees a 'Share with certifiers' / 'Unshare' control on each terminal-status run row on the dashboard, plus a 'Shared with certifiers' badge; certifiers see ONLY the individual runs explicitly shared. Default is private (nothing shared). The per-run mechanism (POST/DELETE /v1/runs/:id/share, shared_with_certifier_at) already existed since v1.10.0 but was only reachable from the single-run detail page and was gated by the now-removed company toggle.",
+        "refactor(security): the certifier-visibility gate is now solely shared_with_certifier_at IS NOT NULL, applied consistently across run-access.js (single-run), runs.js (list), reports.js (comparisons — BOTH underlying runs must be shared), and the tenant middleware (no longer refuses certifiers at the company boundary). company.js no longer reads/writes the toggle and rejects it with a 400 + pointer if an old client sends it. The companies.share_reports_with_certifier DB column is retained (no destructive migration) but unused.",
+        "Operator action required: none. IMPORTANT behaviour change: any reports that were visible to certifiers purely because the old company toggle was ON are now private until a test_manager explicitly shares them. Communicate this to test_managers. Picked up after Watchtower promotes :stable; hard-refresh the dashboard."
+      ]
+    },
     {
       "release": "2026.42",
       "date": "2026-05-20",

@@ -25,22 +25,15 @@ function enforceTenant(req, res, next) {
   if (isPlatformRole(req.user.role)) {
     const bodyCompanyId = req.body && req.body.company_id ? req.body.company_id : null;
     req.companyId = req.query.company_id || req.headers['x-company-id'] || bodyCompanyId || null;
-    // Validate that the specified company actually exists
+    // Validate that the specified company actually exists.
+    // v1.11.15: the company-wide certifier-sharing refusal was removed.
+    // Certifier visibility is now decided per-report (shared_with_certifier_at),
+    // enforced by run-access.js / the runs + reports listings — not at the
+    // tenant boundary. A certifier may target any company; they will simply
+    // see only the individual runs that company's test_manager has shared.
     if (req.companyId) {
-      const company = get('SELECT id, share_reports_with_certifier FROM companies WHERE id = ?', [req.companyId]);
+      const company = get('SELECT id FROM companies WHERE id = ?', [req.companyId]);
       if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Specified company does not exist.' });
-      // Privacy guard (v15): a certification_user targeting a specific
-      // company that opted out of certifier sharing is refused. Administrators
-      // are unaffected — they always have unconditional read access.
-      // SQLite stores BOOLEAN as INTEGER (0/1); the `=== false` branch was
-      // unreachable and flagged by Sonar S3403.
-      if (req.user.role === 'certification_user' &&
-          company.share_reports_with_certifier === 0) {
-        return res.status(403).json({
-          status: 403, title: 'Forbidden',
-          detail: 'This company does not share reports with certifiers.'
-        });
-      }
     }
     return next();
   }

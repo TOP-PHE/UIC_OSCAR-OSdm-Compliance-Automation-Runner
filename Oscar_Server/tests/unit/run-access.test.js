@@ -127,7 +127,7 @@ describe('canUserSeeRun — test_manager', () => {
     expect(canUserSeeRun(RUN_A_TERM_SHARED_KILL, tmA)).toBeNull());
 });
 
-describe('canUserSeeRun — certifier (per-run share + master kill)', () => {
+describe('canUserSeeRun — certifier (per-run share is the sole gate, v1.11.15)', () => {
   const cert = { role: 'certification_user', companyId: COMPANY_PLATFORM };
 
   test('cannot see RUNNING run (never shared)', () =>
@@ -139,10 +139,14 @@ describe('canUserSeeRun — certifier (per-run share + master kill)', () => {
     expect(r).not.toBeNull();
     expect(r.id).toBe(RUN_A_TERM_SHARED);
   });
-  test('cannot see shared run when company master kill switch is off', () =>
-    // Company B has share_reports_with_certifier=0; per-run share is
-    // overridden by the master kill switch.
-    expect(canUserSeeRun(RUN_A_TERM_SHARED_KILL, cert)).toBeNull());
+  test('CAN see a shared run regardless of the legacy company toggle (v1.11.15: master kill removed)', () => {
+    // COMPANY_B still has the legacy share_reports_with_certifier=0 column
+    // value in the seed, but it no longer gates anything — per-run sharing
+    // (shared_with_certifier_at) is now the sole certifier-visibility gate.
+    const r = canUserSeeRun(RUN_A_TERM_SHARED_KILL, cert);
+    expect(r).not.toBeNull();
+    expect(r.id).toBe(RUN_A_TERM_SHARED_KILL);
+  });
 });
 
 describe('canUserSeeRun — unknown role fails closed', () => {
