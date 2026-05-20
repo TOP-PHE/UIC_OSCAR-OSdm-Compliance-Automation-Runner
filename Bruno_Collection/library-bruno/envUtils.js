@@ -30,7 +30,9 @@ function parseEnvJson(name, fallback) {
     raw = (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function')
       ? bru.getEnvVar(name)
       : undefined;
-  } catch (_e) {
+  } catch (e) {
+    // bru.getEnvVar threw (no / broken bru context) — treat the var as unset.
+    console.log('[envUtils] getEnvVar("' + name + '") threw, treating as unset: ' + (e && e.message));
     raw = undefined;
   }
 
@@ -40,7 +42,9 @@ function parseEnvJson(name, fallback) {
       '[ERROR] Required scenario variable "' + name + '" is empty or not set. ' +
       'This usually means getScenarioData() did not run, or the data file failed ' +
       'to load / had no matching data set for this scenario (check data_base and ' +
-      'the scenario code). See scenarioParser.js.'
+      'the scenario code). When running locally in Bruno, check that the data-file ' +
+      'server is running and reachable at the data_base URL (e.g. run ' +
+      '"python -m http.server 8000" in Bruno_Collection/data_base). See scenarioParser.js.'
     );
   }
 
@@ -64,5 +68,5 @@ module.exports = { parseEnvJson };
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

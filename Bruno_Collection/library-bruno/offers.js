@@ -105,7 +105,7 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      // If header extraction fails, continue without headers
+      console.log('[offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
     }
 
     // Best-effort body resolve (may be empty in pre-request)
@@ -122,7 +122,7 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      // ignore body resolution failures
+      console.log('[offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
     }
 
     // Preflight call using bru.sendRequest
@@ -1220,5 +1220,5 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

@@ -196,5 +196,5 @@ function getBookingFulfillmentResponse(booking, offer, bookingState, fulfillment
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

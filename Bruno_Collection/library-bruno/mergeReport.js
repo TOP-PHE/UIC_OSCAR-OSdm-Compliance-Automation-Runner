@@ -238,7 +238,16 @@ function esc(s) {
 function prettyJson(raw) {
   if (raw == null || raw === '') return '';
   if (typeof raw === 'object') return JSON.stringify(raw, null, 2);
-  try { return JSON.stringify(JSON.parse(raw), null, 2); } catch (_) { return String(raw); }
+  // Only attempt a parse when the value actually looks like JSON, so a plain
+  // string is returned as-is instead of routing through an expected throw.
+  const first = String(raw).trim().charAt(0);
+  if (first !== '{' && first !== '[' && first !== '"') return String(raw);
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch (e) {
+    console.log('[mergeReport] prettyJson: JSON-like value failed to parse (' + (e && e.message) + ') — returning raw.');
+    return String(raw);
+  }
 }
 
 function maskHeaderValue(name, value) {

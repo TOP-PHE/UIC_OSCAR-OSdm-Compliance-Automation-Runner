@@ -136,13 +136,13 @@ function initReport(libraryBase) {
       try {
         const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
         prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
-      } catch (_re) { /* corrupt tmp → treat as different; safe to clear */ }
+      } catch (re) { console.log('[reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
       let currentScenarioCode = null;
       try {
         if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
           currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
         }
-      } catch (_be) { /* no bru context (running outside Bruno) → fall through to clear */ }
+      } catch (be) { console.log('[reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
         console.log('[reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');

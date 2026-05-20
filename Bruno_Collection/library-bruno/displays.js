@@ -66,7 +66,9 @@ function validationLogger(message) {
       
       existing.push({ level: level, message: message });
       bru.setVar('__rptLogs', JSON.stringify(existing));
-    } catch (_e) {}
+    } catch (e) {
+      console.log('[displays] addReportLog skipped: ' + (e && e.message));
+    }
   }
 }
 
@@ -420,5 +422,5 @@ function displayFulFilledBooking(response) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

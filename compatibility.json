@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.48",
+  "current_release": "2026.49",
   "releases": [
+    {
+      "release": "2026.49",
+      "date": "2026-05-20",
+      "server": "1.11.21",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(bruno #84): the Bruno scenario engine no longer swallows exceptions silently. The 16 S2486 'ignored exception' sites in library-bruno now LOG the caught error (visible in the run log) with identical control flow / fallback: 9 trailing Object.assign(globalThis,...) module-exposure catches (envUtils, bookings, displays, exchanges, fulfillments, model, offers, passengers, refunds); envUtils.parseEnvJson getEnvVar throw; reportGenerator tmp-read / bru-context; displays.addReportLog; offers preflight header+body resolution; and mergeReport.prettyJson. prettyJson additionally checks whether a value looks like JSON before parsing, so a plain string is returned as-is instead of routing through an expected throw. Caller behaviour unchanged — only error visibility improves. Existing bruno-envutils / bruno-requestsbuilder Jest suites still pass. Completes the second half of #84 (JSON.parse hardening shipped v1.11.18 / #91). Also makes data-load failures clearer: getScenarioData (network / HTTP / non-absolute data_base) and the parseEnvJson 'required scenario variable not set' message now name the data_base URL and suggest checking that the data-file server is running (e.g. 'python -m http.server 8000' in Bruno_Collection/data_base) — reported from running the collection locally in the Bruno UI.",
+        "Operator action required: none. Bruno collection refreshes via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.48",
       "date": "2026-05-20",
