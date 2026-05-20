@@ -74,12 +74,22 @@ describe('reconcileOrphanedRuns — against the real schema', () => {
   const { run, get } = require('../../src/db/db');
   const { randomUUID } = require('crypto');
 
+  // runs.company_id / user_id are FK-constrained (schema.sql: PRAGMA
+  // foreign_keys = ON), so seed a minimal company + user first.
+  const companyId = randomUUID();
+  const userId = randomUUID();
+
+  beforeAll(() => {
+    run('INSERT INTO companies (id, name, slug) VALUES (?, ?, ?)',
+      [companyId, 'Recon Test Co', 'recon-' + companyId.slice(0, 8)]);
+    run('INSERT INTO users (id, company_id, email, password_hash) VALUES (?, ?, ?, ?)',
+      [userId, companyId, 'recon-' + userId.slice(0, 8) + '@example.com', 'x']);
+  });
+
   function insertRun(status) {
     const id = randomUUID();
-    // FK enforcement is off in this build, so arbitrary company_id/user_id are
-    // fine — we only exercise the status lifecycle here.
     run('INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, ?)',
-      [id, 'company-x', 'user-x', status]);
+      [id, companyId, userId, status]);
     return id;
   }
 
