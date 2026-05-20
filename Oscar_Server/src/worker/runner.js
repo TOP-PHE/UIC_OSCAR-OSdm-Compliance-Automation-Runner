@@ -57,6 +57,37 @@ function _incrementAndCheck(runId) {
 }
 function _resetLineCounter(runId) { _runLineCounters.delete(runId); }
 
+// ── Active Bruno child processes — runId → ChildProcess ──────────────────────
+// Lets the API forcibly terminate an in-flight run (emergency stop). Populated
+// when bru.cmd is spawned, cleared on close/error. killRun() escalates SIGTERM
+// → SIGKILL so a wedged scenario dies "hard but sure". The runner's own final
+// status write is guarded with `AND status = 'RUNNING'`, so a row already moved
+// to CANCELLED by the emergency-stop route is never resurrected to FAILED.
+const _activeProcs = new Map();   // runId → ChildProcess
+
+/**
+ * Forcibly terminate the Bruno child process for a run, if one is alive.
+ * SIGTERM first, then SIGKILL after a short grace period if it hasn't exited.
+ * @param {string} runId
+ * @returns {boolean} true if a live process was found and signalled
+ */
+function killRun(runId) {
+  const proc = _activeProcs.get(runId);
+  if (!proc) return false;
+  try {
+    proc.kill('SIGTERM');
+    setTimeout(() => {
+      // Still tracked ⇒ it never emitted 'close' ⇒ escalate.
+      if (_activeProcs.has(runId)) {
+        try { proc.kill('SIGKILL'); } catch (_) { /* already gone */ }
+      }
+    }, 3000).unref();
+  } catch (_) {
+    return false;
+  }
+  return true;
+}
+
 // ── Async FS helpers ──────────────────────────────────────────────────────────
 /** Non-throwing async equivalent of fs.existsSync(). */
 async function fsExists(p) {
@@ -586,6 +617,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       shell: needsShell,
       env:   safeEnv
     });
+    // Register for emergency-stop (killRun). Cleared in close/error below.
+    _activeProcs.set(runId, proc);
 
     const runTimeoutMs = parseInt(getConfig('RUN_TIMEOUT_MS', '600000'), 10);
     const timeout = setTimeout(() => {
@@ -627,10 +660,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
     proc.on('close', code => {
       clearTimeout(timeout);
+      _activeProcs.delete(runId);
       resolve(code ?? 1);
     });
     proc.on('error', err => {
       clearTimeout(timeout);
+      _activeProcs.delete(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });
@@ -788,12 +823,21 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'error', `[runner] Failed to store structured results: ${err.message}`);
   }
 
-  // 11. Update run record
+  // 11. Update run record.
+  // Guard with `AND status = 'RUNNING'`: if the run was emergency-stopped
+  // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
+  // killed, this write must NOT resurrect it to COMPLETED/FAILED.
   const finalStatus = exitCode === 0 ? 'COMPLETED' : 'FAILED';
-  dbRun(
-    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ?`,
+  const finalUpd = dbRun(
+    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
     [finalStatus, exitCode, runId]
   );
+  if (finalUpd && Number(finalUpd.changes) === 0) {
+    // Row was already terminal (e.g. CANCELLED by emergency stop) — leave it.
+    logEvent(runId, 'info', '[runner] Final status not written — run already in a terminal state (likely cancelled).');
+    _resetLineCounter(runId);
+    return { exitCode };
+  }
 
   if (tokenFormatError) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_FORMAT_ERROR' WHERE id = ?`, [runId]);
@@ -813,4 +857,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun };
+module.exports = { executeRun, killRun };
