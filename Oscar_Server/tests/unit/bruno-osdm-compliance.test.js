@@ -10,8 +10,17 @@
  * increment 1: GET /versions → array<ApiVersion>.
  */
 
-const { isType, isDateTime, validateApiVersions } =
-  require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
+const {
+  isType,
+  isDateTime,
+  validateApiVersions,
+  validateOsdmCollection,
+  validateReductionCards,
+  validateZones,
+  validatePromotionCodes,
+  validatePassengerCategories,
+  validateProductTags,
+} = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
 
 describe('osdmCompliance.isType', () => {
   test('classifies primitives the JSON-Schema way', () => {
@@ -101,5 +110,99 @@ describe('osdmCompliance.validateApiVersions', () => {
   test('non-object nextVersion is rejected', () => {
     const checks = validateApiVersions([{ version: '3.8.0', nextVersion: 'x' }]);
     expect(find(checks, '"nextVersion"').ok).toBe(false);
+  });
+});
+
+describe('osdmCompliance.validateOsdmCollection (generic engine)', () => {
+  const spec = {
+    endpoint: '/things', payloadKey: 'things', itemLabel: 'Thing',
+    required: { id: 'string' }, optional: { n: 'number' },
+  };
+  const allOk = (c) => c.every((x) => x.ok);
+  const find = (c, s) => c.find((x) => x.name.includes(s));
+
+  test('valid envelope passes every rule', () => {
+    expect(allOk(validateOsdmCollection({ things: [{ id: 'a' }, { id: 'b', n: 1 }] }, spec))).toBe(true);
+  });
+
+  test('non-object body fails the envelope rule and short-circuits', () => {
+    const c = validateOsdmCollection([1, 2], spec);
+    expect(find(c, 'collection object').ok).toBe(false);
+    expect(c).toHaveLength(1);
+  });
+
+  test('missing payload array fails and short-circuits', () => {
+    const c = validateOsdmCollection({ other: [] }, spec);
+    expect(find(c, 'is an array').ok).toBe(false);
+    expect(c).toHaveLength(2); // envelope-ok + payload-array-fail
+  });
+
+  test('missing required field is named by index', () => {
+    const c = validateOsdmCollection({ things: [{ id: 'a' }, { x: 1 }] }, spec);
+    expect(find(c, 'required "id"').ok).toBe(false);
+    expect(find(c, 'required "id"').message).toMatch(/index 1/);
+  });
+
+  test('wrong-typed optional field is rejected', () => {
+    const c = validateOsdmCollection({ things: [{ id: 'a', n: 'no' }] }, spec);
+    expect(find(c, '"n" (when present)').ok).toBe(false);
+  });
+
+  test('"problems" must be an array when present', () => {
+    const c = validateOsdmCollection({ things: [{ id: 'a' }], problems: {} }, spec);
+    expect(find(c, '"problems"').ok).toBe(false);
+  });
+
+  test('empty collection fails the "at least one" rule', () => {
+    expect(find(validateOsdmCollection({ things: [] }, spec), 'at least one').ok).toBe(false);
+  });
+
+  test('enum membership enforced when present', () => {
+    const espec = Object.assign({}, spec, { enums: { kind: ['A', 'B'] } });
+    const c = validateOsdmCollection({ things: [{ id: 'a', kind: 'Z' }] }, espec);
+    expect(find(c, '"kind"').ok).toBe(false);
+  });
+});
+
+describe('osdmCompliance per-endpoint wrappers', () => {
+  const allOk = (c) => c.every((x) => x.ok);
+  const find = (c, s) => c.find((x) => x.name.includes(s));
+
+  test('validateReductionCards: valid passes; missing issuer fails', () => {
+    expect(allOk(validateReductionCards({
+      reductionCardTypes: [{ code: 'BC', issuer: { ref: 'X' }, name: { id: 't', text: 'BahnCard' } }],
+    }))).toBe(true);
+    const c = validateReductionCards({ reductionCardTypes: [{ code: 'BC', name: { id: 't', text: 'x' } }] });
+    expect(find(c, 'required "issuer"').ok).toBe(false);
+  });
+
+  test('validateZones: requires id + carrier', () => {
+    expect(allOk(validateZones({ zones: [{ id: 'z1', carrier: { ref: 'X' } }] }))).toBe(true);
+    expect(find(validateZones({ zones: [{ carrier: {} }] }), 'required "id"').ok).toBe(false);
+  });
+
+  test('validatePromotionCodes: requires code', () => {
+    expect(allOk(validatePromotionCodes({ promotionCodes: [{ code: 'SUMMER' }] }))).toBe(true);
+    expect(find(validatePromotionCodes({ promotionCodes: [{}] }), 'required "code"').ok).toBe(false);
+  });
+
+  test('validatePassengerCategories: bare array; requires title + specification', () => {
+    expect(allOk(validatePassengerCategories([
+      { title: { id: 't', text: 'Adult' }, specification: {} },
+    ]))).toBe(true);
+    const c = validatePassengerCategories({ not: 'an array' });
+    expect(find(c, 'is an array').ok).toBe(false);
+    expect(c).toHaveLength(1);
+  });
+
+  test('validateProductTags: dual arrays + item required fields', () => {
+    expect(allOk(validateProductTags({
+      productTagNames: [{ tag: 'SPLIT_RESERVATION', description: { id: 'd', text: 'x' } }],
+      productTagGroups: [{ code: 'G1', description: { id: 'd', text: 'x' } }],
+    }))).toBe(true);
+    expect(find(validateProductTags({ productTagGroups: [] }), '"productTagNames"').ok).toBe(false);
+    expect(find(validateProductTags({
+      productTagNames: [{ description: {} }], productTagGroups: [],
+    }), 'required "tag"').ok).toBe(false);
   });
 });

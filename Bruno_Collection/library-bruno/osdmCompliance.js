@@ -115,7 +115,206 @@ function validateApiVersions(body) {
   return checks;
 }
 
-module.exports = { isType, isDateTime, validateApiVersions };
+// ── Generic OSDM collection validator ───────────────────────────────────
+// Drives the standard collection-response shape AND bare-array responses from
+// a small declarative spec, so each System-Information endpoint needs only a
+// thin wrapper. Rules are AGGREGATED (one result per rule); offending entry
+// indices are named in the failure message.
+//
+// spec = {
+//   endpoint:   '/zones',          // for human-readable check names
+//   payloadKey: 'zones' | null,    // array property name; null = body IS the array
+//   itemLabel:  'ZoneDefinition',
+//   required:   { id: 'string', carrier: 'object' },  // present (non-null) + typed
+//   optional:   { name: 'string' },                   // typed only when present
+//   enums:      { field: ['A', 'B'] },                // membership only when present
+// }
+function validateOsdmCollection(body, spec) {
+  const checks = [];
+  const ep = spec.endpoint;
+  let items;
+
+  if (spec.payloadKey == null) {
+    const isArr = Array.isArray(body);
+    checks.push({
+      name: `GET ${ep} → response is an array<${spec.itemLabel}>`,
+      ok: isArr,
+      message: isArr ? '' : `Expected a JSON array, got ${body === null ? 'null' : typeof body}`,
+    });
+    if (!isArr) return checks;
+    items = body;
+  } else {
+    const isObj = isType(body, 'object');
+    checks.push({
+      name: `GET ${ep} → response is a collection object`,
+      ok: isObj,
+      message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+    });
+    if (!isObj) return checks;
+
+    const arr = body[spec.payloadKey];
+    const isArr = Array.isArray(arr);
+    checks.push({
+      name: `GET ${ep} → "${spec.payloadKey}" is an array<${spec.itemLabel}>`,
+      ok: isArr,
+      message: isArr ? '' : `Property "${spec.payloadKey}" should be an array, got ${arr === undefined ? 'undefined' : typeof arr}`,
+    });
+    if (!isArr) return checks;
+    items = arr;
+
+    // Envelope hygiene: "problems" must be an array of Problem when present.
+    if (body.problems !== undefined) {
+      checks.push({
+        name: `GET ${ep} → "problems" (when present) is an array`,
+        ok: Array.isArray(body.problems),
+        message: Array.isArray(body.problems) ? '' : '"problems" must be an array of Problem objects',
+      });
+    }
+  }
+
+  checks.push({
+    name: `GET ${ep} → at least one ${spec.itemLabel} entry`,
+    ok: items.length > 0,
+    message: items.length > 0 ? '' : `Collection is empty — expected at least one ${spec.itemLabel}`,
+  });
+
+  const aggregate = (fields, predicate, label) => {
+    Object.entries(fields || {}).forEach(([field, type]) => {
+      const bad = [];
+      items.forEach((it, i) => { if (predicate(it, field, type)) bad.push(i); });
+      checks.push({
+        name: label(field, type),
+        ok: bad.length === 0,
+        message: bad.length === 0 ? '' : `Entries with issue on "${field}": index ${bad.join(', ')}`,
+      });
+    });
+  };
+
+  aggregate(spec.required, (it, f, t) => !isType(it, 'object') || it[f] == null || !isType(it[f], t),
+    (f, t) => `GET ${ep} → every ${spec.itemLabel} has required "${f}" (${t})`);
+  aggregate(spec.optional, (it, f, t) => isType(it, 'object') && it[f] != null && !isType(it[f], t),
+    (f, t) => `GET ${ep} → "${f}" (when present) is ${t}`);
+
+  Object.entries(spec.enums || {}).forEach(([field, allowed]) => {
+    const bad = [];
+    items.forEach((it, i) => { if (isType(it, 'object') && it[field] != null && !allowed.includes(it[field])) bad.push(i); });
+    checks.push({
+      name: `GET ${ep} → "${field}" (when present) is a known OSDM value`,
+      ok: bad.length === 0,
+      message: bad.length === 0 ? '' : `Entries with unknown "${field}": index ${bad.join(', ')}`,
+    });
+  });
+
+  return checks;
+}
+
+// ── Per-endpoint wrappers (OSDM System-Information collections) ──────────
+function validateReductionCards(body) {
+  return validateOsdmCollection(body, {
+    endpoint: '/reduction-cards',
+    payloadKey: 'reductionCardTypes',
+    itemLabel: 'ReductionCardType',
+    required: { code: 'string', issuer: 'object', name: 'object' },
+    optional: { shortCode: 'string', cardIdRequired: 'boolean' },
+  });
+}
+
+function validateZones(body) {
+  return validateOsdmCollection(body, {
+    endpoint: '/zones',
+    payloadKey: 'zones',
+    itemLabel: 'ZoneDefinition',
+    required: { id: 'string', carrier: 'object' },
+    optional: { name: 'string', nutsCodes: 'array' },
+  });
+}
+
+function validatePromotionCodes(body) {
+  return validateOsdmCollection(body, {
+    endpoint: '/promotion-codes',
+    payloadKey: 'promotionCodes',
+    itemLabel: 'PromotionCode',
+    required: { code: 'string' },
+    optional: { issuer: 'string' },
+  });
+}
+
+function validatePassengerCategories(body) {
+  return validateOsdmCollection(body, {
+    endpoint: '/passenger-categories',
+    payloadKey: null, // OSDM v3.8: GET /passenger-categories returns a bare array
+    itemLabel: 'PassengerCategory',
+    required: { title: 'object', specification: 'object' },
+    optional: { base: 'boolean', additional: 'boolean' },
+  });
+}
+
+// ── GET /product-tags → ProductTagsResponse (non-standard dual-array shape) ─
+// { productTagNames*: array<ProductTagName>, productTagGroups*: array<ProductTagGroup>,
+//   problems?: array<Problem> }
+function validateProductTags(body) {
+  const checks = [];
+  const ep = '/product-tags';
+  const isObj = isType(body, 'object');
+  checks.push({
+    name: `GET ${ep} → response is a ProductTagsResponse object`,
+    ok: isObj,
+    message: isObj ? '' : `Expected an object, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+  });
+  if (!isObj) return checks;
+
+  const names = body.productTagNames;
+  const namesArr = Array.isArray(names);
+  checks.push({
+    name: `GET ${ep} → required "productTagNames" is an array<ProductTagName>`,
+    ok: namesArr,
+    message: namesArr ? '' : '"productTagNames" must be an array',
+  });
+
+  const groups = body.productTagGroups;
+  const groupsArr = Array.isArray(groups);
+  checks.push({
+    name: `GET ${ep} → required "productTagGroups" is an array<ProductTagGroup>`,
+    ok: groupsArr,
+    message: groupsArr ? '' : '"productTagGroups" must be an array',
+  });
+
+  if (namesArr) {
+    const badTag = [];
+    const badDesc = [];
+    names.forEach((n, i) => {
+      if (!isType(n, 'object') || !isType(n.tag, 'string')) badTag.push(i);
+      if (!isType(n, 'object') || !isType(n.description, 'object')) badDesc.push(i);
+    });
+    checks.push({ name: `GET ${ep} → every productTagName has required "tag" (string)`, ok: badTag.length === 0, message: badTag.length === 0 ? '' : `index ${badTag.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagName has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+  }
+
+  if (groupsArr) {
+    const badCode = [];
+    const badDesc = [];
+    groups.forEach((g, i) => {
+      if (!isType(g, 'object') || !isType(g.code, 'string')) badCode.push(i);
+      if (!isType(g, 'object') || !isType(g.description, 'object')) badDesc.push(i);
+    });
+    checks.push({ name: `GET ${ep} → every productTagGroup has required "code" (string)`, ok: badCode.length === 0, message: badCode.length === 0 ? '' : `index ${badCode.join(', ')}` });
+    checks.push({ name: `GET ${ep} → every productTagGroup has required "description" (Text object)`, ok: badDesc.length === 0, message: badDesc.length === 0 ? '' : `index ${badDesc.join(', ')}` });
+  }
+
+  return checks;
+}
+
+module.exports = {
+  isType,
+  isDateTime,
+  validateApiVersions,
+  validateOsdmCollection,
+  validateReductionCards,
+  validateZones,
+  validatePromotionCodes,
+  validatePassengerCategories,
+  validateProductTags,
+};
 
 // Expose to globalThis for convenience inside the Bruno sandbox (collection
 // convention). The logged catch keeps lint/CodeQL happy about empty blocks.
