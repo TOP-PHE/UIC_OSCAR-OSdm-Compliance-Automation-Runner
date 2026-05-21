@@ -8,7 +8,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Build stage — installs app dependencies (with native compilation for bcrypt)
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:22-slim AS builder
+FROM node:26-slim AS builder
 
 # Build deps for bcrypt native compilation
 RUN apt-get update && \
@@ -36,7 +36,7 @@ RUN npm ci --omit=dev
 #   2. Shrink the runtime image by ~50 MB.
 # OSCAR never invokes npm at runtime — node_modules is already in place
 # (copied from the builder stage below).
-FROM node:22-slim
+FROM node:26-slim
 
 WORKDIR /app
 
