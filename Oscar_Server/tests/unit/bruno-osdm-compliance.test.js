@@ -23,6 +23,10 @@ const {
   validateProductTags,
   validateProducts,
   validateProduct,
+  validateCoachLayouts,
+  validateCoachDeckLayouts,
+  validateCoachLayout,
+  validateCoachDeckLayout,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
 
 describe('osdmCompliance.isType', () => {
@@ -248,5 +252,53 @@ describe('osdmCompliance Products (collection + single resource)', () => {
     const c = validateProduct(null);
     expect(find(c, 'resource object').ok).toBe(false);
     expect(c).toHaveLength(1);
+  });
+});
+
+describe('osdmCompliance Coach layouts (layouts vs deck variants)', () => {
+  const allOk = (c) => c.every((x) => x.ok);
+  const find = (c, s) => c.find((x) => x.name.includes(s));
+
+  test('validateCoachLayouts: valid CoachLayoutCollectionResponse passes', () => {
+    expect(allOk(validateCoachLayouts({ layouts: [{ id: 'L1', gridSize: { x: 10, y: 5 } }] }))).toBe(true);
+  });
+
+  test('validateCoachLayouts: missing gridSize fails', () => {
+    const c = validateCoachLayouts({ layouts: [{ id: 'L1' }] });
+    expect(find(c, 'required "gridSize"').ok).toBe(false);
+  });
+
+  test('validateCoachDeckLayouts: valid CoachDeckLayoutCollectionResponse passes', () => {
+    expect(allOk(validateCoachDeckLayouts({
+      coachDeckLayouts: [{ id: 'D1', name: 'Deck 1', dimension: { width: 4, height: 20 }, deckLevel: 'UPPER_DECK' }],
+    }))).toBe(true);
+  });
+
+  test('validateCoachDeckLayouts: payload key is "coachDeckLayouts", not "layouts"', () => {
+    const c = validateCoachDeckLayouts({ layouts: [{ id: 'D1', name: 'x', dimension: {}, deckLevel: 'UPPER_DECK' }] });
+    expect(find(c, '"coachDeckLayouts" is an array').ok).toBe(false);
+  });
+
+  test('validateCoachDeckLayouts: missing required name fails (deckLevel type-checked as string)', () => {
+    const c = validateCoachDeckLayouts({
+      coachDeckLayouts: [{ id: 'D1', dimension: { width: 1, height: 1 }, deckLevel: 'LOWER_DECK' }],
+    });
+    expect(find(c, 'required "name"').ok).toBe(false);
+  });
+
+  test('validateCoachLayout: single resource under "coachLayout"', () => {
+    expect(allOk(validateCoachLayout({ coachLayout: { id: 'L1', gridSize: { x: 1, y: 1 } } }))).toBe(true);
+    expect(find(validateCoachLayout({ warnings: {} }), '"coachLayout" is a CoachLayout object').ok).toBe(false);
+  });
+
+  test('validateCoachDeckLayout: single resource under "coachDeckLayout"', () => {
+    expect(allOk(validateCoachDeckLayout({
+      coachDeckLayout: { id: 'D1', name: 'Deck', dimension: { width: 1, height: 1 }, deckLevel: 'SINGLE_DECK' },
+    }))).toBe(true);
+  });
+
+  test('coach validators reflect the passed endpoint in check names', () => {
+    const c = validateCoachDeckLayouts({ coachDeckLayouts: [] }, '/coach-deck-layouts');
+    expect(c.some((x) => x.name.includes('/coach-deck-layouts'))).toBe(true);
   });
 });

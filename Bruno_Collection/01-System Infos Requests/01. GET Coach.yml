@@ -130,6 +130,18 @@ runtime:
           }
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): Coach(Deck)LayoutCollectionResponse ──
+          // Resource depends on the effective OSDM version: coach-deck-layouts
+          // (>=3.8) → CoachDeckLayout items under "coachDeckLayouts"; otherwise
+          // coach-layouts → CoachLayout items under "layouts".
+          const osdmCompliance = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          const coachChecks = (resource === 'coach-deck-layouts')
+            ? osdmCompliance.validateCoachDeckLayouts(body, endpoint)
+            : osdmCompliance.validateCoachLayouts(body, endpoint);
+          coachChecks.forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {

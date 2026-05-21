@@ -386,6 +386,63 @@ function validateProduct(body) {
   });
 }
 
+// ── Coach layouts: collection + single resource ─────────────────────────
+// The scenario picks the resource by effective OSDM version:
+//   >= 3.8 → /coach-deck-layouts  (CoachDeckLayoutCollectionResponse → coachDeckLayouts[]; item CoachDeckLayout)
+//   <  3.8 → /coach-layouts       (CoachLayoutCollectionResponse → layouts[];            item CoachLayout)
+// Both endpoints accept an optional `endpoint` arg so the check names reflect
+// the actual resource that was called. dimension/gridSize are objects;
+// deckLevel is an x-extensible-enum string (type-checked only).
+const COACH_LAYOUT_REQUIRED = { id: 'string', gridSize: 'object' };
+const COACH_LAYOUT_OPTIONAL = {
+  summary: 'string', places: 'array', signs: 'array',
+  internals: 'array', directedInternals: 'array', compartmentNumbers: 'array',
+};
+const COACH_DECK_REQUIRED = { id: 'string', name: 'string', dimension: 'object', deckLevel: 'string' };
+const COACH_DECK_OPTIONAL = {
+  lowFloorEntry: 'boolean', placeGroups: 'array', graphicElements: 'array', serviceIcons: 'array',
+};
+
+function validateCoachLayouts(body, endpoint) {
+  return validateOsdmCollection(body, {
+    endpoint: endpoint || '/coach-layouts',
+    payloadKey: 'layouts',
+    itemLabel: 'CoachLayout',
+    required: COACH_LAYOUT_REQUIRED,
+    optional: COACH_LAYOUT_OPTIONAL,
+  });
+}
+
+function validateCoachDeckLayouts(body, endpoint) {
+  return validateOsdmCollection(body, {
+    endpoint: endpoint || '/coach-deck-layouts',
+    payloadKey: 'coachDeckLayouts',
+    itemLabel: 'CoachDeckLayout',
+    required: COACH_DECK_REQUIRED,
+    optional: COACH_DECK_OPTIONAL,
+  });
+}
+
+function validateCoachLayout(body, endpoint) {
+  return validateOsdmResource(body, {
+    endpoint: endpoint || '/coach-layouts/{id}',
+    resourceKey: 'coachLayout',
+    itemLabel: 'CoachLayout',
+    required: COACH_LAYOUT_REQUIRED,
+    optional: COACH_LAYOUT_OPTIONAL,
+  });
+}
+
+function validateCoachDeckLayout(body, endpoint) {
+  return validateOsdmResource(body, {
+    endpoint: endpoint || '/coach-deck-layouts/{id}',
+    resourceKey: 'coachDeckLayout',
+    itemLabel: 'CoachDeckLayout',
+    required: COACH_DECK_REQUIRED,
+    optional: COACH_DECK_OPTIONAL,
+  });
+}
+
 module.exports = {
   isType,
   isDateTime,
@@ -399,6 +456,10 @@ module.exports = {
   validateProductTags,
   validateProducts,
   validateProduct,
+  validateCoachLayouts,
+  validateCoachDeckLayouts,
+  validateCoachLayout,
+  validateCoachDeckLayout,
 };
 
 // Expose to globalThis for convenience inside the Bruno sandbox (collection

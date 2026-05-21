@@ -104,6 +104,18 @@ runtime:
           });
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ID=${layoutId}`);
 
+          // ── OSDM compliance (Layer 1): Coach(Deck)LayoutResponse ──
+          // coach-deck-layouts/{id} (>=3.8) wraps a CoachDeckLayout under
+          // "coachDeckLayout"; coach-layouts/{id} wraps a CoachLayout under
+          // "coachLayout".
+          const osdmCompliance = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          const coachChecks = (resource === 'coach-deck-layouts')
+            ? osdmCompliance.validateCoachDeckLayout(body, endpoint)
+            : osdmCompliance.validateCoachLayout(body, endpoint);
+          coachChecks.forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {
