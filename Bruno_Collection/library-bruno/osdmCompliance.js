@@ -445,6 +445,65 @@ function validateCoachDeckLayout(body, endpoint) {
   });
 }
 
+// ── Place availability (/availabilities/place-map) — issue #104 ──────────
+// PlaceAvailabilityResponse: { warnings?, problems?[], vehicleAvailability? }.
+// vehicleAvailability (PlaceAvailability) wraps a REQUIRED "vehicle" (Vehicle)
+// plus optional reference + preSelections[]. The response is transaction-scoped
+// (needs an OFFER + RESERVATION context), so vehicleAvailability may be absent —
+// that is reported as a check, not crashed. This is a bespoke validator (not
+// validateOsdmResource) because the resource is nested under vehicleAvailability.
+function validatePlaceAvailability(body, endpoint) {
+  const ep = endpoint || '/availabilities/place-map';
+  const checks = [];
+
+  const isObj = isType(body, 'object');
+  checks.push({
+    name: `GET ${ep} → response is a PlaceAvailabilityResponse object`,
+    ok: isObj,
+    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+  });
+  if (!isObj) return checks;
+
+  const problemsOk = body.problems == null || isType(body.problems, 'array');
+  checks.push({
+    name: `GET ${ep} → "problems" (when present) is an array`,
+    ok: problemsOk,
+    message: problemsOk ? '' : 'Envelope "problems" must be an array when present',
+  });
+
+  const va = body.vehicleAvailability;
+  const vaPresent = va != null;
+  const vaOk = !vaPresent || isType(va, 'object');
+  checks.push({
+    name: `GET ${ep} → "vehicleAvailability" (when present) is a PlaceAvailability object`,
+    ok: vaOk,
+    message: vaOk ? '' : 'Expected "vehicleAvailability" to be an object',
+  });
+
+  if (vaPresent && vaOk) {
+    const vehicleOk = va.vehicle != null && isType(va.vehicle, 'object');
+    checks.push({
+      name: `GET ${ep} → PlaceAvailability has required "vehicle" (object)`,
+      ok: vehicleOk,
+      message: vehicleOk ? '' : 'Missing/invalid required "vehicle" in vehicleAvailability',
+    });
+    const refOk = va.reference == null || isType(va.reference, 'object');
+    checks.push({
+      name: `GET ${ep} → "reference" (when present) is an object`,
+      ok: refOk,
+      message: refOk ? '' : 'Wrong-typed "reference" (expected object)',
+    });
+    const psOk = va.preSelections == null || isType(va.preSelections, 'array');
+    checks.push({
+      name: `GET ${ep} → "preSelections" (when present) is an array`,
+      ok: psOk,
+      message: psOk ? '' : 'Wrong-typed "preSelections" (expected array)',
+    });
+  }
+
+  return checks;
+}
+
 // ── Shared System-Information response-status classification ─────────────
 // Pure classification of a System-Information GET response status, made
 // version-aware via the test-framework OSDM version (osdmVersion.js). Returns:
@@ -516,6 +575,7 @@ module.exports = {
   validateCoachDeckLayouts,
   validateCoachLayout,
   validateCoachDeckLayout,
+  validatePlaceAvailability,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 };
