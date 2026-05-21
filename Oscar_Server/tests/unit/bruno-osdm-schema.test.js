@@ -29,10 +29,19 @@ beforeEach(() => { store = {}; });
 describe('osdmSchemas bundle', () => {
   test('has all 5 versions and the expected per-version components', () => {
     expect(VERSIONS).toEqual(['3.4.0', '3.5.0', '3.6.0', '3.7.0', '3.8.0']);
-    expect(schemas['3.8.0'].Product).toBeDefined();
-    expect(schemas['3.4.0'].PassengerCategory).toBeUndefined(); // introduced 3.6
+    // Present in every version (component defined since 3.4):
+    VERSIONS.forEach((v) => {
+      expect(schemas[v].Product).toBeDefined();
+      expect(schemas[v].PromotionCode).toBeDefined();
+    });
+    // Components introduced later (presence in the spec's components, which is
+    // distinct from endpoint introduction):
+    expect(schemas['3.4.0'].ApiVersion).toBeUndefined();        // ApiVersion 3.6+
+    expect(schemas['3.6.0'].ApiVersion).toBeDefined();
+    expect(schemas['3.4.0'].CoachDeckLayout).toBeUndefined();   // CoachDeckLayout 3.5+
+    expect(schemas['3.5.0'].CoachDeckLayout).toBeDefined();
+    expect(schemas['3.4.0'].PassengerCategory).toBeUndefined(); // PassengerCategory 3.6+
     expect(schemas['3.8.0'].PassengerCategory).toBeDefined();
-    expect(schemas['3.4.0'].PromotionCode).toBeUndefined(); // introduced 3.8
   });
 
   test('depth-2 nesting captured (Product.serviceClass.{type,name})', () => {
