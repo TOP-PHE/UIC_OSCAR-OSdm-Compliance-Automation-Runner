@@ -304,16 +304,97 @@ function validateProductTags(body) {
   return checks;
 }
 
+// ── Generic OSDM single-resource validator ──────────────────────────────
+// For "get one" endpoints whose response wraps a single object under a key,
+// e.g. ProductResponse = { warnings, problems[], product }. Validates the
+// envelope, the wrapped object's presence/type, then its required/optional
+// fields. Extensible-enum fields (x-extensible-enum) are type-checked only,
+// never value-checked, since OSDM permits values beyond the published list.
+function validateOsdmResource(body, spec) {
+  const checks = [];
+  const ep = spec.endpoint;
+
+  const isObj = isType(body, 'object');
+  checks.push({
+    name: `GET ${ep} → response is a resource object`,
+    ok: isObj,
+    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+  });
+  if (!isObj) return checks;
+
+  const item = body[spec.resourceKey];
+  const itemOk = isType(item, 'object');
+  checks.push({
+    name: `GET ${ep} → "${spec.resourceKey}" is a ${spec.itemLabel} object`,
+    ok: itemOk,
+    message: itemOk ? '' : `Expected "${spec.resourceKey}" to be a ${spec.itemLabel} object (OSDM wraps the resource under "${spec.resourceKey}")`,
+  });
+  if (!itemOk) return checks;
+
+  Object.entries(spec.required || {}).forEach(([field, type]) => {
+    const ok = item[field] != null && isType(item[field], type);
+    checks.push({
+      name: `GET ${ep} → ${spec.itemLabel} has required "${field}" (${type})`,
+      ok,
+      message: ok ? '' : `Missing/invalid required "${field}"`,
+    });
+  });
+  Object.entries(spec.optional || {}).forEach(([field, type]) => {
+    const ok = item[field] == null || isType(item[field], type);
+    checks.push({
+      name: `GET ${ep} → "${field}" (when present) is ${type}`,
+      ok,
+      message: ok ? '' : `Wrong-typed "${field}" (expected ${type})`,
+    });
+  });
+
+  return checks;
+}
+
+// ── Products: collection (/products) + single resource (/products/{id}) ──
+// Product required: id, code, owner, flexibility. type / flexibility /
+// travelClass are x-extensible-enum strings → type-checked, not value-checked.
+const PRODUCT_REQUIRED = { id: 'string', code: 'string', owner: 'object', flexibility: 'string' };
+const PRODUCT_OPTIONAL = {
+  type: 'string', summary: 'string', description: 'string',
+  serviceClass: 'object', travelClass: 'string',
+  isTrainBound: 'boolean', isReturnProduct: 'boolean',
+  tariff: 'string', productTags: 'array',
+};
+
+function validateProducts(body) {
+  return validateOsdmCollection(body, {
+    endpoint: '/products',
+    payloadKey: 'products',
+    itemLabel: 'Product',
+    required: PRODUCT_REQUIRED,
+    optional: PRODUCT_OPTIONAL,
+  });
+}
+
+function validateProduct(body) {
+  return validateOsdmResource(body, {
+    endpoint: '/products/{productId}',
+    resourceKey: 'product',
+    itemLabel: 'Product',
+    required: PRODUCT_REQUIRED,
+    optional: PRODUCT_OPTIONAL,
+  });
+}
+
 module.exports = {
   isType,
   isDateTime,
   validateApiVersions,
   validateOsdmCollection,
+  validateOsdmResource,
   validateReductionCards,
   validateZones,
   validatePromotionCodes,
   validatePassengerCategories,
   validateProductTags,
+  validateProducts,
+  validateProduct,
 };
 
 // Expose to globalThis for convenience inside the Bruno sandbox (collection

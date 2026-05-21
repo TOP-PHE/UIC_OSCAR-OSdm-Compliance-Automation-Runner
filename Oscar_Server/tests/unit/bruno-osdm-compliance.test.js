@@ -15,11 +15,14 @@ const {
   isDateTime,
   validateApiVersions,
   validateOsdmCollection,
+  validateOsdmResource,
   validateReductionCards,
   validateZones,
   validatePromotionCodes,
   validatePassengerCategories,
   validateProductTags,
+  validateProducts,
+  validateProduct,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
 
 describe('osdmCompliance.isType', () => {
@@ -204,5 +207,46 @@ describe('osdmCompliance per-endpoint wrappers', () => {
     expect(find(validateProductTags({
       productTagNames: [{ description: {} }], productTagGroups: [],
     }), 'required "tag"').ok).toBe(false);
+  });
+});
+
+describe('osdmCompliance Products (collection + single resource)', () => {
+  const allOk = (c) => c.every((x) => x.ok);
+  const find = (c, s) => c.find((x) => x.name.includes(s));
+  const product = { id: 'p1', code: 'PASS', owner: { ref: 'XX' }, flexibility: 'FULL_FLEXIBLE' };
+
+  test('validateProducts: valid collection passes', () => {
+    expect(allOk(validateProducts({ products: [product] }))).toBe(true);
+  });
+
+  test('validateProducts: missing required flexibility fails and names index', () => {
+    const c = validateProducts({ products: [product, { id: 'p2', code: 'X', owner: {} }] });
+    expect(find(c, 'required "flexibility"').ok).toBe(false);
+    expect(find(c, 'required "flexibility"').message).toMatch(/index 1/);
+  });
+
+  test('validateProducts: extensible-enum "type" is type-checked only (unknown value OK)', () => {
+    expect(allOk(validateProducts({ products: [Object.assign({}, product, { type: 'SOME_FUTURE_TYPE' })] }))).toBe(true);
+    expect(find(validateProducts({ products: [Object.assign({}, product, { type: 123 })] }), '"type"').ok).toBe(false);
+  });
+
+  test('validateProduct: valid ProductResponse passes', () => {
+    expect(allOk(validateProduct({ product }))).toBe(true);
+  });
+
+  test('validateProduct: missing "product" wrapper fails', () => {
+    const c = validateProduct({ warnings: {}, problems: [] });
+    expect(find(c, '"product" is a Product object').ok).toBe(false);
+  });
+
+  test('validateProduct: product missing required code fails', () => {
+    const c = validateProduct({ product: { id: 'p1', owner: {}, flexibility: 'NON_FLEXIBLE' } });
+    expect(find(c, 'required "code"').ok).toBe(false);
+  });
+
+  test('validateProduct: non-object body short-circuits', () => {
+    const c = validateProduct(null);
+    expect(find(c, 'resource object').ok).toBe(false);
+    expect(c).toHaveLength(1);
   });
 });
