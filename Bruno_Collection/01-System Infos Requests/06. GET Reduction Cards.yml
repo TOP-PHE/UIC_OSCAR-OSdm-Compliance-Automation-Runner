@@ -41,6 +41,14 @@ runtime:
           });
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): ReductionCardCollectionResponse ──
+          // Envelope object → "reductionCardTypes" array; every entry has
+          // required code (string), issuer (CompanyRef object), name (Text object).
+          const { validateReductionCards } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          validateReductionCards(body).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {

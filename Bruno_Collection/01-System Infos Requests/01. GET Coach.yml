@@ -19,35 +19,12 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        const DEFAULT_LATEST_VERSION = '3.9.0';
-
-        function parseVersion(v) {
-          if (v == null) return null;
-          const m = String(v).trim().match(/(\d+)\.(\d+)(?:\.(\d+))?/);
-          if (!m) return null;
-          return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3] || 0) };
-        }
-
-        function score(v) {
-          return (v.major * 1000000) + (v.minor * 1000) + v.patch;
-        }
-
-        function pickLatestFromList(raw) {
-          if (!raw) return null;
-          return String(raw)
-            .split(',')
-            .map(s => parseVersion(s))
-            .filter(Boolean)
-            .sort((a, b) => score(b) - score(a))[0] || null;
-        }
-
-        const apiVersion = parseVersion(bru.getEnvVar('apiVersion'));
-        const apiVersionFromVersions = pickLatestFromList(bru.getEnvVar('apiVersionsAvailable'));
-        const scenarioVersion = parseVersion(bru.getEnvVar('osdmVersion'));
-        const effective = apiVersion || apiVersionFromVersions || scenarioVersion || parseVersion(DEFAULT_LATEST_VERSION);
-
-        const isCoachDeck = score(effective) >= score({ major: 3, minor: 8, patch: 0 });
-        bru.setVar('coachLayoutsResource', isCoachDeck ? 'coach-deck-layouts' : 'coach-layouts');
+        // Endpoint selection by the NEGOTIATED OSDM version (>= 3.8 → the
+        // coach-deck-layouts resource, else legacy coach-layouts). Version
+        // resolution is centralised in osdmVersion.js (issue #105). NB this is
+        // the negotiated/effective version, NOT the compliance version.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        bru.setVar('coachLayoutsResource', atLeast(resolveEffectiveVersion(), '3.8.0') ? 'coach-deck-layouts' : 'coach-layouts');
 
     - type: after-response
       code: |-
@@ -129,6 +106,18 @@ runtime:
             bru.setEnvVar('coachListCandidateIds', JSON.stringify(coachIds));
           }
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+
+          // ── OSDM compliance (Layer 1): Coach(Deck)LayoutCollectionResponse ──
+          // Resource depends on the effective OSDM version: coach-deck-layouts
+          // (>=3.8) → CoachDeckLayout items under "coachDeckLayouts"; otherwise
+          // coach-layouts → CoachLayout items under "layouts".
+          const osdmCompliance = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          const coachChecks = (resource === 'coach-deck-layouts')
+            ? osdmCompliance.validateCoachDeckLayouts(body, endpoint)
+            : osdmCompliance.validateCoachLayouts(body, endpoint);
+          coachChecks.forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
 
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
