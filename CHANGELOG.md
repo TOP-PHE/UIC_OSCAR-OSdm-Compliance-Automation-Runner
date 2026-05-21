@@ -14,6 +14,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.25] — 2026-05-21
+
+Optional sale-flow features — Tier-1 test-system config (issue #107). Declares
+seat-selection capability in the Test Framework and constrains what a scenario
+may select. Foundation for #104 (place maps in the sale flow) and #108
+(ancillaries). Behaviour-neutral at runtime: the new flags are not consumed by
+any request yet.
+
+### Added
+- **Test Framework — Seat Selection capability** (`public/js/scenarios.js`,
+  `emptyFramework()`): a "Seat map" toggle + a "supported modes" menu
+  (`SEATMAP_AT_OFFER` / `ADD_TO_BOOKING`) under a new framework section, with
+  plain-language helper text. Persists as `framework.placeSelection
+  { seatMap, supportedModes }`.
+- **Scenario authoring constraint (Gate 0 → Gate 1)**: the "Booking Flow
+  Actions" pills are now gated by the framework — "Place selection" requires a
+  reservation ticket type + seat map; "Add/Delete ancillary" require at least
+  one declared ancillary. Unsupported actions render disabled with the reason.
+- **Per-scenario seat-selection mode picker** (`placeSelectionMode`), limited to
+  the framework's supported modes; written into the generated data file and
+  validated by `json_validator/datafile.schema.json` (also adds
+  `salesFlowActions`).
+- **`scenarioParser.resolveSalesFlowActions()`** (tested) centralises the
+  booking-flow-action defaults.
+
+### Changed
+- **Honest baseline**: the optional booking-flow actions (`placeSelection`,
+  `addAncillary`, `deleteAncillary`) now default **OFF** in the runner; existing
+  scenarios no longer claim to exercise unimplemented steps. `patchPassengers`
+  (the only flag consumed today) and `getBooking` keep their historic default
+  (ON), so behaviour is unchanged.
+- `scenarioParser` reads `placeSelectionMode`; the var is added to the reset
+  lists in `scenarioParser.js` and `opencollection.yml`.
+
+### Operator action
+None. Server change picked up after Watchtower promotes :stable (hard-refresh
+the Test Config page to see the new Seat Selection section). Bruno collection
+refreshes via the refresh-collection workflow on merge.
+
+---
+
 ## [server-v1.11.24] — 2026-05-20
 
 Audit P2 (issue #86) — dead-code cleanup (unused vars / imports).
