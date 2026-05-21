@@ -176,12 +176,10 @@ function validateOsdmCollection(body, spec) {
     }
   }
 
-  checks.push({
-    name: `GET ${ep} → at least one ${spec.itemLabel} entry`,
-    ok: items.length > 0,
-    message: items.length > 0 ? '' : `Collection is empty — expected at least one ${spec.itemLabel}`,
-  });
-
+  // NOTE: an empty collection is OSDM-valid (a vendor may legitimately have no
+  // reduction cards, zones, promotion codes, etc.), so there is deliberately NO
+  // "at least one entry" compliance rule here. Data-presence/liveness remains a
+  // separate scenario-level check.
   const aggregate = (fields, predicate, label) => {
     Object.entries(fields || {}).forEach(([field, type]) => {
       const bad = [];

@@ -173,8 +173,10 @@ describe('osdmCompliance.validateOsdmCollection (generic engine)', () => {
     expect(find(c, '"problems"').ok).toBe(false);
   });
 
-  test('empty collection fails the "at least one" rule', () => {
-    expect(find(validateOsdmCollection({ things: [] }, spec), 'at least one').ok).toBe(false);
+  test('empty collection is valid — no "at least one" rule (OSDM permits empty)', () => {
+    const c = validateOsdmCollection({ things: [] }, spec);
+    expect(find(c, 'at least one')).toBeUndefined();
+    expect(c.every((x) => x.ok)).toBe(true);
   });
 
   test('enum membership enforced when present', () => {
