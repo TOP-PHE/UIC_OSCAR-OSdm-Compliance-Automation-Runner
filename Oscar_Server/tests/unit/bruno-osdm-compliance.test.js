@@ -171,6 +171,40 @@ describe('osdmCompliance.validateOsdmCollection (generic engine)', () => {
   });
 });
 
+describe('osdmCompliance.validateOsdmResource (generic single-resource engine)', () => {
+  const spec = {
+    endpoint: '/thing/{id}', resourceKey: 'thing', itemLabel: 'Thing',
+    required: { id: 'string' }, optional: { n: 'number' },
+  };
+  const allOk = (c) => c.every((x) => x.ok);
+  const find = (c, s) => c.find((x) => x.name.includes(s));
+
+  test('valid wrapped resource passes', () => {
+    expect(allOk(validateOsdmResource({ thing: { id: 'a', n: 1 } }, spec))).toBe(true);
+  });
+
+  test('non-object body short-circuits', () => {
+    const c = validateOsdmResource(null, spec);
+    expect(find(c, 'resource object').ok).toBe(false);
+    expect(c).toHaveLength(1);
+  });
+
+  test('missing wrapper key fails', () => {
+    const c = validateOsdmResource({ other: {} }, spec);
+    expect(find(c, '"thing" is a Thing object').ok).toBe(false);
+  });
+
+  test('missing required field is rejected', () => {
+    const c = validateOsdmResource({ thing: { n: 1 } }, spec);
+    expect(find(c, 'required "id"').ok).toBe(false);
+  });
+
+  test('wrong-typed optional is rejected', () => {
+    const c = validateOsdmResource({ thing: { id: 'a', n: 'no' } }, spec);
+    expect(find(c, '"n" (when present)').ok).toBe(false);
+  });
+});
+
 describe('osdmCompliance per-endpoint wrappers', () => {
   const allOk = (c) => c.every((x) => x.ok);
   const find = (c, s) => c.find((x) => x.name.includes(s));
