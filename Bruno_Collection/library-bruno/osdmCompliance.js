@@ -29,6 +29,10 @@ http://www.apache.org/licenses/LICENSE-2.0
  * version-matched OSDM spec is applied separately as "Layer 2".
  */
 
+// Version-applicability helpers (osdmVersion.js) — used by the shared
+// System-Information status classifier below.
+const { getComplianceVersion, endpointMinVersion, isEndpointApplicable } = require('./osdmVersion.js');
+
 // ── Primitive JSON-Schema-style type check ──────────────────────────────
 function isType(value, type) {
   switch (type) {
@@ -172,12 +176,10 @@ function validateOsdmCollection(body, spec) {
     }
   }
 
-  checks.push({
-    name: `GET ${ep} → at least one ${spec.itemLabel} entry`,
-    ok: items.length > 0,
-    message: items.length > 0 ? '' : `Collection is empty — expected at least one ${spec.itemLabel}`,
-  });
-
+  // NOTE: an empty collection is OSDM-valid (a vendor may legitimately have no
+  // reduction cards, zones, promotion codes, etc.), so there is deliberately NO
+  // "at least one entry" compliance rule here. Data-presence/liveness remains a
+  // separate scenario-level check.
   const aggregate = (fields, predicate, label) => {
     Object.entries(fields || {}).forEach(([field, type]) => {
       const bad = [];
@@ -443,6 +445,60 @@ function validateCoachDeckLayout(body, endpoint) {
   });
 }
 
+// ── Shared System-Information response-status classification ─────────────
+// Pure classification of a System-Information GET response status, made
+// version-aware via the test-framework OSDM version (osdmVersion.js). Returns:
+//   { outcome: 'ok'  }                       → 200; caller proceeds to body+compliance
+//   { outcome: 'skip', log }                 → 404 on an endpoint not yet part of the
+//                                              declared OSDM version → out of scope
+//                                              (INFO log only; not pass nor fail)
+//   { outcome: 'fail', name, message, log }  → auth / not-found(when expected) / server
+//   { outcome: 'ok',   name }                → name carries the "200 OK" assertion label
+function classifySystemInfoStatus(statusCode, endpoint) {
+  if (statusCode === 200) {
+    return { outcome: 'ok', name: `GET ${endpoint} → 200 OK` };
+  }
+  if (statusCode === 404 && !isEndpointApplicable(endpoint)) {
+    return {
+      outcome: 'skip',
+      log: `[INFO] GET ${endpoint} → 404 — endpoint introduced in OSDM ${endpointMinVersion(endpoint)}; test-framework version is ${getComplianceVersion()} → out of scope (skipped)`,
+    };
+  }
+  if (statusCode === 401) {
+    return { outcome: 'fail', name: `GET ${endpoint} → 401 Unauthorized (FAIL)`, message: 'Expected 200, got 401 Unauthorized — check access token', log: `[ERROR] GET ${endpoint} → 401 Unauthorized — check access token` };
+  }
+  if (statusCode === 403) {
+    return { outcome: 'fail', name: `GET ${endpoint} → 403 Forbidden (FAIL)`, message: 'Expected 200, got 403 Forbidden — insufficient permissions', log: `[ERROR] GET ${endpoint} → 403 Forbidden — insufficient permissions` };
+  }
+  if (statusCode === 404) {
+    return { outcome: 'fail', name: `GET ${endpoint} → 404 Not Found (FAIL)`, message: `Expected 200, got 404 — endpoint expected in OSDM ${getComplianceVersion()} but not implemented by this vendor`, log: `[ERROR] GET ${endpoint} → 404 Not Found — endpoint not implemented by this vendor` };
+  }
+  if (statusCode >= 500) {
+    return { outcome: 'fail', name: `GET ${endpoint} → ${statusCode} Server Error (FAIL)`, message: `Expected 200, got ${statusCode} server error`, log: `[ERROR] GET ${endpoint} → ${statusCode} Server Error` };
+  }
+  return { outcome: 'fail', name: `GET ${endpoint} → unexpected status ${statusCode}`, message: `Unexpected status ${statusCode}, expected 200`, log: `[WARNING] GET ${endpoint} → unexpected status ${statusCode}` };
+}
+
+// Apply the status classification to the Bruno report. Pass the scenario's
+// { bruTest, validationLogger }. Returns true iff the status is 200 (caller
+// then runs its body + compliance checks); false otherwise (caller returns).
+// Out-of-version endpoints are logged as skipped — no pass/fail registered.
+function handleSystemInfoStatus(statusCode, endpoint, ctx) {
+  const bruTest = ctx && ctx.bruTest;
+  const validationLogger = ctx && ctx.validationLogger;
+  const cls = classifySystemInfoStatus(statusCode, endpoint);
+  if (cls.log && validationLogger) validationLogger(cls.log);
+  if (cls.outcome === 'ok') {
+    if (bruTest) bruTest(cls.name, () => { expect(statusCode).to.eql(200); });
+    return true;
+  }
+  if (cls.outcome === 'fail' && bruTest) {
+    bruTest(cls.name, () => { expect(statusCode, cls.message).to.eql(200); });
+  }
+  // 'skip' → INFO log only, no bruTest (not counted as pass or fail)
+  return false;
+}
+
 module.exports = {
   isType,
   isDateTime,
@@ -460,6 +516,8 @@ module.exports = {
   validateCoachDeckLayouts,
   validateCoachLayout,
   validateCoachDeckLayout,
+  classifySystemInfoStatus,
+  handleSystemInfoStatus,
 };
 
 // Expose to globalThis for convenience inside the Bruno sandbox (collection

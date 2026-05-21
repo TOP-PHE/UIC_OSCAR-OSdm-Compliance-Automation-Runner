@@ -26,6 +26,8 @@ const {
   pickLatestFromList,
   getComplianceVersion,
   resolveEffectiveVersion,
+  endpointMinVersion,
+  isEndpointApplicable,
 } = require('../../../Bruno_Collection/library-bruno/osdmVersion.js');
 
 beforeEach(() => { store = {}; });
@@ -113,5 +115,31 @@ describe('resolveEffectiveVersion (endpoint negotiation)', () => {
     store = {};
     store.apiVersionsAvailable = '3.8.0';
     expect(atLeast(resolveEffectiveVersion(), '3.8.0')).toBe(true); // → coach-deck-layouts
+  });
+});
+
+describe('osdmVersion endpoint applicability (introduction version)', () => {
+  test('endpointMinVersion returns the intro version, or null when always present', () => {
+    expect(endpointMinVersion('/promotion-codes')).toBe('3.8.0');
+    expect(endpointMinVersion('/versions')).toBe('3.6.0');
+    expect(endpointMinVersion('/product-tags')).toBe('3.5.0');
+    expect(endpointMinVersion('/products')).toBeNull(); // present since >= 3.4
+    expect(endpointMinVersion('/reduction-cards')).toBeNull();
+  });
+
+  test('isEndpointApplicable uses the test-framework (compliance) version', () => {
+    store.osdmVersion = '3.5';
+    expect(isEndpointApplicable('/promotion-codes')).toBe(false); // 3.8 endpoint
+    expect(isEndpointApplicable('/versions')).toBe(false);        // 3.6 endpoint
+    expect(isEndpointApplicable('/passenger-categories')).toBe(false); // 3.6 endpoint
+    expect(isEndpointApplicable('/product-tags')).toBe(true);     // 3.5 endpoint
+    expect(isEndpointApplicable('/products')).toBe(true);         // always present
+    store.osdmVersion = '3.8';
+    expect(isEndpointApplicable('/promotion-codes')).toBe(true);
+  });
+
+  test('explicit version argument overrides the env', () => {
+    expect(isEndpointApplicable('/promotion-codes', '3.8.0')).toBe(true);
+    expect(isEndpointApplicable('/promotion-codes', '3.7.0')).toBe(false);
   });
 });

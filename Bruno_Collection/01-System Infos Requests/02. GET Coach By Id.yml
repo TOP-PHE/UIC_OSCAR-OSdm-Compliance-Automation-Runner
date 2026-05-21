@@ -93,6 +93,14 @@ runtime:
             bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
           });
 
+          // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+          const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+          const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
+          const coachItem = (resource === 'coach-deck-layouts') ? body.coachDeckLayout : body.coachLayout;
+          validateSchema(coachComponent, coachItem, { endpoint }).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {

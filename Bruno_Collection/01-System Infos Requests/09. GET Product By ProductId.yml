@@ -80,6 +80,12 @@ runtime:
             bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
           });
 
+          // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+          const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+          validateSchema('Product', body.product, { endpoint }).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
           bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {

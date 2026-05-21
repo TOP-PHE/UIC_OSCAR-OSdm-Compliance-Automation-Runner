@@ -21,61 +21,37 @@ runtime:
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { handleSystemInfoStatus, validateProductTags } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
         const endpoint = '/product-tags';
-        const statusCode = res.getStatus();
+        // Shared, version-aware status handling (product-tags is 3.5+ → a 404
+        // below 3.5 is reported as out of scope, not a failure).
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger })) return;
 
-        if (statusCode === 200) {
-          bruTest(`GET ${endpoint} -> 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-          let body;
-          try { body = res.getBody(); } catch (_e) {}
-          const bodyNotEmpty = Array.isArray(body)
-            ? body.length > 0
-            : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
-          bruTest(`GET ${endpoint} response body is present and not empty`, () => {
-            expect(body, 'Response body should not be null/undefined').to.exist;
-            expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
-          });
-          validationLogger(`[INFO] GET ${endpoint} -> 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+        const bodyNotEmpty = Array.isArray(body)
+          ? body.length > 0
+          : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
+        bruTest(`GET ${endpoint} response body is present and not empty`, () => {
+          expect(body, 'Response body should not be null/undefined').to.exist;
+          expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
+        });
+        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
-          // ── OSDM compliance (Layer 1): ProductTagsResponse ──
-          // Non-standard dual-array shape: required productTagNames[] (each with
-          // tag string + description Text object) and productTagGroups[] (each
-          // with code string + description Text object).
-          const { validateProductTags } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
-          validateProductTags(body).forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
-          });
+        // ── OSDM compliance (Layer 1): ProductTagsResponse ──
+        // Non-standard dual-array shape: required productTagNames[] (each with
+        // tag string + description Text object) and productTagGroups[] (each
+        // with code string + description Text object).
+        validateProductTags(body).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
 
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
-          bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 403 Forbidden - insufficient permissions`);
-          bruTest(`GET ${endpoint} -> 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 404 Not Found - endpoint not implemented by this vendor`);
-          bruTest(`GET ${endpoint} -> 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404 - endpoint not supported').to.eql(200);
-          });
-
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET ${endpoint} -> ${statusCode} Server Error`);
-          bruTest(`GET ${endpoint} -> ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-
-        } else {
-          validationLogger(`[WARNING] GET ${endpoint} -> unexpected status ${statusCode}`);
-          bruTest(`GET ${endpoint} -> unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
-        }
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('ProductTagName', body.productTagNames, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+        validateSchema('ProductTagGroup', body.productTagGroups, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });

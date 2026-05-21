@@ -766,7 +766,7 @@ h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
 <div class="legend">
   <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
   plus two global OSDM compliance checks on every response:
-  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Content-Type is JSON</b> — every non-empty response must be JSON (application/json or a +json media type, e.g. application/vnd.uic.osdm+json) &nbsp;|&nbsp;
   <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
   <div class="color-legend">
     <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>
