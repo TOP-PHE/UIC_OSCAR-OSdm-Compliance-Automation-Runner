@@ -118,6 +118,37 @@ function resolveEffectiveVersion() {
     || parseVersion(DEFAULT_OSDM_VERSION);
 }
 
+// ── System-Information endpoint applicability by OSDM version ───────────
+// Minimum OSDM version that INTRODUCED each System-Information endpoint,
+// derived from the published specs (v3.4–v3.8). Endpoints not listed have
+// existed since at least 3.4. Used to decide, per the test-framework version,
+// whether an endpoint is in scope: a 404 on an endpoint that did not yet exist
+// in the declared version is "out of scope", not a compliance failure.
+//   /coach-deck-layouts, /product-tags → 3.5
+//   /versions, /passenger-categories   → 3.6
+//   /promotion-codes                   → 3.8
+const ENDPOINT_MIN_VERSION = {
+  '/versions': '3.6.0',
+  '/coach-deck-layouts': '3.5.0',
+  '/passenger-categories': '3.6.0',
+  '/promotion-codes': '3.8.0',
+  '/product-tags': '3.5.0',
+};
+
+function endpointMinVersion(endpoint) {
+  return Object.prototype.hasOwnProperty.call(ENDPOINT_MIN_VERSION, endpoint)
+    ? ENDPOINT_MIN_VERSION[endpoint]
+    : null;
+}
+
+// Is this endpoint part of the OSDM version the test framework declares?
+// `version` defaults to getComplianceVersion() (the test-framework truth).
+function isEndpointApplicable(endpoint, version) {
+  const min = endpointMinVersion(endpoint);
+  if (!min) return true; // present since >= 3.4
+  return atLeast(version || getComplianceVersion(), min);
+}
+
 module.exports = {
   DEFAULT_OSDM_VERSION,
   parseVersion,
@@ -127,6 +158,9 @@ module.exports = {
   pickLatestFromList,
   getComplianceVersion,
   resolveEffectiveVersion,
+  ENDPOINT_MIN_VERSION,
+  endpointMinVersion,
+  isEndpointApplicable,
 };
 
 // Expose to globalThis for convenience inside the Bruno sandbox (collection
