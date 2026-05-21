@@ -125,7 +125,7 @@ function validateApiVersions(body) {
 //   endpoint:   '/zones',          // for human-readable check names
 //   payloadKey: 'zones' | null,    // array property name; null = body IS the array
 //   itemLabel:  'ZoneDefinition',
-//   required:   { id: 'string', carrier: 'object' },  // present (non-null) + typed
+//   required:   { id: 'string', carrier: 'string' },  // present (non-null) + typed
 //   optional:   { name: 'string' },                   // typed only when present
 //   enums:      { field: ['A', 'B'] },                // membership only when present
 // }
@@ -214,7 +214,8 @@ function validateReductionCards(body) {
     endpoint: '/reduction-cards',
     payloadKey: 'reductionCardTypes',
     itemLabel: 'ReductionCardType',
-    required: { code: 'string', issuer: 'object', name: 'object' },
+    // issuer is a CompanyRef (string URN); name is a Text object.
+    required: { code: 'string', issuer: 'string', name: 'object' },
     optional: { shortCode: 'string', cardIdRequired: 'boolean' },
   });
 }
@@ -224,7 +225,8 @@ function validateZones(body) {
     endpoint: '/zones',
     payloadKey: 'zones',
     itemLabel: 'ZoneDefinition',
-    required: { id: 'string', carrier: 'object' },
+    // carrier is a CompanyRef (string URN), not an object.
+    required: { id: 'string', carrier: 'string' },
     optional: { name: 'string', nutsCodes: 'array' },
   });
 }
@@ -354,7 +356,9 @@ function validateOsdmResource(body, spec) {
 // ── Products: collection (/products) + single resource (/products/{id}) ──
 // Product required: id, code, owner, flexibility. type / flexibility /
 // travelClass are x-extensible-enum strings → type-checked, not value-checked.
-const PRODUCT_REQUIRED = { id: 'string', code: 'string', owner: 'object', flexibility: 'string' };
+// NB: owner is a CompanyRef, which OSDM defines as a STRING (a RICS/ERA
+// company-code URN, e.g. "urn:uic:rics:1185:000011") — not an object.
+const PRODUCT_REQUIRED = { id: 'string', code: 'string', owner: 'string', flexibility: 'string' };
 const PRODUCT_OPTIONAL = {
   type: 'string', summary: 'string', description: 'string',
   serviceClass: 'object', travelClass: 'string',

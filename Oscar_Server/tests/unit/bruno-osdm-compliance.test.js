@@ -173,15 +173,15 @@ describe('osdmCompliance per-endpoint wrappers', () => {
 
   test('validateReductionCards: valid passes; missing issuer fails', () => {
     expect(allOk(validateReductionCards({
-      reductionCardTypes: [{ code: 'BC', issuer: { ref: 'X' }, name: { id: 't', text: 'BahnCard' } }],
+      reductionCardTypes: [{ code: 'BC', issuer: 'urn:uic:rics:0080:000001', name: { id: 't', text: 'BahnCard' } }],
     }))).toBe(true);
     const c = validateReductionCards({ reductionCardTypes: [{ code: 'BC', name: { id: 't', text: 'x' } }] });
     expect(find(c, 'required "issuer"').ok).toBe(false);
   });
 
   test('validateZones: requires id + carrier', () => {
-    expect(allOk(validateZones({ zones: [{ id: 'z1', carrier: { ref: 'X' } }] }))).toBe(true);
-    expect(find(validateZones({ zones: [{ carrier: {} }] }), 'required "id"').ok).toBe(false);
+    expect(allOk(validateZones({ zones: [{ id: 'z1', carrier: 'urn:uic:rics:1185:000011' }] }))).toBe(true);
+    expect(find(validateZones({ zones: [{ carrier: 'urn:x' }] }), 'required "id"').ok).toBe(false);
   });
 
   test('validatePromotionCodes: requires code', () => {
@@ -213,14 +213,14 @@ describe('osdmCompliance per-endpoint wrappers', () => {
 describe('osdmCompliance Products (collection + single resource)', () => {
   const allOk = (c) => c.every((x) => x.ok);
   const find = (c, s) => c.find((x) => x.name.includes(s));
-  const product = { id: 'p1', code: 'PASS', owner: { ref: 'XX' }, flexibility: 'FULL_FLEXIBLE' };
+  const product = { id: 'p1', code: 'PASS', owner: 'urn:uic:rics:1185:000011', flexibility: 'FULL_FLEXIBLE' };
 
   test('validateProducts: valid collection passes', () => {
     expect(allOk(validateProducts({ products: [product] }))).toBe(true);
   });
 
   test('validateProducts: missing required flexibility fails and names index', () => {
-    const c = validateProducts({ products: [product, { id: 'p2', code: 'X', owner: {} }] });
+    const c = validateProducts({ products: [product, { id: 'p2', code: 'X', owner: 'urn:x' }] });
     expect(find(c, 'required "flexibility"').ok).toBe(false);
     expect(find(c, 'required "flexibility"').message).toMatch(/index 1/);
   });
