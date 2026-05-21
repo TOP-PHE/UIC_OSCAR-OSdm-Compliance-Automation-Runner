@@ -54,6 +54,12 @@ runtime:
           });
         });
 
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('ApiVersion', versionsData, { endpoint: '/versions' }).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
         // Extract API versions from response
         const apiVersions = versionsData && versionsData.length > 0 
           ? versionsData.map(v => v.version || v.major + "." + v.minor + "." + (v.patch || "0")).join(", ")

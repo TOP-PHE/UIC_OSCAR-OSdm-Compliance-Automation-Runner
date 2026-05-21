@@ -115,3 +115,11 @@ runtime:
         coachChecks.forEach((c) => {
           bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
         });
+
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
+        const coachItems = (resource === 'coach-deck-layouts') ? body.coachDeckLayouts : body.layouts;
+        validateSchema(coachComponent, coachItems, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });

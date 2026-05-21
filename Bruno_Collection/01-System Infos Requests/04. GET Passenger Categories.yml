@@ -45,3 +45,9 @@ runtime:
         validatePassengerCategories(body).forEach((c) => {
           bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
         });
+
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('PassengerCategory', body, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
