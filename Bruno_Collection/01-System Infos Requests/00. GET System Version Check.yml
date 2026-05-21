@@ -20,53 +20,14 @@ runtime:
     - type: after-response
       code: |-
         // Import library functions
-        const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { handleSystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
-        // Handle and validate HTTP response status
-        // Handle and validate HTTP response status
-        const statusCode = res.getStatus();
-        // ── Status code classification ────────────────────────────────────
-        // 200: pass + continue to body/version validation
-        // 401/403: auth failure (FAIL, stop further checks)
-        // 404: endpoint not implemented by this vendor (FAIL, stop further checks)
-        // 5xx: server error (FAIL, stop further checks)
-        // other: unexpected (FAIL, stop further checks)
-        if (statusCode === 200) {
-          bruTest(`GET /versions → 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET /versions → 401 Unauthorized — check access token`);
-          bruTest(`GET /versions → 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-          return;
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET /versions → 403 Forbidden — insufficient permissions`);
-          bruTest(`GET /versions → 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-          return;
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET /versions → 404 Not Found — endpoint not implemented by this vendor`);
-          bruTest(`GET /versions → 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404 — /versions endpoint not supported').to.eql(200);
-          });
-          return;
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET /versions → ${statusCode} Server Error`);
-          bruTest(`GET /versions → ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-          return;
-        } else {
-          validationLogger(`[WARNING] GET /versions → unexpected status ${statusCode}`);
-          bruTest(`GET /versions → unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
-          return;
-        }
+        // Shared, version-aware status handling. /versions is an OSDM 3.6+
+        // endpoint — a 404 when the test-framework version is below 3.6 is
+        // reported as out of scope (skipped), not a failure.
+        if (!handleSystemInfoStatus(res.getStatus(), '/versions', { bruTest, validationLogger })) return;
 
         // Parse JSON response safely
         let versionsData;
