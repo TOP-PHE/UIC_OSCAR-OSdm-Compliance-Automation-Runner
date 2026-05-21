@@ -8,7 +8,16 @@
  * cleanly and pull only themselves into coverage — they cannot endanger the CI
  * global coverage gate. Added for the OSDM compliance-assertion initiative,
  * increment 1: GET /versions → array<ApiVersion>.
+ *
+ * Most helpers are pure; the version-aware status classifier reads the OSDM
+ * version via `bru`, mocked here before require (harness pattern).
  */
+
+let store = {};
+global.bru = {
+  getEnvVar: (k) => (Object.prototype.hasOwnProperty.call(store, k) ? store[k] : undefined),
+  setEnvVar: (k, v) => { store[k] = v; },
+};
 
 const {
   isType,
@@ -27,7 +36,11 @@ const {
   validateCoachDeckLayouts,
   validateCoachLayout,
   validateCoachDeckLayout,
+  classifySystemInfoStatus,
+  handleSystemInfoStatus,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
+
+beforeEach(() => { store = {}; });
 
 describe('osdmCompliance.isType', () => {
   test('classifies primitives the JSON-Schema way', () => {
@@ -160,8 +173,10 @@ describe('osdmCompliance.validateOsdmCollection (generic engine)', () => {
     expect(find(c, '"problems"').ok).toBe(false);
   });
 
-  test('empty collection fails the "at least one" rule', () => {
-    expect(find(validateOsdmCollection({ things: [] }, spec), 'at least one').ok).toBe(false);
+  test('empty collection is valid — no "at least one" rule (OSDM permits empty)', () => {
+    const c = validateOsdmCollection({ things: [] }, spec);
+    expect(find(c, 'at least one')).toBeUndefined();
+    expect(c.every((x) => x.ok)).toBe(true);
   });
 
   test('enum membership enforced when present', () => {
@@ -334,5 +349,74 @@ describe('osdmCompliance Coach layouts (layouts vs deck variants)', () => {
   test('coach validators reflect the passed endpoint in check names', () => {
     const c = validateCoachDeckLayouts({ coachDeckLayouts: [] }, '/coach-deck-layouts');
     expect(c.some((x) => x.name.includes('/coach-deck-layouts'))).toBe(true);
+  });
+});
+
+describe('osdmCompliance.classifySystemInfoStatus (version-aware status)', () => {
+  test('200 → ok', () => {
+    expect(classifySystemInfoStatus(200, '/products').outcome).toBe('ok');
+  });
+
+  test('404 on an endpoint not yet in the declared version → skip + INFO log', () => {
+    store.osdmVersion = '3.5';
+    const c = classifySystemInfoStatus(404, '/promotion-codes'); // introduced 3.8
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/out of scope/);
+    expect(c.log).toMatch(/3\.8\.0/);
+  });
+
+  test('404 on an in-version endpoint → fail', () => {
+    store.osdmVersion = '3.8';
+    expect(classifySystemInfoStatus(404, '/promotion-codes').outcome).toBe('fail');
+  });
+
+  test('404 on an always-present endpoint → fail regardless of version', () => {
+    store.osdmVersion = '3.4';
+    expect(classifySystemInfoStatus(404, '/products').outcome).toBe('fail');
+  });
+
+  test('401 / 403 / 5xx / unexpected → fail', () => {
+    expect(classifySystemInfoStatus(401, '/products').outcome).toBe('fail');
+    expect(classifySystemInfoStatus(403, '/products').outcome).toBe('fail');
+    expect(classifySystemInfoStatus(503, '/products').outcome).toBe('fail');
+    expect(classifySystemInfoStatus(418, '/products').outcome).toBe('fail');
+  });
+});
+
+describe('osdmCompliance.handleSystemInfoStatus (report application)', () => {
+  // Mock bruTest to record the registered check name WITHOUT running the
+  // assertion callback (so the Bruno-only `expect` global is never touched).
+  function ctxRecorder() {
+    const tests = [];
+    const logs = [];
+    return {
+      tests,
+      logs,
+      bruTest: (name) => { tests.push(name); },
+      validationLogger: (msg) => { logs.push(msg); },
+    };
+  }
+
+  test('200 → returns true, registers a "200 OK" pass, no log', () => {
+    const ctx = ctxRecorder();
+    expect(handleSystemInfoStatus(200, '/products', ctx)).toBe(true);
+    expect(ctx.tests).toEqual(['GET /products → 200 OK']);
+    expect(ctx.logs).toEqual([]);
+  });
+
+  test('out-of-version 404 → returns false, logs INFO, registers NO test', () => {
+    store.osdmVersion = '3.5';
+    const ctx = ctxRecorder();
+    expect(handleSystemInfoStatus(404, '/promotion-codes', ctx)).toBe(false);
+    expect(ctx.tests).toEqual([]); // skipped — not counted as pass or fail
+    expect(ctx.logs.join(' ')).toMatch(/out of scope/);
+  });
+
+  test('401 → returns false, logs ERROR, registers a FAIL test', () => {
+    const ctx = ctxRecorder();
+    expect(handleSystemInfoStatus(401, '/products', ctx)).toBe(false);
+    expect(ctx.tests.length).toBe(1);
+    expect(ctx.tests[0]).toMatch(/401 Unauthorized/);
+    expect(ctx.logs.length).toBe(1);
   });
 });

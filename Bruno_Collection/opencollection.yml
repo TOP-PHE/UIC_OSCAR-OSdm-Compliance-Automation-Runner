@@ -382,11 +382,16 @@ request:
         try {
           const { bruTest: _bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
 
-          // H1: Content-Type check (OSDM spec)
+          // H1: Content-Type is JSON (OSDM). Accept application/json AND any
+          // media type using the +json structured-syntax suffix — the OSDM
+          // vendor type application/vnd.uic.osdm+json (with any ;version) and
+          // RFC 9457 application/problem+json (error bodies) are all JSON.
           if (_rptStatus && _rptStatus !== 204 && _rptStatus !== 304) {
             const _ct = (res.headers || {})['content-type'] || (res.headers || {})['Content-Type'] || '';
-            _bruTest(`[OSDM] Content-Type is application/json`, () => {
-              expect(_ct, `Expected application/json, got: '${_ct}'`).to.include('application/json');
+            const _mediaType = String(_ct).split(';')[0].trim().toLowerCase();
+            const _isJson = /^application\/(.*\+)?json$/.test(_mediaType);
+            _bruTest(`[OSDM] Content-Type is JSON`, () => {
+              expect(_isJson, `Expected a JSON media type (application/json or application/...+json), got: '${_ct}'`).to.be.true;
             });
           }
 
