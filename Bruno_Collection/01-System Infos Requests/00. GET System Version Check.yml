@@ -80,9 +80,17 @@ runtime:
           return;
         }
 
-        // Validate response is an array
-        bruTest(`/versions response is an array`, () => {
-          expect(versionsData).to.be.an("array");
+        // ── OSDM compliance (Layer 1): GET /versions → array<ApiVersion> ──
+        // Structural conformance against the OSDM ApiVersion schema: response
+        // is an array, has at least one entry, every entry carries a required
+        // non-empty "version" string, and optional "sunset" (ISO-8601
+        // date-time) / "nextVersion" (object) are well-typed when present.
+        // Logic lives in osdmCompliance.js (pure + Jest unit-tested).
+        const { validateApiVersions } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        validateApiVersions(versionsData).forEach((c) => {
+          bruTest(c.name, () => {
+            expect(c.ok, c.message).to.be.true;
+          });
         });
 
         // Extract API versions from response

@@ -40,6 +40,15 @@ runtime:
           });
           validationLogger(`[INFO] GET ${endpoint} -> 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): ProductTagsResponse ──
+          // Non-standard dual-array shape: required productTagNames[] (each with
+          // tag string + description Text object) and productTagGroups[] (each
+          // with code string + description Text object).
+          const { validateProductTags } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          validateProductTags(body).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
           bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {

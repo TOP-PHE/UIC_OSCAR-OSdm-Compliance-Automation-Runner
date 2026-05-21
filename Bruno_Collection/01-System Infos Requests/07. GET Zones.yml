@@ -41,6 +41,14 @@ runtime:
           });
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): ZoneCollectionResponse ──
+          // Envelope object → "zones" array; every ZoneDefinition has required
+          // id (string) and carrier (CompanyRef object); name/nutsCodes typed when present.
+          const { validateZones } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          validateZones(body).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {

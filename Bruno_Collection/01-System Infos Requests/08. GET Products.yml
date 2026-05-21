@@ -79,6 +79,15 @@ runtime:
           }
           validationLogger(`[INFO] GET ${endpoint} -> 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): ProductCollectionResponse ──
+          // Envelope object → "products" array; every Product has required id,
+          // code (strings), owner (CompanyRef object), flexibility (string).
+          // type/travelClass are x-extensible-enum strings (type-checked only).
+          const { validateProducts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          validateProducts(body).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
           bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {

@@ -41,6 +41,14 @@ runtime:
           });
           validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
 
+          // ── OSDM compliance (Layer 1): array<PassengerCategory> ──
+          // Bare array (v3.8); every PassengerCategory has required title (Text
+          // object) and specification (object); base/additional booleans when present.
+          const { validatePassengerCategories } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          validatePassengerCategories(body).forEach((c) => {
+            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          });
+
         } else if (statusCode === 401) {
           validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
           bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {
