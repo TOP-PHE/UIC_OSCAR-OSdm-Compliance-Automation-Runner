@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.52",
+  "current_release": "2026.53",
   "releases": [
+    {
+      "release": "2026.53",
+      "date": "2026-05-21",
+      "server": "1.11.25",
+      "collection": "OTST_V2.0.2",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#107): Tier-1 test-system config for optional sale-flow features. The Test Framework gains a 'Seat Selection' section (public/js/scenarios.js, emptyFramework()): a 'seat map' capability toggle + a supported-modes menu (SEATMAP_AT_OFFER = seat map before booking; ADD_TO_BOOKING = reservation added to an existing booking, e.g. SNCF first-class TGV), persisted as framework.placeSelection {seatMap, supportedModes}. Scenario 'Booking Flow Actions' pills are now authorised by the framework (Gate 0 → Gate 1): Place selection requires a reservation ticket type + seat map; Add/Delete ancillary require at least one declared ancillary; unsupported actions render disabled with the reason. A per-scenario placeSelectionMode picker (limited to the framework's supported modes) is written into the generated data file and validated by json_validator/datafile.schema.json (which also gains salesFlowActions). Bruno-side: scenarioParser.resolveSalesFlowActions() (unit-tested) centralises the booking-flow-action defaults — the optional features (placeSelection/addAncillary/deleteAncillary) now default OFF so existing scenarios stop claiming unimplemented steps; patchPassengers (the only flag consumed today) and getBooking keep their historic ON default, so runtime behaviour is unchanged. scenarioParser reads placeSelectionMode (added to both reset lists). Foundation for #104 (place maps in the sale flow) and #108 (ancillaries); no request consumes the new flags yet. Collection version unchanged (OTST_V2.0.2).",
+        "Operator action required: none. Server change picked up after Watchtower promotes :stable (hard-refresh the Test Config page to see the new Seat Selection section). Bruno collection refreshes via the refresh-collection workflow on merge."
+      ]
+    },
     {
       "release": "2026.52",
       "date": "2026-05-20",

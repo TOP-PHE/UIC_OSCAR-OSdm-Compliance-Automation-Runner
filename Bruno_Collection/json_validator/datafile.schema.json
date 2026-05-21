@@ -166,6 +166,27 @@
           },
           "offerSearchCriteriaListId": {
             "type": "integer"
+          },
+          "salesFlowActions": {
+            "type": "object",
+            "description": "Optional intermediate booking-flow actions to exercise (issue #107). Optional features default off in the runner.",
+            "properties": {
+              "patchPassengers": { "type": "boolean" },
+              "placeSelection":  { "type": "boolean" },
+              "addAncillary":    { "type": "boolean" },
+              "getBooking":      { "type": "boolean" },
+              "deleteAncillary": { "type": "boolean" }
+            }
+          },
+          "placeSelectionMode": {
+            "type": ["string", "null"],
+            "description": "How place selection is exercised (issue #107). SEATMAP_AT_OFFER = seat map before booking; ADD_TO_BOOKING = reservation added to an existing booking.",
+            "enum": [
+              "SEATMAP_AT_OFFER",
+              "ADD_TO_BOOKING",
+              "",
+              null
+            ]
           }
         },
         "required": [

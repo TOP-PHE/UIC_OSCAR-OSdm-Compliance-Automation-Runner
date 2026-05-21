@@ -200,6 +200,7 @@ request:
                 "patchDateOfBirth", "patchFirstName", "patchLastName",
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
+                "placeSelectionMode",
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 // Fulfillment

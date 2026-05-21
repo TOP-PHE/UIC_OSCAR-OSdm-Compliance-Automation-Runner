@@ -489,6 +489,9 @@ function renderWizardStep1InSection() {
   if (!fw.offerCriteria.offerMode)   fw.offerCriteria.offerMode  = def.offerCriteria.offerMode;
   if (!fw.offerCriteria.currency)    fw.offerCriteria.currency   = def.offerCriteria.currency;
   if (fw.offerCriteria.requiresPlaceSelection == null) fw.offerCriteria.requiresPlaceSelection = false;
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  if (typeof fw.placeSelection.seatMap !== 'boolean') fw.placeSelection.seatMap = false;
+  if (!Array.isArray(fw.placeSelection.supportedModes)) fw.placeSelection.supportedModes = [];
   if (!fw.fulfillment || typeof fw.fulfillment !== 'object') fw.fulfillment = def.fulfillment;
   if (!Array.isArray(fw.fulfillment.media)) fw.fulfillment.media = def.fulfillment.media;
   if (!Array.isArray(fw.fulfillment.types)) fw.fulfillment.types = def.fulfillment.types;
@@ -1273,6 +1276,17 @@ const SALES_FLOW_ACTIONS = [
     description: 'Remove a previously added ancillary (tests the reverse path)' },
 ];
 
+// Place-selection modes (issue #107). Two genuinely different OSDM mechanisms,
+// not "the same call at two times" — so the labels avoid the misleading
+// pre/post-booking framing. The Test Framework declares which it supports
+// (placeSelection.supportedModes); each scenario picks one from that menu.
+const PLACE_SELECTION_MODES = [
+  { key: 'SEATMAP_AT_OFFER', label: 'Seat map at offer', icon: '🪑',
+    description: 'Traveller picks a seat before the booking is created (the seat may affect the price). Seat map → BookingRequest.placeSelections.' },
+  { key: 'ADD_TO_BOOKING',   label: 'Add reservation to a booking', icon: '➕',
+    description: 'A seat reservation is added after the booking already exists (e.g. SNCF first-class TGV). Adds an offer part to the booking.' },
+];
+
 // Defaults for newly-created scenarios: all actions OFF. The user opts in
 // explicitly to each step they want to exercise. Legacy scenarios loaded
 // from a data file that pre-dates this feature (no salesFlowActions field)
@@ -1335,24 +1349,65 @@ function buildSalesFlowActionsSection(idx, sc) {
   const readOnly = isTester && sc.shared;
   const current = (sc && typeof sc.salesFlowActions === 'object' && sc.salesFlowActions)
     ? sc.salesFlowActions : defaultSalesFlowActions();
+
+  // Gate 0 — the Test Framework authorises which optional actions a scenario may
+  // select (issue #107). An unsupported action is shown disabled with the reason;
+  // it cannot be turned on here.
+  const fw = (wizData && wizData.framework) || {};
+  const ticketTypes  = (fw.rail && Array.isArray(fw.rail.ticketTypes)) ? fw.rail.ticketTypes : [];
+  const hasReservations = ticketTypes.includes('IRT') || ticketTypes.includes('NRT_OPTIONAL_RESERVATION');
+  const hasSeatMap      = !!(fw.placeSelection && fw.placeSelection.seatMap);
+  const hasAncillaries  = Array.isArray(fw.ancillaries) && fw.ancillaries.length > 0;
+  const blockedReasonFor = {
+    placeSelection: (hasReservations && hasSeatMap) ? null
+      : 'Enable a reservation ticket type + "seat map" in your Test Framework first',
+    addAncillary:    hasAncillaries ? null : 'Declare at least one ancillary in your Test Framework first',
+    deleteAncillary: hasAncillaries ? null : 'Declare at least one ancillary in your Test Framework first',
+  };
+
   const pills = SALES_FLOW_ACTIONS.map(a => {
-    const on = current[a.key] === true; // explicit opt-in only
-    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${esc(idx)}" data-key="${esc(a.key)}" title="${esc(a.description)}"${readOnly?' style="pointer-events:none;opacity:.6"':''}>${a.icon} ${esc(a.label)}</div>`;
+    const blocked = blockedReasonFor[a.key] || null;     // null → authorised
+    const on = current[a.key] === true && !blocked;       // a disabled action never shows selected
+    const disabled = readOnly || !!blocked;
+    const style = disabled ? ' style="pointer-events:none;opacity:.45"' : '';
+    const title = blocked || a.description;
+    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${esc(idx)}" data-key="${esc(a.key)}" title="${esc(title)}"${style}>${a.icon} ${esc(a.label)}</div>`;
   }).join('');
+
+  // Seat-selection mode picker — shown when the framework authorises place
+  // selection. Limited to the framework's supported modes; single-select.
+  let modePickerHtml = '';
+  if (!blockedReasonFor.placeSelection) {
+    const supported = (fw.placeSelection && Array.isArray(fw.placeSelection.supportedModes)) ? fw.placeSelection.supportedModes : [];
+    const offered = PLACE_SELECTION_MODES.filter(m => supported.includes(m.key));
+    if (offered.length > 0) {
+      const sel = sc.placeSelectionMode || (offered.length === 1 ? offered[0].key : null);
+      const modePills = offered.map(m => {
+        const style = readOnly ? ' style="pointer-events:none;opacity:.6"' : '';
+        return `<div class="pill${sel === m.key ? ' selected' : ''}" data-action="set-place-mode" data-idx="${esc(idx)}" data-val="${esc(m.key)}" title="${esc(m.description)}"${style}>${m.icon} ${esc(m.label)}</div>`;
+      }).join('');
+      modePickerHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Seat-selection mode <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— applies when "Place selection" is enabled above</span></div>
+          <div class="pill-group">${modePills}</div>
+        </div>`;
+    }
+  }
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🛒 Booking Flow Actions <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">optional steps during the booking → fulfillment phase (applies to SALE, REFUND and EXCHANGE scenarios, which all start with a booking)</span><span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
       <div style="padding:12px 14px">
         <div class="pill-group">${pills}</div>
+        ${modePickerHtml}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),
           the test runner logs it as <strong>NOT_APPLICABLE</strong> and continues —
           each attempted action becomes one row in the Vendor Capability Matrix of the
           generated report, so a certifier can see at a glance which sub-flows the vendor
-          implements. Matching library-bruno support is required for each action;
-          <em>PATCH passengers</em> is already wired.
+          implements. Greyed-out actions are not enabled in your Test Framework.
         </div>
       </div>
     </div>
@@ -2388,6 +2443,10 @@ function emptyFramework() {
       currency:            'EUR',
       requiresPlaceSelection: false
     },
+    // Optional-feature capability (issue #107): does the system offer a graphical
+    // seat map, and via which mode(s)? seatMap=false / supportedModes=[] means
+    // place selection is not exercised. Authorises the per-scenario opt-in.
+    placeSelection: { seatMap: false, supportedModes: [] },
     fulfillment:    { media: ['PDF_A4'], types: ['ETICKET'] },
     serviceClasses:['STANDARD','HIGH'],
     accommodations:['SEAT'],
@@ -2448,6 +2507,10 @@ function renderWizardStep1() {
   if (!fw.offerCriteria.offerMode)   fw.offerCriteria.offerMode  = def.offerCriteria.offerMode;
   if (!fw.offerCriteria.currency)    fw.offerCriteria.currency   = def.offerCriteria.currency;
   if (fw.offerCriteria.requiresPlaceSelection == null) fw.offerCriteria.requiresPlaceSelection = false;
+  // Place-selection capability (issue #107)
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  if (typeof fw.placeSelection.seatMap !== 'boolean') fw.placeSelection.seatMap = false;
+  if (!Array.isArray(fw.placeSelection.supportedModes)) fw.placeSelection.supportedModes = [];
   // Fulfillment
   if (!fw.fulfillment || typeof fw.fulfillment !== 'object') fw.fulfillment = def.fulfillment;
   if (!Array.isArray(fw.fulfillment.media)) fw.fulfillment.media = def.fulfillment.media;
@@ -2605,6 +2668,34 @@ function renderWizardStep1() {
     </div>
   </div>
 
+  <!-- ②-bis Seat selection capability (issue #107) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🪑 Seat Selection<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="ps-seatmap" ${fw.placeSelection.seatMap?'checked':''} data-action="fw-toggle-seatmap" style="accent-color:#0090D4;width:16px;height:16px">
+          Does the system offer a graphical seat map?
+        </label>
+        <div style="font-size:11px;color:#90a4ae;margin-bottom:10px;line-height:1.5">
+          Tick this if travellers can pick a specific seat. Then choose <strong>when</strong> it happens — a scenario can only use a mode you enable here.
+        </div>
+        <div id="place-selection-detail" style="${fw.placeSelection.seatMap?'':'display:none'}">
+          <div class="fw-subsection">
+            <div class="fw-subsection-label">Supported seat-selection modes</div>
+            <div class="pill-group">
+              ${PLACE_SELECTION_MODES.map(m=>`<div class="pill${(fw.placeSelection.supportedModes||[]).includes(m.key)?' selected':''}" data-action="fw-pill" data-mode="placeSelection" data-group="supportedModes" data-val="${esc(m.key)}" title="${esc(m.description)}">${m.icon} ${esc(m.label)}</div>`).join('')}
+            </div>
+            <div style="font-size:11px;color:#90a4ae;margin-top:8px;line-height:1.5">
+              🪑 <strong>Seat map at offer</strong> — traveller picks a seat before booking (e.g. a seat that affects the price).<br>
+              ➕ <strong>Add reservation to a booking</strong> — seat reservation added after the booking exists (e.g. SNCF first-class TGV).
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ③ Passenger Types + age limits -->
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">👥 Passenger Types<span class="fw-toggle-icon">▶</span></div>
@@ -2691,6 +2782,18 @@ function fwToggleIrops(type, code, el) {
 function fwToggleMode(mode, enabled) {
   wizData.framework[mode].enabled = enabled;
   const d = document.getElementById(`${mode}-detail`);
+  if (d) d.style.display = enabled ? '' : 'none';
+}
+
+// Seat-selection capability toggle (issue #107). seatMap=true reveals the
+// supported-modes picker; the modes themselves use the generic fw-pill handler
+// (placeSelection.supportedModes). When off, the modes are kept but hidden —
+// consumers always check seatMap first.
+function fwToggleSeatMap(enabled) {
+  const fw = wizData.framework;
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  fw.placeSelection.seatMap = enabled;
+  const d = document.getElementById('place-selection-detail');
   if (d) d.style.display = enabled ? '' : 'none';
 }
 
@@ -3876,6 +3979,9 @@ async function wizGenerateScenario() {
       // /bookings and POST /fulfillments. All-enabled by default; users
       // narrow via the pills in the detail panel.
       salesFlowActions: defaultSalesFlowActions(),
+      // Seat-selection mode (issue #107) — null until the author enables Place
+      // selection and picks a framework-supported mode in the detail panel.
+      placeSelectionMode: null,
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,
@@ -4243,6 +4349,19 @@ document.body.addEventListener('click', function(e) {
       // treated as false for the toggle purpose and becomes true.
       sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
       el.classList.toggle('selected', sc.salesFlowActions[key]);
+      markDirty();
+      break;
+    }
+    case 'set-place-mode': {
+      // Single-select seat-selection mode (issue #107). Constrained at render
+      // time to the framework's supported modes.
+      e.stopPropagation();
+      const spmIdx = parseInt(el.dataset.idx);
+      const spmSc = state.scenarios[spmIdx];
+      if (!spmSc) break;
+      spmSc.placeSelectionMode = el.dataset.val;
+      const grp = el.parentElement;
+      if (grp) grp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
       markDirty();
       break;
     }
@@ -4733,6 +4852,8 @@ document.body.addEventListener('change', function(e) {
       fwToggleFlow(el.dataset.key, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-mode':
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
+    case 'fw-toggle-seatmap':
+      fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
     case 'fw-pax-age': {
       const raw = (el.value || '').trim();
       const n = parseInt(raw, 10);

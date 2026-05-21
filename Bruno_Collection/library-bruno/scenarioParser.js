@@ -17,11 +17,33 @@ module.exports = {
   getScenarioData,
   parseScenarioData,
   resetScenarioEnvVars,
+  resolveSalesFlowActions,
   osdmTripSearchCriteria,
   osdmTripSpecification,
   osdmOfferSearchCriteria,
   osdmFulfillmentOptions
 };
+
+// Resolve the optional intermediate booking-flow actions for a scenario.
+// The OPTIONAL features (placeSelection, addAncillary, deleteAncillary) default
+// OFF: they are not implemented yet, and existing scenarios must not claim to
+// exercise them (issue #107). patchPassengers / getBooking default ON, which
+// preserves historic behaviour (patchPassengers is the only flag consumed by
+// the collection today — POST Create Booking skips the PATCH only when it is
+// explicitly "false"). An explicit boolean in the scenario's salesFlowActions
+// always overrides the default.
+function resolveSalesFlowActions(salesFlowActions) {
+  const defaults = {
+    patchPassengers: true,  placeSelection: false, addAncillary: false,
+    getBooking: true,       deleteAncillary: false
+  };
+  const src = (salesFlowActions && typeof salesFlowActions === 'object') ? salesFlowActions : {};
+  const out = {};
+  Object.keys(defaults).forEach(function (k) {
+    out[k] = Object.prototype.hasOwnProperty.call(src, k) ? (src[k] === true) : defaults[k];
+  });
+  return out;
+}
 
 // Deletes all business-logic env vars so a new scenario starts with a clean slate.
 // Must stay in sync with the _deleteList in opencollection.yml.
@@ -60,6 +82,7 @@ function resetScenarioEnvVars() {
     "salesFlow_patchPassengers", "salesFlow_placeSelection",
     "salesFlow_addAncillary",   "salesFlow_getBooking", "salesFlow_deleteAncillary",
     // Place selection
+    "placeSelectionMode",
     "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
     "reservationId", "reservationIds", "tripLegCoverage",
     // Fulfillment
@@ -406,27 +429,27 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);
 
-      // Optional intermediate SALE-flow actions. The scenario may carry a
+      // Optional intermediate booking-flow actions. The scenario may carry a
       // `salesFlowActions` map { patchPassengers, placeSelection, addAncillary,
       // getBooking, deleteAncillary } indicating which steps to exercise
-      // between POST /bookings and POST /fulfillments. Missing object → all
-      // actions enabled (legacy scenarios behave like before). Each flag is
-      // exported as an env var `salesFlow_<key>` with value "true" / "false"
-      // so individual .bru files can branch on it with a simple getEnvVar.
-      const _salesActionDefaults = {
-        patchPassengers: true, placeSelection: true, addAncillary: true,
-        getBooking: true, deleteAncillary: true
-      };
-      const _salesActions = (scenario.salesFlowActions && typeof scenario.salesFlowActions === 'object')
-        ? scenario.salesFlowActions : {};
-      Object.keys(_salesActionDefaults).forEach(function (k) {
-        const on = _salesActions[k] === false ? false : true;
-        bru.setEnvVar("salesFlow_" + k, on ? "true" : "false");
+      // between POST /bookings and POST /fulfillments. Resolution + defaults are
+      // centralised in resolveSalesFlowActions() (issue #107): the optional
+      // features default OFF, patchPassengers/getBooking default ON. Each flag
+      // is exported as `salesFlow_<key>` = "true"/"false" so individual .bru
+      // files can branch on it with a simple getEnvVar.
+      const _salesActions = resolveSalesFlowActions(scenario.salesFlowActions);
+      Object.keys(_salesActions).forEach(function (k) {
+        bru.setEnvVar("salesFlow_" + k, _salesActions[k] ? "true" : "false");
       });
       validationLogger("[INFO] 🛒 Sales-flow actions: " +
-        Object.keys(_salesActionDefaults).map(function (k) {
+        Object.keys(_salesActions).map(function (k) {
           return k + "=" + bru.getEnvVar("salesFlow_" + k);
         }).join(", "));
+
+      // Place-selection mode (issue #107): SEATMAP_AT_OFFER (seat map → booking)
+      // or ADD_TO_BOOKING (reservation added to an existing booking). Chosen per
+      // scenario from the framework-authorised set; null when not applicable.
+      bru.setEnvVar("placeSelectionMode", ["", "null"].includes(scenario.placeSelectionMode) ? null : scenario.placeSelectionMode);
 
       // Trip requirements
       jsonData.tripRequirements?.some(function (tripRequirement) {

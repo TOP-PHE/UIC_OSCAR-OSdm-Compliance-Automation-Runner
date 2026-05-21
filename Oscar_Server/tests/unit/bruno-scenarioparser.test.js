@@ -99,13 +99,48 @@ describe('resetScenarioEnvVars', () => {
   test('clears business env vars but leaves unrelated keys', () => {
     Object.assign(envStore, {
       offerId: 'O1', bookingId: 'B1', scenarioCode: 'X', fulfillmentIds: '["F1"]',
-      offerSearchCriteria: '{}', placeSelections: '[]',
+      offerSearchCriteria: '{}', placeSelections: '[]', placeSelectionMode: 'SEATMAP_AT_OFFER',
       __unrelatedKeep: 'keep',
     });
     sp.resetScenarioEnvVars();
-    for (const k of ['offerId', 'bookingId', 'scenarioCode', 'fulfillmentIds', 'offerSearchCriteria', 'placeSelections']) {
+    for (const k of ['offerId', 'bookingId', 'scenarioCode', 'fulfillmentIds', 'offerSearchCriteria', 'placeSelections', 'placeSelectionMode']) {
       expect(envStore[k]).toBeUndefined();
     }
     expect(envStore.__unrelatedKeep).toBe('keep');
+  });
+});
+
+describe('resolveSalesFlowActions (issue #107)', () => {
+  test('missing/invalid object → optional features OFF, patch/get ON', () => {
+    for (const input of [undefined, null, 'nope', 42, []]) {
+      expect(sp.resolveSalesFlowActions(input)).toEqual({
+        patchPassengers: true,  placeSelection: false, addAncillary: false,
+        getBooking: true,       deleteAncillary: false,
+      });
+    }
+  });
+
+  test('explicit true overrides the OFF default', () => {
+    expect(sp.resolveSalesFlowActions({ placeSelection: true, addAncillary: true }))
+      .toEqual({
+        patchPassengers: true, placeSelection: true, addAncillary: true,
+        getBooking: true,      deleteAncillary: false,
+      });
+  });
+
+  test('explicit false overrides the ON default (patchPassengers opt-out)', () => {
+    expect(sp.resolveSalesFlowActions({ patchPassengers: false }).patchPassengers).toBe(false);
+  });
+
+  test('only strict boolean true counts as on (truthy non-true → off)', () => {
+    const out = sp.resolveSalesFlowActions({ placeSelection: 'true', addAncillary: 1 });
+    expect(out.placeSelection).toBe(false);
+    expect(out.addAncillary).toBe(false);
+  });
+
+  test('result keys are exactly the five known actions', () => {
+    expect(Object.keys(sp.resolveSalesFlowActions({})).sort()).toEqual(
+      ['addAncillary', 'deleteAncillary', 'getBooking', 'patchPassengers', 'placeSelection']
+    );
   });
 });
