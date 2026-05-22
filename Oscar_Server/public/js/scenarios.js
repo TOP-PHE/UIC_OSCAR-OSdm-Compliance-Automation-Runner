@@ -4301,8 +4301,9 @@ function renderWizardStep3() {
             data-action="wiz-currency">
         </div>
         <div class="param-field" style="min-width:160px">
-          <label class="param-label">Offer mode</label>
+          <label class="param-label">Offer mode <span class="param-hint">(optional)</span></label>
           <select class="param-input param-select" data-action="wiz-offer-mode">
+            <option value="" ${!sc.offerMode?'selected':''} style="color:#90a4ae">— none —</option>
             ${fwFilter(WIZ_OFFER_MODES, fw.offerCriteria && fw.offerCriteria.offerMode ? [fw.offerCriteria.offerMode] : null).map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
           </select>
         </div>
