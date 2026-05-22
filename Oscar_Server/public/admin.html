@@ -493,7 +493,9 @@ function onRoleChange(userId) {
     // Tester, Test Manager and Certifier are assigned to a company. Preserve the
     // user's current company across the role change (issue #128) — preselect it.
     const current = roleEl.getAttribute('data-company-id') || '';
-    cell.innerHTML = `<select id="company-${userId}">${companyOptions(current)}</select>`;
+    // esc(userId) — userId originates from a data-* DOM attribute; escape it
+    // before it reaches innerHTML (CodeQL js/xss-through-dom, defence-in-depth).
+    cell.innerHTML = `<select id="company-${esc(userId)}">${companyOptions(current)}</select>`;
   } else {
     // Administrator always belongs to the platform
     cell.innerHTML = `<span style="color:#78909c;font-size:12px;font-style:italic">Platform</span>`;
