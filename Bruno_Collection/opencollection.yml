@@ -118,13 +118,25 @@ request:
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
 
+          // Place maps run only when the scenario enabled Place selection in the
+          // SEATMAP_AT_OFFER mode (issues #104/#107); legacy requiresPlaceSelection
+          // and the SALE+PLACEMAP scenario type are kept as OR-fallbacks. When the
+          // gate is off (every current scenario) the place-map request is skipped
+          // wherever it sits in the flow.
+          var _runPlaceMap = (bru.getEnvVar('placeSelectionMode') === 'SEATMAP_AT_OFFER'
+                               && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true')
+                          || (bru.getEnvVar('requiresPlaceSelection') === true || bru.getEnvVar('requiresPlaceSelection') === 'true')
+                          || _st === 'SALE+PLACEMAP';
+
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
             _skipReason = 'not for "' + _sandbox + '" sandbox';
-          } else if (_st === 'SALE'         && (_isPlaceMap || _isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
-            else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange))               { _skipReason = 'not in SALE+PLACEMAP scope'; }
-            else if (_st === 'REFUND'        && _isExchange)                              { _skipReason = 'Exchange excluded for REFUND scenario'; }
-            else if (_st === 'EXCHANGE'      && _isRefund)                                { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
+          } else if (_isPlaceMap && !_runPlaceMap)                       { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
+            else if (_isPlaceMap && bru.getEnvVar('bookingId'))           { _skipReason = 'place map is pre-booking only (booking already created)'; }
+            else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
+            else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange)) { _skipReason = 'not in SALE+PLACEMAP scope'; }
+            else if (_st === 'REFUND'        && _isExchange)               { _skipReason = 'Exchange excluded for REFUND scenario'; }
+            else if (_st === 'EXCHANGE'      && _isRefund)                 { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
 
           if (_skipReason) {
             console.log('[INFO] ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
