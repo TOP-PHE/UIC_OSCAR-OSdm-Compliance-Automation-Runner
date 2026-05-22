@@ -473,7 +473,9 @@ function companyCellHtml(u) {
   if (isTestMgr) {
     return `<span style="color:#78909c;font-size:12px;font-style:italic">${esc(u.company_name || '')}</span>`;
   }
-  if (u.role === 'company_user' || u.role === 'certification_user') {
+  // Company-bound roles (Tester, Test Manager) and Certifier get an editable
+  // company select so an admin can keep or change the company (issue #128).
+  if (u.role === 'company_user' || u.role === 'certification_user' || u.role === 'test_manager') {
     return `<select id="company-${u.id}">${companyOptions(u.company_id)}</select>`;
   }
   return `<span style="color:#78909c;font-size:12px;font-style:italic">${esc(u.company_name || 'Platform')}</span>`;
@@ -481,12 +483,17 @@ function companyCellHtml(u) {
 
 // When the role dropdown changes, swap the company cell between editable and read-only
 function onRoleChange(userId) {
-  const role = document.getElementById(`role-${userId}`).value;
+  const roleEl = document.getElementById(`role-${userId}`);
+  const role = roleEl.value;
   const cell = document.getElementById(`company-cell-${userId}`);
   if (!cell) return;
-  if (role === 'company_user' || role === 'certification_user') {
-    // Tester and Certifier can be assigned to a company
-    cell.innerHTML = `<select id="company-${userId}">${companyOptions('')}</select>`;
+  // Test managers manage only their own company's users — no company reassignment.
+  if (isTestMgr) return;
+  if (role === 'company_user' || role === 'certification_user' || role === 'test_manager') {
+    // Tester, Test Manager and Certifier are assigned to a company. Preserve the
+    // user's current company across the role change (issue #128) — preselect it.
+    const current = roleEl.getAttribute('data-company-id') || '';
+    cell.innerHTML = `<select id="company-${userId}">${companyOptions(current)}</select>`;
   } else {
     // Administrator always belongs to the platform
     cell.innerHTML = `<span style="color:#78909c;font-size:12px;font-style:italic">Platform</span>`;
@@ -519,7 +526,7 @@ async function loadUsers() {
   tbody.innerHTML = (data.users || []).map(u => `
     <tr>
       <td class="mono">${esc(u.email)}</td>
-      <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}">${roleOptions(u.role)}</select></td>
+      <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}" data-company-id="${esc(u.company_id || '')}">${roleOptions(u.role)}</select></td>
       <td id="company-cell-${u.id}">${companyCellHtml(u)}</td>
       <td>${fmtDate(u.created_at)}</td>
       <td>

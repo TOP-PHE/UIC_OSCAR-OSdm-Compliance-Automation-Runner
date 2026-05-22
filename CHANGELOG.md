@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.27] — 2026-05-22
+
+Fix (#128) — changing a user's role to **Test Manager** no longer wipes their
+company.
+
+### Fixed
+- **`src/api/routes/admin.js`** (`PATCH /v1/admin/users/:id`): `test_manager` was
+  not handled as a company-bound role, so it fell into the catch-all `else` that
+  reassigns to the platform company — changing a Tester to Test Manager silently
+  moved them onto the OSCAR platform company. `company_user` and `test_manager`
+  now **keep the user's current company** when no `company_id` is supplied, or
+  move to a provided `company_id`; only `administrator` maps to the platform
+  company. A company-bound role can't be left on the platform company (rejected
+  with a clear 400).
+- **`public/admin.html`**: the Users-tab company cell is now an editable select
+  for **Test Manager** too (not a read-only "Platform" label), pre-selected to
+  the current company and preserved across role changes — so an admin can keep
+  *or* change the company. (Test-manager-managed user lists are unaffected — they
+  stay scoped to the manager's own company.)
+
+### Notes
+- When a user *is* moved to another company, access to the previous company's
+  data is **already blocked** by the per-request tenant scoping — no extra change
+  needed. Deleting a company's test config/datafile when it loses its last user
+  is a separate company-lifecycle policy, intentionally out of scope here.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the admin console
+Users tab.
+
+---
+
 ## [server-v1.11.26] — 2026-05-22
 
 Release of the **optional sale-flow features** initiative (collection
