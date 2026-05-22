@@ -972,21 +972,20 @@ async function extractFromDatafile(datafile) {
     const trips = datafile.tripRequirements || [];
     const trainResources = trips.map((trip, idx) => {
       let origin = '', destination = '', departureTime = '', arrivalTime = '', vehicleNumber = '', operatorCode = '';
-      if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0) {
-        const leg = trip.legs[0];
-        origin = leg.origin || '';
-        destination = leg.destination || '';
-        departureTime = (leg.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (leg.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = leg.vehicleNumber || '';
-        operatorCode = leg.operatorCode || '';
-      } else if (trip.trip) {
-        origin = trip.trip.origin || '';
-        destination = trip.trip.destination || '';
-        departureTime = (trip.trip.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (trip.trip.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = trip.trip.vehicleNumber || '';
-        operatorCode = trip.trip.operatorCode || '';
+      let pcRef = '', pcName = '', pcShortName = '';
+      const src = (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0)
+        ? trip.legs[0]
+        : (trip.trip || null);
+      if (src) {
+        origin = src.origin || '';
+        destination = src.destination || '';
+        departureTime = (src.startDatetime || '').replace(/%TRIP_DATE%T/, '');
+        arrivalTime = (src.endDatetime || '').replace(/%TRIP_DATE%T/, '');
+        vehicleNumber = src.vehicleNumber || '';
+        operatorCode = src.operatorCode || '';
+        pcRef = src.productCategoryRef || '';
+        pcName = src.productCategoryName || '';
+        pcShortName = src.productCategoryShortName || '';
       }
 
       return {
@@ -996,7 +995,9 @@ async function extractFromDatafile(datafile) {
           originURN: origin,
           destinationURN: destination,
           operatorCode,
-          productCategory: '',
+          productCategoryRef: pcRef,
+          productCategoryName: pcName,
+          productCategoryShortName: pcShortName,
           services: (vehicleNumber || departureTime || arrivalTime)
             ? [{ vehicleNumber, departureTime, arrivalTime, daysOfWeek: [] }]
             : [],
@@ -3064,6 +3065,11 @@ function normalizeTrainData(d) {
     arrivalTime:   (s && s.arrivalTime) || '',
     daysOfWeek:    Array.isArray(s && s.daysOfWeek) ? s.daysOfWeek : []
   }));
+  // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
+  // single `productCategory` text field into the ref so saved sets keep working.
+  if (d.productCategoryRef == null)       d.productCategoryRef = d.productCategory || '';
+  if (d.productCategoryName == null)      d.productCategoryName = '';
+  if (d.productCategoryShortName == null) d.productCategoryShortName = '';
   return d;
 }
 
@@ -3218,11 +3224,22 @@ function buildTrainDetailHTML(tidx) {
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
           <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
-        <!-- Row 3: Product category (full width, optional) -->
+        <!-- Row 3: Product category ref | short name -->
+        <div class="param-field">
+          <label class="param-label">Product category ref <span class="param-hint">(urn:uic:sbc:… — sent in the request)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryRef" value="${esc(d.productCategoryRef || '')}" placeholder="urn:uic:sbc:SQILLS_HS">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryRef-err"></span>
+        </div>
+        <div class="param-field">
+          <label class="param-label">Product category short name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryShortName" value="${esc(d.productCategoryShortName || '')}" placeholder="Sqills High Speed train">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryShortName-err"></span>
+        </div>
+        <!-- Row 4: Product category name (full width, optional) -->
         <div class="param-field" style="grid-column:1/-1">
-          <label class="param-label">Product category <span class="param-hint">(optional — e.g. urn:uic:sbc:SQILLS_IC or a short name)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategory" value="${esc(d.productCategory || '')}" placeholder="urn:uic:sbc:SQILLS_IC" style="max-width:360px">
-          <span class="field-error" id="tf-${esc(tidx)}-productCategory-err"></span>
+          <label class="param-label">Product category name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryName" value="${esc(d.productCategoryName || '')}" placeholder="Sqills High Speed train" style="max-width:360px">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryName-err"></span>
         </div>
       </div>
     </div>
@@ -3335,7 +3352,9 @@ function readTrainDetailFields(tidx) {
     originURN:     field('originURN'),
     destinationURN:field('destinationURN'),
     operatorCode:  field('operatorCode'),
-    productCategory: field('productCategory'),
+    productCategoryRef:       field('productCategoryRef'),
+    productCategoryName:      field('productCategoryName'),
+    productCategoryShortName: field('productCategoryShortName'),
     services:      readTrainServiceRows(tidx),
     ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
     travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
@@ -3413,7 +3432,9 @@ async function wizSaveTrain(tidx) {
     originURN:        fields.originURN,
     destinationURN:   fields.destinationURN,
     operatorCode:     fields.operatorCode,
-    productCategory:  fields.productCategory,
+    productCategoryRef:       fields.productCategoryRef,
+    productCategoryName:      fields.productCategoryName,
+    productCategoryShortName: fields.productCategoryShortName,
     services:         fields.services,
     ticketTypes:      fields.ticketTypes,
     travelClasses:    fields.travelClasses,
@@ -3580,6 +3601,9 @@ function journeyToTripLegs(j) {
     if (svc.arrivalTime)   out.endDatetime   = '%TRIP_DATE%T' + svc.arrivalTime;
     if (svc.vehicleNumber) out.vehicleNumber = svc.vehicleNumber;
     if (d.operatorCode)    out.operatorCode  = d.operatorCode;
+    if (d.productCategoryRef)       out.productCategoryRef       = d.productCategoryRef;
+    if (d.productCategoryName)      out.productCategoryName      = d.productCategoryName;
+    if (d.productCategoryShortName) out.productCategoryShortName = d.productCategoryShortName;
     return out;
   }).filter(Boolean);
 }
@@ -4555,9 +4579,9 @@ async function wizGenerateScenario() {
           destination:              resolvedDestination,
           startDatetime:            `%TRIP_DATE%T${svc0.departureTime || '07:00:00+01:00'}`,
           endDatetime:              `%TRIP_DATE%T${svc0.arrivalTime   || '09:00:00+01:00'}`,
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
           vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }]
@@ -4572,9 +4596,9 @@ async function wizGenerateScenario() {
           destination:              resolvedDestination,
           startDatetime:            svc0.departureTime  ? `%TRIP_DATE%T${svc0.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
           endDatetime:              svc0.arrivalTime    ? `%TRIP_DATE%T${svc0.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
           vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }
@@ -5381,6 +5405,10 @@ document.body.addEventListener('change', function(e) {
       if (svc.arrivalTime)     t.endDatetime    = '%TRIP_DATE%T' + svc.arrivalTime;
       if (svc.vehicleNumber)   t.vehicleNumber  = svc.vehicleNumber;
       if (data.operatorCode)   t.operatorCode   = data.operatorCode;
+      // Product category (#141) — carried into the request's service.productCategory.
+      if (data.productCategoryRef)       t.productCategoryRef       = data.productCategoryRef;
+      if (data.productCategoryName)      t.productCategoryName      = data.productCategoryName;
+      if (data.productCategoryShortName) t.productCategoryShortName = data.productCategoryShortName;
       markDirty();
       // Reset the dropdown to its placeholder so it reads as "apply again"
       // next time (avoids users wondering whether the select remembered
