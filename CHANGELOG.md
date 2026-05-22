@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.28] — 2026-05-22
+
+Feature (#130) — configurable ancillary catalog at the Test Framework level.
+
+### Added
+- **`public/js/scenarios.js`**: a new **Ancillaries** section in the Test
+  Framework — the OSDM standard `AncillaryType` examples as toggle pills **plus
+  an "add custom" input** for vendor-specific codes (e.g. `BIKE`). OSDM
+  `AncillaryType` is an x-extensible-enum (the spec lists examples), so custom
+  values are spec-valid. Stored in `framework.ancillaries`.
+- **Per-train reuse**: a train resource's "Ancillaries available" picker now
+  draws from the **framework catalog** (`framework.ancillaries`) instead of a
+  hard-coded constant — mirroring how ticket types already derive from
+  `framework.rail.ticketTypes`. The picker shows the framework catalog **unioned
+  with the train's existing selections**, so no previously-selected ancillary is
+  lost.
+
+### Changed
+- New `emptyFramework()` seeds `ancillaries` with the OSDM standard set (was just
+  `['WIFI']`). The hard-coded `WIZ_ANCILLARIES` constant is removed in favour of
+  the editable framework catalog (`OSDM_ANCILLARY_TYPES` seeds the standard
+  options).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Framework → Ancillaries, then per train under Test Data.
+
+---
+
 ## [server-v1.11.27] — 2026-05-22
 
 Fix (#128) — changing a user's role to **Test Manager** no longer wipes their
