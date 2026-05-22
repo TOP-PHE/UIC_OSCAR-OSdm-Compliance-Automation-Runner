@@ -48,7 +48,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: Oscar_Server/package-lock.json
 
+      # ── Skip the analysis on Dependabot PRs (skip-with-success) ───────────
+      # GitHub does not pass Actions secrets (incl. SONAR_TOKEN) to
+      # Dependabot-triggered runs, so the scan can't authenticate and the
+      # required check would fail forever, blocking every bot PR. We guard the
+      # work STEPS (not the job) with `github.actor != 'dependabot[bot]'`: on a
+      # bot PR the steps are skipped and the job still completes GREEN, so the
+      # required "SonarCloud Code Analysis" check is satisfied and the PR can
+      # merge. (A job-level `if:` would leave the required check pending forever.)
+      # No coverage is lost: a Dependabot PR only changes package.json /
+      # package-lock.json — Sonar has no new source code to analyse — and the
+      # bump is fully analysed when it lands on main (push: [main] above).
+      # Dependency security/quality on the PR is still covered by npm audit,
+      # Trivy and CodeQL, which run without the Sonar token.
       - name: Install dependencies
+        if: ${{ github.actor != 'dependabot[bot]' }}
         working-directory: Oscar_Server
         run: npm ci
 
@@ -56,6 +70,7 @@ jobs:
         # Sonar reads Oscar_Server/coverage/lcov.info to populate the
         # Coverage on New Code metric. The thresholds here mirror ci-server.yml
         # so a Sonar gate failure means the same regression as a CI failure.
+        if: ${{ github.actor != 'dependabot[bot]' }}
         working-directory: Oscar_Server
         run: npx jest --coverage
         env:
@@ -63,6 +78,7 @@ jobs:
           ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' }}
 
       - name: SonarCloud Scan
+        if: ${{ github.actor != 'dependabot[bot]' }}
         uses: SonarSource/sonarcloud-github-action@v3
         env:
           # Provided automatically by GitHub for PR decoration (commit
