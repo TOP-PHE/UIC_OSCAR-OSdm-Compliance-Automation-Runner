@@ -117,10 +117,24 @@ runtime:
 
         //swaggerSchemaValidatorContent();
 
-        const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
+        // ── Place-selection routing (issue #104) ──────────────────────────────
+        // Pre-booking seat map (SEATMAP_AT_OFFER) runs only when the scenario
+        // opted into Place selection AND chose the SEATMAP_AT_OFFER mode (both
+        // authorised by the Test Framework, issue #107). Legacy requiresPlaceSelection
+        // is kept as an OR-fallback for backward compatibility. When the gate is
+        // off (every current scenario) we route straight to Create Booking and
+        // set skipPlaceMaps — the historic behaviour, unchanged.
+        const _psMode   = bru.getEnvVar("placeSelectionMode");
+        const _psOptIn  = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
+        const _reqPlace = bru.getEnvVar("requiresPlaceSelection");
+        const _runPlaceMap = (_psMode === "SEATMAP_AT_OFFER" && _psOptIn)
+                          || (_reqPlace === true || _reqPlace === "true");
 
-        if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true") {
-          bru.runner.setNextRequest("03. POST Create Booking");
+        if (_runPlaceMap) {
+          bru.setGlobalEnvVar("skipPlaceMaps", false);
+          bru.runner.setNextRequest("08. GET Place Maps");
+        } else {
+          bru.runner.setNextRequest("02. POST Create Booking");
           bru.setGlobalEnvVar("skipPlaceMaps", true);
         }
 
