@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.57",
+  "current_release": "2026.58",
   "releases": [
+    {
+      "release": "2026.58",
+      "date": "2026-05-22",
+      "server": "1.11.30",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#135): duplicate a train set — Phase 1 of the train-set/journey test-data series (duplicate -> timetable #136 -> journeys #137). public/js/scenarios.js: each train row in Test Resources gains a Duplicate button; wizDuplicateTrain() deep-clones the source train's data + label into a fresh unsaved placeholder with a unique '(copy)' label and expands it for editing (mirrors wizAddTrain), so the common 'same route, different hour' case no longer requires re-entering every field. The copy persists as a brand-new test_resources row on Save Train; the original is untouched. Hidden in tester read-only mode alongside add/delete. Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Data."
+      ]
+    },
     {
       "release": "2026.57",
       "date": "2026-05-22",
