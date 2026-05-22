@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.61",
+  "current_release": "2026.62",
   "releases": [
+    {
+      "release": "2026.62",
+      "date": "2026-05-22",
+      "server": "1.11.34",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#143): the new-scenario wizard can now select a Journey (multi-leg). public/js/scenarios.js renderWizardStep3/wizGenerateScenario: the scenario-creation wizard only offered 'Select train resource' (a single train set), so building a fresh multi-leg scenario from a reusable Journey (#137) was a dead end. The Train/Trip Selection step now shows a 'Select a Journey' dropdown when journeys exist; picking one sets wizScenario.journeyResourceId, hides the single-train/trip-mode controls (a journey is inherently a multi-leg SPECIFICATION), shows a route summary, and wizGenerateScenario builds the trip as SPECIFICATION with legs = journeyToTripLegs(journey) — origin/destination/times/vehicle/operator and product category resolved per leg from each train set. Single-train selection unchanged when no journey is chosen. Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Scenarios -> New."
+      ]
+    },
     {
       "release": "2026.61",
       "date": "2026-05-22",
