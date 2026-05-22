@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.54",
+  "current_release": "2026.55",
   "releases": [
+    {
+      "release": "2026.55",
+      "date": "2026-05-22",
+      "server": "1.11.27",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#128): changing a user's role to Test Manager no longer wipes their company. src/api/routes/admin.js PATCH /v1/admin/users/:id treated test_manager as not company-bound, so it fell into the catch-all else that reassigns to the platform company — changing a Tester to Test Manager silently moved them onto the OSCAR platform company. company_user and test_manager now keep the user's current company when no company_id is supplied, or move to a provided company_id; only administrator maps to the platform company; a company-bound role cannot be left on the platform company (clear 400). public/admin.html: the Users-tab company cell is now an editable select for Test Manager too (not a read-only Platform label), pre-selected to the current company and preserved across role changes, so an admin can keep or change the company. Test-manager-managed user lists are unaffected (scoped to the manager's own company). When a user IS moved to another company, access to the previous company's data is already blocked by per-request tenant scoping; deleting a company's test config when it loses its last user is a separate lifecycle policy, out of scope. Covered by tests/integration/admin-routes.test.js.",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the admin console Users tab."
+      ]
+    },
     {
       "release": "2026.54",
       "date": "2026-05-22",

@@ -198,16 +198,28 @@ router.patch('/users/:id',
     updates.push('role = ?');
     values.push(resolvedRole);
 
-    if (resolvedRole === 'company_user') {
-      if (!company_id) {
-        return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required when role is company_user.' });
+    if (resolvedRole === 'company_user' || resolvedRole === 'test_manager') {
+      // Company-bound roles. Change the company only when a valid company_id is
+      // provided; otherwise KEEP the user's current company. Changing the role
+      // alone (e.g. Tester → Test Manager) must NOT move the user off their
+      // company (issue #128 — previously test_manager fell into the platform
+      // catch-all below). A company-bound role may not sit on the platform
+      // company, so require company_id if the user is currently on it.
+      if (company_id) {
+        const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
+        if (!targetCompany) {
+          return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
+        }
+        updates.push('company_id = ?');
+        values.push(company_id);
+      } else {
+        const platformCompany = ensurePlatformCompany();
+        if (user.company_id === platformCompany.id) {
+          return res.status(400).json({ status: 400, title: 'Bad Request', detail: `company_id is required for ${resolvedRole} (the user is currently on the platform company).` });
+        }
+        // Already on a real company and no company_id provided → keep it
+        // (no company_id update is pushed).
       }
-      const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
-      if (!targetCompany) {
-        return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
-      }
-      updates.push('company_id = ?');
-      values.push(company_id);
     } else if (resolvedRole === 'certification_user') {
       // Certifiers may optionally belong to a specific company; if not provided keep current
       if (company_id) {
