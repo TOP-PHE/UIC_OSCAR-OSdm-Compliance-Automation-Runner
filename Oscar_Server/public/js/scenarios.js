@@ -3589,13 +3589,18 @@ function journeyLegPickerHtml(jidx, li, leg) {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const sel = leg && leg.trainResourceId !== '' && leg.trainResourceId != null
     ? `${leg.trainResourceId}::${leg.serviceIndex || 0}` : '';
-  const opts = ['<option value="">— pick a train + service —</option>'];
+  const opts = ['<option value="">— pick a service for this leg —</option>'];
   trains.forEach(t => {
     const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
     const route = [d.originURN, d.destinationURN].filter(Boolean).map(stnShort).join('→');
     (d.services.length ? d.services : [{}]).forEach((s, si) => {
       const v = `${t.id}::${si}`;
-      const lbl = [t.label || '?', route, [s.vehicleNumber, s.departureTime].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+      // Identify the leg by its *service* (route · vehicle · departure→arrival),
+      // not the train-set label — a set holds several services, so leading with
+      // the set name was misleading (#141). The set name trails as context.
+      const times = [s.departureTime, s.arrivalTime].filter(Boolean).join('→');
+      const svc = [route, s.vehicleNumber, times].filter(Boolean).join(' · ');
+      const lbl = svc ? `${svc}  ·  ${t.label || '?'}` : (t.label || '?');
       opts.push(`<option value="${esc(v)}" ${sel === v ? 'selected' : ''}>${esc(lbl)}</option>`);
     });
   });
