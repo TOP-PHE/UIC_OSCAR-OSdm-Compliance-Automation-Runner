@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.55",
+  "current_release": "2026.56",
   "releases": [
+    {
+      "release": "2026.56",
+      "date": "2026-05-22",
+      "server": "1.11.28",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#130): configurable ancillary catalog at the Test Framework level. public/js/scenarios.js gains an 'Ancillaries' section in the Test Framework — the OSDM standard AncillaryType examples as toggle pills plus an 'add custom' input for vendor-specific codes (e.g. BIKE); AncillaryType is an x-extensible-enum so custom values are spec-valid. Stored in framework.ancillaries. A train resource's 'Ancillaries available' picker now draws from the framework catalog (framework.ancillaries), unioned with the train's existing selections so nothing is lost — mirroring how ticket types derive from framework.rail.ticketTypes. New emptyFramework() seeds ancillaries with the OSDM standard set; the hard-coded WIZ_ANCILLARIES constant is removed in favour of OSDM_ANCILLARY_TYPES + the editable catalog.",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page → Test Framework → Ancillaries, then per train under Test Data."
+      ]
+    },
     {
       "release": "2026.55",
       "date": "2026-05-22",

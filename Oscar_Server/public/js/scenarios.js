@@ -2347,7 +2347,12 @@ const WIZ_TICKET_TYPES    = [
 ];
 const WIZ_SERVICE_CLASSES = ['BEST','HIGH','STANDARD','BASIC','ANY_CLASS'];
 const WIZ_ACCOMMODATIONS  = ['SEAT','COUCHETTE','BERTH','VEHICLE'];
-const WIZ_ANCILLARIES     = ['WIFI','FOOD_ON_BOARD','DRINKS_ON_BOARD','LUGGAGE','PARKING','PETS','ASSISTANT','ON_BOARD_SERVICE','ENTERTAINMENT'];
+// OSDM AncillaryType example values. AncillaryType is an x-extensible-enum —
+// the spec states the listed values are examples, so custom values (e.g. BIKE)
+// are valid. These seed the editable ancillary catalog at the Test Framework
+// level (issue #130); train resources then pick from framework.ancillaries
+// (standard + custom), not from a fixed constant.
+const OSDM_ANCILLARY_TYPES = ['PAYMENT_VOUCHER','PRODUCT_ACCESS','MERCHANDISE_PRODUCT','LUGGAGE','LUGGAGE_TRANSFER','ON_BOARD_SERVICE','STATION_SERVICE','FOOD_ON_BOARD','DRINKS_ON_BOARD','WIFI','PARKING'];
 const WIZ_PAX_TYPES       = [
   'ADULT','CHILD','YOUTH','SENIOR','YOUNG_CHILD','FAMILY_CHILD',
   'PRM','ACCOMP_PRM','WHEELCHAIR','DOG','PET','BICYCLE',
@@ -2450,7 +2455,7 @@ function emptyFramework() {
     fulfillment:    { media: ['PDF_A4'], types: ['ETICKET'] },
     serviceClasses:['STANDARD','HIGH'],
     accommodations:['SEAT'],
-    ancillaries:   ['WIFI'],
+    ancillaries:   [...OSDM_ANCILLARY_TYPES],
     passengerTypes:['ADULT','CHILD'],
     passengerAgeRanges: {
       ADULT: { min: 26, max: 99 },
@@ -2731,6 +2736,27 @@ function renderWizardStep1() {
       </div>
     </div>
   </div>
+
+  <!-- ④ Ancillaries catalog (issue #130) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🧳 Ancillaries<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">Ancillaries the platform supports — standard (OSDM) plus any custom ones. Train resources pick from this catalog.</div>
+        <div class="pill-group">
+          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replace(/_/g,' '))}</div>`).join('')}
+        </div>
+        ${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).length
+          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).map(a=>`<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('')}</div></div>`
+          : ''}
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <input class="param-input" id="fw-custom-ancillary" placeholder="Add custom — e.g. BIKE" style="max-width:240px" maxlength="40">
+          <button class="btn btn-small btn-secondary" data-action="fw-add-ancillary">+ Add</button>
+        </div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">OSDM <code>AncillaryType</code> is an extensible code list — custom values are spec-valid.</div>
+      </div>
+    </div>
+  </div>
   `;
 
   } catch(e) {
@@ -2836,6 +2862,31 @@ function fwToggleFulfilPill(el, subKey, value) {
   const idx = arr.indexOf(value);
   if (idx === -1) { arr.push(value); el.classList.add('selected'); }
   else            { arr.splice(idx,1); el.classList.remove('selected'); }
+}
+
+// ── Ancillary catalog helpers (issue #130) ───────────────────────────────────
+// framework.ancillaries is the editable catalog the platform supports (OSDM
+// standard + custom). Train resources pick from it. Custom add/remove re-render
+// the framework section so the new/removed pill shows immediately.
+function fwAddCustomAncillary() {
+  const input = document.getElementById('fw-custom-ancillary');
+  if (!input) return;
+  // Normalise to an UPPER_SNAKE code (OSDM AncillaryType is a string code list).
+  const code = (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!code) return;
+  const fw = wizData.framework;
+  if (!Array.isArray(fw.ancillaries)) fw.ancillaries = [];
+  if (!fw.ancillaries.includes(code)) fw.ancillaries.push(code);
+  input.value = '';
+  saveFrameworkDebounced();
+  renderWizardStep1InSection();
+}
+function fwRemoveAncillary(value) {
+  const fw = wizData.framework;
+  if (!Array.isArray(fw.ancillaries)) return;
+  fw.ancillaries = fw.ancillaries.filter(a => a !== value);
+  saveFrameworkDebounced();
+  renderWizardStep1InSection();
 }
 
 // ── Passenger type + age-range helpers ───────────────────────────────────────
@@ -3015,7 +3066,7 @@ function buildTrainDetailHTML(tidx) {
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Ancillaries available</div>
-        <div class="pill-group" id="tf-${esc(tidx)}-ancillaries">${pills(WIZ_ANCILLARIES, 'ancillaries')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-ancillaries">${pills([...new Set([...(fw.ancillaries || []), ...(d.ancillaries || [])])], 'ancillaries')}</div>
       </div>
     </div>
     </div>
@@ -4437,6 +4488,12 @@ document.body.addEventListener('click', function(e) {
       fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-pax-type':
       fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-ancillary':
+      fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-remove-ancillary':
+      fwRemoveAncillary(el.dataset.val); break;
+    case 'fw-add-ancillary':
+      fwAddCustomAncillary(); break;
 
     // ── Pill toggle (simple self-toggle) ──────────────────────────────────────
     case 'pill-toggle':
