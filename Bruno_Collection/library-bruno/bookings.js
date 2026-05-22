@@ -338,10 +338,16 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   });
 
   // Capture the first BookedOffer id for post-booking add-offer-part flows
-  // (issue #104 Stage B / ADD_TO_BOOKING). Needed for the URL of
-  // POST /bookings/{bookingId}/booked-offers/{bookedOfferId}/(offer-parts|reservations).
-  if (Array.isArray(booking.bookedOffers) && booking.bookedOffers.length > 0 && booking.bookedOffers[0].id) {
-    bru.setEnvVar("bookedOfferId", booking.bookedOffers[0].id);
+  // (issue #104 Stage B / ADD_TO_BOOKING, #108 add-ancillary). Needed for the URL
+  // of POST /bookings/{bookingId}/booked-offers/{bookedOfferId}/(offer-parts|
+  // reservations|ancillaries). Per OSDM the BookedOffer identifier is `offerId`
+  // (BookedOffer.required = [offerId]; there is no `id` field) — note this is a
+  // NEW id minted by the booking, not the original offer's id. Fall back to a
+  // legacy `.id` only if a vendor ever provides one (#147).
+  const firstBookedOffer = (Array.isArray(booking.bookedOffers) && booking.bookedOffers[0]) || null;
+  const bookedOfferId = firstBookedOffer && (firstBookedOffer.offerId || firstBookedOffer.id);
+  if (bookedOfferId) {
+    bru.setEnvVar("bookedOfferId", bookedOfferId);
   }
 
   // Price structure checks
