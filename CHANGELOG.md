@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.31] — 2026-05-22
+
+Feature (#136) — a train set is now a route + a timetable of services. Phase 2
+of the train-set/journey series (duplicate #135 → timetable → journeys #137).
+
+### Added
+- **`public/js/scenarios.js`**: a train set's `data` gains a **`services[]`**
+  array — each `{ vehicleNumber, departureTime, arrivalTime, daysOfWeek? }` — so
+  one route (e.g. Sqills IC Basel→Amsterdam) can hold the several trains that run
+  it at different hours (`OSDM_200/202/204/206`). Train Details now holds the
+  shared route (label, operator, origin/destination, optional product category);
+  a new **Services (timetable)** section lists the departures with **add/remove**
+  rows, per-service **day-of-week** toggles, and a **paste box** that parses
+  vendor tokens like `OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|…|8500010|8400058`
+  into rows (and fills empty route fields).
+- The scenario trip **"Apply test data"** picker now lists **one entry per
+  service**, so a scenario copies the route + the chosen departure.
+
+### Changed
+- `normalizeTrainData()` migrates legacy single-service train sets (top-level
+  `vehicleNumber`/`departureTime`/`arrivalTime`) into `services[0]` on read —
+  existing trains load and run unchanged. The wizard scenario generator and the
+  delete-impact check use the first service / match any service's vehicle. No
+  server route or datafile-schema change (train data is an opaque blob).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data.
+
+---
+
 ## [server-v1.11.30] — 2026-05-22
 
 Feature (#135) — duplicate a train set. Phase 1 of the train-set/journey
