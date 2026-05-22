@@ -36,6 +36,7 @@ const {
   validateCoachDeckLayouts,
   validateCoachLayout,
   validateCoachDeckLayout,
+  validatePlaceAvailability,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
@@ -418,5 +419,45 @@ describe('osdmCompliance.handleSystemInfoStatus (report application)', () => {
     expect(ctx.tests.length).toBe(1);
     expect(ctx.tests[0]).toMatch(/401 Unauthorized/);
     expect(ctx.logs.length).toBe(1);
+  });
+});
+
+describe('validatePlaceAvailability (issue #104)', () => {
+  const allOk = (checks) => checks.every((c) => c.ok);
+  const find = (checks, re) => checks.find((c) => re.test(c.name));
+
+  test('valid response with vehicleAvailability.vehicle passes', () => {
+    const checks = validatePlaceAvailability(
+      { warnings: null, problems: [], vehicleAvailability: { vehicle: { coaches: [] }, preSelections: [] } },
+      '/availabilities/place-map'
+    );
+    expect(allOk(checks)).toBe(true);
+  });
+
+  test('non-object body fails and short-circuits to a single check', () => {
+    const checks = validatePlaceAvailability(null, '/availabilities/place-map');
+    expect(checks.length).toBe(1);
+    expect(checks[0].ok).toBe(false);
+  });
+
+  test('vehicleAvailability present but missing "vehicle" fails', () => {
+    const checks = validatePlaceAvailability({ vehicleAvailability: { preSelections: [] } }, '/availabilities/place-map');
+    expect(find(checks, /required "vehicle"/).ok).toBe(false);
+  });
+
+  test('absent vehicleAvailability is valid (transaction-scoped — reported elsewhere)', () => {
+    const checks = validatePlaceAvailability({ warnings: null, problems: [] }, '/availabilities/place-map');
+    expect(allOk(checks)).toBe(true);
+    expect(find(checks, /required "vehicle"/)).toBeUndefined();
+  });
+
+  test('"problems" must be an array when present', () => {
+    const checks = validatePlaceAvailability({ problems: 'oops' }, '/availabilities/place-map');
+    expect(find(checks, /"problems"/).ok).toBe(false);
+  });
+
+  test('wrong-typed "preSelections" fails', () => {
+    const checks = validatePlaceAvailability({ vehicleAvailability: { vehicle: {}, preSelections: 'no' } }, '/availabilities/place-map');
+    expect(find(checks, /"preSelections"/).ok).toBe(false);
   });
 });

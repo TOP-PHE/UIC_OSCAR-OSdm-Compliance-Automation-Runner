@@ -1,0 +1,97 @@
+info:
+  name: 08. GET Place Maps
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{api_base}}/availabilities/place-map?contextId={{offerId}}&contextType=OFFER&resourceId={{reservationId}}&resourceType=RESERVATION"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Requestor
+      value: "{{requestor}}"
+  params:
+    - name: contextId
+      value: "{{offerId}}"
+      type: query
+    - name: contextType
+      value: OFFER
+      type: query
+    - name: resourceId
+      value: "{{reservationId}}"
+      type: query
+    - name: resourceType
+      value: RESERVATION
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+    - type: after-response
+      code: |-
+        // /availabilities/place-map is the pre-booking seat-map step
+        // (SEATMAP_AT_OFFER, issue #104). It is transaction-scoped: it needs an
+        // OFFER + RESERVATION context (contextId=offerId, resourceId=
+        // reservationId) that only exists in the sale flow — which is why it now
+        // lives here and not under System Information. It runs only when
+        // 01. POST Get Offer routed here (place selection enabled); otherwise the
+        // smart run filter skips it. The chosen place feeds 02. POST Create
+        // Booking via preselectedCoach / preselectedPlace / layoutId.
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validatePlaceAvailability } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        const endpoint = '/availabilities/place-map';
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status ────────────────────────────────────────────────────────
+        if (statusCode === 200) {
+          bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[INFO] GET ${endpoint} → 200 OK`);
+        } else {
+          validationLogger(`[ERROR] GET ${endpoint} → ${statusCode} (expected 200 for seat-map selection)`);
+          bruTest(`GET ${endpoint} → ${statusCode} (FAIL)`, () => {
+            expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
+          });
+        }
+
+        // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
+        validatePlaceAvailability(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
+        // ── Capability/offer mismatch diagnostic (#104) ───────────────────
+        // Place selection was requested but the system returned no seat map for
+        // this offer — report it (NOT_APPLICABLE-style), do not crash.
+        const _va = body && body.vehicleAvailability;
+        if (!_va) {
+          validationLogger('[WARNING] ❕ Place selection enabled but no vehicleAvailability returned — the system may not offer a seat map for this offer.');
+        }
+
+        // ── Place pre-selection extraction → feeds Create Booking ─────────
+        const vehicle = _va && _va.vehicle;
+        const coach = (vehicle && Array.isArray(vehicle.coaches)) ? vehicle.coaches[0] : null;
+        if (coach) {
+          const preSelection = Array.isArray(coach.compartments) ? coach.compartments[0] : null;
+          bru.setEnvVar("preselectedCoach", coach.coachNumber);
+          if (preSelection) bru.setEnvVar("preselectedPlace", preSelection.place);
+          bru.setEnvVar("layoutId", coach.layoutId);
+        }
+
+        // Continue the sale flow: place selection done → create the booking.
+        // (This file is seq 8; without explicit routing the runner would not
+        // reach Create Booking after a routed jump here.)
+        bru.runner.setNextRequest("02. POST Create Booking");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
