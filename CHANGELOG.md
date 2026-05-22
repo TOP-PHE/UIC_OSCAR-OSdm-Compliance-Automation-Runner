@@ -14,6 +14,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.26] — 2026-05-22
+
+Release of the **optional sale-flow features** initiative (collection
+**OTST_V2.0.3**). Bundles the Bruno-collection work that landed after v1.11.25
+into one tested, labelled version. Behaviour is **inert / zero-regression** for
+every current scenario — the new steps activate only when a scenario opts in
+(authorised by the Test Framework, v1.11.25 / #107).
+
+### Added
+- **OPT-PLACE Stage A** (#104) — `03. GET Place Maps` relocated from System
+  Information into the sale flow (`02-Common Requests/08. GET Place Maps`), run
+  as the pre-booking seat map (`SEATMAP_AT_OFFER`); `PlaceAvailabilityResponse`
+  Layer-1 compliance + a no-seat-map mismatch diagnostic.
+- **OPT-PLACE Stage B** (#124, issue #123) — `09. POST Add Reservation to
+  Booking`: post-booking add-reservation (`ADD_TO_BOOKING`), version-aware
+  endpoint (`/offer-parts` ≥3.7 else the deprecated `/reservations`);
+  `BookedOfferPartResponse` compliance. `bookings.js` now captures
+  `bookedOfferId`.
+- **OPT-ANCILLARY** (#125/#126, issue #108) — `10. POST Add Ancillary to
+  Booking` (version-aware `/offer-parts` ancillaryOfferIds ≥3.7 else
+  `/ancillaries`); plus **offer-time `AncillaryOfferPart` compliance** wired into
+  `01. POST Get Offer` (validates id/type/category on offers that carry
+  ancillaries — e.g. Sqills; no-op otherwise).
+- Optional post-booking steps **chain** in order: Create Booking → [Add
+  Reservation] → [Add Ancillary] → PATCH/GET; each gated and guarded against
+  re-runs.
+
+### Changed
+- Collection bumped **OTST_V2.0.2 → OTST_V2.0.3** to record the above.
+- CI/housekeeping (already merged): Dependabot ignores breaking-major bumps
+  (uuid/express/eslint/dotenv/node, #111/#120); SonarCloud skips-with-success on
+  Dependabot PRs so safe bumps can merge (#121); production-deps minor/patch
+  group bumped (#122).
+
+### Operator action
+None. Server change picked up after Watchtower promotes :stable (hard-refresh
+the Test Config page). Bruno collection refreshes via the refresh-collection
+workflow on merge. All new sale-flow steps stay inert until a scenario enables
+them via the Test Framework.
+
+---
+
 ## [server-v1.11.25] — 2026-05-21
 
 Optional sale-flow features — Tier-1 test-system config (issue #107). Declares

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.53",
+  "current_release": "2026.54",
   "releases": [
+    {
+      "release": "2026.54",
+      "date": "2026-05-22",
+      "server": "1.11.26",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Release of the optional sale-flow features initiative (collection OTST_V2.0.3). Bundles the Bruno-collection work that landed after v1.11.25 into one tested, labelled version; behaviour is inert / zero-regression for every current scenario (the new steps activate only when a scenario opts in, authorised by the Test Framework from v1.11.25 / #107). OPT-PLACE Stage A (#104): GET Place Maps relocated from System Information into the sale flow (02-Common Requests/08. GET Place Maps), run as the pre-booking seat map (SEATMAP_AT_OFFER), with PlaceAvailabilityResponse Layer-1 compliance + a no-seat-map mismatch diagnostic. OPT-PLACE Stage B (#124 / issue #123): 09. POST Add Reservation to Booking — post-booking add-reservation (ADD_TO_BOOKING), version-aware endpoint (/offer-parts >=3.7 else the deprecated /reservations), BookedOfferPartResponse compliance; bookings.js now captures bookedOfferId. OPT-ANCILLARY (#125/#126 / issue #108): 10. POST Add Ancillary to Booking (version-aware /offer-parts ancillaryOfferIds >=3.7 else /ancillaries) plus offer-time AncillaryOfferPart compliance wired into 01. POST Get Offer (validates id/type/category on offers that carry ancillaries, e.g. Sqills; no-op otherwise). Optional post-booking steps chain in order Create Booking -> [Add Reservation] -> [Add Ancillary] -> PATCH/GET, each gated and guarded against re-runs. Also bundles CI housekeeping already merged: Dependabot ignores breaking-major bumps (uuid/express/eslint/dotenv/node, #111/#120), SonarCloud skips-with-success on Dependabot PRs (#121), production-deps minor/patch group bump (#122).",
+        "Operator action required: none. Server change picked up after Watchtower promotes :stable (hard-refresh the Test Config page). Bruno collection refreshes via the refresh-collection workflow on merge. All new sale-flow steps stay inert until a scenario enables them via the Test Framework."
+      ]
+    },
     {
       "release": "2026.53",
       "date": "2026-05-21",
