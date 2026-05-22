@@ -107,7 +107,7 @@ runtime:
         const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
             && bru.getEnvVar("__addAncillaryDone") !== "true";
         if (_addAnc) {
-          bru.runner.setNextRequest("10. POST Add Ancillary to Booking");
+          bru.runner.setNextRequest("11. Add Ancillary - Get Additional Offers");
         } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
             || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
           bru.runner.setNextRequest("04. GET Passenger");

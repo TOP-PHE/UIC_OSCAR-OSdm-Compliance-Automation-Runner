@@ -1,0 +1,82 @@
+info:
+  name: 11. Add Ancillary - Get Additional Offers
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{api_base}}/bookings/{{bookingId}}/booked-offers/{{bookedOfferId}}/additional-offers"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Step before "10. POST Add Ancillary" (issue #150). The pre-booking
+        // offer's ancillaryOfferId is rejected post-booking ("ancillary not valid
+        // for bookedOfferId"); the bookable ancillaries for an existing booking
+        // come from GET .../additional-offers, whose offerId + ancillaryOfferParts
+        // ids are valid for THIS booking. The name contains "Add Ancillary" so the
+        // smart run filter gates it under the same salesFlow_addAncillary rule.
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+
+        const endpoint = "/bookings/{id}/booked-offers/{id}/additional-offers";
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // additional-offers is optional per OSDM — "A provider can decide to allow
+        // or reject additional offers on a booking." Non-200 → nothing to add.
+        if (statusCode === 200) {
+          bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[INFO] GET ${endpoint} → 200 OK`);
+        } else {
+          validationLogger(`[INFO] GET ${endpoint} → ${statusCode} (no additional offers; add-ancillary skipped)`);
+        }
+
+        // Pick the first additional offer that carries an ancillary part; its
+        // offerId + ancillaryOfferParts[].id are valid for this booking.
+        const offers = (body && Array.isArray(body.offers)) ? body.offers : [];
+        let chosen = null;
+        for (const o of offers) {
+          const parts = (o && Array.isArray(o.ancillaryOfferParts)) ? o.ancillaryOfferParts.filter((p) => p && p.id) : [];
+          if (parts.length > 0) { chosen = { offerId: o.offerId, ids: parts.map((p) => p.id) }; break; }
+        }
+
+        if (chosen && chosen.offerId && chosen.ids.length > 0) {
+          bru.setEnvVar("addAncillaryParentOfferId", chosen.offerId);
+          bru.setEnvVar("addAncillaryOfferIds", JSON.stringify(chosen.ids));
+          validationLogger(`[INFO] additional-offers → offerId=${chosen.offerId} ancillaryOfferIds=[${chosen.ids.join(", ")}]`);
+          bru.runner.setNextRequest("10. POST Add Ancillary to Booking");
+        } else {
+          // Nothing addable — skip the POST and continue the sale flow so the
+          // scenario doesn't dead-end. Mark done so the filter won't loop back.
+          validationLogger(`[WARNING] No additional ancillary offer available for this booking — add-ancillary skipped.`);
+          bru.setEnvVar("__addAncillaryDone", "true");
+          if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+              || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
+            bru.runner.setNextRequest("04. GET Passenger");
+          } else {
+            bru.runner.setNextRequest("03. PATCH Multi Passenger");
+          }
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
