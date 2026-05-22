@@ -789,7 +789,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -3024,8 +3024,9 @@ function renderWizardStep2() {
       ${trains.length === 0
         ? '<div style="color:#90a4ae;font-size:13px;padding:8px 0 12px">No trains configured yet — click Add Train to get started.</div>'
         : `<div id="train-list">${trainItems}</div>`}
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-train">➕ Add Train</button>
+        ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
       </div>
     </div>
   </div>
@@ -3427,8 +3428,8 @@ function wizValidateTrain(tidx) {
   return ok;
 }
 
-async function wizSaveTrain(tidx) {
-  if (!wizValidateTrain(tidx)) return;
+async function wizSaveTrain(tidx, opts = {}) {
+  if (!wizValidateTrain(tidx)) return null;
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const t = trains[tidx];
   if (!t) return;
@@ -3478,9 +3479,52 @@ async function wizSaveTrain(tidx) {
     const targetIdx = wizData.resources.findIndex(r => r === t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
+    // Save-all reads + persists several panels, then re-renders once itself.
+    if (opts.rerender === false) return saved;
     showMsg(`✅ Train "${label}" saved.`, true);
-    await refreshAllSections();
-  } catch(e) { alert(`Network error: ${e.message}`); }
+    // Re-render the Test Data section locally (no server round-trip) and re-open
+    // the saved panel — so saving a train no longer collapses it / wipes the
+    // list (#141). refreshAllSections() is unnecessary here: a resource save
+    // doesn't touch the framework, scenarios or datafile.
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenTrainById(saved.id);
+    return saved;
+  } catch(e) { alert(`Network error: ${e.message}`); return null; }
+}
+
+// Re-open a train's detail panel by resource id after a list re-render.
+function reopenTrainById(id) {
+  if (id == null) return;
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const tidx = trains.findIndex(r => String(r.id) === String(id));
+  if (tidx < 0) return;
+  const detail = document.getElementById('train-detail-' + tidx);
+  if (detail && !detail.classList.contains('open')) toggleTrainDetail(tidx);
+}
+
+// Save every train whose detail panel is open/edited (rendered), in one go.
+// Validates all first so a bad field blocks the batch before anything is sent.
+async function wizSaveAllTrains() {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const targets = [];
+  trains.forEach((t, tidx) => {
+    const detail = document.getElementById('train-detail-' + tidx);
+    if (detail && detail.dataset.rendered) targets.push(tidx);
+  });
+  if (targets.length === 0) { showMsg('Open the train(s) you want to save first (click a row to expand).', false); return; }
+  for (const tidx of targets) {
+    if (!wizValidateTrain(tidx)) { showMsg('Fix the highlighted train fields, then Save all.', false); return; }
+  }
+  const savedIds = [];
+  for (const tidx of targets) {
+    const r = await wizSaveTrain(tidx, { rerender: false });
+    if (r) savedIds.push(r.id);
+  }
+  renderTestDataSection(wizData.framework, wizData.resources);
+  renderWizardStep2InSection();
+  savedIds.forEach(reopenTrainById);
+  showMsg(`✅ Saved ${savedIds.length} train${savedIds.length !== 1 ? 's' : ''}.`, true);
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
@@ -3831,8 +3875,21 @@ async function wizSaveJourney(jidx) {
     const idx = wizData.resources.findIndex(r => r === j);
     if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
     showMsg(`✅ Journey "${label}" saved.`, true);
-    await refreshAllSections();
+    // Local re-render + re-open (keep the panel expanded after save, #141).
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenJourneyById(saved.id);
   } catch (e) { alert(`Network error: ${e.message}`); }
+}
+
+// Re-open a journey's detail panel by resource id after a list re-render.
+function reopenJourneyById(id) {
+  if (id == null) return;
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const jidx = journeys.findIndex(r => String(r.id) === String(id));
+  if (jidx < 0) return;
+  const detail = document.getElementById('journey-detail-' + jidx);
+  if (detail && !detail.classList.contains('open')) toggleJourneyDetail(jidx);
 }
 
 async function wizDeleteJourney(id) {
@@ -5110,6 +5167,8 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
+    case 'wiz-save-all-trains':
+      wizSaveAllTrains(); break;
     case 'train-add-service':
       trainAddService(parseInt(el.dataset.tidx)); break;
     case 'train-remove-service': {
