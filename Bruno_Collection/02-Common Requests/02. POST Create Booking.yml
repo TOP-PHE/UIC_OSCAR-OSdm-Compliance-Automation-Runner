@@ -75,11 +75,18 @@ runtime:
         //    when the scenario chose ADD_TO_BOOKING place selection, insert the
         //    add-reservation step before the passenger steps. It then continues
         //    to PATCH/GET Passenger itself. Inert for every current scenario.
+        //    Optional post-booking add-offer-part steps chain in order:
+        //    [Add Reservation] → [Add Ancillary] → PATCH/GET. Each runs only
+        //    when its gate is on; both default off → straight to PATCH/GET.
         const _addRes = bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
             && String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
             && bru.getEnvVar("__addReservationDone") !== "true";
+        const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
+            && bru.getEnvVar("__addAncillaryDone") !== "true";
         if (_addRes) {
             bru.runner.setNextRequest("09. POST Add Reservation to Booking");
+        } else if (_addAnc) {
+            bru.runner.setNextRequest("10. POST Add Ancillary to Booking");
         } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
             || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
             bru.runner.setNextRequest("04. GET Passenger");
