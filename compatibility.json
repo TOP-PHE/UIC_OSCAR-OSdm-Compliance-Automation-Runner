@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.60",
+  "current_release": "2026.61",
   "releases": [
+    {
+      "release": "2026.61",
+      "date": "2026-05-22",
+      "server": "1.11.33",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#141): bundle of train-set/journey usability fixes from testing the timetable (#136) and journeys (#137), all in public/js/scenarios.js. (1) Journey leg picker now labels each option by its service (route · vehicle · departure→arrival · set name) instead of the train-set name. (2) Product category was missing from the offer request (Sqills rejected it): the train set now captures productCategoryRef/Name/ShortName (was a single field; old value migrates to the ref) and all three are copied into the trip leg by every builder (per-service Apply-test-data picker, Apply-a-Journey, new-scenario wizard, datafile import); Bruno already maps these to service.productCategory. (3) Operating-days calendar moved from per-service to the train-set level (one picker for the whole timetable; old per-service days migrate up). (4) Saving a train/journey no longer collapses the panel, wipes the list, or needs a second click to re-expand — wizSaveTrain/wizSaveJourney re-render the Test Data section locally and re-open the saved panel instead of the heavy refreshAllSections(). New 'Save all trains' button persists every open/edited train at once (validates all first). Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Data. Re-open each Sqills train set to confirm the migrated product-category ref and fill name/short name from the vendor data."
+      ]
+    },
     {
       "release": "2026.60",
       "date": "2026-05-22",

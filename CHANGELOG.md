@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.33] — 2026-05-22
+
+Fixes & polish (#141) — a bundle of train-set / journey usability fixes found
+while testing the timetable (#136) and journeys (#137).
+
+### Fixed
+- **Journey leg picker labelled by service, not the train-set name** — each
+  option now reads `route · vehicle · departure→arrival · <set name>` so it is
+  clearly a *leg* (a service), not the whole set.
+- **Product category was missing from the offer request** (Sqills rejected it).
+  The train set now captures product category as **ref / name / shortName** (was
+  a single field; the old value migrates into the ref), and all three are copied
+  into the trip leg by every builder (the per-service "Apply test data" picker,
+  "Apply a Journey", the new-scenario wizard, and the datafile import). Bruno
+  already maps these into `service.productCategory`, so the request is now
+  populated.
+- **Operating-days calendar moved from per service to the train-set level** —
+  one "Operating days" picker governs the whole timetable instead of editing
+  every train; old per-service days migrate up to the set.
+- **Saving a train no longer collapses its panel / wipes the list, and no longer
+  needs a second click to re-expand.** `wizSaveTrain` / `wizSaveJourney` now
+  re-render the Test Data section locally and re-open the saved panel instead of
+  the heavy `refreshAllSections()` (a resource save doesn't touch the framework,
+  scenarios or datafile).
+
+### Added
+- **"Save all trains"** button — persists every open/edited train at once
+  (validates all panels first; a bad field blocks the batch).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data. **Re-open each Sqills train set** to confirm the migrated
+product-category **ref** and fill **name / short name** from the vendor data.
+
+---
+
 ## [server-v1.11.32] — 2026-05-22
 
 Feature (#137) — reusable multi-leg **Journeys**. Phase 3 (final) of the
