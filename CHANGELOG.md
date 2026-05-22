@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.34] — 2026-05-22
+
+Fix (#143) — the new-scenario wizard can now select a Journey (multi-leg).
+
+### Fixed
+- **`public/js/scenarios.js`** (`renderWizardStep3` / `wizGenerateScenario`): the
+  scenario-creation wizard only offered **"Select train resource"** (a single
+  train set), so a fresh **multi-leg** scenario built from a reusable Journey
+  (#137) was unreachable — a dead end. The wizard's Train / Trip Selection now
+  shows a **"Select a Journey"** dropdown (when journeys exist). Picking one sets
+  `wizScenario.journeyResourceId`, hides the single-train / trip-mode controls
+  (a journey is inherently a multi-leg SPECIFICATION), shows a route summary, and
+  `wizGenerateScenario` builds the trip as `SPECIFICATION` with
+  `legs = journeyToTripLegs(journey)` — origin/destination/times/vehicle/operator
+  **and product category** resolved per leg from each train set. Single-train
+  selection is unchanged when no journey is chosen.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Scenarios → New.
+
+---
+
 ## [server-v1.11.33] — 2026-05-22
 
 Fixes & polish (#141) — a bundle of train-set / journey usability fixes found
