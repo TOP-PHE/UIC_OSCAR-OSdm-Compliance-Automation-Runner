@@ -998,8 +998,9 @@ async function extractFromDatafile(datafile) {
           productCategoryRef: pcRef,
           productCategoryName: pcName,
           productCategoryShortName: pcShortName,
+          daysOfWeek: [],
           services: (vehicleNumber || departureTime || arrivalTime)
-            ? [{ vehicleNumber, departureTime, arrivalTime, daysOfWeek: [] }]
+            ? [{ vehicleNumber, departureTime, arrivalTime }]
             : [],
           ticketTypes: [],
           travelClasses: [],
@@ -3056,14 +3057,19 @@ function normalizeTrainData(d) {
   d = d || {};
   if (!Array.isArray(d.services)) {
     d.services = (d.vehicleNumber || d.departureTime || d.arrivalTime)
-      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '', daysOfWeek: [] }]
+      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '' }]
       : [];
+  }
+  // Operating days live at the set level (#141) — all services share one
+  // calendar. Migrate from a per-service daysOfWeek (the Phase 2 shape).
+  if (!Array.isArray(d.daysOfWeek)) {
+    const fromSvc = d.services.find(s => s && Array.isArray(s.daysOfWeek) && s.daysOfWeek.length);
+    d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
   }
   d.services = d.services.map(s => ({
     vehicleNumber: (s && s.vehicleNumber) || '',
     departureTime: (s && s.departureTime) || '',
-    arrivalTime:   (s && s.arrivalTime) || '',
-    daysOfWeek:    Array.isArray(s && s.daysOfWeek) ? s.daysOfWeek : []
+    arrivalTime:   (s && s.arrivalTime) || ''
   }));
   // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
   // single `productCategory` text field into the ref so saved sets keep working.
@@ -3091,17 +3097,14 @@ function parseServiceToken(tok) {
   };
 }
 
-// One <tr> for a service row in the timetable table.
+// One <tr> for a service row in the timetable table. Operating days are set
+// once for the whole set (#141), so a service row is just vehicle + times.
 function trainServiceRowHtml(s) {
   s = s || {};
-  const days = WIZ_DAYS.map(dy =>
-    `<span class="pill svc-day${(s.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}" style="padding:2px 6px;font-size:10px">${esc(dy.label)}</span>`
-  ).join('');
   return `<tr class="svc-row">
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="vehicleNumber" value="${esc(s.vehicleNumber || '')}" placeholder="OSDM_202" style="min-width:90px"></td>
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="departureTime" value="${esc(s.departureTime || '')}" placeholder="09:10:00+02:00" style="min-width:130px"></td>
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="arrivalTime" value="${esc(s.arrivalTime || '')}" placeholder="16:35:00+02:00" style="min-width:130px"></td>
-    <td style="padding:3px 6px"><div class="pill-group" style="gap:3px;flex-wrap:wrap;max-width:230px">${days}</div></td>
     <td style="padding:3px 6px"><button class="row-delete-btn" data-action="train-remove-service" title="Remove this service">🗑</button></td>
   </tr>`;
 }
@@ -3117,8 +3120,7 @@ function readTrainServiceRows(tidx) {
     return {
       vehicleNumber: val('vehicleNumber'),
       departureTime: val('departureTime'),
-      arrivalTime:   val('arrivalTime'),
-      daysOfWeek:    [...row.querySelectorAll('.svc-day.selected')].map(p => p.dataset.val).filter(Boolean)
+      arrivalTime:   val('arrivalTime')
     };
   });
 }
@@ -3132,7 +3134,7 @@ function reRenderTrainServices(tidx, services) {
 
 function trainAddService(tidx) {
   const rows = readTrainServiceRows(tidx);
-  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '', daysOfWeek: [] });
+  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '' });
   reRenderTrainServices(tidx, rows);
 }
 
@@ -3157,7 +3159,7 @@ function trainPasteServices(tidx) {
   const parsed = tokens.map(parseServiceToken).filter(Boolean);
   if (parsed.length === 0) return;
   const rows = readTrainServiceRows(tidx);
-  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime, daysOfWeek: [] }));
+  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime }));
   reRenderTrainServices(tidx, rows);
   // Fill empty route inputs from the first token.
   const first = parsed[0];
@@ -3249,13 +3251,17 @@ function buildTrainDetailHTML(tidx) {
     <div class="param-section-head" data-action="toggle-param-section">🕑 Services (timetable)<span class="ps-arrow open">▶</span></div>
     <div class="param-section-body open">
     <div style="padding:12px 14px">
+      <div class="fw-subsection" style="margin-bottom:12px">
+        <div class="fw-subsection-label">Operating days <span class="param-hint">(empty = daily — applies to every service in this set)</span></div>
+        <div class="pill-group" id="tf-${esc(tidx)}-days">${WIZ_DAYS.map(dy => `<div class="pill${(d.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}">${esc(dy.label)}</div>`).join('')}</div>
+      </div>
       <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">
         <input class="param-input" id="tf-${esc(tidx)}-paste" placeholder="Paste service tokens, one per line — OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058" style="flex:1;min-width:260px;font-size:11px;font-family:'Consolas','Monaco','Courier New',monospace">
         <button class="btn btn-secondary btn-sm" data-action="train-paste-service" data-tidx="${esc(tidx)}" title="Parse the pasted tokens into service rows">📥 Add from tokens</button>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="text-align:left;color:#90a4ae;font-size:11px">
-          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th style="padding:3px 6px">Days <span style="font-weight:400">(empty = daily)</span></th><th></th>
+          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th></th>
         </tr></thead>
         <tbody id="tf-${esc(tidx)}-services">${(d.services.length ? d.services : [{}]).map(trainServiceRowHtml).join('')}</tbody>
       </table>
@@ -3355,6 +3361,7 @@ function readTrainDetailFields(tidx) {
     productCategoryRef:       field('productCategoryRef'),
     productCategoryName:      field('productCategoryName'),
     productCategoryShortName: field('productCategoryShortName'),
+    daysOfWeek:    getSelectedPills(`tf-${esc(tidx)}-days`),
     services:      readTrainServiceRows(tidx),
     ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
     travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
@@ -3435,6 +3442,7 @@ async function wizSaveTrain(tidx) {
     productCategoryRef:       fields.productCategoryRef,
     productCategoryName:      fields.productCategoryName,
     productCategoryShortName: fields.productCategoryShortName,
+    daysOfWeek:       fields.daysOfWeek,
     services:         fields.services,
     ticketTypes:      fields.ticketTypes,
     travelClasses:    fields.travelClasses,
