@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS test_frameworks (
 CREATE TABLE IF NOT EXISTS test_resources (
   id            TEXT PRIMARY KEY,                -- UUID
   company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  resource_type TEXT NOT NULL DEFAULT 'TRAIN',   -- 'TRAIN' | 'MULTIMODAL'
+  resource_type TEXT NOT NULL DEFAULT 'TRAIN',   -- 'TRAIN' | 'JOURNEY' | 'MULTIMODAL'
   label         TEXT NOT NULL DEFAULT '',        -- human-readable short name
   data          TEXT NOT NULL DEFAULT '{}',      -- JSON blob (see API for schema)
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),

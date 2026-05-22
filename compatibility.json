@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.59",
+  "current_release": "2026.60",
   "releases": [
+    {
+      "release": "2026.60",
+      "date": "2026-05-22",
+      "server": "1.11.32",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#137): reusable multi-leg Journeys — Phase 3 (final) of the train-set/journey series (duplicate #135 -> timetable #136 -> journeys). New JOURNEY test-resource type (src/api/routes/company-test-resources.js allow-list adds 'JOURNEY'; schema.sql comment). A journey's data is { legs: [ { trainResourceId, serviceIndex } ] } — an ordered list of legs each referencing a train set + a chosen service from its timetable (#136). public/js/scenarios.js gains a Journeys section under Test Resources (replacing the Multimodal 'coming soon' placeholder): add/duplicate/delete journeys; each journey edits its ordered legs (pick train set + service per leg, reorder, remove) with a live route summary. Scenario trip gains an 'Apply a Journey' picker that fills all trip legs from a saved journey (sets SPECIFICATION). Journeys are copied into a scenario's legs at apply-time (not referenced), so deleting one can't orphan a scenario; no datafile-schema change since the generated tripRequirement.legs[] is what the runtime already consumes. Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Data."
+      ]
+    },
     {
       "release": "2026.59",
       "date": "2026-05-22",
