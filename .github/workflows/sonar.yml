@@ -35,14 +35,14 @@ jobs:
 
     steps:
       - name: Checkout (full history for blame)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Sonar needs the full Git history to attribute issues to commits
           # for the "new code" period. Shallow clones produce blank blame.
           fetch-depth: 0
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -79,7 +79,7 @@ jobs:
 
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}
-        uses: SonarSource/sonarcloud-github-action@v3
+        uses: SonarSource/sonarcloud-github-action@v5
         env:
           # Provided automatically by GitHub for PR decoration (commit
           # statuses, PR comments). Read-only.
