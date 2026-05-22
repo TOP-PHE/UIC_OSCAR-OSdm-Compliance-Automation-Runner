@@ -789,7 +789,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -972,21 +972,20 @@ async function extractFromDatafile(datafile) {
     const trips = datafile.tripRequirements || [];
     const trainResources = trips.map((trip, idx) => {
       let origin = '', destination = '', departureTime = '', arrivalTime = '', vehicleNumber = '', operatorCode = '';
-      if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0) {
-        const leg = trip.legs[0];
-        origin = leg.origin || '';
-        destination = leg.destination || '';
-        departureTime = (leg.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (leg.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = leg.vehicleNumber || '';
-        operatorCode = leg.operatorCode || '';
-      } else if (trip.trip) {
-        origin = trip.trip.origin || '';
-        destination = trip.trip.destination || '';
-        departureTime = (trip.trip.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (trip.trip.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = trip.trip.vehicleNumber || '';
-        operatorCode = trip.trip.operatorCode || '';
+      let pcRef = '', pcName = '', pcShortName = '';
+      const src = (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0)
+        ? trip.legs[0]
+        : (trip.trip || null);
+      if (src) {
+        origin = src.origin || '';
+        destination = src.destination || '';
+        departureTime = (src.startDatetime || '').replace(/%TRIP_DATE%T/, '');
+        arrivalTime = (src.endDatetime || '').replace(/%TRIP_DATE%T/, '');
+        vehicleNumber = src.vehicleNumber || '';
+        operatorCode = src.operatorCode || '';
+        pcRef = src.productCategoryRef || '';
+        pcName = src.productCategoryName || '';
+        pcShortName = src.productCategoryShortName || '';
       }
 
       return {
@@ -996,9 +995,12 @@ async function extractFromDatafile(datafile) {
           originURN: origin,
           destinationURN: destination,
           operatorCode,
-          productCategory: '',
+          productCategoryRef: pcRef,
+          productCategoryName: pcName,
+          productCategoryShortName: pcShortName,
+          daysOfWeek: [],
           services: (vehicleNumber || departureTime || arrivalTime)
-            ? [{ vehicleNumber, departureTime, arrivalTime, daysOfWeek: [] }]
+            ? [{ vehicleNumber, departureTime, arrivalTime }]
             : [],
           ticketTypes: [],
           travelClasses: [],
@@ -3022,8 +3024,9 @@ function renderWizardStep2() {
       ${trains.length === 0
         ? '<div style="color:#90a4ae;font-size:13px;padding:8px 0 12px">No trains configured yet — click Add Train to get started.</div>'
         : `<div id="train-list">${trainItems}</div>`}
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-train">➕ Add Train</button>
+        ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
       </div>
     </div>
   </div>
@@ -3055,15 +3058,25 @@ function normalizeTrainData(d) {
   d = d || {};
   if (!Array.isArray(d.services)) {
     d.services = (d.vehicleNumber || d.departureTime || d.arrivalTime)
-      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '', daysOfWeek: [] }]
+      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '' }]
       : [];
+  }
+  // Operating days live at the set level (#141) — all services share one
+  // calendar. Migrate from a per-service daysOfWeek (the Phase 2 shape).
+  if (!Array.isArray(d.daysOfWeek)) {
+    const fromSvc = d.services.find(s => s && Array.isArray(s.daysOfWeek) && s.daysOfWeek.length);
+    d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
   }
   d.services = d.services.map(s => ({
     vehicleNumber: (s && s.vehicleNumber) || '',
     departureTime: (s && s.departureTime) || '',
-    arrivalTime:   (s && s.arrivalTime) || '',
-    daysOfWeek:    Array.isArray(s && s.daysOfWeek) ? s.daysOfWeek : []
+    arrivalTime:   (s && s.arrivalTime) || ''
   }));
+  // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
+  // single `productCategory` text field into the ref so saved sets keep working.
+  if (d.productCategoryRef == null)       d.productCategoryRef = d.productCategory || '';
+  if (d.productCategoryName == null)      d.productCategoryName = '';
+  if (d.productCategoryShortName == null) d.productCategoryShortName = '';
   return d;
 }
 
@@ -3085,17 +3098,14 @@ function parseServiceToken(tok) {
   };
 }
 
-// One <tr> for a service row in the timetable table.
+// One <tr> for a service row in the timetable table. Operating days are set
+// once for the whole set (#141), so a service row is just vehicle + times.
 function trainServiceRowHtml(s) {
   s = s || {};
-  const days = WIZ_DAYS.map(dy =>
-    `<span class="pill svc-day${(s.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}" style="padding:2px 6px;font-size:10px">${esc(dy.label)}</span>`
-  ).join('');
   return `<tr class="svc-row">
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="vehicleNumber" value="${esc(s.vehicleNumber || '')}" placeholder="OSDM_202" style="min-width:90px"></td>
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="departureTime" value="${esc(s.departureTime || '')}" placeholder="09:10:00+02:00" style="min-width:130px"></td>
     <td style="padding:3px 6px"><input class="param-input" data-svc-field="arrivalTime" value="${esc(s.arrivalTime || '')}" placeholder="16:35:00+02:00" style="min-width:130px"></td>
-    <td style="padding:3px 6px"><div class="pill-group" style="gap:3px;flex-wrap:wrap;max-width:230px">${days}</div></td>
     <td style="padding:3px 6px"><button class="row-delete-btn" data-action="train-remove-service" title="Remove this service">🗑</button></td>
   </tr>`;
 }
@@ -3111,8 +3121,7 @@ function readTrainServiceRows(tidx) {
     return {
       vehicleNumber: val('vehicleNumber'),
       departureTime: val('departureTime'),
-      arrivalTime:   val('arrivalTime'),
-      daysOfWeek:    [...row.querySelectorAll('.svc-day.selected')].map(p => p.dataset.val).filter(Boolean)
+      arrivalTime:   val('arrivalTime')
     };
   });
 }
@@ -3126,7 +3135,7 @@ function reRenderTrainServices(tidx, services) {
 
 function trainAddService(tidx) {
   const rows = readTrainServiceRows(tidx);
-  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '', daysOfWeek: [] });
+  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '' });
   reRenderTrainServices(tidx, rows);
 }
 
@@ -3151,7 +3160,7 @@ function trainPasteServices(tidx) {
   const parsed = tokens.map(parseServiceToken).filter(Boolean);
   if (parsed.length === 0) return;
   const rows = readTrainServiceRows(tidx);
-  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime, daysOfWeek: [] }));
+  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime }));
   reRenderTrainServices(tidx, rows);
   // Fill empty route inputs from the first token.
   const first = parsed[0];
@@ -3218,11 +3227,22 @@ function buildTrainDetailHTML(tidx) {
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
           <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
-        <!-- Row 3: Product category (full width, optional) -->
+        <!-- Row 3: Product category ref | short name -->
+        <div class="param-field">
+          <label class="param-label">Product category ref <span class="param-hint">(urn:uic:sbc:… — sent in the request)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryRef" value="${esc(d.productCategoryRef || '')}" placeholder="urn:uic:sbc:SQILLS_HS">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryRef-err"></span>
+        </div>
+        <div class="param-field">
+          <label class="param-label">Product category short name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryShortName" value="${esc(d.productCategoryShortName || '')}" placeholder="Sqills High Speed train">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryShortName-err"></span>
+        </div>
+        <!-- Row 4: Product category name (full width, optional) -->
         <div class="param-field" style="grid-column:1/-1">
-          <label class="param-label">Product category <span class="param-hint">(optional — e.g. urn:uic:sbc:SQILLS_IC or a short name)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategory" value="${esc(d.productCategory || '')}" placeholder="urn:uic:sbc:SQILLS_IC" style="max-width:360px">
-          <span class="field-error" id="tf-${esc(tidx)}-productCategory-err"></span>
+          <label class="param-label">Product category name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryName" value="${esc(d.productCategoryName || '')}" placeholder="Sqills High Speed train" style="max-width:360px">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryName-err"></span>
         </div>
       </div>
     </div>
@@ -3232,13 +3252,17 @@ function buildTrainDetailHTML(tidx) {
     <div class="param-section-head" data-action="toggle-param-section">🕑 Services (timetable)<span class="ps-arrow open">▶</span></div>
     <div class="param-section-body open">
     <div style="padding:12px 14px">
+      <div class="fw-subsection" style="margin-bottom:12px">
+        <div class="fw-subsection-label">Operating days <span class="param-hint">(empty = daily — applies to every service in this set)</span></div>
+        <div class="pill-group" id="tf-${esc(tidx)}-days">${WIZ_DAYS.map(dy => `<div class="pill${(d.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}">${esc(dy.label)}</div>`).join('')}</div>
+      </div>
       <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">
         <input class="param-input" id="tf-${esc(tidx)}-paste" placeholder="Paste service tokens, one per line — OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058" style="flex:1;min-width:260px;font-size:11px;font-family:'Consolas','Monaco','Courier New',monospace">
         <button class="btn btn-secondary btn-sm" data-action="train-paste-service" data-tidx="${esc(tidx)}" title="Parse the pasted tokens into service rows">📥 Add from tokens</button>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="text-align:left;color:#90a4ae;font-size:11px">
-          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th style="padding:3px 6px">Days <span style="font-weight:400">(empty = daily)</span></th><th></th>
+          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th></th>
         </tr></thead>
         <tbody id="tf-${esc(tidx)}-services">${(d.services.length ? d.services : [{}]).map(trainServiceRowHtml).join('')}</tbody>
       </table>
@@ -3335,7 +3359,10 @@ function readTrainDetailFields(tidx) {
     originURN:     field('originURN'),
     destinationURN:field('destinationURN'),
     operatorCode:  field('operatorCode'),
-    productCategory: field('productCategory'),
+    productCategoryRef:       field('productCategoryRef'),
+    productCategoryName:      field('productCategoryName'),
+    productCategoryShortName: field('productCategoryShortName'),
+    daysOfWeek:    getSelectedPills(`tf-${esc(tidx)}-days`),
     services:      readTrainServiceRows(tidx),
     ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
     travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
@@ -3401,8 +3428,8 @@ function wizValidateTrain(tidx) {
   return ok;
 }
 
-async function wizSaveTrain(tidx) {
-  if (!wizValidateTrain(tidx)) return;
+async function wizSaveTrain(tidx, opts = {}) {
+  if (!wizValidateTrain(tidx)) return null;
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const t = trains[tidx];
   if (!t) return;
@@ -3413,7 +3440,10 @@ async function wizSaveTrain(tidx) {
     originURN:        fields.originURN,
     destinationURN:   fields.destinationURN,
     operatorCode:     fields.operatorCode,
-    productCategory:  fields.productCategory,
+    productCategoryRef:       fields.productCategoryRef,
+    productCategoryName:      fields.productCategoryName,
+    productCategoryShortName: fields.productCategoryShortName,
+    daysOfWeek:       fields.daysOfWeek,
     services:         fields.services,
     ticketTypes:      fields.ticketTypes,
     travelClasses:    fields.travelClasses,
@@ -3449,9 +3479,52 @@ async function wizSaveTrain(tidx) {
     const targetIdx = wizData.resources.findIndex(r => r === t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
+    // Save-all reads + persists several panels, then re-renders once itself.
+    if (opts.rerender === false) return saved;
     showMsg(`✅ Train "${label}" saved.`, true);
-    await refreshAllSections();
-  } catch(e) { alert(`Network error: ${e.message}`); }
+    // Re-render the Test Data section locally (no server round-trip) and re-open
+    // the saved panel — so saving a train no longer collapses it / wipes the
+    // list (#141). refreshAllSections() is unnecessary here: a resource save
+    // doesn't touch the framework, scenarios or datafile.
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenTrainById(saved.id);
+    return saved;
+  } catch(e) { alert(`Network error: ${e.message}`); return null; }
+}
+
+// Re-open a train's detail panel by resource id after a list re-render.
+function reopenTrainById(id) {
+  if (id == null) return;
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const tidx = trains.findIndex(r => String(r.id) === String(id));
+  if (tidx < 0) return;
+  const detail = document.getElementById('train-detail-' + tidx);
+  if (detail && !detail.classList.contains('open')) toggleTrainDetail(tidx);
+}
+
+// Save every train whose detail panel is open/edited (rendered), in one go.
+// Validates all first so a bad field blocks the batch before anything is sent.
+async function wizSaveAllTrains() {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const targets = [];
+  trains.forEach((t, tidx) => {
+    const detail = document.getElementById('train-detail-' + tidx);
+    if (detail && detail.dataset.rendered) targets.push(tidx);
+  });
+  if (targets.length === 0) { showMsg('Open the train(s) you want to save first (click a row to expand).', false); return; }
+  for (const tidx of targets) {
+    if (!wizValidateTrain(tidx)) { showMsg('Fix the highlighted train fields, then Save all.', false); return; }
+  }
+  const savedIds = [];
+  for (const tidx of targets) {
+    const r = await wizSaveTrain(tidx, { rerender: false });
+    if (r) savedIds.push(r.id);
+  }
+  renderTestDataSection(wizData.framework, wizData.resources);
+  renderWizardStep2InSection();
+  savedIds.forEach(reopenTrainById);
+  showMsg(`✅ Saved ${savedIds.length} train${savedIds.length !== 1 ? 's' : ''}.`, true);
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
@@ -3580,6 +3653,9 @@ function journeyToTripLegs(j) {
     if (svc.arrivalTime)   out.endDatetime   = '%TRIP_DATE%T' + svc.arrivalTime;
     if (svc.vehicleNumber) out.vehicleNumber = svc.vehicleNumber;
     if (d.operatorCode)    out.operatorCode  = d.operatorCode;
+    if (d.productCategoryRef)       out.productCategoryRef       = d.productCategoryRef;
+    if (d.productCategoryName)      out.productCategoryName      = d.productCategoryName;
+    if (d.productCategoryShortName) out.productCategoryShortName = d.productCategoryShortName;
     return out;
   }).filter(Boolean);
 }
@@ -3589,13 +3665,18 @@ function journeyLegPickerHtml(jidx, li, leg) {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const sel = leg && leg.trainResourceId !== '' && leg.trainResourceId != null
     ? `${leg.trainResourceId}::${leg.serviceIndex || 0}` : '';
-  const opts = ['<option value="">— pick a train + service —</option>'];
+  const opts = ['<option value="">— pick a service for this leg —</option>'];
   trains.forEach(t => {
     const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
     const route = [d.originURN, d.destinationURN].filter(Boolean).map(stnShort).join('→');
     (d.services.length ? d.services : [{}]).forEach((s, si) => {
       const v = `${t.id}::${si}`;
-      const lbl = [t.label || '?', route, [s.vehicleNumber, s.departureTime].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+      // Identify the leg by its *service* (route · vehicle · departure→arrival),
+      // not the train-set label — a set holds several services, so leading with
+      // the set name was misleading (#141). The set name trails as context.
+      const times = [s.departureTime, s.arrivalTime].filter(Boolean).join('→');
+      const svc = [route, s.vehicleNumber, times].filter(Boolean).join(' · ');
+      const lbl = svc ? `${svc}  ·  ${t.label || '?'}` : (t.label || '?');
       opts.push(`<option value="${esc(v)}" ${sel === v ? 'selected' : ''}>${esc(lbl)}</option>`);
     });
   });
@@ -3794,8 +3875,21 @@ async function wizSaveJourney(jidx) {
     const idx = wizData.resources.findIndex(r => r === j);
     if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
     showMsg(`✅ Journey "${label}" saved.`, true);
-    await refreshAllSections();
+    // Local re-render + re-open (keep the panel expanded after save, #141).
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenJourneyById(saved.id);
   } catch (e) { alert(`Network error: ${e.message}`); }
+}
+
+// Re-open a journey's detail panel by resource id after a list re-render.
+function reopenJourneyById(id) {
+  if (id == null) return;
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const jidx = journeys.findIndex(r => String(r.id) === String(id));
+  if (jidx < 0) return;
+  const detail = document.getElementById('journey-detail-' + jidx);
+  if (detail && !detail.classList.contains('open')) toggleJourneyDetail(jidx);
 }
 
 async function wizDeleteJourney(id) {
@@ -4550,9 +4644,9 @@ async function wizGenerateScenario() {
           destination:              resolvedDestination,
           startDatetime:            `%TRIP_DATE%T${svc0.departureTime || '07:00:00+01:00'}`,
           endDatetime:              `%TRIP_DATE%T${svc0.arrivalTime   || '09:00:00+01:00'}`,
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
           vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }]
@@ -4567,9 +4661,9 @@ async function wizGenerateScenario() {
           destination:              resolvedDestination,
           startDatetime:            svc0.departureTime  ? `%TRIP_DATE%T${svc0.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
           endDatetime:              svc0.arrivalTime    ? `%TRIP_DATE%T${svc0.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
           vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }
@@ -5073,6 +5167,8 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
+    case 'wiz-save-all-trains':
+      wizSaveAllTrains(); break;
     case 'train-add-service':
       trainAddService(parseInt(el.dataset.tidx)); break;
     case 'train-remove-service': {
@@ -5376,6 +5472,10 @@ document.body.addEventListener('change', function(e) {
       if (svc.arrivalTime)     t.endDatetime    = '%TRIP_DATE%T' + svc.arrivalTime;
       if (svc.vehicleNumber)   t.vehicleNumber  = svc.vehicleNumber;
       if (data.operatorCode)   t.operatorCode   = data.operatorCode;
+      // Product category (#141) — carried into the request's service.productCategory.
+      if (data.productCategoryRef)       t.productCategoryRef       = data.productCategoryRef;
+      if (data.productCategoryName)      t.productCategoryName      = data.productCategoryName;
+      if (data.productCategoryShortName) t.productCategoryShortName = data.productCategoryShortName;
       markDirty();
       // Reset the dropdown to its placeholder so it reads as "apply again"
       // next time (avoids users wondering whether the select remembered
