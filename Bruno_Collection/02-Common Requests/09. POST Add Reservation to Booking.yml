@@ -102,8 +102,13 @@ runtime:
         // step if the flow falls through to it again at the end of the scenario.
         bru.setEnvVar('__addReservationDone', 'true');
 
-        // Continue the sale flow — same PATCH-vs-GET decision as Create Booking.
-        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+        // Continue the sale flow: chain to Add Ancillary if that step is also
+        // enabled, otherwise the same PATCH-vs-GET decision as Create Booking.
+        const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
+            && bru.getEnvVar("__addAncillaryDone") !== "true";
+        if (_addAnc) {
+          bru.runner.setNextRequest("10. POST Add Ancillary to Booking");
+        } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
             || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
           bru.runner.setNextRequest("04. GET Passenger");
         } else {

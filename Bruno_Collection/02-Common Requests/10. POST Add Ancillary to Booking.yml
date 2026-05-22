@@ -1,0 +1,106 @@
+info:
+  name: 10. POST Add Ancillary to Booking
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings/{{bookingId}}/booked-offers/{{bookedOfferId}}/{{addAncillaryResource}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: |
+      {{addAncillaryBody}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Add-ancillary step (OPT-ANCILLARY, issue #108). Adds an ancillary
+        // offer part to an existing booking. Version-aware endpoint: the unified
+        // /offer-parts (OSDM >= 3.7, body uses ancillaryOfferIds[]) else the
+        // /ancillaries endpoint (all versions, body uses a single
+        // ancillaryOfferId). Reached only when a scenario enabled "Add ancillary"
+        // (salesFlow_addAncillary) AND the offer carried ancillary parts;
+        // otherwise the smart run filter skips it.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+
+        const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
+        bru.setVar('addAncillaryResource', useOfferParts ? 'offer-parts' : 'ancillaries');
+
+        // ── Best-effort request body ───────────────────────────────────────
+        // No add-ancillary scenario / supporting vendor exists yet to validate
+        // the exact shape; this assembles the schema-required fields from env
+        // set by offers.js (referencedAncillaryIds) and scenarioParser
+        // (bookingPassengerReferences). Schemas:
+        //   >=3.7 BookedOfferPartRequest:      offerId*, passengerRefs* (+ ancillaryOfferIds)
+        //   any   BookedOfferAncillaryRequest: offerId*, ancillaryOfferId*, passengerRefs*
+        const offerId = bru.getEnvVar('offerId');
+        let passengerRefs = [];
+        try { passengerRefs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch (_e) {}
+        let ancillaryOfferIds = [];
+        try { ancillaryOfferIds = JSON.parse(bru.getEnvVar('referencedAncillaryIds') || '[]'); } catch (_e) {}
+        ancillaryOfferIds = Array.isArray(ancillaryOfferIds) ? ancillaryOfferIds.filter(Boolean) : [];
+
+        const body = useOfferParts
+          ? { offerId: offerId, passengerRefs: passengerRefs, ancillaryOfferIds: ancillaryOfferIds }
+          : { offerId: offerId, ancillaryOfferId: ancillaryOfferIds[0], passengerRefs: passengerRefs };
+        bru.setVar('addAncillaryBody', JSON.stringify(body));
+
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        const resource = bru.getVar('addAncillaryResource') || 'offer-parts';
+        const endpoint = `/bookings/{id}/booked-offers/{id}/${resource}`;
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status ────────────────────────────────────────────────────────
+        if (statusCode === 200) {
+          bruTest(`POST ${endpoint} (ancillary) → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[INFO] POST ${endpoint} (ancillary) → 200 OK`);
+        } else {
+          validationLogger(`[ERROR] POST ${endpoint} (ancillary) → ${statusCode} (expected 200 adding an ancillary to the booking)`);
+          bruTest(`POST ${endpoint} (ancillary) → ${statusCode} (FAIL)`, () => {
+            expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
+          });
+        }
+
+        // ── OSDM compliance (Layer 1): BookedOfferPart/Ancillary response ──
+        // BookedOfferAncillaryResponse shares the { warnings?, problems[],
+        // bookedOffers[] } envelope with BookedOfferPartResponse.
+        validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
+        // Mark done so the smart run filter does not re-run this post-booking
+        // step if the flow falls through to it again at the end of the scenario.
+        bru.setEnvVar('__addAncillaryDone', 'true');
+
+        // Continue the sale flow — same PATCH-vs-GET decision as Create Booking.
+        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+            || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
+          bru.runner.setNextRequest("04. GET Passenger");
+        } else {
+          bru.runner.setNextRequest("03. PATCH Multi Passenger");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

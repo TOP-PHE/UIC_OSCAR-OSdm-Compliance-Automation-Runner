@@ -115,6 +115,7 @@ request:
           var _isToken    = _rn.includes('token') || _rn.includes('access');
           var _isPlaceMap = _ru.includes('place-map') || _rn.includes('place map');
           var _isAddReservation = _rn.includes('add reservation');
+          var _isAddAncillary   = _rn.includes('add ancillary');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
@@ -134,6 +135,10 @@ request:
           var _runAddReservation = (bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
                                  && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true';
 
+          // Post-booking add-ancillary runs only when the scenario enabled it
+          // (salesFlow_addAncillary, authorised by the framework #107), once.
+          var _runAddAncillary = String(bru.getEnvVar('salesFlow_addAncillary')) === 'true';
+
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
             _skipReason = 'not for "' + _sandbox + '" sandbox';
@@ -141,6 +146,8 @@ request:
             else if (_isPlaceMap && bru.getEnvVar('bookingId'))           { _skipReason = 'place map is pre-booking only (booking already created)'; }
             else if (_isAddReservation && !_runAddReservation)            { _skipReason = 'add-reservation not enabled (ADD_TO_BOOKING)'; }
             else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
+            else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
+            else if (_isAddAncillary && bru.getEnvVar('__addAncillaryDone') === 'true') { _skipReason = 'add-ancillary already done this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
             else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange)) { _skipReason = 'not in SALE+PLACEMAP scope'; }
             else if (_st === 'REFUND'        && _isExchange)               { _skipReason = 'Exchange excluded for REFUND scenario'; }
@@ -208,7 +215,7 @@ request:
                 "admissionPartsPrice", "reservationPartsPrice", "ancillaryPartsPrice",
                 "referencedAncillaryIds", "passengerCount",
                 // Booking
-                "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone",
+                "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone", "__addAncillaryDone",
                 "admissionReservationAncillaryBookingPartsIds",
                 "provisionalPrice", "provisionalPriceAmount",
                 "confirmedPriceAmount", "bookingConfirmedPrice",
