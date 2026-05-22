@@ -48,7 +48,15 @@ updates:
     ignore:
       # Major bumps come through as their own PR but are NOT auto-grouped —
       # explicitly list any package whose major bumps you never want PRs for
-      # here. Currently we accept all majors as separate PRs.
+      # here.
+      # uuid: v7+ is ESM-only. OSCAR is CommonJS (require('uuid') in
+      # company-test-framework.js, company-test-resources.js, …), so a major
+      # bump breaks both Jest and the running server (PR #110 / v14.0.0 →
+      # "SyntaxError: Unexpected token 'export'"). Stay on 9.x until we either
+      # migrate to ESM or drop the dep for Node's built-in crypto.randomUUID().
+      - dependency-name: uuid
+        update-types:
+          - version-update:semver-major
 
   # ── docker: base image (node:22-slim) ──────────────────────────────────────
   - package-ecosystem: docker
