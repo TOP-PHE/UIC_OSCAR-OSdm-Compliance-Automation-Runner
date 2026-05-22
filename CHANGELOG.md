@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.35] — 2026-05-22
+
+Offer-criteria polish (#145).
+
+### Fixed
+- **`public/js/scenarios.js`**: the new-scenario wizard's **Offer mode** can now
+  be left empty (a "— none —" option). `offerSearchCriteria` and all its fields
+  are optional per OSDM (verified v3.4 & v3.8: `OfferSearchCriteria` has no
+  required properties, and `offerSearchCriteria` is not required on
+  `OfferCollectionRequest`/`ExchangeOfferCollectionRequest`); the wizard
+  previously forced a mode while every other criterion was clearable. Selecting
+  "none" omits `offerMode` from the request.
+
+### Added
+- **Journey leg-continuity guard**: the journey editor now warns (amber banner,
+  live) when a leg **departs before the previous leg arrives** or **starts at a
+  different station** than the previous leg ends — the trap that produced an
+  empty Sqills offer (OSDM_202 arrived 16:35 but OSDM_109 departed 15:00). Soft
+  warning, since overnight connections are legitimate.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Scenarios.
+
+---
+
 ## [server-v1.11.34] — 2026-05-22
 
 Fix (#143) — the new-scenario wizard can now select a Journey (multi-leg).

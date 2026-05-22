@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.62",
+  "current_release": "2026.63",
   "releases": [
+    {
+      "release": "2026.63",
+      "date": "2026-05-22",
+      "server": "1.11.35",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Offer-criteria polish (#145), public/js/scenarios.js. (1) The new-scenario wizard's Offer mode can be left empty (a '— none —' option). offerSearchCriteria and all its fields are optional per OSDM (verified v3.4 & v3.8: OfferSearchCriteria has no required properties; offerSearchCriteria is not required on OfferCollectionRequest/ExchangeOfferCollectionRequest); the wizard previously forced a mode while every other criterion was clearable. Selecting 'none' omits offerMode from the request. (2) Journey leg-continuity guard: the journey editor warns (amber banner, live) when a leg departs before the previous leg arrives, or starts at a different station than the previous leg ends — the trap that produced an empty Sqills offer (OSDM_202 arrived 16:35 but OSDM_109 departed 15:00). Soft warning (overnight connections are legitimate). Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Scenarios."
+      ]
+    },
     {
       "release": "2026.62",
       "date": "2026-05-22",
