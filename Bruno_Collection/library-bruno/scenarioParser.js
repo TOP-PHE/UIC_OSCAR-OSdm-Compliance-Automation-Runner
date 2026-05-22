@@ -67,7 +67,7 @@ function resetScenarioEnvVars() {
     "admissionPartsPrice", "reservationPartsPrice", "ancillaryPartsPrice",
     "referencedAncillaryIds", "passengerCount",
     // Booking
-    "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone",
+    "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone", "__addAncillaryDone",
     "admissionReservationAncillaryBookingPartsIds",
     "provisionalPrice", "provisionalPriceAmount",
     "confirmedPriceAmount", "bookingConfirmedPrice",
