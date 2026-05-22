@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.36] — 2026-05-22 + collection-OTST_V2.0.4
+
+Collection version bump — surface the Bruno-collection fixes that shipped on
+collection 2.0.3 without a version change.
+
+### Changed
+- **`Bruno_Collection/VERSION`**: **OTST_V2.0.3 → OTST_V2.0.4**. Records two
+  Bruno-collection fixes that previously refreshed onto prod without bumping the
+  collection version (so the version chip looked unchanged):
+  - **#147** — `library-bruno/bookings.js` captures `bookedOfferId` from the
+    BookedOffer's `offerId` (the OSDM identifier) instead of a non-existent
+    `.id`, so post-booking add-ancillary/add-reservation URLs are populated.
+  - **#132** — `10. POST Add Ancillary to Booking` sources `ancillaryOfferIds`
+    from the offer's top-level `ancillaryOfferParts` when no admission-linked
+    refs exist (Sqills).
+- **Process**: from now on, a Bruno-collection change bumps `Bruno_Collection/
+  VERSION` and rides a server release, so the version chip and `compatibility.json`
+  always reflect what's actually running. The server image is functionally
+  unchanged here — this re-release exists to surface the new collection version
+  on the chip (compatibility.json is read once at boot, so the chip refreshes
+  when Watchtower restarts on the new :stable digest).
+
+### Operator action
+None. After Watchtower promotes :stable, the version chip shows
+**2026.64 / server-v1.11.36 / OTST_V2.0.4**.
+
+---
+
 ## [server-v1.11.35] — 2026-05-22
 
 Offer-criteria polish (#145).

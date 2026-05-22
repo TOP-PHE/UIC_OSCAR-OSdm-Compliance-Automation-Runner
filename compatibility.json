@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.63",
+  "current_release": "2026.64",
   "releases": [
+    {
+      "release": "2026.64",
+      "date": "2026-05-22",
+      "server": "1.11.36",
+      "collection": "OTST_V2.0.4",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Collection version bump OTST_V2.0.3 -> OTST_V2.0.4 (Bruno_Collection/VERSION). Records two Bruno-collection fixes that previously refreshed onto prod without a collection version change (so the version chip looked frozen at 2.0.3): #147 — library-bruno/bookings.js now captures bookedOfferId from the BookedOffer's offerId (the OSDM identifier; there is no .id) so post-booking add-ancillary/add-reservation URLs are populated; #132 — 10. POST Add Ancillary to Booking sources ancillaryOfferIds from the offer's top-level ancillaryOfferParts when no admission-linked refs exist (Sqills). The server image is functionally unchanged — this re-release surfaces the new collection version on the chip (compatibility.json is read once at boot; the chip refreshes when Watchtower restarts on the new :stable digest). Process going forward: every Bruno-collection change bumps Bruno_Collection/VERSION and rides a server release.",
+        "Operator action required: none. After Watchtower promotes :stable, the version chip shows 2026.64 / server-v1.11.36 / OTST_V2.0.4."
+      ]
+    },
     {
       "release": "2026.63",
       "date": "2026-05-22",
