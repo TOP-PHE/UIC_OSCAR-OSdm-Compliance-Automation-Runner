@@ -74,8 +74,8 @@ router.post('/test-resources', (req, res) => {
   if (targetCompanyId === null) return;
 
   const { resource_type, label, data } = req.body || {};
-  if (!resource_type || !['TRAIN', 'MULTIMODAL'].includes(resource_type)) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'resource_type must be TRAIN or MULTIMODAL.' });
+  if (!resource_type || !['TRAIN', 'JOURNEY', 'MULTIMODAL'].includes(resource_type)) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'resource_type must be TRAIN, JOURNEY or MULTIMODAL.' });
   }
   if (!label || !label.trim()) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'label is required.' });

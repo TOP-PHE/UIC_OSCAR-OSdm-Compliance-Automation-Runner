@@ -789,7 +789,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -1509,6 +1509,19 @@ function buildTripSection(idx, sc, trip) {
     </select>
   </div>`;
 
+  // Apply-a-Journey picker (#137) — fills all legs from a saved journey.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyPicker = journeys.length ? `
+  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#546e7a;margin:8px 0 4px">
+    <span style="font-weight:600">🧭 Apply a Journey:</span>
+    <select class="param-input param-select" style="max-width:340px;font-size:12px"
+      data-action="apply-trip-journey" data-idx="${esc(idx)}" data-tidx="${esc(tIdx)}">
+      <option value="">— pick a saved journey to fill all legs —</option>
+      ${journeys.map(j => `<option value="${esc(j.id)}">${esc(j.label || j.id)} — ${esc(journeySummary(j))}</option>`).join('')}
+    </select>
+    <span style="color:#90a4ae;font-size:11px">sets SPECIFICATION + fills the legs below</span>
+  </div>` : '';
+
   let inner = '';
   if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs)) {
     inner = trip.legs.map((leg, li) => `
@@ -1541,7 +1554,7 @@ function buildTripSection(idx, sc, trip) {
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🚂 Trip (requirement #${sc.tripRequirementId})<span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
-      <div style="padding:12px 14px 4px">${tripTypeSelect}</div>
+      <div style="padding:12px 14px 4px">${tripTypeSelect}${journeyPicker}</div>
       <div style="padding:0 14px 12px">${inner}</div>
     </div>
   </div>`;
@@ -2978,6 +2991,24 @@ function renderWizardStep2() {
     </div>`;
   }).join('');
 
+  // Journeys (#137) — reusable multi-leg itineraries chaining train sets.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyItems = journeys.map((j, jidx) => `
+    <div class="train-item">
+      <div class="train-row" data-action="toggle-journey-detail" data-jidx="${esc(jidx)}">
+        <div style="flex:1;min-width:0">
+          <div class="train-row-label">${esc(j.label || '—')}</div>
+          <div class="train-row-sub">${esc(journeySummary(j))}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
+          <span class="toggle-arrow" id="journey-arrow-${esc(jidx)}">▶</span>
+          <button class="btn btn-sm btn-secondary" data-action="wiz-duplicate-journey" data-jidx="${esc(jidx)}" title="Duplicate this journey" style="font-size:11px;padding:3px 8px">🗐 Duplicate</button>
+          <button class="row-delete-btn" data-action="wiz-delete-journey" data-id="${esc(j.id)}" title="Delete this journey">🗑</button>
+        </div>
+      </div>
+      <div class="train-detail" id="journey-detail-${esc(jidx)}"></div>
+    </div>`).join('');
+
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
     Register the test trains available in your system under test.
@@ -2997,15 +3028,17 @@ function renderWizardStep2() {
     </div>
   </div>
 
-  <!-- Multimodal placeholder -->
+  <!-- Journeys (multi-leg) -->
   <div class="fw-section">
-    <div class="fw-section-head" data-action="fw-toggle">
-      🗺️ Multimodal Trips
-      <span style="font-size:10px;font-weight:400;color:#90a4ae;margin-left:8px">— coming soon</span>
-      <span class="fw-toggle-icon">▶</span>
-    </div>
+    <div class="fw-section-head" data-action="fw-toggle">🧭 Journeys <span style="font-size:10px;font-weight:400;color:#90a4ae;margin-left:8px">— reusable multi-leg itineraries</span><span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body">
-      <div class="placeholder" style="padding:24px">🚧 Multimodal trip configuration will be available in a future release.</div>
+      <p style="color:#90a4ae;font-size:12px;margin:0 0 8px">Chain train sets into a multi-leg journey (e.g. Basel → Amsterdam → Paris). A scenario can then apply the whole journey at once instead of typing each leg.</p>
+      ${journeys.length === 0
+        ? '<div style="color:#90a4ae;font-size:13px;padding:4px 0 12px">No journeys yet — click Add Journey to chain train sets together.</div>'
+        : `<div id="journey-list">${journeyItems}</div>`}
+      <div style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" data-action="wiz-add-journey">➕ Add Journey</button>
+      </div>
     </div>
   </div>
   `;
@@ -3491,6 +3524,304 @@ async function wizDeleteResource(id) {
   }
   // Delegate to deleteTrainResource which checks for impacted scenarios
   await deleteTrainResource(id);
+}
+
+// ── Journeys (#137) ───────────────────────────────────────────────────────
+// A Journey is a reusable multi-leg itinerary: an ordered list of legs, each
+// referencing a train set (#136) + a chosen service from its timetable. A
+// scenario can apply a journey to fill its trip legs once, instead of typing
+// every leg by hand. Stored as a JOURNEY test-resource: data = { legs: [
+// { trainResourceId, serviceIndex } ] }.
+function stnShort(urn) { return String(urn || '').split(':').pop() || ''; }
+
+// Resolve one journey leg → { train, d (normalized data), svc (chosen service) }.
+function journeyResolveLeg(leg) {
+  if (!leg) return null;
+  const train = (wizData.resources || []).find(r => String(r.id) === String(leg.trainResourceId) && r.resource_type === 'TRAIN');
+  if (!train) return null;
+  const d = normalizeTrainData(typeof train.data === 'string' ? JSON.parse(train.data) : (train.data || {}));
+  const svc = d.services[leg.serviceIndex] || d.services[0] || {};
+  return { train, d, svc };
+}
+
+function journeyData(j) {
+  if (!j) return { legs: [] };
+  const data = typeof j.data === 'string' ? (() => { try { return JSON.parse(j.data || '{}'); } catch (_) { return {}; } })() : (j.data || {});
+  if (!Array.isArray(data.legs)) data.legs = [];
+  return data;
+}
+
+// Human summary of a journey: "BAS → AMS → PAR · 2 legs · 1 transfer".
+function journeySummary(j) {
+  const legs = journeyData(j).legs;
+  if (!legs.length) return 'no legs yet';
+  const stops = [];
+  legs.forEach((leg, i) => {
+    const r = journeyResolveLeg(leg);
+    const o = r ? stnShort(r.d.originURN) : '?';
+    const dst = r ? stnShort(r.d.destinationURN) : '?';
+    if (i === 0) stops.push(o || '?');
+    stops.push(dst || '?');
+  });
+  const transfers = Math.max(0, legs.length - 1);
+  return `${stops.join(' → ')}  ·  ${legs.length} leg${legs.length > 1 ? 's' : ''}  ·  ${transfers} transfer${transfers !== 1 ? 's' : ''}`;
+}
+
+// Resolve a journey into scenario trip legs (origin/destination/times/vehicle).
+function journeyToTripLegs(j) {
+  return journeyData(j).legs.map(leg => {
+    const r = journeyResolveLeg(leg);
+    if (!r) return null;
+    const { d, svc } = r;
+    const out = {};
+    if (d.originURN)      out.origin        = d.originURN;
+    if (d.destinationURN) out.destination   = d.destinationURN;
+    if (svc.departureTime) out.startDatetime = '%TRIP_DATE%T' + svc.departureTime;
+    if (svc.arrivalTime)   out.endDatetime   = '%TRIP_DATE%T' + svc.arrivalTime;
+    if (svc.vehicleNumber) out.vehicleNumber = svc.vehicleNumber;
+    if (d.operatorCode)    out.operatorCode  = d.operatorCode;
+    return out;
+  }).filter(Boolean);
+}
+
+// <select> of every train set × service for one journey leg.
+function journeyLegPickerHtml(jidx, li, leg) {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const sel = leg && leg.trainResourceId !== '' && leg.trainResourceId != null
+    ? `${leg.trainResourceId}::${leg.serviceIndex || 0}` : '';
+  const opts = ['<option value="">— pick a train + service —</option>'];
+  trains.forEach(t => {
+    const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+    const route = [d.originURN, d.destinationURN].filter(Boolean).map(stnShort).join('→');
+    (d.services.length ? d.services : [{}]).forEach((s, si) => {
+      const v = `${t.id}::${si}`;
+      const lbl = [t.label || '?', route, [s.vehicleNumber, s.departureTime].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+      opts.push(`<option value="${esc(v)}" ${sel === v ? 'selected' : ''}>${esc(lbl)}</option>`);
+    });
+  });
+  return `<select class="param-input param-select" data-action="journey-leg-pick" data-jidx="${esc(jidx)}" data-li="${esc(li)}" style="min-width:300px;font-size:12px">${opts.join('')}</select>`;
+}
+
+// The legs + summary body of a journey detail (re-rendered on leg edits; the
+// label input lives outside this container so unsaved edits survive).
+function journeyBodyHtml(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return '';
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const legs = journeyData(j).legs;
+  const legsHtml = legs.length ? legs.map((leg, li) => `
+    <div class="sub-card" style="display:flex;gap:8px;align-items:center;padding:8px 12px;margin-bottom:6px">
+      <span style="font-weight:700;color:#455a64;min-width:46px">Leg ${li + 1}</span>
+      ${journeyLegPickerHtml(jidx, li, leg)}
+      <div style="display:flex;gap:3px;margin-left:auto">
+        <button class="btn btn-sm btn-secondary" data-action="journey-move-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" data-dir="-1" title="Move up"${li === 0 ? ' disabled' : ''}>▲</button>
+        <button class="btn btn-sm btn-secondary" data-action="journey-move-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" data-dir="1" title="Move down"${li === legs.length - 1 ? ' disabled' : ''}>▼</button>
+        <button class="row-delete-btn" data-action="journey-remove-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" title="Remove this leg">🗑</button>
+      </div>
+    </div>`).join('') : '<div style="color:#90a4ae;font-size:12px;padding:6px 0">No legs yet — chain the train sets this journey runs over.</div>';
+  return `
+    <div style="font-size:11px;color:#78909c;margin-bottom:8px">🧭 ${esc(journeySummary(j))}</div>
+    ${trains.length === 0
+      ? '<div style="color:#e65100;font-size:12px">⚠️ Define train sets first — a journey chains existing train sets.</div>'
+      : legsHtml}
+    <div style="margin-top:10px">
+      <button class="btn btn-secondary btn-sm" data-action="journey-add-leg" data-jidx="${esc(jidx)}"${trains.length === 0 ? ' disabled' : ''}>➕ Add leg</button>
+    </div>
+    <span class="field-error" id="jf-${esc(jidx)}-legs-err"></span>`;
+}
+
+function buildJourneyDetailHTML(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return '';
+  return `
+  <div class="param-section" style="margin-top:8px">
+    <div class="param-section-head" data-action="toggle-param-section">🧭 Journey<span class="ps-arrow open">▶</span></div>
+    <div class="param-section-body open">
+    <div style="padding:12px 14px">
+      <div class="param-field" style="margin-bottom:12px">
+        <label class="param-label">Label <span class="param-hint">(short display name)</span></label>
+        <input class="param-input" data-action="journey-label" data-jidx="${esc(jidx)}" value="${esc(j.label || '')}" placeholder="e.g. Basel → Paris via Amsterdam">
+        <span class="field-error" id="jf-${esc(jidx)}-label-err"></span>
+      </div>
+      <div id="journey-body-${esc(jidx)}">${journeyBodyHtml(jidx)}</div>
+      <div style="margin-top:14px">
+        <button class="btn btn-primary btn-sm" data-action="wiz-save-journey" data-jidx="${esc(jidx)}">💾 Save Journey</button>
+      </div>
+    </div>
+    </div>
+  </div>`;
+}
+
+function reRenderJourneyBody(jidx) {
+  const body = document.getElementById('journey-body-' + jidx);
+  if (body) body.innerHTML = journeyBodyHtml(jidx);
+}
+
+function toggleJourneyDetail(jidx) {
+  const detail = document.getElementById('journey-detail-' + jidx);
+  const arrow  = document.getElementById('journey-arrow-' + jidx);
+  if (!detail) return;
+  if (!detail.classList.contains('open')) {
+    if (!detail.dataset.rendered) {
+      detail.innerHTML = buildJourneyDetailHTML(jidx);
+      detail.dataset.rendered = '1';
+    }
+    detail.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+  } else {
+    detail.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+  }
+}
+
+function wizAddJourney() {
+  wizData.resources.push({ id: null, _unsaved: true, label: '', resource_type: 'JOURNEY', data: { legs: [] } });
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const newIdx = journeys.length - 1;
+  toggleJourneyDetail(newIdx);
+  const detail = document.getElementById('journey-detail-' + newIdx);
+  if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function wizDuplicateJourney(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const src = journeys[jidx];
+  if (!src) return;
+  const existing = new Set(journeys.map(x => x.label).filter(Boolean));
+  const base = `${src.label || 'Journey'} (copy)`;
+  let newLabel = base;
+  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  wizData.resources.push({
+    id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
+    data: JSON.parse(JSON.stringify(journeyData(src)))
+  });
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const after = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  toggleJourneyDetail(after.length - 1);
+}
+
+function journeyAddLeg(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  if (trains.length === 0) return;
+  // Default the new leg to the first train's first service so it is valid.
+  j.data.legs.push({ trainResourceId: trains[0].id, serviceIndex: 0 });
+  reRenderJourneyBody(jidx);
+}
+
+function journeyRemoveLeg(jidx, li) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  if (li >= 0 && li < j.data.legs.length) j.data.legs.splice(li, 1);
+  reRenderJourneyBody(jidx);
+}
+
+function journeyMoveLeg(jidx, li, dir) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const to = li + dir;
+  if (to < 0 || to >= j.data.legs.length) return;
+  const tmp = j.data.legs[li];
+  j.data.legs[li] = j.data.legs[to];
+  j.data.legs[to] = tmp;
+  reRenderJourneyBody(jidx);
+}
+
+function journeySetLeg(jidx, li, value) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const [trainResourceId, svcIdxStr] = String(value || '').split('::');
+  if (!trainResourceId) { j.data.legs[li] = { trainResourceId: '', serviceIndex: 0 }; }
+  else {
+    const parsedId = /^\d+$/.test(trainResourceId) ? parseInt(trainResourceId, 10) : trainResourceId;
+    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: parseInt(svcIdxStr, 10) || 0 };
+  }
+  reRenderJourneyBody(jidx);
+}
+
+async function wizSaveJourney(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  const detail = document.getElementById('journey-detail-' + jidx);
+  const labelEl = detail && detail.querySelector('[data-action="journey-label"]');
+  const label = labelEl ? labelEl.value.trim() : (j.label || '');
+  const legs = journeyData(j).legs.filter(l => l && l.trainResourceId !== '' && l.trainResourceId != null);
+
+  const labelErr = document.getElementById(`jf-${jidx}-label-err`);
+  const legsErr  = document.getElementById(`jf-${jidx}-legs-err`);
+  if (labelErr) { labelErr.textContent = ''; labelErr.classList.remove('show'); }
+  if (legsErr)  { legsErr.textContent = '';  legsErr.classList.remove('show'); }
+  let ok = true;
+  if (!label) { if (labelErr) { labelErr.textContent = 'Label is required.'; labelErr.classList.add('show'); } ok = false; }
+  if (legs.length === 0) { if (legsErr) { legsErr.textContent = 'Add at least one leg (a train set + service).'; legsErr.classList.add('show'); } ok = false; }
+  if (!ok) return;
+
+  const data = { legs };
+  const isNew = !j.id || j._unsaved;
+  try {
+    const url    = isNew ? '/v1/company/test-resources' : `/v1/company/test-resources/${j.id}`;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, resource_type: 'JOURNEY', data })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Failed to save journey: ${err.detail || err.title || res.status}`);
+      return;
+    }
+    const saved = await res.json();
+    const idx = wizData.resources.findIndex(r => r === j);
+    if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
+    showMsg(`✅ Journey "${label}" saved.`, true);
+    await refreshAllSections();
+  } catch (e) { alert(`Network error: ${e.message}`); }
+}
+
+async function wizDeleteJourney(id) {
+  // Unsaved journey (no id) — drop locally.
+  if (!id || id === 'null') {
+    const unsaved = wizData.resources.find(r => r._unsaved && !r.id && r.resource_type === 'JOURNEY');
+    if (unsaved) {
+      wizData.resources = wizData.resources.filter(r => r !== unsaved);
+      renderWizardStep2InSection();
+      const bodyData = document.getElementById('body-data');
+      const toggleData = document.getElementById('toggle-data');
+      if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+    }
+    return;
+  }
+  const j = (wizData.resources || []).find(r => String(r.id) === String(id) && r.resource_type === 'JOURNEY');
+  if (!j) return;
+  // Journeys are copied into a scenario's legs at apply-time (not referenced),
+  // so deleting one cannot orphan a scenario — a plain confirm is enough.
+  if (!confirm(`Delete journey "${j.label || id}"?`)) return;
+  try {
+    const res = await fetch(`/v1/company/test-resources/${id}`, { method: 'DELETE' });
+    if (!res.ok) { alert(`Failed to delete journey: ${res.status}`); return; }
+    wizData.resources = wizData.resources.filter(r => r !== j);
+    await refreshAllSections();
+  } catch (e) { alert(`Network error: ${e.message}`); }
 }
 
 // ── Wizard navigation (now section-local) ─────────────────────────────────────
@@ -4753,6 +5084,24 @@ document.body.addEventListener('click', function(e) {
     case 'train-paste-service':
       trainPasteServices(parseInt(el.dataset.tidx)); break;
 
+    // ── Journey actions (Step 2, #137) ────────────────────────────────────────
+    case 'toggle-journey-detail':
+      toggleJourneyDetail(parseInt(el.dataset.jidx)); break;
+    case 'wiz-add-journey':
+      wizAddJourney(); break;
+    case 'wiz-duplicate-journey':
+      e.stopPropagation(); wizDuplicateJourney(parseInt(el.dataset.jidx)); break;
+    case 'wiz-delete-journey':
+      e.stopPropagation(); wizDeleteJourney(el.dataset.id); break;
+    case 'wiz-save-journey':
+      wizSaveJourney(parseInt(el.dataset.jidx)); break;
+    case 'journey-add-leg':
+      journeyAddLeg(parseInt(el.dataset.jidx)); break;
+    case 'journey-remove-leg':
+      journeyRemoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li)); break;
+    case 'journey-move-leg':
+      journeyMoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), parseInt(el.dataset.dir)); break;
+
     // ── Scenario creation (Step 3) ────────────────────────────────────────────
     case 'wiz-scen-type':
       wizSetScenType(el.dataset.val); break;
@@ -4991,6 +5340,8 @@ document.body.addEventListener('change', function(e) {
       });
       break;
     }
+    case 'journey-leg-pick':
+      journeySetLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), el.value); break;
     case 'apply-trip-train': {
       const atScIdx = parseInt(el.dataset.idx);
       const atTIdx  = parseInt(el.dataset.tidx);
@@ -5031,6 +5382,25 @@ document.body.addEventListener('change', function(e) {
       // their last pick).
       el.value = '';
       reRenderScenarioDetail(atScIdx);
+      break;
+    }
+    case 'apply-trip-journey': {
+      const ajScIdx = parseInt(el.dataset.idx);
+      const ajTIdx  = parseInt(el.dataset.tidx);
+      const jid = el.value;
+      if (!jid) break;
+      const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
+      if (!journey) break;
+      const tripReq = state.tripRequirements[ajTIdx];
+      if (!tripReq) break;
+      const legs = journeyToTripLegs(journey);
+      if (legs.length === 0) break;
+      // A journey is an explicit multi-leg itinerary → SPECIFICATION.
+      tripReq.tripType = 'SPECIFICATION';
+      tripReq.legs = legs;
+      markDirty();
+      el.value = '';
+      reRenderScenarioDetail(ajScIdx);
       break;
     }
     case 'toggle-purchaser-is-pax': {

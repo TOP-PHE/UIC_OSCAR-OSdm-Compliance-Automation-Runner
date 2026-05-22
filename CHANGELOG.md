@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.32] — 2026-05-22
+
+Feature (#137) — reusable multi-leg **Journeys**. Phase 3 (final) of the
+train-set/journey series (duplicate #135 → timetable #136 → journeys).
+
+### Added
+- **New `JOURNEY` test-resource type** (`src/api/routes/company-test-resources.js`
+  allow-list; `src/db/schema.sql` comment). A journey's `data` is
+  `{ legs: [ { trainResourceId, serviceIndex } ] }` — an ordered list of legs,
+  each referencing a **train set + a chosen service** from its timetable (#136).
+- **`public/js/scenarios.js`**: a **Journeys** section under Test Resources
+  (replacing the old "Multimodal — coming soon" placeholder) — add/duplicate/
+  delete journeys; each journey edits its ordered legs (pick train set + service
+  per leg, reorder ▲▼, remove), with a live route summary
+  (`BAS → AMS → PAR · 2 legs · 1 transfer`).
+- **Scenario trip → "Apply a Journey"** picker: fills all trip legs from a saved
+  journey in one click (sets the trip to SPECIFICATION). Define once, reuse
+  across scenarios.
+
+### Notes
+- Journeys are **copied** into a scenario's legs at apply-time (not referenced),
+  so deleting a journey can't orphan a scenario. No datafile-schema change — the
+  generated `tripRequirement.legs[]` is exactly what the runtime already
+  consumes.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data.
+
+---
+
 ## [server-v1.11.31] — 2026-05-22
 
 Feature (#136) — a train set is now a route + a timetable of services. Phase 2
