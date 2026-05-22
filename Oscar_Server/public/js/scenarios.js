@@ -3660,6 +3660,30 @@ function journeyToTripLegs(j) {
   }).filter(Boolean);
 }
 
+// Continuity check (#145): a journey's legs must chain — each leg should start
+// where the previous ended, and depart after the previous arrives. Returns a
+// list of human warnings (soft — overnight connections are legitimately
+// possible, so this guides rather than blocks). Times are "HH:MM:SS±HH:MM" on a
+// shared trip date, so a fixed-date parse compares them correctly.
+function journeyContinuityWarnings(j) {
+  const legs = journeyData(j).legs;
+  const ms = (t) => { if (!t) return NaN; const d = new Date('2000-01-01T' + t); return d.getTime(); };
+  const warns = [];
+  for (let i = 1; i < legs.length; i++) {
+    const prev = journeyResolveLeg(legs[i - 1]);
+    const cur  = journeyResolveLeg(legs[i]);
+    if (!prev || !cur) continue;
+    if (prev.d.destinationURN && cur.d.originURN && prev.d.destinationURN !== cur.d.originURN) {
+      warns.push(`Leg ${i + 1} starts at ${stnShort(cur.d.originURN)} but leg ${i} ends at ${stnShort(prev.d.destinationURN)} — the legs don't connect.`);
+    }
+    const arr = ms(prev.svc.arrivalTime), dep = ms(cur.svc.departureTime);
+    if (!isNaN(arr) && !isNaN(dep) && dep < arr) {
+      warns.push(`Leg ${i + 1} departs ${cur.svc.departureTime} before leg ${i} arrives ${prev.svc.arrivalTime} — pick a later service (or ignore if it's an overnight connection).`);
+    }
+  }
+  return warns;
+}
+
 // <select> of every train set × service for one journey leg.
 function journeyLegPickerHtml(jidx, li, leg) {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
@@ -3701,8 +3725,13 @@ function journeyBodyHtml(jidx) {
         <button class="row-delete-btn" data-action="journey-remove-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" title="Remove this leg">🗑</button>
       </div>
     </div>`).join('') : '<div style="color:#90a4ae;font-size:12px;padding:6px 0">No legs yet — chain the train sets this journey runs over.</div>';
+  const warns = journeyContinuityWarnings(j);
+  const warnHtml = warns.length
+    ? `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#e65100">⚠ ${warns.map(esc).join('<br>')}</div>`
+    : '';
   return `
     <div style="font-size:11px;color:#78909c;margin-bottom:8px">🧭 ${esc(journeySummary(j))}</div>
+    ${warnHtml}
     ${trains.length === 0
       ? '<div style="color:#e65100;font-size:12px">⚠️ Define train sets first — a journey chains existing train sets.</div>'
       : legsHtml}
@@ -4301,8 +4330,9 @@ function renderWizardStep3() {
             data-action="wiz-currency">
         </div>
         <div class="param-field" style="min-width:160px">
-          <label class="param-label">Offer mode</label>
+          <label class="param-label">Offer mode <span class="param-hint">(optional)</span></label>
           <select class="param-input param-select" data-action="wiz-offer-mode">
+            <option value="" ${!sc.offerMode?'selected':''} style="color:#90a4ae">— none —</option>
             ${fwFilter(WIZ_OFFER_MODES, fw.offerCriteria && fw.offerCriteria.offerMode ? [fw.offerCriteria.offerMode] : null).map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
           </select>
         </div>
