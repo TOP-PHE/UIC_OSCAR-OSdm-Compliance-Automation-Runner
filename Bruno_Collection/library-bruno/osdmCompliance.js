@@ -504,6 +504,52 @@ function validatePlaceAvailability(body, endpoint) {
   return checks;
 }
 
+// ── Add-offer-part to a booking (issue #104 Stage B / ADD_TO_BOOKING) ─────
+// POST /bookings/{id}/booked-offers/{id}/offer-parts (>=3.7) responds with a
+// BookedOfferPartResponse, and the deprecated .../reservations (<3.7) with a
+// BookedOfferReservationResponse. Both are envelopes:
+//   { warnings?, problems?[], bookedOffers?[] }
+// Neither field is "required" by the schema, but a successful add returns the
+// updated bookedOffers, so we assert envelope hygiene + that bookedOffers (when
+// present) is a non-empty array. `endpoint` lets the check names reflect the
+// resolved resource (offer-parts vs reservations).
+function validateBookedOfferPartResponse(body, endpoint) {
+  const ep = endpoint || '/bookings/{id}/booked-offers/{id}/offer-parts';
+  const checks = [];
+
+  const isObj = isType(body, 'object');
+  checks.push({
+    name: `POST ${ep} → response is a BookedOfferPartResponse object`,
+    ok: isObj,
+    message: isObj ? '' : `Expected an object envelope, got ${body === null ? 'null' : (Array.isArray(body) ? 'array' : typeof body)}`,
+  });
+  if (!isObj) return checks;
+
+  const problemsOk = body.problems == null || isType(body.problems, 'array');
+  checks.push({
+    name: `POST ${ep} → "problems" (when present) is an array`,
+    ok: problemsOk,
+    message: problemsOk ? '' : 'Envelope "problems" must be an array when present',
+  });
+
+  const boOk = body.bookedOffers == null || isType(body.bookedOffers, 'array');
+  checks.push({
+    name: `POST ${ep} → "bookedOffers" (when present) is an array`,
+    ok: boOk,
+    message: boOk ? '' : 'Expected "bookedOffers" to be an array of BookedOffer',
+  });
+  if (body.bookedOffers != null && boOk) {
+    const nonEmpty = body.bookedOffers.length > 0;
+    checks.push({
+      name: `POST ${ep} → "bookedOffers" is non-empty (the added part is returned)`,
+      ok: nonEmpty,
+      message: nonEmpty ? '' : 'A successful add-offer-part returns the updated bookedOffers',
+    });
+  }
+
+  return checks;
+}
+
 // ── Shared System-Information response-status classification ─────────────
 // Pure classification of a System-Information GET response status, made
 // version-aware via the test-framework OSDM version (osdmVersion.js). Returns:
@@ -576,6 +622,7 @@ module.exports = {
   validateCoachLayout,
   validateCoachDeckLayout,
   validatePlaceAvailability,
+  validateBookedOfferPartResponse,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 };

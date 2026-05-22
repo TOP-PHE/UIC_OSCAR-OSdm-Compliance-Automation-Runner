@@ -337,6 +337,13 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     validationLogger(`[INFO] booking.bookedOffers count: ${booking.bookedOffers?.length}`);
   });
 
+  // Capture the first BookedOffer id for post-booking add-offer-part flows
+  // (issue #104 Stage B / ADD_TO_BOOKING). Needed for the URL of
+  // POST /bookings/{bookingId}/booked-offers/{bookedOfferId}/(offer-parts|reservations).
+  if (Array.isArray(booking.bookedOffers) && booking.bookedOffers.length > 0 && booking.bookedOffers[0].id) {
+    bru.setEnvVar("bookedOfferId", booking.bookedOffers[0].id);
+  }
+
   // Price structure checks
   const prov      = booking.provisionalPrice;
   const mini      = selectedOffer.offerSummary.minimalPrice;

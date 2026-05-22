@@ -1,0 +1,117 @@
+info:
+  name: 09. POST Add Reservation to Booking
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings/{{bookingId}}/booked-offers/{{bookedOfferId}}/{{addOfferPartResource}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: |
+      {{addReservationBody}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Post-booking add-reservation step (ADD_TO_BOOKING, issue #104 Stage B).
+        // OSDM has no post-booking "seat map" — this ADDS a reservation offer
+        // part to an existing booking. Endpoint is version-aware: the unified
+        // /offer-parts is OSDM >= 3.7; older versions use the deprecated
+        // /reservations. Reached only when 02. POST Create Booking routed here
+        // (place selection enabled in ADD_TO_BOOKING mode); otherwise skipped.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+
+        const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
+        bru.setVar('addOfferPartResource', useOfferParts ? 'offer-parts' : 'reservations');
+
+        // ── Best-effort request body ───────────────────────────────────────
+        // No ADD_TO_BOOKING scenario / supporting vendor exists yet to validate
+        // the exact shape; this assembles the schema-required fields from env
+        // set by offers.js (reservationId / tripLegCoverage) and scenarioParser
+        // (bookingPassengerReferences). Refine against a live system when one is
+        // available. Schemas:
+        //   >=3.7 BookedOfferPartRequest: offerId*, passengerRefs* (+ optional
+        //         placeSelections / ancillaryOfferIds)
+        //   <3.7  BookedOfferReservationRequest: offerId*, reservationOfferId*,
+        //         passengerRefs*, placeSelections*
+        const offerId = bru.getEnvVar('offerId');
+        let passengerRefs = [];
+        try { passengerRefs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch (_e) {}
+        const reservationOfferId = bru.getEnvVar('reservationId');
+        let tripLegCoverage = null;
+        try { tripLegCoverage = JSON.parse(bru.getEnvVar('tripLegCoverage') || 'null'); } catch (_e) {}
+
+        const placeSelections = [];
+        if (reservationOfferId && tripLegCoverage) {
+          placeSelections.push({ reservationId: reservationOfferId, tripLegCoverage: tripLegCoverage });
+        }
+
+        const body = { offerId: offerId, passengerRefs: passengerRefs };
+        if (!useOfferParts) {
+          // Deprecated /reservations: reservationOfferId + placeSelections required.
+          body.reservationOfferId = reservationOfferId;
+          body.placeSelections = placeSelections;
+        } else if (placeSelections.length > 0) {
+          // Unified /offer-parts: placeSelections optional.
+          body.placeSelections = placeSelections;
+        }
+        bru.setVar('addReservationBody', JSON.stringify(body));
+
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        const resource = bru.getVar('addOfferPartResource') || 'offer-parts';
+        const endpoint = `/bookings/{id}/booked-offers/{id}/${resource}`;
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status ────────────────────────────────────────────────────────
+        if (statusCode === 200) {
+          bruTest(`POST ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[INFO] POST ${endpoint} → 200 OK`);
+        } else {
+          validationLogger(`[ERROR] POST ${endpoint} → ${statusCode} (expected 200 adding a reservation to the booking)`);
+          bruTest(`POST ${endpoint} → ${statusCode} (FAIL)`, () => {
+            expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
+          });
+        }
+
+        // ── OSDM compliance (Layer 1): BookedOfferPart/Reservation response ──
+        validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
+        // Mark done so the smart run filter does not re-run this post-booking
+        // step if the flow falls through to it again at the end of the scenario.
+        bru.setEnvVar('__addReservationDone', 'true');
+
+        // Continue the sale flow — same PATCH-vs-GET decision as Create Booking.
+        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+            || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
+          bru.runner.setNextRequest("04. GET Passenger");
+        } else {
+          bru.runner.setNextRequest("03. PATCH Multi Passenger");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

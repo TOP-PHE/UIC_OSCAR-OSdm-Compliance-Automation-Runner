@@ -37,6 +37,7 @@ const {
   validateCoachLayout,
   validateCoachDeckLayout,
   validatePlaceAvailability,
+  validateBookedOfferPartResponse,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
@@ -459,5 +460,43 @@ describe('validatePlaceAvailability (issue #104)', () => {
   test('wrong-typed "preSelections" fails', () => {
     const checks = validatePlaceAvailability({ vehicleAvailability: { vehicle: {}, preSelections: 'no' } }, '/availabilities/place-map');
     expect(find(checks, /"preSelections"/).ok).toBe(false);
+  });
+});
+
+describe('validateBookedOfferPartResponse (issue #104 Stage B)', () => {
+  const allOk = (checks) => checks.every((c) => c.ok);
+  const find = (checks, re) => checks.find((c) => re.test(c.name));
+  const ep = '/bookings/{id}/booked-offers/{id}/offer-parts';
+
+  test('valid response with non-empty bookedOffers passes', () => {
+    const checks = validateBookedOfferPartResponse({ problems: [], bookedOffers: [{ id: 'BO1' }] }, ep);
+    expect(allOk(checks)).toBe(true);
+  });
+
+  test('non-object body fails and short-circuits to a single check', () => {
+    const checks = validateBookedOfferPartResponse([], ep);
+    expect(checks.length).toBe(1);
+    expect(checks[0].ok).toBe(false);
+  });
+
+  test('"problems" must be an array when present', () => {
+    const checks = validateBookedOfferPartResponse({ problems: {} }, ep);
+    expect(find(checks, /"problems"/).ok).toBe(false);
+  });
+
+  test('"bookedOffers" wrong type fails', () => {
+    const checks = validateBookedOfferPartResponse({ bookedOffers: 'no' }, ep);
+    expect(find(checks, /"bookedOffers" \(when present\)/).ok).toBe(false);
+  });
+
+  test('present-but-empty bookedOffers fails the non-empty rule', () => {
+    const checks = validateBookedOfferPartResponse({ bookedOffers: [] }, ep);
+    expect(find(checks, /non-empty/).ok).toBe(false);
+  });
+
+  test('absent bookedOffers/problems is tolerated (envelope only)', () => {
+    const checks = validateBookedOfferPartResponse({ warnings: null }, ep);
+    expect(allOk(checks)).toBe(true);
+    expect(find(checks, /non-empty/)).toBeUndefined();
   });
 });
