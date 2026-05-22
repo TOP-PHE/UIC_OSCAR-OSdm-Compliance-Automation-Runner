@@ -57,6 +57,22 @@ updates:
       - dependency-name: uuid
         update-types:
           - version-update:semver-major
+      # express: v5 is a breaking major (path-to-regexp 8, removed req.param /
+      # app.del, changed body/route handling). Adopt deliberately via a tracked
+      # migration, not a weekly auto-PR (PR #114).
+      - dependency-name: express
+        update-types:
+          - version-update:semver-major
+      # eslint: v10 is a breaking major (config/API). Dev tooling — bump
+      # deliberately when migrating the lint setup (PR #115).
+      - dependency-name: eslint
+        update-types:
+          - version-update:semver-major
+      # dotenv: low-risk but still a major; bump deliberately rather than via a
+      # weekly auto-PR (PR #116).
+      - dependency-name: dotenv
+        update-types:
+          - version-update:semver-major
 
   # ── docker: base image (node:22-slim) ──────────────────────────────────────
   - package-ecosystem: docker
@@ -72,6 +88,13 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       include: scope
+    ignore:
+      # node base image: the runtime targets node:22-slim (current LTS line) and
+      # the codebase is validated on Node 22. A major image bump (e.g. 26-slim,
+      # PR #112) is a deliberate runtime migration, not a weekly auto-PR.
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
 
   # ── github-actions: action versions in workflows ───────────────────────────
   - package-ecosystem: github-actions
