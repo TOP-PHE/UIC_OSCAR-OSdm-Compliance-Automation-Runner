@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.29] — 2026-05-22
+
+Fix (#133) — scenario title no longer collapses to a bare "Sale" for custom codes.
+
+### Fixed
+- **`public/js/scenarios.js`** (`decodeCode()`): a scenario renamed to a code
+  outside the strict OSDM test-suite convention — e.g. `SALE_SEARCH_IC_BAS_AMS_1PAX`
+  — showed a bold title of just **"Sale"** because every descriptive token after
+  the recognised type prefix (`SEARCH`, `IC`, `BAS`, `AMS`, `1PAX`) was silently
+  dropped. `decodeCode()` now counts unrecognised tokens and, when **nothing
+  beyond the bare type marker** was recognised, returns the code **verbatim** so
+  the title matches the code the user typed. Genuine convention codes still decode
+  to their rich human-readable label (`OTST_RFND_SRCH_CRIT_1ADT_1LEG` →
+  "Refund — Search criteria — 1 Adult — 1 Leg").
+- Also accept the full `COUCHETTE` token (not only the abbreviated `CCHTTE`), so
+  couchette scenarios decode correctly instead of dropping the marker.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page.
+
+---
+
 ## [server-v1.11.28] — 2026-05-22
 
 Feature (#130) — configurable ancillary catalog at the Test Framework level.
