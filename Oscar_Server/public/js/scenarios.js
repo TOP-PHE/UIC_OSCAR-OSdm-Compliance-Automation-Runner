@@ -3964,6 +3964,7 @@ function wizInitScenario() {
     passengerGender:    {},    // per-type default gender applied at generation: { ADULT: 'X'|'MALE'|'FEMALE', ... }
     overruleCode:       null,
     trainResourceId:    null,
+    journeyResourceId:  null,   // #143 — when set, the scenario is a multi-leg journey
     tripType:           'SPECIFICATION',
     originURN:          '',
     destinationURN:     '',
@@ -4054,6 +4055,23 @@ function renderWizardStep3() {
       </div>`;
     }
   }
+
+  // Journey selector (#143) — pick a saved multi-leg journey instead of a single
+  // train. When set, the scenario is generated as a SPECIFICATION from the
+  // journey's legs, and the single-train controls below are hidden.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyOpts = ['<option value="">— none (use a single train below) —</option>',
+    ...journeys.map(j => `<option value="${esc(j.id)}" ${String(sc.journeyResourceId) === String(j.id) ? 'selected' : ''}>${esc(j.label || j.id)} — ${esc(journeySummary(j))}</option>`)
+  ].join('');
+  const selJourney = sc.journeyResourceId ? journeys.find(j => String(j.id) === String(sc.journeyResourceId)) : null;
+  const journeyLegList = selJourney ? journeyData(selJourney).legs.map((leg, i) => {
+    const r = journeyResolveLeg(leg);
+    return r ? `${i + 1}. ${esc(stnShort(r.d.originURN))}→${esc(stnShort(r.d.destinationURN))} ${esc(r.svc.vehicleNumber || '')}` : `${i + 1}. ?`;
+  }).join(' &nbsp; ') : '';
+  const journeyDetail = selJourney ? `<div class="train-sel-detail open" style="margin-top:10px">
+      <div style="font-size:12px"><span class="param-label">Journey (multi-leg → SPECIFICATION)</span><br><code style="font-size:11px">🧭 ${esc(journeySummary(selJourney))}</code></div>
+      <div style="margin-top:6px;font-size:11px;color:#78909c">Legs: ${journeyLegList}</div>
+    </div>` : '';
 
   // Passenger counters — each human type also gets a default-gender picker.
   // The chosen gender is applied to every passenger of that type when the
@@ -4174,6 +4192,13 @@ function renderWizardStep3() {
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">🚆 Train / Trip Selection<span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body open">
+      ${journeys.length ? `
+      <div class="param-field" style="margin-bottom:12px">
+        <label class="param-label">Select a Journey <span class="param-hint">(multi-leg — overrides the single train below)</span></label>
+        <select class="param-input param-select" data-action="wiz-select-journey">${journeyOpts}</select>
+        ${journeyDetail}
+      </div>` : ''}
+      ${sc.journeyResourceId ? '' : `
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap">
         <div>
           <div class="param-label" style="margin-bottom:4px">Trip search mode</div>
@@ -4239,6 +4264,7 @@ function renderWizardStep3() {
           </div>
         </div>`;
       })()}
+      `}
     </div>
   </div>
 
@@ -4404,6 +4430,18 @@ function wizSelectTrain(id) {
       if (d.originURN)      wizScenario.originURN      = d.originURN;
       if (d.destinationURN) wizScenario.destinationURN = d.destinationURN;
     }
+  }
+  reRenderStep3InSection();
+}
+
+// #143 — pick a saved multi-leg Journey for a new scenario. A journey is always
+// a SPECIFICATION; selecting one supersedes the single-train selection.
+function wizSelectJourney(id) {
+  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  wizScenario.journeyResourceId = parsed;
+  if (parsed) {
+    wizScenario.tripType = 'SPECIFICATION';
+    wizScenario.trainResourceId = null;
   }
   reRenderStep3InSection();
 }
@@ -4623,19 +4661,34 @@ async function wizGenerateScenario() {
     // "Apply test data" picker.
     const svc0 = (d.services && d.services[0]) || {};
 
+    // #143 — a selected Journey supersedes the single train: build a multi-leg
+    // SPECIFICATION from its legs (origin/dest/times/vehicle/operator + product
+    // category resolved per leg from each train set).
+    const journey = sc.journeyResourceId
+      ? (wizData.resources||[]).find(r => String(r.id) === String(sc.journeyResourceId) && r.resource_type === 'JOURNEY')
+      : null;
+
     // Resolve origin/destination: wizard override → train resource → framework → empty
     const resolvedOrigin      = sc.originURN      || d.originURN      || fw.originURN      || '';
     const resolvedDestination = sc.destinationURN || d.destinationURN || fw.destinationURN || '';
 
-    // Validate: SEARCH requires non-empty origin and destination
-    if (sc.tripType === 'SEARCH' && (!resolvedOrigin || !resolvedDestination)) {
+    // Validate: SEARCH requires non-empty origin and destination (a journey carries its own legs)
+    if (!journey && sc.tripType === 'SEARCH' && (!resolvedOrigin || !resolvedDestination)) {
       const missing = [!resolvedOrigin && 'Origin', !resolvedDestination && 'Destination'].filter(Boolean).join(' and ');
       if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ SEARCH mode requires ${esc(missing)} station URN(s). Please fill them in the Train/Trip section above.</span>`;
       if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate & Add Scenario'; }
       return;
     }
 
-    if (sc.tripType === 'SPECIFICATION') {
+    if (journey) {
+      const journeyLegs = journeyToTripLegs(journey);
+      if (journeyLegs.length === 0) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ The selected journey has no legs. Add legs to it under Test Data → Journeys.</span>`;
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate & Add Scenario'; }
+        return;
+      }
+      tripReq = { id: tripId, tripType: 'SPECIFICATION', legs: journeyLegs };
+    } else if (sc.tripType === 'SPECIFICATION') {
       tripReq = {
         id: tripId,
         tripType: 'SPECIFICATION',
@@ -5645,6 +5698,8 @@ document.body.addEventListener('change', function(e) {
     // ── Step 3 change handlers ────────────────────────────────────────────────
     case 'wiz-select-train':
       wizSelectTrain(el.value); break;
+    case 'wiz-select-journey':
+      wizSelectJourney(el.value); break;
     case 'wiz-flexibility':
       wizScenario.desiredFlexibility = el.value; wizUpdateCodePreview(); break;
     case 'wiz-overrule':
