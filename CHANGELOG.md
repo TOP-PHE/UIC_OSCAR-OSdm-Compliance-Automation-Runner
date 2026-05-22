@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.37] — 2026-05-22 + collection-OTST_V2.0.5
+
+Fix (#150) — add-ancillary now sources bookable ancillaries from the booking's
+additional-offers, not the pre-booking offer.
+
+### Fixed
+- Post-booking add-ancillary failed with `400 "ancillary not valid for
+  bookedOfferId …"` because the request reused the **pre-booking offer's**
+  `offerId`/`ancillaryOfferId`, which the booking rejects. New request
+  **`02-Common Requests/11. Add Ancillary - Get Additional Offers`** does
+  `GET /bookings/{id}/booked-offers/{bookedOfferId}/additional-offers` and
+  captures the first additional offer's `offerId` + `ancillaryOfferParts[].id`
+  (valid for *this* booking), then chains to `10. POST Add Ancillary`. If the
+  provider offers nothing addable, it logs and skips (OSDM allows rejecting
+  post-booking additions).
+- **`10. POST Add Ancillary to Booking`** now **prefers** the additional-offers
+  ids (`addAncillaryParentOfferId` / `addAncillaryOfferIds`), falling back to the
+  admission-linked refs and the offer's own ancillary parts.
+- **`02. POST Create Booking`** and **`09. POST Add Reservation`** route to the
+  new GET step instead of straight to the POST. Smart filter gates the new step
+  under the existing `add ancillary` rule; the new env vars are added to the
+  per-scenario reset list.
+
+### Changed
+- **`Bruno_Collection/VERSION`**: OTST_V2.0.4 → **OTST_V2.0.5**.
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows
+**2026.65 / server-v1.11.37 / OTST_V2.0.5** after Watchtower restarts.
+
+---
+
 ## [server-v1.11.36] — 2026-05-22 + collection-OTST_V2.0.4
 
 Collection version bump — surface the Bruno-collection fixes that shipped on

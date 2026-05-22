@@ -39,22 +39,29 @@ runtime:
         bru.setVar('addAncillaryResource', useOfferParts ? 'offer-parts' : 'ancillaries');
 
         // ── Request body ───────────────────────────────────────────────────
-        // Assembles the schema-required fields from env set by offers.js
-        // (referencedAncillaryIds, plus an offer.ancillaryOfferParts fallback
-        // below) and scenarioParser (bookingPassengerReferences). Schemas:
+        // Schemas:
         //   >=3.7 BookedOfferPartRequest:      offerId*, passengerRefs* (+ ancillaryOfferIds)
         //   any   BookedOfferAncillaryRequest: offerId*, ancillaryOfferId*, passengerRefs*
-        const offerId = bru.getEnvVar('offerId');
+        // PREFER the ids captured by step 11 from GET .../additional-offers
+        // (offerId + ancillaryOfferIds valid for THIS booking, #150) — the
+        // pre-booking offer's ancillary ids are rejected with "ancillary not
+        // valid for bookedOfferId". Fall back to the original offer's ids when
+        // step 11 didn't run / found none (keeps the step usable standalone).
+        const offerId = bru.getEnvVar('addAncillaryParentOfferId') || bru.getEnvVar('offerId');
         let passengerRefs = [];
         try { passengerRefs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch (_e) {}
+
         let ancillaryOfferIds = [];
-        try { ancillaryOfferIds = JSON.parse(bru.getEnvVar('referencedAncillaryIds') || '[]'); } catch (_e) {}
+        try { ancillaryOfferIds = JSON.parse(bru.getEnvVar('addAncillaryOfferIds') || '[]'); } catch (_e) {}
         ancillaryOfferIds = Array.isArray(ancillaryOfferIds) ? ancillaryOfferIds.filter(Boolean) : [];
 
-        // Fallback: some vendors (e.g. Sqills) expose ancillaries as top-level
-        // offer.ancillaryOfferParts rather than admission-linked ancillaryRefs,
-        // so referencedAncillaryIds (built from admission links in offers.js) is
-        // empty. Source the ids from the selected offer's own ancillary parts.
+        // Fallback 1: admission-linked ancillary refs (offers.js).
+        if (ancillaryOfferIds.length === 0) {
+          try { ancillaryOfferIds = JSON.parse(bru.getEnvVar('referencedAncillaryIds') || '[]'); } catch (_e) {}
+          ancillaryOfferIds = Array.isArray(ancillaryOfferIds) ? ancillaryOfferIds.filter(Boolean) : [];
+        }
+        // Fallback 2: the selected offer's own top-level ancillaryOfferParts
+        // (e.g. Sqills), for standalone/pre-booking use.
         if (ancillaryOfferIds.length === 0) {
           let _offer = bru.getEnvVar('offer');
           try { if (typeof _offer === 'string') _offer = JSON.parse(_offer); } catch (_e) { _offer = null; }
