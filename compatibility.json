@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.58",
+  "current_release": "2026.59",
   "releases": [
+    {
+      "release": "2026.59",
+      "date": "2026-05-22",
+      "server": "1.11.31",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#136): a train set is now a route + a timetable of services — Phase 2 of the train-set/journey series (duplicate #135 -> timetable -> journeys #137). public/js/scenarios.js: a train set's data gains a services[] array, each { vehicleNumber, departureTime, arrivalTime, daysOfWeek? }, so one route (e.g. Sqills IC Basel->Amsterdam) holds the several trains that run it at different hours (OSDM_200/202/204/206). Train Details holds the shared route (label, operator, origin/destination, optional product category); a new Services (timetable) section lists departures with add/remove rows, per-service day-of-week toggles, and a paste box that parses vendor tokens like OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|...|8500010|8400058 into rows (and fills empty route fields). The scenario trip 'Apply test data' picker now lists one entry per service. normalizeTrainData() migrates legacy single-service train sets (top-level vehicleNumber/departureTime/arrivalTime) into services[0] on read, so existing trains load and run unchanged; the wizard scenario generator uses the first service and the delete-impact check matches any service's vehicle. No server route or datafile-schema change (train data is an opaque encrypted blob). Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page -> Test Data."
+      ]
+    },
     {
       "release": "2026.58",
       "date": "2026-05-22",

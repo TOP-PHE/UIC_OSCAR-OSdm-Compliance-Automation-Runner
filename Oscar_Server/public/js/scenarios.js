@@ -625,20 +625,22 @@ async function deleteTrainResource(resourceId) {
   const targetTrain = trains.find(t => t.id === resourceId);
   if (!targetTrain) return;
 
-  const td = typeof targetTrain.data === 'string' ? JSON.parse(targetTrain.data) : (targetTrain.data || {});
-  const trainLabel = targetTrain.label || td.vehicleNumber || resourceId;
+  const td = normalizeTrainData(typeof targetTrain.data === 'string' ? JSON.parse(targetTrain.data) : (targetTrain.data || {}));
+  const vehicleNumbers = td.services.map(s => s.vehicleNumber).filter(Boolean);
+  const trainLabel = targetTrain.label || vehicleNumbers[0] || resourceId;
 
-  // Find scenarios that reference this train (by matching vehicle number / origin / destination)
+  // Find scenarios that reference this train (by matching any of its services'
+  // vehicle numbers against a trip/leg).
   let impacted = [];
   if (state && state.scenarios && state.tripRequirements) {
     // Find tripRequirement IDs that match this train's data
     const matchingTripIds = (state.tripRequirements || [])
       .filter(tr => {
         if (tr.tripType === 'SEARCH' && tr.trip) {
-          return tr.trip.vehicleNumber === td.vehicleNumber;
+          return vehicleNumbers.includes(tr.trip.vehicleNumber);
         }
         if (tr.tripType === 'SPECIFICATION' && tr.legs) {
-          return tr.legs.some(l => l.vehicleNumber === td.vehicleNumber);
+          return tr.legs.some(l => vehicleNumbers.includes(l.vehicleNumber));
         }
         return false;
       })
@@ -991,12 +993,13 @@ async function extractFromDatafile(datafile) {
         label: `Train ${vehicleNumber || ('Trip-' + (idx+1))}`,
         resource_type: 'TRAIN',
         data: {
-          vehicleNumber,
           originURN: origin,
           destinationURN: destination,
-          departureTime,
-          arrivalTime,
           operatorCode,
+          productCategory: '',
+          services: (vehicleNumber || departureTime || arrivalTime)
+            ? [{ vehicleNumber, departureTime, arrivalTime, daysOfWeek: [] }]
+            : [],
           ticketTypes: [],
           travelClasses: [],
           serviceClasses: [],
@@ -1006,11 +1009,21 @@ async function extractFromDatafile(datafile) {
       };
     });
 
+    // Dedup key from a train resource's route + its first service (#136).
+    const trainDedupKey = (data) => {
+      const d = data || {};
+      const s = (Array.isArray(d.services) && d.services[0]) || {};
+      const veh = s.vehicleNumber || d.vehicleNumber || '';      // legacy fallback
+      const dep = s.departureTime || d.departureTime || '';
+      const arr = s.arrivalTime || d.arrivalTime || '';
+      return `${veh}|${d.originURN||''}|${d.destinationURN||''}|${dep}|${arr}`;
+    };
+
     // Deduplicate trainResources from the datafile itself (same vehicle + route + times)
     const seenTrainKeys = new Set();
     const uniqueTrainResources = [];
     for (const train of trainResources) {
-      const key = `${train.data.vehicleNumber||''}|${train.data.originURN||''}|${train.data.destinationURN||''}|${train.data.departureTime||''}|${train.data.arrivalTime||''}`;
+      const key = trainDedupKey(train.data);
       if (!seenTrainKeys.has(key)) {
         seenTrainKeys.add(key);
         uniqueTrainResources.push(train);
@@ -1034,12 +1047,12 @@ async function extractFromDatafile(datafile) {
 
     const existingTrains = existingResources.filter(r => r.resource_type === 'TRAIN').map(r => {
       const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
-      return `${d.vehicleNumber||''}|${d.originURN||''}|${d.destinationURN||''}|${d.departureTime||''}|${d.arrivalTime||''}`;
+      return trainDedupKey(d);
     });
 
     let created = 0, skipped = 0;
     for (const train of uniqueTrainResources) {
-      const key = `${train.data.vehicleNumber||''}|${train.data.originURN||''}|${train.data.destinationURN||''}|${train.data.departureTime||''}|${train.data.arrivalTime||''}`;
+      const key = trainDedupKey(train.data);
       if (existingTrains.includes(key)) {
         skipped++;
         continue; // duplicate — skip
@@ -1467,11 +1480,16 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
     <span style="font-weight:600">🚄 ${label}:</span>
     <select class="param-input param-select" style="max-width:280px;font-size:12px"
       data-action="apply-trip-train" data-idx="${esc(idx)}" data-tidx="${esc(tIdx)}" data-target="${esc(target)}">
-      <option value="">— pick a train to copy its parameters —</option>
-      ${trains.map(t => {
-        const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
-        const hint = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || t.label;
-        return '<option value="' + esc(t.id) + '">' + esc(t.label || '?') + (hint ? ' — ' + esc(hint) : '') + '</option>';
+      <option value="">— pick a service to copy its parameters —</option>
+      ${trains.flatMap(t => {
+        const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+        const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ');
+        const svcs = d.services.length ? d.services : [{}];
+        return svcs.map((s, si) => {
+          const svcLabel = [s.vehicleNumber, s.departureTime].filter(Boolean).join(' ');
+          const bits = [t.label || '?', route, svcLabel].filter(Boolean).join(' — ');
+          return '<option value="' + esc(t.id) + '::' + si + '">' + esc(bits) + '</option>';
+        });
       }).join('')}
     </select>
     <span style="color:#90a4ae;font-size:11px">values fill the fields below; edit any of them afterwards</span>
@@ -2388,6 +2406,14 @@ const WIZ_OFFER_MODES    = ['INDIVIDUAL','COMBINATION'];
 // Fulfillment
 const WIZ_FULFIL_MEDIA   = ['PDF_A4','PKPASS','AZTEC_CODE','QR_CODE','NFC'];
 const WIZ_FULFIL_TYPES   = ['ETICKET','PAPER_TICKET'];
+// Days of week for a train set's timetable services (#136). Stored per service;
+// empty = runs every day. Informational today (the offer request still targets a
+// specific %TRIP_DATE%), but documents the route's weekly pattern.
+const WIZ_DAYS = [
+  { value: 'MON', label: 'Mon' }, { value: 'TUE', label: 'Tue' }, { value: 'WED', label: 'Wed' },
+  { value: 'THU', label: 'Thu' }, { value: 'FRI', label: 'Fri' }, { value: 'SAT', label: 'Sat' },
+  { value: 'SUN', label: 'Sun' }
+];
 const WIZ_PAX_ABBREV = {
   ADULT:'ADT', CHILD:'CHD', YOUTH:'YTH', SENIOR:'SEN',
   YOUNG_CHILD:'YCH', FAMILY_CHILD:'FCH', PRM:'PRM',
@@ -2927,11 +2953,14 @@ function renderWizardStep2() {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
 
   const trainItems = trains.map((t, tidx) => {
-    const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+    const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
-    const times = [d.departureTime, d.arrivalTime].filter(Boolean).join(' — ') || '';
+    const svc = d.services || [];
+    const svcSummary = svc.length === 0 ? 'no services'
+      : svc.length === 1 ? (svc[0].vehicleNumber || '1 service')
+      : `${svc.length} services`;
     const classes = (d.travelClasses || []).join(', ') || '';
-    const sub = [d.vehicleNumber || d.trainId || '', route, times, classes].filter(Boolean).join('  ·  ');
+    const sub = [route, svcSummary, classes].filter(Boolean).join('  ·  ');
     return `
     <div class="train-item">
       <div class="train-row" data-action="toggle-train-detail" data-tidx="${esc(tidx)}">
@@ -2982,12 +3011,133 @@ function renderWizardStep2() {
   `;
 }
 
+// ── Train timetable (#136) ────────────────────────────────────────────────
+// A train set is a route (origin/destination/operator/product/classes/...)
+// plus a list of *services* — the individual trains that run that route at
+// different hours/days (e.g. Sqills IC BAS→AMS = OSDM_200/202/204/206). Legacy
+// train sets stored a single service as top-level vehicleNumber/departureTime/
+// arrivalTime; normalizeTrainData() migrates those into services[0] on read so
+// the rest of the UI can assume the array. Idempotent.
+function normalizeTrainData(d) {
+  d = d || {};
+  if (!Array.isArray(d.services)) {
+    d.services = (d.vehicleNumber || d.departureTime || d.arrivalTime)
+      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '', daysOfWeek: [] }]
+      : [];
+  }
+  d.services = d.services.map(s => ({
+    vehicleNumber: (s && s.vehicleNumber) || '',
+    departureTime: (s && s.departureTime) || '',
+    arrivalTime:   (s && s.arrivalTime) || '',
+    daysOfWeek:    Array.isArray(s && s.daysOfWeek) ? s.daysOfWeek : []
+  }));
+  return d;
+}
+
+// Parse a vendor service token, e.g. the Sqills form
+// "OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058".
+// Returns a service (+ route hints) or null if it doesn't have enough parts.
+function parseServiceToken(tok) {
+  const p = String(tok || '').trim().split('|');
+  if (p.length < 4 || !p[0].trim()) return null;
+  const timeOf = (iso) => { const i = String(iso).indexOf('T'); return (i >= 0 ? iso.slice(i + 1) : iso).trim(); };
+  const stnUrn = (s) => { s = String(s || '').trim(); return s ? (/^urn:/i.test(s) ? s : `urn:uic:stn:${s}`) : ''; };
+  return {
+    vehicleNumber: p[0].trim(),
+    productCategory: (p[1] || '').trim(),
+    departureTime: timeOf(p[2]),
+    arrivalTime: timeOf(p[3]),
+    originURN: stnUrn(p[4]),
+    destinationURN: stnUrn(p[5])
+  };
+}
+
+// One <tr> for a service row in the timetable table.
+function trainServiceRowHtml(s) {
+  s = s || {};
+  const days = WIZ_DAYS.map(dy =>
+    `<span class="pill svc-day${(s.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}" style="padding:2px 6px;font-size:10px">${esc(dy.label)}</span>`
+  ).join('');
+  return `<tr class="svc-row">
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="vehicleNumber" value="${esc(s.vehicleNumber || '')}" placeholder="OSDM_202" style="min-width:90px"></td>
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="departureTime" value="${esc(s.departureTime || '')}" placeholder="09:10:00+02:00" style="min-width:130px"></td>
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="arrivalTime" value="${esc(s.arrivalTime || '')}" placeholder="16:35:00+02:00" style="min-width:130px"></td>
+    <td style="padding:3px 6px"><div class="pill-group" style="gap:3px;flex-wrap:wrap;max-width:230px">${days}</div></td>
+    <td style="padding:3px 6px"><button class="row-delete-btn" data-action="train-remove-service" title="Remove this service">🗑</button></td>
+  </tr>`;
+}
+
+// Read the current service rows out of an expanded train detail panel's
+// timetable table (DOM is the source of truth until Save, like the other
+// train fields). Returns [] when the panel/table isn't present.
+function readTrainServiceRows(tidx) {
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (!tbody) return [];
+  return [...tbody.querySelectorAll('tr.svc-row')].map(row => {
+    const val = (f) => { const el = row.querySelector(`[data-svc-field="${f}"]`); return el ? el.value.trim() : ''; };
+    return {
+      vehicleNumber: val('vehicleNumber'),
+      departureTime: val('departureTime'),
+      arrivalTime:   val('arrivalTime'),
+      daysOfWeek:    [...row.querySelectorAll('.svc-day.selected')].map(p => p.dataset.val).filter(Boolean)
+    };
+  });
+}
+
+// Re-render only the timetable <tbody> from a services array — preserves the
+// route fields above (which are untouched DOM-only inputs).
+function reRenderTrainServices(tidx, services) {
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (tbody) tbody.innerHTML = (services || []).map(trainServiceRowHtml).join('');
+}
+
+function trainAddService(tidx) {
+  const rows = readTrainServiceRows(tidx);
+  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '', daysOfWeek: [] });
+  reRenderTrainServices(tidx, rows);
+}
+
+function trainRemoveService(tidx, rowEl) {
+  const rows = readTrainServiceRows(tidx);
+  const tr = rowEl && rowEl.closest('tr.svc-row');
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (tr && tbody) {
+    const i = [...tbody.querySelectorAll('tr.svc-row')].indexOf(tr);
+    if (i >= 0) rows.splice(i, 1);
+  }
+  reRenderTrainServices(tidx, rows);
+}
+
+// Parse the paste box (one token per line or comma-separated) and append the
+// resulting services; fill empty route fields (origin/destination) from the
+// first token as a convenience.
+function trainPasteServices(tidx) {
+  const box = document.getElementById(`tf-${tidx}-paste`);
+  if (!box) return;
+  const tokens = String(box.value || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  const parsed = tokens.map(parseServiceToken).filter(Boolean);
+  if (parsed.length === 0) return;
+  const rows = readTrainServiceRows(tidx);
+  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime, daysOfWeek: [] }));
+  reRenderTrainServices(tidx, rows);
+  // Fill empty route inputs from the first token.
+  const first = parsed[0];
+  const setIfEmpty = (field, v) => {
+    if (!v) return;
+    const el = document.querySelector(`#train-detail-${tidx} [data-tfield="${field}"]`);
+    if (el && !el.value.trim()) el.value = v;
+  };
+  setIfEmpty('originURN', first.originURN);
+  setIfEmpty('destinationURN', first.destinationURN);
+  box.value = '';
+}
+
 // ── Build the detail HTML for one train resource ─────────────────────────────
 function buildTrainDetailHTML(tidx) {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const t = trains[tidx];
   if (!t) return '';
-  const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+  const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
   const fw = wizData.framework;
 
   // Build pill HTML with pre-selected state
@@ -3011,47 +3161,58 @@ function buildTrainDetailHTML(tidx) {
     <div class="param-section-head" data-action="toggle-param-section">⚙️ Train Details<span class="ps-arrow open">▶</span></div>
     <div class="param-section-body open">
     <div style="padding:12px 14px">
+      <p style="color:#90a4ae;font-size:11px;margin:0 0 10px">A train set is a <b>route</b> (below) plus a <b>timetable</b> of services (the trains that run it at different hours). Add the individual departures in the Services section.</p>
       <div class="train-form-grid">
-        <!-- Row 1: Label | Vehicle Number -->
+        <!-- Row 1: Label | Operator Code -->
         <div class="param-field">
           <label class="param-label">Label <span class="param-hint">(short display name)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. ICE 123 Berlin→Paris">
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. Sqills IC BAS/AMS">
           <span class="field-error" id="tf-${esc(tidx)}-label-err"></span>
         </div>
         <div class="param-field">
-          <label class="param-label">Vehicle Number</label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="vehicleNumber" value="${esc(d.vehicleNumber || d.trainId || '')}" placeholder="e.g. ICE123">
-          <span class="field-error" id="tf-${esc(tidx)}-vehicleNumber-err"></span>
+          <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184">
+          <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
         </div>
-        <!-- Row 2: Origin URN | Departure time -->
+        <!-- Row 2: Origin URN | Destination URN -->
         <div class="param-field">
           <label class="param-label">Origin station URN</label>
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010">
           <span class="field-error" id="tf-${esc(tidx)}-originURN-err"></span>
         </div>
         <div class="param-field">
-          <label class="param-label">Departure time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="departureTime" value="${esc(d.departureTime || '')}" placeholder="07:00:00+02:00">
-          <span class="field-error" id="tf-${esc(tidx)}-departureTime-err"></span>
-        </div>
-        <!-- Row 3: Destination URN | Arrival time -->
-        <div class="param-field">
           <label class="param-label">Destination station URN</label>
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
           <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
-        <div class="param-field">
-          <label class="param-label">Arrival time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="arrivalTime" value="${esc(d.arrivalTime || '')}" placeholder="10:20:00+02:00">
-          <span class="field-error" id="tf-${esc(tidx)}-arrivalTime-err"></span>
-        </div>
-        <!-- Row 4: Operator Code (full width) -->
+        <!-- Row 3: Product category (full width, optional) -->
         <div class="param-field" style="grid-column:1/-1">
-          <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN — operator's UIC RICS code)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184" style="max-width:280px">
-          <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
+          <label class="param-label">Product category <span class="param-hint">(optional — e.g. urn:uic:sbc:SQILLS_IC or a short name)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategory" value="${esc(d.productCategory || '')}" placeholder="urn:uic:sbc:SQILLS_IC" style="max-width:360px">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategory-err"></span>
         </div>
       </div>
+    </div>
+    </div>
+  </div>
+  <div class="param-section" style="margin-top:8px">
+    <div class="param-section-head" data-action="toggle-param-section">🕑 Services (timetable)<span class="ps-arrow open">▶</span></div>
+    <div class="param-section-body open">
+    <div style="padding:12px 14px">
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">
+        <input class="param-input" id="tf-${esc(tidx)}-paste" placeholder="Paste service tokens, one per line — OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058" style="flex:1;min-width:260px;font-size:11px;font-family:'Consolas','Monaco','Courier New',monospace">
+        <button class="btn btn-secondary btn-sm" data-action="train-paste-service" data-tidx="${esc(tidx)}" title="Parse the pasted tokens into service rows">📥 Add from tokens</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="text-align:left;color:#90a4ae;font-size:11px">
+          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th style="padding:3px 6px">Days <span style="font-weight:400">(empty = daily)</span></th><th></th>
+        </tr></thead>
+        <tbody id="tf-${esc(tidx)}-services">${(d.services.length ? d.services : [{}]).map(trainServiceRowHtml).join('')}</tbody>
+      </table>
+      <div style="margin-top:10px">
+        <button class="btn btn-secondary btn-sm" data-action="train-add-service" data-tidx="${esc(tidx)}">➕ Add service</button>
+      </div>
+      <span class="field-error" id="tf-${esc(tidx)}-services-err"></span>
     </div>
     </div>
   </div>
@@ -3138,12 +3299,11 @@ function readTrainDetailFields(tidx) {
   };
   return {
     label:         field('label'),
-    vehicleNumber: field('vehicleNumber'),
     originURN:     field('originURN'),
     destinationURN:field('destinationURN'),
-    departureTime: field('departureTime'),
-    arrivalTime:   field('arrivalTime'),
     operatorCode:  field('operatorCode'),
+    productCategory: field('productCategory'),
+    services:      readTrainServiceRows(tidx),
     ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
     travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
     serviceClasses:    getSelectedPills(`tf-${esc(tidx)}-serviceClasses`),
@@ -3162,20 +3322,19 @@ function wizValidateTrain(tidx) {
   if (!detail) return false;
   const checks = [
     { tfield: 'label',          test: v => v.length > 0,            msg: 'Label is required.' },
-    { tfield: 'vehicleNumber',  test: v => v.length > 0,            msg: 'Vehicle Number is required.' },
     { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
     { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
-    { tfield: 'departureTime',  test: v => !v || TIME_RE.test(v),  msg: 'Must be HH:MM:SS+HH:MM or HH:MM:SS-HH:MM (e.g. 07:00:00+02:00).' },
-    { tfield: 'arrivalTime',    test: v => !v || TIME_RE.test(v),  msg: 'Must be HH:MM:SS+HH:MM or HH:MM:SS-HH:MM (e.g. 10:20:00+02:00).' },
     { tfield: 'operatorCode',   test: v => !v || RICS_RE.test(v),  msg: 'Must be urn:uic:rics:NNNN (e.g. urn:uic:rics:1184) or leave empty.' }
   ];
-  // Clear previous state
+  // Clear previous state (route fields + services)
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
     const err = document.getElementById(`tf-${esc(tidx)}-${c.tfield}-err`);
     if (el)  el.classList.remove('invalid');
     if (err) { err.textContent = ''; err.classList.remove('show'); }
   });
+  const svcErr = document.getElementById(`tf-${esc(tidx)}-services-err`);
+  if (svcErr) { svcErr.textContent = ''; svcErr.classList.remove('show'); }
   let ok = true;
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
@@ -3188,6 +3347,24 @@ function wizValidateTrain(tidx) {
       ok = false;
     }
   });
+
+  // Services (timetable): at least one, each with a vehicle # and valid times.
+  const services = readTrainServiceRows(tidx);
+  let svcMsg = '';
+  if (services.length === 0) {
+    svcMsg = 'Add at least one service (the train that runs this route).';
+  } else {
+    for (let i = 0; i < services.length; i++) {
+      const s = services[i];
+      if (!s.vehicleNumber) { svcMsg = `Service ${i + 1}: vehicle number is required.`; break; }
+      if (s.departureTime && !TIME_RE.test(s.departureTime)) { svcMsg = `Service ${i + 1}: departure must be HH:MM:SS±HH:MM (e.g. 09:10:00+02:00).`; break; }
+      if (s.arrivalTime && !TIME_RE.test(s.arrivalTime)) { svcMsg = `Service ${i + 1}: arrival must be HH:MM:SS±HH:MM (e.g. 16:35:00+02:00).`; break; }
+    }
+  }
+  if (svcMsg) {
+    if (svcErr) { svcErr.textContent = svcMsg; svcErr.classList.add('show'); }
+    ok = false;
+  }
   return ok;
 }
 
@@ -3200,12 +3377,11 @@ async function wizSaveTrain(tidx) {
   if (!fields) return;
   const label = fields.label;
   const data = {
-    vehicleNumber:    fields.vehicleNumber,
     originURN:        fields.originURN,
     destinationURN:   fields.destinationURN,
-    departureTime:    fields.departureTime,
-    arrivalTime:      fields.arrivalTime,
     operatorCode:     fields.operatorCode,
+    productCategory:  fields.productCategory,
+    services:         fields.services,
     ticketTypes:      fields.ticketTypes,
     travelClasses:    fields.travelClasses,
     serviceClasses:   fields.serviceClasses,
@@ -3426,8 +3602,10 @@ function renderWizardStep3() {
     ? '<option value="">— No trains defined — go to Step 2 first —</option>'
     : ['<option value="">— Select a train —</option>',
         ...trains.map(t => {
-          const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
-          return `<option value="${esc(t.id)}" ${sc.trainResourceId===t.id?'selected':''}>${esc(t.label||t.id)} (${esc(d.vehicleNumber||d.trainId||'?')})</option>`;
+          const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+          const route = [d.originURN, d.destinationURN].filter(Boolean).join('→');
+          const hint = route || `${d.services.length} svc`;
+          return `<option value="${esc(t.id)}" ${sc.trainResourceId===t.id?'selected':''}>${esc(t.label||t.id)}${hint?' ('+esc(hint)+')':''}</option>`;
         })].join('');
 
   // Selected train detail card
@@ -3435,13 +3613,14 @@ function renderWizardStep3() {
   if (sc.trainResourceId) {
     const tr = trains.find(t => t.id === sc.trainResourceId);
     if (tr) {
-      const d = typeof tr.data === 'string' ? JSON.parse(tr.data) : (tr.data || {});
+      const d = normalizeTrainData(typeof tr.data === 'string' ? JSON.parse(tr.data) : (tr.data || {}));
+      const svcList = d.services.length
+        ? d.services.map(s => `${esc(s.vehicleNumber||'?')} ${esc(s.departureTime||'')}→${esc(s.arrivalTime||'')}`).join('<br>')
+        : '—';
       trainDetail = `<div class="train-sel-detail open" style="margin-top:10px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><span class="param-label">Vehicle Number</span><br><code style="font-size:11px">${esc(d.vehicleNumber||d.trainId||'—')}</code></div>
           <div><span class="param-label">Route</span><br><code style="font-size:11px">${esc(d.originURN||'?')} → ${esc(d.destinationURN||'?')}</code></div>
-          <div><span class="param-label">Departure</span><br><code style="font-size:11px">${esc(d.departureTime||'—')}</code></div>
-          <div><span class="param-label">Arrival</span><br><code style="font-size:11px">${esc(d.arrivalTime||'—')}</code></div>
+          <div><span class="param-label">Services (${d.services.length})</span><br><code style="font-size:11px">${svcList}</code></div>
         </div>
         <div style="margin-top:8px;font-size:11px;color:#78909c">
           Travel classes: ${(d.travelClasses||[]).join(', ')||'—'} &nbsp;·&nbsp;
@@ -4013,7 +4192,11 @@ async function wizGenerateScenario() {
     const trainRes = sc.trainResourceId
       ? (wizData.resources||[]).find(r => r.id === sc.trainResourceId)
       : null;
-    const d = trainRes ? (typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    const d = trainRes ? normalizeTrainData(typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    // A train set may carry several services (timetable, #136); the wizard uses
+    // the first one. Per-service selection is available in the trip editor's
+    // "Apply test data" picker.
+    const svc0 = (d.services && d.services[0]) || {};
 
     // Resolve origin/destination: wizard override → train resource → framework → empty
     const resolvedOrigin      = sc.originURN      || d.originURN      || fw.originURN      || '';
@@ -4034,12 +4217,12 @@ async function wizGenerateScenario() {
         legs: [{
           origin:                   resolvedOrigin,
           destination:              resolvedDestination,
-          startDatetime:            `%TRIP_DATE%T${d.departureTime || '07:00:00+01:00'}`,
-          endDatetime:              `%TRIP_DATE%T${d.arrivalTime   || '09:00:00+01:00'}`,
+          startDatetime:            `%TRIP_DATE%T${svc0.departureTime || '07:00:00+01:00'}`,
+          endDatetime:              `%TRIP_DATE%T${svc0.arrivalTime   || '09:00:00+01:00'}`,
           productCategoryRef:       '',
           productCategoryName:      '',
           productCategoryShortName: '',
-          vehicleNumber:            d.vehicleNumber || d.trainId || '',
+          vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }]
       };
@@ -4051,12 +4234,12 @@ async function wizGenerateScenario() {
         trip: {
           origin:                   resolvedOrigin,
           destination:              resolvedDestination,
-          startDatetime:            d.departureTime  ? `%TRIP_DATE%T${d.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
-          endDatetime:              d.arrivalTime    ? `%TRIP_DATE%T${d.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
+          startDatetime:            svc0.departureTime  ? `%TRIP_DATE%T${svc0.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
+          endDatetime:              svc0.arrivalTime    ? `%TRIP_DATE%T${svc0.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
           productCategoryRef:       '',
           productCategoryName:      '',
           productCategoryShortName: '',
-          vehicleNumber:            d.vehicleNumber || d.trainId || '',
+          vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }
       };
@@ -4559,6 +4742,16 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
+    case 'train-add-service':
+      trainAddService(parseInt(el.dataset.tidx)); break;
+    case 'train-remove-service': {
+      const _tb = el.closest('tbody');
+      const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
+      if (_m) trainRemoveService(parseInt(_m[1], 10), el);
+      break;
+    }
+    case 'train-paste-service':
+      trainPasteServices(parseInt(el.dataset.tidx)); break;
 
     // ── Scenario creation (Step 3) ────────────────────────────────────────────
     case 'wiz-scen-type':
@@ -4802,17 +4995,20 @@ document.body.addEventListener('change', function(e) {
       const atScIdx = parseInt(el.dataset.idx);
       const atTIdx  = parseInt(el.dataset.tidx);
       const target  = el.dataset.target; // "trip" or "legs.<n>"
-      const trainId = el.value;
-      if (!trainId) break;
+      const raw = el.value; // "<trainId>::<serviceIndex>"
+      if (!raw) break;
+      const [trainId, svcIdxStr] = String(raw).split('::');
+      const svcIdx = parseInt(svcIdxStr, 10) || 0;
       const train = (wizData.resources || []).find(r => String(r.id) === String(trainId));
       if (!train) break;
-      const data = typeof train.data === 'string'
-        ? JSON.parse(train.data) : (train.data || {});
+      const data = normalizeTrainData(typeof train.data === 'string'
+        ? JSON.parse(train.data) : (train.data || {}));
+      const svc = data.services[svcIdx] || data.services[0] || {};
       const tripReq = state.tripRequirements[atTIdx];
       if (!tripReq) break;
       // Resolve the target sub-object (trip block or leg N) and populate its
-      // scalar fields from the train resource. Preserve any field the train
-      // does not define — the user may have already typed into it.
+      // scalar fields from the train set's route + the chosen service.
+      // Preserve any field neither defines — the user may have typed into it.
       let t;
       if (target === 'trip') {
         tripReq.trip = tripReq.trip || {};
@@ -4825,9 +5021,9 @@ document.body.addEventListener('change', function(e) {
       }
       if (data.originURN)      t.origin         = data.originURN;
       if (data.destinationURN) t.destination    = data.destinationURN;
-      if (data.departureTime)  t.startDatetime  = '%TRIP_DATE%T' + data.departureTime;
-      if (data.arrivalTime)    t.endDatetime    = '%TRIP_DATE%T' + data.arrivalTime;
-      if (data.vehicleNumber)  t.vehicleNumber  = data.vehicleNumber;
+      if (svc.departureTime)   t.startDatetime  = '%TRIP_DATE%T' + svc.departureTime;
+      if (svc.arrivalTime)     t.endDatetime    = '%TRIP_DATE%T' + svc.arrivalTime;
+      if (svc.vehicleNumber)   t.vehicleNumber  = svc.vehicleNumber;
       if (data.operatorCode)   t.operatorCode   = data.operatorCode;
       markDirty();
       // Reset the dropdown to its placeholder so it reads as "apply again"
