@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.56",
+  "current_release": "2026.57",
   "releases": [
+    {
+      "release": "2026.57",
+      "date": "2026-05-22",
+      "server": "1.11.29",
+      "collection": "OTST_V2.0.3",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#133): scenario title no longer collapses to a bare 'Sale' for custom codes. public/js/scenarios.js decodeCode() rendered the bold scenario title; a code outside the strict OSDM test-suite convention (e.g. SALE_SEARCH_IC_BAS_AMS_1PAX) showed just 'Sale' because every descriptive token after the recognised type prefix (SEARCH/IC/BAS/AMS/1PAX) was silently dropped. decodeCode() now counts unrecognised tokens and, when nothing beyond the bare type marker was recognised, returns the code verbatim so the title matches what the user typed; genuine convention codes still decode to their rich label (OTST_RFND_SRCH_CRIT_1ADT_1LEG -> 'Refund — Search criteria — 1 Adult — 1 Leg'). Also accepts the full COUCHETTE token, not only the abbreviated CCHTTE, so couchette scenarios decode correctly. Collection version unchanged (OTST_V2.0.3).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page."
+      ]
+    },
     {
       "release": "2026.56",
       "date": "2026-05-22",

@@ -172,6 +172,7 @@ function decodeCode(code) {
   }
   let i = 0;
   let type = '', action = '', tripMode = '', paxParts = [], legs = '', special = [];
+  let unrecognized = 0;
 
   // Type
   if      (parts[i] === 'RFND') { type = 'Refund';   i++; }
@@ -194,9 +195,18 @@ function decodeCode(code) {
     else if (!isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
     else if (!isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
     else if (p === 'SEAT')   { special.push('Seat selection'); }
-    else if (p === 'CCHTTE') { special.push('Couchette'); }
+    else if (p === 'CCHTTE' || p === 'COUCHETTE') { special.push('Couchette'); }
+    else { unrecognized++; }
     i++;
   }
+
+  // If nothing beyond the bare type marker was recognised yet some tokens
+  // were unrecognised, the code does not follow the OSDM naming convention
+  // (e.g. a custom rename like `SALE_SEARCH_IC_BAS_AMS_1PAX`). Return it
+  // verbatim rather than collapsing it to a misleading bare "Sale" /
+  // "Refund" / "Exchange" — same intent as the first-token guard above.
+  const decodedSomething = action || tripMode || paxParts.length || legs || special.length;
+  if (!decodedSomething && unrecognized > 0) return code;
 
   let desc = [type, action, tripMode, paxParts.join(' + '), legs].filter(Boolean).join(' — ');
   if (special.length) desc += ' — ' + special.join(', ');
