@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.30] — 2026-05-22
+
+Feature (#135) — duplicate a train set. Phase 1 of the train-set/journey
+test-data series (duplicate → timetable #136 → journeys #137).
+
+### Added
+- **`public/js/scenarios.js`**: each train row in Test Resources gains a
+  **🗐 Duplicate** button. `wizDuplicateTrain()` deep-clones the source train's
+  `data` + `label` into a fresh **unsaved** placeholder with a unique "(copy)"
+  label and expands it for editing — mirroring `wizAddTrain()` — so the common
+  "same route, different hour" case no longer requires re-entering every field.
+  The copy persists as a brand-new `test_resources` row on **Save Train**; the
+  original is untouched. Hidden in tester read-only mode alongside add/delete.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data.
+
+---
+
 ## [server-v1.11.29] — 2026-05-22
 
 Fix (#133) — scenario title no longer collapses to a bare "Sale" for custom codes.
