@@ -216,6 +216,7 @@ request:
                 "referencedAncillaryIds", "passengerCount",
                 // Booking
                 "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone", "__addAncillaryDone",
+                "addAncillaryParentOfferId", "addAncillaryOfferIds",
                 "admissionReservationAncillaryBookingPartsIds",
                 "provisionalPrice", "provisionalPriceAmount",
                 "confirmedPriceAmount", "bookingConfirmedPrice",
