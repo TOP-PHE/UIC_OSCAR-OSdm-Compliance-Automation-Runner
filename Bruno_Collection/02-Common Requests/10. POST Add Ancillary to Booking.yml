@@ -38,11 +38,10 @@ runtime:
         const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
         bru.setVar('addAncillaryResource', useOfferParts ? 'offer-parts' : 'ancillaries');
 
-        // ── Best-effort request body ───────────────────────────────────────
-        // No add-ancillary scenario / supporting vendor exists yet to validate
-        // the exact shape; this assembles the schema-required fields from env
-        // set by offers.js (referencedAncillaryIds) and scenarioParser
-        // (bookingPassengerReferences). Schemas:
+        // ── Request body ───────────────────────────────────────────────────
+        // Assembles the schema-required fields from env set by offers.js
+        // (referencedAncillaryIds, plus an offer.ancillaryOfferParts fallback
+        // below) and scenarioParser (bookingPassengerReferences). Schemas:
         //   >=3.7 BookedOfferPartRequest:      offerId*, passengerRefs* (+ ancillaryOfferIds)
         //   any   BookedOfferAncillaryRequest: offerId*, ancillaryOfferId*, passengerRefs*
         const offerId = bru.getEnvVar('offerId');
@@ -51,6 +50,17 @@ runtime:
         let ancillaryOfferIds = [];
         try { ancillaryOfferIds = JSON.parse(bru.getEnvVar('referencedAncillaryIds') || '[]'); } catch (_e) {}
         ancillaryOfferIds = Array.isArray(ancillaryOfferIds) ? ancillaryOfferIds.filter(Boolean) : [];
+
+        // Fallback: some vendors (e.g. Sqills) expose ancillaries as top-level
+        // offer.ancillaryOfferParts rather than admission-linked ancillaryRefs,
+        // so referencedAncillaryIds (built from admission links in offers.js) is
+        // empty. Source the ids from the selected offer's own ancillary parts.
+        if (ancillaryOfferIds.length === 0) {
+          let _offer = bru.getEnvVar('offer');
+          try { if (typeof _offer === 'string') _offer = JSON.parse(_offer); } catch (_e) { _offer = null; }
+          const _parts = (_offer && Array.isArray(_offer.ancillaryOfferParts)) ? _offer.ancillaryOfferParts : [];
+          ancillaryOfferIds = _parts.map((p) => p && p.id).filter(Boolean);
+        }
 
         const body = useOfferParts
           ? { offerId: offerId, passengerRefs: passengerRefs, ancillaryOfferIds: ancillaryOfferIds }
