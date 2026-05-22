@@ -38,6 +38,7 @@ const {
   validateCoachDeckLayout,
   validatePlaceAvailability,
   validateBookedOfferPartResponse,
+  validateAncillaryOfferParts,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 } = require('../../../Bruno_Collection/library-bruno/osdmCompliance.js');
@@ -498,5 +499,51 @@ describe('validateBookedOfferPartResponse (issue #104 Stage B)', () => {
     const checks = validateBookedOfferPartResponse({ warnings: null }, ep);
     expect(allOk(checks)).toBe(true);
     expect(find(checks, /non-empty/)).toBeUndefined();
+  });
+});
+
+describe('validateAncillaryOfferParts (issue #108, offer-time)', () => {
+  const allOk = (checks) => checks.every((c) => c.ok);
+  const find = (checks, re) => checks.find((c) => re.test(c.name));
+
+  test('no ancillaryOfferParts → no checks (pure no-op)', () => {
+    expect(validateAncillaryOfferParts({ offerId: 'O1' }, '/offers')).toEqual([]);
+    expect(validateAncillaryOfferParts(null, '/offers')).toEqual([]);
+    expect(validateAncillaryOfferParts({ ancillaryOfferParts: undefined }, '/offers')).toEqual([]);
+  });
+
+  test('empty array → array-shape check only, passes', () => {
+    const checks = validateAncillaryOfferParts({ ancillaryOfferParts: [] }, '/offers');
+    expect(allOk(checks)).toBe(true);
+    expect(find(checks, /required "id"/)).toBeUndefined();
+  });
+
+  test('valid parts (id + type) pass', () => {
+    const checks = validateAncillaryOfferParts(
+      { ancillaryOfferParts: [{ id: 'A1', type: 'MEAL' }, { id: 'A2', type: 'LUGGAGE', category: 'Bag' }] },
+      '/offers'
+    );
+    expect(allOk(checks)).toBe(true);
+  });
+
+  test('missing id / type are reported with the offending index', () => {
+    const checks = validateAncillaryOfferParts(
+      { ancillaryOfferParts: [{ id: 'A1', type: 'MEAL' }, { type: 'X' }, { id: 'A3' }] },
+      '/offers'
+    );
+    expect(find(checks, /required "id"/).ok).toBe(false);
+    expect(find(checks, /required "id"/).message).toMatch(/index 1/);
+    expect(find(checks, /required "type"/).ok).toBe(false);
+    expect(find(checks, /required "type"/).message).toMatch(/index 2/);
+  });
+
+  test('non-string category fails', () => {
+    const checks = validateAncillaryOfferParts({ ancillaryOfferParts: [{ id: 'A1', type: 'MEAL', category: 5 }] }, '/offers');
+    expect(find(checks, /"category"/).ok).toBe(false);
+  });
+
+  test('ancillaryOfferParts not an array fails the shape check', () => {
+    const checks = validateAncillaryOfferParts({ ancillaryOfferParts: {} }, '/offers');
+    expect(find(checks, /is an array/).ok).toBe(false);
   });
 });

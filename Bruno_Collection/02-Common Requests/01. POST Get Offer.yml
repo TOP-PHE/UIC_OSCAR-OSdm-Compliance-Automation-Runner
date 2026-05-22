@@ -117,6 +117,14 @@ runtime:
 
         //swaggerSchemaValidatorContent();
 
+        // ── OSDM compliance (Layer 1): offer-time AncillaryOfferPart shape (#108) ──
+        // No-op for offers without ancillaries; validates id/type/category on the
+        // selected offer's ancillaryOfferParts when present (e.g. Sqills).
+        const { validateAncillaryOfferParts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        validateAncillaryOfferParts(bru.getEnvVar("offer"), '/offers → ancillaryOfferParts').forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
         // ── Place-selection routing (issue #104) ──────────────────────────────
         // Pre-booking seat map (SEATMAP_AT_OFFER) runs only when the scenario
         // opted into Place selection AND chose the SEATMAP_AT_OFFER mode (both
