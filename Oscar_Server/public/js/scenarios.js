@@ -787,7 +787,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -2941,6 +2941,7 @@ function renderWizardStep2() {
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
           <span class="toggle-arrow" id="train-arrow-${esc(tidx)}">▶</span>
+          <button class="btn btn-sm btn-secondary" data-action="wiz-duplicate-train" data-tidx="${esc(tidx)}" title="Duplicate this train (copy then edit the vehicle # / times)" style="font-size:11px;padding:3px 8px">🗐 Duplicate</button>
           <button class="row-delete-btn" data-action="wiz-delete-resource" data-id="${esc(t.id)}" title="Delete this train">🗑</button>
         </div>
       </div>
@@ -3256,6 +3257,44 @@ function wizAddTrain() {
   if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const newIdx = trains.length - 1;
+  toggleTrainDetail(newIdx);
+  const detail = document.getElementById('train-detail-' + newIdx);
+  if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Duplicate an existing train into a new unsaved copy and expand it ─────────
+// Deep-clones the source train's data + label into a fresh unsaved placeholder
+// (mirrors wizAddTrain) so the user can tweak the vehicle # / times before
+// saving — the common "same route, different hour" case. The copy gets a
+// unique "(copy)" label and is persisted as a brand-new resource on Save Train.
+function wizDuplicateTrain(tidx) {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const src = trains[tidx];
+  if (!src) return;
+  const srcData = typeof src.data === 'string' ? JSON.parse(src.data) : (src.data || {});
+
+  // Unique "(copy)" label so the list stays readable and Save doesn't collide.
+  const existing = new Set(trains.map(t => t.label).filter(Boolean));
+  const base = `${src.label || 'Train'} (copy)`;
+  let newLabel = base;
+  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+
+  const copy = {
+    id: null,
+    _unsaved: true,
+    label: newLabel,
+    resource_type: 'TRAIN',
+    data: JSON.parse(JSON.stringify(srcData))
+  };
+  wizData.resources.push(copy);
+
+  // Re-render and expand the new (last) train — same flow as wizAddTrain.
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const newTrains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const newIdx = newTrains.length - 1;
   toggleTrainDetail(newIdx);
   const detail = document.getElementById('train-detail-' + newIdx);
   if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4516,6 +4555,8 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDeleteResource(el.dataset.id); break;
     case 'wiz-add-train':
       wizAddTrain(); break;
+    case 'wiz-duplicate-train':
+      e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
 
