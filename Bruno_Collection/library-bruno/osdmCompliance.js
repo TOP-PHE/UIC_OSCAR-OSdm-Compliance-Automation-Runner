@@ -550,6 +550,53 @@ function validateBookedOfferPartResponse(body, endpoint) {
   return checks;
 }
 
+// ── Offer-time AncillaryOfferPart compliance (issue #108) ──────────────────
+// Validates the OSDM structural shape of an Offer's ancillaryOfferParts[].
+// Lenient (Layer 1) and emitted ONLY when the offer carries ancillary parts —
+// so it is a pure no-op for offers without ancillaries (most vendors) and lights
+// up only where there is something to check (e.g. Sqills). Each AncillaryOfferPart
+// requires a non-empty string "id" (AbstractOfferPart) and a string "type"
+// (AncillaryType — an x-extensible-enum, so type-checked, not value-checked);
+// "category" is an optional string. Pass the parsed Offer object.
+function validateAncillaryOfferParts(offer, endpoint) {
+  const ep = endpoint || '/offers';
+  const checks = [];
+  const parts = offer && typeof offer === 'object' ? offer.ancillaryOfferParts : undefined;
+  if (parts == null) return checks; // no ancillary parts → nothing to assert
+
+  const isArr = isType(parts, 'array');
+  checks.push({
+    name: `${ep} → "ancillaryOfferParts" is an array<AncillaryOfferPart>`,
+    ok: isArr,
+    message: isArr ? '' : `Expected "ancillaryOfferParts" to be an array, got ${typeof parts}`,
+  });
+  if (!isArr || parts.length === 0) return checks;
+
+  const badId = [], badType = [], badCategory = [];
+  parts.forEach((p, i) => {
+    const obj = isType(p, 'object');
+    if (!obj || !isType(p.id, 'string') || p.id.trim() === '') badId.push(i);
+    if (!obj || !isType(p.type, 'string') || p.type.trim() === '') badType.push(i);
+    if (obj && p.category != null && !isType(p.category, 'string')) badCategory.push(i);
+  });
+  checks.push({
+    name: `${ep} → every AncillaryOfferPart has required "id" (non-empty string)`,
+    ok: badId.length === 0,
+    message: badId.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "id": index ${badId.join(', ')}`,
+  });
+  checks.push({
+    name: `${ep} → every AncillaryOfferPart has required "type" (AncillaryType string)`,
+    ok: badType.length === 0,
+    message: badType.length === 0 ? '' : `AncillaryOfferParts with missing/invalid "type": index ${badType.join(', ')}`,
+  });
+  checks.push({
+    name: `${ep} → AncillaryOfferPart "category" (when present) is a string`,
+    ok: badCategory.length === 0,
+    message: badCategory.length === 0 ? '' : `AncillaryOfferParts with non-string "category": index ${badCategory.join(', ')}`,
+  });
+  return checks;
+}
+
 // ── Shared System-Information response-status classification ─────────────
 // Pure classification of a System-Information GET response status, made
 // version-aware via the test-framework OSDM version (osdmVersion.js). Returns:
@@ -623,6 +670,7 @@ module.exports = {
   validateCoachDeckLayout,
   validatePlaceAvailability,
   validateBookedOfferPartResponse,
+  validateAncillaryOfferParts,
   classifySystemInfoStatus,
   handleSystemInfoStatus,
 };
