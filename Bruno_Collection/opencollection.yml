@@ -114,6 +114,7 @@ request:
 
           var _isToken    = _rn.includes('token') || _rn.includes('access');
           var _isPlaceMap = _ru.includes('place-map') || _rn.includes('place map');
+          var _isAddReservation = _rn.includes('add reservation');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
@@ -128,11 +129,18 @@ request:
                           || (bru.getEnvVar('requiresPlaceSelection') === true || bru.getEnvVar('requiresPlaceSelection') === 'true')
                           || _st === 'SALE+PLACEMAP';
 
+          // Post-booking add-reservation runs only in ADD_TO_BOOKING mode
+          // (issues #104 Stage B / #107), and only once per scenario.
+          var _runAddReservation = (bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
+                                 && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true';
+
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
             _skipReason = 'not for "' + _sandbox + '" sandbox';
           } else if (_isPlaceMap && !_runPlaceMap)                       { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
             else if (_isPlaceMap && bru.getEnvVar('bookingId'))           { _skipReason = 'place map is pre-booking only (booking already created)'; }
+            else if (_isAddReservation && !_runAddReservation)            { _skipReason = 'add-reservation not enabled (ADD_TO_BOOKING)'; }
+            else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
             else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange)) { _skipReason = 'not in SALE+PLACEMAP scope'; }
             else if (_st === 'REFUND'        && _isExchange)               { _skipReason = 'Exchange excluded for REFUND scenario'; }
@@ -200,7 +208,7 @@ request:
                 "admissionPartsPrice", "reservationPartsPrice", "ancillaryPartsPrice",
                 "referencedAncillaryIds", "passengerCount",
                 // Booking
-                "BookingRequest", "bookingId",
+                "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone",
                 "admissionReservationAncillaryBookingPartsIds",
                 "provisionalPrice", "provisionalPriceAmount",
                 "confirmedPriceAmount", "bookingConfirmedPrice",

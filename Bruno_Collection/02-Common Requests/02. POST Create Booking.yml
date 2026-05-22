@@ -71,7 +71,16 @@ runtime:
         // consequence the skip path (old `skipPatchPassengerRequest === true`)
         // silently never worked either. Fixed here to match the actual
         // request names in the collection.
-        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+        // 4. Post-booking add-reservation (ADD_TO_BOOKING, issue #104 Stage B):
+        //    when the scenario chose ADD_TO_BOOKING place selection, insert the
+        //    add-reservation step before the passenger steps. It then continues
+        //    to PATCH/GET Passenger itself. Inert for every current scenario.
+        const _addRes = bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
+            && String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
+            && bru.getEnvVar("__addReservationDone") !== "true";
+        if (_addRes) {
+            bru.runner.setNextRequest("09. POST Add Reservation to Booking");
+        } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
             || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
             bru.runner.setNextRequest("04. GET Passenger");
         } else {
