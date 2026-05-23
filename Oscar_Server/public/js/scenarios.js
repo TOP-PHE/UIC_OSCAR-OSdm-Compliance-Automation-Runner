@@ -1946,25 +1946,21 @@ function syncPurchaserFromPassenger(paxList, pax) {
 // ── Offer search criteria section (inline on scenario) ───────────────────────
 function buildOfferSection(idx, sc) {
   const criteria = sc.offerSearchCriteria || {};
-  const fwOc = ((wizData && wizData.framework) || {}).offerCriteria || {};
-  const fwSc = ((wizData && wizData.framework) || {}).serviceClasses;
 
-  // Filter each list by the framework's offerCriteria constraints, falling
-  // back to the full OSDM enum when the framework leaves a field empty.
-  // The framework's offerMode is a single string (not array), so we build
-  // a one-item array to pass through fwFilter uniformly.
-  const offerModeAllowed = fwOc.offerMode ? [fwOc.offerMode] : null;
-  const modeList         = fwFilter(ENUMS.offerMode,           offerModeAllowed);
-  // Always include whatever the scenario already has selected, even if it falls
-  // outside the framework's allowed set — otherwise a value seeded from the
-  // train (e.g. travelClass FIRST while the framework offer-criteria lists only
-  // SECOND) renders no pill and can never be deselected (#153).
+  // Offer search criteria are free request filters: a scenario must be able to
+  // request ANY value from the OSDM master list — including travel/service
+  // classes or offer parts the train or system-under-test doesn't support — so
+  // that non-happy-flow scenarios can be authored (#155). Travel class is test
+  // data (per train), not a framework setting; the framework must NOT restrict
+  // these options. So each list is the full OSDM enum, unioned with whatever is
+  // already selected (a safety net for any custom/out-of-enum value).
   const withSelected = (allowed, selected) =>
     [...new Set([...(allowed || []), ...(Array.isArray(selected) ? selected : [])])];
-  const offerPartsList   = withSelected(fwFilter(ENUMS.requestedOfferParts, fwOc.requestedOfferParts), criteria.requestedOfferParts);
-  const serviceClassList = withSelected(fwFilter(ENUMS.serviceClass,        fwSc),                      criteria.serviceClass);
-  const travelClassList  = withSelected(fwFilter(ENUMS.travelClass,         fwOc.travelClasses),        criteria.travelClass);
-  const flexibilityList  = withSelected(fwFilter(ENUMS.flexibilities,       fwOc.flexibilities),        criteria.flexibilities);
+  const modeList         = withSelected(ENUMS.offerMode,           criteria.offerMode ? [criteria.offerMode] : []);
+  const offerPartsList   = withSelected(ENUMS.requestedOfferParts, criteria.requestedOfferParts);
+  const serviceClassList = withSelected(ENUMS.serviceClass,        criteria.serviceClass);
+  const travelClassList  = withSelected(ENUMS.travelClass,         criteria.travelClass);
+  const flexibilityList  = withSelected(ENUMS.flexibilities,       criteria.flexibilities);
 
   const modeOpts = `<option value="" ${!criteria.offerMode?'selected':''} style="color:#90a4ae">— none —</option>`
     + modeList.map(m =>
@@ -4144,11 +4140,14 @@ function renderWizardStep3() {
     </div>`;
   }).join('');
 
-  // Offer criteria — prefer train-specific values if a train is selected
-  const activeTrain = sc.trainResourceId ? trains.find(t => t.id === sc.trainResourceId) : null;
-  const atd = activeTrain ? (typeof activeTrain.data==='string'?JSON.parse(activeTrain.data):activeTrain.data||{}) : null;
-  const availSC = atd && atd.serviceClasses && atd.serviceClasses.length ? atd.serviceClasses : (fw.serviceClasses||[]);
-  const availTC = atd && atd.travelClasses  && atd.travelClasses.length  ? atd.travelClasses  : (fw.offerCriteria&&fw.offerCriteria.travelClasses||WIZ_TRAVEL_CLASSES);
+  // Offer search criteria are free request filters — a scenario must be able to
+  // request ANY OSDM master-list value (incl. travel/service classes the train
+  // or system-under-test doesn't support), so non-happy-flow scenarios can be
+  // authored (#155). Options are the full enum; the train/framework values are
+  // only defaults (seeded into sc.* elsewhere), never a restriction. Union with
+  // whatever's already selected as a safety net.
+  const availSC = [...new Set([...WIZ_SERVICE_CLASSES, ...(sc.serviceClasses || [])])];
+  const availTC = [...new Set([...WIZ_TRAVEL_CLASSES,  ...(sc.travelClasses  || [])])];
 
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
@@ -4339,13 +4338,13 @@ function renderWizardStep3() {
           <label class="param-label">Offer mode <span class="param-hint">(optional)</span></label>
           <select class="param-input param-select" data-action="wiz-offer-mode">
             <option value="" ${!sc.offerMode?'selected':''} style="color:#90a4ae">— none —</option>
-            ${fwFilter(WIZ_OFFER_MODES, fw.offerCriteria && fw.offerCriteria.offerMode ? [fw.offerCriteria.offerMode] : null).map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
+            ${WIZ_OFFER_MODES.map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Requested offer parts</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_OFFER_PARTS, fw.offerCriteria && fw.offerCriteria.requestedOfferParts).map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${esc(p)}">${esc(p)}</div>`).join('')}
+        ${[...new Set([...WIZ_OFFER_PARTS, ...(sc.requestedOfferParts||[])])].map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${esc(p)}">${esc(p)}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Service class</div>
       <div class="pill-group" style="margin-bottom:14px">
@@ -4359,7 +4358,7 @@ function renderWizardStep3() {
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
+        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
       </div>
     </div>
   </div>
