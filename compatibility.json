@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.73",
+  "current_release": "2026.74",
   "releases": [
+    {
+      "release": "2026.74",
+      "date": "2026-05-23",
+      "server": "1.11.46",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#169): Timetable Discovery splits a route into separate train sets by operating-days pattern. src/services/timetable-discovery.js groupAndMerge() now tracks operating days per service across the scan, then splits each route into one set per day-pattern — e.g. Sqills BAS<->AMS yields '... (Mon-Fri)' with the 1xx weekday trains and '... (weekend)' with the 8xx weekend trains, each with its own accurate calendar (consistent with the one-calendar-per-set model from #141) instead of a single Mon-Sun set. The reconcile key now includes the calendar (origin+destination+productCategoryRef+sortedDays) so a re-scan merges into the matching set; set labels carry the day-pattern; summary gains setsDiscovered. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.73",
       "date": "2026-05-23",

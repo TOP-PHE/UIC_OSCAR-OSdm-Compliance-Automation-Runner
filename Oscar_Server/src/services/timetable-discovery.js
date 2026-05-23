@@ -268,9 +268,28 @@ function harvestOfferCatalog(resp) {
   return { travelClasses: [...tc], serviceClasses: [...sc], ancillaries: [...anc] };
 }
 
+const _DAY_SHORT = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
+
+// Human label for an operating-days pattern, used to distinguish split sets.
+// '' for daily / unknown (no suffix), else 'Mon–Fri', 'weekend', or 'Mon,Wed,Fri'.
+function _dayPatternLabel(days) {
+  const d = sortDays(days);
+  if (d.length === 0 || d.length === 7) return '';
+  const set = new Set(d);
+  if (d.length === 5 && ['MON', 'TUE', 'WED', 'THU', 'FRI'].every(x => set.has(x))) return 'Mon–Fri';
+  if (d.length === 2 && set.has('SAT') && set.has('SUN')) return 'weekend';
+  return d.map(x => _DAY_SHORT[x] || x).join(',');
+}
+
 /**
  * Group harvested service records into desired train sets, then reconcile
  * against the company's existing TRAIN resources.
+ *
+ * Services on the same route are SPLIT into separate sets by their observed
+ * operating-days pattern (e.g. weekday 1xx trains vs weekend 8xx trains), so
+ * each set keeps a single, accurate operating-days calendar (the model #141
+ * established — one calendar per set). The reconcile key therefore includes
+ * the calendar: origin + destination + product-category ref + sorted days.
  *
  * @param {Array<object>} harvested   output of harvestTrips() (possibly across many days)
  * @param {Array<object>} existing    existing TRAIN resources: { id, resource_type, label, data }
@@ -290,7 +309,9 @@ function groupAndMerge(harvested, existing, catalog) {
   const catTravel  = Array.isArray(catalog.travelClasses)  ? catalog.travelClasses  : [];
   const catService = Array.isArray(catalog.serviceClasses) ? catalog.serviceClasses : [];
   const catAnc     = Array.isArray(catalog.ancillaries)    ? catalog.ancillaries    : [];
-  // 1. Collapse harvested records into per-route groups.
+  // 1. Collapse harvested records into per-route groups, tracking the set of
+  //    operating days observed PER service (so a route can be split into
+  //    separate sets by day-pattern — e.g. weekday vs weekend trains).
   const groups = new Map();   // routeKey -> group accumulator
   for (const rec of (harvested || [])) {
     // A leg with neither endpoint nor a vehicle is noise — ignore.
@@ -305,8 +326,7 @@ function groupAndMerge(harvested, existing, catalog) {
         productCategoryRef: rec.productCategoryRef,
         productCategoryName: rec.productCategoryName,
         productCategoryShortName: rec.productCategoryShortName,
-        services: new Map(),   // serviceKey -> { vehicleNumber, departureTime, arrivalTime }
-        days: new Set()
+        services: new Map()   // serviceKey -> { svc, days:Set }
       };
       groups.set(key, g);
     }
@@ -316,40 +336,62 @@ function groupAndMerge(harvested, existing, catalog) {
     if (!g.productCategoryShortName && rec.productCategoryShortName) g.productCategoryShortName = rec.productCategoryShortName;
     if (!g.originName && rec.originName) g.originName = rec.originName;
     if (!g.destName && rec.destName) g.destName = rec.destName;
-    if (rec.dayOfWeek) g.days.add(rec.dayOfWeek);
     const svc = {
       vehicleNumber: rec.vehicleNumber || '',
       departureTime: rec.departureTime || '',
       arrivalTime:   rec.arrivalTime || ''
     };
-    g.services.set(serviceKey(svc), svc);
+    const sk = serviceKey(svc);
+    let entry = g.services.get(sk);
+    if (!entry) { entry = { svc, days: new Set() }; g.services.set(sk, entry); }
+    if (rec.dayOfWeek) entry.days.add(rec.dayOfWeek);
   }
 
-  // 2. Index existing TRAIN resources by route key (first wins on collision).
+  // 2. Split each route into desired sets — one per distinct operating-days
+  //    pattern. A service that ran Mon..Fri and one that ran Sat/Sun end up in
+  //    two sets, each with its own calendar.
+  const desired = [];   // { g, daysOfWeek:[], patternLabel, services:[] }
+  let servicesDiscovered = 0;
+  for (const g of groups.values()) {
+    const byPattern = new Map();   // sortedDaysCsv -> { days:[], services:[] }
+    for (const { svc, days } of g.services.values()) {
+      servicesDiscovered++;
+      const sorted = sortDays([...days]);
+      const csv = sorted.join(',');
+      let p = byPattern.get(csv);
+      if (!p) { p = { days: sorted, services: [] }; byPattern.set(csv, p); }
+      p.services.push(svc);
+    }
+    for (const p of byPattern.values()) {
+      desired.push({ g, daysOfWeek: p.days, patternLabel: _dayPatternLabel(p.days), services: p.services });
+    }
+  }
+
+  // 3. Index existing TRAIN resources by route + calendar (first wins).
   const existingByKey = new Map();
   for (const r of (existing || [])) {
     if (!r || r.resource_type !== 'TRAIN') continue;
     const d = r.data || {};
-    const k = `${d.originURN || ''}|${d.destinationURN || ''}|${d.productCategoryRef || ''}`;
+    const cal = sortDays(Array.isArray(d.daysOfWeek) ? d.daysOfWeek : []).join(',');
+    const k = `${d.originURN || ''}|${d.destinationURN || ''}|${d.productCategoryRef || ''}|${cal}`;
     if (!existingByKey.has(k)) existingByKey.set(k, r);
   }
 
-  // 3. Reconcile.
+  // 4. Reconcile each desired set against the matching existing set.
   const toCreate = [];
   const toUpdate = [];
   let servicesAdded = 0;
-  let servicesDiscovered = 0;
 
-  for (const [key, g] of groups) {
-    const discovered = [...g.services.values()];
-    servicesDiscovered += discovered.length;
-    const existingRes = existingByKey.get(key);
+  for (const set of desired) {
+    const g = set.g;
+    const dkey = `${g.originURN || ''}|${g.destinationURN || ''}|${g.productCategoryRef || ''}|${set.daysOfWeek.join(',')}`;
+    const existingRes = existingByKey.get(dkey);
 
     if (!existingRes) {
-      // New set — sort services by departure for readability.
-      const services = discovered.slice().sort((a, b) => String(a.departureTime).localeCompare(String(b.departureTime)));
+      const services = set.services.slice().sort((a, b) => String(a.departureTime).localeCompare(String(b.departureTime)));
+      const base = _newSetLabel(g);
       toCreate.push({
-        label: _newSetLabel(g),
+        label: set.patternLabel ? `${base} (${set.patternLabel})` : base,
         data: {
           originURN: g.originURN || '',
           destinationURN: g.destinationURN || '',
@@ -357,7 +399,7 @@ function groupAndMerge(harvested, existing, catalog) {
           productCategoryRef: g.productCategoryRef || '',
           productCategoryName: g.productCategoryName || '',
           productCategoryShortName: g.productCategoryShortName || '',
-          daysOfWeek: sortDays([...g.days]),
+          daysOfWeek: set.daysOfWeek.slice(),
           services,
           ticketTypes: [],
           travelClasses:  catTravel.slice(),
@@ -371,23 +413,20 @@ function groupAndMerge(harvested, existing, catalog) {
       continue;
     }
 
-    // Existing set — merge non-destructively into a clone of its data.
+    // Existing set with the SAME route + calendar — merge non-destructively.
     const data = JSON.parse(JSON.stringify(existingRes.data || {}));
     if (!Array.isArray(data.services)) data.services = [];
     const seen = new Set(data.services.map(serviceKey));
     let addedHere = 0;
-    for (const svc of discovered) {
+    for (const svc of set.services) {
       const k = serviceKey(svc);
       if (seen.has(k)) continue;
       data.services.push(svc);
       seen.add(k);
       addedHere++;
     }
-    // Union the operating-days calendar.
-    const beforeDays = Array.isArray(data.daysOfWeek) ? data.daysOfWeek : [];
-    const mergedDays = sortDays([...beforeDays, ...g.days]);
-    const daysChanged = mergedDays.length !== beforeDays.length;
-    data.daysOfWeek = mergedDays;
+    // Calendar is part of the match key; only set it if the existing set had none.
+    if (!Array.isArray(data.daysOfWeek) || data.daysOfWeek.length === 0) data.daysOfWeek = set.daysOfWeek.slice();
     // Fill descriptive fields only when currently empty (preserve manual edits).
     if (!data.operatorCode && g.operatorCode) data.operatorCode = g.operatorCode;
     if (!data.productCategoryName && g.productCategoryName) data.productCategoryName = g.productCategoryName;
@@ -407,7 +446,7 @@ function groupAndMerge(harvested, existing, catalog) {
     fillEmpty('serviceClasses', catService);
     fillEmpty('ancillaries', catAnc);
 
-    if (addedHere > 0 || daysChanged || catalogFilled) {
+    if (addedHere > 0 || catalogFilled) {
       toUpdate.push({ id: existingRes.id, label: existingRes.label, data });
       servicesAdded += addedHere;
     }
@@ -418,6 +457,7 @@ function groupAndMerge(harvested, existing, catalog) {
     toUpdate,
     summary: {
       routesDiscovered: groups.size,
+      setsDiscovered: desired.length,
       servicesDiscovered,
       created: toCreate.length,
       updated: toUpdate.length,
