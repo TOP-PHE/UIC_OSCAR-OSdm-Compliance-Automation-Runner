@@ -189,20 +189,35 @@ function _newSetLabel(group) {
   return `${tag} ${route}`.trim();
 }
 
-// Recursively collect every string value stored under `key` anywhere in a
-// (possibly deeply nested) offer object. Depth-guarded. Used to harvest
-// travelClass / serviceClass without depending on the exact offer-part path,
-// which varies across vendors and OSDM versions.
-function _collectStrings(node, key, out, depth) {
+// Pull a class value out of whatever shape a *Class field takes. OSDM uses two
+// forms: a bare enum string ("SECOND") for travelClass, and an object
+// ({ name, type }) for serviceClass / overallServiceClass. Prefer `type`, then
+// `name`. Returns '' for anything else.
+function _classValue(v) {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') {
+    if (typeof v.type === 'string' && v.type) return v.type;
+    if (typeof v.name === 'string' && v.name) return v.name;
+  }
+  return '';
+}
+
+// Recursively collect every class value stored under any of `keys` anywhere in
+// a (possibly deeply nested) offer object. Depth-guarded. Decoupled from the
+// exact offer-part path, which varies across vendors / OSDM versions.
+function _collectClasses(node, keys, out, depth) {
   if (depth > 8 || node == null || typeof node !== 'object') return;
   if (Array.isArray(node)) {
-    for (const x of node) _collectStrings(x, key, out, depth + 1);
+    for (const x of node) _collectClasses(x, keys, out, depth + 1);
     return;
   }
   for (const k of Object.keys(node)) {
     const v = node[k];
-    if (k === key && typeof v === 'string' && v) out.add(v);
-    else _collectStrings(v, key, out, depth + 1);
+    if (keys.includes(k)) {
+      const s = _classValue(v);
+      if (s) out.add(s);
+    }
+    _collectClasses(v, keys, out, depth + 1);
   }
 }
 
@@ -244,8 +259,10 @@ function harvestOfferCatalog(resp) {
   const sc = new Set();
   const anc = new Set();
   for (const o of offers) {
-    _collectStrings(o, 'travelClass', tc, 0);
-    _collectStrings(o, 'serviceClass', sc, 0);
+    // travelClass is a string; serviceClass is { name, type }. The offerSummary
+    // mirrors them as overallTravelClass / overallServiceClass.
+    _collectClasses(o, ['travelClass', 'overallTravelClass'], tc, 0);
+    _collectClasses(o, ['serviceClass', 'overallServiceClass'], sc, 0);
     _collectAncillaries(o, anc, 0);
   }
   return { travelClasses: [...tc], serviceClasses: [...sc], ancillaries: [...anc] };

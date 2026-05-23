@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.45] — 2026-05-23
+
+Fix (#167) — Timetable Discovery: unblock scenario creation after discovery,
+discover via /offers only, and prefill object-form service classes.
+
+### Fixed
+- **`public/js/scenarios.js`**: after a discovery run the Test Scenarios section
+  stayed locked ("configure Test Data first") even though a train now existed —
+  discovery only re-rendered Test Data, leaving the train-count-gated Scenarios
+  section stale. Discovery now calls `refreshAllSections()` (reloads resources +
+  re-renders all three sections). Removed the now-unused `refreshResourcesOnly`.
+- **`src/services/timetable-discovery.js`** (`harvestOfferCatalog`): service
+  class is an object `{ name, type }` in some sandboxes (e.g. Sqills), not a
+  string, so it was never prefilled. It now reads both forms (prefers `.type`,
+  then `.name`) and also harvests `offerSummary.overallTravelClass` /
+  `overallServiceClass`.
+
+### Changed
+- **`src/api/routes/company-test-resources.js`**: discovery now uses **`POST
+  /offers` only** (`DISCOVERY_ENDPOINTS = ['offers']`). The offer response
+  carries both the timetable (`trips[]`) and the offered classes/ancillaries
+  (`offers[]`) — strictly more than `/trips-collection` — and works on every
+  sandbox. Sandboxes that DO implement `/trips-collection` (e.g. Sqills) were
+  served by it and so got no class/ancillary prefill; offers-only fixes that.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.44] — 2026-05-23
 
 Enhancement (#165) — Timetable Discovery keeps the clean O&D the tester searched

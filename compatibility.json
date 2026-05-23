@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.72",
+  "current_release": "2026.73",
   "releases": [
+    {
+      "release": "2026.73",
+      "date": "2026-05-23",
+      "server": "1.11.45",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#167): Timetable Discovery — three fixes from live Sqills testing. (1) public/js/scenarios.js: after discovery the Test Scenarios section stayed locked ('configure Test Data first') because discovery only re-rendered Test Data; it now calls refreshAllSections() (reloads resources + re-renders all sections), removed unused refreshResourcesOnly. (2) src/api/routes/company-test-resources.js: discovery now uses POST /offers only (DISCOVERY_ENDPOINTS=['offers']) — the offer response carries both the timetable (trips[]) and the offered classes/ancillaries (offers[]), strictly more than /trips-collection, and works on every sandbox; Sqills implements /trips-collection so discovery had used it and got no prefill. (3) src/services/timetable-discovery.js harvestOfferCatalog: serviceClass is an object {name,type} in some sandboxes (Sqills), not a string, so it was never prefilled; now reads both forms (prefers .type then .name) and also harvests offerSummary.overallTravelClass/overallServiceClass. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.72",
       "date": "2026-05-23",

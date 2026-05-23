@@ -30,13 +30,14 @@ const log = require('../../utils/logger').child({ module: 'timetable-discovery' 
 // not pin the request handler for minutes.
 const TRIPS_FETCH_TIMEOUT_MS = 20000;
 
-// Endpoints we harvest trips from, in preference order. Both
-// TripCollectionResponse and OfferCollectionResponse carry `trips[]` with the
-// same `legs[].timedLeg`, so the same harvestTrips() reads either. Many
-// sandboxes (e.g. Chaps) don't implement the optional OJP /trips-collection
-// search and return 400 on it — /offers is the path the Bruno run flow always
-// uses, so it is the reliable fallback (issue #159).
-const DISCOVERY_ENDPOINTS = ['trips-collection', 'offers'];
+// Discovery harvests from POST /offers only (issue #167). The offer response
+// carries BOTH the timetable (`trips[].legs[].timedLeg`, read by harvestTrips)
+// AND the offered classes/ancillaries (`offers[]`, read by harvestOfferCatalog)
+// — strictly more information than /trips-collection, and it's the path the
+// Bruno run flow always uses, so it works on every sandbox (some, e.g. Chaps,
+// don't implement the optional OJP /trips-collection search at all). The
+// per-endpoint loop is kept generic in case a future vendor needs a fallback.
+const DISCOVERY_ENDPOINTS = ['offers'];
 
 // Normalize a station identifier to an OSDM URN. Accepts a full
 // `urn:uic:stn:8400058` or a bare code `8400058` (convenience).
@@ -215,14 +216,14 @@ router.delete('/test-resources/:id', (req, res) => {
   return res.json({ deleted: true });
 });
 
-// ── POST /v1/company/test-resources/discover-timetable (issue #157, #159) ─────
+// ── POST /v1/company/test-resources/discover-timetable (issue #157,#159,#167) ─
 // "Train Timetable Discovery" — reverse-engineer train-set test data from the
-// trips a sandbox actually returns. For an O&D across the next N days (1..14,
-// default 7) it queries the sandbox (POST /trips-collection, falling back to
-// POST /offers when the former is unimplemented — #159), harvests every timed
-// leg as a service, groups them by route (origin + destination + product
-// category), and merges the result into the company's existing TRAIN resources
-// WITHOUT clobbering manual edits. Test-Manager only; tenant-scoped.
+// offers a sandbox actually returns. For an O&D across the next N days (1..14,
+// default 7) it calls POST {api_base}/offers, harvests every timed leg as a
+// service AND the offered travel/service classes + ancillaries, groups services
+// by route (origin + destination + product category), and merges the result
+// into the company's existing TRAIN resources WITHOUT clobbering manual edits.
+// Test-Manager only; tenant-scoped.
 router.post('/test-resources/discover-timetable', async (req, res) => {
   if (!requireTestManager(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
@@ -327,7 +328,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   if (!anyOk) {
     return res.status(502).json({
       status: 502, title: 'Discovery Failed',
-      detail: 'No sandbox response could be read across the searched days (tried /trips-collection and /offers).',
+      detail: 'No usable offer response across the searched days (POST /offers).',
       dayResults
     });
   }
