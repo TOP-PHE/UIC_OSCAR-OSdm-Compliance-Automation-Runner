@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.38] — 2026-05-22
+
+Fix (#153) — a selected travel/service class can now always be deselected in a
+scenario's Offer Search Criteria.
+
+### Fixed
+- **`public/js/scenarios.js`** (`buildOfferSection`): each Offer-Criteria
+  multi-select (requested offer parts, service class, **travel class**,
+  flexibilities) was rendered **only** from the framework's allowed set
+  (`fwFilter(...)`). A value seeded from the train — e.g. `travelClass: ["FIRST"]`
+  when the framework offer-criteria lists only `SECOND` — therefore had **no
+  pill to untick**, so it couldn't be removed (it kept reaching the request as
+  `offerSearchCriteria.travelClasses: ["FIRST"]`). Each list now renders the
+  **union of allowed ∪ currently-selected** values, so anything already set
+  always appears (checked) and is deselectable.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → the scenario's Offer Search Criteria.
+
+---
+
 ## [server-v1.11.37] — 2026-05-22 + collection-OTST_V2.0.5
 
 Fix (#150) — add-ancillary now sources bookable ancillaries from the booking's
