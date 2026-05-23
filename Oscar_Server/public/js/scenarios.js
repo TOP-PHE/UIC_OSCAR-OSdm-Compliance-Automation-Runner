@@ -3559,8 +3559,9 @@ function openTimetableDiscovery() {
         <button class="row-delete-btn" data-action="tt-discover-close" title="Close">✕</button>
       </div>
       <p style="color:#607d8b;font-size:12.5px;line-height:1.6;margin:0 0 16px">
-        Enter an origin and destination. OSCAR queries the sandbox timetable
-        (<code>POST /trips-collection</code>) across the next few days and
+        Enter an origin and destination. OSCAR queries the sandbox across the
+        next few days (<code>POST /trips-collection</code>, falling back to
+        <code>POST /offers</code> when a sandbox doesn't implement it) and
         creates/updates the train sets it actually runs. Existing manual edits
         are preserved.
       </p>
@@ -3668,7 +3669,8 @@ function renderDiscoveryDays(el, dayResults) {
   const rows = dayResults.map(d => {
     const ok = d.status >= 200 && d.status < 300;
     const icon = ok ? '✅' : '⚠️';
-    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 120)) : ''}`;
+    const via = d.via ? ` via ${esc(d.via)}` : '';
+    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : ''}`;
     return `<tr><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${icon} ${esc(d.date)}</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${detail}</td></tr>`;
   }).join('');
   el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
