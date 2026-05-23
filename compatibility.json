@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.70",
+  "current_release": "2026.71",
   "releases": [
+    {
+      "release": "2026.71",
+      "date": "2026-05-23",
+      "server": "1.11.43",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#163): Timetable Discovery accepts vendor station URNs and prefills Service Configuration from the offer response. (1) public/js/scenarios.js wizValidateTrain now accepts any urn:<scheme>:stn:<id> (UIC codes and vendor refs like Bileto's urn:x_bileto:stn:<uuid>), which previously failed validation and blocked saving discovered sets. (2) src/services/timetable-discovery.js harvestOfferCatalog() collects travel classes, service classes and ancillary types (ancillaryOfferParts[].type, fallback .category) from an OfferCollectionResponse via a depth-guarded deep scan; groupAndMerge() seeds these onto new sets and fills only empty arrays on existing sets (manual edits, incl. a removed class, are never overwritten/re-added). A /trips-collection response has no offers[] so prefill is a no-op there. src/api/routes/company-test-resources.js accumulates the catalog across days and passes it to the merge. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.70",
       "date": "2026-05-23",

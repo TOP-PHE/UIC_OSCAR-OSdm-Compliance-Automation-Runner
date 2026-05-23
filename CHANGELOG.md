@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.43] — 2026-05-23
+
+Enhancement (#163) — Timetable Discovery accepts vendor station URNs and
+prefills a discovered train set's Service Configuration from the offer response.
+
+### Added
+- **`src/services/timetable-discovery.js`** (`harvestOfferCatalog`): collects the
+  **travel classes**, **service classes** and **ancillary types** the sandbox
+  actually offered on the searched O&D from an `OfferCollectionResponse` — a
+  depth-guarded deep scan (`travelClass` / `serviceClass` anywhere in an offer;
+  `ancillaryOfferParts[].type`, falling back to `.category`), so it's agnostic
+  to vendor/OSDM-version offer-part nesting. `groupAndMerge()` now takes that
+  catalog and **seeds** these arrays on newly created sets and **fills only
+  empty** arrays on existing sets — a set the tester has already configured (or
+  a class they deliberately removed) is never overwritten or re-added. A
+  `/trips-collection` response has no `offers[]`, so prefill is a no-op there.
+- **`src/api/routes/company-test-resources.js`**: accumulates the offer catalog
+  across the searched days and passes it to `groupAndMerge`.
+
+### Fixed
+- **`public/js/scenarios.js`** (`wizValidateTrain`): the Origin/Destination
+  station URN validator only accepted `urn:uic:stn:<digits>`, so a discovered
+  vendor ref (e.g. Bileto's `urn:x_bileto:stn:<uuid>`) was flagged invalid and
+  blocked saving. It now accepts any `urn:<scheme>:stn:<id>` — UIC codes **and**
+  vendor refs.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.42] — 2026-05-23
 
 Fix (#161) — Timetable Discovery now uses an OffsetDateTime for Bileto's trip

@@ -173,6 +173,68 @@ function _newSetLabel(group) {
   return `${tag} ${route}`.trim();
 }
 
+// Recursively collect every string value stored under `key` anywhere in a
+// (possibly deeply nested) offer object. Depth-guarded. Used to harvest
+// travelClass / serviceClass without depending on the exact offer-part path,
+// which varies across vendors and OSDM versions.
+function _collectStrings(node, key, out, depth) {
+  if (depth > 8 || node == null || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const x of node) _collectStrings(x, key, out, depth + 1);
+    return;
+  }
+  for (const k of Object.keys(node)) {
+    const v = node[k];
+    if (k === key && typeof v === 'string' && v) out.add(v);
+    else _collectStrings(v, key, out, depth + 1);
+  }
+}
+
+// Recursively collect ancillary identifiers from any `ancillaryOfferParts`
+// array found in the offer tree. Prefers the OSDM AncillaryType (`type`,
+// which aligns with the framework's OSDM_ANCILLARY_TYPES catalog), falling
+// back to the free-text `category`.
+function _collectAncillaries(node, out, depth) {
+  if (depth > 8 || node == null || typeof node !== 'object') return;
+  if (Array.isArray(node)) {
+    for (const x of node) _collectAncillaries(x, out, depth + 1);
+    return;
+  }
+  if (Array.isArray(node.ancillaryOfferParts)) {
+    for (const a of node.ancillaryOfferParts) {
+      if (a && typeof a === 'object') {
+        const v = (typeof a.type === 'string' && a.type) ? a.type
+          : (typeof a.category === 'string' ? a.category : '');
+        if (v) out.add(v);
+      }
+    }
+  }
+  for (const k of Object.keys(node)) _collectAncillaries(node[k], out, depth + 1);
+}
+
+/**
+ * Harvest the offer "catalog" — the travel classes, service classes and
+ * ancillary types the sandbox actually offered on this O&D — from an
+ * OfferCollectionResponse. Used to PREFILL a discovered train set's Service
+ * Configuration (a TripCollectionResponse has no `offers[]`, so this returns
+ * empty arrays for the /trips-collection path).
+ *
+ * @param {object} resp parsed OfferCollectionResponse ({ offers: [...] })
+ * @returns {{ travelClasses:string[], serviceClasses:string[], ancillaries:string[] }}
+ */
+function harvestOfferCatalog(resp) {
+  const offers = (resp && Array.isArray(resp.offers)) ? resp.offers : [];
+  const tc = new Set();
+  const sc = new Set();
+  const anc = new Set();
+  for (const o of offers) {
+    _collectStrings(o, 'travelClass', tc, 0);
+    _collectStrings(o, 'serviceClass', sc, 0);
+    _collectAncillaries(o, anc, 0);
+  }
+  return { travelClasses: [...tc], serviceClasses: [...sc], ancillaries: [...anc] };
+}
+
 /**
  * Group harvested service records into desired train sets, then reconcile
  * against the company's existing TRAIN resources.
@@ -180,13 +242,21 @@ function _newSetLabel(group) {
  * @param {Array<object>} harvested   output of harvestTrips() (possibly across many days)
  * @param {Array<object>} existing    existing TRAIN resources: { id, resource_type, label, data }
  *                                     `data` already parsed to an object.
+ * @param {object} [catalog]          optional offer catalog (harvestOfferCatalog):
+ *                                     { travelClasses, serviceClasses, ancillaries }.
+ *                                     Seeds NEW sets and fills EMPTY arrays on
+ *                                     existing sets (never overwrites manual edits).
  * @returns {{
  *   toCreate: Array<{ label:string, data:object }>,
  *   toUpdate: Array<{ id:string, label:string, data:object }>,
  *   summary: object
  * }}
  */
-function groupAndMerge(harvested, existing) {
+function groupAndMerge(harvested, existing, catalog) {
+  catalog = catalog || {};
+  const catTravel  = Array.isArray(catalog.travelClasses)  ? catalog.travelClasses  : [];
+  const catService = Array.isArray(catalog.serviceClasses) ? catalog.serviceClasses : [];
+  const catAnc     = Array.isArray(catalog.ancillaries)    ? catalog.ancillaries    : [];
   // 1. Collapse harvested records into per-route groups.
   const groups = new Map();   // routeKey -> group accumulator
   for (const rec of (harvested || [])) {
@@ -256,8 +326,11 @@ function groupAndMerge(harvested, existing) {
           productCategoryShortName: g.productCategoryShortName || '',
           daysOfWeek: sortDays([...g.days]),
           services,
-          ticketTypes: [], travelClasses: [], serviceClasses: [],
-          accommodations: [], ancillaries: [],
+          ticketTypes: [],
+          travelClasses:  catTravel.slice(),
+          serviceClasses: catService.slice(),
+          accommodations: [],
+          ancillaries:    catAnc.slice(),
           fulfillmentTypes: [], fulfillmentMedia: []
         }
       });
@@ -287,7 +360,21 @@ function groupAndMerge(harvested, existing) {
     if (!data.productCategoryName && g.productCategoryName) data.productCategoryName = g.productCategoryName;
     if (!data.productCategoryShortName && g.productCategoryShortName) data.productCategoryShortName = g.productCategoryShortName;
 
-    if (addedHere > 0 || daysChanged) {
+    // Prefill Service Configuration from the offer catalog, but ONLY into arrays
+    // that are currently empty — a set the tester has already configured is
+    // never re-seeded (and a class they removed is never re-added).
+    let catalogFilled = false;
+    const fillEmpty = (field, vals) => {
+      if (vals.length && (!Array.isArray(data[field]) || data[field].length === 0)) {
+        data[field] = vals.slice();
+        catalogFilled = true;
+      }
+    };
+    fillEmpty('travelClasses', catTravel);
+    fillEmpty('serviceClasses', catService);
+    fillEmpty('ancillaries', catAnc);
+
+    if (addedHere > 0 || daysChanged || catalogFilled) {
       toUpdate.push({ id: existingRes.id, label: existingRes.label, data });
       servicesAdded += addedHere;
     }
@@ -311,6 +398,7 @@ module.exports = {
   timePartOf,
   searchDates,
   harvestTrips,
+  harvestOfferCatalog,
   routeKey,
   serviceKey,
   groupAndMerge,
