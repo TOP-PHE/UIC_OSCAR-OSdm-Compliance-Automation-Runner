@@ -26,9 +26,17 @@ const { resolveAccessToken } = require('../../worker/access-token');
 const { harvestTrips, groupAndMerge, searchDates } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
-// Cap each trips-collection round-trip. Discovery loops several days, so a
-// hung sandbox must not pin the request handler for minutes.
+// Cap each round-trip. Discovery loops several days, so a hung sandbox must
+// not pin the request handler for minutes.
 const TRIPS_FETCH_TIMEOUT_MS = 20000;
+
+// Endpoints we harvest trips from, in preference order. Both
+// TripCollectionResponse and OfferCollectionResponse carry `trips[]` with the
+// same `legs[].timedLeg`, so the same harvestTrips() reads either. Many
+// sandboxes (e.g. Chaps) don't implement the optional OJP /trips-collection
+// search and return 400 on it — /offers is the path the Bruno run flow always
+// uses, so it is the reliable fallback (issue #159).
+const DISCOVERY_ENDPOINTS = ['trips-collection', 'offers'];
 
 // Normalize a station identifier to an OSDM URN. Accepts a full
 // `urn:uic:stn:8400058` or a bare code `8400058` (convenience).
@@ -38,10 +46,39 @@ function _stnUrn(s) {
   return /^urn:/i.test(v) ? v : `urn:uic:stn:${v}`;
 }
 
-// POST {api_base}/trips-collection. Returns { ok, status, json, text } and
-// never throws on a non-2xx — the caller records per-day outcomes.
-async function _postTripsCollection(apiBase, token, body, extraHeaders) {
-  const url = `${String(apiBase).replace(/\/+$/, '')}/trips-collection`;
+// The shared trip-search block. departureTime is a LocalDateTime (no offset),
+// per the OSDM TripSearchCriteria pattern.
+function _tripSearch(date, origin, destination) {
+  return {
+    departureTime: `${date}T00:00:00`,
+    origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
+    destination: { objectType: 'StopPlaceRef', stopPlaceRef: destination }
+  };
+}
+
+// Build the request body for a given endpoint + day.
+//   trips-collection → a bare TripSearchCriteria.
+//   offers           → an OfferCollectionRequest (trip search + one anonymous
+//                      passenger; offerSearchCriteria left empty so nothing is
+//                      filtered out — we only want the trips, not the pricing).
+function _discoveryBody(endpoint, date, origin, destination) {
+  const trip = _tripSearch(date, origin, destination);
+  if (endpoint === 'offers') {
+    return {
+      tripSearchCriteria: trip,
+      anonymousPassengerSpecifications: [
+        { externalRef: '1', type: 'PERSON', dateOfBirth: '1990-01-01', gender: 'X' }
+      ],
+      offerSearchCriteria: {}
+    };
+  }
+  return trip;
+}
+
+// POST {api_base}/{path}. Returns { ok, status, json, text } and never throws
+// on a non-2xx — the caller records per-day outcomes.
+async function _postJson(apiBase, path, token, body, extraHeaders) {
+  const url = `${String(apiBase).replace(/\/+$/, '')}/${path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRIPS_FETCH_TIMEOUT_MS);
   try {
@@ -175,13 +212,14 @@ router.delete('/test-resources/:id', (req, res) => {
   return res.json({ deleted: true });
 });
 
-// ── POST /v1/company/test-resources/discover-timetable (issue #157) ───────────
+// ── POST /v1/company/test-resources/discover-timetable (issue #157, #159) ─────
 // "Train Timetable Discovery" — reverse-engineer train-set test data from the
-// trips a sandbox actually returns. Fires POST {api_base}/trips-collection for
-// an O&D across the next N days (1..14, default 7), harvests every timed leg as
-// a service, groups them by route (origin + destination + product category),
-// and merges the result into the company's existing TRAIN resources WITHOUT
-// clobbering manual edits. Test-Manager only; tenant-scoped.
+// trips a sandbox actually returns. For an O&D across the next N days (1..14,
+// default 7) it queries the sandbox (POST /trips-collection, falling back to
+// POST /offers when the former is unimplemented — #159), harvests every timed
+// leg as a service, groups them by route (origin + destination + product
+// category), and merges the result into the company's existing TRAIN resources
+// WITHOUT clobbering manual edits. Test-Manager only; tenant-scoped.
 router.post('/test-resources/discover-timetable', async (req, res) => {
   if (!requireTestManager(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
@@ -219,29 +257,55 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
   try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
 
-  // Search day-by-day. departureTime is local date-time WITHOUT offset, per the
-  // OSDM TripSearchCriteria pattern (YYYY-MM-DDThh:mm:ss).
+  // Search day-by-day. For each day we try the endpoints in preference order
+  // (trips-collection → offers); both responses carry `trips[]`. Once one
+  // endpoint actually returns trips, we lock onto it for the remaining days so
+  // we don't keep probing the unsupported one (issue #159).
   const dates = searchDates(days, new Date());
   const harvested = [];
   const dayResults = [];
+  let preferred = null;   // endpoint that worked on a previous day
+
   for (const date of dates) {
-    const body = {
-      departureTime: `${date}T00:00:00`,
-      origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
-      destination: { objectType: 'StopPlaceRef', stopPlaceRef: destination }
-    };
-    try {
-      const r = await _postTripsCollection(company.api_base, token, body, extraHeaders);
+    const order = preferred ? [preferred] : DISCOVERY_ENDPOINTS;
+    let via = null;
+    let lastStatus = 0;
+    let lastError = '';
+    let dayRecs = [];
+    let dayTrips = 0;
+
+    for (const endpoint of order) {
+      let r;
+      try {
+        r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination), extraHeaders);
+      } catch (err) {
+        lastStatus = 0;
+        lastError = err.name === 'AbortError' ? 'timeout' : err.message;
+        continue;   // try the next endpoint
+      }
+      lastStatus = r.status;
       if (!r.ok) {
-        dayResults.push({ date, status: r.status, trips: 0, legs: 0, error: (r.text || '').slice(0, 300) });
-        continue;
+        lastError = `${endpoint}: ${(r.text || '').slice(0, 240)}`;
+        continue;   // try the next endpoint
       }
       const recs = harvestTrips(r.json);
-      harvested.push(...recs);
       const tripCount = (r.json && Array.isArray(r.json.trips)) ? r.json.trips.length : 0;
-      dayResults.push({ date, status: r.status, trips: tripCount, legs: recs.length });
-    } catch (err) {
-      dayResults.push({ date, status: 0, trips: 0, legs: 0, error: err.name === 'AbortError' ? 'timeout' : err.message });
+      // A 2xx with trips wins. A 2xx with NO trips only "wins" if it's the last
+      // endpoint to try — otherwise fall through in case another endpoint has data.
+      if (recs.length > 0 || endpoint === order[order.length - 1]) {
+        via = endpoint;
+        dayRecs = recs;
+        dayTrips = tripCount;
+        if (recs.length > 0) preferred = endpoint;
+        break;
+      }
+    }
+
+    if (via) {
+      harvested.push(...dayRecs);
+      dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length });
+    } else {
+      dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, error: lastError });
     }
   }
 
@@ -249,7 +313,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   if (!anyOk) {
     return res.status(502).json({
       status: 502, title: 'Discovery Failed',
-      detail: 'No successful trips-collection response across the searched days.',
+      detail: 'No sandbox response could be read across the searched days (tried /trips-collection and /offers).',
       dayResults
     });
   }

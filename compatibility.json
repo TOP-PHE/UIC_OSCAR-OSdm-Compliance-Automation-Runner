@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.68",
+  "current_release": "2026.69",
   "releases": [
+    {
+      "release": "2026.69",
+      "date": "2026-05-23",
+      "server": "1.11.41",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#159): Timetable Discovery falls back to POST /offers when a sandbox doesn't implement the optional OJP /trips-collection search. Live-testing #157 against Chaps returned HTTP 400 'Failed to read request' on every /trips-collection call — Chaps (like the other sandboxes) doesn't implement that endpoint; OSCAR's Bruno run flow only ever uses POST {api_base}/offers with the trip search embedded (tripSearchCriteria), and the offer response carries trips[].legs[].timedLeg. src/api/routes/company-test-resources.js now tries /trips-collection first and falls back to POST /offers (an OfferCollectionRequest with the trip search + one anonymous passenger + empty offerSearchCriteria) when it 4xx's or returns no trips; both responses are read by the same harvestTrips(). The working endpoint is locked in for the remaining days (no repeated probing), and the per-day breakdown reports which endpoint served each day (via). The token is fetched server-side exactly as before (this was never an auth issue — that would be a 401). Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.68",
       "date": "2026-05-23",
