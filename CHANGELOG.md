@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.42] — 2026-05-23
+
+Fix (#161) — Timetable Discovery now uses an OffsetDateTime for Bileto's trip
+search, matching the Bileto exception in the Bruno run flow.
+
+### Fixed
+- **`src/api/routes/company-test-resources.js`**: discovery against the Bileto
+  sandbox returned `HTTP 400 "Failed to read request"` on both `/trips-collection`
+  and `/offers` while normal scenario runs worked. Cause: Bileto's deserializer
+  requires the trip-search `departureTime` to be an **OffsetDateTime**, but
+  discovery sent a bare LocalDateTime (`YYYY-MM-DDThh:mm:ss`). The Bruno
+  `scenarioParser` already has this exact carve-out (`api_base.includes("bileto")`
+  → OffsetDateTime). Discovery now applies the same rule: for Bileto it sends
+  `…T00:00:00+00:00`; all other vendors keep the LocalDateTime the OSDM
+  TripSearchCriteria pattern specifies.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.41] — 2026-05-23
 
 Fix (#159) — Timetable Discovery now falls back to `POST /offers` when a sandbox

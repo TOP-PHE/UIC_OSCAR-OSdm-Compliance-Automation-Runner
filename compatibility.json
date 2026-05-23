@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.69",
+  "current_release": "2026.70",
   "releases": [
+    {
+      "release": "2026.70",
+      "date": "2026-05-23",
+      "server": "1.11.42",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#161): Timetable Discovery uses an OffsetDateTime for Bileto's trip search. Discovery against Bileto returned HTTP 400 'Failed to read request' on both /trips-collection and /offers while normal scenario runs worked, because Bileto's deserializer requires the trip-search departureTime to be an OffsetDateTime but discovery sent a bare LocalDateTime (YYYY-MM-DDThh:mm:ss). The Bruno scenarioParser already carves this out (api_base.includes('bileto') -> OffsetDateTime); src/api/routes/company-test-resources.js now does the same: for Bileto it sends ...T00:00:00+00:00, all other vendors keep the LocalDateTime the OSDM TripSearchCriteria pattern specifies. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.69",
       "date": "2026-05-23",
