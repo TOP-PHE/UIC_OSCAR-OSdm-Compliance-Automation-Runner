@@ -25,10 +25,10 @@ const path        = require('path');
 const fs          = require('fs');
 const { spawn }   = require('child_process');
 const { v4: uuidv4 } = require('uuid');
-const { get, run: dbRun, encrypt, decrypt, colEncrypt, getConfig } = require('../db/db');
+const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
-const { fetchToken } = require('./auth-profiles');
+const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
@@ -416,77 +416,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
-  // 3. Resolve access token (per-tester credentials, per-tester token cache)
+  // 3. Resolve access token (per-tester credentials, per-tester token cache).
+  //    The oauth2/bearer logic + token cache live in access-token.js so the
+  //    Timetable Discovery endpoint reuses the exact same path (issue #157).
   let accessToken;
   try {
-    if (userRow.auth_mode === 'oauth2') {
-      const clientId     = decrypt(userRow.client_id_enc);
-      const clientSecret = decrypt(userRow.client_secret_enc);
-      const tokenUrl     = userRow.token_url;
-      const profile      = userRow.oauth_profile || 'oauth2_basic';
-
-      // Field-level "what's missing" message — operator doesn't have to play
-      // guess-which-credential after fixing one and getting the same error.
-      const missing = [];
-      if (!tokenUrl)     missing.push('token_url');
-      if (!clientId)     missing.push('client_id');
-      if (!clientSecret) missing.push('client_secret');
-      if (profile === 'sqills_extension' && !userRow.oauth_extra_enc) missing.push('extra credential (Basic auth value)');
-      if (profile === 'custom' && !userRow.oauth_custom_template)     missing.push('custom request template');
-      if (missing.length > 0) {
-        throw new Error(`Auth profile "${profile}" is missing: ${missing.join(', ')}. Set ${missing.length > 1 ? 'them' : 'it'} in your profile (Profile → API Configuration).`);
-      }
-
-      const log = _authLogger(runId);
-
-      // ── Cache check (per-tester since v12) ──────────────────────────────
-      // Reuse a previously-fetched token if it still has at least
-      // TOKEN_CACHE_SAFETY_MARGIN_S seconds left. Saves a round-trip to the
-      // vendor's auth endpoint for back-to-back scenarios run by the same
-      // tester. Cleared on any PATCH that touches that tester's auth config.
-      const TOKEN_CACHE_SAFETY_MARGIN_S = 60;
-      const now = new Date();
-      const expIso = userRow.cached_token_expires_at;
-      const cachedExp = expIso ? new Date(expIso) : null;
-      const cachedValid = cachedExp && !isNaN(cachedExp) &&
-        (cachedExp.getTime() - now.getTime() > TOKEN_CACHE_SAFETY_MARGIN_S * 1000);
-      if (cachedValid && userRow.cached_token_enc) {
-        const remainingS = Math.floor((cachedExp.getTime() - now.getTime()) / 1000);
-        log.info(`[runner] Auth — using cached token (user=${userRow.email}, expires in ${remainingS}s, at ${expIso}).`);
-        accessToken = decrypt(userRow.cached_token_enc);
-      } else {
-        if (cachedExp && !cachedValid) {
-          log.info(`[runner] Auth — cached token expired or within safety margin (was: ${expIso}); refetching.`);
-        }
-        const result = await fetchToken(profile, {
-          tokenUrl, clientId, clientSecret,
-          scope:          userRow.oauth_scope || '',
-          extra:          userRow.oauth_extra_enc ? decrypt(userRow.oauth_extra_enc) : '',
-          customTemplate: userRow.oauth_custom_template || ''
-        }, log);
-        accessToken = result.token;
-
-        // Persist the cache only when the vendor told us how long the token
-        // is good for. Anything else risks reusing a token past its real
-        // expiry, which would surface as a mid-run 401.
-        if (result.expiresIn && result.expiresIn > 0) {
-          const newExp = new Date(now.getTime() + result.expiresIn * 1000).toISOString();
-          dbRun(
-            'UPDATE users SET cached_token_enc = ?, cached_token_expires_at = ? WHERE id = ?',
-            [encrypt(accessToken), newExp, userRow.id]
-          );
-          log.info(`[runner] Auth — token cached until ${newExp}.`);
-        } else {
-          // Clear any stale cache so we don't accidentally serve an old token.
-          dbRun(
-            'UPDATE users SET cached_token_enc = NULL, cached_token_expires_at = NULL WHERE id = ?',
-            [userRow.id]
-          );
-        }
-      }
-    } else {
-      accessToken = decrypt(userRow.access_token_enc);
-      if (!accessToken) throw new Error('Bearer token not configured. Set it in your profile.');
+    accessToken = await resolveAccessToken(userRow, _authLogger(runId));
+    if (userRow.auth_mode !== 'oauth2') {
       logEvent(runId, 'info', '[runner] Bearer token resolved.');
     }
   } catch (err) {
