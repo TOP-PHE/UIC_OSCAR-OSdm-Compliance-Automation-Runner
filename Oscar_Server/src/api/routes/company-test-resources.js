@@ -23,7 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { harvestTrips, groupAndMerge, searchDates } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -267,6 +267,9 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   const dates = searchDates(days, new Date());
   const harvested = [];
   const dayResults = [];
+  // Accumulate the offer "catalog" (travel/service classes + ancillaries the
+  // sandbox actually offered) across days, to prefill Service Configuration.
+  const cat = { travelClasses: new Set(), serviceClasses: new Set(), ancillaries: new Set() };
   let preferred = null;   // endpoint that worked on a previous day
 
   for (const date of dates) {
@@ -276,6 +279,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
     let lastError = '';
     let dayRecs = [];
     let dayTrips = 0;
+    let dayJson = null;
 
     for (const endpoint of order) {
       let r;
@@ -299,6 +303,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
         via = endpoint;
         dayRecs = recs;
         dayTrips = tripCount;
+        dayJson = r.json;
         if (recs.length > 0) preferred = endpoint;
         break;
       }
@@ -306,6 +311,12 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
     if (via) {
       harvested.push(...dayRecs);
+      // Harvest the offered classes/ancillaries (no-op on a trips-collection
+      // response, which has no offers[]).
+      const oc = harvestOfferCatalog(dayJson);
+      oc.travelClasses.forEach(x => cat.travelClasses.add(x));
+      oc.serviceClasses.forEach(x => cat.serviceClasses.add(x));
+      oc.ancillaries.forEach(x => cat.ancillaries.add(x));
       dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length });
     } else {
       dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, error: lastError });
@@ -329,7 +340,12 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
     return { id: r.id, resource_type: r.resource_type, label: r.label, data };
   });
 
-  const { toCreate, toUpdate, summary } = groupAndMerge(harvested, existing);
+  const catalog = {
+    travelClasses:  [...cat.travelClasses],
+    serviceClasses: [...cat.serviceClasses],
+    ancillaries:    [...cat.ancillaries]
+  };
+  const { toCreate, toUpdate, summary } = groupAndMerge(harvested, existing, catalog);
 
   const created = [];
   for (const c of toCreate) {

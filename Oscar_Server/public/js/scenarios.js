@@ -3378,15 +3378,19 @@ function readTrainDetailFields(tidx) {
 }
 
 function wizValidateTrain(tidx) {
-  const URN_RE  = /^urn:uic:stn:\d+$/i;
+  // Station refs are not always UIC codes: some sandboxes use vendor-specific
+  // schemes (e.g. Bileto returns urn:x_bileto:stn:<uuid>). Accept any
+  // urn:<scheme>:stn:<id> so discovered/real refs validate (#161 follow-up).
+  const URN_RE  = /^urn:[a-z0-9_]+:stn:[a-z0-9_.-]+$/i;
   const RICS_RE = /^urn:uic:rics:\d+$/i;
   const TIME_RE = /^\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/;
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return false;
+  const urnMsg = 'Must be a station URN, e.g. urn:uic:stn:8400058 (or a vendor ref like urn:x_bileto:stn:…).';
   const checks = [
     { tfield: 'label',          test: v => v.length > 0,            msg: 'Label is required.' },
-    { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
-    { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
+    { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: urnMsg },
+    { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: urnMsg },
     { tfield: 'operatorCode',   test: v => !v || RICS_RE.test(v),  msg: 'Must be urn:uic:rics:NNNN (e.g. urn:uic:rics:1184) or leave empty.' }
   ];
   // Clear previous state (route fields + services)
