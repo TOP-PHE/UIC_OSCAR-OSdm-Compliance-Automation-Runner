@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.41] — 2026-05-23
+
+Fix (#159) — Timetable Discovery now falls back to `POST /offers` when a sandbox
+doesn't implement the optional OJP `/trips-collection` search.
+
+### Fixed
+- **`src/api/routes/company-test-resources.js`**: live-testing #157 against the
+  Chaps sandbox returned `HTTP 400 "Failed to read request"` on every
+  `/trips-collection` call — Chaps (like the others) doesn't implement that
+  optional endpoint; OSCAR's Bruno run flow only ever uses `POST {api_base}/offers`
+  with the trip search embedded. Discovery now tries `/trips-collection` first
+  and **falls back to `POST /offers`** (an `OfferCollectionRequest` with the trip
+  search + one anonymous passenger + empty offer criteria) when the former 4xx's
+  or returns no trips. Both responses carry `trips[].legs[].timedLeg`, so the
+  same `harvestTrips()` reads either. The working endpoint is locked in for the
+  remaining days (no repeated probing), and the per-day breakdown now reports
+  which endpoint served each day (`via`). The token is fetched server-side
+  exactly as before — this was never an auth issue (that would be a 401).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.40] — 2026-05-23
 
 Feature (#157) — **Train Timetable Discovery**: reverse-engineer the train sets
