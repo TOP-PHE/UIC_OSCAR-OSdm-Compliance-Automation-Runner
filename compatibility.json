@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.67",
+  "current_release": "2026.68",
   "releases": [
+    {
+      "release": "2026.68",
+      "date": "2026-05-23",
+      "server": "1.11.40",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#157): Train Timetable Discovery — reverse-engineer the train sets a sandbox actually runs from POST /trips-collection and auto-fill Test Data. New src/services/timetable-discovery.js (pure, unit-tested): harvestTrips() reads every timed leg of every returned trip as a service on its own sub-route (start/end stop + product category + vehicle #s + departure/arrival + operating day); groupAndMerge() groups by route key (origin+destination+productCategoryRef) and reconciles against existing TRAIN resources — creates new sets, appends new services (dedup on vehicle#+departure+arrival), unions the operating-days calendar, fills operator/product names only when empty, preserves manual catalogs. New src/worker/access-token.js extracts the per-tester OAuth2/bearer token resolution + cache from runner.js so the new endpoint and the Bruno run worker share one path (runner behaviour unchanged). New endpoint POST /v1/company/test-resources/discover-timetable (Test-Manager only, tenant-scoped) loops the next 1-14 days (default 7), calls {api_base}/trips-collection, harvests+merges, persists, returns {summary,created,updated,dayResults}; per-day failures tolerated. public/js/scenarios.js adds a 'Discover timetable' button + modal in Test Data > Train Resources (hidden for testers). Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'. Requires the company's OSDM API base + the tester's credentials to be configured."
+      ]
+    },
     {
       "release": "2026.67",
       "date": "2026-05-22",

@@ -18,10 +18,52 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { get, all, run, colEncrypt, colDecrypt } = require('../../db/db');
+const { get, all, run, colEncrypt, colDecrypt, decrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
+const { resolveAccessToken } = require('../../worker/access-token');
+const { harvestTrips, groupAndMerge, searchDates } = require('../../services/timetable-discovery');
+const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
+
+// Cap each trips-collection round-trip. Discovery loops several days, so a
+// hung sandbox must not pin the request handler for minutes.
+const TRIPS_FETCH_TIMEOUT_MS = 20000;
+
+// Normalize a station identifier to an OSDM URN. Accepts a full
+// `urn:uic:stn:8400058` or a bare code `8400058` (convenience).
+function _stnUrn(s) {
+  const v = String(s || '').trim();
+  if (!v) return '';
+  return /^urn:/i.test(v) ? v : `urn:uic:stn:${v}`;
+}
+
+// POST {api_base}/trips-collection. Returns { ok, status, json, text } and
+// never throws on a non-2xx — the caller records per-day outcomes.
+async function _postTripsCollection(apiBase, token, body, extraHeaders) {
+  const url = `${String(apiBase).replace(/\/+$/, '')}/trips-collection`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TRIPS_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...extraHeaders
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    let text = '';
+    let json = null;
+    try { text = await res.text(); json = text ? JSON.parse(text) : null; } catch (_) { /* keep raw text */ }
+    return { ok: res.ok, status: res.status, json, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -131,6 +173,117 @@ router.delete('/test-resources/:id', (req, res) => {
 
   run('DELETE FROM test_resources WHERE id = ?', [req.params.id]);
   return res.json({ deleted: true });
+});
+
+// ── POST /v1/company/test-resources/discover-timetable (issue #157) ───────────
+// "Train Timetable Discovery" — reverse-engineer train-set test data from the
+// trips a sandbox actually returns. Fires POST {api_base}/trips-collection for
+// an O&D across the next N days (1..14, default 7), harvests every timed leg as
+// a service, groups them by route (origin + destination + product category),
+// and merges the result into the company's existing TRAIN resources WITHOUT
+// clobbering manual edits. Test-Manager only; tenant-scoped.
+router.post('/test-resources/discover-timetable', async (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+
+  const origin = _stnUrn(req.body && req.body.originURN);
+  const destination = _stnUrn(req.body && req.body.destinationURN);
+  if (!origin || !destination) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'originURN and destinationURN are required.' });
+  }
+  let days = Number.parseInt(req.body && req.body.days, 10);
+  if (!Number.isInteger(days) || days < 1) days = 7;
+  if (days > 14) days = 14;
+
+  // api_base lives on the company; OSDM credentials live on the tester.
+  const company = get('SELECT id, slug, api_base FROM companies WHERE id = ?', [targetCompanyId]);
+  if (!company || !company.api_base) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
+  }
+  const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!userRow) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
+  }
+
+  // Resolve a bearer token — reuses the runner's auth profiles + token cache.
+  let token;
+  try {
+    token = await resolveAccessToken(userRow, { info: (m) => log.debug(m), error: (m) => log.warn(m) });
+  } catch (err) {
+    return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
+  }
+
+  // Optional per-tester headers (mirror the Bruno run path).
+  const extraHeaders = {};
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+
+  // Search day-by-day. departureTime is local date-time WITHOUT offset, per the
+  // OSDM TripSearchCriteria pattern (YYYY-MM-DDThh:mm:ss).
+  const dates = searchDates(days, new Date());
+  const harvested = [];
+  const dayResults = [];
+  for (const date of dates) {
+    const body = {
+      departureTime: `${date}T00:00:00`,
+      origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
+      destination: { objectType: 'StopPlaceRef', stopPlaceRef: destination }
+    };
+    try {
+      const r = await _postTripsCollection(company.api_base, token, body, extraHeaders);
+      if (!r.ok) {
+        dayResults.push({ date, status: r.status, trips: 0, legs: 0, error: (r.text || '').slice(0, 300) });
+        continue;
+      }
+      const recs = harvestTrips(r.json);
+      harvested.push(...recs);
+      const tripCount = (r.json && Array.isArray(r.json.trips)) ? r.json.trips.length : 0;
+      dayResults.push({ date, status: r.status, trips: tripCount, legs: recs.length });
+    } catch (err) {
+      dayResults.push({ date, status: 0, trips: 0, legs: 0, error: err.name === 'AbortError' ? 'timeout' : err.message });
+    }
+  }
+
+  const anyOk = dayResults.some(d => d.status >= 200 && d.status < 300);
+  if (!anyOk) {
+    return res.status(502).json({
+      status: 502, title: 'Discovery Failed',
+      detail: 'No successful trips-collection response across the searched days.',
+      dayResults
+    });
+  }
+
+  // Load existing TRAIN resources (decrypted) so the merge can preserve edits.
+  const rows = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']);
+  const existing = rows.map(r => {
+    let data = {};
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+    return { id: r.id, resource_type: r.resource_type, label: r.label, data };
+  });
+
+  const { toCreate, toUpdate, summary } = groupAndMerge(harvested, existing);
+
+  const created = [];
+  for (const c of toCreate) {
+    const id = uuidv4();
+    run(
+      `INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', ?, ?)`,
+      [id, targetCompanyId, c.label, colEncrypt(JSON.stringify(c.data))]
+    );
+    created.push({ id, label: c.label });
+  }
+  const updated = [];
+  for (const u of toUpdate) {
+    run(
+      `UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
+      [colEncrypt(JSON.stringify(u.data)), u.id, targetCompanyId]
+    );
+    updated.push({ id: u.id, label: u.label });
+  }
+
+  log.info({ companyId: targetCompanyId, origin, destination, days, ...summary }, 'Timetable discovery completed');
+  return res.json({ summary, created, updated, dayResults });
 });
 
 module.exports = router;
