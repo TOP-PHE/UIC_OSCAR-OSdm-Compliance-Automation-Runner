@@ -1955,10 +1955,16 @@ function buildOfferSection(idx, sc) {
   // a one-item array to pass through fwFilter uniformly.
   const offerModeAllowed = fwOc.offerMode ? [fwOc.offerMode] : null;
   const modeList         = fwFilter(ENUMS.offerMode,           offerModeAllowed);
-  const offerPartsList   = fwFilter(ENUMS.requestedOfferParts, fwOc.requestedOfferParts);
-  const serviceClassList = fwFilter(ENUMS.serviceClass,        fwSc);
-  const travelClassList  = fwFilter(ENUMS.travelClass,         fwOc.travelClasses);
-  const flexibilityList  = fwFilter(ENUMS.flexibilities,       fwOc.flexibilities);
+  // Always include whatever the scenario already has selected, even if it falls
+  // outside the framework's allowed set — otherwise a value seeded from the
+  // train (e.g. travelClass FIRST while the framework offer-criteria lists only
+  // SECOND) renders no pill and can never be deselected (#153).
+  const withSelected = (allowed, selected) =>
+    [...new Set([...(allowed || []), ...(Array.isArray(selected) ? selected : [])])];
+  const offerPartsList   = withSelected(fwFilter(ENUMS.requestedOfferParts, fwOc.requestedOfferParts), criteria.requestedOfferParts);
+  const serviceClassList = withSelected(fwFilter(ENUMS.serviceClass,        fwSc),                      criteria.serviceClass);
+  const travelClassList  = withSelected(fwFilter(ENUMS.travelClass,         fwOc.travelClasses),        criteria.travelClass);
+  const flexibilityList  = withSelected(fwFilter(ENUMS.flexibilities,       fwOc.flexibilities),        criteria.flexibilities);
 
   const modeOpts = `<option value="" ${!criteria.offerMode?'selected':''} style="color:#90a4ae">— none —</option>`
     + modeList.map(m =>
