@@ -18,6 +18,7 @@ const {
   timePartOf,
   searchDates,
   harvestTrips,
+  harvestOfferCatalog,
   routeKey,
   serviceKey,
   groupAndMerge,
@@ -258,5 +259,68 @@ describe('groupAndMerge', () => {
     expect(toCreate).toHaveLength(0);
     expect(toUpdate).toHaveLength(0);
     expect(summary.routesDiscovered).toBe(0);
+  });
+});
+
+// ── harvestOfferCatalog ──────────────────────────────────────────────────────
+describe('harvestOfferCatalog', () => {
+  test('collects travel/service classes (any depth) and ancillary types from offers', () => {
+    const resp = {
+      offers: [
+        {
+          offerId: 'o1',
+          admissionOfferParts: [{ products: [{ travelClass: 'SECOND', serviceClass: 'STANDARD' }] }],
+          ancillaryOfferParts: [{ type: 'WIFI' }, { type: 'FOOD_ON_BOARD', category: 'Meal' }],
+        },
+        {
+          offerId: 'o2',
+          reservationOfferParts: [{ deep: { travelClass: 'FIRST' } }],
+          ancillaryOfferParts: [{ category: 'Gift' }],   // no type → category fallback
+        },
+      ],
+    };
+    const cat = harvestOfferCatalog(resp);
+    expect(cat.travelClasses.sort()).toEqual(['FIRST', 'SECOND']);
+    expect(cat.serviceClasses).toEqual(['STANDARD']);
+    expect(cat.ancillaries.sort()).toEqual(['FOOD_ON_BOARD', 'Gift', 'WIFI']);
+  });
+
+  test('returns empty arrays for a trips-collection response (no offers[])', () => {
+    expect(harvestOfferCatalog({ trips: [{}] })).toEqual({ travelClasses: [], serviceClasses: [], ancillaries: [] });
+    expect(harvestOfferCatalog(null)).toEqual({ travelClasses: [], serviceClasses: [], ancillaries: [] });
+  });
+});
+
+// ── groupAndMerge with the offer catalog ─────────────────────────────────────
+describe('groupAndMerge — offer catalog prefill', () => {
+  const harvest = () => ({
+    originURN: 'A', destinationURN: 'B', productCategoryRef: 'P',
+    vehicleNumber: 'V1', departureTime: '09:00:00', arrivalTime: '10:00:00', dayOfWeek: 'MON',
+  });
+  const catalog = { travelClasses: ['FIRST', 'SECOND'], serviceClasses: ['STANDARD'], ancillaries: ['WIFI'] };
+
+  test('seeds Service Configuration on a new set', () => {
+    const { toCreate } = groupAndMerge([harvest()], [], catalog);
+    expect(toCreate[0].data.travelClasses).toEqual(['FIRST', 'SECOND']);
+    expect(toCreate[0].data.serviceClasses).toEqual(['STANDARD']);
+    expect(toCreate[0].data.ancillaries).toEqual(['WIFI']);
+  });
+
+  test('fills only empty arrays on an existing set; never overwrites manual edits', () => {
+    const existing = [{
+      id: 't1', resource_type: 'TRAIN', label: 'x',
+      data: {
+        originURN: 'A', destinationURN: 'B', productCategoryRef: 'P', daysOfWeek: ['MON'],
+        services: [{ vehicleNumber: 'V1', departureTime: '09:00:00', arrivalTime: '10:00:00' }],
+        travelClasses: ['THIRD'],   // manual edit → must be preserved
+        serviceClasses: [],          // empty → fillable
+        ancillaries: [],             // empty → fillable
+      },
+    }];
+    const { toUpdate } = groupAndMerge([harvest()], existing, catalog);
+    expect(toUpdate).toHaveLength(1);                       // catalog fill alone triggers an update
+    expect(toUpdate[0].data.travelClasses).toEqual(['THIRD']);     // preserved
+    expect(toUpdate[0].data.serviceClasses).toEqual(['STANDARD']); // filled
+    expect(toUpdate[0].data.ancillaries).toEqual(['WIFI']);        // filled
   });
 });
