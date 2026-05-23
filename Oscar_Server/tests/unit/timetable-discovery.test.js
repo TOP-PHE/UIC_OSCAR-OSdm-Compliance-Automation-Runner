@@ -314,6 +314,23 @@ describe('harvestOfferCatalog', () => {
     expect(harvestOfferCatalog({ trips: [{}] })).toEqual({ travelClasses: [], serviceClasses: [], ancillaries: [] });
     expect(harvestOfferCatalog(null)).toEqual({ travelClasses: [], serviceClasses: [], ancillaries: [] });
   });
+
+  test('reads object-form serviceClass and offerSummary.overall* (real Sqills shape)', () => {
+    const resp = {
+      offers: [{
+        offerSummary: { overallTravelClass: 'SECOND', overallServiceClass: { name: 'HIGH', type: 'HIGH' } },
+        products: [
+          { code: 'STAN_ABO2', travelClass: 'SECOND', serviceClass: { name: 'HIGH', type: 'HIGH' } },
+          { code: 'BIKE_01' },   // ancillary product, no class
+        ],
+        ancillaryOfferParts: [{ type: 'BK' }, { type: 'LU' }],
+      }],
+    };
+    const cat = harvestOfferCatalog(resp);
+    expect(cat.travelClasses).toEqual(['SECOND']);
+    expect(cat.serviceClasses).toEqual(['HIGH']);     // pulled from the { type } object
+    expect(cat.ancillaries.sort()).toEqual(['BK', 'LU']);
+  });
 });
 
 // ── groupAndMerge with the offer catalog ─────────────────────────────────────

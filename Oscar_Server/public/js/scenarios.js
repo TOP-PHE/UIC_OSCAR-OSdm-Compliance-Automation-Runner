@@ -3563,11 +3563,10 @@ function openTimetableDiscovery() {
         <button class="row-delete-btn" data-action="tt-discover-close" title="Close">✕</button>
       </div>
       <p style="color:#607d8b;font-size:12.5px;line-height:1.6;margin:0 0 16px">
-        Enter an origin and destination. OSCAR queries the sandbox across the
-        next few days (<code>POST /trips-collection</code>, falling back to
-        <code>POST /offers</code> when a sandbox doesn't implement it) and
-        creates/updates the train sets it actually runs. Existing manual edits
-        are preserved.
+        Enter an origin and destination. OSCAR queries the sandbox
+        (<code>POST /offers</code>) across the next few days and creates/updates
+        the train sets it actually runs — including the offered travel/service
+        classes and ancillaries. Existing manual edits are preserved.
       </p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <label style="font-size:12px;color:#455a64;font-weight:600">Origin
@@ -3643,10 +3642,11 @@ async function runTimetableDiscovery() {
     statusEl.textContent = `✅ Found ${s.routesDiscovered || 0} route(s), ${s.servicesDiscovered || 0} service(s). Created ${s.created || 0}, updated ${s.updated || 0} train set(s).`;
     renderDiscoveryResult(resultEl, body);
 
-    // Refresh the resources from the server so the new/updated sets appear.
-    await refreshResourcesOnly();
-    renderTestDataSection(wizData.framework, wizData.resources);
-    renderWizardStep2InSection();
+    // Reload + re-render ALL sections from the server so the new/updated train
+    // sets appear AND the Scenarios section unlocks (it gates on train count;
+    // a partial Test-Data-only refresh left it stale → "configure Test Data
+    // first" even though a train now exists). #165 follow-up.
+    await refreshAllSections();
   } catch (e) {
     statusEl.style.color = '#c62828';
     statusEl.textContent = `❌ Network error: ${e.message}`;
@@ -3679,15 +3679,6 @@ function renderDiscoveryDays(el, dayResults) {
   }).join('');
   el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
     <table style="margin-top:6px;border-collapse:collapse">${rows}</table></details>`;
-}
-
-// Reload only the test resources (no full section rebuild) so discovery results
-// appear in wizData.resources. Mirrors the loader used by refreshAllSections.
-async function refreshResourcesOnly() {
-  try {
-    const res = await fetch('/v1/company/test-resources', {});
-    if (res.ok) wizData.resources = await res.json();
-  } catch (_) { /* keep stale list on failure */ }
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
