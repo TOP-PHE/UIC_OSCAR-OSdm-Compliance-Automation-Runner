@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.65",
+  "current_release": "2026.66",
   "releases": [
+    {
+      "release": "2026.66",
+      "date": "2026-05-22",
+      "server": "1.11.38",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#153): a selected travel/service class can now always be deselected in a scenario's Offer Search Criteria. public/js/scenarios.js buildOfferSection() rendered each multi-select (requested offer parts, service class, travel class, flexibilities) only from the framework's allowed set, so a value seeded from the train (e.g. travelClass FIRST while the framework offer-criteria lists only SECOND) had no pill to untick and kept reaching the request as offerSearchCriteria.travelClasses:[FIRST]. Each list now renders the union of allowed + currently-selected, so anything already set appears (checked) and is deselectable. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page."
+      ]
+    },
     {
       "release": "2026.65",
       "date": "2026-05-22",
