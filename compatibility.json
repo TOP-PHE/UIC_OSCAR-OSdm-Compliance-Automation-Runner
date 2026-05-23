@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.71",
+  "current_release": "2026.72",
   "releases": [
+    {
+      "release": "2026.72",
+      "date": "2026-05-23",
+      "server": "1.11.44",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#165): Timetable Discovery keeps the searched O&D codes at route endpoints. Some sandboxes (e.g. Bileto) echo their internal stop refs (urn:x_bileto:stn:<uuid>) in the offer response, so a discovered set's Origin showed that UUID rather than the UIC code the tester typed. src/services/timetable-discovery.js harvestTrips() now accepts { searchedOrigin, searchedDestination } and substitutes them at the route endpoints — the first timed leg's origin and last timed leg's destination of each trip (every returned trip spans the searched O&D); intermediate connection stations the sandbox resolves are left untouched and leg-to-leg continuity is preserved. src/api/routes/company-test-resources.js passes the normalized searched O&D in. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Picked up after Watchtower promotes :stable; hard-refresh the Test Config page > Test Data > Train Resources > 'Discover timetable'."
+      ]
+    },
     {
       "release": "2026.71",
       "date": "2026-05-23",
