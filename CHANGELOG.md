@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.39] — 2026-05-22
+
+Fix (#155) — scenario Offer Search Criteria now offers the full OSDM master
+list, so any value can be requested (incl. for non-happy-flow scenarios).
+
+### Fixed
+- **`public/js/scenarios.js`**: a scenario's Offer Search Criteria is a free
+  request filter — the tester must be able to request **any** OSDM value (travel
+  class, service class, requested offer parts, flexibilities, offer mode),
+  including ones the train or system-under-test doesn't support, to author
+  **non-happy-flow** scenarios. Travel class is test data (per train), not a
+  framework setting, so the framework/train must not restrict the options. Both
+  the creation wizard (`renderWizardStep3`) and the scenario detail editor
+  (`buildOfferSection`) now build each control from the **full OSDM enum**
+  (`WIZ_*` / `ENUMS.*`), unioned with whatever is already selected. Framework/
+  train values remain only as **defaults** (seeded into the scenario), never as
+  a filter. Completes #153 (which only let an already-set value be deselected).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → a scenario's Offer Search Criteria.
+
+---
+
 ## [server-v1.11.38] — 2026-05-22
 
 Fix (#153) — a selected travel/service class can now always be deselected in a
