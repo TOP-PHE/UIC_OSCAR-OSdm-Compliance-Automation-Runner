@@ -46,11 +46,14 @@ function _stnUrn(s) {
   return /^urn:/i.test(v) ? v : `urn:uic:stn:${v}`;
 }
 
-// The shared trip-search block. departureTime is a LocalDateTime (no offset),
-// per the OSDM TripSearchCriteria pattern.
-function _tripSearch(date, origin, destination) {
+// The shared trip-search block. The OSDM TripSearchCriteria rule is a
+// LocalDateTime (no offset), EXCEPT Bileto, which requires an OffsetDateTime —
+// its deserializer 400s ("Failed to read request") on a bare local time. This
+// mirrors the Bileto exception in the Bruno run flow (scenarioParser.js).
+function _tripSearch(date, origin, destination, apiBase) {
+  const isBileto = /bileto/i.test(String(apiBase || ''));
   return {
-    departureTime: `${date}T00:00:00`,
+    departureTime: isBileto ? `${date}T00:00:00+00:00` : `${date}T00:00:00`,
     origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
     destination: { objectType: 'StopPlaceRef', stopPlaceRef: destination }
   };
@@ -61,8 +64,8 @@ function _tripSearch(date, origin, destination) {
 //   offers           → an OfferCollectionRequest (trip search + one anonymous
 //                      passenger; offerSearchCriteria left empty so nothing is
 //                      filtered out — we only want the trips, not the pricing).
-function _discoveryBody(endpoint, date, origin, destination) {
-  const trip = _tripSearch(date, origin, destination);
+function _discoveryBody(endpoint, date, origin, destination, apiBase) {
+  const trip = _tripSearch(date, origin, destination, apiBase);
   if (endpoint === 'offers') {
     return {
       tripSearchCriteria: trip,
@@ -277,7 +280,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
     for (const endpoint of order) {
       let r;
       try {
-        r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination), extraHeaders);
+        r = await _postJson(company.api_base, endpoint, token, _discoveryBody(endpoint, date, origin, destination, company.api_base), extraHeaders);
       } catch (err) {
         lastStatus = 0;
         lastError = err.name === 'AbortError' ? 'timeout' : err.message;
