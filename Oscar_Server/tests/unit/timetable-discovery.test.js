@@ -139,6 +139,31 @@ describe('harvestTrips', () => {
     })] }] };
     expect(harvestTrips(resp)[0].vehicleNumber).toBe('ICE 100/ICE 101');
   });
+
+  test('substitutes the searched O&D at the route endpoints, preserving connections + continuity', () => {
+    const resp = { trips: [{ legs: [
+      leg({ origin: 'urn:x_bileto:stn:AAA', dest: 'urn:x_bileto:stn:MID',
+        dep: '2026-06-01T08:00:00+02:00', arr: '2026-06-01T09:00:00+02:00', veh: 'L1', pcRef: 'r', pcName: 'n', pcShort: 's' }),
+      leg({ origin: 'urn:x_bileto:stn:MID', dest: 'urn:x_bileto:stn:BBB',
+        dep: '2026-06-01T09:30:00+02:00', arr: '2026-06-01T11:00:00+02:00', veh: 'L2', pcRef: 'r', pcName: 'n', pcShort: 's' }),
+    ] }] };
+    const recs = harvestTrips(resp, { searchedOrigin: 'urn:uic:stn:1000', searchedDestination: 'urn:uic:stn:2000' });
+    expect(recs).toHaveLength(2);
+    expect(recs[0].originURN).toBe('urn:uic:stn:1000');          // first leg start → searched origin
+    expect(recs[0].destinationURN).toBe('urn:x_bileto:stn:MID'); // connection untouched
+    expect(recs[1].originURN).toBe('urn:x_bileto:stn:MID');      // continuity preserved (same MID)
+    expect(recs[1].destinationURN).toBe('urn:uic:stn:2000');     // last leg end → searched destination
+  });
+
+  test('without opts, keeps the sandbox refs verbatim', () => {
+    const resp = { trips: [{ legs: [leg({
+      origin: 'urn:x_bileto:stn:AAA', dest: 'urn:x_bileto:stn:BBB',
+      dep: '2026-06-01T08:00:00+02:00', arr: '2026-06-01T09:00:00+02:00', veh: 'L1', pcRef: 'r', pcName: 'n', pcShort: 's',
+    })] }] };
+    const recs = harvestTrips(resp);
+    expect(recs[0].originURN).toBe('urn:x_bileto:stn:AAA');
+    expect(recs[0].destinationURN).toBe('urn:x_bileto:stn:BBB');
+  });
 });
 
 // ── routeKey / serviceKey ────────────────────────────────────────────────────

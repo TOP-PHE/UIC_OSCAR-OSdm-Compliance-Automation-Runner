@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.44] — 2026-05-23
+
+Enhancement (#165) — Timetable Discovery keeps the clean O&D the tester searched
+with at the route endpoints, instead of a vendor's internal stop refs.
+
+### Changed
+- **`src/services/timetable-discovery.js`** (`harvestTrips`): now accepts
+  `{ searchedOrigin, searchedDestination }`. Some sandboxes (e.g. Bileto) echo
+  their **internal** stop refs (`urn:x_bileto:stn:<uuid>`) in the offer response,
+  so a discovered set's Origin showed that UUID rather than the UIC code the
+  tester typed. Harvest now substitutes the searched O&D at the route endpoints
+  — the **first** timed leg's origin and the **last** timed leg's destination of
+  each trip (every returned trip spans the searched O&D). Intermediate
+  connection stations the sandbox resolves itself are left untouched, and
+  leg-to-leg continuity is preserved (the same connection ref still chains).
+- **`src/api/routes/company-test-resources.js`**: passes the normalized searched
+  O&D into `harvestTrips`.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.43] — 2026-05-23
 
 Enhancement (#163) — Timetable Discovery accepts vendor station URNs and

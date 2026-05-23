@@ -99,20 +99,31 @@ function _stopRef(end) {
  * Non-timed legs (transfers / walking connections / continuous legs) carry no
  * service and are skipped — only `timedLeg` entries describe a train run.
  *
- * @param {object} resp  parsed TripCollectionResponse ({ trips: [...] })
+ * When `opts.searchedOrigin` / `opts.searchedDestination` are supplied, the
+ * clean O&D the tester searched with replaces the sandbox's own refs at the
+ * route endpoints — the FIRST timed leg's origin and the LAST timed leg's
+ * destination of each trip (every returned trip spans the searched O&D). This
+ * keeps tidy UIC codes for the endpoints instead of a vendor's internal stop
+ * refs (e.g. Bileto's urn:x_bileto:stn:<uuid>), while intermediate connection
+ * stations the sandbox resolves itself are left untouched (#163 follow-up).
+ *
+ * @param {object} resp  parsed TripCollectionResponse / OfferCollectionResponse ({ trips: [...] })
+ * @param {{searchedOrigin?:string, searchedDestination?:string}} [opts]
  * @returns {Array<object>} one record per timed leg:
  *   { originURN, destinationURN, originName, destName, operatorCode,
  *     productCategoryRef, productCategoryName, productCategoryShortName,
  *     vehicleNumber, departureTime, arrivalTime, dayOfWeek }
  */
-function harvestTrips(resp) {
+function harvestTrips(resp, opts) {
+  opts = opts || {};
+  const searchedOrigin = opts.searchedOrigin || '';
+  const searchedDestination = opts.searchedDestination || '';
   const out = [];
   const trips = (resp && Array.isArray(resp.trips)) ? resp.trips : [];
   for (const trip of trips) {
     const legs = (trip && Array.isArray(trip.legs)) ? trip.legs : [];
-    for (const leg of legs) {
-      const tl = leg && leg.timedLeg;
-      if (!tl) continue;   // skip transfer / walk / continuous legs
+    const timed = legs.map(l => l && l.timedLeg).filter(Boolean);
+    timed.forEach((tl, idx) => {
       const svc = tl.service || {};
       const pc = svc.productCategory || {};
       const veh = Array.isArray(svc.vehicleNumbers) ? svc.vehicleNumbers.filter(Boolean) : [];
@@ -121,9 +132,14 @@ function harvestTrips(resp) {
       const end = tl.end || {};
       const dep = start.serviceDeparture && start.serviceDeparture.timetabledTime;
       const arr = end.serviceArrival && end.serviceArrival.timetabledTime;
+      let originURN = _stopRef(start);
+      let destinationURN = _stopRef(end);
+      // Substitute the searched O&D at the route endpoints (first/last leg).
+      if (searchedOrigin && idx === 0) originURN = searchedOrigin;
+      if (searchedDestination && idx === timed.length - 1) destinationURN = searchedDestination;
       out.push({
-        originURN:      _stopRef(start),
-        destinationURN: _stopRef(end),
+        originURN,
+        destinationURN,
         originName:     start.stopPlaceName || '',
         destName:       end.stopPlaceName || '',
         operatorCode:   carrier ? (carrier.ref || '') : '',
@@ -135,7 +151,7 @@ function harvestTrips(resp) {
         arrivalTime:    timePartOf(arr),
         dayOfWeek:      dayOfWeekCode(dep)
       });
-    }
+    });
   }
   return out;
 }
