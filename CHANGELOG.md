@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.40] — 2026-05-23
+
+Feature (#157) — **Train Timetable Discovery**: reverse-engineer the train sets
+a sandbox actually runs from `POST /trips-collection`, and auto-fill Test Data.
+
+### Added
+- **`src/services/timetable-discovery.js`** (new): pure harvest/group/merge
+  logic. `harvestTrips()` reads **every timed leg** of every returned trip as a
+  service on its own sub-route (start/end stop + product category + vehicle #s +
+  departure/arrival + operating day). `groupAndMerge()` groups services by route
+  key (origin + destination + product-category ref) and reconciles against the
+  company's existing TRAIN resources: **creates** new sets, **appends** new
+  services (dedup on vehicle# + departure + arrival), and **unions** the
+  operating-days calendar — never overwriting manual edits (operator/product
+  names are only filled when empty; catalogs like ticket types are preserved).
+  `searchDates()` builds the 1–14-day scan window (default 7). Fully unit-tested
+  (`tests/unit/timetable-discovery.test.js`).
+- **`src/worker/access-token.js`** (new): the per-tester OAuth2/bearer token
+  resolution + token cache, extracted verbatim from `runner.js` so the discovery
+  endpoint and the Bruno run worker share one implementation. `runner.js` now
+  delegates to it (no behaviour change to runs).
+- **`POST /v1/company/test-resources/discover-timetable`** (Test-Manager only,
+  tenant-scoped): given `{ originURN, destinationURN, days? }`, obtains a sandbox
+  token, fires `POST {api_base}/trips-collection` for each day (local
+  `YYYY-MM-DDThh:mm:ss`, `{objectType:'StopPlaceRef'}` O&D), harvests + merges,
+  persists the resulting TRAIN sets, and returns a `{ summary, created, updated,
+  dayResults }` report. Per-day failures are tolerated; the call only fails if
+  no day succeeded.
+- **`public/js/scenarios.js`**: a **🔍 Discover timetable** button in Test Data →
+  Train Resources opens a modal (origin, destination, days), runs discovery, and
+  shows what was created/updated plus a per-day breakdown, then refreshes the
+  train list. Hidden for testers (read-only).
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable". Requires the
+company's OSDM API base + the tester's credentials to be configured.
+
+---
+
 ## [server-v1.11.39] — 2026-05-22
 
 Fix (#155) — scenario Offer Search Criteria now offers the full OSDM master

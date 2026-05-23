@@ -789,7 +789,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -3029,6 +3029,7 @@ function renderWizardStep2() {
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-train">➕ Add Train</button>
         ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
+        <button class="btn btn-secondary btn-sm" data-action="wiz-discover-timetable" title="Scan the sandbox timetable for an origin/destination and auto-create the train sets it actually runs">🔍 Discover timetable</button>
       </div>
     </div>
   </div>
@@ -3527,6 +3528,160 @@ async function wizSaveAllTrains() {
   renderWizardStep2InSection();
   savedIds.forEach(reopenTrainById);
   showMsg(`✅ Saved ${savedIds.length} train${savedIds.length !== 1 ? 's' : ''}.`, true);
+}
+
+// ── Timetable Discovery (#157) ───────────────────────────────────────────────
+// Reverse-engineer the train sets a sandbox actually runs: enter an O&D, OSCAR
+// fires POST /trips-collection across the next N days server-side, harvests
+// every leg as a service, and merges the result into the Train Resources list
+// (creating new sets, appending services to existing ones — never clobbering
+// manual edits). All the network + merge work happens on the server; the
+// client just collects the O&D, shows a spinner, then renders the summary.
+
+// Seed the O&D from the first existing train set, as a convenience.
+function _ttSeedOD() {
+  const t = (wizData.resources || []).find(r => r.resource_type === 'TRAIN');
+  const d = t ? normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {})) : {};
+  return { origin: d.originURN || '', destination: d.destinationURN || '' };
+}
+
+function openTimetableDiscovery() {
+  if (isTester) return;
+  closeTimetableDiscovery();
+  const seed = _ttSeedOD();
+  const overlay = document.createElement('div');
+  overlay.id = 'tt-discover-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:560px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:22px 24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0;font-size:17px;color:#263238">🔍 Discover timetable</h3>
+        <button class="row-delete-btn" data-action="tt-discover-close" title="Close">✕</button>
+      </div>
+      <p style="color:#607d8b;font-size:12.5px;line-height:1.6;margin:0 0 16px">
+        Enter an origin and destination. OSCAR queries the sandbox timetable
+        (<code>POST /trips-collection</code>) across the next few days and
+        creates/updates the train sets it actually runs. Existing manual edits
+        are preserved.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:12px;color:#455a64;font-weight:600">Origin
+          <input id="tt-origin" class="param-input" value="${esc(seed.origin)}" placeholder="urn:uic:stn:8500010 (or just 8500010)" style="margin-top:3px">
+        </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Destination
+          <input id="tt-dest" class="param-input" value="${esc(seed.destination)}" placeholder="urn:uic:stn:8400058 (or just 8400058)" style="margin-top:3px">
+        </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Days to scan (1–14)
+          <input id="tt-days" class="param-input" type="number" min="1" max="14" value="7" style="margin-top:3px;width:90px">
+        </label>
+      </div>
+      <div id="tt-discover-status" style="margin-top:14px;font-size:12.5px;color:#546e7a"></div>
+      <div id="tt-discover-result" style="margin-top:12px"></div>
+      <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" data-action="tt-discover-close">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="tt-discover-run-btn" data-action="tt-discover-run">Discover</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Click outside the dialog closes it.
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeTimetableDiscovery(); });
+  const o = document.getElementById('tt-origin');
+  if (o) o.focus();
+}
+
+function closeTimetableDiscovery() {
+  const el = document.getElementById('tt-discover-overlay');
+  if (el) el.remove();
+}
+
+async function runTimetableDiscovery() {
+  const originEl = document.getElementById('tt-origin');
+  const destEl   = document.getElementById('tt-dest');
+  const daysEl   = document.getElementById('tt-days');
+  const statusEl = document.getElementById('tt-discover-status');
+  const resultEl = document.getElementById('tt-discover-result');
+  const runBtn   = document.getElementById('tt-discover-run-btn');
+  if (!originEl || !destEl) return;
+
+  const originURN = originEl.value.trim();
+  const destinationURN = destEl.value.trim();
+  let days = parseInt(daysEl && daysEl.value, 10);
+  if (!Number.isInteger(days) || days < 1) days = 7;
+  if (days > 14) days = 14;
+
+  if (!originURN || !destinationURN) {
+    statusEl.textContent = '⚠️ Enter both an origin and a destination.';
+    statusEl.style.color = '#c62828';
+    return;
+  }
+
+  if (resultEl) resultEl.innerHTML = '';
+  statusEl.style.color = '#546e7a';
+  statusEl.textContent = `⏳ Scanning the next ${days} day(s) of timetable… this can take up to ~${Math.min(days * 20, 60)}s.`;
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Scanning…'; }
+
+  try {
+    const res = await fetch('/v1/company/test-resources/discover-timetable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originURN, destinationURN, days })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      statusEl.style.color = '#c62828';
+      statusEl.textContent = `❌ ${body.detail || body.title || ('HTTP ' + res.status)}`;
+      if (Array.isArray(body.dayResults)) renderDiscoveryDays(resultEl, body.dayResults);
+      return;
+    }
+    const s = body.summary || {};
+    statusEl.style.color = '#2e7d32';
+    statusEl.textContent = `✅ Found ${s.routesDiscovered || 0} route(s), ${s.servicesDiscovered || 0} service(s). Created ${s.created || 0}, updated ${s.updated || 0} train set(s).`;
+    renderDiscoveryResult(resultEl, body);
+
+    // Refresh the resources from the server so the new/updated sets appear.
+    await refreshResourcesOnly();
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+  } catch (e) {
+    statusEl.style.color = '#c62828';
+    statusEl.textContent = `❌ Network error: ${e.message}`;
+  } finally {
+    if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Discover again'; }
+  }
+}
+
+// Render the created/updated lists + per-day breakdown into the modal.
+function renderDiscoveryResult(el, body) {
+  if (!el) return;
+  const created = body.created || [];
+  const updated = body.updated || [];
+  const list = (title, arr) => arr.length
+    ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
+        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('')}</ul></div>`
+    : '';
+  el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated);
+  renderDiscoveryDays(el, body.dayResults || []);
+}
+
+function renderDiscoveryDays(el, dayResults) {
+  if (!el || !Array.isArray(dayResults) || dayResults.length === 0) return;
+  const rows = dayResults.map(d => {
+    const ok = d.status >= 200 && d.status < 300;
+    const icon = ok ? '✅' : '⚠️';
+    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 120)) : ''}`;
+    return `<tr><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${icon} ${esc(d.date)}</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${detail}</td></tr>`;
+  }).join('');
+  el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
+    <table style="margin-top:6px;border-collapse:collapse">${rows}</table></details>`;
+}
+
+// Reload only the test resources (no full section rebuild) so discovery results
+// appear in wizData.resources. Mirrors the loader used by refreshAllSections.
+async function refreshResourcesOnly() {
+  try {
+    const res = await fetch('/v1/company/test-resources', {});
+    if (res.ok) wizData.resources = await res.json();
+  } catch (_) { /* keep stale list on failure */ }
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
@@ -5257,6 +5412,12 @@ document.body.addEventListener('click', function(e) {
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-all-trains':
       wizSaveAllTrains(); break;
+    case 'wiz-discover-timetable':
+      openTimetableDiscovery(); break;
+    case 'tt-discover-run':
+      runTimetableDiscovery(); break;
+    case 'tt-discover-close':
+      closeTimetableDiscovery(); break;
     case 'train-add-service':
       trainAddService(parseInt(el.dataset.tidx)); break;
     case 'train-remove-service': {
