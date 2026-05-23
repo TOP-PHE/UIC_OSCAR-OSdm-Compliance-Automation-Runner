@@ -295,7 +295,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
         lastError = `${endpoint}: ${(r.text || '').slice(0, 240)}`;
         continue;   // try the next endpoint
       }
-      const recs = harvestTrips(r.json);
+      const recs = harvestTrips(r.json, { searchedOrigin: origin, searchedDestination: destination });
       const tripCount = (r.json && Array.isArray(r.json.trips)) ? r.json.trips.length : 0;
       // A 2xx with trips wins. A 2xx with NO trips only "wins" if it's the last
       // endpoint to try — otherwise fall through in case another endpoint has data.
