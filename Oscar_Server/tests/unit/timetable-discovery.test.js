@@ -79,10 +79,11 @@ describe('searchDates', () => {
     const out = searchDates(2, new Date(2026, 4, 31)); // May 31
     expect(out).toEqual(['2026-05-31', '2026-06-01']);
   });
-  test('clamps to 1..14 and defaults to 7', () => {
-    expect(searchDates(0, new Date(2026, 0, 1))).toHaveLength(1);
-    expect(searchDates(99, new Date(2026, 0, 1))).toHaveLength(14);
-    expect(searchDates(undefined, new Date(2026, 0, 1))).toHaveLength(7);
+  test('clamps to 1..14, treats falsy/missing as the default 7', () => {
+    expect(searchDates(-3, new Date(2026, 0, 1))).toHaveLength(1);   // below min → clamp to 1
+    expect(searchDates(99, new Date(2026, 0, 1))).toHaveLength(14);  // above max → clamp to 14
+    expect(searchDates(undefined, new Date(2026, 0, 1))).toHaveLength(7); // missing → default 7
+    expect(searchDates(0, new Date(2026, 0, 1))).toHaveLength(7);    // 0 (falsy) → default 7
   });
 });
 
