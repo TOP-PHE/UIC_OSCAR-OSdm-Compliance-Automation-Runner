@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.46] — 2026-05-23
+
+Enhancement (#169) — Timetable Discovery splits a route into separate train sets
+by operating-days pattern (weekday vs weekend trains).
+
+### Changed
+- **`src/services/timetable-discovery.js`** (`groupAndMerge`): now tracks the
+  operating days observed **per service** across the scan, then splits each
+  route into separate sets by day-pattern. E.g. on Sqills BAS↔AMS the 1xx trains
+  (Mon–Fri) and the 8xx trains (weekend) become two sets — "… (Mon–Fri)" and
+  "… (weekend)" — each with its own accurate calendar (consistent with the
+  one-calendar-per-set model from #141), instead of one set marked Mon–Sun. The
+  reconcile key now includes the calendar (origin + destination + product
+  category ref + sorted days), so a re-scan merges into the matching set; the
+  set label carries the day-pattern. Summary gains `setsDiscovered`.
+
+### Operator action
+None. Picked up after Watchtower promotes :stable; hard-refresh the Test Config
+page → Test Data → Train Resources → "Discover timetable".
+
+---
+
 ## [server-v1.11.45] — 2026-05-23
 
 Fix (#167) — Timetable Discovery: unblock scenario creation after discovery,

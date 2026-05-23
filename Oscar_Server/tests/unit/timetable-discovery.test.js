@@ -221,7 +221,7 @@ describe('groupAndMerge', () => {
     expect(toCreate).toHaveLength(2);
   });
 
-  test('merges new services into an existing route set without clobbering manual edits', () => {
+  test('merges a new same-calendar service into an existing set without clobbering manual edits', () => {
     const existing = [{
       id: 'train-1', resource_type: 'TRAIN', label: 'My Basel→Amsterdam',
       data: {
@@ -233,18 +233,39 @@ describe('groupAndMerge', () => {
         ticketTypes: ['FLEXI'], travelClasses: ['FIRST'],     // manual edits
       },
     }];
-    // A brand-new service on the same route, on a new day.
-    const newSvc = harvest({ vehicleNumber: 'OSDM_204', departureTime: '13:10:00+02:00', arrivalTime: '20:35:00+02:00', dayOfWeek: 'WED' });
+    // A brand-new service on the same route AND same operating-days pattern (MON).
+    const newSvc = harvest({ vehicleNumber: 'OSDM_204', departureTime: '13:10:00+02:00', arrivalTime: '20:35:00+02:00', dayOfWeek: 'MON' });
     const { toCreate, toUpdate } = groupAndMerge([newSvc], existing);
 
     expect(toCreate).toHaveLength(0);
     expect(toUpdate).toHaveLength(1);
     const d = toUpdate[0].data;
     expect(d.services).toHaveLength(2);                        // appended, not replaced
-    expect(d.daysOfWeek).toEqual(['MON', 'WED']);              // unioned
+    expect(d.daysOfWeek).toEqual(['MON']);                     // calendar unchanged (same pattern)
     expect(d.operatorCode).toBe('urn:uic:rics:9999');          // manual edit preserved
     expect(d.ticketTypes).toEqual(['FLEXI']);                  // manual catalog preserved
     expect(d.travelClasses).toEqual(['FIRST']);
+  });
+
+  test('splits a route into separate sets by operating-days pattern', () => {
+    // Vehicle 101 runs Mon–Fri; vehicle 801 only on the weekend.
+    const weekday = ['MON', 'TUE', 'WED', 'THU', 'FRI'].map(dy =>
+      harvest({ vehicleNumber: '101', departureTime: '07:00:00+02:00', arrivalTime: '10:00:00+02:00', dayOfWeek: dy }));
+    const weekend = ['SAT', 'SUN'].map(dy =>
+      harvest({ vehicleNumber: '801', departureTime: '08:00:00+02:00', arrivalTime: '11:00:00+02:00', dayOfWeek: dy }));
+    const { toCreate, summary } = groupAndMerge([...weekday, ...weekend], []);
+
+    expect(toCreate).toHaveLength(2);                          // one route → two sets
+    expect(summary.routesDiscovered).toBe(1);
+    expect(summary.setsDiscovered).toBe(2);
+    const byVeh = {};
+    toCreate.forEach(c => { byVeh[c.data.services[0].vehicleNumber] = c.data.daysOfWeek; });
+    expect(byVeh['101']).toEqual(['MON', 'TUE', 'WED', 'THU', 'FRI']);
+    expect(byVeh['801']).toEqual(['SAT', 'SUN']);
+    // Labels carry the day-pattern so the two sets are distinguishable.
+    const labels = toCreate.map(c => c.label);
+    expect(labels.some(l => /Mon–Fri/.test(l))).toBe(true);
+    expect(labels.some(l => /weekend/.test(l))).toBe(true);
   });
 
   test('does not emit an update when nothing changed', () => {
