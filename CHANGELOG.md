@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.51] — 2026-05-24
+
+Fix (#180) — return booking adapts when a vendor rejects multi-offer bookings,
+with a trackable vendor-gap assertion. Collection **OTST_V2.0.7 → OTST_V2.0.8**.
+
+### Changed
+- **`02. POST Create Booking`** (return scenarios): first attempts the
+  OSDM-valid **combined** booking (both offers). If the vendor rejects it with a
+  multi-offer error (Bileto: `400 "Too many offers — Only one offer can be
+  booked at a time, for now"`), OSCAR emits a clearly-named **FAILING** assertion
+  `[OSDM] Vendor supports booking multiple offers (round trip) in one booking`
+  (so the gap is easy to track/filter in the report) plus a `[VENDOR GAP]` log,
+  then **falls back** to two separate bookings — `sep-out` (outbound), then
+  `sep-in` (inbound) — the inbound becoming the current booking that continues
+  the normal post-booking flow.
+- **`library-bruno/requestsBuilder.js`** (`buildBookingRequest`): mode-aware via
+  `__returnBookMode` (combined / sep-out / sep-in). One-way scenarios unchanged.
+- New return env vars (`outboundBookingId`, `__returnBookMode`) reset between
+  scenarios (`opencollection.yml` + `scenarioParser.resetScenarioEnvVars`).
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.8
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.50] — 2026-05-24
 
 Feature (#178) — full two-step OSDM return trip (inward offer + round-trip

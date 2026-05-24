@@ -116,20 +116,31 @@ function buildBookingRequest() {
   const placeSelections = parseEnvJson("placeSelections", []);
   const passengerRefs = parseEnvJson("bookingPassengerReferences");
 
-  // Two-step return (#178): when an inbound offer was fetched, book BOTH the
-  // outbound and the inbound offers in one booking. Otherwise book the single
-  // selected offer (unchanged single-trip behaviour). Manual place selections
-  // are applied to the outbound offer only (the inbound uses automatic
-  // selection — manual place selection on a return is out of scope for now).
+  // Two-step return (#178/#180): when an inbound offer was fetched, book the
+  // return. The FIRST attempt books BOTH offers in one booking (OSDM-valid).
+  // If the vendor rejects multi-offer booking (e.g. Bileto "Only one offer can
+  // be booked at a time"), 02's after-response sets __returnBookMode and re-runs
+  // this builder to book them separately: 'sep-out' (outbound only) then
+  // 'sep-in' (inbound only). One-way scenarios book the single selected offer
+  // (unchanged). Manual place selections apply to the outbound offer only.
   const inboundOfferId  = bru.getEnvVar("inboundOfferId");
   const outboundOfferId = bru.getEnvVar("outboundOfferId");
+  const returnMode      = bru.getEnvVar("__returnBookMode") || "";
   const offers = [];
   if (inboundOfferId && outboundOfferId) {
     const outboundOffer = { offerId: outboundOfferId, passengerRefs };
     if (placeSelections.length > 0) outboundOffer.placeSelections = placeSelections;
-    offers.push(outboundOffer);
-    offers.push({ offerId: inboundOfferId, passengerRefs });
-    validationLogger(`[INFO] 🔁 Return booking — booking outbound (${outboundOfferId}) + inbound (${inboundOfferId}) offers.`);
+    if (returnMode === "sep-out") {
+      offers.push(outboundOffer);
+      validationLogger(`[INFO] 🔁 Return booking (separate) — outbound only (${outboundOfferId}).`);
+    } else if (returnMode === "sep-in") {
+      offers.push({ offerId: inboundOfferId, passengerRefs });
+      validationLogger(`[INFO] 🔁 Return booking (separate) — inbound only (${inboundOfferId}).`);
+    } else {
+      offers.push(outboundOffer);
+      offers.push({ offerId: inboundOfferId, passengerRefs });
+      validationLogger(`[INFO] 🔁 Return booking (combined) — outbound (${outboundOfferId}) + inbound (${inboundOfferId}).`);
+    }
   } else {
     const offer = { offerId: bru.getEnvVar("offerId"), passengerRefs };
     if (placeSelections.length > 0) offer.placeSelections = placeSelections;
