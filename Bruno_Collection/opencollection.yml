@@ -116,9 +116,22 @@ request:
           var _isPlaceMap = _ru.includes('place-map') || _rn.includes('place map');
           var _isAddReservation = _rn.includes('add reservation');
           var _isAddAncillary   = _rn.includes('add ancillary');
+          var _isReturnOffer    = _rn.includes('return offer');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
+
+          // Two-step return (#178): the inward "01b. POST Get Return Offer" step
+          // runs only for return scenarios — detected from the outbound
+          // tripSearchCriteria the scenarioParser built (returnSearchParameters
+          // .inwardReturnDate). For one-way scenarios it is skipped wherever it
+          // sits in the flow.
+          var _isReturnScenario = (function () {
+            try {
+              var _t = JSON.parse(bru.getEnvVar('offerTripSearchCriteria') || '{}');
+              return !!(_t.returnSearchParameters && _t.returnSearchParameters.inwardReturnDate);
+            } catch (_e) { return false; }
+          })();
 
           // Place maps run only when the scenario enabled Place selection in the
           // SEATMAP_AT_OFFER mode (issues #104/#107); legacy requiresPlaceSelection
@@ -148,6 +161,8 @@ request:
             else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
             else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
             else if (_isAddAncillary && bru.getEnvVar('__addAncillaryDone') === 'true') { _skipReason = 'add-ancillary already done this scenario'; }
+            else if (_isReturnOffer && !_isReturnScenario)                { _skipReason = 'not a return-trip scenario'; }
+            else if (_isReturnOffer && bru.getEnvVar('__returnInboundDone') === 'true') { _skipReason = 'inward (return) offer already fetched this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
             else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange)) { _skipReason = 'not in SALE+PLACEMAP scope'; }
             else if (_st === 'REFUND'        && _isExchange)               { _skipReason = 'Exchange excluded for REFUND scenario'; }
@@ -209,6 +224,9 @@ request:
                 "offer", "offerId", "offers", "OfferCollectionRequest",
                 "offerSearchCriteria", "offerTripSearchCriteria", "offerTripSpecifications",
                 "offerFulfillmentOptions", "offerPassengerSpecifications",
+                // Two-step return (#178)
+                "outboundOfferId", "inboundOfferId", "outboundOfferTag",
+                "ReturnOfferCollectionRequest", "__returnInboundDone",
                 "admissionReservationAncillaryOfferPartsIds",
                 "admissionReservationAncillaryOfferPartsAftersalesConditions",
                 "overallFlexibility", "coveredTripId", "minimalPrice",

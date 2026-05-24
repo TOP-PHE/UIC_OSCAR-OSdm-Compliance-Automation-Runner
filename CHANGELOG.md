@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.50] — 2026-05-24
+
+Feature (#178) — full two-step OSDM return trip (inward offer + round-trip
+booking). Collection **OTST_V2.0.6 → OTST_V2.0.7**.
+
+### Added
+- **Inward offer step** — new request **`02-Common Requests/01b. POST Get Return
+  Offer`**. After the outbound offer of a return scenario, OSCAR captures the
+  chosen outbound offer (`outboundOfferId`) and fetches the **return** offers:
+  `POST /offers` with the trip reversed (O&D swapped, `departureTime =
+  inwardReturnDate`) and `returnSearchParameters.outwardOfferIds =
+  [outboundOfferId]`, then captures `inboundOfferId`.
+- **`library-bruno/requestsBuilder.js`**: `buildReturnOfferCollectionRequest()`
+  builds that inward request; `buildBookingRequest()` now books **both** the
+  outbound and inbound offers in one booking when a return was fetched
+  (`offers: [outbound, inbound]`), otherwise the single offer as before.
+
+### Changed
+- **`01. POST Get Offer`** routes to `01b` (instead of booking) on a return
+  scenario; **`opencollection.yml`** smart-run filter skips `01b` for one-way
+  scenarios and resets the new return env vars. Return is detected from the
+  outbound `tripSearchCriteria.returnSearchParameters.inwardReturnDate`, so
+  **one-way scenarios are unchanged**. Scoped to SEARCH outbounds.
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.7
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.49] — 2026-05-23
 
 Fix (#176) — return trips are now valid OSDM (move from a bogus
