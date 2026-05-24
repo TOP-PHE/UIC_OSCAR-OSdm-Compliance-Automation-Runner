@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.79",
+  "current_release": "2026.80",
   "releases": [
+    {
+      "release": "2026.80",
+      "date": "2026-05-24",
+      "server": "1.11.52",
+      "collection": "OTST_V2.0.9",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#182): adaptive place-selection fallback — pick the seat after pre-booking when the offer-time seat map is unavailable. OSDM exposes seat selection at two times: pre-booking (SEATMAP_AT_OFFER, GET /availabilities/place-map with contextType=OFFER, 08. GET Place Maps -> 02. POST Create Booking) and post-booking (ADD_TO_BOOKING, POST /bookings/{id}/booked-offers/{bookedOfferId}/{offer-parts|reservations}, 09. POST Add Reservation to Booking). Some providers (e.g. Bileto) hold seats against a BOOKING, so they serve no seat map for a bare OFFER and the offer-time map call returns non-200 (or 200 with no vehicleAvailability). 08. GET Place Maps now, when the offer-time map is unavailable and salesFlow_placeSelection==='true', sets __placeMapAtOfferFailed='true' and emits a clearly-named FAILING assertion '[OSDM] Vendor serves a pre-booking (OFFER-context) seat map' (+ [VENDOR GAP] log). 02. POST Create Booking routes to the post-booking add-reservation (09) when __placeMapAtOfferFailed==='true' (so the customer still picks a seat, post-booking) even when the scenario's nominal mode was SEATMAP_AT_OFFER. opencollection.yml smart-run filter _runAddReservation is also true when __placeMapAtOfferFailed==='true' (so 09 is not skipped) and resets __placeMapAtOfferFailed at collection start; scenarioParser.resetScenarioEnvVars also resets it. One-way, nominal ADD_TO_BOOKING and working SEATMAP_AT_OFFER scenarios unchanged. Bruno_Collection/VERSION OTST_V2.0.8 -> OTST_V2.0.9.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.80 / server-v1.11.52 / OTST_V2.0.9 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.79",
       "date": "2026-05-24",

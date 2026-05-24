@@ -75,6 +75,22 @@ runtime:
           validationLogger('[WARNING] ❕ Place selection enabled but no vehicleAvailability returned — the system may not offer a seat map for this offer.');
         }
 
+        // ── Adaptive fallback (#182): no offer-time seat map → select after booking ──
+        // Many providers (e.g. Bileto) hold seats against a BOOKING, so they
+        // expose no seat map for a bare OFFER (contextType=OFFER). When the
+        // offer-time map is unavailable (non-200 or no vehicleAvailability) we
+        // flag the OFFER-context gap (trackable) and let Create Booking route to
+        // the post-booking add-reservation step — i.e. "pre-book, then pick the
+        // seat", which is the customer-natural flow these providers support.
+        const _offerSeatMapOk = (statusCode === 200) && !!_va;
+        if (!_offerSeatMapOk && String(bru.getEnvVar("salesFlow_placeSelection")) === "true") {
+          bru.setEnvVar("__placeMapAtOfferFailed", "true");
+          bruTest("[OSDM] Vendor serves a pre-booking (OFFER-context) seat map", () => {
+            expect(_offerSeatMapOk, `No offer-time seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Falling back to post-booking place selection (add-reservation).`).to.be.true;
+          });
+          console.log("⚠️ [VENDOR GAP] No offer-time (OFFER-context) seat map — selecting the place AFTER pre-booking (post-booking add-reservation).");
+        }
+
         // ── Place pre-selection extraction → feeds Create Booking ─────────
         const vehicle = _va && _va.vehicle;
         const coach = (vehicle && Array.isArray(vehicle.coaches)) ? vehicle.coaches[0] : null;

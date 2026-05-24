@@ -130,7 +130,15 @@ runtime:
         //    Optional post-booking add-offer-part steps chain in order:
         //    [Add Reservation] → [Add Ancillary] → PATCH/GET. Each runs only
         //    when its gate is on; both default off → straight to PATCH/GET.
-        const _addRes = bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
+        //    Adaptive fallback (#182): when the pre-booking seat map failed at
+        //    offer time (08. GET Place Maps set __placeMapAtOfferFailed), the
+        //    seat could not be picked before booking. We still want the customer
+        //    to pick a place, so route to the post-booking add-reservation step
+        //    here even though the scenario's nominal mode was SEATMAP_AT_OFFER —
+        //    "pre-book, then pick the seat" (the customer-natural flow that
+        //    providers like Bileto support).
+        const _addRes = (bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
+                          || bru.getEnvVar("__placeMapAtOfferFailed") === "true")
             && String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
             && bru.getEnvVar("__addReservationDone") !== "true";
         const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
