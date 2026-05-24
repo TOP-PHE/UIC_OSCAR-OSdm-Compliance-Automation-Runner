@@ -265,6 +265,86 @@ describe('accommodationAndPlaceSelection', () => {
     expect(ps[0].places[0].coachNumber).toBe('C1');
     expect(ps[0].places[0].placeNumber).toBe('P1');
   });
+
+  test('preselectedPlaces → one place per passenger (multi-pax, distinct seats)', () => {
+    setEnv({
+      // No requiresPlaceSelection flag: the picks alone enable place selection.
+      accommodationSelection: 'NONE',
+      tripLegCoverage: '[{"tripId":"T1","legId":"L1"}]',
+      bookingPassengerReferences: '["00001","00002"]',
+      reservationId: 'R1',
+      preselectedPlaces: '[{"coachNumber":"12","placeNumber":"21"},{"coachNumber":"12","placeNumber":"22"}]',
+    });
+    rb.accommodationAndPlaceSelection();
+    const ps = JSON.parse(store.placeSelections);
+    expect(ps[0].places).toHaveLength(2);
+    expect(ps[0].places[0]).toEqual({ passengerRefs: ['00001'], coachNumber: '12', placeNumber: '21' });
+    expect(ps[0].places[1]).toEqual({ passengerRefs: ['00002'], coachNumber: '12', placeNumber: '22' });
+  });
+
+  test('preselectedPlaces fewer than passengers → surplus pax reuse the last place', () => {
+    setEnv({
+      accommodationSelection: 'NONE',
+      tripLegCoverage: '[]',
+      bookingPassengerReferences: '["00001","00002","00003"]',
+      reservationId: 'R1',
+      preselectedPlaces: '[{"coachNumber":"1","placeNumber":"5"}]',
+    });
+    rb.accommodationAndPlaceSelection();
+    const ps = JSON.parse(store.placeSelections);
+    expect(ps[0].places).toHaveLength(3);
+    expect(ps[0].places.map((p) => p.passengerRefs[0])).toEqual(['00001', '00002', '00003']);
+    expect(ps[0].places.every((p) => p.placeNumber === '5')).toBe(true);
+  });
+});
+
+describe('collectAvailablePlaces', () => {
+  test('returns [] for missing/invalid vehicle', () => {
+    expect(rb.collectAvailablePlaces(null, 2)).toEqual([]);
+    expect(rb.collectAvailablePlaces({}, 2)).toEqual([]);
+    expect(rb.collectAvailablePlaces({ coaches: 'x' }, 2)).toEqual([]);
+  });
+
+  test('skips occupied/reserved/unavailable places, keeps available, respects count', () => {
+    const vehicle = {
+      coaches: [{
+        coachNumber: '12', layoutId: 'L9',
+        places: [
+          { number: '1', available: false },
+          { number: '2', occupied: true },
+          { number: '3', state: 'RESERVED' },
+          { number: '4', available: true },
+          { number: '5', availability: 'AVAILABLE' },
+          { number: '6' }, // no availability info → assumed available
+        ],
+      }],
+    };
+    const out = rb.collectAvailablePlaces(vehicle, 2);
+    expect(out).toEqual([
+      { coachNumber: '12', placeNumber: '4', layoutId: 'L9' },
+      { coachNumber: '12', placeNumber: '5', layoutId: 'L9' },
+    ]);
+  });
+
+  test('flattens across coaches and handles compartments[].places + compartment.place shapes', () => {
+    const vehicle = {
+      coaches: [
+        { coachNumber: 'A', layoutId: 'LA', compartments: [{ places: [{ place: 'a1', available: true }] }] },
+        { coachNumber: 'B', layoutId: 'LB', compartments: [{ place: 'b1', state: 'FREE' }] }, // compartment IS a place
+      ],
+    };
+    const out = rb.collectAvailablePlaces(vehicle, 5);
+    expect(out).toEqual([
+      { coachNumber: 'A', placeNumber: 'a1', layoutId: 'LA' },
+      { coachNumber: 'B', placeNumber: 'b1', layoutId: 'LB' },
+    ]);
+  });
+
+  test('count defaults to at least 1', () => {
+    const vehicle = { coaches: [{ coachNumber: '1', places: [{ number: 'x', available: true }, { number: 'y', available: true }] }] };
+    expect(rb.collectAvailablePlaces(vehicle, 0)).toHaveLength(1);
+    expect(rb.collectAvailablePlaces(vehicle)).toHaveLength(1);
+  });
 });
 
 describe('requestRefundOffersBody', () => {

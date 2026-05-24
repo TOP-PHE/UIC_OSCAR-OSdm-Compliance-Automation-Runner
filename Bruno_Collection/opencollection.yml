@@ -252,7 +252,7 @@ request:
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
                 "placeSelectionMode", "__placeMapAtOfferFailed",
-                "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
+                "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 // Fulfillment
                 "fulfillmentIds",

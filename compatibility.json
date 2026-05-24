@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.80",
+  "current_release": "2026.81",
   "releases": [
+    {
+      "release": "2026.81",
+      "date": "2026-05-24",
+      "server": "1.11.53",
+      "collection": "OTST_V2.0.10",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#184): availability-aware seat selection. Follow-up to #182. The pre-booking seat-map step (08. GET Place Maps, SEATMAP_AT_OFFER) previously took coaches[0]->compartments[0].place blindly (ignoring availability) and accommodationAndPlaceSelection jammed ALL passengers onto a SINGLE place. Now: library-bruno/requestsBuilder.js collectAvailablePlaces(vehicle, count) (exported, unit-tested) flattens the whole-vehicle place-map response (coach.places, coach.compartments[].places, coach.decks[].places, or a compartment carrying .place), keeps only AVAILABLE places (boolean available/bookable or enum availability/state/status; no info => assumed available) and returns up to count {coachNumber, placeNumber, layoutId}. 08. GET Place Maps derives the passenger count, picks one available place per passenger, stores preselectedPlaces (+ back-compat preselectedCoach/preselectedPlace/layoutId), logs picks and warns if fewer available than passengers. accommodationAndPlaceSelection emits one places entry per passenger when preselectedPlaces is present (pairs passengerRefs[i] with the i-th pick; surplus pax reuse the last place), and the presence of picks enables place selection even without the legacy requiresPlaceSelection flag; single-place back-compat path preserved. preselectedPlaces reset between scenarios/runs. Availability-only (no seat-together optimisation, scope confirmed). No sandbox tested so far serves an OFFER-context seat map (vendors hold seats against a BOOKING, see #182), so this is built to the OSDM spec and unit-tested, not yet live-validated. Bruno_Collection/VERSION OTST_V2.0.9 -> OTST_V2.0.10.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.81 / server-v1.11.53 / OTST_V2.0.10 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.80",
       "date": "2026-05-24",

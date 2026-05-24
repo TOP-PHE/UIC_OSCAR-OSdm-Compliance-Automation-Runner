@@ -88,7 +88,7 @@ function resetScenarioEnvVars() {
     "salesFlow_addAncillary",   "salesFlow_getBooking", "salesFlow_deleteAncillary",
     // Place selection
     "placeSelectionMode", "__placeMapAtOfferFailed",
-    "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
+    "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
     "reservationId", "reservationIds", "tripLegCoverage",
     // Fulfillment
     "fulfillmentIds",

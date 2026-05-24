@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.53] — 2026-05-24
+
+Feat (#184) — availability-aware seat selection: `08. GET Place Maps` now picks
+an **available** place **per passenger** from the seat map instead of blindly
+taking the first place and seating everyone on it. Collection
+**OTST_V2.0.9 → OTST_V2.0.10**.
+
+### Added
+- **`library-bruno/requestsBuilder.js`** — `collectAvailablePlaces(vehicle, count)`
+  (exported, unit-tested): the OSDM place map returns the whole vehicle in one
+  response, so this flattens the coaches (handles `coach.places`,
+  `coach.compartments[].places`, `coach.decks[].places`, and a compartment that
+  itself carries `.place`), keeps only **available** places (boolean
+  `available`/`bookable` or enum `availability`/`state`/`status`; no availability
+  info ⇒ treated as available so minimal vendors aren't excluded), and returns up
+  to `count` `{ coachNumber, placeNumber, layoutId }`.
+
+### Changed
+- **`08. GET Place Maps`**: derives the passenger count, calls
+  `collectAvailablePlaces`, stores `preselectedPlaces` (plus back-compat
+  `preselectedCoach`/`preselectedPlace`/`layoutId`), logs the chosen seats and
+  warns when fewer places are available than passengers.
+- **`accommodationAndPlaceSelection`**: when `preselectedPlaces` is present, emits
+  **one `places` entry per passenger** (pairs `passengerRefs[i]` with the i-th
+  pick; surplus passengers reuse the last place). The presence of picks also
+  enables place selection even when the legacy `requiresPlaceSelection` flag is
+  unset, so a `SEATMAP_AT_OFFER` scenario carries its seats into the booking. The
+  single-place back-compat path is preserved.
+- `preselectedPlaces` reset between scenarios/runs (`opencollection.yml` +
+  `scenarioParser.resetScenarioEnvVars`).
+
+### Notes
+- **Availability-only** (scope confirmed with the requester) — no "seat
+  passengers together" optimisation.
+- No sandbox tested so far serves an OFFER-context seat map (the vendors hold
+  seats against a BOOKING — see #182), so this is built to the OSDM spec and
+  unit-tested; it cannot be live-validated until such a vendor is available.
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.10
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.52] — 2026-05-24
 
 Fix (#182) — adaptive place-selection fallback: when the pre-booking
