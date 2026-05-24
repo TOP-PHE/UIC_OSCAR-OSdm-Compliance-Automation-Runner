@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.78",
+  "current_release": "2026.79",
   "releases": [
+    {
+      "release": "2026.79",
+      "date": "2026-05-24",
+      "server": "1.11.51",
+      "collection": "OTST_V2.0.8",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#180): return booking adapts when a vendor rejects multi-offer bookings, with a trackable vendor-gap assertion. Follow-up to #178: the two-step return offer flow works, but booking both offers in one booking (OSDM-valid) is rejected by Bileto (400 'Too many offers — Only one offer can be booked at a time, for now'). 02. POST Create Booking now, for a return scenario, first attempts the combined booking; on a multi-offer rejection it emits a clearly-named FAILING assertion '[OSDM] Vendor supports booking multiple offers (round trip) in one booking' (+ [VENDOR GAP] log) and falls back to two separate bookings (sep-out outbound, then sep-in inbound; the inbound continues the normal post-booking flow). library-bruno/requestsBuilder.js buildBookingRequest is mode-aware via __returnBookMode (combined/sep-out/sep-in); one-way scenarios unchanged. New env vars outboundBookingId/__returnBookMode reset between scenarios. Bruno_Collection/VERSION OTST_V2.0.7 -> OTST_V2.0.8.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.79 / server-v1.11.51 / OTST_V2.0.8 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.78",
       "date": "2026-05-24",

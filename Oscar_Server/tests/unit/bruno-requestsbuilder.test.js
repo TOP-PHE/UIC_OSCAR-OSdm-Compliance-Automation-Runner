@@ -128,7 +128,7 @@ describe('buildBookingRequest', () => {
     expect(body.passengerSpecifications[0].type).toBe('PERSON');
   });
 
-  test('#178 return: books BOTH the outbound and inbound offers', () => {
+  test('#178 return: first (combined) attempt books BOTH the outbound and inbound offers', () => {
     setEnv({
       requiresPlaceSelection: 'false',
       accommodationSelection: 'NONE',
@@ -147,6 +147,36 @@ describe('buildBookingRequest', () => {
     expect(body.offers[1].offerId).toBe('IN-1');
     expect(body.offers[0].passengerRefs).toEqual(['PAX1']);
     expect(body.offers[1].passengerRefs).toEqual(['PAX1']);
+  });
+
+  test('#180 return fallback: sep-out books only the outbound offer', () => {
+    setEnv({
+      requiresPlaceSelection: 'false', accommodationSelection: 'NONE', api_base: 'https://x',
+      bookingPassengerSpecifications: '[{"externalRef":"PAX1","detail":{"firstName":"A","lastName":"B"}}]',
+      bookingPassengerReferences: '["PAX1"]',
+      bookingPurchaserSpecifications: '{}',
+      outboundOfferId: 'OUT-1', inboundOfferId: 'IN-1', offerId: 'IN-1',
+      __returnBookMode: 'sep-out',
+    });
+    rb.buildBookingRequest();
+    const body = JSON.parse(store.BookingRequest);
+    expect(body.offers).toHaveLength(1);
+    expect(body.offers[0].offerId).toBe('OUT-1');
+  });
+
+  test('#180 return fallback: sep-in books only the inbound offer', () => {
+    setEnv({
+      requiresPlaceSelection: 'false', accommodationSelection: 'NONE', api_base: 'https://x',
+      bookingPassengerSpecifications: '[{"externalRef":"PAX1","detail":{"firstName":"A","lastName":"B"}}]',
+      bookingPassengerReferences: '["PAX1"]',
+      bookingPurchaserSpecifications: '{}',
+      outboundOfferId: 'OUT-1', inboundOfferId: 'IN-1', offerId: 'IN-1',
+      __returnBookMode: 'sep-in',
+    });
+    rb.buildBookingRequest();
+    const body = JSON.parse(store.BookingRequest);
+    expect(body.offers).toHaveLength(1);
+    expect(body.offers[0].offerId).toBe('IN-1');
   });
 });
 
