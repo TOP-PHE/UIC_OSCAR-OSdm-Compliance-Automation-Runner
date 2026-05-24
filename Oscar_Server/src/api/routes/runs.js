@@ -170,9 +170,13 @@ router.post('/', runSubmitLimiter, (req, res) => {
     });
   }
 
-  // Read concurrent session limit from test framework config
+  // Read concurrent session limit from test framework config.
+  // The config column is encrypted at rest (Phase 2 of issue #60) — it MUST be
+  // colDecrypt()'d before JSON.parse, or parsing the ciphertext throws and the
+  // limit silently falls back to 1, serialising every company's runs (the
+  // concurrency bug). colDecrypt() passes legacy plaintext through unchanged.
   const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
-  let fwConfig = tfRow ? (() => { try { return JSON.parse(tfRow.config); } catch (_) { return {}; } })() : {};
+  let fwConfig = tfRow ? (() => { try { return JSON.parse(colDecrypt(tfRow.config)); } catch (_) { return {}; } })() : {};
   // Handle double-nested config (legacy: { config: { concurrentSessionLimit: N } })
   if (fwConfig.config && typeof fwConfig.config === 'object' && !Array.isArray(fwConfig.config)) {
     fwConfig = fwConfig.config;
@@ -563,7 +567,8 @@ router.get('/queue-status', (req, res) => {
   const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
   let concurrentLimit = 1;
   if (tfRow) {
-    try { concurrentLimit = JSON.parse(tfRow.config).concurrentSessionLimit || 1; } catch (_) {}
+    // config is encrypted at rest — decrypt before parsing (see POST / above).
+    try { concurrentLimit = JSON.parse(colDecrypt(tfRow.config)).concurrentSessionLimit || 1; } catch (_) {}
   }
 
   // Get all QUEUED + RUNNING runs for this company

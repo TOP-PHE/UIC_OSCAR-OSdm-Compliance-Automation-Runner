@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.47] — 2026-05-23
+
+Fix (#171) — restore per-company concurrent runs. Enhancement (#172) — new
+scenarios default to a minimal offer search (O&D + departure date only).
+
+### Fixed
+- **`src/api/routes/runs.js`**: the per-company concurrent-run limit was always
+  `1`, so batch runs serialized regardless of the configured value (e.g. Bileto
+  set to 3 with a global cap of 9 still ran one-by-one). The test-framework
+  `config` column is **encrypted at rest** (Phase 2 of #60), but both the
+  run-submit path and the queue-status path read it with a plain
+  `JSON.parse(tfRow.config)` — no `colDecrypt` — so parsing the ciphertext threw
+  and `concurrentSessionLimit` fell back to `1`. Both reads now `colDecrypt()`
+  first (legacy plaintext still passes through). The queue's per-company
+  throttle was already correct; it was simply being fed a limit of 1.
+
+### Changed
+- **`public/js/scenarios.js`** (`wizInitScenario`): a new scenario no longer
+  pre-seeds the offer-search criteria (requestedOfferParts, service/travel
+  classes, flexibilities, offerMode, currency) from the framework defaults.
+  They start **empty**, so a search-based scenario sends only the trip (origin +
+  destination + departure date) and an empty `offerSearchCriteria` — the vendor
+  returns its full default offer. Every criterion remains optional and tickable
+  in the wizard; fulfillment defaults (booking, not search) are unchanged.
+
+### Operator action
+None. The concurrency fix takes effect for runs submitted after Watchtower
+promotes :stable. Hard-refresh the Test Config page for the scenario-default
+change.
+
+---
+
 ## [server-v1.11.46] — 2026-05-23
 
 Enhancement (#169) — Timetable Discovery splits a route into separate train sets

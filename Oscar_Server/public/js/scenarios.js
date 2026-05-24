@@ -4152,18 +4152,18 @@ function wizInitScenario() {
     originURN:          '',
     destinationURN:     '',
     passengers,
-    // Per OSDM spec, every offer-search criterion is OPTIONAL. The wizard
-    // pre-fills only from the company's Test Framework defaults — if the
-    // framework leaves a field empty, we leave it empty here too, so the
-    // generated scenario sends nothing for it (and the vendor applies its
-    // own server-side default). Users can still type/tick values in the
-    // wizard to override.
-    requestedOfferParts: (fw.offerCriteria && fw.offerCriteria.requestedOfferParts) ? [...fw.offerCriteria.requestedOfferParts] : [],
-    serviceClasses:      (fw.offerCriteria && fw.offerCriteria.serviceClasses)      ? [...fw.offerCriteria.serviceClasses]      : [],
-    travelClasses:       (fw.offerCriteria && fw.offerCriteria.travelClasses)       ? [...fw.offerCriteria.travelClasses]       : [],
-    flexibilities:       (fw.offerCriteria && fw.offerCriteria.flexibilities)       ? [...fw.offerCriteria.flexibilities]       : [],
-    offerMode:           (fw.offerCriteria && fw.offerCriteria.offerMode)           || '',
-    currency:            (fw.offerCriteria && fw.offerCriteria.currency)            || '',
+    // Per OSDM spec, every offer-search criterion is OPTIONAL. By default a new
+    // scenario sends ONLY the trip (origin + destination + departure date) and
+    // NO offer criteria — an empty offerSearchCriteria, so the vendor returns
+    // its full default offer. The tester ticks any criterion in the wizard to
+    // constrain the search. (#172 — framework offer-criteria defaults are no
+    // longer auto-applied; they remain selectable in the wizard.)
+    requestedOfferParts: [],
+    serviceClasses:      [],
+    travelClasses:       [],
+    flexibilities:       [],
+    offerMode:           '',
+    currency:            '',
     fulfillmentTypes:    (fw.fulfillment && fw.fulfillment.types) ? [...fw.fulfillment.types] : ['ETICKET'],
     fulfillmentMedia:    (fw.fulfillment && fw.fulfillment.media) ? [...fw.fulfillment.media] : ['PDF_A4']
   };
