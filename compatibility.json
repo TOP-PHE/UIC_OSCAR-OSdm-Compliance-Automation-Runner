@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.80",
+  "current_release": "2026.81",
   "releases": [
+    {
+      "release": "2026.81",
+      "date": "2026-05-24",
+      "server": "1.11.53",
+      "collection": "OTST_V2.0.10",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#184): availability-aware seat selection at BOTH selection times (pre-booking OFFER context and post-booking BOOKING context). Follow-up to #182. Previously 08. GET Place Maps (SEATMAP_AT_OFFER) took coaches[0]->compartments[0].place blindly (ignoring availability) and accommodationAndPlaceSelection jammed ALL passengers onto a SINGLE place; the post-booking add-reservation fetched no map and let the system auto-assign. Now: library-bruno/requestsBuilder.js collectAvailablePlaces(vehicle, count) (exported, unit-tested) flattens the whole-vehicle place-map response (coach.places, coach.compartments[].places, coach.decks[].places, or a compartment carrying .place), keeps only AVAILABLE places (boolean available/bookable or enum availability/state/status; no info => assumed available) and returns up to count {coachNumber, placeNumber, layoutId}; placesForPassengers(picked, refs) (exported, unit-tested) maps them one places[] entry per passenger (surplus pax reuse the last place). 08. GET Place Maps (OFFER context) derives passenger count, picks one available place per passenger into preselectedPlaces (+ back-compat singles). New 08b. GET Place Map Post-Booking issues GET /availabilities/place-map?contextType=BOOKING&contextId={bookingId}&resourceId={reservationId}&resourceType=RESERVATION; it runs in ADD_TO_BOOKING mode or as the #182 fallback, routed 02. POST Create Booking -> 08b -> 09. POST Add Reservation, reuses collectAvailablePlaces, and 09 now carries placeSelections.places (one per passenger) instead of auto-assigning. 08b is best-effort: a vendor with no BOOKING-context map is reported via a trackable assertion '[OSDM] Vendor serves a post-booking (BOOKING-context) seat map' (+ [VENDOR GAP] log) and the flow still completes (system assigns). accommodationAndPlaceSelection emits one places entry per passenger when preselectedPlaces is present, and picks enable place selection even without the legacy requiresPlaceSelection flag; single-place back-compat preserved. opencollection.yml smart-run filter gates the OFFER-context map (pre-booking) and BOOKING-context map (post-booking, needs a booking, once) independently. preselectedPlaces / __postBookingPlaceMapDone reset between scenarios/runs. Availability-only (no seat-together optimisation, scope confirmed). No sandbox tested so far serves a place map in either context (vendors hold seats against a BOOKING, see #182), so this is spec-built and unit-tested, not yet live-validated. Bruno_Collection/VERSION OTST_V2.0.9 -> OTST_V2.0.10.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.81 / server-v1.11.53 / OTST_V2.0.10 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.80",
       "date": "2026-05-24",

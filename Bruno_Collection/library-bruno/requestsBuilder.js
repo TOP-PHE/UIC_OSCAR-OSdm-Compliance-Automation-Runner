@@ -5,6 +5,8 @@ module.exports = {
   buildReturnOfferCollectionRequest,
   buildBookingRequest,
   accommodationAndPlaceSelection,
+  collectAvailablePlaces,
+  placesForPassengers,
   requestRefundOffersBody,
   requestExchangeOffersBody,
   requestExchangeOperationsBody
@@ -161,6 +163,92 @@ function buildBookingRequest() {
   bru.setEnvVar("BookingRequest", JSON.stringify(body));
 }
 
+// Walk a PlaceAvailability "vehicle" (08. GET Place Maps response) and return up
+// to `count` AVAILABLE places as { coachNumber, placeNumber, layoutId }.
+//
+// The OSDM seat-map response returns the WHOLE vehicle in one payload (all
+// coaches, each with its places), so an automated runner has full visibility at
+// once — there is no "show coach, then drill into seats" round-trip. We flatten
+// the coaches, keep only available places, and pick the first `count`.
+//
+// No sandbox has served an OFFER-context seat map yet (issue #182 — the vendors
+// we test hold seats against a BOOKING and expose no offer-time map), so this is
+// built to the OSDM spec and is deliberately DEFENSIVE about the exact shape:
+//   - a coach's places may sit at coach.places, coach.compartments[].places,
+//     coach.decks[].places, or a compartment object may itself carry .place
+//     (the shape the original stub assumed);
+//   - availability may be a boolean (available/bookable) or an enum
+//     (availability/state/status). A place with NO availability info is treated
+//     as available so minimal vendors are not excluded by accident.
+// Availability-only (no "seat passengers together" optimisation — issue #182
+// follow-up, scope confirmed with the user).
+function collectAvailablePlaces(vehicle, count) {
+  const out = [];
+  if (!vehicle || typeof vehicle !== "object" || !Array.isArray(vehicle.coaches)) return out;
+  const want = Math.max(1, parseInt(count, 10) || 1);
+
+  const isAvailable = (p) => {
+    if (!p || typeof p !== "object") return false;
+    if (p.available === false || p.bookable === false || p.reserved === true || p.occupied === true) return false;
+    if (p.available === true || p.bookable === true) return true;
+    const s = String(p.availability || p.state || p.status || "").toUpperCase();
+    if (s) return s === "AVAILABLE" || s === "FREE" || s === "BOOKABLE" || s === "OPEN";
+    return true; // no availability info → assume available
+  };
+
+  const placeId = (p) => {
+    if (!p || typeof p !== "object") return null;
+    if (p.place != null) return p.place;
+    if (p.placeNumber != null) return p.placeNumber;
+    if (p.number != null) return p.number;
+    return null;
+  };
+
+  const placesOf = (coach) => {
+    if (Array.isArray(coach.places)) return coach.places;
+    const acc = [];
+    if (Array.isArray(coach.compartments)) {
+      coach.compartments.forEach((c) => {
+        if (Array.isArray(c && c.places)) acc.push(...c.places);
+        else if (c && c.place != null) acc.push(c); // compartment IS a place (legacy stub shape)
+      });
+    }
+    if (Array.isArray(coach.decks)) {
+      coach.decks.forEach((d) => { if (Array.isArray(d && d.places)) acc.push(...d.places); });
+    }
+    return acc;
+  };
+
+  for (let ci = 0; ci < vehicle.coaches.length && out.length < want; ci++) {
+    const coach = vehicle.coaches[ci];
+    if (!coach || typeof coach !== "object") continue;
+    const places = placesOf(coach);
+    for (let pi = 0; pi < places.length && out.length < want; pi++) {
+      const p = places[pi];
+      if (!isAvailable(p)) continue;
+      const pid = placeId(p);
+      if (pid == null) continue;
+      out.push({ coachNumber: coach.coachNumber, placeNumber: pid, layoutId: coach.layoutId });
+    }
+  }
+  return out;
+}
+
+// Map availability-picked places onto passengers — one places[] entry per
+// passenger (issue #184). Pairs passengerRefs[i] with the i-th picked place; if
+// fewer places were available than passengers, the surplus reuse the last place
+// (best-effort). Shared by accommodationAndPlaceSelection (pre-booking, into the
+// booking request) and 09. POST Add Reservation (post-booking, BOOKING-context
+// seat map). Returns [] when there is nothing to assign.
+function placesForPassengers(picked, passengerRefs) {
+  const refs = Array.isArray(passengerRefs) ? passengerRefs : [];
+  if (!Array.isArray(picked) || picked.length === 0 || refs.length === 0) return [];
+  return refs.map((ref, i) => {
+    const pk = picked[i] || picked[picked.length - 1];
+    return { passengerRefs: [ref], coachNumber: pk.coachNumber, placeNumber: pk.placeNumber };
+  });
+}
+
 // Function to handle place selections
 function accommodationAndPlaceSelection() {
   validationLogger("[INFO] ➤ accommodationAndPlaceSelection");
@@ -168,7 +256,15 @@ function accommodationAndPlaceSelection() {
   const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
 
-  if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true" && accommodationSelection !== "COUCHETTE") {
+  // Availability-aware picks produced by 08. GET Place Maps (one AVAILABLE place
+  // per passenger). Their presence ALSO enables place selection, so a
+  // SEATMAP_AT_OFFER scenario that did not set the legacy requiresPlaceSelection
+  // flag still carries its chosen seats into the booking.
+  const preselectedPlaces = parseEnvJson("preselectedPlaces", []);
+  const hasPicks = Array.isArray(preselectedPlaces) && preselectedPlaces.length > 0;
+
+  if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true"
+      && accommodationSelection !== "COUCHETTE" && !hasPicks) {
     bru.setEnvVar("placeSelections", JSON.stringify([]));
     return;
   }
@@ -176,7 +272,8 @@ function accommodationAndPlaceSelection() {
   const tripLegCoverageArr = parseEnvJson("tripLegCoverage", []);
   const tripId = tripLegCoverageArr.length > 0 ? tripLegCoverageArr[0].tripId : "";
   const legId = tripLegCoverageArr.length > 0 ? tripLegCoverageArr[0].legId : "";
-  const passengerRefs = parseEnvJson("bookingPassengerReferences");
+  const passengerRefsRaw = parseEnvJson("bookingPassengerReferences", []);
+  const passengerRefs = Array.isArray(passengerRefsRaw) ? passengerRefsRaw : [];
 
   const placeSelection = {
     reservationId: bru.getEnvVar("reservationId"),
@@ -192,7 +289,11 @@ function accommodationAndPlaceSelection() {
     }];
   }
 
-  if (requiresPlaceSelection === true || requiresPlaceSelection === "true") {
+  if (hasPicks) {
+    // One AVAILABLE place per passenger (shared with the post-booking path).
+    placeSelection.places = placesForPassengers(preselectedPlaces, passengerRefs);
+  } else if (requiresPlaceSelection === true || requiresPlaceSelection === "true") {
+    // Back-compat: a single preselected coach/place applied to all passengers.
     placeSelection.places = [{
       passengerRefs,
       coachNumber: bru.getEnvVar("preselectedCoach"),

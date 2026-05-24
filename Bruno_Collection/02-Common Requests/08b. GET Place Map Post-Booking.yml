@@ -1,0 +1,105 @@
+info:
+  name: 08b. GET Place Map Post-Booking
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{api_base}}/availabilities/place-map?contextId={{bookingId}}&contextType=BOOKING&resourceId={{reservationId}}&resourceType=RESERVATION"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Requestor
+      value: "{{requestor}}"
+  params:
+    - name: contextId
+      value: "{{bookingId}}"
+      type: query
+    - name: contextType
+      value: BOOKING
+      type: query
+    - name: resourceId
+      value: "{{reservationId}}"
+      type: query
+    - name: resourceType
+      value: RESERVATION
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+    - type: after-response
+      code: |-
+        // Post-booking seat map (#184 follow-up). The OSDM /availabilities/place-map
+        // endpoint is context-parametrised: contextType can be OFFER (pre-booking,
+        // 08. GET Place Maps) or BOOKING (post-booking, this request). Providers
+        // that hold seats against a BOOKING rather than an OFFER (e.g. Bileto —
+        // see #182) expose the seat map only here, after pre-booking. This runs in
+        // ADD_TO_BOOKING mode or as the #182 fallback (offer-time map unavailable),
+        // AFTER 02. POST Create Booking and BEFORE 09. POST Add Reservation, so the
+        // chosen places feed the add-reservation. It is best-effort: a vendor that
+        // does not serve a BOOKING-context map is reported (trackable) but does not
+        // abort the flow — 09 then lets the system auto-assign.
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validatePlaceAvailability } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        const { collectAvailablePlaces } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+
+        const endpoint = '/availabilities/place-map?contextType=BOOKING';
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status (best-effort, trackable) ───────────────────────────────
+        const _va = body && body.vehicleAvailability;
+        const _postSeatMapOk = (statusCode === 200) && !!_va;
+        if (_postSeatMapOk) {
+          bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[INFO] GET ${endpoint} → 200 OK`);
+        } else {
+          // Trackable vendor-capability finding (intentionally FAILS), like #182.
+          // The booking still proceeds; 09 will let the system assign a place.
+          bruTest("[OSDM] Vendor serves a post-booking (BOOKING-context) seat map", () => {
+            expect(_postSeatMapOk, `No post-booking seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Proceeding to add-reservation; the system will assign a place.`).to.be.true;
+          });
+          validationLogger(`[WARNING] GET ${endpoint} → ${statusCode}${_va ? "" : " (no vehicleAvailability)"} — proceeding without explicit place picks.`);
+          console.log("⚠️ [VENDOR GAP] No post-booking (BOOKING-context) seat map — letting the system assign the place at add-reservation.");
+        }
+
+        // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
+        validatePlaceAvailability(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+        });
+
+        // ── Availability-aware selection → feeds 09. POST Add Reservation ──
+        // Same algorithm as pre-booking: one AVAILABLE place per passenger.
+        const vehicle = _va && _va.vehicle;
+        let _paxCount = 0;
+        try { _paxCount = (JSON.parse(bru.getEnvVar("bookingPassengerReferences") || "[]") || []).length; } catch (_e) {}
+        if (!_paxCount) _paxCount = parseInt(bru.getEnvVar("passengerCount"), 10) || 1;
+        const _picked = collectAvailablePlaces(vehicle, _paxCount);
+        if (_picked.length > 0) {
+          bru.setEnvVar("preselectedPlaces", JSON.stringify(_picked));
+          bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
+          bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
+          if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
+          console.log("✅ [PLACES] Post-booking: selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          if (_picked.length < _paxCount) {
+            validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
+          }
+        }
+
+        // Mark done so the smart-run filter does not re-run this step, then
+        // continue to the add-reservation (which carries the picks, if any).
+        bru.setEnvVar("__postBookingPlaceMapDone", "true");
+        bru.runner.setNextRequest("09. POST Add Reservation to Booking");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
