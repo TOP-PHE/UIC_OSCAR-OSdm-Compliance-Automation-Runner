@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.49] — 2026-05-23
+
+Fix (#176) — return trips are now valid OSDM (move from a bogus
+`offerSearchCriteria.inboundDate` to `tripSearchCriteria.returnSearchParameters`)
+and defined as a day-offset instead of an absolute date. Collection
+**OTST_V2.0.5 → OTST_V2.0.6**.
+
+### Fixed
+- **`Bruno_Collection/library-bruno/scenarioParser.js`**: the return date was
+  written to `offerSearchCriteria.inboundDate`, but `inboundDate` is not an OSDM
+  field and `OfferSearchCriteria` is `additionalProperties:false` — so the whole
+  request was invalid and spec-strict vendors (e.g. Bileto) rejected it with
+  **400**. The return is now expressed the OSDM way:
+  `returnSearchParameters.inwardReturnDate` on the **tripSearchCriteria** (SEARCH)
+  / **tripSpecification** (SPECIFICATION).
+
+### Changed
+- **Return trip is now a day-offset, not an absolute date.** Outbound dates are
+  resolved dynamically at run time, so the return is derived:
+  `inwardReturnDate = outbound departure date + N days` (default suggestion 2,
+  for night trains; `0` = same day). The time mirrors the outbound departure
+  time-of-day (with an optional `HH:MM` override), and the trailing timezone
+  offset is mirrored from the outbound so the format matches the vendor exactly.
+- **`public/js/scenarios.js`**: the scenario Offer Search Criteria editor
+  replaces the "Inbound Date" date-picker with a **Return trip** day-offset field
+  (empty = one-way) + an optional **Return time** override. Stored as
+  `returnOffsetDays` / `returnTime` (authoring data only — routed to the trip,
+  never echoed into the OSDM offerSearchCriteria).
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.6 after
+Watchtower restarts. Hard-refresh the Test Config page; re-set the return on any
+scenario that used the old (broken) inbound date.
+
+---
+
 ## [server-v1.11.48] — 2026-05-23
 
 Enhancement (#174) — collapsible detailed run report: foldable logs, two-level

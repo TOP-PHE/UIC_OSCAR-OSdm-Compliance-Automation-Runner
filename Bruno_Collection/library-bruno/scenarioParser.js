@@ -21,7 +21,8 @@ module.exports = {
   osdmTripSearchCriteria,
   osdmTripSpecification,
   osdmOfferSearchCriteria,
-  osdmFulfillmentOptions
+  osdmFulfillmentOptions,
+  buildReturnSearchParameters
 };
 
 // Resolve the optional intermediate booking-flow actions for a scenario.
@@ -490,7 +491,7 @@ function parseScenarioData(jsonData) {
                 ));
               });
 
-              osdmTripSpecification(legDefinitions);
+              osdmTripSpecification(legDefinitions, returnOptsFromScenario(scenario));
               break;
 
             case "SEARCH":
@@ -517,7 +518,7 @@ function parseScenarioData(jsonData) {
                   tripRequirement.trip.vehicleNumber,
                   tripRequirement.trip.operatorCode
                 )
-              ]);
+              ], returnOptsFromScenario(scenario));
               break;
           }
           return true;
@@ -682,14 +683,13 @@ function parseScenarioData(jsonData) {
           criteria.serviceClass || null,
           criteria.travelClass || null,
           criteria.productTags || null,
-          criteria.productSelections || null,
-          criteria.inboundDate || null
+          criteria.productSelections || null
         );
       } else {
         // Legacy scenario without any offerSearchCriteria — use safe defaults
         validationLogger(`[WARN] No offerSearchCriteria on scenario '${scenario.code}' — using defaults.`);
         osdmOfferSearchCriteria('EUR', 'INDIVIDUAL', ['ADMISSION', 'RESERVATION'],
-          null, null, null, null, null, null);
+          null, null, null, null, null);
       }
 
       // Requested fulfillment options
@@ -727,7 +727,7 @@ function parseScenarioData(jsonData) {
 }
 
 // Function to set trip search criteria
-function osdmTripSearchCriteria(legDefinitions) {
+function osdmTripSearchCriteria(legDefinitions, returnOpts) {
   test('Trip Search Criteria has at least one leg', function () {
     expect(legDefinitions).to.be.an("array");
     expect(legDefinitions.length).to.be.above(0);
@@ -784,11 +784,15 @@ function osdmTripSearchCriteria(legDefinitions) {
     );
   }
 
+  // Return trip (#176): derive inwardReturnDate from the outbound departure.
+  const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, _startDateTime);
+  if (rsp) tripSearchCriteria.returnSearchParameters = rsp;
+
   bru.setEnvVar("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
 }
 
 // Function to set trip specifications
-function osdmTripSpecification(legDefinitions) {
+function osdmTripSpecification(legDefinitions, returnOpts) {
   test('Trip Specification has at least one leg', function () {
     expect(legDefinitions).to.be.an("array");
     expect(legDefinitions.length).to.be.above(0);
@@ -798,6 +802,7 @@ function osdmTripSpecification(legDefinitions) {
   bru.setEnvVar(TRIP.EXTERNAL_REF, randomUUID());
 
   const legSpecs = [];
+  let outboundStartDateTime = null;   // first leg's departure — basis for the return date
 
   for (let n = 1; n <= legDefinitions.length; n++) {
     const legKey = TRIP.LEG_SPECIFICATION_REF_PATTERN.replace("%LEG_COUNT%", n);
@@ -806,6 +811,7 @@ function osdmTripSpecification(legDefinitions) {
     // TripSpecifications should use OffsetDateTime and must not use trailing Z.
     const _specStartDateTime = toOffsetDateTime(legDef.startDateTime);
     const _specEndDateTime = toOffsetDateTime(legDef.endDateTime);
+    if (n === 1) outboundStartDateTime = _specStartDateTime;
 
     if (_specStartDateTime !== legDef.startDateTime || _specEndDateTime !== legDef.endDateTime) {
       validationLogger(
@@ -842,7 +848,52 @@ function osdmTripSpecification(legDefinitions) {
     legSpecs
   );
 
+  // Return trip (#176): derive inwardReturnDate from the first leg's departure.
+  const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, outboundStartDateTime);
+  if (rsp) tripSpecification.returnSearchParameters = rsp;
+
   bru.setEnvVar("offerTripSpecifications", JSON.stringify([tripSpecification]));
+}
+
+// Return trip (#176): OSDM expresses a return via TripSearchCriteria /
+// TripSpecification → returnSearchParameters.inwardReturnDate — NOT inside
+// offerSearchCriteria (which is strict; an unknown field like the old
+// `inboundDate` 400s on spec-strict vendors such as Bileto). The return date is
+// DERIVED from the dynamically-resolved outbound departure: outbound date +
+// offsetDays, at the outbound departure time-of-day (or an optional HH:MM
+// override). The trailing offset (e.g. +00:00 for Bileto, none otherwise) is
+// mirrored from the outbound so the format matches the outbound exactly.
+// Returns { inwardReturnDate } or null (one-way / unparseable).
+function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
+  if (offsetDays == null || offsetDays === '') return null;
+  const offset = parseInt(offsetDays, 10);
+  if (!Number.isInteger(offset) || offset < 0) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2}:\d{2})(.*)$/.exec(String(outboundStart || ''));
+  if (!m) {
+    validationLogger(`[WARN] Return trip skipped — could not parse outbound datetime "${outboundStart}"`);
+    return null;
+  }
+  const tz = m[5] || '';
+  let timePart = m[4];
+  if (typeof returnTime === 'string' && /^\d{2}:\d{2}$/.test(returnTime.trim())) {
+    timePart = returnTime.trim() + ':00';
+  }
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  d.setUTCDate(d.getUTCDate() + offset);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const inwardReturnDate = `${yyyy}-${mm}-${dd}T${timePart}${tz}`;
+  validationLogger(`[INFO] 🔁 Return trip — inwardReturnDate "${inwardReturnDate}" (outbound "${outboundStart}" + ${offset} day(s))`);
+  return { inwardReturnDate };
+}
+
+// Read the return-trip options the OSCAR scenario stores on offerSearchCriteria
+// (returnOffsetDays + optional returnTime). These are authoring data only — they
+// are routed to the TRIP, never echoed into the OSDM offerSearchCriteria.
+function returnOptsFromScenario(scenario) {
+  const c = (scenario && scenario.offerSearchCriteria) || {};
+  return { offsetDays: c.returnOffsetDays, time: c.returnTime };
 }
 
 // Function to set offer search criteria
@@ -855,7 +906,6 @@ function osdmOfferSearchCriteria(
   travelClasses,
   productTags,
   productSelections,
-  inboundDate,
 ) {
   const offerSearchCriteria = {};
 
@@ -882,9 +932,6 @@ function osdmOfferSearchCriteria(
   }
   if (Array.isArray(productSelections) && productSelections.length > 0) {
     offerSearchCriteria.productSelections = productSelections;
-  }
-  if (inboundDate != null && inboundDate !== '') {
-    offerSearchCriteria.inboundDate = inboundDate;
   }
 
   bru.setEnvVar("offerSearchCriteria", JSON.stringify(offerSearchCriteria));

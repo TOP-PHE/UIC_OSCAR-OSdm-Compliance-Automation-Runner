@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.76",
+  "current_release": "2026.77",
   "releases": [
+    {
+      "release": "2026.77",
+      "date": "2026-05-23",
+      "server": "1.11.49",
+      "collection": "OTST_V2.0.6",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#176): return trips are now valid OSDM and defined as a day-offset. The return date was written to offerSearchCriteria.inboundDate, but inboundDate is not an OSDM field and OfferSearchCriteria is additionalProperties:false, so the whole request was invalid and spec-strict vendors (e.g. Bileto) rejected it with 400 — it was our bug, not a Bileto limitation. Bruno_Collection/library-bruno/scenarioParser.js now expresses the return the OSDM way: returnSearchParameters.inwardReturnDate on tripSearchCriteria (SEARCH) / tripSpecification (SPECIFICATION). The return is derived as outbound departure date + N days (default suggestion 2, for night trains; 0 = same day), with the time mirroring the outbound departure time-of-day (optional HH:MM override) and the trailing timezone offset mirrored from the outbound. public/js/scenarios.js replaces the absolute 'Inbound Date' picker with a 'Return trip' day-offset field (empty = one-way) + optional 'Return time'; stored as returnOffsetDays/returnTime (authoring data only, routed to the trip, never echoed into the OSDM offerSearchCriteria). Bruno_Collection/VERSION OTST_V2.0.5 -> OTST_V2.0.6.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.77 / server-v1.11.49 / OTST_V2.0.6 after Watchtower restarts. Re-set the return on any scenario that used the old (broken) inbound date."
+      ]
+    },
     {
       "release": "2026.76",
       "date": "2026-05-23",

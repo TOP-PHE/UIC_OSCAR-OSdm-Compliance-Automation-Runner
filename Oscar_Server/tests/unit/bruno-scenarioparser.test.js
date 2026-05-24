@@ -46,7 +46,7 @@ describe('osdmOfferSearchCriteria', () => {
   test('includes every provided field', () => {
     sp.osdmOfferSearchCriteria(
       'EUR', 'INDIVIDUAL', [{ type: 'ADMISSION' }], ['NON_FLEXIBLE'],
-      ['NOT_APPLICABLE'], ['FIRST'], ['tag1'], [{ productId: 'P1' }], '2026-06-01'
+      ['NOT_APPLICABLE'], ['FIRST'], ['tag1'], [{ productId: 'P1' }]
     );
     const out = JSON.parse(envStore.offerSearchCriteria);
     expect(out.currency).toBe('EUR');
@@ -57,11 +57,14 @@ describe('osdmOfferSearchCriteria', () => {
     expect(out.travelClasses).toEqual(['FIRST']);
     expect(out.productTags).toEqual(['tag1']);
     expect(out.productSelections).toEqual([{ productId: 'P1' }]);
-    expect(out.inboundDate).toBe('2026-06-01');
+    // #176: a return trip is NOT expressed in offerSearchCriteria (the old
+    // inboundDate field was invalid OSDM and 400'd on strict vendors). It now
+    // lives in tripSearchCriteria.returnSearchParameters.
+    expect(out).not.toHaveProperty('inboundDate');
   });
 
   test('omits empty / absent fields → {}', () => {
-    sp.osdmOfferSearchCriteria('', '', [], [], [], [], [], [], '');
+    sp.osdmOfferSearchCriteria('', '', [], [], [], [], [], []);
     expect(JSON.parse(envStore.offerSearchCriteria)).toEqual({});
   });
 
@@ -75,6 +78,42 @@ describe('osdmOfferSearchCriteria', () => {
     const out = JSON.parse(envStore.offerSearchCriteria);
     expect(out).not.toHaveProperty('requestedOfferParts');
     expect(out.currency).toBe('EUR');
+  });
+});
+
+// ── Return trip (#176) ───────────────────────────────────────────────────────
+describe('buildReturnSearchParameters', () => {
+  test('derives inwardReturnDate = outbound date + offset, mirroring the outbound time + offset', () => {
+    // Non-Bileto outbound = LocalDateTime (no offset). Default offset 2 days.
+    const r = sp.buildReturnSearchParameters(2, '', '2026-05-30T09:10:00');
+    expect(r).toEqual({ inwardReturnDate: '2026-06-01T09:10:00' });
+  });
+
+  test('mirrors the outbound timezone offset (Bileto OffsetDateTime form)', () => {
+    const r = sp.buildReturnSearchParameters(1, '', '2026-05-30T09:10:00+00:00');
+    expect(r).toEqual({ inwardReturnDate: '2026-05-31T09:10:00+00:00' });
+  });
+
+  test('applies an explicit HH:MM time override', () => {
+    const r = sp.buildReturnSearchParameters(2, '18:30', '2026-05-30T09:10:00');
+    expect(r).toEqual({ inwardReturnDate: '2026-06-01T18:30:00' });
+  });
+
+  test('offset 0 = same day as the outbound', () => {
+    const r = sp.buildReturnSearchParameters(0, '', '2026-05-30T09:10:00');
+    expect(r.inwardReturnDate).toBe('2026-05-30T09:10:00');
+  });
+
+  test('crosses month boundaries', () => {
+    const r = sp.buildReturnSearchParameters(3, '', '2026-05-30T07:00:00');
+    expect(r.inwardReturnDate).toBe('2026-06-02T07:00:00');
+  });
+
+  test('returns null for one-way (no offset) or unparseable outbound', () => {
+    expect(sp.buildReturnSearchParameters(null, '', '2026-05-30T09:10:00')).toBeNull();
+    expect(sp.buildReturnSearchParameters('', '', '2026-05-30T09:10:00')).toBeNull();
+    expect(sp.buildReturnSearchParameters(2, '', 'not-a-date')).toBeNull();
+    expect(sp.buildReturnSearchParameters(-1, '', '2026-05-30T09:10:00')).toBeNull();
   });
 });
 

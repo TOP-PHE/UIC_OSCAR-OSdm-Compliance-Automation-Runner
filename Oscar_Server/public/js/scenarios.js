@@ -2044,9 +2044,14 @@ function buildOfferSection(idx, sc) {
           data-action="set-offer-tags" data-idx="${esc(idx)}">
       </div>
       <div class="param-field">
-        <span class="param-label">Inbound Date <span class="param-hint">(optional) — return trip date</span></span>
-        <input class="param-input" type="datetime-local" value="${esc(criteria.inboundDate||'')}"
-          data-action="set-offer-inbound" data-idx="${esc(idx)}">
+        <span class="param-label">Return trip <span class="param-hint">(optional) — days after the outbound. Empty = one-way · 0 = same day · e.g. 2</span></span>
+        <input class="param-input" type="number" min="0" max="30" value="${esc(criteria.returnOffsetDays != null ? criteria.returnOffsetDays : '')}" placeholder="e.g. 2 (leave empty for one-way)"
+          data-action="set-offer-return-offset" data-idx="${esc(idx)}">
+      </div>
+      <div class="param-field">
+        <span class="param-label">Return time <span class="param-hint">(optional) — HH:MM; defaults to the outbound departure time</span></span>
+        <input class="param-input" type="time" value="${esc(criteria.returnTime||'')}"
+          data-action="set-offer-return-time" data-idx="${esc(idx)}">
       </div>
     </div>
 
@@ -5980,8 +5985,15 @@ document.body.addEventListener('input', function(e) {
       setOfferField(parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
       break;
     }
-    case 'set-offer-inbound':
-      setOfferField(parseInt(el.dataset.idx), 'inboundDate', el.value || null); break;
+    case 'set-offer-return-offset': {
+      const v = el.value.trim();
+      const n = parseInt(v, 10);
+      // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
+      setOfferField(parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
+      break;
+    }
+    case 'set-offer-return-time':
+      setOfferField(parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
     case 'set-offer-selections': {
       try {
         const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;
