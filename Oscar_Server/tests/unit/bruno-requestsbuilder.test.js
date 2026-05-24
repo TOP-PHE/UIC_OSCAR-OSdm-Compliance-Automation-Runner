@@ -127,6 +127,73 @@ describe('buildBookingRequest', () => {
     const body = JSON.parse(store.BookingRequest);
     expect(body.passengerSpecifications[0].type).toBe('PERSON');
   });
+
+  test('#178 return: books BOTH the outbound and inbound offers', () => {
+    setEnv({
+      requiresPlaceSelection: 'false',
+      accommodationSelection: 'NONE',
+      api_base: 'https://x',
+      bookingPassengerSpecifications: '[{"externalRef":"PAX1","detail":{"firstName":"A","lastName":"B"}}]',
+      bookingPassengerReferences: '["PAX1"]',
+      bookingPurchaserSpecifications: '{"detail":{"firstName":"P"}}',
+      outboundOfferId: 'OUT-1',
+      inboundOfferId: 'IN-1',
+      offerId: 'IN-1',   // last offer captured = inbound; must NOT shadow the two-offer path
+    });
+    rb.buildBookingRequest();
+    const body = JSON.parse(store.BookingRequest);
+    expect(body.offers).toHaveLength(2);
+    expect(body.offers[0].offerId).toBe('OUT-1');
+    expect(body.offers[1].offerId).toBe('IN-1');
+    expect(body.offers[0].passengerRefs).toEqual(['PAX1']);
+    expect(body.offers[1].passengerRefs).toEqual(['PAX1']);
+  });
+});
+
+describe('buildReturnOfferCollectionRequest (#178)', () => {
+  test('builds the inward request: O&D swapped, departureTime = inwardReturnDate, outwardOfferIds set', () => {
+    setEnv({
+      api_base: 'https://sqills-osdm-test.cloud',
+      offerTripSearchCriteria: JSON.stringify({
+        departureTime: '2026-06-03T09:22:00',
+        origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5457076' },
+        destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5454300' },
+        returnSearchParameters: { inwardReturnDate: '2026-06-05T09:22:00' }
+      }),
+      outboundOfferId: 'OUT-1',
+      offerPassengerSpecifications: '[{"externalRef":"PAX1","type":"PERSON"}]',
+      offerSearchCriteria: '{}',
+      offerFulfillmentOptions: '[{"type":"ETICKET","media":"PDF_A4"}]',
+    });
+    const ok = rb.buildReturnOfferCollectionRequest();
+    expect(ok).toBe(true);
+    const body = JSON.parse(store.ReturnOfferCollectionRequest);
+    expect(body.tripSearchCriteria.departureTime).toBe('2026-06-05T09:22:00');
+    expect(body.tripSearchCriteria.origin.stopPlaceRef).toBe('urn:uic:stn:5454300');      // swapped
+    expect(body.tripSearchCriteria.destination.stopPlaceRef).toBe('urn:uic:stn:5457076'); // swapped
+    expect(body.tripSearchCriteria.returnSearchParameters.outwardOfferIds).toEqual(['OUT-1']);
+    expect(body.tripSearchCriteria.returnSearchParameters.inwardReturnDate).toBeUndefined();
+    expect(body.anonymousPassengerSpecifications).toHaveLength(1);
+    expect(body.requestedFulfillmentOptions[0].type).toBe('ETICKET');
+  });
+
+  test('returns false for a one-way scenario (no returnSearchParameters)', () => {
+    setEnv({
+      api_base: 'https://x',
+      offerTripSearchCriteria: '{"departureTime":"2026-06-03T09:22:00","origin":{},"destination":{}}',
+      outboundOfferId: 'OUT-1',
+    });
+    expect(rb.buildReturnOfferCollectionRequest()).toBe(false);
+    expect(store.ReturnOfferCollectionRequest).toBeUndefined();
+  });
+
+  test('returns false when the outbound offer was not captured', () => {
+    setEnv({
+      api_base: 'https://x',
+      offerTripSearchCriteria: JSON.stringify({ returnSearchParameters: { inwardReturnDate: '2026-06-05T09:22:00' } }),
+    });
+    expect(rb.buildReturnOfferCollectionRequest()).toBe(false);
+  });
 });
 
 describe('accommodationAndPlaceSelection', () => {

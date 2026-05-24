@@ -132,18 +132,37 @@ runtime:
         // is kept as an OR-fallback for backward compatibility. When the gate is
         // off (every current scenario) we route straight to Create Booking and
         // set skipPlaceMaps — the historic behaviour, unchanged.
-        const _psMode   = bru.getEnvVar("placeSelectionMode");
-        const _psOptIn  = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
-        const _reqPlace = bru.getEnvVar("requiresPlaceSelection");
-        const _runPlaceMap = (_psMode === "SEATMAP_AT_OFFER" && _psOptIn)
-                          || (_reqPlace === true || _reqPlace === "true");
+        // ── Two-step return (#178) ────────────────────────────────────────────
+        // On the OUTBOUND offer of a return scenario, capture the chosen outbound
+        // offer and route to the inward (return) offer step BEFORE booking.
+        // Detected from the outbound tripSearchCriteria's
+        // returnSearchParameters.inwardReturnDate (SEARCH returns only).
+        const _isReturn = (function () {
+          try {
+            const t = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+            return !!(t.returnSearchParameters && t.returnSearchParameters.inwardReturnDate);
+          } catch (_) { return false; }
+        })();
 
-        if (_runPlaceMap) {
-          bru.setGlobalEnvVar("skipPlaceMaps", false);
-          bru.runner.setNextRequest("08. GET Place Maps");
-        } else {
-          bru.runner.setNextRequest("02. POST Create Booking");
+        if (_isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
+          bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
           bru.setGlobalEnvVar("skipPlaceMaps", true);
+          console.log("🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
+          bru.runner.setNextRequest("01b. POST Get Return Offer");
+        } else {
+          const _psMode   = bru.getEnvVar("placeSelectionMode");
+          const _psOptIn  = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
+          const _reqPlace = bru.getEnvVar("requiresPlaceSelection");
+          const _runPlaceMap = (_psMode === "SEATMAP_AT_OFFER" && _psOptIn)
+                            || (_reqPlace === true || _reqPlace === "true");
+
+          if (_runPlaceMap) {
+            bru.setGlobalEnvVar("skipPlaceMaps", false);
+            bru.runner.setNextRequest("08. GET Place Maps");
+          } else {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            bru.setGlobalEnvVar("skipPlaceMaps", true);
+          }
         }
 
 settings:

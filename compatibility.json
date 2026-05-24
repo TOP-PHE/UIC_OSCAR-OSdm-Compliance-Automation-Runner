@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.77",
+  "current_release": "2026.78",
   "releases": [
+    {
+      "release": "2026.78",
+      "date": "2026-05-24",
+      "server": "1.11.50",
+      "collection": "OTST_V2.0.7",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#178): full two-step OSDM return trip (inward offer + round-trip booking). Follow-up to #176 (outbound return-aware search). New request 02-Common Requests/01b. POST Get Return Offer: after the outbound offer of a return scenario, 01. POST Get Offer captures the chosen outbound offer (outboundOfferId) and routes to 01b, which POSTs /offers with the trip reversed (O&D swapped, departureTime=inwardReturnDate) and returnSearchParameters.outwardOfferIds=[outboundOfferId], capturing inboundOfferId, then routes to booking. library-bruno/requestsBuilder.js: buildReturnOfferCollectionRequest() builds the inward request; buildBookingRequest() books BOTH offers (offers:[outbound,inbound]) when a return was fetched, else the single offer unchanged. opencollection.yml smart-run filter skips 01b for one-way scenarios and resets the new return env vars (outboundOfferId/inboundOfferId/__returnInboundDone/ReturnOfferCollectionRequest). Detected from the outbound returnSearchParameters.inwardReturnDate so one-way scenarios are unchanged; scoped to SEARCH outbounds. Bruno_Collection/VERSION OTST_V2.0.6 -> OTST_V2.0.7.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.78 / server-v1.11.50 / OTST_V2.0.7 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.77",
       "date": "2026-05-23",
