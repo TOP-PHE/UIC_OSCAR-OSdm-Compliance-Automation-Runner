@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.54] — 2026-05-24
+
+Fix (#186) — plain **seat** scenarios sent an unresolved `{{reservationId}}` to
+the place map, so the vendor returned **400**. Collection
+**OTST_V2.0.10 → OTST_V2.0.11**.
+
+### Fixed
+- **`library-bruno/offers.js`** (`handleAccommodationAndPlaceSelection`): the
+  place map (`08`/`08b`) and add-reservation (`09`) are keyed on a RESERVATION
+  offer-part (`resourceType=RESERVATION`), but `reservationId`/`tripLegCoverage`
+  were only set on the `COUCHETTE`/`BERTH` branch. A plain seat scenario
+  (`SEATMAP_AT_OFFER` / `ADD_TO_BOOKING`, `accommodationSelection = NONE`) never
+  set them, so `08`'s URL contained the literal `{{reservationId}}`
+  (`%7B%7BreservationId%7D%7D`) and the vendor rejected it with `400` (seen on
+  Bileto). Now, for the seat path, when place selection is enabled and
+  `reservationId` isn't already set, it's derived (with `reservationIds` /
+  `tripLegCoverage`) from the offer's **first `reservationOfferPart`**. Offers
+  with no reservation part log "seat map not applicable".
+- **`opencollection.yml`** smart-run filter: defensively **skips** any place-map
+  request when `reservationId` is empty (no reservation → seat map N/A), so a
+  malformed `{{reservationId}}` URL is never sent.
+
+### Note
+The earlier #182 finding ("Bileto serves no offer-time seat map") may have been
+based on this same malformed request — with `reservationId` now resolving, `08`
+sends a valid request, so Bileto's **real** offer-context response can finally be
+observed (re-test recommended).
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.11
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.53] — 2026-05-24
 
 Feat (#184) — availability-aware seat selection at **both** selection times:

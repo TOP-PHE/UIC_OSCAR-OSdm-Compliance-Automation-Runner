@@ -171,6 +171,7 @@ request:
             else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
             else if (_isPostBookingPlaceMap && !bru.getEnvVar('bookingId')) { _skipReason = 'post-booking place map needs a booking first'; }
             else if (_isPostBookingPlaceMap && bru.getEnvVar('__postBookingPlaceMapDone') === 'true') { _skipReason = 'post-booking place map already done this scenario'; }
+            else if (_isPlaceMap && !bru.getEnvVar('reservationId')) { _skipReason = 'no reservation offer-part in this offer — seat map not applicable (resourceId would be unresolved)'; }
             else if (_isAddReservation && !_runAddReservation)            { _skipReason = 'add-reservation not enabled (ADD_TO_BOOKING)'; }
             else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
             else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
