@@ -78,6 +78,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-line .search-hl{background:#ffe082;color:#000;border-radius:2px;padding:0 1px}
 .assertion-filter{transition:background .15s}
 .assertion-filter.active{background:#0090D4;color:#fff}
+.req-filter{transition:background .15s}
+.req-filter.active{background:#0090D4;color:#fff}
 .assertion-row{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid #f5f5f5;font-size:12px}
 .assertion-row:hover{background:#fafbfc}
 .a-pass{color:#2e7d32}
@@ -92,6 +94,27 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .suite-header{padding:8px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;cursor:pointer}
 .suite-header:hover{background:#e3e8ec}
 .req-header{padding:6px 16px 6px 32px;background:#f5f5f5;font-size:12px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+/* ── Collapse / expand (logs, assertions, HTTP traffic) ──────────────── */
+.chev{display:inline-block;width:12px;text-align:center;font-size:10px;color:#90a4ae;transition:transform .12s;flex-shrink:0}
+.collapsible-head{cursor:pointer;user-select:none}
+.collapsible-head:hover .chev{color:#0090D4}
+/* Card-level collapse (logs): hide body when the card has .collapsed */
+.card.collapsed .card-body{display:none}
+.card.collapsed .log-controls{display:none}
+.card-header .chev{margin-right:2px}
+.card:not(.collapsed)>.card-header .collapsible-head .chev{transform:rotate(90deg)}
+/* Two-level collapse for assertions + HTTP traffic */
+.asuite-body,.areq-body{display:none}
+.asuite.open>.asuite-body{display:block}
+.areq.open>.areq-body{display:block}
+.asuite.open>.suite-header .chev,.areq.open>.req-header .chev{transform:rotate(90deg)}
+.areq{border-bottom:1px solid #f0f0f0}
+.areq-count{margin-left:auto;color:#90a4ae;font-size:11px;font-weight:400}
+.msg-block{padding:8px 16px 12px 32px;border-bottom:1px solid #f5f5f5}
+.msg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#90a4ae;margin:8px 0 4px}
+.msg-meta{font-size:11px;color:#607d8b;margin-bottom:6px;word-break:break-all}
+.msg-pre{background:#1e1e1e;color:#d4d4d4;border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;margin:0}
+.msg-loading{padding:10px 32px;color:#90a4ae;font-size:12px;font-style:italic}
 </style>
 </head>
 <body>
@@ -123,28 +146,32 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 
   <div id="meta" class="meta"></div>
 
-  <!-- Live Log -->
-  <div class="card">
+  <!-- Live Log (collapsed by default) -->
+  <div class="card collapsed" id="log-card">
     <div class="card-header" style="flex-wrap:wrap;gap:8px">
-      <span>📋 Execution Log</span>
-      <div style="display:flex;gap:4px;align-items:center">
-        <button class="btn btn-sm log-level-btn active" data-level="all">All</button>
-        <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
-        <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
-        <button class="btn btn-sm log-level-btn" data-level="info">info</button>
-        <button class="btn btn-sm log-level-btn" data-level="error">error</button>
+      <span class="collapsible-head" id="log-toggle" title="Show / hide the execution log"><span class="chev">▶</span> 📋 Execution Log</span>
+      <div class="log-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-sm log-level-btn active" data-level="all">All</button>
+          <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
+          <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
+          <button class="btn btn-sm log-level-btn" data-level="info">info</button>
+          <button class="btn btn-sm log-level-btn" data-level="error">error</button>
+        </div>
+        <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
+        <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm" id="log-copy-btn">Copy</button>
+          <button class="btn btn-sm" id="log-download-btn">Download</button>
+        </div>
+        <label style="font-size:12px;font-weight:400;color:#546e7a">
+          <input type="checkbox" id="autoscroll" checked> Auto-scroll
+        </label>
       </div>
-      <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
-      <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-sm" id="log-copy-btn">Copy</button>
-        <button class="btn btn-sm" id="log-download-btn">Download</button>
-      </div>
-      <label style="font-size:12px;font-weight:400;color:#546e7a">
-        <input type="checkbox" id="autoscroll" checked> Auto-scroll
-      </label>
     </div>
-    <div id="log-box" class="log-box"><span style="color:#546e7a;font-style:italic">Waiting for logs...</span></div>
+    <div class="card-body">
+      <div id="log-box" class="log-box"><span style="color:#546e7a;font-style:italic">Waiting for logs...</span></div>
+    </div>
   </div>
 
   <!-- Assertions -->
@@ -161,6 +188,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     </div>
     <div id="assertion-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>
     <div id="assertion-content" style="max-height:600px;overflow-y:auto"></div>
+  </div>
+
+  <!-- HTTP Traffic — request & response messages, grouped like the assertions -->
+  <div class="card" id="requests-card" style="display:none">
+    <div class="card-header">
+      <span>🌐 HTTP Traffic — Request &amp; Response</span>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm req-filter active" data-filter="all">All</button>
+        <button class="btn btn-sm req-filter" data-filter="non2xx">Non-2xx</button>
+        <button class="btn btn-sm req-filter" data-filter="failed">Failed</button>
+      </div>
+    </div>
+    <div id="requests-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>
+    <div id="requests-content" style="max-height:600px;overflow-y:auto"></div>
   </div>
 
   <!-- Artifacts -->
@@ -270,6 +311,7 @@ function updateStatus(run) {
     polling = false;
     loadArtifacts();
     loadAssertions();
+    loadRequests();
 
     // Show delete button if user has permission
     const canDelete = user.role === 'administrator' ||
@@ -534,20 +576,25 @@ async function loadAssertions() {
   } catch(_) {}
 }
 
+// Two-level collapse: suite (main area) → request (endpoint) → assertions.
+// Everything starts collapsed; clicking a suite reveals its endpoints (still
+// collapsed), clicking an endpoint reveals its assertions.
 function renderAssertions() {
   if (!assertionsData) return;
   const s = assertionsData.summary;
   const passRate = s.total > 0 ? Math.round(s.passed / s.total * 1000) / 10 : 0;
   document.getElementById('assertion-summary').innerHTML =
-    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate`;
+    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate
+     <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an area to expand)</span>`;
 
   const catFilter = document.getElementById('assertion-category-filter').value;
   const domFilter = document.getElementById('assertion-domain-filter').value;
   let html = '';
 
   for (const suite of assertionsData.suites || []) {
-    let suiteHtml = '';
+    let reqsHtml = '';
     let suiteFiltered = 0;
+    let suiteFailed = 0;
 
     for (const req of suite.requests || []) {
       let assertions = req.assertions || [];
@@ -557,17 +604,18 @@ function renderAssertions() {
       if (domFilter) assertions = assertions.filter(a => a.domain === domFilter);
       if (assertions.length === 0) continue;
       suiteFiltered += assertions.length;
+      const reqFailed = assertions.filter(a => !a.passed).length;
+      suiteFailed += reqFailed;
 
       const statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
         : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
         : '<span style="color:#90a4ae">SKIP</span>';
-      suiteHtml += `<div class="req-header">${statusBadge} <span>${escHtml(req.request_name)}</span>
-        <span style="color:#90a4ae;font-size:11px;margin-left:auto">${req.http_method||''} ${req.http_status||''} · ${req.duration_ms||0}ms</span></div>`;
 
+      let rowsHtml = '';
       for (const a of assertions) {
         const icon = a.passed ? '<span class="a-pass">✓</span>' : '<span class="a-fail">✗</span>';
         const sev = !a.passed && a.severity ? `<span class="a-badge a-sev-${a.severity}">${escHtml(a.severity)}</span>` : '';
-        suiteHtml += `<div class="assertion-row">${icon}
+        rowsHtml += `<div class="assertion-row">${icon}
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.assertion_name)}">${escHtml(a.assertion_name)}</span>
           ${a.category ? `<span class="a-badge a-cat">${escHtml(a.category)}</span>` : ''}
           ${a.domain ? `<span class="a-badge a-dom">${escHtml(a.domain)}</span>` : ''}
@@ -575,15 +623,34 @@ function renderAssertions() {
           ${a.error_msg ? `<span style="color:#c62828;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.error_msg)}">⚠ ${escHtml(a.error_msg.slice(0,60))}</span>` : ''}
         </div>`;
       }
+
+      reqsHtml += `<div class="areq">
+        <div class="req-header collapsible-head" data-action="toggle-areq"><span class="chev">▶</span>
+          ${statusBadge} <span>${escHtml(req.request_name)}</span>
+          <span class="areq-count">${escHtml(req.http_method||'')} ${escHtml(req.http_status||'')} · ${req.duration_ms||0}ms · ${assertions.length} assertion${assertions.length!==1?'s':''}${reqFailed>0?` · <span class="a-fail">${reqFailed} failed</span>`:''}</span>
+        </div>
+        <div class="areq-body">${rowsHtml}</div>
+      </div>`;
     }
 
     if (suiteFiltered === 0) continue;
-    const sfailed = suite.failed || 0;
-    html += `<div class="suite-header">${escHtml(suite.suite_name)} — ${suiteFiltered} assertions${sfailed > 0 ? ` · <span style="color:#c62828">${sfailed} failed</span>` : ''} · ${suite.pass_rate}%</div>${suiteHtml}`;
+    html += `<div class="asuite">
+      <div class="suite-header collapsible-head" data-action="toggle-asuite"><span class="chev">▶</span>
+        ${escHtml(suite.suite_name)} — ${suiteFiltered} assertion${suiteFiltered!==1?'s':''}${suiteFailed>0?` · <span style="color:#c62828">${suiteFailed} failed</span>`:''} · ${suite.pass_rate}%</div>
+      <div class="asuite-body">${reqsHtml}</div>
+    </div>`;
   }
 
   document.getElementById('assertion-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No assertions match the selected filters.</div>';
 }
+
+// Collapse/expand toggles for the two assertion levels.
+document.getElementById('assertion-content').addEventListener('click', function(e) {
+  const sh = e.target.closest('[data-action="toggle-asuite"]');
+  if (sh) { sh.parentElement.classList.toggle('open'); return; }
+  const rh = e.target.closest('[data-action="toggle-areq"]');
+  if (rh) { rh.parentElement.classList.toggle('open'); }
+});
 
 // Assertion filter event listeners
 document.getElementById('assertions-card').addEventListener('click', function(e) {
@@ -612,6 +679,127 @@ document.getElementById('log-search').addEventListener('input', function() {
 });
 document.getElementById('log-copy-btn').addEventListener('click', copyLogs);
 document.getElementById('log-download-btn').addEventListener('click', downloadLogs);
+
+// Collapse / expand the whole Execution Log card.
+document.getElementById('log-toggle').addEventListener('click', function() {
+  document.getElementById('log-card').classList.toggle('collapsed');
+});
+
+// ── HTTP Traffic (request / response messages) ───────────────────────────────
+// Same suite → endpoint structure as the assertions, collapsed by default.
+// Bodies are fetched lazily the first time an endpoint is expanded (the list
+// endpoint returns metadata only, so we avoid pulling every body up-front).
+let requestsData = null;
+let activeReqFilter = 'all';
+
+async function loadRequests() {
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/requests?status_filter=${encodeURIComponent(activeReqFilter)}`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) return;
+    requestsData = await res.json();
+    if (!requestsData.requests || requestsData.requests.length === 0) {
+      // Only hide on the unfiltered (all) view — keep the card visible so the
+      // user can switch filters back.
+      if (activeReqFilter === 'all') return;
+    }
+    document.getElementById('requests-card').style.display = 'block';
+    renderRequests();
+  } catch (_) {}
+}
+
+function renderRequests() {
+  if (!requestsData) return;
+  const reqs = requestsData.requests || [];
+  document.getElementById('requests-summary').innerHTML =
+    `<strong>${reqs.length}</strong> request${reqs.length!==1?'s':''} <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an endpoint to load its request &amp; response)</span>`;
+
+  // Group by suite, preserving first-seen order.
+  const order = [];
+  const bySuite = new Map();
+  for (const r of reqs) {
+    const key = r.suite_name || r.scenario_name || '—';
+    if (!bySuite.has(key)) { bySuite.set(key, []); order.push(key); }
+    bySuite.get(key).push(r);
+  }
+
+  let html = '';
+  for (const suiteName of order) {
+    const group = bySuite.get(suiteName);
+    let rowsHtml = '';
+    for (const r of group) {
+      const st = r.http_status;
+      const ok = typeof st === 'number' && st >= 200 && st < 300;
+      const badge = st == null ? '<span style="color:#90a4ae">—</span>'
+        : `<span class="${ok ? 'a-pass' : 'a-fail'}">${escHtml(st)}</span>`;
+      rowsHtml += `<div class="areq" data-req-id="${escHtml(r.id)}">
+        <div class="req-header collapsible-head" data-action="toggle-rreq"><span class="chev">▶</span>
+          ${badge} <span>${escHtml(r.request_name)}</span>
+          <span class="areq-count">${escHtml(r.http_method||'')} · ${r.duration_ms||0}ms${r.failed>0?` · <span class="a-fail">${r.failed} failed</span>`:''}</span>
+        </div>
+        <div class="areq-body"><div class="msg-loading">Click to load…</div></div>
+      </div>`;
+    }
+    html += `<div class="asuite">
+      <div class="suite-header collapsible-head" data-action="toggle-rsuite"><span class="chev">▶</span>
+        ${escHtml(suiteName)} — ${group.length} request${group.length!==1?'s':''}</div>
+      <div class="asuite-body">${rowsHtml}</div>
+    </div>`;
+  }
+  document.getElementById('requests-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No requests match the selected filter.</div>';
+}
+
+function renderMessage(label, meta, body) {
+  let pretty = body;
+  if (body) { try { pretty = JSON.stringify(JSON.parse(body), null, 2); } catch (_) { pretty = body; } }
+  return `<div class="msg-label">${escHtml(label)}</div>`
+    + (meta ? `<div class="msg-meta">${meta}</div>` : '')
+    + `<pre class="msg-pre">${escHtml(pretty || '(empty)')}</pre>`;
+}
+
+async function loadRequestBodies(reqId, bodyEl) {
+  bodyEl.innerHTML = '<div class="msg-loading">Loading…</div>';
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/requests/${encodeURIComponent(reqId)}`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) { bodyEl.innerHTML = '<div class="msg-loading">Could not load this message.</div>'; return; }
+    const d = await res.json();
+    const r = d.request || {};
+    const reqMeta = `${escHtml(r.http_method||'')} ${escHtml(r.http_url||'')}`.trim();
+    const resMeta = r.http_status != null ? `HTTP ${escHtml(r.http_status)}` : '';
+    bodyEl.innerHTML = '<div class="msg-block">'
+      + renderMessage('Request', reqMeta, r.request_body)
+      + renderMessage('Response', resMeta, r.response_body)
+      + '</div>';
+  } catch (_) {
+    bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';
+  }
+}
+
+// Collapse/expand + lazy body load for the HTTP Traffic section.
+document.getElementById('requests-content').addEventListener('click', function(e) {
+  const sh = e.target.closest('[data-action="toggle-rsuite"]');
+  if (sh) { sh.parentElement.classList.toggle('open'); return; }
+  const rh = e.target.closest('[data-action="toggle-rreq"]');
+  if (rh) {
+    const areq = rh.parentElement;
+    areq.classList.toggle('open');
+    if (areq.classList.contains('open') && !areq.dataset.loaded) {
+      areq.dataset.loaded = '1';
+      loadRequestBodies(areq.dataset.reqId, areq.querySelector('.areq-body'));
+    }
+  }
+});
+
+// HTTP Traffic filter buttons (re-fetch with the server-side status filter).
+document.getElementById('requests-card').addEventListener('click', function(e) {
+  const btn = e.target.closest('.req-filter');
+  if (!btn) return;
+  activeReqFilter = btn.dataset.filter;
+  document.querySelectorAll('.req-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadRequests();
+});
 
 poll();
 </script>
