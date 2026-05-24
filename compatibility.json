@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.74",
+  "current_release": "2026.75",
   "releases": [
+    {
+      "release": "2026.75",
+      "date": "2026-05-23",
+      "server": "1.11.47",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#171): restore per-company concurrent runs. The per-company concurrent-run limit was always 1, so batch runs serialized regardless of the configured value (Bileto set to 3, global cap 9, still ran one-by-one). The test_frameworks.config column is encrypted at rest (Phase 2 of #60) but src/api/routes/runs.js read it with a plain JSON.parse(tfRow.config) (no colDecrypt) at both the run-submit and queue-status paths, so parsing the ciphertext threw and concurrentSessionLimit fell back to 1. Both reads now colDecrypt() first (legacy plaintext still passes through); the queue's per-company throttle was already correct.",
+        "feat(#172): new scenarios default to a minimal offer search. public/js/scenarios.js wizInitScenario no longer pre-seeds offer-search criteria (requestedOfferParts, service/travel classes, flexibilities, offerMode, currency) from the framework defaults — they start empty, so a search-based scenario sends only the trip (origin+destination+departure date) and an empty offerSearchCriteria; the vendor returns its full default offer. Criteria remain optional and tickable in the wizard; fulfillment defaults unchanged. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Concurrency fix applies to runs submitted after Watchtower promotes :stable; hard-refresh the Test Config page for the scenario-default change."
+      ]
+    },
     {
       "release": "2026.74",
       "date": "2026-05-23",
