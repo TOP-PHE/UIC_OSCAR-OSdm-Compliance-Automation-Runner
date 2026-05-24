@@ -31,28 +31,80 @@ runtime:
     - type: after-response
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
+        const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
 
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
-        });
+        const _status = res.getStatus();
+        let _body = null;
+        try { _body = res.getBody(); } catch (_e) { _body = null; }
 
-        if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
-          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("POST Create Booking");
-          return;
+        // ── Two-step return booking (#178/#180), adaptive ─────────────────────
+        // Return scenarios first attempt a COMBINED booking (both offers). OSDM
+        // permits this, but some vendors don't (Bileto: "Only one offer can be
+        // booked at a time, for now"). On that rejection we emit a clearly-named
+        // FAILING assertion (so the vendor gap is easy to track in the report)
+        // and fall back to two SEPARATE bookings: outbound, then inbound.
+        const _isReturn = !!bru.getEnvVar("inboundOfferId") && !!bru.getEnvVar("outboundOfferId");
+        const _mode = bru.getEnvVar("__returnBookMode") || "";
+
+        function _isMultiOfferRejected(b, st) {
+          if (st !== 400 || !b || typeof b !== "object") return false;
+          const t = ((b.title || "") + " " + (b.detail || "")).toLowerCase();
+          return t.includes("too many offers") || t.includes("one offer") || t.includes("multiple offer");
         }
 
-        postCreateBookingResponse(
-            bru.getEnvVar("offer"),
-            res.getBody(),
-            ["PREBOOKED"],
-            ["ON_HOLD", "AVAILABLE"]
-        );
-
-        bru.deleteEnvVar("currentPassengerIndex");
+        if (_isReturn && _mode === "") {
+          // First attempt = combined (both offers in one booking).
+          if (_status === 200) {
+            test("[OSDM] Vendor books a round trip (both offers) in a single booking", () => {
+              expect(_status).to.eql(200);
+            });
+            postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+            bru.deleteEnvVar("currentPassengerIndex");
+          } else if (_isMultiOfferRejected(_body, _status)) {
+            // Trackable vendor-gap finding (intentionally FAILS).
+            test("[OSDM] Vendor supports booking multiple offers (round trip) in one booking", () => {
+              expect(false, `Vendor rejected the combined round-trip booking — ${(_body && _body.title) || ""}: ${(_body && _body.detail) || ""}. OSDM allows multiple offers; falling back to two separate bookings.`).to.be.true;
+            });
+            console.log("⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
+            bru.setEnvVar("__returnBookMode", "sep-out");
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+          } else {
+            test("Status code is 200", () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            loopbackOrStop("POST Create Booking (combined return)");
+            return;
+          }
+        } else if (_isReturn && _mode === "sep-out") {
+          // Separate booking, leg 1 (outbound).
+          test("Return — outbound booking created (status 200)", () => { expect(_status).to.eql(200); });
+          if (_status !== 200) { loopbackOrStop("POST Create Booking (outbound leg)"); return; }
+          const _ob = _body && _body.booking;
+          if (_ob && _ob.id) { bru.setEnvVar("outboundBookingId", _ob.id); console.log("🔁 Outbound booking created: " + _ob.id); }
+          bru.setEnvVar("__returnBookMode", "sep-in");
+          bru.runner.setNextRequest("02. POST Create Booking");
+          return;
+        } else if (_isReturn && _mode === "sep-in") {
+          // Separate booking, leg 2 (inbound) — becomes the "current" booking
+          // and continues through the normal post-booking flow below.
+          test("Return — inbound booking created (status 200)", () => { expect(_status).to.eql(200); });
+          if (_status !== 200) { loopbackOrStop("POST Create Booking (inbound leg)"); return; }
+          bru.setEnvVar("__returnBookMode", "done");
+          postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+          console.log("🔁 Inbound booking created: " + bru.getEnvVar("bookingId") + " — round trip booked as 2 bookings (outbound=" + bru.getEnvVar("outboundBookingId") + ").");
+          bru.deleteEnvVar("currentPassengerIndex");
+        } else {
+          // One-way (unchanged behaviour), or the combined-200 success path.
+          test("Status code is 200", () => {
+              expect(_status, "[ERROR] Wrong response status").to.eql(200);
+          });
+          if (_status !== 200) {
+            test("Status code is 200", () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            loopbackOrStop("POST Create Booking");
+            return;
+          }
+          postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+          bru.deleteEnvVar("currentPassengerIndex");
+        }
 
         // Routing after POST Create Booking:
         //   1. Legacy `skipPatchPassengerRequest` still wins for explicit

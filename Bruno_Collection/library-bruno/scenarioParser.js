@@ -62,9 +62,10 @@ function resetScenarioEnvVars() {
     "offer", "offerId", "offers", "OfferCollectionRequest",
     "offerSearchCriteria", "offerTripSearchCriteria", "offerTripSpecifications",
     "offerFulfillmentOptions", "offerPassengerSpecifications",
-    // Two-step return (#178)
+    // Two-step return (#178/#180)
     "outboundOfferId", "inboundOfferId", "outboundOfferTag",
     "ReturnOfferCollectionRequest", "__returnInboundDone",
+    "outboundBookingId", "__returnBookMode",
     "admissionReservationAncillaryOfferPartsIds",
     "admissionReservationAncillaryOfferPartsAftersalesConditions",
     "overallFlexibility", "coveredTripId", "minimalPrice",
