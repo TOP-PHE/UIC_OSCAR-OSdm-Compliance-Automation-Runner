@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.55] — 2026-05-24
+
+Fix (#188) — booking failed with `400 "Invalid request content"` because
+`placeSelections.places[]` didn't match the OSDM `SelectedPlace` schema.
+Collection **OTST_V2.0.11 → OTST_V2.0.12**.
+
+### Fixed
+- **`library-bruno/requestsBuilder.js`** (`placesForPassengers`): OSDM
+  `SelectedPlace` is `additionalProperties:false` and requires exactly
+  `{ coachNumber, placeNumber, passengerRef }` — all **strings**, `passengerRef`
+  **singular**. The builder emitted `passengerRefs` (plural array) and
+  potentially numeric `coachNumber`/`placeNumber`, so the vendor rejected the
+  booking with `400 "Invalid request content"`. Now emits the conformant shape
+  (one entry per passenger; values coerced to strings). The legacy single-place
+  branch in `accommodationAndPlaceSelection` routes through the same helper.
+  Fixes both `02. POST Create Booking` and `09. POST Add Reservation` (shared).
+- **`collectAvailablePlaces`**: the coach number is read from the OSDM
+  `Coach.number` field (was wrongly reading `coachNumber`, which is always
+  `undefined`), with `coachNumber` kept only as a fallback for non-spec vendors.
+  Without this, the picked place had no coach number and the required
+  `SelectedPlace.coachNumber` was missing → `400`.
+- This was latent until #186 made the offer-time seat map work and `places`
+  actually populate.
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.12
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.54] — 2026-05-24
 
 Fix (#186) — plain **seat** scenarios sent an unresolved `{{reservationId}}` to
