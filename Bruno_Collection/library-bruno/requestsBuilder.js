@@ -2,12 +2,72 @@ const { parseEnvJson } = require('./envUtils.js');
 
 module.exports = {
   buildOfferCollectionRequest,
+  buildReturnOfferCollectionRequest,
   buildBookingRequest,
   accommodationAndPlaceSelection,
   requestRefundOffersBody,
   requestExchangeOffersBody,
   requestExchangeOperationsBody
 };
+
+// Two-step return (#178): does this scenario's outbound search request a return?
+// We detect it from the outbound tripSearchCriteria the scenarioParser built —
+// returnSearchParameters.inwardReturnDate is present only for return scenarios.
+// (Return is supported for SEARCH outbounds; SPECIFICATION returns are out of
+// scope — there's no return train spec in the test data.)
+function returnInwardDateFromOutbound() {
+  try {
+    const tsc = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+    const d = tsc && tsc.returnSearchParameters && tsc.returnSearchParameters.inwardReturnDate;
+    return (typeof d === "string" && d) ? d : null;
+  } catch (_) { return null; }
+}
+
+// Build the INWARD (return) offer request — OSDM two-step return, leg 2.
+// Reuses the outbound tripSearchCriteria but swaps origin/destination, sets the
+// departureTime to the inwardReturnDate, and relates it to the chosen outbound
+// offer via returnSearchParameters.outwardOfferIds. Passengers / offer criteria
+// / fulfillment are the same as the outbound. Returns true when a body was
+// built (i.e. this is a return scenario), false otherwise.
+function buildReturnOfferCollectionRequest() {
+  validationLogger("[INFO] ➤ buildReturnOfferCollectionRequest");
+  const inwardReturnDate = returnInwardDateFromOutbound();
+  const outboundOfferId  = bru.getEnvVar("outboundOfferId");
+  if (!inwardReturnDate || !outboundOfferId) {
+    validationLogger("[WARN] buildReturnOfferCollectionRequest — not a return scenario or missing outbound offer; skipping.");
+    return false;
+  }
+
+  const outboundTsc = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+  // Swap O&D for the return leg; drop the outbound's vehicle/carrier filter
+  // (the return is an open search) and the inwardReturnDate.
+  const inboundTsc = {
+    departureTime: inwardReturnDate,
+    origin: outboundTsc.destination,
+    destination: outboundTsc.origin,
+    returnSearchParameters: { outwardOfferIds: [outboundOfferId] }
+  };
+  const outboundTag = bru.getEnvVar("outboundOfferTag");
+  if (outboundTag) inboundTsc.returnSearchParameters.outwardOfferTag = outboundTag;
+
+  const sandbox = bru.getEnvVar("api_base") || "";
+  const isPaxone = sandbox.includes("paxone");
+  const body = {
+    tripSearchCriteria: inboundTsc,
+    anonymousPassengerSpecifications: parseEnvJson("offerPassengerSpecifications"),
+    offerSearchCriteria: parseEnvJson("offerSearchCriteria")
+  };
+  const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
+  const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
+    ? JSON.parse(fulfillmentOptions) : [];
+  if (!isPaxone || parsedFulfillmentOptions.length > 0) {
+    body.requestedFulfillmentOptions = parsedFulfillmentOptions;
+  }
+
+  bru.setEnvVar("ReturnOfferCollectionRequest", JSON.stringify(body));
+  validationLogger(`[INFO] 🔁 Return (inward) offer request built — ${inboundTsc.origin && inboundTsc.origin.stopPlaceRef} → ${inboundTsc.destination && inboundTsc.destination.stopPlaceRef} on ${inwardReturnDate}, outwardOfferIds=[${outboundOfferId}]`);
+  return true;
+}
 
 // Function to build the offer collection request
 function buildOfferCollectionRequest() {
@@ -54,17 +114,30 @@ function buildBookingRequest() {
     : parseEnvJson("offerPassengerSpecifications");
 
   const placeSelections = parseEnvJson("placeSelections", []);
+  const passengerRefs = parseEnvJson("bookingPassengerReferences");
 
-  const offer = {
-    offerId: bru.getEnvVar("offerId"),
-    passengerRefs: parseEnvJson("bookingPassengerReferences")
-  };
-  if (placeSelections.length > 0) {
-    offer.placeSelections = placeSelections;
+  // Two-step return (#178): when an inbound offer was fetched, book BOTH the
+  // outbound and the inbound offers in one booking. Otherwise book the single
+  // selected offer (unchanged single-trip behaviour). Manual place selections
+  // are applied to the outbound offer only (the inbound uses automatic
+  // selection — manual place selection on a return is out of scope for now).
+  const inboundOfferId  = bru.getEnvVar("inboundOfferId");
+  const outboundOfferId = bru.getEnvVar("outboundOfferId");
+  const offers = [];
+  if (inboundOfferId && outboundOfferId) {
+    const outboundOffer = { offerId: outboundOfferId, passengerRefs };
+    if (placeSelections.length > 0) outboundOffer.placeSelections = placeSelections;
+    offers.push(outboundOffer);
+    offers.push({ offerId: inboundOfferId, passengerRefs });
+    validationLogger(`[INFO] 🔁 Return booking — booking outbound (${outboundOfferId}) + inbound (${inboundOfferId}) offers.`);
+  } else {
+    const offer = { offerId: bru.getEnvVar("offerId"), passengerRefs };
+    if (placeSelections.length > 0) offer.placeSelections = placeSelections;
+    offers.push(offer);
   }
 
   const body = {
-    offers: [offer],
+    offers,
     purchaser: parseEnvJson("bookingPurchaserSpecifications"),
     passengerSpecifications
   };
