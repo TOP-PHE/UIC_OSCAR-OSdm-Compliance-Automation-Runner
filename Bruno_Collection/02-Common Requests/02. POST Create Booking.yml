@@ -143,7 +143,16 @@ runtime:
             && bru.getEnvVar("__addReservationDone") !== "true";
         const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
             && bru.getEnvVar("__addAncillaryDone") !== "true";
-        if (_addRes) {
+        // #184: when an add-reservation is due, first fetch the BOOKING-context
+        // seat map (08b) so the reservation can carry an AVAILABLE place. 08b
+        // runs once then routes to 09 itself; if it already ran we go straight
+        // to 09. The pre-booking SEATMAP_AT_OFFER path (picks already made at
+        // offer time) does not enter here — it is not an add-reservation flow.
+        const _postBookMap = _addRes
+            && bru.getEnvVar("__postBookingPlaceMapDone") !== "true";
+        if (_postBookMap) {
+            bru.runner.setNextRequest("08b. GET Place Map Post-Booking");
+        } else if (_addRes) {
             bru.runner.setNextRequest("09. POST Add Reservation to Booking");
         } else if (_addAnc) {
             bru.runner.setNextRequest("11. Add Ancillary - Get Additional Offers");

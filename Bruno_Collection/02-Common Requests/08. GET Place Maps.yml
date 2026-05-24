@@ -92,13 +92,30 @@ runtime:
         }
 
         // ── Place pre-selection extraction → feeds Create Booking ─────────
+        // Pick one AVAILABLE place per passenger from the seat map (#182
+        // follow-up). OSCAR sees the whole vehicle in this single response, so it
+        // flattens the coaches, keeps only available places and takes the first N
+        // (N = passenger count). The picks feed 02. POST Create Booking via
+        // accommodationAndPlaceSelection — one placeSelections.places entry per
+        // passenger. Availability-only — no "seat together" optimisation.
+        const { collectAvailablePlaces } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
         const vehicle = _va && _va.vehicle;
-        const coach = (vehicle && Array.isArray(vehicle.coaches)) ? vehicle.coaches[0] : null;
-        if (coach) {
-          const preSelection = Array.isArray(coach.compartments) ? coach.compartments[0] : null;
-          bru.setEnvVar("preselectedCoach", coach.coachNumber);
-          if (preSelection) bru.setEnvVar("preselectedPlace", preSelection.place);
-          bru.setEnvVar("layoutId", coach.layoutId);
+        let _paxCount = 0;
+        try { _paxCount = (JSON.parse(bru.getEnvVar("bookingPassengerReferences") || "[]") || []).length; } catch (_e) {}
+        if (!_paxCount) _paxCount = parseInt(bru.getEnvVar("passengerCount"), 10) || 1;
+        const _picked = collectAvailablePlaces(vehicle, _paxCount);
+        if (_picked.length > 0) {
+          bru.setEnvVar("preselectedPlaces", JSON.stringify(_picked));
+          // Back-compat single-place vars (first pick).
+          bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
+          bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
+          if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
+          console.log("✅ [PLACES] Selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          if (_picked.length < _paxCount) {
+            validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
+          }
+        } else if (_va) {
+          validationLogger("[WARNING] Seat map returned but no AVAILABLE place found — booking without explicit place selection.");
         }
 
         // Continue the sale flow: place selection done → create the booking.

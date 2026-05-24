@@ -54,9 +54,21 @@ runtime:
         let tripLegCoverage = null;
         try { tripLegCoverage = JSON.parse(bru.getEnvVar('tripLegCoverage') || 'null'); } catch (_e) {}
 
+        // Availability-aware place picks (#184): when 08b. GET Place Map
+        // Post-Booking served a BOOKING-context seat map, preselectedPlaces holds
+        // one AVAILABLE place per passenger. Carry them as placeSelections.places
+        // (one entry per passenger). When absent (vendor serves no post-booking
+        // map), placeSelections has no places and the system assigns the seat.
+        const { placesForPassengers } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        let _picked = [];
+        try { _picked = JSON.parse(bru.getEnvVar("preselectedPlaces") || "[]") || []; } catch (_e) {}
+        const _places = placesForPassengers(_picked, passengerRefs);
+
         const placeSelections = [];
         if (reservationOfferId && tripLegCoverage) {
-          placeSelections.push({ reservationId: reservationOfferId, tripLegCoverage: tripLegCoverage });
+          const _sel = { reservationId: reservationOfferId, tripLegCoverage: tripLegCoverage };
+          if (_places.length > 0) _sel.places = _places;
+          placeSelections.push(_sel);
         }
 
         const body = { offerId: offerId, passengerRefs: passengerRefs };
