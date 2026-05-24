@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.48] — 2026-05-23
+
+Enhancement (#174) — collapsible detailed run report: foldable logs, two-level
+assertions, and a new request/response section.
+
+### Added / Changed
+- **`public/run-detail.html`**:
+  - **Execution Log** is now a collapsible card (collapsed by default) — click
+    the header to expand/collapse; the log controls hide while collapsed.
+  - **Assertions** now collapse on two levels: main area (suite) → endpoint
+    (request) → individual assertions. Everything starts collapsed; each level
+    shows its counts (assertions / failed / pass-rate). Filters unchanged.
+  - New **"HTTP Traffic — Request & Response"** card, structured the same way
+    (suite → endpoint, collapsed by default). Expanding an endpoint lazily loads
+    that request's **request body and response body** (pretty-printed) from
+    `/v1/runs/:id/requests/:reqId`. All / Non-2xx / Failed filters.
+
+### Operator action
+None. Hard-refresh the run-detail page after Watchtower promotes :stable.
+
+---
+
 ## [server-v1.11.47] — 2026-05-23
 
 Fix (#171) — restore per-company concurrent runs. Enhancement (#172) — new

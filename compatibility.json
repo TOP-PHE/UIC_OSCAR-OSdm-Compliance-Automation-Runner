@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.75",
+  "current_release": "2026.76",
   "releases": [
+    {
+      "release": "2026.76",
+      "date": "2026-05-23",
+      "server": "1.11.48",
+      "collection": "OTST_V2.0.5",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#174): collapsible detailed run report (public/run-detail.html). Execution Log is now a collapsible card (collapsed by default; header toggles it, controls hide while collapsed). Assertions collapse on two levels — main area (suite) -> endpoint (request) -> individual assertions — all collapsed by default, with counts at each level; filters unchanged. New 'HTTP Traffic - Request & Response' card uses the same suite->endpoint structure and lazily loads each request's request body + response body (pretty-printed) from /v1/runs/:id/requests/:reqId on expand, with All/Non-2xx/Failed filters. UI-only change. Collection version unchanged (OTST_V2.0.5).",
+        "Operator action required: none. Hard-refresh the run-detail page after Watchtower promotes :stable."
+      ]
+    },
     {
       "release": "2026.75",
       "date": "2026-05-23",
