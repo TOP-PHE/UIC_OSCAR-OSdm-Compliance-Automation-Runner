@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.82",
+  "current_release": "2026.83",
   "releases": [
+    {
+      "release": "2026.83",
+      "date": "2026-05-24",
+      "server": "1.11.55",
+      "collection": "OTST_V2.0.12",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#188): booking failed with 400 'Invalid request content' because placeSelections.places[] did not match the OSDM SelectedPlace schema. SelectedPlace is additionalProperties:false and requires exactly { coachNumber, placeNumber, passengerRef } — all STRINGS, passengerRef SINGULAR. library-bruno/requestsBuilder.js placesForPassengers emitted passengerRefs (plural array) and potentially numeric coachNumber/placeNumber, so the vendor rejected the booking with 400. Now emits the conformant shape (one entry per passenger; coachNumber/placeNumber coerced to strings; passengerRef singular). The legacy single-place branch in accommodationAndPlaceSelection routes through the same helper. Fixes both 02. POST Create Booking and 09. POST Add Reservation (shared helper). Latent until #186 made the offer-time seat map work and places actually populate. Bruno_Collection/VERSION OTST_V2.0.11 -> OTST_V2.0.12.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.83 / server-v1.11.55 / OTST_V2.0.12 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.82",
       "date": "2026-05-24",

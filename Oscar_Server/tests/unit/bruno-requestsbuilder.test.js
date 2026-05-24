@@ -278,8 +278,8 @@ describe('accommodationAndPlaceSelection', () => {
     rb.accommodationAndPlaceSelection();
     const ps = JSON.parse(store.placeSelections);
     expect(ps[0].places).toHaveLength(2);
-    expect(ps[0].places[0]).toEqual({ passengerRefs: ['00001'], coachNumber: '12', placeNumber: '21' });
-    expect(ps[0].places[1]).toEqual({ passengerRefs: ['00002'], coachNumber: '12', placeNumber: '22' });
+    expect(ps[0].places[0]).toEqual({ coachNumber: '12', placeNumber: '21', passengerRef: '00001' });
+    expect(ps[0].places[1]).toEqual({ coachNumber: '12', placeNumber: '22', passengerRef: '00002' });
   });
 
   test('preselectedPlaces fewer than passengers → surplus pax reuse the last place', () => {
@@ -293,7 +293,7 @@ describe('accommodationAndPlaceSelection', () => {
     rb.accommodationAndPlaceSelection();
     const ps = JSON.parse(store.placeSelections);
     expect(ps[0].places).toHaveLength(3);
-    expect(ps[0].places.map((p) => p.passengerRefs[0])).toEqual(['00001', '00002', '00003']);
+    expect(ps[0].places.map((p) => p.passengerRef)).toEqual(['00001', '00002', '00003']);
     expect(ps[0].places.every((p) => p.placeNumber === '5')).toBe(true);
   });
 });
@@ -353,18 +353,23 @@ describe('placesForPassengers', () => {
     { coachNumber: '12', placeNumber: '22' },
   ];
 
-  test('one entry per passenger, paired by index', () => {
+  test('one entry per passenger, paired by index (OSDM SelectedPlace shape)', () => {
     expect(rb.placesForPassengers(picked, ['00001', '00002'])).toEqual([
-      { passengerRefs: ['00001'], coachNumber: '12', placeNumber: '21' },
-      { passengerRefs: ['00002'], coachNumber: '12', placeNumber: '22' },
+      { coachNumber: '12', placeNumber: '21', passengerRef: '00001' },
+      { coachNumber: '12', placeNumber: '22', passengerRef: '00002' },
     ]);
+  });
+
+  test('coachNumber/placeNumber are coerced to strings', () => {
+    const out = rb.placesForPassengers([{ coachNumber: 12, placeNumber: 21 }], ['00001']);
+    expect(out[0]).toEqual({ coachNumber: '12', placeNumber: '21', passengerRef: '00001' });
   });
 
   test('surplus passengers reuse the last picked place', () => {
     const out = rb.placesForPassengers([{ coachNumber: '1', placeNumber: '5' }], ['00001', '00002', '00003']);
     expect(out).toHaveLength(3);
     expect(out.every((p) => p.placeNumber === '5')).toBe(true);
-    expect(out.map((p) => p.passengerRefs[0])).toEqual(['00001', '00002', '00003']);
+    expect(out.map((p) => p.passengerRef)).toEqual(['00001', '00002', '00003']);
   });
 
   test('returns [] when nothing to assign', () => {
