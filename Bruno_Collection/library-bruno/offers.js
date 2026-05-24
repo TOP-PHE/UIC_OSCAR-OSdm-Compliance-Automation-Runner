@@ -1152,7 +1152,40 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
 
   if (accommodationSelection !== "COUCHETTE" && accommodationSelection !== "BERTH") {
-    validationLogger(`[INFO] accommodationSelection is ${accommodationSelection}, skipping place selection`);
+    // Plain SEAT scenario (not a couchette/berth). The pre-/post-booking place
+    // map (08/08b) and add-reservation (09) are keyed on a RESERVATION offer-part
+    // (resourceType=RESERVATION). reservationId/tripLegCoverage were previously
+    // ONLY set on the COUCHETTE/BERTH branch — so a SEATMAP_AT_OFFER / ADD_TO_BOOKING
+    // seat scenario sent an unresolved "{{reservationId}}" in the place-map URL and
+    // the vendor replied 400 (observed on Bileto). Derive them here from the first
+    // reservationOfferPart when place selection is in play and not already set.
+    const _placeSelEnabled = String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
+      || bru.getEnvVar("placeSelectionMode") === "SEATMAP_AT_OFFER"
+      || bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
+      || bru.getEnvVar("requiresPlaceSelection") === true
+      || bru.getEnvVar("requiresPlaceSelection") === "true";
+
+    if (!_placeSelEnabled) {
+      validationLogger(`[INFO] accommodationSelection is ${accommodationSelection}, place selection not enabled → skipping place selection`);
+      return;
+    }
+    if (bru.getEnvVar("reservationId")) {
+      validationLogger(`[INFO] reservationId already set (${bru.getEnvVar("reservationId")}) → keeping it`);
+      return;
+    }
+    const _seatResParts = selectedOffer.reservationOfferParts || [];
+    if (_seatResParts.length === 0) {
+      validationLogger(`[WARN] Place selection enabled but this offer has no reservationOfferParts → seat map not applicable (nothing to reserve).`);
+      return;
+    }
+    const _firstRes = _seatResParts[0];
+    bru.setEnvVar("reservationId", _firstRes.id);
+    bru.setEnvVar("reservationIds", JSON.stringify(_seatResParts.map((p) => p.id)));
+    const _firstPlace = Array.isArray(_firstRes.availablePlaces) ? _firstRes.availablePlaces[0] : null;
+    if (_firstPlace && _firstPlace.tripLegCoverage) {
+      bru.setEnvVar("tripLegCoverage", JSON.stringify([_firstPlace.tripLegCoverage]));
+    }
+    validationLogger(`[INFO] Seat place selection — reservationId set from first reservationOfferPart: ${_firstRes.id}`);
     return;
   }
 
