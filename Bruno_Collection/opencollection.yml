@@ -114,6 +114,13 @@ request:
 
           var _isToken    = _rn.includes('token') || _rn.includes('access');
           var _isPlaceMap = _ru.includes('place-map') || _rn.includes('place map');
+          // Two seat-map variants share the /availabilities/place-map endpoint
+          // (#184): the OFFER-context map (08, pre-booking) and the
+          // BOOKING-context map (08b, post-booking). Detect the post-booking one
+          // by its contextType=BOOKING query (or its name) so the two are gated
+          // independently below.
+          var _isPostBookingPlaceMap = _isPlaceMap && (_ru.includes('contexttype=booking') || _rn.includes('post-booking'));
+          var _isOfferPlaceMap = _isPlaceMap && !_isPostBookingPlaceMap;
           var _isAddReservation = _rn.includes('add reservation');
           var _isAddAncillary   = _rn.includes('add ancillary');
           var _isReturnOffer    = _rn.includes('return offer');
@@ -159,8 +166,11 @@ request:
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
             _skipReason = 'not for "' + _sandbox + '" sandbox';
-          } else if (_isPlaceMap && !_runPlaceMap)                       { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
-            else if (_isPlaceMap && bru.getEnvVar('bookingId'))           { _skipReason = 'place map is pre-booking only (booking already created)'; }
+          } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
+            else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
+            else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
+            else if (_isPostBookingPlaceMap && !bru.getEnvVar('bookingId')) { _skipReason = 'post-booking place map needs a booking first'; }
+            else if (_isPostBookingPlaceMap && bru.getEnvVar('__postBookingPlaceMapDone') === 'true') { _skipReason = 'post-booking place map already done this scenario'; }
             else if (_isAddReservation && !_runAddReservation)            { _skipReason = 'add-reservation not enabled (ADD_TO_BOOKING)'; }
             else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
             else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
@@ -251,7 +261,7 @@ request:
                 "patchDateOfBirth", "patchFirstName", "patchLastName",
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
-                "placeSelectionMode", "__placeMapAtOfferFailed",
+                "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone",
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 // Fulfillment

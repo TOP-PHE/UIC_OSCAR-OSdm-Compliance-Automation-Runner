@@ -6,6 +6,7 @@ module.exports = {
   buildBookingRequest,
   accommodationAndPlaceSelection,
   collectAvailablePlaces,
+  placesForPassengers,
   requestRefundOffersBody,
   requestExchangeOffersBody,
   requestExchangeOperationsBody
@@ -233,6 +234,21 @@ function collectAvailablePlaces(vehicle, count) {
   return out;
 }
 
+// Map availability-picked places onto passengers — one places[] entry per
+// passenger (issue #184). Pairs passengerRefs[i] with the i-th picked place; if
+// fewer places were available than passengers, the surplus reuse the last place
+// (best-effort). Shared by accommodationAndPlaceSelection (pre-booking, into the
+// booking request) and 09. POST Add Reservation (post-booking, BOOKING-context
+// seat map). Returns [] when there is nothing to assign.
+function placesForPassengers(picked, passengerRefs) {
+  const refs = Array.isArray(passengerRefs) ? passengerRefs : [];
+  if (!Array.isArray(picked) || picked.length === 0 || refs.length === 0) return [];
+  return refs.map((ref, i) => {
+    const pk = picked[i] || picked[picked.length - 1];
+    return { passengerRefs: [ref], coachNumber: pk.coachNumber, placeNumber: pk.placeNumber };
+  });
+}
+
 // Function to handle place selections
 function accommodationAndPlaceSelection() {
   validationLogger("[INFO] ➤ accommodationAndPlaceSelection");
@@ -274,13 +290,8 @@ function accommodationAndPlaceSelection() {
   }
 
   if (hasPicks) {
-    // One place per passenger: pair passengerRefs[i] with the i-th picked
-    // AVAILABLE place. If fewer places were available than passengers, the
-    // surplus passengers reuse the last picked place (best-effort).
-    placeSelection.places = passengerRefs.map((ref, i) => {
-      const pk = preselectedPlaces[i] || preselectedPlaces[preselectedPlaces.length - 1];
-      return { passengerRefs: [ref], coachNumber: pk.coachNumber, placeNumber: pk.placeNumber };
-    });
+    // One AVAILABLE place per passenger (shared with the post-booking path).
+    placeSelection.places = placesForPassengers(preselectedPlaces, passengerRefs);
   } else if (requiresPlaceSelection === true || requiresPlaceSelection === "true") {
     // Back-compat: a single preselected coach/place applied to all passengers.
     placeSelection.places = [{

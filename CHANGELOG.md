@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-v1.11.53] — 2026-05-24
 
-Feat (#184) — availability-aware seat selection: `08. GET Place Maps` now picks
-an **available** place **per passenger** from the seat map instead of blindly
-taking the first place and seating everyone on it. Collection
+Feat (#184) — availability-aware seat selection at **both** selection times:
+OSCAR now picks an **available** place **per passenger** from the seat map —
+pre-booking (`08. GET Place Maps`, OFFER context) **and** post-booking
+(`08b. GET Place Map Post-Booking`, BOOKING context) — instead of blindly taking
+the first place and seating everyone on it. Collection
 **OTST_V2.0.9 → OTST_V2.0.10**.
 
 ### Added
@@ -30,6 +32,20 @@ taking the first place and seating everyone on it. Collection
   `available`/`bookable` or enum `availability`/`state`/`status`; no availability
   info ⇒ treated as available so minimal vendors aren't excluded), and returns up
   to `count` `{ coachNumber, placeNumber, layoutId }`.
+- **`library-bruno/requestsBuilder.js`** — `placesForPassengers(picked, refs)`
+  (exported, unit-tested): maps picked places onto passengers, one `places[]`
+  entry per passenger (surplus passengers reuse the last place). Shared by the
+  pre- and post-booking paths.
+- **`08b. GET Place Map Post-Booking`** — new request. The
+  `/availabilities/place-map` endpoint is context-parametrised: `contextType` may
+  be `OFFER` (pre-booking) or **`BOOKING`** (post-booking). Providers that hold
+  seats against a BOOKING (e.g. Bileto — see #182) expose the seat map only
+  *after* pre-booking. This runs in `ADD_TO_BOOKING` mode or as the #182 fallback,
+  routed `02. POST Create Booking → 08b → 09. POST Add Reservation`. It reuses
+  `collectAvailablePlaces`, then `09` carries the picks. Best-effort: a vendor
+  that serves no BOOKING-context map is reported via a trackable assertion
+  `[OSDM] Vendor serves a post-booking (BOOKING-context) seat map` (+ `[VENDOR
+  GAP]` log) and the flow continues — `09` lets the system assign the place.
 
 ### Changed
 - **`08. GET Place Maps`**: derives the passenger count, calls
@@ -37,20 +53,28 @@ taking the first place and seating everyone on it. Collection
   `preselectedCoach`/`preselectedPlace`/`layoutId`), logs the chosen seats and
   warns when fewer places are available than passengers.
 - **`accommodationAndPlaceSelection`**: when `preselectedPlaces` is present, emits
-  **one `places` entry per passenger** (pairs `passengerRefs[i]` with the i-th
-  pick; surplus passengers reuse the last place). The presence of picks also
-  enables place selection even when the legacy `requiresPlaceSelection` flag is
-  unset, so a `SEATMAP_AT_OFFER` scenario carries its seats into the booking. The
-  single-place back-compat path is preserved.
-- `preselectedPlaces` reset between scenarios/runs (`opencollection.yml` +
-  `scenarioParser.resetScenarioEnvVars`).
+  **one `places` entry per passenger** (via `placesForPassengers`). The presence
+  of picks also enables place selection even when the legacy
+  `requiresPlaceSelection` flag is unset, so a `SEATMAP_AT_OFFER` scenario carries
+  its seats into the booking. The single-place back-compat path is preserved.
+- **`09. POST Add Reservation to Booking`**: when `preselectedPlaces` is present
+  (set by `08b`), the add-reservation `placeSelections` now carries `places`
+  (one per passenger) instead of relying on system auto-assignment.
+- **`02. POST Create Booking`** routes to `08b` before `09` when an
+  add-reservation is due; **`opencollection.yml`** smart-run filter now gates the
+  OFFER-context map (pre-booking) and the BOOKING-context map (post-booking,
+  needs a booking, once) independently.
+- `preselectedPlaces` / `__postBookingPlaceMapDone` reset between scenarios/runs
+  (`opencollection.yml` + `scenarioParser.resetScenarioEnvVars`).
 
 ### Notes
 - **Availability-only** (scope confirmed with the requester) — no "seat
   passengers together" optimisation.
-- No sandbox tested so far serves an OFFER-context seat map (the vendors hold
-  seats against a BOOKING — see #182), so this is built to the OSDM spec and
-  unit-tested; it cannot be live-validated until such a vendor is available.
+- No sandbox tested so far serves a place map in **either** context (the vendors
+  hold seats against a BOOKING — see #182), so this is built to the OSDM spec and
+  unit-tested; it cannot be live-validated until a vendor serves one. For Bileto,
+  whether post-booking selection is exposed as a BOOKING-context place map (vs.
+  accepting `places` directly / auto-assigning) is to be confirmed on next test.
 
 ### Operator action
 None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.10

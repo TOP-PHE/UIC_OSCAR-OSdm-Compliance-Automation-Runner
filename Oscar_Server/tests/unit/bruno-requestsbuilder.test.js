@@ -347,6 +347,34 @@ describe('collectAvailablePlaces', () => {
   });
 });
 
+describe('placesForPassengers', () => {
+  const picked = [
+    { coachNumber: '12', placeNumber: '21' },
+    { coachNumber: '12', placeNumber: '22' },
+  ];
+
+  test('one entry per passenger, paired by index', () => {
+    expect(rb.placesForPassengers(picked, ['00001', '00002'])).toEqual([
+      { passengerRefs: ['00001'], coachNumber: '12', placeNumber: '21' },
+      { passengerRefs: ['00002'], coachNumber: '12', placeNumber: '22' },
+    ]);
+  });
+
+  test('surplus passengers reuse the last picked place', () => {
+    const out = rb.placesForPassengers([{ coachNumber: '1', placeNumber: '5' }], ['00001', '00002', '00003']);
+    expect(out).toHaveLength(3);
+    expect(out.every((p) => p.placeNumber === '5')).toBe(true);
+    expect(out.map((p) => p.passengerRefs[0])).toEqual(['00001', '00002', '00003']);
+  });
+
+  test('returns [] when nothing to assign', () => {
+    expect(rb.placesForPassengers([], ['00001'])).toEqual([]);
+    expect(rb.placesForPassengers(picked, [])).toEqual([]);
+    expect(rb.placesForPassengers(null, ['00001'])).toEqual([]);
+    expect(rb.placesForPassengers(picked, null)).toEqual([]);
+  });
+});
+
 describe('requestRefundOffersBody', () => {
   test('includes fulfillmentIds + optional overruleCode/refundDate', () => {
     setEnv({ fulfillmentIds: '["F1","F2"]' });
