@@ -222,13 +222,19 @@ function collectAvailablePlaces(vehicle, count) {
   for (let ci = 0; ci < vehicle.coaches.length && out.length < want; ci++) {
     const coach = vehicle.coaches[ci];
     if (!coach || typeof coach !== "object") continue;
+    // OSDM Coach uses `number` for the coach number (required); `coachNumber`
+    // is kept only as a fallback for non-spec vendors. Reading the wrong field
+    // produced an undefined coachNumber → the booking's SelectedPlace was missing
+    // its required coachNumber and the vendor rejected it (#188).
+    const cn = (coach.number != null) ? coach.number
+             : (coach.coachNumber != null ? coach.coachNumber : null);
     const places = placesOf(coach);
     for (let pi = 0; pi < places.length && out.length < want; pi++) {
       const p = places[pi];
       if (!isAvailable(p)) continue;
       const pid = placeId(p);
       if (pid == null) continue;
-      out.push({ coachNumber: coach.coachNumber, placeNumber: pid, layoutId: coach.layoutId });
+      out.push({ coachNumber: cn, placeNumber: pid, layoutId: coach.layoutId });
     }
   }
   return out;
@@ -243,9 +249,17 @@ function collectAvailablePlaces(vehicle, count) {
 function placesForPassengers(picked, passengerRefs) {
   const refs = Array.isArray(passengerRefs) ? passengerRefs : [];
   if (!Array.isArray(picked) || picked.length === 0 || refs.length === 0) return [];
+  // OSDM SelectedPlace is additionalProperties:false and requires exactly
+  // { coachNumber, placeNumber, passengerRef } — all STRINGS, passengerRef
+  // SINGULAR. Emitting "passengerRefs" (plural array) — or numeric coach/place —
+  // makes the vendor reject the booking with 400 "Invalid request content".
   return refs.map((ref, i) => {
     const pk = picked[i] || picked[picked.length - 1];
-    return { passengerRefs: [ref], coachNumber: pk.coachNumber, placeNumber: pk.placeNumber };
+    return {
+      coachNumber: String(pk.coachNumber),
+      placeNumber: String(pk.placeNumber),
+      passengerRef: ref
+    };
   });
 }
 
@@ -293,12 +307,12 @@ function accommodationAndPlaceSelection() {
     // One AVAILABLE place per passenger (shared with the post-booking path).
     placeSelection.places = placesForPassengers(preselectedPlaces, passengerRefs);
   } else if (requiresPlaceSelection === true || requiresPlaceSelection === "true") {
-    // Back-compat: a single preselected coach/place applied to all passengers.
-    placeSelection.places = [{
-      passengerRefs,
-      coachNumber: bru.getEnvVar("preselectedCoach"),
-      placeNumber: bru.getEnvVar("preselectedPlace")
-    }];
+    // Back-compat: a single preselected coach/place → one SelectedPlace per
+    // passenger (via the shared, schema-correct builder).
+    placeSelection.places = placesForPassengers(
+      [{ coachNumber: bru.getEnvVar("preselectedCoach"), placeNumber: bru.getEnvVar("preselectedPlace") }],
+      passengerRefs
+    );
   }
 
   bru.setEnvVar("placeSelections", JSON.stringify([placeSelection]));
