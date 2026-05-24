@@ -308,7 +308,7 @@ describe('collectAvailablePlaces', () => {
   test('skips occupied/reserved/unavailable places, keeps available, respects count', () => {
     const vehicle = {
       coaches: [{
-        coachNumber: '12', layoutId: 'L9',
+        number: '12', layoutId: 'L9',
         places: [
           { number: '1', available: false },
           { number: '2', occupied: true },
@@ -326,11 +326,27 @@ describe('collectAvailablePlaces', () => {
     ]);
   });
 
+  test('coach number comes from OSDM Coach.number (not coachNumber)', () => {
+    // OSDM Coach uses `number`; reading `coachNumber` previously yielded undefined
+    // → the booking's SelectedPlace lost its required coachNumber (#188).
+    const vehicle = { coaches: [{ number: '7', layoutId: 'L1', places: [{ number: '1', available: true }] }] };
+    expect(rb.collectAvailablePlaces(vehicle, 1)).toEqual([
+      { coachNumber: '7', placeNumber: '1', layoutId: 'L1' },
+    ]);
+  });
+
+  test('falls back to coachNumber when number is absent (non-spec vendors)', () => {
+    const vehicle = { coaches: [{ coachNumber: '9', layoutId: 'L2', places: [{ number: '1', available: true }] }] };
+    expect(rb.collectAvailablePlaces(vehicle, 1)).toEqual([
+      { coachNumber: '9', placeNumber: '1', layoutId: 'L2' },
+    ]);
+  });
+
   test('flattens across coaches and handles compartments[].places + compartment.place shapes', () => {
     const vehicle = {
       coaches: [
-        { coachNumber: 'A', layoutId: 'LA', compartments: [{ places: [{ place: 'a1', available: true }] }] },
-        { coachNumber: 'B', layoutId: 'LB', compartments: [{ place: 'b1', state: 'FREE' }] }, // compartment IS a place
+        { number: 'A', layoutId: 'LA', compartments: [{ places: [{ place: 'a1', available: true }] }] },
+        { number: 'B', layoutId: 'LB', compartments: [{ place: 'b1', state: 'FREE' }] }, // compartment IS a place
       ],
     };
     const out = rb.collectAvailablePlaces(vehicle, 5);
@@ -341,7 +357,7 @@ describe('collectAvailablePlaces', () => {
   });
 
   test('count defaults to at least 1', () => {
-    const vehicle = { coaches: [{ coachNumber: '1', places: [{ number: 'x', available: true }, { number: 'y', available: true }] }] };
+    const vehicle = { coaches: [{ number: '1', places: [{ number: 'x', available: true }, { number: 'y', available: true }] }] };
     expect(rb.collectAvailablePlaces(vehicle, 0)).toHaveLength(1);
     expect(rb.collectAvailablePlaces(vehicle)).toHaveLength(1);
   });

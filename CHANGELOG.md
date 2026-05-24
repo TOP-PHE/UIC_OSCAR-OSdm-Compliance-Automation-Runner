@@ -30,6 +30,11 @@ Collection **OTST_V2.0.11 → OTST_V2.0.12**.
   (one entry per passenger; values coerced to strings). The legacy single-place
   branch in `accommodationAndPlaceSelection` routes through the same helper.
   Fixes both `02. POST Create Booking` and `09. POST Add Reservation` (shared).
+- **`collectAvailablePlaces`**: the coach number is read from the OSDM
+  `Coach.number` field (was wrongly reading `coachNumber`, which is always
+  `undefined`), with `coachNumber` kept only as a fallback for non-spec vendors.
+  Without this, the picked place had no coach number and the required
+  `SelectedPlace.coachNumber` was missing → `400`.
 - This was latent until #186 made the offer-time seat map work and `places`
   actually populate.
 

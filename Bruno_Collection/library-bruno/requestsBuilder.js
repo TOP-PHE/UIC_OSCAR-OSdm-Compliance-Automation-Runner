@@ -222,13 +222,19 @@ function collectAvailablePlaces(vehicle, count) {
   for (let ci = 0; ci < vehicle.coaches.length && out.length < want; ci++) {
     const coach = vehicle.coaches[ci];
     if (!coach || typeof coach !== "object") continue;
+    // OSDM Coach uses `number` for the coach number (required); `coachNumber`
+    // is kept only as a fallback for non-spec vendors. Reading the wrong field
+    // produced an undefined coachNumber → the booking's SelectedPlace was missing
+    // its required coachNumber and the vendor rejected it (#188).
+    const cn = (coach.number != null) ? coach.number
+             : (coach.coachNumber != null ? coach.coachNumber : null);
     const places = placesOf(coach);
     for (let pi = 0; pi < places.length && out.length < want; pi++) {
       const p = places[pi];
       if (!isAvailable(p)) continue;
       const pid = placeId(p);
       if (pid == null) continue;
-      out.push({ coachNumber: coach.coachNumber, placeNumber: pid, layoutId: coach.layoutId });
+      out.push({ coachNumber: cn, placeNumber: pid, layoutId: coach.layoutId });
     }
   }
   return out;
