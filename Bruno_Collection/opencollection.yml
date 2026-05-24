@@ -145,7 +145,11 @@ request:
 
           // Post-booking add-reservation runs only in ADD_TO_BOOKING mode
           // (issues #104 Stage B / #107), and only once per scenario.
-          var _runAddReservation = (bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
+          // Adaptive fallback (#182): also runs when the pre-booking seat map
+          // failed at offer time (08. GET Place Maps set __placeMapAtOfferFailed)
+          // — the seat is then selected AFTER pre-booking via add-reservation.
+          var _runAddReservation = ((bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
+                                    || bru.getEnvVar('__placeMapAtOfferFailed') === 'true')
                                  && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true';
 
           // Post-booking add-ancillary runs only when the scenario enabled it
@@ -247,7 +251,7 @@ request:
                 "patchDateOfBirth", "patchFirstName", "patchLastName",
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
-                "placeSelectionMode",
+                "placeSelectionMode", "__placeMapAtOfferFailed",
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 // Fulfillment

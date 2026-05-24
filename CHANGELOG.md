@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.52] — 2026-05-24
+
+Fix (#182) — adaptive place-selection fallback: when the pre-booking
+(OFFER-context) seat map is unavailable, OSCAR selects the seat **after**
+pre-booking, with a trackable vendor-gap assertion. Collection
+**OTST_V2.0.8 → OTST_V2.0.9**.
+
+### Changed
+- **`08. GET Place Maps`**: when the offer-time seat map is unavailable
+  (non-200 **or** 200 with no `vehicleAvailability`) and place selection is
+  enabled (`salesFlow_placeSelection === 'true'`), set `__placeMapAtOfferFailed`
+  and emit a clearly-named **FAILING** assertion `[OSDM] Vendor serves a
+  pre-booking (OFFER-context) seat map` (+ a `[VENDOR GAP]` log). Providers such
+  as Bileto hold seats against a **BOOKING**, so they expose no seat map for a
+  bare OFFER — place selection then happens post-booking.
+- **`02. POST Create Booking`**: the post-booking add-reservation routing
+  (`_addRes`) now also fires when `__placeMapAtOfferFailed === 'true'`, so the
+  seat is selected after pre-booking via `09. POST Add Reservation to Booking`
+  (*"pre-book, then pick the seat"*) — even when the scenario's nominal mode was
+  `SEATMAP_AT_OFFER`.
+- **`opencollection.yml`**: smart-run filter `_runAddReservation` is also true
+  when `__placeMapAtOfferFailed === 'true'` (so `09` is not skipped);
+  `__placeMapAtOfferFailed` added to the collection-start reset list.
+- **`library-bruno/scenarioParser.js`** (`resetScenarioEnvVars`):
+  `__placeMapAtOfferFailed` reset between scenarios.
+
+One-way scenarios, nominal `ADD_TO_BOOKING`, and working `SEATMAP_AT_OFFER`
+scenarios are unchanged.
+
+### Operator action
+None. Bruno collection refreshes on the VPS at merge; chip shows OTST_V2.0.9
+after Watchtower restarts.
+
+---
+
 ## [server-v1.11.51] — 2026-05-24
 
 Fix (#180) — return booking adapts when a vendor rejects multi-offer bookings,
