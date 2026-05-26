@@ -21,7 +21,7 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
@@ -303,8 +303,8 @@ router.post('/users/:id/generate-reset-link', (req, res) => {
   // Wipe any previous outstanding token for this user (one active link at a time)
   run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
 
-  const token     = require('uuid').v4();
-  const id        = require('uuid').v4();
+  const token     = uuidv4();
+  const id        = uuidv4();
   const PASSWORD_RESET_EXPIRY_HOURS = 24;
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 

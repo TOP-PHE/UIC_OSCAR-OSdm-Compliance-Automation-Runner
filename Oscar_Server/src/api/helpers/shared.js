@@ -13,7 +13,7 @@
  * Extracted to eliminate duplication between auth.js, admin.js, and company.js.
  */
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run } = require('../../db/db');
 const { normalizeRole } = require('../middleware/auth');
 

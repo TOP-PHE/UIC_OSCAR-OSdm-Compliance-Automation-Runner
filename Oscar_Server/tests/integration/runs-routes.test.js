@@ -22,7 +22,7 @@
 process.env.JWT_SECRET = 'test-jwt-secret-for-runs-routes';
 
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
 const { run, get } = require('../../src/db/db');

@@ -22,7 +22,7 @@
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-shared';
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run, all } = require('../../src/db/db');
 const {
   resolveRole,

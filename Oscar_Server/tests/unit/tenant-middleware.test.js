@@ -15,7 +15,7 @@
  * roles (administrator/certification_user) can target other companies.
  */
 
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { run, get } = require('../../src/db/db');
 const { enforceTenant } = require('../../src/api/middleware/tenant');
 

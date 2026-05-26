@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.58] — 2026-05-26
+
+Dependency + repo cleanup (no functional behaviour change). **Bundles three
+Dependabot items and removes one dependency; server 1.11.57 → 1.11.58, Bruno
+collection OTST_V2.0.13 → OTST_V2.0.14, release 2026.86.**
+
+### Removed
+- **Dropped the `uuid` dependency for Node's built-in `crypto.randomUUID()`.**
+  Every call site used `uuid.v4()` with no buffer, and the package could not be
+  upgraded — uuid v7+ is ESM-only and breaks OSCAR's CommonJS (the documented
+  PR #110 failure, `SyntaxError: Unexpected token 'export'`), so even the
+  patched `11.1.1` was off-limits. Replaced
+  `const { v4: uuidv4 } = require('uuid')` with
+  `const { randomUUID: uuidv4 } = require('node:crypto')` across **9 `src` files
+  + 10 test files** (call sites unchanged — `randomUUID()` returns an identical
+  RFC-4122 v4 string), and removed `uuid` from `package.json` +
+  `package-lock.json`. **Permanently resolves Dependabot alert #1** (uuid
+  `< 11.1.1` buffer-bounds in v3/v5/v6 — a path OSCAR never used) and obsoletes
+  Dependabot **PR #191** (uuid→14).
+
+### Changed
+- **Dependency bumps** (merged from Dependabot): `nodemailer` 8.0.7 → 8.0.9
+  (patch, #192); `pino` 9.5.0 → 10.3.1 (major, #193 — `logger.js` uses only
+  stable pino APIs and Node 22 satisfies pino v10's engine floor).
+
+### Added
+- **Tracked the three sibling Bruno `folder.yml` files** (`data_base`,
+  `json_validator`, `library-bruno`) so collection folder ordering is
+  deterministic for everyone; **gitignored** the local
+  `Bruno_Collection/Dev working documents/` scratch folder.
+
+---
+
 ## [server-v1.11.57] — 2026-05-26
 
 Passenger contact read robustness (#231) — **Bruno collection change

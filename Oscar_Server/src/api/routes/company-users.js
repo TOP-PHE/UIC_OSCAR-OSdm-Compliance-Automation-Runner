@@ -35,7 +35,7 @@
 const express   = require('express');
 const bcrypt    = require('bcrypt');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { auditLog } = require('../helpers/shared');
