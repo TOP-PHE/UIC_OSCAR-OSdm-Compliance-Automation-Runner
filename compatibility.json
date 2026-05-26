@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.85",
+  "current_release": "2026.86",
   "releases": [
+    {
+      "release": "2026.86",
+      "date": "2026-05-26",
+      "server": "1.11.58",
+      "collection": "OTST_V2.0.14",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "chore: dependency + repo cleanup release (no functional behaviour change). (1) Dropped the uuid dependency entirely in favour of Node's built-in crypto.randomUUID(): every call site used uuid.v4() with no buffer, and the package could not be upgraded (uuid v7+ is ESM-only and breaks OSCAR's CommonJS — the documented PR #110 'SyntaxError: Unexpected token export'). Replaced `const { v4: uuidv4 } = require('uuid')` with `const { randomUUID: uuidv4 } = require('node:crypto')` across 9 src files + 10 test files (call sites unchanged; randomUUID returns an identical RFC-4122 v4 string), and removed uuid from package.json + package-lock.json. This permanently resolves Dependabot alert #1 (uuid < 11.1.1 buffer-bounds in v3/v5/v6, to which OSCAR was never exposed) and obsoletes Dependabot PR #191. (2) Merged Dependabot updates: nodemailer 8.0.7 -> 8.0.9 (patch, #192) and pino 9.5.0 -> 10.3.1 (major, #193; logger.js uses only stable pino APIs and Node 22 satisfies v10's engine floor). (3) Tracked the three sibling Bruno folder.yml files (data_base, json_validator, library-bruno) so collection folder ordering is deterministic; gitignored the local 'Dev working documents/' scratch folder. Server 1.11.57 -> 1.11.58; Bruno_Collection/VERSION OTST_V2.0.13 -> OTST_V2.0.14.",
+        "Operator action required: none. Hard-refresh after Watchtower promotes :stable. Chip shows 2026.86 / server-v1.11.58 / OTST_V2.0.14."
+      ]
+    },
     {
       "release": "2026.85",
       "date": "2026-05-26",

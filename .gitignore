@@ -55,6 +55,11 @@ Bruno_Collection/results/
 # deliberately, use `git add -f <file>`.
 Bruno_Collection/Validation_Reports/
 
+# ── Bruno: local scratch ────────────────────────────────────────────────
+# Personal working-notes folder the Bruno GUI creates locally. Not part of
+# the shipped collection — keep it (and whatever drafts live in it) out of git.
+Bruno_Collection/Dev working documents/
+
 # ── OS / misc ───────────────────────────────────────────────────────────
 *.bak
 *.tmp
