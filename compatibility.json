@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.83",
+  "current_release": "2026.84",
   "releases": [
+    {
+      "release": "2026.84",
+      "date": "2026-05-26",
+      "server": "1.11.56",
+      "collection": "OTST_V2.0.12",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "ui(#194): scenario-authoring + admin time-display polish (server-only; Bruno collection unchanged, OTST_V2.0.12). (1) Scenario row title shows the code verbatim via scenarioTitle(sc) instead of decodeCode(sc.code) — decodeCode partial-decoded codes with recognised tokens (e.g. SALE_SEARCH_BAS_PAR_2ADT_2LEG -> 'Sale - 2 Adults - 2 Legs', dropping O&D) and looked like a rename; decoded/default name now used only when there is no code. (2) Passenger category preserved: wizGenPassengers (bulk create) omitted the category field the scenario view reads first, so a 3-adult/2-child request rendered as 5 adults (DOBs already child-aged; only the label was wrong) — it now stamps category like the single Add Passenger path; corrected help texts that wrongly claimed names are prefixed with the type. (3) Server Activity: login-events list was capped at the latest 50 with no date filter — added a local-day date picker + Latest button (GET /v1/admin/activity?from=&to= filters by the UTC range derived from the picked local day, matching the local times shown), a scrollable list, empty-state, and local-today clamp. (4) App-wide local-timezone reference: nav.js gains localTzRef() + a clock chip in the nav bar (e.g. Europe/Paris (UTC+02:00), DST-aware) so every page's time columns have an explicit zone; the Activity caption also names the zone. Server 1.11.55 -> 1.11.56.",
+        "Operator action required: none. Hard-refresh after Watchtower promotes :stable. Chip shows 2026.84 / server-v1.11.56 / OTST_V2.0.12."
+      ]
+    },
     {
       "release": "2026.83",
       "date": "2026-05-24",

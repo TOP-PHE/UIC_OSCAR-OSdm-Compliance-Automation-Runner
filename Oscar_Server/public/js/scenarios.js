@@ -213,6 +213,18 @@ function decodeCode(code) {
   return desc;
 }
 
+// Display name for a scenario row. Show the scenario CODE exactly as the user
+// entered it — NEVER rewrite a user-provided code into a decoded "friendly"
+// name. (decodeCode used to partial-decode e.g. SALE_SEARCH_BAS_PAR_2ADT_2LEG
+// into "Sale — 2 Adults — 2 Legs", silently dropping the origin/destination and
+// making it look like the system had renamed the scenario.) A generated/decoded
+// default applies ONLY when there is no code at all.
+function scenarioTitle(sc) {
+  const code = (sc && sc.code != null) ? String(sc.code).trim() : '';
+  if (code) return code;
+  return decodeCode((sc && sc.code) || '') || 'Untitled scenario';
+}
+
 function scenarioTypeBadge(sc) {
   const t = (sc.scenarioType || 'SALE').toUpperCase();
   if (t === 'REFUND')   return `<span class="badge badge-refund">Refund</span>`;
@@ -1134,7 +1146,7 @@ function renderAll() {
           title="${inRun ? 'Remove from run' : 'Add to run'}"
           style="accent-color:#0090D4;width:18px;height:18px;flex-shrink:0;cursor:pointer">
         <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${esc(idx)}">
-          <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(decodeCode(sc.code))} ${ownerBadge} ${versionBadge}</div>
+          <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(scenarioTitle(sc))} ${ownerBadge} ${versionBadge}</div>
           <div style="font-size:11px;color:#90a4ae;font-family:'Courier New',monospace">${esc(sc.code)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
@@ -2770,7 +2782,7 @@ function renderWizardStep1() {
       <div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">
           Age limits per passenger type
-          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — used to generate valid birth dates in test data; first name prefixed with type (e.g. ADULT_Marie)</span>
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — used to generate valid birth dates in test data for each passenger type</span>
         </div>
         <div class="pax-age-table">
           ${WIZ_HUMAN_PAX_TYPES.map(p => {
@@ -4464,8 +4476,8 @@ function renderWizardStep3() {
     <div class="fw-section-head open" data-action="fw-toggle">👥 Passengers<span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body open">
       <div style="font-size:12px;color:#78909c;margin-bottom:10px">
-        First names are prefixed with the passenger type (e.g. <code>ADULT_Marie</code>).
-        Date of birth is generated from configured age ranges.
+        Each passenger keeps its type (Adult, Child, …) and gets a realistic name;
+        the date of birth is generated from the configured age ranges for that type.
       </div>
       <div class="pax-counter-rows">
         ${paxRows || '<div style="color:#90a4ae;font-size:13px">No passenger types configured in the Test Framework.</div>'}
@@ -4736,6 +4748,12 @@ function wizGenPassengers() {
       const pax = {
         reference:   `PAX${refNum++}`,       // required by schema
         type:        osdmType,
+        // OSCAR-side passenger category (ADULT / CHILD / YOUTH / SENIOR / …).
+        // The OSDM `type` is PERSON for all humans (age differentiated by
+        // dateOfBirth), so without this the scenario view could not tell an
+        // ADULT from a CHILD and defaulted everything to ADULT — a 3-adult /
+        // 2-child request rendered as 5 adults. inferCategory() reads this first.
+        category:    category,
         phoneNumber: paxPhone,
         email:       paxEmail
       };
@@ -5540,9 +5558,10 @@ document.body.addEventListener('change', function(e) {
         if (raw)   raw.textContent   = normalised;
         if (human) {
           // Preserve trailing ownership/version badges by only rewriting the
-          // leading text node. Simpler: rebuild with decodeCode + existing badges.
+          // leading text node. Show the (normalised) code verbatim — never the
+          // decoded "friendly" rename.
           const badgeHtml = human.innerHTML.replace(/^[^<]*/, '');
-          human.innerHTML = esc(decodeCode(normalised)) + ' ' + badgeHtml;
+          human.innerHTML = esc(scenarioTitle({ code: normalised })) + ' ' + badgeHtml;
         }
       }
       // Toggle-scenario checkbox uses the code as identifier — refresh its

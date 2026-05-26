@@ -386,12 +386,33 @@ router.get('/activity', (req, res) => {
      LIMIT 10`
   );
 
-  const latestLogins = all(
-    `SELECT created_at, event_type, email, ip, user_agent
-     FROM auth_events
-     ORDER BY created_at DESC
-     LIMIT 50`
-  );
+  // Optional ?from=&to= (UTC datetimes "YYYY-MM-DD HH:MM:SS") — return login
+  // events in that half-open range instead of the most-recent 50. The client
+  // computes the range from the LOCAL day the admin picks (local midnight →
+  // +24h, converted to UTC), so the day filter matches the local times shown in
+  // the table. created_at is stored UTC in that exact format, so a lexical
+  // string range is also chronological. Without the params, the historic
+  // "latest 50" is returned.
+  const TS_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+  const fromParam = (typeof req.query.from === 'string' && TS_RE.test(req.query.from)) ? req.query.from : null;
+  const toParam   = (typeof req.query.to   === 'string' && TS_RE.test(req.query.to))   ? req.query.to   : null;
+  const useRange  = !!(fromParam && toParam);
+
+  const latestLogins = useRange
+    ? all(
+        `SELECT created_at, event_type, email, ip, user_agent
+         FROM auth_events
+         WHERE created_at >= ? AND created_at < ?
+         ORDER BY created_at DESC
+         LIMIT 1000`,
+        [fromParam, toParam]
+      )
+    : all(
+        `SELECT created_at, event_type, email, ip, user_agent
+         FROM auth_events
+         ORDER BY created_at DESC
+         LIMIT 50`
+      );
 
   return res.json({
     totals,
@@ -400,7 +421,8 @@ router.get('/activity', (req, res) => {
     failed_logins_last_24h: failedLogins24h,
     run_status_distribution: runStatus,
     top_submitters_last_7d: topSubmitters,
-    latest_auth_events: latestLogins
+    latest_auth_events: latestLogins,
+    auth_events_range: useRange ? { from: fromParam, to: toParam } : null
   });
 });
 
