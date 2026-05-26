@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.57] — 2026-05-26
+
+Passenger contact read robustness (#231) — **Bruno collection change
+(OTST_V2.0.12 → OTST_V2.0.13); server bumped in lockstep (1.11.56 → 1.11.57).**
+
+### Fixed
+- **Passenger email/phone read is now version-agnostic**
+  (`library-bruno/passengers.js`). `patchMultiPassengerResponse` validated the
+  PATCH/GET passenger response's echoed email/phone behind
+  `parseFloat(osdmVersion) >= 3.4`, but the OSDM `PersonDetail` change actually
+  landed at **3.1**: `contact` (`ContactDetail`) was added and top‑level
+  `email`/`phoneNumber` were marked `deprecated` (still returned). The `>= 3.4`
+  boundary false‑failed on 3.1–3.3 servers returning contact‑only, and
+  `parseFloat("3.0.4")` collapsed to `3` (so the reported 3.0.4 failure read the
+  wrong field). Replaced the version branch with a **contact‑first / flat‑fallback**
+  read (`detail.contact?.email ?? detail.email ?? ""`, same for `phoneNumber`),
+  matching the already‑robust purchaser read in `fulfillments.js`. No version
+  guessing, correct across 3.0.x and 3.1+. The build side (`scenarioParser.js`,
+  `DetailContact`/`Contact` vs flat `Detail` at the 3.4 boundary) is unchanged —
+  flat is accepted/deprecated at 3.1–3.3 and correct at 3.0.x, so requests stay
+  valid.
+
+---
+
 ## [server-v1.11.56] — 2026-05-26
 
 UI polish (#194) — scenario authoring + admin time displays. **Server‑only; Bruno
