@@ -24,7 +24,7 @@
 const path        = require('path');
 const fs          = require('fs');
 const { spawn }   = require('child_process');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });

@@ -20,7 +20,7 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
