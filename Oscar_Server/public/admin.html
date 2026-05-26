@@ -274,7 +274,14 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 
     <div class="card">
       <h3>Recent Login Events</h3>
-      <div class="table-wrap">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <label style="font-size:12px;color:#607d8b">View a specific day (local time):
+          <input type="date" id="activity-date" style="margin-left:6px;padding:3px 6px">
+        </label>
+        <button class="btn btn-sm" id="btn-activity-latest" title="Show the most recent events">Latest</button>
+        <span id="activity-date-label" style="font-size:12px;color:#90a4ae"></span>
+      </div>
+      <div class="table-wrap" style="max-height:440px;overflow:auto">
         <table>
           <thead><tr><th>Time</th><th>Event</th><th>Email</th><th>IP</th><th>User-Agent</th></tr></thead>
           <tbody id="auth-events-tbody"></tbody>
@@ -980,8 +987,17 @@ async function callBulkAdminAction(action, run_ids) {
   loadReports();
 }
 
-async function loadActivity() {
-  const res = await fetch('/v1/admin/activity', { headers: authHeaders });
+async function loadActivity(date) {
+  let url = '/v1/admin/activity';
+  if (date) {
+    // Convert the picked LOCAL day to a UTC [start, start+24h) range so the
+    // filter matches the local times shown in the table.
+    const startLocal = new Date(date + 'T00:00:00');               // local midnight
+    const endLocal   = new Date(startLocal.getTime() + 86400000);  // +24h
+    const toSql = d => d.toISOString().slice(0, 19).replace('T', ' ');  // UTC "YYYY-MM-DD HH:MM:SS"
+    url += '?from=' + encodeURIComponent(toSql(startLocal)) + '&to=' + encodeURIComponent(toSql(endLocal));
+  }
+  const res = await fetch(url, { headers: authHeaders });
   const data = await res.json();
 
   document.getElementById('activity-kpis').innerHTML = `
@@ -1005,11 +1021,39 @@ async function loadActivity() {
       <td class="mono">${esc(e.ip || '-')}</td>
       <td>${esc((e.user_agent || '-').slice(0,80))}</td>
     </tr>
-  `).join('');
+  `).join('') || `<tr><td colspan="5" style="color:#90a4ae;padding:12px">No login events for this day.</td></tr>`;
+
+  // Reflect what the events list is showing (the picked LOCAL day), and keep the
+  // date picker in sync. Times in the table are already rendered in local time
+  // via fmtDate()/parseServerTs().
+  const evCount = (data.latest_auth_events || []).length;
+  const lbl = document.getElementById('activity-date-label');
+  if (lbl) lbl.textContent = (date
+    ? evCount + ' event(s) on ' + date
+    : 'Showing the latest ' + evCount + ' events')
+    + ' — times in ' + localTzRef();
+  const dEl = document.getElementById('activity-date');
+  if (dEl) {
+    if (!dEl.max) {
+      const now = new Date();   // clamp to LOCAL today (no future days)
+      dEl.max = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    }
+    dEl.value = date || '';
+  }
 }
 
 // ── Static element event listeners ───────────────────────────────────────────
 document.getElementById('btn-refresh').addEventListener('click', refreshCurrentTab);
+// Server Activity — jump to a specific day, or back to the latest events.
+(function () {
+  var dateEl = document.getElementById('activity-date');
+  if (dateEl) dateEl.addEventListener('change', function () { loadActivity(this.value || null); });
+  var latestEl = document.getElementById('btn-activity-latest');
+  if (latestEl) latestEl.addEventListener('click', function () {
+    var d = document.getElementById('activity-date'); if (d) d.value = '';
+    loadActivity(null);
+  });
+})();
 document.getElementById('new-role').addEventListener('change', toggleNewCompanyField);
 document.getElementById('btn-create-user').addEventListener('click', createUser);
 document.getElementById('user-search').addEventListener('input', debouncedLoadUsers);
