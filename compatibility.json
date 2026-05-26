@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.84",
+  "current_release": "2026.85",
   "releases": [
+    {
+      "release": "2026.85",
+      "date": "2026-05-26",
+      "server": "1.11.57",
+      "collection": "OTST_V2.0.13",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#231): passenger email/phone read is now version-agnostic. library-bruno/passengers.js patchMultiPassengerResponse validated the echoed email/phone behind parseFloat(osdmVersion) >= 3.4, but the OSDM PersonDetail change landed at 3.1 (contact/ContactDetail added; top-level email/phoneNumber marked deprecated but still returned). The 3.4 boundary false-failed on 3.1-3.3 servers returning contact-only, and parseFloat('3.0.4') collapses to 3 so the reported 3.0.4 failure read the wrong field. Replaced the version branch with a contact-first/flat-fallback read (detail.contact?.email ?? detail.email ?? '' and the same for phoneNumber), matching the already-robust purchaser read in fulfillments.js — no version guessing, correct across 3.0.x and 3.1+. Build side (scenarioParser.js DetailContact/Contact vs flat Detail at the 3.4 boundary) unchanged: flat is accepted/deprecated at 3.1-3.3 and correct at 3.0.x, so requests stay valid. Bruno_Collection/VERSION OTST_V2.0.12 -> OTST_V2.0.13; server 1.11.56 -> 1.11.57.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.85 / server-v1.11.57 / OTST_V2.0.13 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.84",
       "date": "2026-05-26",

@@ -12,10 +12,15 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   const dateOfBirth = response.passenger?.dateOfBirth;
   const gender      = response.passenger?.gender;
 
-  const isV34Plus = parseFloat(bru.getEnvVar("osdmVersion")) >= 3.4;
-  const contact   = response.passenger?.detail;
-  const phoneNumber = isV34Plus ? (contact?.contact?.phoneNumber || "") : (contact?.phoneNumber || "");
-  const email       = isV34Plus ? (contact?.contact?.email       || "") : (contact?.email       || "");
+  // Email/phone moved from detail.{email,phoneNumber} (now deprecated) into
+  // detail.contact.{email,phoneNumber} (ContactDetail) at OSDM 3.1. Read
+  // contact-first, then fall back to the deprecated flat fields — robust across
+  // 3.0.x and 3.1+ with no version guessing. (Replaces an earlier `>= 3.4`
+  // boundary that false-failed on 3.1–3.3 servers returning contact-only, and
+  // mis-parsed a bare "3" osdmVersion.)
+  const detail = response.passenger?.detail || {};
+  const phoneNumber = detail.contact?.phoneNumber ?? detail.phoneNumber ?? "";
+  const email       = detail.contact?.email       ?? detail.email       ?? "";
 
   const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber"));
   const passengerDataRaw = bru.getEnvVar("passengerAdditionalData") || "[]";
