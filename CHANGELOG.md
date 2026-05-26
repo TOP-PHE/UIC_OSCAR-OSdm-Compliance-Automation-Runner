@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.56] — 2026-05-26
+
+UI polish (#194) — scenario authoring + admin time displays. **Server‑only; Bruno
+collection unchanged (OTST_V2.0.12).**
+
+### Fixed
+- **Scenario title shows the code verbatim** (`public/js/scenarios.js`). The row
+  title ran `decodeCode(sc.code)`, which partial‑decoded codes containing
+  recognised tokens (e.g. `SALE_SEARCH_BAS_PAR_2ADT_2LEG` → "Sale — 2 Adults — 2
+  Legs", dropping the origin/destination) and looked like a system rename. New
+  `scenarioTitle(sc)` shows the **code as entered**; the decoded/default name is
+  used only when there is no code.
+- **Passenger category preserved** (`public/js/scenarios.js`). `wizGenPassengers`
+  (bulk create) omitted the `category` field the scenario view reads first, so a
+  3‑adult / 2‑child request rendered as **5 adults** (DOBs were already
+  child‑aged — only the label was wrong). It now stamps `category` like the
+  single "Add Passenger" path already did. Corrected two help texts that wrongly
+  claimed names are prefixed with the type.
+
+### Added
+- **Server Activity — browse earlier days + a specific day, in local time**
+  (`public/admin.html`, `src/api/routes/admin.js`). The login‑events list was
+  capped at the latest 50 with no date filter. Added a **date picker** (local
+  day) + **Latest** button; `GET /v1/admin/activity?from=&to=` filters by the UTC
+  range derived from the picked **local** day so it matches the local times
+  shown; the list is now a scrollable region; empty‑state + local‑today clamp.
+- **Local‑timezone reference, app‑wide** (`public/nav.js`). Timestamps render in
+  the viewer's local zone but printed no zone. New shared `localTzRef()` + a
+  small **clock chip in the nav bar** (e.g. `🕒 Europe/Paris (UTC+02:00)`,
+  DST‑aware) gives every page's time columns an explicit reference; the Activity
+  caption also names the zone.
+
+### Operator action
+None. Hard‑refresh after Watchtower promotes `:stable`.
+
+---
+
 ## [server-v1.11.55] — 2026-05-24
 
 Fix (#188) — booking failed with `400 "Invalid request content"` because

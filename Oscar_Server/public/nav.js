@@ -255,6 +255,14 @@
       '<span style="font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Company</span>'
       + '&nbsp;<strong style="color:#37474f;font-size:12px">' + esc(company.name || 'N/A') + '</strong>';
 
+    // Local timezone reference chip — every page renders timestamps in the
+    // viewer's local time (parseServerTs + toLocaleString), so show the zone once
+    // here as the reference for all time columns.
+    var tzRef = (typeof global.localTzRef === 'function') ? global.localTzRef() : '';
+    var tzChip = tzRef
+      ? '<span class="nav-user" title="All times on OSCAR pages are shown in this local timezone" style="font-size:11px;color:#78909c">🕒 ' + esc(tzRef) + '</span>' + sep
+      : '';
+
     container.innerHTML =
       '<a href="/welcome.html" class="brand">'
         + '<img src="/oscar-icon.svg" alt="OSCAR"> OSCAR'
@@ -266,6 +274,7 @@
       + sep
       + linkParts.join(sep)
       + '<span class="spacer"></span>'
+      + tzChip
       + '<span class="nav-user">' + companyLabel + '</span>'
       + sep
       + '<span class="nav-user">' + esc(user.email || '') + inlineBadge(meta) + '</span>'
@@ -302,6 +311,26 @@
     if (typeof s !== 'string' || !s) return new Date(s);
     if (/Z$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s);
     return new Date(s.replace(' ', 'T') + 'Z');
+  };
+
+  // ── Local timezone reference (v1.11.56) ───────────────────────────────────────
+  // All timestamps are stored UTC and rendered with parseServerTs(...).
+  // toLocaleString() (i.e. the viewer's local zone) — but that prints no zone, so
+  // it's unclear *which* local time. This returns a human label for the viewer's
+  // zone, e.g. "Europe/Paris (UTC+02:00)" (auto-reflects DST), shown once in the
+  // nav bar so every page's time columns have an explicit reference.
+  global.localTzRef = function localTzRef() {
+    var zone = '';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_e) {}
+    var off = -new Date().getTimezoneOffset();   // minutes east of UTC
+    var sign = off >= 0 ? '+' : '-';
+    var abs = Math.abs(off);
+    var hh = String(Math.floor(abs / 60));
+    var mm = String(abs % 60);
+    if (hh.length < 2) hh = '0' + hh;
+    if (mm.length < 2) mm = '0' + mm;
+    var utc = 'UTC' + sign + hh + ':' + mm;
+    return zone ? (zone + ' (' + utc + ')') : utc;
   };
 
   // ── Global logout helper ─────────────────────────────────────────────────────
