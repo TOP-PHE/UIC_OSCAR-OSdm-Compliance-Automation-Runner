@@ -54,6 +54,7 @@ function resetScenarioEnvVars() {
     "scenario_override",
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
+    "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
     "overruleCode", "refundDate", "TripType",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
@@ -423,6 +424,10 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("scenarioAction", ["", "null"].includes(scenario.scenarioAction) ? null : scenario.scenarioAction);
       // RI negative probe (#258 Phase 3c): off (default) | omit | invalid.
       bru.setEnvVar("requestedInformationProbe", ["", "null", null, undefined].includes(scenario.requestedInformationProbe) ? "off" : String(scenario.requestedInformationProbe).toLowerCase());
+      // Purchaser at booking (#258 / #203): inline (default — purchaser in the
+      // booking request) | deferred (omit, then POST it to satisfy the demand) |
+      // omit (never supply) | invalid (POST a bad purchaser → expect rejection).
+      bru.setEnvVar("bookingPurchaserMode", ["", "null", null, undefined].includes(scenario.bookingPurchaserMode) ? "inline" : String(scenario.bookingPurchaserMode).toLowerCase());
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
       // The data file is the per-scenario source of truth; the env file is the fallback

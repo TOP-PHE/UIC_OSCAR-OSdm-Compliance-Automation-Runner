@@ -22,6 +22,13 @@
  * or `ANY` (every passenger). A leaf is true when that attribute is populated;
  * the whole expression must be true to proceed.
  *
+ * #258 purchaser support: the grammar's root token is generic, so a provider may
+ * also demand purchaser data with a `purchaser[…].…` leaf (not in the published
+ * examples, but valid syntax). The engine is therefore ROOT-AWARE: a leaf's root
+ * decides the subject it refers to — `passengerSpecifications` → an indexed
+ * passenger; `purchaser` → the single purchaser object (the index is ignored).
+ * Each kind has its own evaluation subject and its own auto-feed/probe channel.
+ *
  * Phase 1 (this module): parse the expression, render it for humans, map each
  * leaf to the OSCAR scenario field a tester must set, and Layer-1 type-check the
  * raw string. Evaluation against the sent data model is Phase 2.
@@ -65,6 +72,15 @@ function fieldInfo(path) {
 
 function passengerRef(index) {
   return index === 'ANY' ? 'all passengers' : `passenger ${index}`;
+}
+
+// #258: a leaf's ROOT decides the "subject" it refers to. passengerSpecifications
+// → an indexed passenger; purchaser → the single purchaser object (index ignored).
+// Unknown roots are tolerated but flagged (staticIssues.unknownRoots).
+const ROOT_KIND = { passengerSpecifications: 'passenger', purchaser: 'purchaser' };
+function rootKind(root) { return ROOT_KIND[root] || 'other'; }
+function subjectRef(root, index) {
+  return rootKind(root) === 'purchaser' ? 'the purchaser' : passengerRef(index);
 }
 
 // ─── Tokenizer ───────────────────────────────────────────────────────────────
@@ -183,7 +199,7 @@ function parseRequestedInformation(expr) {
 function renderNode(node) {
   if (!node) return '';
   if (node.type === 'leaf') {
-    return `${fieldInfo(node.path).label} (${passengerRef(node.index)})`;
+    return `${fieldInfo(node.path).label} (${subjectRef(node.root, node.index)})`;
   }
   const op = node.type === 'and' ? 'AND' : 'OR';
   const render = (child) => {
@@ -205,10 +221,13 @@ function collectLeaves(node, acc) {
   if (!node) return acc;
   if (node.type === 'leaf') {
     const fi = fieldInfo(node.path);
+    const ref = subjectRef(node.root, node.index);
     acc.push({
       root: node.root,
+      kind: rootKind(node.root),
       index: node.index,
-      passengerRef: passengerRef(node.index),
+      passengerRef: ref, // back-compat name; root-aware value ('the purchaser' for purchaser leaves)
+      subjectRef: ref,
       path: node.path,
       fieldLabel: fi.label,
       scenarioField: fi.scenarioField,
@@ -284,6 +303,14 @@ function collectionFor(model, root) {
 
 function evalNode(node, model) {
   if (node.type === 'leaf') {
+    // #258: the purchaser is a SINGLE object (not a collection); the index is
+    // immaterial — `purchaser[0]` / `purchaser[ANY]` both mean "the purchaser".
+    if (rootKind(node.root) === 'purchaser') {
+      const subject = model && model.purchaser;
+      return leafSatisfiedFor(subject, node)
+        ? { satisfied: true, unmet: [] }
+        : { satisfied: false, unmet: [{ leaf: node, index: node.index }] };
+    }
     const collection = collectionFor(model, node.root);
     if (node.index === 'ANY') {
       if (!collection.length) return { satisfied: false, unmet: [{ leaf: node, index: 'ANY' }] };
@@ -310,13 +337,16 @@ function evalNode(node, model) {
 
 function unmetDescriptor(u) {
   const fi = fieldInfo(u.leaf.path);
+  const ref = subjectRef(u.leaf.root, u.index);
   return {
     fieldLabel: fi.label,
     scenarioField: fi.scenarioField,
     root: u.leaf.root,
+    kind: rootKind(u.leaf.root),
     path: u.leaf.path,
     index: u.index,
-    passengerRef: passengerRef(u.index),
+    passengerRef: ref,
+    subjectRef: ref,
   };
 }
 
@@ -369,6 +399,36 @@ function buildPassengerModelFromAdditionalData(additionalArr, specsArr) {
   });
 }
 
+/**
+ * Build the PURCHASER data model (a single object, not a collection) from OSCAR's
+ * scenario data. `purchaserAdditional` carries update* override values (parallel
+ * to passengerAdditionalData, used by the POST/PATCH purchaser step); `purchaserSpec`
+ * is the scenario's purchaser (bookingPurchaserSpecifications) supplying fields
+ * already set. Tolerates the 3.0 flat (detail.email) vs 3.1+ (detail.contact.email)
+ * shapes on the spec side.
+ * @returns {object} normalised purchaser (OSDM-ish) for evaluation.
+ */
+function buildPurchaserModelFromAdditionalData(purchaserAdditional, purchaserSpec) {
+  const a = (purchaserAdditional && typeof purchaserAdditional === 'object') ? purchaserAdditional : {};
+  const s = (purchaserSpec && typeof purchaserSpec === 'object') ? purchaserSpec : {};
+  const sd = (s.detail && typeof s.detail === 'object') ? s.detail : {};
+  const sc = (sd.contact && typeof sd.contact === 'object') ? sd.contact : {};
+  const pick = (...vals) => { for (const v of vals) { if (v !== undefined && v !== null) return v; } return null; };
+  return {
+    type: pick(s.type, a.type),
+    dateOfBirth: pick(a.updateDateOfBirth, s.dateOfBirth, sd.dateOfBirth),
+    gender: pick(a.updateGender, s.gender, sd.gender),
+    detail: {
+      firstName: pick(a.updateFirstName, sd.firstName),
+      lastName: pick(a.updateLastName, sd.lastName),
+      contact: {
+        email: pick(a.updateEmail, sc.email, sd.email),
+        phoneNumber: pick(a.updatePhoneNumber, sc.phoneNumber, sd.phoneNumber),
+      },
+    },
+  };
+}
+
 // ─── Static conformance (Phase 3b) ────────────────────────────────────────────
 // Known passenger attributes OSCAR recognises (last path segment). Anything else
 // is reported as an unknown path (S3 — WARN, allow-list may be incomplete).
@@ -384,16 +444,22 @@ function staticIssues(ast, passengerCount) {
   const leaves = ast ? collectLeaves(ast) : [];
   const indexErrors = [];
   const unknownPaths = [];
+  const unknownRoots = [];
   leaves.forEach((l) => {
-    if (typeof l.index === 'number'
+    const kind = rootKind(l.root);
+    // Index range applies to passengers only — the purchaser is a single object,
+    // so `purchaser[0]`/`purchaser[3]` carry no out-of-range meaning.
+    if (kind === 'passenger'
+        && typeof l.index === 'number'
         && typeof passengerCount === 'number' && passengerCount >= 0
         && l.index >= passengerCount) {
       indexErrors.push({ index: l.index, passengerCount, path: l.path.join('.') });
     }
     const last = l.path[l.path.length - 1];
     if (!KNOWN_LAST_SEGMENTS.has(last)) unknownPaths.push(l.path.join('.'));
+    if (kind === 'other') unknownRoots.push(l.root);
   });
-  return { indexErrors, unknownPaths };
+  return { indexErrors, unknownPaths, unknownRoots };
 }
 
 // ─── Auto-feed (Phase 3a) ──────────────────────────────────────────────────────
@@ -457,6 +523,32 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
   return { additional, provided };
 }
 
+/**
+ * Auto-feed missing mappable PURCHASER fields into a copy of the purchaser
+ * additional-data object (single object, not an array). Only fills empty fields;
+ * never overwrites tester/scenario-provided values. The POST/PATCH purchaser step
+ * reads these update* keys. @returns {{ purchaserAdditional:object, provided:Array }}
+ */
+function applyPurchaserAutoFeed(purchaserAdditional, unmetLeaves, purchaserSpec) {
+  const out = (purchaserAdditional && typeof purchaserAdditional === 'object')
+    ? Object.assign({}, purchaserAdditional) : {};
+  const provided = [];
+  (unmetLeaves || []).forEach((u) => {
+    const updateKey = AUTO_FEED_UPDATE_KEYS[u.scenarioField];
+    if (!updateKey) return;               // unmappable (taxId/companyDetails) → can't PATCH
+    if (isSet(out[updateKey])) return;    // keep scenario/tester-provided values
+    const type = (purchaserSpec && purchaserSpec.type) || out.type || null;
+    const value = sampleValueForField(u.scenarioField, 0, type);
+    if (value === null) return;
+    out[updateKey] = value;
+    provided.push({
+      scenarioField: u.scenarioField, updateKey, value,
+      fieldLabel: u.fieldLabel, subjectRef: u.subjectRef || 'the purchaser',
+    });
+  });
+  return { purchaserAdditional: out, provided };
+}
+
 /** A deliberately INVALID value for a field, for the negative probe (Phase 3c).
  *  Returns null for fields with no clear invalid form (those get omitted instead). */
 function invalidValueForField(scenarioField) {
@@ -476,29 +568,56 @@ function invalidValueForField(scenarioField) {
  * negative probe, deliberately OMIT or set INVALID values so the provider must
  * reject. Pure except via injected callbacks, so it is unit-testable with mocks.
  *
+ * Root-aware (#258): passenger leaves use the passengerAdditionalData channel (the
+ * PATCH-passenger step); purchaser leaves use a SEPARATE purchaserAdditional channel
+ * (the POST/PATCH-purchaser step). The two channels have independent modes so a run
+ * can, e.g., auto-feed passengers while withholding the purchaser.
+ *
  * @param {object} o
- * @param {string}   o.expr            raw requestedInformation string
- * @param {string}   o.tag             context label (e.g. "admissionOfferParts[0]" / "booking")
- * @param {Array}    o.additional      passengerAdditionalData (not mutated; a new array is returned)
- * @param {Array}    o.specs           passenger specs (for `type` + count)
- * @param {number}   o.passengerCount  passenger count for index-range checks
- * @param {string}   [o.mode]          'autofeed' | 'omit' | 'invalid'
- * @param {boolean}  [o.autoFeedOn]    legacy: true→'autofeed', false→'omit' (used if mode absent)
- * @param {function} o.assert          (name, okBool, failMsg) — FAIL semantics
- * @param {function} o.log             (level, msg) — 'INFO' | 'WARNING'
- * @returns {{ additional:Array, provided:Array, probeTargets:Array, satisfied:boolean, parseOk:boolean }}
+ * @param {string}   o.expr             raw requestedInformation string
+ * @param {string}   o.tag              context label (e.g. "admissionOfferParts[0]" / "booking")
+ * @param {Array}    o.additional       passengerAdditionalData (not mutated; a new array is returned)
+ * @param {Array}    o.specs            passenger specs (for `type` + count)
+ * @param {number}   o.passengerCount   passenger count for index-range checks
+ * @param {string}   [o.mode]           passenger mode: 'autofeed' | 'omit' | 'invalid'
+ * @param {boolean}  [o.autoFeedOn]     legacy: true→'autofeed', false→'omit' (used if mode absent)
+ * @param {object}   [o.purchaserAdditional] purchaser update* overrides (not mutated; a copy is returned)
+ * @param {object}   [o.purchaserSpec]  the scenario purchaser (bookingPurchaserSpecifications)
+ * @param {string}   [o.purchaserMode]  purchaser mode: 'autofeed' (default) | 'omit' | 'invalid'
+ * @param {function} o.assert           (name, okBool, failMsg) — FAIL semantics
+ * @param {function} o.log              (level, msg) — 'INFO' | 'WARNING'
+ * @returns {{ additional:Array, provided:Array, probeTargets:Array,
+ *            purchaserAdditional:object, purchaserProvided:Array, purchaserProbeTargets:Array,
+ *            satisfied:boolean, parseOk:boolean }}
  */
 function processRequestedInformation(o) {
   const { expr, tag, specs, passengerCount, assert, log } = o;
-  const mode = o.mode || (o.autoFeedOn === false ? 'omit' : 'autofeed');
+  const paxMode = o.mode || (o.autoFeedOn === false ? 'omit' : 'autofeed');
+  // Only 'omit'/'invalid' are negative probes; anything else (inline/deferred/
+  // undefined) means "satisfy it" → autofeed.
+  const purMode = (o.purchaserMode === 'omit' || o.purchaserMode === 'invalid') ? o.purchaserMode : 'autofeed';
   let additional = Array.isArray(o.additional) ? o.additional.map((x) => Object.assign({}, x)) : [];
+  let purchaserAdditional = (o.purchaserAdditional && typeof o.purchaserAdditional === 'object')
+    ? Object.assign({}, o.purchaserAdditional) : {};
+  const purchaserSpec = o.purchaserSpec || null;
+
+  const provided = [];
+  const probeTargets = [];
+  const purchaserProvided = [];
+  const purchaserProbeTargets = [];
+  const result = () => ({
+    additional, provided, probeTargets,
+    purchaserAdditional, purchaserProvided, purchaserProbeTargets,
+    satisfied: false, parseOk: true,
+  });
+
   const s = summariseRequestedInformation(expr);
 
   assert(`${tag}.requestedInformation is a valid OSDM type (string, <=${MAX_LENGTH})`,
     s.typeOk, `type errors: ${s.typeErrors.join('; ')}`);
   assert(`${tag}.requestedInformation parses against the OSDM grammar`,
     s.parseOk, `parse error: ${s.parseError}`);
-  if (!s.parseOk) return { additional, provided: [], probeTargets: [], satisfied: false, parseOk: false };
+  if (!s.parseOk) { const r = result(); r.parseOk = false; return r; }
 
   log('INFO', `${tag} requests additional information before the next step: ${s.description}`);
 
@@ -509,67 +628,125 @@ function processRequestedInformation(o) {
   if (issues.unknownPaths.length) {
     log('WARNING', `${tag}.requestedInformation references attribute(s) OSCAR does not recognise: ${[...new Set(issues.unknownPaths)].join(', ')}`);
   }
+  if (issues.unknownRoots.length) {
+    log('WARNING', `${tag}.requestedInformation references unknown root object(s): ${[...new Set(issues.unknownRoots)].join(', ')} — OSCAR handles 'passengerSpecifications' and 'purchaser'.`);
+  }
 
   s.leaves.forEach((l) => {
     if (l.scenarioField) {
-      log('INFO', `  → '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+      log('INFO', `  → '${l.scenarioField}' (${l.fieldLabel}) on ${l.subjectRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
     } else {
-      log('WARNING', `  → '${l.path.join('.')}' on ${l.passengerRef} is not configurable in OSCAR — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+      log('WARNING', `  → '${l.path.join('.')}' on ${l.subjectRef} is not configurable in OSCAR — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
     }
   });
 
-  const provided = [];
-  const probeTargets = [];
+  const paxLeaves = s.leaves.filter((l) => l.kind === 'passenger');
+  const purLeaves = s.leaves.filter((l) => l.kind === 'purchaser');
+  const evalNow = () => evaluateRequestedInformation(s.ast, {
+    passengerSpecifications: buildPassengerModelFromAdditionalData(additional, specs),
+    purchaser: buildPurchaserModelFromAdditionalData(purchaserAdditional, purchaserSpec),
+  });
 
-  if (mode === 'autofeed') {
-    const evalNow = () => evaluateRequestedInformation(
-      s.ast, { passengerSpecifications: buildPassengerModelFromAdditionalData(additional, specs) });
-    let res = evalNow();
-    if (res.satisfied) {
-      log('INFO', `${tag} requestedInformation is already satisfied by the scenario's passenger data.`);
-      return { additional, provided, probeTargets, satisfied: true, parseOk: true };
+  let paxSatisfied = true;
+  let purSatisfied = true;
+
+  // ── PASSENGER channel (passengerAdditionalData → PATCH-passenger step) ──────
+  if (paxLeaves.length) {
+    if (paxMode === 'autofeed') {
+      let unmet = evalNow().unmetLeaves.filter((u) => u.kind === 'passenger');
+      if (unmet.length === 0) {
+        log('INFO', `${tag} requestedInformation is already satisfied by the scenario's passenger data.`);
+      } else {
+        const r = applyAutoFeed(additional, unmet, specs);
+        additional = r.additional;
+        r.provided.forEach((p) => {
+          provided.push(p);
+          log('INFO', `Auto-provided '${p.scenarioField}' (${p.fieldLabel}) = '${p.value}' for ${p.passengerRef} to satisfy ${tag}.requestedInformation`);
+        });
+        unmet = evalNow().unmetLeaves.filter((u) => u.kind === 'passenger');
+        const mappableRemaining = unmet.filter((u) => u.scenarioField);
+        assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
+          mappableRemaining.length === 0,
+          `still unmet after auto-feed: ${mappableRemaining.map((u) => `${u.scenarioField}@${u.passengerRef}`).join(', ')}`);
+        unmet.filter((u) => !u.scenarioField).forEach((u) => {
+          log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
+        });
+      }
+      paxSatisfied = evalNow().unmetLeaves.every((u) => u.kind !== 'passenger');
+    } else {
+      // Negative probe: omit or set INVALID the demanded mappable passenger fields
+      // so the next step is submitted with missing/invalid data → provider rejects.
+      const count = (typeof passengerCount === 'number' && passengerCount > 0) ? passengerCount : additional.length;
+      paxLeaves.forEach((l) => {
+        const updateKey = AUTO_FEED_UPDATE_KEYS[l.scenarioField];
+        if (!updateKey) return; // unmappable → cannot manipulate via the PATCH body
+        const indices = (l.index === 'ANY') ? Array.from({ length: count }, (_, i) => i) : [l.index];
+        indices.forEach((i) => {
+          if (typeof i !== 'number' || i < 0) return;
+          while (additional.length <= i) additional.push({});
+          const entry = additional[i];
+          const bad = (paxMode === 'invalid') ? invalidValueForField(l.scenarioField) : null;
+          if (paxMode === 'invalid' && bad !== null) {
+            entry[updateKey] = bad;
+            probeTargets.push({ index: i, scenarioField: l.scenarioField, value: bad });
+            log('WARNING', `${tag} negative probe: set INVALID '${l.scenarioField}' = '${bad}' for passenger ${i} — expecting the provider to reject the next step`);
+          } else {
+            entry[updateKey] = '';
+            probeTargets.push({ index: i, scenarioField: l.scenarioField });
+            log('WARNING', `${tag} negative probe: withholding required '${l.scenarioField}' for passenger ${i} — expecting the provider to reject the next step`);
+          }
+        });
+      });
+      paxSatisfied = false;
     }
-    const r = applyAutoFeed(additional, res.unmetLeaves, specs);
-    additional = r.additional;
-    r.provided.forEach((p) => {
-      provided.push(p);
-      log('INFO', `Auto-provided '${p.scenarioField}' (${p.fieldLabel}) = '${p.value}' for ${p.passengerRef} to satisfy ${tag}.requestedInformation`);
-    });
-    res = evalNow();
-    const mappableRemaining = res.unmetLeaves.filter((u) => u.scenarioField);
-    assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
-      mappableRemaining.length === 0,
-      `still unmet after auto-feed: ${mappableRemaining.map((u) => `${u.scenarioField}@${u.passengerRef}`).join(', ')}`);
-    res.unmetLeaves.filter((u) => !u.scenarioField).forEach((u) => {
-      log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
-    });
-    return { additional, provided, probeTargets, satisfied: res.satisfied, parseOk: true };
   }
 
-  // Negative probe: omit or set INVALID the demanded mappable fields so the next
-  // step is submitted with missing/invalid data → the provider must reject it.
-  const count = (typeof passengerCount === 'number' && passengerCount > 0) ? passengerCount : additional.length;
-  s.leaves.forEach((l) => {
-    const updateKey = AUTO_FEED_UPDATE_KEYS[l.scenarioField];
-    if (!updateKey) return; // unmappable → cannot manipulate via the PATCH body
-    const indices = (l.index === 'ANY') ? Array.from({ length: count }, (_, i) => i) : [l.index];
-    indices.forEach((i) => {
-      if (typeof i !== 'number' || i < 0) return;
-      while (additional.length <= i) additional.push({});
-      const entry = additional[i];
-      const bad = (mode === 'invalid') ? invalidValueForField(l.scenarioField) : null;
-      if (mode === 'invalid' && bad !== null) {
-        entry[updateKey] = bad;
-        probeTargets.push({ index: i, scenarioField: l.scenarioField, value: bad });
-        log('WARNING', `${tag} negative probe: set INVALID '${l.scenarioField}' = '${bad}' for passenger ${i} — expecting the provider to reject the next step`);
+  // ── PURCHASER channel (purchaserAdditional → POST/PATCH-purchaser step) ─────
+  if (purLeaves.length) {
+    if (purMode === 'autofeed') {
+      let unmet = evalNow().unmetLeaves.filter((u) => u.kind === 'purchaser');
+      if (unmet.length === 0) {
+        log('INFO', `${tag} requestedInformation (purchaser) is already satisfied by the scenario's purchaser data.`);
       } else {
-        entry[updateKey] = '';
-        probeTargets.push({ index: i, scenarioField: l.scenarioField });
-        log('WARNING', `${tag} negative probe: withholding required '${l.scenarioField}' for passenger ${i} — expecting the provider to reject the next step`);
+        const r = applyPurchaserAutoFeed(purchaserAdditional, unmet, purchaserSpec);
+        purchaserAdditional = r.purchaserAdditional;
+        r.provided.forEach((p) => {
+          purchaserProvided.push(p);
+          log('INFO', `Auto-provided '${p.scenarioField}' (${p.fieldLabel}) = '${p.value}' for the purchaser to satisfy ${tag}.requestedInformation`);
+        });
+        unmet = evalNow().unmetLeaves.filter((u) => u.kind === 'purchaser');
+        const mappableRemaining = unmet.filter((u) => u.scenarioField);
+        assert(`${tag}.requestedInformation (purchaser) is satisfiable from OSCAR scenario fields (auto-fed)`,
+          mappableRemaining.length === 0,
+          `still unmet after auto-feed: ${mappableRemaining.map((u) => u.scenarioField).join(', ')}`);
+        unmet.filter((u) => !u.scenarioField).forEach((u) => {
+          log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for the purchaser (not configurable in OSCAR) — booking/confirmation may be rejected.`);
+        });
       }
-    });
-  });
-  return { additional, provided, probeTargets, satisfied: false, parseOk: true };
+      purSatisfied = evalNow().unmetLeaves.every((u) => u.kind !== 'purchaser');
+    } else {
+      // Negative probe on the purchaser (a single object → no index).
+      purLeaves.forEach((l) => {
+        const updateKey = AUTO_FEED_UPDATE_KEYS[l.scenarioField];
+        if (!updateKey) return;
+        const bad = (purMode === 'invalid') ? invalidValueForField(l.scenarioField) : null;
+        if (purMode === 'invalid' && bad !== null) {
+          purchaserAdditional[updateKey] = bad;
+          purchaserProbeTargets.push({ scenarioField: l.scenarioField, value: bad });
+          log('WARNING', `${tag} negative probe: set INVALID '${l.scenarioField}' = '${bad}' for the purchaser — expecting the provider to reject the next step`);
+        } else {
+          purchaserAdditional[updateKey] = '';
+          purchaserProbeTargets.push({ scenarioField: l.scenarioField });
+          log('WARNING', `${tag} negative probe: withholding required '${l.scenarioField}' for the purchaser — expecting the provider to reject the next step`);
+        }
+      });
+      purSatisfied = false;
+    }
+  }
+
+  const out = result();
+  out.satisfied = paxSatisfied && purSatisfied;
+  return out;
 }
 
 /**
@@ -611,12 +788,15 @@ module.exports = {
   summariseRequestedInformation,
   evaluateRequestedInformation,
   buildPassengerModelFromAdditionalData,
+  buildPurchaserModelFromAdditionalData,
   staticIssues,
   sampleValueForField,
   applyAutoFeed,
+  applyPurchaserAutoFeed,
   invalidValueForField,
   processRequestedInformation,
   validateProblemResponse,
+  rootKind,
   AUTO_FEED_UPDATE_KEYS,
   MAX_LENGTH,
 };

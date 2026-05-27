@@ -57,6 +57,18 @@
               null
             ]
           },
+          "bookingPurchaserMode": {
+            "description": "Where the purchaser is supplied for a booking (#258 / #203). 'inline' (default): the purchaser is sent in the POST /bookings request (historic behaviour). 'deferred': omit it at booking, then POST it to /bookings/{id}/purchaser afterwards (happy path — also exercises any purchaser requestedInformation the booking raised). 'omit': never supply the purchaser. 'invalid': omit at booking, then POST an invalid purchaser and assert an RFC-9457 Problem.",
+            "type": ["string", "null"],
+            "enum": [
+              "inline",
+              "deferred",
+              "omit",
+              "invalid",
+              "",
+              null
+            ]
+          },
           "osdmVersion": {
             "type": "string"
           },
