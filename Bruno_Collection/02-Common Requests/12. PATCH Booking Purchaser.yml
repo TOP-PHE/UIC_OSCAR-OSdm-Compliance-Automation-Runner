@@ -1,10 +1,10 @@
 info:
-  name: 12. POST Booking Purchaser
+  name: 12. PATCH Booking Purchaser
   type: http
   seq: 12
 
 http:
-  method: POST
+  method: PATCH
   url: "{{api_base}}/bookings/{{bookingId}}/purchaser"
   headers:
     - name: Authorization
@@ -25,16 +25,21 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        // #258 / #203: set the purchaser on an already-existing booking
-        // (postBookingPurchaser). Reached only when the scenario chose
+        // #258 / #203: set the purchaser on an already-existing booking via
+        // PATCH (patchBookingPurchaser). Reached only when the scenario chose
         // bookingPurchaserMode = 'deferred' (happy: supply it) or 'invalid'
         // (negative: supply a bad purchaser → expect rejection). The purchaser
-        // was deliberately OMITTED from 02. POST Create Booking so this exercises
-        // both the endpoint and any purchaser requestedInformation the booking
-        // raised. The exact body is a best-effort assembly from the scenario's
-        // purchaser (bookingPurchaserSpecifications) + any update* overrides the
-        // booking-level RI handler produced (purchaserAdditionalData); refine
-        // against a live system if a vendor's PurchaserResponse differs.
+        // was deliberately OMITTED from 02. POST Create Booking.
+        //
+        // NB OSDM offers two write ops on this sub-resource: POST (create a
+        // purchaser for a booking that has none) and PATCH (update an existing
+        // one). For a booking created WITHOUT a purchaser, POST-create is the
+        // canonical call — but several providers (e.g. Bileto) already
+        // materialise an (empty) purchaser on the booking, so a POST-create hits
+        // an existing resource and 500s; PATCH-update is the call that works.
+        // We therefore use PATCH here. The body is a best-effort assembly from
+        // the scenario's purchaser (bookingPurchaserSpecifications) + any update*
+        // overrides the booking-level RI handler produced (purchaserAdditionalData).
         console.log("⏩ [STEP] Executing request : " + req.getName());
 
         const mode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
@@ -85,7 +90,7 @@ runtime:
           const { validateProblemResponse } = require(bru.getEnvVar("library_base") + "requestedInformation.js");
           let targets = [];
           try { targets = JSON.parse(bru.getEnvVar("requestedInfoPurchaserProbeTargets") || "[]"); } catch (_e) { targets = []; }
-          validationLogger(`[INFO] Purchaser negative probe (invalid) — expecting POST ${endpoint} to be rejected.`);
+          validationLogger(`[INFO] Purchaser negative probe (invalid) — expecting PATCH ${endpoint} to be rejected.`);
           validateProblemResponse({
             status: status,
             body: body,
@@ -97,17 +102,17 @@ runtime:
           // ── Happy path (deferred): expect 2xx PurchaserResponse ──────────────
           const ok2xx = status >= 200 && status < 300;
           if (ok2xx) {
-            bruTest(`POST ${endpoint} → ${status} (purchaser set on the booking)`, () => {
+            bruTest(`PATCH ${endpoint} → ${status} (purchaser set on the booking)`, () => {
               expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
             });
-            validationLogger(`[INFO] POST ${endpoint} → ${status} — purchaser set on the booking after deferral.`);
+            validationLogger(`[INFO] PATCH ${endpoint} → ${status} — purchaser set on the booking after deferral.`);
             const hasPurchaser = !!(body && typeof body === "object" && body.purchaser);
-            bruTest(`POST ${endpoint} response carries 'purchaser' (PurchaserResponse)`, () => {
+            bruTest(`PATCH ${endpoint} response carries 'purchaser' (PurchaserResponse)`, () => {
               expect(hasPurchaser, "no 'purchaser' in the PurchaserResponse").to.be.true;
             });
           } else {
-            validationLogger(`[ERROR] POST ${endpoint} → ${status} (expected 2xx setting the deferred purchaser)`);
-            bruTest(`POST ${endpoint} → ${status} (FAIL)`, () => {
+            validationLogger(`[ERROR] PATCH ${endpoint} → ${status} (expected 2xx setting the deferred purchaser)`);
+            bruTest(`PATCH ${endpoint} → ${status} (FAIL)`, () => {
               expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
             });
           }

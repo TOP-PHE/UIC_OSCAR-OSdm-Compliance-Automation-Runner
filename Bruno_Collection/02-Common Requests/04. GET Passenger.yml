@@ -86,7 +86,7 @@ runtime:
             const _purMode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
             const _purStepDue = (_purMode === "deferred" || _purMode === "invalid")
                 && bru.getEnvVar("__purchaserStepDone") !== "true";
-            bru.runner.setNextRequest(_purStepDue ? "12. POST Booking Purchaser" : "07. GET Booking before Fulfillments");
+            bru.runner.setNextRequest(_purStepDue ? "12. PATCH Booking Purchaser" : "07. GET Booking before Fulfillments");
         }
 
 settings:

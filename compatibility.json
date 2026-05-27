@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.99",
+  "current_release": "2026.100",
   "releases": [
+    {
+      "release": "2026.100",
+      "date": "2026-05-27",
+      "server": "1.11.72",
+      "collection": "OTST_V2.0.25",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#258/#203): the deferred-purchaser step now uses PATCH (patchBookingPurchaser) instead of POST (postBookingPurchaser). For a booking created WITHOUT a purchaser, POST-create is the OSDM-canonical call, but providers that already materialise an (empty) purchaser on the booking (e.g. Bileto) 500 on POST-create because the resource already exists; PATCH-update is the call that works there. Step renamed '12. POST Booking Purchaser' -> '12. PATCH Booking Purchaser'; method POST -> PATCH; 04. GET Passenger routes to the new name; body assembly unchanged. Bruno_Collection/VERSION OTST_V2.0.24 -> OTST_V2.0.25; server 1.11.71 -> 1.11.72.",
+        "Operator action required: none. Only affects scenarios with bookingPurchaserMode=deferred/invalid (default inline is unchanged). Chip shows 2026.100 / server-v1.11.72 / OTST_V2.0.25 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.99",
       "date": "2026-05-27",
