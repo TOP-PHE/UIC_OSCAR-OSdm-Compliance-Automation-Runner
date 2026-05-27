@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.103",
+  "current_release": "2026.104",
   "releases": [
+    {
+      "release": "2026.104",
+      "date": "2026-05-27",
+      "server": "1.11.76",
+      "collection": "OTST_V2.0.29",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258): purchaser negative-probe SWEEP — test every purchaser parameter one-by-one in a SINGLE run. With bookingPurchaserMode=invalid, the purchaser write step now loops over each field (firstName, lastName, email, phoneNumber), corrupting exactly ONE per pass (the rest valid) and grading it on its own line, then loops back to 12. GET Booking Purchaser for the next field — reusing the GET-adaptive create-or-update each pass so it is robust to rejections. email/phoneNumber are sent invalid (unconstrained string → WARN if accepted); firstName/lastName are OMITTED (required in PersonDetail → FAIL if not rejected). validateProblemResponse() gains an optional `label` so each field shows as its own assertion ('[purchaser.email]', …). No need to create one scenario per parameter. Only affects bookingPurchaserMode=invalid. Bruno_Collection/VERSION OTST_V2.0.28 -> OTST_V2.0.29; server 1.11.75 -> 1.11.76.",
+        "Operator action required: none. Chip shows 2026.104 / server-v1.11.76 / OTST_V2.0.29 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.103",
       "date": "2026-05-27",
