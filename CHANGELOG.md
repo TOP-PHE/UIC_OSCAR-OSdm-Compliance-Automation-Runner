@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.59] — 2026-05-27
+
+OSDM `requestedInformation` surfacing — **#258 Phase 1**. Bruno collection change
+(OTST_V2.0.14 → OTST_V2.0.15); server in lockstep (1.11.58 → 1.11.59).
+
+### Added
+- **Surface what a provider asks for before the next step**
+  (`library-bruno/requestedInformation.js`, new). OSDM lets a provider advertise,
+  via the `requestedInformation` string on each offer part (`AbstractOfferPart`)
+  and on the post‑booking response (`Booking`), **which passenger data must be
+  populated to proceed** (provisional booking → confirmation). The value is a
+  boolean expression over `passengerSpecifications[i]` paths
+  (`AND`/`OR`/grouping; numeric or `ANY` index; a leaf is true when that
+  attribute is set). The new pure module **parses** the expression, **describes**
+  it in plain language, **maps** each leaf to the OSCAR scenario field
+  (`firstName`/`lastName`/`gender`/`dateOfBirth`/`email`/`phoneNumber` — keyed on
+  the last path segment so `detail.email` and `detail.contact.email` both
+  resolve), and **Layer‑1 type‑checks** the raw string (`string`, ≤ 32768).
+- **Wired into the offer and booking flows** (`offers.js` `validateOfferParts`
+  per offer part; `bookings.js` `postCreateBookingResponse` at booking level).
+  When `requestedInformation` is present, a Layer‑1 type assertion runs and a
+  tester‑facing line states exactly what to set and on which passenger
+  (e.g. *"set 'gender' on passenger 0 — OSDM:
+  `passengerSpecifications[0].detail.gender`"*). A field the provider demands but
+  OSCAR cannot yet author (e.g. `taxId`) is flagged as a gap rather than ignored.
+- Unit tests `tests/unit/bruno-requestedinformation.test.js` (parser / describer
+  / summariser, incl. the four verbatim spec examples).
+
+Absence of `requestedInformation` is not a failure (it is nullable/optional).
+**Unmet** requirements are *not* failed in this phase — evaluation against the
+sent data + WARN is Phase 2; auto‑injecting the demanded data is a later phase.
+Design note: `Documentation/Bruno_Collection/RequestedInformation_Plan_258.md`.
+
+---
+
 ## [server-v1.11.58] — 2026-05-26
 
 Dependency + repo cleanup (no functional behaviour change). **Bundles three

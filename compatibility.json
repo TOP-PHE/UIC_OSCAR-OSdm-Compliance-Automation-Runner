@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.86",
+  "current_release": "2026.87",
   "releases": [
+    {
+      "release": "2026.87",
+      "date": "2026-05-27",
+      "server": "1.11.59",
+      "collection": "OTST_V2.0.15",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258, Phase 1): surface OSDM requestedInformation. The provider can advertise, via the requestedInformation string on each offer part (AbstractOfferPart) and on the post-booking response (Booking), which passenger data must be populated before the next step (provisional booking -> confirmation) — a boolean expression over passengerSpecifications[i] paths (AND/OR/grouping, numeric or ANY index; a leaf is true when that attribute is set). New pure module library-bruno/requestedInformation.js parses the expression, renders it for humans, maps each leaf to the OSCAR scenario field (firstName/lastName/gender/dateOfBirth/email/phoneNumber; keyed on the last path segment so detail.email and detail.contact.email both resolve), and Layer-1 type-checks the raw string (string, <=32768). Wired into offers.js validateOfferParts (per offer part) and bookings.js postCreateBookingResponse (booking level): when present, a Layer-1 type assertion runs and a tester-facing line states exactly what to set and on which passenger, e.g. \"set 'gender' on passenger 0\". Absence is not a failure (nullable/optional); unmet requirements are NOT failed in this phase (evaluation + WARN is Phase 2; auto-injection is a later phase). Unmappable fields (e.g. taxId) are flagged as a scenario-authoring gap rather than ignored. No behavioural change to existing flows beyond the new optional Layer-1 check and logging. Jest: tests/unit/bruno-requestedinformation.test.js covers the parser/describer/summariser incl. the four spec examples. Bruno_Collection/VERSION OTST_V2.0.14 -> OTST_V2.0.15; server 1.11.58 -> 1.11.59.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.87 / server-v1.11.59 / OTST_V2.0.15 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.86",
       "date": "2026-05-26",
