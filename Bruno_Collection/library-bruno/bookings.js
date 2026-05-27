@@ -266,7 +266,7 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
 
 // ─── Public functions ────────────────────────────────────────────────────────
 
-function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus) {
+function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[INFO] ► postCreateBookingResponse");
 
   const booking = jsonData.booking;
@@ -460,7 +460,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
 
-  validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus);
+  validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus, requireFulfillments);
 
   // Check that booking has the same number of passengers as expected from the offer
   const expectedPassengerCount = Number(bru.getEnvVar("passengerCount") || 0);
@@ -489,9 +489,20 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   }
 }
 
-function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
+function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[INFO] ► validateFulfillments");
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) {
+    if (requireFulfillments) {
+      // #250: after POST /fulfillments, GET /bookings/{id} MUST embed the
+      // generated fulfillments — the provider has to keep the booking object
+      // updated. An empty/missing booking.fulfillments here is a conformance
+      // failure, not a "continue".
+      test(`Booking embeds the generated fulfillments after fulfillment (OSDM: booking must be kept updated)`, () => {
+        expect(Array.isArray(fulfillments) && fulfillments.length > 0,
+          "GET /bookings returned no fulfillments after a successful POST /fulfillments — the provider did not update the booking object").to.be.true;
+      });
+      return;
+    }
     validationLogger("[INFO] No fulfillments available in the response, continue execution");
     return;
   }

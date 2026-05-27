@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.93",
+  "current_release": "2026.94",
   "releases": [
+    {
+      "release": "2026.94",
+      "date": "2026-05-27",
+      "server": "1.11.66",
+      "collection": "OTST_V2.0.21",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#250, #251): two offer/booking conformance checks. #250 — after POST /bookings/{id}/fulfillments, the GET /bookings/{id} must embed the generated fulfillments (the provider has to keep the booking object updated). library-bruno/bookings.js validateFulfillments + postCreateBookingResponse gain a requireFulfillments flag; the '07. GET Booking after Fulfillments' step now passes it true, so an empty booking.fulfillments after fulfillment FAILS instead of silently passing (it stays lenient pre-fulfillment / for other callers). #251 — offer->trip link: tripCoverage is optional on an offer part, but when present OSDM requires coveredTripId (TripCoverage.required=[coveredTripId]); offers.js validateOfferParts now asserts tripCoverage.coveredTripId is a non-empty string when tripCoverage is present, and WARNs (does not fail) when the offer carries no tripCoverage at all (clients then derive the link from offerParts). Bruno_Collection/VERSION OTST_V2.0.20 -> OTST_V2.0.21; server 1.11.65 -> 1.11.66.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.94 / server-v1.11.66 / OTST_V2.0.21 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.93",
       "date": "2026-05-27",

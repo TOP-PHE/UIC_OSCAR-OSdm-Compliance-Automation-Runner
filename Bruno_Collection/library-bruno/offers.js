@@ -667,6 +667,20 @@ function validateOfferParts(selectedOffer) {
     bru.setEnvVar("coveredTripId", coveredTripId);
   }
 
+  // #251: the offer→trip link. `tripCoverage` is OPTIONAL on an offer part, but
+  // when present OSDM requires `coveredTripId` (TripCoverage.required=[coveredTripId]).
+  // Assert it when tripCoverage exists; WARN (not fail) when the offer carries no
+  // tripCoverage at all, since clients then have to derive the link from offerParts
+  // (the spec recommends returning coveredTripId at offer level for a single, optimal link).
+  if (selectedOffer.tripCoverage) {
+    test(`Offer tripCoverage.coveredTripId is present (OSDM: TripCoverage.coveredTripId required)`, () => {
+      expect(selectedOffer.tripCoverage.coveredTripId, "tripCoverage present but coveredTripId missing/empty")
+        .to.be.a("string").and.not.be.empty;
+    });
+  } else {
+    validationLogger(`[WARNING] Offer has no tripCoverage — no offer-level coveredTripId; clients must derive the offer↔trip link from offerParts (recommended: return tripCoverage.coveredTripId). (#251)`);
+  }
+
   // Validate tripCoverage.coveredLegIds are non-empty strings (if present)
   const coveredLegIds = selectedOffer.tripCoverage?.coveredLegIds || [];
   if (coveredLegIds.length > 0) {
