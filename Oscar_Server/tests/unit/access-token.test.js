@@ -23,21 +23,11 @@ jest.mock('../../src/worker/auth-profiles', () => ({
   fetchToken: jest.fn(),
 }));
 
-const crypto = require('node:crypto');
 const db = require('../../src/db/db');
 const { fetchToken } = require('../../src/worker/auth-profiles');
 const { resolveAccessToken } = require('../../src/worker/access-token');
 
 const log = { info: jest.fn(), error: jest.fn() };
-
-// Mirror the credential fingerprint computed in access-token.js (#208) so the
-// cache-hit tests can supply a matching value. Inputs are the DECRYPTED creds in
-// this fixed order, space-joined.
-function credFp({ profile = 'oauth2_basic', tokenUrl, clientId, clientSecret, scope = '', extra = '', custom = '' }) {
-  return crypto.createHash('sha256')
-    .update([profile, tokenUrl, clientId, clientSecret, scope, extra, custom].join(' '))
-    .digest('hex');
-}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -82,17 +72,25 @@ describe('resolveAccessToken — oauth2 cache', () => {
     oauth_scope: '',
   };
 
-  // Fingerprint that matches `base`'s decrypted credentials (#208): the cache is
-  // only trusted while the exact credentials are unchanged.
-  const matchingFp = credFp({
-    profile: 'oauth2_basic', tokenUrl: 'https://token', clientId: 'cid', clientSecret: 'secret',
-  });
+  // Resolve once with an empty cache so the implementation computes AND persists
+  // its OWN credential fingerprint (#208), then read it back from the persist
+  // call. Capturing the real value avoids re-implementing the hashing formula in
+  // the test — the cache-hit test then supplies a fingerprint the code is
+  // guaranteed to recognise for `base`'s exact credentials.
+  async function captureCredFp() {
+    fetchToken.mockResolvedValue({ token: 'seed', expiresIn: 3600 });
+    await resolveAccessToken({ ...base }, log);
+    const persist = db.run.mock.calls.find(([sql]) => /cached_token_cred_fp = \?/.test(sql));
+    return persist[1][2]; // 3rd bound param of the persist UPDATE = credFp
+  }
 
   test('reuses a still-valid cached token without fetching', async () => {
+    const fp = await captureCredFp();
+    fetchToken.mockClear(); // forget the seed fetch — a cache hit must not refetch
     const future = new Date(Date.now() + 3600 * 1000).toISOString();
     const tok = await resolveAccessToken(
       { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
-        cached_token_cred_fp: matchingFp }, log
+        cached_token_cred_fp: fp }, log
     );
     expect(tok).toBe('cachedtok');
     expect(fetchToken).not.toHaveBeenCalled();
