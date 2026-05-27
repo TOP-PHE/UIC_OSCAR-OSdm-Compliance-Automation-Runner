@@ -137,4 +137,15 @@ describe('resolveAccessToken — oauth2 cache', () => {
       ['u1']
     );
   });
+
+  test('returns the freshly-fetched token even when caching it throws (#208 regression)', async () => {
+    // Reproduces the regression where the cached_token_cred_fp column was missing
+    // on an un-migrated DB: the persist UPDATE threw "no such column" and failed
+    // EVERY oauth2 run. A cache-write failure must NOT fail an otherwise-valid auth.
+    fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+    db.run.mockImplementationOnce(() => { throw new Error('no such column: cached_token_cred_fp'); });
+    const tok = await resolveAccessToken({ ...base }, log);
+    expect(tok).toBe('freshtok');               // valid token still returned
+    expect(log.error).toHaveBeenCalled();        // failure logged, not thrown
+  });
 });

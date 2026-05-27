@@ -499,6 +499,21 @@ const MIGRATIONS = [
         console.log(`[db] migration v19 — ${name}.${col}: encrypted ${encrypted} rows (skipped ${skipped} already-encrypted)`);
       }
   }},
+  { version: 20, name: 'users-cached-token-cred-fp', up: () => {
+      // #208 REGRESSION FIX. The cached_token_cred_fp ALTER was mistakenly added
+      // inside the already-applied v12 migration, so the version-gated runner
+      // (`if (m.version <= current) continue`) SKIPPED it on every existing DB —
+      // the column was never created. resolveAccessToken() then tried to persist
+      // the cache with `UPDATE users SET ... cached_token_cred_fp = ? ...`, which
+      // threw "no such column: cached_token_cred_fp" and FAILED EVERY oauth2 run
+      // (valid credentials included). Re-add it here as a NEW migration so
+      // deployed DBs actually get the column. Idempotent: fresh DBs that already
+      // ran the v12 ALTER simply no-op via _safeAlter. companies gets it too so
+      // the migrated schema matches schema.sql (column is currently unused there
+      // — resolveAccessToken caches against users — but kept consistent).
+      _safeAlter('ALTER TABLE users ADD COLUMN cached_token_cred_fp TEXT');
+      _safeAlter('ALTER TABLE companies ADD COLUMN cached_token_cred_fp TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
