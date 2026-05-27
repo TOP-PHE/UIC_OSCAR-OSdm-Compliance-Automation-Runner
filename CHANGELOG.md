@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **DB migration smoke test** (`tests/unit/db-migrations.test.js`, #208 / #221 rec #2) —
+  runs the real `schema.sql` + versioned migrations against throwaway temp DBs and
+  asserts (1) a fresh install produces every column the runtime depends on, and
+  (2) a column missing on an already-versioned DB is restored by a new migration.
+  Guards the exact #208 regression class (a required column buried in an
+  already-applied migration) that the mocked-DB unit tests could not catch.
+  Test-only; no runtime change.
 - (next cycle)
 
 ---
