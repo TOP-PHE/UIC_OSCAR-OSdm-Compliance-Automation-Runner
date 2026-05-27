@@ -52,11 +52,14 @@ runtime:
             loopbackOrStop("GET Booking after Fulfillments (JSON parse)");
             return;
         }
+        // #250: this is the GET /bookings AFTER POST /fulfillments — require the
+        // booking to embed the generated fulfillments (5th arg = requireFulfillments).
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
         ["FULFILLED", "CONFIRMED"],
-        ["FULFILLED", "CONFIRMED"]);
+        ["FULFILLED", "CONFIRMED"],
+        true);
 
         displayFulFilledBooking(jsonData);
 
