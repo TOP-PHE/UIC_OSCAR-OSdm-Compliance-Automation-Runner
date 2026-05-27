@@ -14,6 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.67] — 2026-05-27
+
+Clear, fail-fast diagnostic for invalid auth credentials — **#208**. Bruno
+collection change (OTST_V2.0.21 → OTST_V2.0.22); server in lockstep
+(1.11.66 → 1.11.67).
+
+### Fixed
+- **Invalid OAuth credentials now stop the run with a self-explanatory message**
+  instead of cascading into misleading 4xx errors. Each vendor *Access Token*
+  request previously only `console.error`'d when no `access_token` came back — no
+  assertion, no stop — so a bad `client_id`/`client_secret` let every downstream
+  request fail confusingly (and the success path logged the token value, a leak).
+- New **`library-bruno/auth.js`** `handleAccessTokenResponse(res, { vendor })`,
+  called by all six `00-Access Token` requests (Benerail / Bileto / Chaps /
+  Paxone / Sqills / Turnit):
+  - **success** → store `access_token`, record a passing assertion, **never log
+    the token value**;
+  - **failure** (non-2xx or no token; tries `access_token` / `accessToken` /
+    `token`) → emit a clear `[ERROR]` naming the likely cause (OAuth
+    `client_id`/`client_secret`/`scope`/token URL), surface the provider's
+    `error`/`error_description`, record a **FAILING** "access token acquired"
+    assertion, clear any stale token, and **`bru.runner.stopExecution()`** so the
+    cascade never happens.
+- Token request HTTP definitions (endpoints / grant types / bodies) are unchanged.
+
+---
+
 ## [server-v1.11.66] — 2026-05-27
 
 Two offer/booking conformance checks — **#250 + #251**. Bruno collection change
