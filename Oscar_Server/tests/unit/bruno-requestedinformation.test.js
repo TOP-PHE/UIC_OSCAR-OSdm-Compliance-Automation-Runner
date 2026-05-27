@@ -697,4 +697,14 @@ describe('validateProblemResponse — provider-fair severity (#258)', () => {
     });
     expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
   });
+
+  test('label disambiguates assertion names for the per-field sweep', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 400, body: { title: 'Bad', detail: 'gender invalid' }, label: 'purchaser.gender',
+      targets: [{ scenarioField: 'gender', value: 'ZZZ' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.some((a) => /\[purchaser\.gender\]/.test(a.name))).toBe(true);
+  });
 });
