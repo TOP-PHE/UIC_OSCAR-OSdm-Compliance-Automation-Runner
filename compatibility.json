@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.88",
+  "current_release": "2026.89",
   "releases": [
+    {
+      "release": "2026.89",
+      "date": "2026-05-27",
+      "server": "1.11.61",
+      "collection": "OTST_V2.0.17",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258, Phase 3a+3b): auto-feed requestedInformation + static conformance assertions. library-bruno/requestedInformation.js gains: staticIssues(ast, passengerCount) (index-range + unknown-attribute checks), sampleValueForField (valid sample values; gender from the OSDM enum [MALE,FEMALE,X]; type-aware dateOfBirth), applyAutoFeed (fills empty mappable update* fields without overwriting tester data), and processRequestedInformation(...) — a dependency-injected orchestrator (assert/log callbacks) used by both handlers. offers.js validateOfferParts and bookings.js postCreateBookingResponse now: (S1) assert type string<=32768, (S2) assert the expression parses against the OSDM grammar [FAIL], (S4) assert numeric passenger indices are in range [FAIL], (S3) WARN on attributes OSCAR does not recognise; then evaluate against the passenger data OSCAR will send and, by default (auto-feed ON), AUTO-PROVIDE missing demanded fields into passengerAdditionalData (the PATCH Multi Passenger body), re-enabling skipPatchPassengerRequest so the values are actually sent. The report documents what was auto-provided (field, passenger, value). A booking-level P2 check WARNs if the provider re-requests a field OSCAR already provided. Auto-feed is suppressed when a negative probe (requestedInformationProbe != off) is active (Phase 3c, next). Unmappable demands (e.g. taxId) are WARNed, not auto-fed. Jest extended (staticIssues/sampleValueForField/applyAutoFeed/processRequestedInformation with mock sinks). Bruno_Collection/VERSION OTST_V2.0.16 -> OTST_V2.0.17; server 1.11.60 -> 1.11.61.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.89 / server-v1.11.61 / OTST_V2.0.17 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.88",
       "date": "2026-05-27",

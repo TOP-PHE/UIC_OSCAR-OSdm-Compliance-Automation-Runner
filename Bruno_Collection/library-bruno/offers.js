@@ -4,7 +4,7 @@ require('./requestsBuilder.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
-const { summariseRequestedInformation, evaluateRequestedInformation, buildPassengerModelFromAdditionalData } = require('./requestedInformation.js');
+const { processRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   checkWarningsAndProblems,
@@ -650,57 +650,56 @@ function validateOfferParts(selectedOffer) {
     validationLogger(`[INFO] A8 currency consistency checked for all offer parts against summaryCurrency=${_summaryCurrency}`);
   }
 
-  // RI (#258): surface requestedInformation on offer parts (Phase 1) and, when
-  // present, evaluate it against the passenger data OSCAR will send and WARN on
-  // any unmet requirement (Phase 2). WARN-only: a scenario may legitimately omit
-  // an optional field, so unmet info is informational, not a server defect.
+  // RI (#258): for each offer part carrying requestedInformation — assert it is
+  // statically conformant (Phase 1/3b: type, grammar, index range), evaluate it
+  // against the passenger data OSCAR will send, and AUTO-PROVIDE any missing
+  // demanded fields so the happy flow completes (Phase 3a, default on). A
+  // negative probe (Phase 3c) disables auto-feed to test the provider's error.
   const _riReadJson = (name) => {
     const raw = bru.getEnvVar(name);
     if (raw === null || raw === undefined || raw === '') return [];
     try { return typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_e) { return []; }
   };
-  const _riModel = {
-    passengerSpecifications: buildPassengerModelFromAdditionalData(
-      _riReadJson('passengerAdditionalData'),
-      _riReadJson('offerPassengerSpecifications')
-    ),
-  };
+  const _riSpecs = _riReadJson('offerPassengerSpecifications');
+  let _riAdditional = _riReadJson('passengerAdditionalData');
+  const _riCount = Number(bru.getEnvVar('offerPassengerNumber')) || _riAdditional.length || 0;
+  const _riAutoFeedOn = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase() === 'off';
+  const _riAssert = (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; });
+  const _riLog = (lvl, msg) => validationLogger(`[${lvl}] ${msg}`);
+  const _riAutoFed = [];
+  let _riChanged = false;
+
   ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].forEach(partType => {
     (selectedOffer[partType] || []).forEach((part, pi) => {
       const ri = part && part.requestedInformation;
       if (ri === undefined || ri === null || ri === '') return;
-      const s = summariseRequestedInformation(ri);
-      test(`${partType}[${pi}].requestedInformation is a valid OSDM type (string, <=32768)`, () => {
-        expect(s.typeOk, `requestedInformation type errors: ${s.typeErrors.join('; ')}`).to.be.true;
+      const out = processRequestedInformation({
+        expr: ri,
+        tag: `${partType}[${pi}]`,
+        additional: _riAdditional,
+        specs: _riSpecs,
+        passengerCount: _riCount,
+        autoFeedOn: _riAutoFeedOn,
+        assert: _riAssert,
+        log: _riLog,
       });
-      if (!s.parseOk) {
-        validationLogger(`[WARNING] ${partType}[${pi}].requestedInformation could not be parsed as an OSDM requested-information expression: ${s.parseError}`);
-        return;
-      }
-      validationLogger(`[INFO] ${partType}[${pi}] (offer part id ${part.id}) requests additional information before the next step: ${s.description}`);
-      s.leaves.forEach(l => {
-        if (l.scenarioField) {
-          validationLogger(`[INFO]   → set '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
-        } else {
-          validationLogger(`[WARNING]   → provider requires '${l.path.join('.')}' on ${l.passengerRef}, not currently configurable in OSCAR scenario authoring — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
-        }
-      });
-      // Phase 2: evaluate the expression against the scenario's passenger data.
-      const _res = evaluateRequestedInformation(s.ast, _riModel);
-      if (_res.satisfied) {
-        validationLogger(`[INFO] ${partType}[${pi}] requestedInformation is satisfied by the scenario's passenger data.`);
-      } else {
-        validationLogger(`[WARNING] ${partType}[${pi}] requestedInformation is NOT satisfied by the scenario's passenger data — the booking/confirmation will likely be rejected unless these are set:`);
-        _res.unmetLeaves.forEach(u => {
-          if (u.scenarioField) {
-            validationLogger(`[WARNING]   → missing '${u.scenarioField}' (${u.fieldLabel}) for ${u.passengerRef}`);
-          } else {
-            validationLogger(`[WARNING]   → missing '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR authoring)`);
-          }
-        });
+      if (out.provided.length) {
+        _riAdditional = out.additional;
+        _riChanged = true;
+        out.provided.forEach(p => _riAutoFed.push({ index: p.index, scenarioField: p.scenarioField }));
       }
     });
   });
+
+  if (_riChanged) {
+    bru.setEnvVar('passengerAdditionalData', JSON.stringify(_riAdditional));
+    // The PATCH step is skipped when no passenger update was configured; auto-fed
+    // values must actually be sent, so re-enable it.
+    if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
+      bru.setEnvVar('skipPatchPassengerRequest', 'false');
+    }
+  }
+  if (_riAutoFed.length) bru.setEnvVar('requestedInfoAutoFed', JSON.stringify(_riAutoFed));
 }
 
 // Admission validation
