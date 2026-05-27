@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.70] — 2026-05-27
+
+Purchaser-aware `requestedInformation` + a purchaser-on-booking step — **#258, #203.**
+**Bruno collection bumped (OTST_V2.0.23 → OTST_V2.0.24).**
+
+### Added
+- **Root-aware `requestedInformation` engine** (`library-bruno/requestedInformation.js`).
+  A leaf's *root* now decides its subject: `passengerSpecifications[i]` (an indexed
+  passenger — unchanged) or `purchaser[…]` (the **single** purchaser object, index
+  ignored). Each kind has its own evaluation subject, report label (`the purchaser`)
+  and auto-feed/probe channel. New helpers `buildPurchaserModelFromAdditionalData`,
+  `applyPurchaserAutoFeed`, `rootKind`, and `staticIssues.unknownRoots`. Passenger
+  behaviour and all existing engine tests are unchanged; purchaser-channel unit
+  tests added.
+- **`bookingPurchaserMode` scenario field** (`inline` | `deferred` | `omit` |
+  `invalid`) — authored in the scenario detail panel, documented in
+  `datafile.schema.json`. Controls where the purchaser is supplied:
+  - `inline` *(default)* — purchaser sent in the `POST /bookings` request (historic behaviour).
+  - `deferred` — omitted at booking, then **`POST /bookings/{id}/purchaser`** to satisfy
+    any purchaser `requestedInformation` (the OSDM-correct way to exercise a provider
+    that requests purchaser data).
+  - `omit` — never supplied (observe the provider's demand / rejection).
+  - `invalid` — POST a deliberately bad purchaser and assert an RFC-9457 `Problem`.
+- **New Bruno step `12. POST Booking Purchaser`** (`postBookingPurchaser`), gated in the
+  smart-run filter and routed from `04. GET Passenger` before fulfillment — **closes #203**
+  (purchaser endpoints exercised). Fully inert when `inline`/`omit`.
+
+### Notes
+- OSDM `BookingRequest.required = [offers, passengerSpecifications]` — `purchaser` is
+  optional, and the spec points to `requestedInformation` as the mechanism to request it.
+- **Operator action required: none.** New scenarios default to `bookingPurchaserMode=inline`,
+  so existing scenarios behave exactly as before.
+
+---
+
 ## [server-v1.11.69] — 2026-05-27
 
 Invalidate the OAuth token cache on credential change — **#208 (root cause).**
