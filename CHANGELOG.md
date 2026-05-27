@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.68] — 2026-05-27
+
+Auth-rejection fail-fast (mid-flow) — **#208 follow-up**. Bruno collection change
+(OTST_V2.0.22 → OTST_V2.0.23); server in lockstep (1.11.67 → 1.11.68).
+
+### Fixed
+- **A 401/403 now stops the run with a clear message instead of cascading.** The
+  2026.95 fix covered the OAuth *token-acquisition* failure, but a **bearer/static
+  token that is present yet expired/revoked** can't be detected up-front (the
+  server only decrypts it — it can't know it's dead without calling the provider),
+  so the run used to proceed and every request 401/403'd. New
+  `library-bruno/auth.js` `checkAuthRejection(res, reqName)` is called from the
+  collection-level after-response (`opencollection.yml`) for **every** request: on
+  the first 401/403 from a non-token request it logs a clear `[ERROR]`
+  (*"access/bearer token invalid or expired — update it in Profile → API
+  Configuration"*), records a **FAILING** "Authentication accepted" assertion, and
+  `bru.runner.stopExecution()`. Keyed strictly on **401/403** (a rejected
+  credential) — 404/400 (wrong endpoint / bad request) and the token request
+  itself are left alone; the failing request is still recorded in the report.
+
+---
+
 ## [server-v1.11.67] — 2026-05-27
 
 Clear, fail-fast diagnostic for invalid auth credentials — **#208**. Bruno
