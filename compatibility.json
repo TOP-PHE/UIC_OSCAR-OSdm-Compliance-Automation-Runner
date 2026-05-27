@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.95",
+  "current_release": "2026.96",
   "releases": [
+    {
+      "release": "2026.96",
+      "date": "2026-05-27",
+      "server": "1.11.68",
+      "collection": "OTST_V2.0.23",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#208 follow-up): fail-fast on an auth rejection (401/403) mid-flow. The 2026.95 fix stops a run when the OAuth token can't be obtained, but a bearer/static token that is present-but-expired/revoked can't be detected up-front (the server only decrypts it; it can't know it is dead without calling the provider), so the run proceeded and every request 401/403'd. library-bruno/auth.js gains checkAuthRejection(res, reqName), now called from the collection-level after-response (opencollection.yml) for every request: on the first 401/403 from a non-token request it logs a clear [ERROR] ('access/bearer token invalid or expired — update it in Profile > API Configuration'), records a FAILING 'Authentication accepted' assertion, and calls bru.runner.stopExecution() so the dead token does not cascade. Keyed strictly on 401/403 (a rejected credential) — 404/400 (wrong endpoint / bad request) and the token-acquisition request itself are left alone; the failing request is still recorded in the report. Bruno_Collection/VERSION OTST_V2.0.22 -> OTST_V2.0.23; server 1.11.67 -> 1.11.68.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.96 / server-v1.11.68 / OTST_V2.0.23 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.95",
       "date": "2026-05-27",

@@ -81,7 +81,45 @@ function handleAccessTokenResponse(res, opts) {
   return false;
 }
 
-module.exports = { handleAccessTokenResponse };
+/**
+ * Stop the run fast on an authentication rejection (#208). Called from the
+ * collection-level after-response for every request. Covers the case the
+ * token-step handler can't: a bearer/static token that is present but
+ * EXPIRED/REVOKED (the server can't know without calling the provider, so it
+ * injects the dead token and every request 401/403s). On the first such
+ * rejection we surface a clear message, fail an assertion, and stop the run so
+ * the dead token doesn't cascade into failures on every following request.
+ *
+ * Keyed strictly on 401/403 (a *rejected* credential). A 404/400 means a wrong
+ * endpoint / bad request, not an auth problem, and is left alone — as is the
+ * token-acquisition request itself (handled by handleAccessTokenResponse).
+ *
+ * @param {object} res      Bruno response
+ * @param {string} reqName  the current request's name
+ * @returns {boolean} true when an auth rejection was detected (run stopped)
+ */
+function checkAuthRejection(res, reqName) {
+  const name = String(reqName || '').toLowerCase();
+  if (name.includes('token') || name.includes('access')) return false; // token step handles itself
+
+  let status = -1;
+  try { status = res.getStatus(); } catch (_e) { return false; }
+  if (status !== 401 && status !== 403) return false;
+
+  const msg = `AUTHENTICATION REJECTED (HTTP ${status}) on "${reqName || 'request'}". `
+    + `Your access / bearer token is most likely invalid or expired. `
+    + `Update the token (or OAuth credentials) in Profile → API Configuration and re-run. `
+    + `The run is stopped here so the rejected token does not cascade into failures on every following request.`;
+
+  validationLogger(`[ERROR] ❌ ${msg}`);
+  bruTest(`Authentication accepted on "${reqName || 'request'}"`, function () {
+    expect(status, msg).to.not.be.oneOf([401, 403]);
+  });
+  try { bru.runner.stopExecution(); } catch (_e) { /* not in a runner context */ }
+  return true;
+}
+
+module.exports = { handleAccessTokenResponse, checkAuthRejection };
 
 // Expose to global for the eval/require loader flows (matches the other modules).
 try {

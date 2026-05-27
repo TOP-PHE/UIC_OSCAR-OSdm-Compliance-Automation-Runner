@@ -441,6 +441,18 @@ request:
         // ── Shared response status ────────────────────────────────────────────
         const _rptStatus = res && (typeof res.getStatus === 'function' ? res.getStatus() : res.status);
 
+        // ── #208: auth-rejection fail-fast ────────────────────────────────────
+        // A 401/403 on any (non-token) request means the access/bearer token was
+        // rejected — typically a stale/expired token pasted in the API config, or
+        // rotated OAuth credentials. Stop the run with a clear message rather than
+        // cascading the same failure across every following request. We do NOT
+        // return early: the report still records THIS request + the failing auth
+        // assertion; stopExecution() just prevents the next request from running.
+        try {
+          const { checkAuthRejection } = require(bru.getEnvVar("library_base") + "auth.js");
+          checkAuthRejection(res, (req && typeof req.getName === 'function') ? req.getName() : '');
+        } catch (_authGuardErr) { console.log(`[WARNING] auth guard: ${_authGuardErr && _authGuardErr.message}`); }
+
         // ── H1/H2: run via bruTest so results accumulate in __rptTests ────────
         try {
           const { bruTest: _bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
