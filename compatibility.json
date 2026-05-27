@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.92",
+  "current_release": "2026.93",
   "releases": [
+    {
+      "release": "2026.93",
+      "date": "2026-05-27",
+      "server": "1.11.65",
+      "collection": "OTST_V2.0.20",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#254): a fulfillment document may carry its payload as EITHER a downloadLink (URI) OR inline rawData (content) — fare/eticket providers can return either. library-bruno/bookings.js validateFulfillments previously hard-required doc.downloadLink to be a non-empty string, failing valid rawData-only documents. It now requires at least one of downloadLink / rawData to be present (medium/type/format checks unchanged) and logs which is present. Bruno_Collection/VERSION OTST_V2.0.19 -> OTST_V2.0.20; server 1.11.64 -> 1.11.65.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.93 / server-v1.11.65 / OTST_V2.0.20 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.92",
       "date": "2026-05-27",

@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.65] — 2026-05-27
+
+Fulfillment document payload — **#254**. Bruno collection change
+(OTST_V2.0.19 → OTST_V2.0.20); server in lockstep (1.11.64 → 1.11.65).
+
+### Fixed
+- **A fulfillment document may carry its payload as `downloadLink` *or* `rawData`**
+  (`library-bruno/bookings.js`, `validateFulfillments`). The check hard-required
+  `doc.downloadLink` to be a non-empty string, which **false-failed** valid
+  documents that return inline `rawData` instead of a link (common for fare /
+  e-ticket providers). It now requires **at least one** of `downloadLink` /
+  `rawData` to be present (the `medium` / `type` / `format` checks are unchanged),
+  and logs which one was returned.
+
+---
+
 ## [server-v1.11.64] — 2026-05-27
 
 Flexibility-based offer selection without `offerSummary` — **#223**. Bruno

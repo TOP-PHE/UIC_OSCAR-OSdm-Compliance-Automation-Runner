@@ -582,10 +582,16 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus) {
         validationLogger(`[INFO] Fulfillment[${idx}] number of documents: ${fulfillment.fulfillmentDocuments.length}`);
         fulfillment.fulfillmentDocuments.forEach((doc, docIndex) => {
           test(`Fulfillment[${idx}].document[${docIndex}] - fields exist`, () => {
-            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, link=${doc.downloadLink}`);
+            // #254: a FulfillmentDocument carries the payload as EITHER a
+            // downloadLink (URI) OR inline rawData (content) — fare/eticket
+            // providers may return either. Require at least one, not downloadLink
+            // specifically (the old check failed valid rawData-only documents).
+            const _hasLink = typeof doc.downloadLink === "string" && doc.downloadLink.trim() !== "";
+            const _hasRaw  = doc.rawData !== undefined && doc.rawData !== null && String(doc.rawData).trim() !== "";
+            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, link=${_hasLink ? doc.downloadLink : '(none)'}, rawData=${_hasRaw ? 'present' : '(none)'}`);
             expect(doc.medium,       "medium missing").to.be.a("string").and.not.be.empty;
             expect(doc.type,         "type missing").to.be.a("string").and.not.be.empty;
-            expect(doc.downloadLink, "downloadLink missing").to.be.a("string").and.not.be.empty;
+            expect(_hasLink || _hasRaw, "fulfillment document must carry either a downloadLink or rawData").to.be.true;
             expect(doc.format,       "format missing").to.be.a("string").and.not.be.empty;
           });
         });
