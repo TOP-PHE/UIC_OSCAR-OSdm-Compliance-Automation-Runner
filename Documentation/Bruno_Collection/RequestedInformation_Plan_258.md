@@ -1,7 +1,12 @@
 # OSDM `requestedInformation` Handling — Implementation Plan (#258)
 
-Status: **proposal** · Issue: [#258](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/258)
-Decisions locked: **(1) unmet requirement → WARN (informational), not FAIL** · **(2) auto-inject the data → later phase**
+Status: **SHIPPED** (passenger + purchaser) · Issues: [#258](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/258) (closed), [#203](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/203) (closed)
+Original decisions: **(1) unmet requirement → WARN (informational), not FAIL** · **(2) auto-inject the data → later phase** — both later revised (see §11).
+
+> **§1–§10 below are the original proposal** (kept for the design rationale). **§11 is the
+> as-built record** of everything actually shipped, including the purchaser support and the
+> revised decisions (auto-feed is now ON, negative probes added). Read §11 first for the
+> current behaviour.
 
 ---
 
@@ -199,3 +204,130 @@ CHANGELOG entry, and ships through CI → auto-tag → Watchtower like any colle
   (`RequestedInformation`, `AbstractOfferPart`, `Booking`)
 - Related (request-side): #227 (optional offer params / gender for night trains),
   #224 (optional pax info on booking), #225 (optional booking-request validation)
+
+---
+
+## 11. As-built (shipped) — current behaviour
+
+This section supersedes the proposal where they differ. Everything here is live.
+
+### 11.1 Passenger side (#258)
+
+Delivered in phases on `library-bruno/requestedInformation.js` (a pure, unit-tested module):
+
+| Phase | What shipped |
+| --- | --- |
+| **1 — surface** | recursive-descent parser for the grammar, human-readable describer, leaf→scenario-field mapping, Layer-1 type check (string, ≤ 32768). Wired into `offers.js` (per offer part) and `bookings.js` (booking level). |
+| **2 — evaluate** | `evaluateRequestedInformation(ast, model)` against the data OSCAR will send; per-passenger unmet reporting; `[ANY]` ⇒ AND over all passengers; #231 contact-first/flat-fallback so `detail.contact.email` ↔ `detail.email` both resolve. |
+| **3a — auto-feed (decision revised)** | **Auto-feed is now ON by default.** Instead of only WARNing, OSCAR auto-provides the demanded mappable fields from the scenario data / sane samples so the happy flow completes unattended, and the report states *what* was requested, *at which step*, and *what was supplied*. (Revises original decision #2.) |
+| **3b — static assertions** | grammar parse (FAIL), passenger-index-in-range (FAIL), unknown-attribute (WARN). |
+| **3c — negative probe** | scenario field **`requestedInformationProbe`** = `off` (default) / `omit` / `invalid`. `omit` withholds a demanded field; `invalid` sends a malformed value. The PATCH-passenger step then grades the provider's rejection with `validateProblemResponse()` (Group N): N1 = 4xx client error, N2 = RFC-9457 `Problem` body, N3 = field pointer (WARN, recommended). |
+
+### 11.2 Purchaser side (#258 root-awareness + #203)
+
+OSDM `BookingRequest.required = [offers, passengerSpecifications]` — **purchaser is optional**,
+and the spec points to `requestedInformation` as the mechanism to request it. The published
+grammar only standardises `passengerSpecifications`, but its root token is generic, so a
+provider may emit a `purchaser[…]` demand. Support shipped as:
+
+- **Root-aware engine.** A leaf's *root* selects its subject: `passengerSpecifications[i]`
+  (indexed passenger) vs **`purchaser[…]`** (the single purchaser object — **index ignored**).
+  Each kind has its own evaluation subject, report label (`the purchaser`) and
+  auto-feed/probe channel. New: `buildPurchaserModelFromAdditionalData`,
+  `applyPurchaserAutoFeed`, `rootKind`, `staticIssues.unknownRoots`. Passenger behaviour
+  unchanged; full unit coverage added.
+- **Scenario field `bookingPurchaserMode`** (`inline` | `deferred` | `omit` | `invalid`):
+
+  | Mode | Behaviour |
+  | --- | --- |
+  | `inline` *(default)* | purchaser sent in the `POST /bookings` request — historic behaviour, byte-identical |
+  | `deferred` | purchaser **omitted** at booking, then set afterwards (happy path) — triggers/satisfies any purchaser `requestedInformation` |
+  | `omit` | never supplied (observe the provider's demand / rejection) |
+  | `invalid` | omitted at booking, then a **deliberately invalid** purchaser is sent → provider must reject (RFC-9457 `Problem`, graded) |
+
+- **Create-or-update (upsert) flow — closes #203.** Rather than guess POST vs PATCH, the
+  deferred/invalid flow **probes first**:
+
+  ```
+  04. GET Passenger
+     └─▶ 12. GET Booking Purchaser        (getBookingPurchaser)
+            ├─ 2xx  (purchaser exists) ─▶ 13. PATCH Booking Purchaser  (patchBookingPurchaser — update)
+            └─ 404 / none              ─▶ 14. POST Booking Purchaser   (postBookingPurchaser — create)
+                                              └─▶ 05. GET Booking before Fulfillments
+  ```
+
+  This handles **both** provider styles — those that materialise an empty purchaser on the
+  booking (PATCH; e.g. **Bileto**) and those that don't (POST) — without hardcoding a method.
+  Shared body in `requestsBuilder.buildBookingPurchaserBody()`; `requestsBuilder` gates the
+  inline purchaser on the mode; `bookings.js` routes purchaser leaves to the purchaser
+  channel; the smart-run filter (`opencollection.yml`) gates each step (the two write steps
+  run only for the method the GET probe selected). All inert when `inline`/`omit`.
+
+### 11.3 OSDM field-constraint findings (what "invalid" can mean)
+
+A negative `invalid` probe is only meaningful where the **schema actually constrains the
+value**. From the bundled spec (`openapi3_0.json`):
+
+| Field | OSDM schema | Is a bad value a true violation? |
+| --- | --- | --- |
+| `detail.firstName` / `detail.lastName` (`PersonDetail`) | bare `type: string` — **no `pattern` / `maxLength` / `format`** | **No.** Special chars (`#`, `%`, `§`), accents, hyphens, apostrophes are all valid names (spec example: `"Diaz Lopez"`). A conformant provider should **accept** them. |
+| `email` (`ContactDetail`) | bare `type: string` — **no `format: email`** | Not a *schema* violation. `not-an-email` tests **semantic** validation (good practice, not OSDM-mandated). |
+| `phoneNumber` | bare `type: string` | Same — semantic only. |
+| `gender` | `enum: [MALE, FEMALE, X]` | **Yes** — `"ZZZ"` is a hard enum violation. |
+| `dateOfBirth` | `format: date` | **Yes** — `"not-a-date"` is a hard format violation. |
+
+Consequences, reflected in the code:
+- `invalidValueForField()` returns **`null` for names/`type`** → the probe **omits** them
+  rather than inventing spec-valid "garbage". It only fabricates invalid values for
+  `gender` / `dateOfBirth` (hard violations) and `email` / `phoneNumber` (semantic).
+- The **purchaser's `PersonDetail` has neither `gender` nor `dateOfBirth`** — only names +
+  email/phone (all unconstrained strings). So for the purchaser the only practical invalid
+  value is `email = not-an-email` (a semantic check).
+- For `requestedInformation` itself, the spec only requires a demanded field to be
+  **populated** to proceed — a *malformed-but-present* value is still "populated". So the
+  strongest spec-grounded negative test is **`omit`** (missing required → must reject);
+  **`invalid`** is a softer "does the provider validate values" probe. *(Open option: grade
+  `invalid` as a hard FAIL only for enum/format fields and a WARN for unconstrained strings.)*
+
+### 11.4 Bug fixes along the way
+
+- **#208 (token-cache fingerprint) regression** — the `users.cached_token_cred_fp` column
+  ALTER was added to an already-applied migration (v12), so the version-gated runner never
+  created it on existing DBs → the cache-persist `UPDATE` threw `no such column` and failed
+  **every** `oauth2` run (valid creds included). Fixed by a new migration **v20** + making
+  cache persistence best-effort (a fetched token is returned even if the cache write fails).
+- **`invalid`-purchaser sent valid data** — `buildBookingPurchaserBody()` corrupted the
+  email only when it was empty, so a scenario purchaser with a valid email passed through
+  unchanged. `invalid` mode now **overwrites** the email with `not-an-email`.
+
+### 11.5 Authoring & schema
+
+- `scenarios.js`: dropdowns for `requestedInformationProbe` (`off`/`omit`/`invalid`) and
+  `bookingPurchaserMode` (`inline`/`deferred`/`omit`/`invalid`); wizard defaults.
+- `datafile.schema.json`: both fields documented with their enums.
+- `scenarioParser.js`: both fields → env vars; per-scenario reset of the purchaser channel
+  (`purchaserAdditionalData`, `requestedInfoPurchaserProbeTargets`, `__purchaserStepDone`,
+  `__purchaserWriteMethod`).
+
+### 11.6 Release history (all collection changes → trio bump + CI → auto-tag → Watchtower)
+
+| Release | Server | Collection | What |
+| --- | --- | --- | --- |
+| (3a/3b) | — | — | auto-feed + static assertions |
+| (3c) | — | — | negative probe + `validateProblemResponse` |
+| **2026.98** | 1.11.70 | OTST_V2.0.24 | root-aware engine + `bookingPurchaserMode` + first purchaser step |
+| **2026.99** | 1.11.71 | OTST_V2.0.24 | #208 migration regression hotfix (server-only) |
+| **2026.100** | 1.11.72 | OTST_V2.0.25 | deferred purchaser step → PATCH (quick fix) |
+| **2026.101** | 1.11.73 | OTST_V2.0.26 | **GET-adaptive upsert** (GET probe → PATCH/POST) |
+| **2026.102** | 1.11.74 | OTST_V2.0.27 | `invalid` mode forces a bad email |
+
+### 11.7 Key files
+
+`library-bruno/requestedInformation.js` (engine), `library-bruno/requestsBuilder.js`
+(`buildBookingPurchaserBody`), `library-bruno/bookings.js` (booking-level RI + purchaser
+channel), `library-bruno/offers.js` (offer-part RI), `02-Common Requests/{12 GET, 13 PATCH,
+14 POST} Booking Purchaser.yml` + `04. GET Passenger.yml` (routing), `opencollection.yml`
+(smart-run gates), `scenarios.js` + `datafile.schema.json` + `scenarioParser.js` (authoring),
+`Oscar_Server/src/db/db.js` (#208 migration v20) + `worker/access-token.js`.
+Tests: `Oscar_Server/tests/unit/bruno-requestedinformation.test.js`,
+`tests/unit/access-token.test.js`.
