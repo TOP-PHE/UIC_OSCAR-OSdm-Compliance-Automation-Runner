@@ -158,6 +158,24 @@ function toLocalDateTime(raw) {
   return normalized.replace(/[+-]\d{2}:\d{2}$/, '').replace(/Z$/i, '');
 }
 
+// Apply the "%TRIP_DATE%" placeholder substitution to a trip datetime, with a
+// guard (#210 pt.3). A minimal/hand-authored data file that omits startDatetime
+// or endDatetime previously crashed with an opaque
+// `TypeError: Cannot read properties of undefined (reading 'replace')`.
+// This converts that into a clear, actionable message naming the missing field.
+// UI-generated data files always include both, so they are unaffected.
+function subTripDate(value, replacement, fieldLabel, ctx) {
+  if (typeof value !== 'string') {
+    throw new Error(
+      `Data file error: ${ctx} is missing a valid '${fieldLabel}' ` +
+      `(got ${value === undefined ? 'undefined' : JSON.stringify(value)}). ` +
+      `Each trip requirement needs both a startDatetime and an endDatetime. ` +
+      `Add it to the data file, or regenerate the data file via the Test Config UI.`
+    );
+  }
+  return value.replace("%TRIP_DATE%", replacement);
+}
+
 // Helper: GET JSON via Bruno's sendRequest
 function getJson(url) {
   // Normalize double-slashes in path (e.g. http://host//path → http://host/path)
@@ -492,8 +510,9 @@ function parseScenarioData(jsonData) {
 
               tripRequirement.legs.forEach(function (leg, legIndex) {
                 const legPrefix = `leg${legIndex + 1}`;
-                const startDatetime = leg.startDatetime.replace("%TRIP_DATE%", nextWeekdayString);
-                const endDatetime = leg.endDatetime.replace("%TRIP_DATE%", nextWeekdayString);
+                const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
+                const startDatetime = subTripDate(leg.startDatetime, nextWeekdayString, 'startDatetime', _legCtx);
+                const endDatetime = subTripDate(leg.endDatetime, nextWeekdayString, 'endDatetime', _legCtx);
 
                 bru.setEnvVar(`${legPrefix}StartStopPlaceRef`, leg.origin);
                 bru.setEnvVar(`${legPrefix}EndStopPlaceRef`, leg.destination);
@@ -524,10 +543,12 @@ function parseScenarioData(jsonData) {
 
             case "SEARCH":
               validationLogger('[INFO] ⏳ processing a search');
+              const _searchStart = subTripDate(tripRequirement.trip.startDatetime, nextWeekdayString, 'startDatetime', 'tripRequirement (SEARCH)');
+              const _searchEnd = subTripDate(tripRequirement.trip.endDatetime, nextWeekdayString, 'endDatetime', 'tripRequirement (SEARCH)');
               bru.setEnvVar("tripStartStopPlaceRef", tripRequirement.trip.origin);
               bru.setEnvVar("tripEndStopPlaceRef", tripRequirement.trip.destination);
-              bru.setEnvVar("tripStartDatetime", tripRequirement.trip.startDatetime.replace("%TRIP_DATE%", nextWeekdayString));
-              bru.setEnvVar("tripEndDatetime", tripRequirement.trip.endDatetime.replace("%TRIP_DATE%", nextWeekdayString));
+              bru.setEnvVar("tripStartDatetime", _searchStart);
+              bru.setEnvVar("tripEndDatetime", _searchEnd);
               bru.setEnvVar("tripVehicleNumber", tripRequirement.trip.vehicleNumber);
               bru.setEnvVar("tripOperatorCode", tripRequirement.trip.operatorCode);
               bru.setEnvVar("tripProductCategoryRef", tripRequirement.trip.productCategoryRef || null);
@@ -537,9 +558,9 @@ function parseScenarioData(jsonData) {
               osdmTripSearchCriteria([
                 new TripLegDefinition(
                   tripRequirement.trip.origin,
-                  tripRequirement.trip.startDatetime.replace("%TRIP_DATE%", nextWeekdayString),
+                  _searchStart,
                   tripRequirement.trip.destination,
-                  tripRequirement.trip.endDatetime.replace("%TRIP_DATE%", nextWeekdayString),
+                  _searchEnd,
                   tripRequirement.trip.productCategoryRef,
                   tripRequirement.trip.productCategoryName,
                   tripRequirement.trip.productCategoryShortName,

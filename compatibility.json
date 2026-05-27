@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.108",
+  "current_release": "2026.109",
   "releases": [
+    {
+      "release": "2026.109",
+      "date": "2026-05-27",
+      "server": "1.11.81",
+      "collection": "OTST_V2.0.34",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#210 pt.3): hardened the data-file trip-datetime parsing. A minimal/hand-authored data file that omitted startDatetime or endDatetime in a tripRequirement previously crashed scenarioParser.js with an opaque 'TypeError: Cannot read properties of undefined (reading replace)'. The %TRIP_DATE% substitution now runs through a guard (subTripDate) that throws a clear, actionable message naming the missing field and the trip context (SEARCH/SPECIFICATION leg N) and pointing to the Test Config UI. UI-generated data files always include both datetimes and are unaffected (no behaviour change for them). Audit of the other #210 points: configurable logging (loggingType FULL/INFO/DEBUG/ERROR) implemented; passenger.reference now consumed as OSDM externalRef; empty trip filters no longer emitted (carrier/vehicle/dataFilter built only when a value exists). Bruno_Collection/VERSION OTST_V2.0.33 -> OTST_V2.0.34; server 1.11.80 -> 1.11.81.",
+        "Operator action required: none. Chip shows 2026.109 / server-v1.11.81 / OTST_V2.0.34 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.108",
       "date": "2026-05-27",
