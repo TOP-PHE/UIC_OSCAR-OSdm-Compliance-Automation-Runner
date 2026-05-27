@@ -348,6 +348,22 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     const _probe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();
     const _mode = (_probe === 'omit' || _probe === 'invalid') ? _probe : 'autofeed';
 
+    // Purchaser channel (#258 / #203): the purchaser is a single object. Its mode
+    // is driven by bookingPurchaserMode — inline/deferred → satisfy (autofeed),
+    // omit/invalid → negative probe. The resulting purchaserAdditionalData /
+    // requestedInfoPurchaserProbeTargets are read by the POST Booking Purchaser
+    // step. The scenario purchaser (bookingPurchaserSpecifications) seeds the
+    // model so an already-complete purchaser needs no auto-feed.
+    const _readObj = (n) => {
+      const r = bru.getEnvVar(n);
+      if (r === null || r === undefined || r === '') return {};
+      try { const v = typeof r === 'string' ? JSON.parse(r) : r; return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch (_e) { return {}; }
+    };
+    const _purSpec = _readObj('bookingPurchaserSpecifications');
+    const _purAdd = _readObj('purchaserAdditionalData');
+    const _purModeRaw = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
+    const _purMode = (_purModeRaw === 'omit' || _purModeRaw === 'invalid') ? _purModeRaw : 'autofeed';
+
     const out = processRequestedInformation({
       expr: _bookingRi,
       tag: 'booking',
@@ -355,6 +371,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       specs: _specs,
       passengerCount: _count,
       mode: _mode,
+      purchaserAdditional: _purAdd,
+      purchaserSpec: _purSpec,
+      purchaserMode: _purMode,
       assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
       log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
     });
@@ -367,6 +386,14 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     if (out.probeTargets && out.probeTargets.length) {
       const _existing = _read('requestedInfoProbeTargets');
       bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
+    }
+    // Persist the purchaser channel for the POST Booking Purchaser step (#258/#203).
+    if ((out.purchaserProvided && out.purchaserProvided.length)
+        || (out.purchaserProbeTargets && out.purchaserProbeTargets.length)) {
+      bru.setEnvVar('purchaserAdditionalData', JSON.stringify(out.purchaserAdditional || {}));
+    }
+    if (out.purchaserProbeTargets && out.purchaserProbeTargets.length) {
+      bru.setEnvVar('requestedInfoPurchaserProbeTargets', JSON.stringify(out.purchaserProbeTargets));
     }
 
     // P2: the provider should stop requesting what OSCAR already provided at the
