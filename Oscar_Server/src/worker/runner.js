@@ -480,12 +480,19 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
   const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra);
+  // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs the
+  // run, i.e. now + RUN_TIMEOUT_MS) as a read-only env var. The expired-booking
+  // test uses it to decide whether waiting until booking.confirmationTimeLimit
+  // fits the run budget — if not, it skips with a WARNING instead of being killed
+  // mid-wait. Read-only; does not change run behaviour.
+  const _runTimeoutMsForEnv = parseInt(getConfig('RUN_TIMEOUT_MS', '600000'), 10) || 600000;
+  const envYmlOut  = envYml + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runTimeoutMsForEnv}"\n`;
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
   try {
     await fs.promises.mkdir(envsDir, { recursive: true });
-    await fs.promises.writeFile(envFilePath, envYml, { mode: 0o600, encoding: 'utf8' });
+    await fs.promises.writeFile(envFilePath, envYmlOut, { mode: 0o600, encoding: 'utf8' });
     logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml` + (scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : ''));
   } catch (err) {
     const msg = `Failed to write env file: ${err.message}`;
