@@ -54,6 +54,7 @@ function resetScenarioEnvVars() {
     "scenario_override",
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
+    "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",

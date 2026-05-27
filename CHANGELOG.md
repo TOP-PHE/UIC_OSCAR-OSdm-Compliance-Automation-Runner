@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.77] — 2026-05-27
+
+Passenger negative-probe **sweep** (companion to the purchaser sweep) — **#258.**
+**Bruno collection bumped (OTST_V2.0.29 → OTST_V2.0.30).**
+
+### Added
+- **`requestedInformationProbe = invalid` now sweeps each passenger field** on passenger 0,
+  one at a time, within a single run (`03. PATCH Multi Passenger`): a valid baseline for
+  every field with exactly **one corrupted per pass**, graded on its own line
+  (`[passenger0.<field>]`), then it loops back to PATCH for the next field and stops after
+  the last:
+  - `gender` → `ZZZ` (enum) → **FAIL** if not rejected
+  - `dateOfBirth` → `not-a-date` (format) → **FAIL** if not rejected
+  - `email` → `not-an-email`, `phoneNumber` → `not-a-phone` (unconstrained strings) → **WARN** if accepted
+  - `firstName` / `lastName` → omitted (required in `PersonDetail`) → **FAIL** if not rejected
+
+### Notes
+- **Operator action required: none.** Strictly gated to `requestedInformationProbe = invalid`;
+  `off` / `omit` / happy paths are byte-identical.
+- ⚠️ **Built without live-flow validation** (it touches the core passenger PATCH step) —
+  validate against a sandbox before relying on it.
+
+---
+
 ## [server-v1.11.76] — 2026-05-27
 
 Purchaser negative-probe **sweep** — test every parameter one-by-one in a single run — **#258.**
