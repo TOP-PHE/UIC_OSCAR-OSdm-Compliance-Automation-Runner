@@ -53,6 +53,7 @@ function resetScenarioEnvVars() {
     // Scenario / trip
     "scenario_override",
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
+    "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
     "overruleCode", "refundDate", "TripType",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
@@ -420,6 +421,8 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("scenarioCode", scenario.code);
       bru.setEnvVar("scenarioType", ["", "null"].includes(scenario.scenarioType) ? null : scenario.scenarioType);
       bru.setEnvVar("scenarioAction", ["", "null"].includes(scenario.scenarioAction) ? null : scenario.scenarioAction);
+      // RI negative probe (#258 Phase 3c): off (default) | omit | invalid.
+      bru.setEnvVar("requestedInformationProbe", ["", "null", null, undefined].includes(scenario.requestedInformationProbe) ? "off" : String(scenario.requestedInformationProbe).toLowerCase());
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
       // The data file is the per-scenario source of truth; the env file is the fallback

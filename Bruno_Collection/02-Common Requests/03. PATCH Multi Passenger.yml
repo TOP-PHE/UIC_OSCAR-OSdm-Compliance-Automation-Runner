@@ -68,6 +68,27 @@ runtime:
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");
 
+        // RI negative probe (#258 Phase 3c): when a probe is active AND we actually
+        // withheld/corrupted a required field at the offer/booking step, the PATCH
+        // MUST be rejected. Grade the error (N1-N4) and stop the chain. When the
+        // probe is off (default) this branch is skipped → happy path unchanged.
+        const _riProbe = String(bru.getEnvVar("requestedInformationProbe") || "off").toLowerCase();
+        const _riTargets = JSON.parse(bru.getEnvVar("requestedInfoProbeTargets") || "[]");
+        if ((_riProbe === "omit" || _riProbe === "invalid") && _riTargets.length > 0) {
+            const { validateProblemResponse } = require(bru.getEnvVar("library_base") + "requestedInformation.js");
+            const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+            validationLogger(`[INFO] RI negative probe '${_riProbe}' active — expecting the PATCH to be rejected for: ${_riTargets.map(t => t.scenarioField + "@p" + t.index).join(", ")}`);
+            validateProblemResponse({
+                status: res.getStatus(),
+                body: res.getBody(),
+                targets: _riTargets,
+                assert: (name, ok, msg) => { test(name, () => { expect(ok, msg).to.be.true; }); },
+                log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
+            });
+            bru.runner.setNextRequest(null);
+            return;
+        }
+
         test("Status code is 200", () => {
             expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
         });

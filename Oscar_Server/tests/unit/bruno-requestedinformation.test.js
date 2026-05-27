@@ -379,3 +379,94 @@ describe('processRequestedInformation', () => {
     expect(m.logs.some((l) => l.lvl === 'WARNING' && /cannot auto-provide/.test(l.msg))).toBe(true);
   });
 });
+
+// ─── Phase 3c (negative probe) ──────────────────────────────────────────────
+describe('invalidValueForField', () => {
+  test('produces clearly-invalid values for constrained fields', () => {
+    expect(ri.invalidValueForField('gender')).toBe('ZZZ');
+    expect(ri.invalidValueForField('email')).not.toMatch(/@/);
+    expect(ri.invalidValueForField('dateOfBirth')).toBe('not-a-date');
+  });
+  test('returns null for fields with no clear invalid form', () => {
+    expect(ri.invalidValueForField('firstName')).toBeNull();
+    expect(ri.invalidValueForField('type')).toBeNull();
+  });
+});
+
+describe('processRequestedInformation — negative probe', () => {
+  test("mode 'omit' clears the demanded field and records the target", () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].gender', tag: 'booking', additional: [{ updateGender: 'MALE' }],
+      specs: [{ type: 'PERSON' }], passengerCount: 1, mode: 'omit', assert: m.assert, log: m.log,
+    });
+    expect(out.additional[0].updateGender).toBe('');
+    expect(out.probeTargets).toEqual([{ index: 0, scenarioField: 'gender' }]);
+    expect(out.satisfied).toBe(false);
+  });
+
+  test("mode 'invalid' injects an invalid value for a constrained field", () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].gender', tag: 'booking', additional: [{ updateGender: 'MALE' }],
+      specs: [{ type: 'PERSON' }], passengerCount: 1, mode: 'invalid', assert: m.assert, log: m.log,
+    });
+    expect(out.additional[0].updateGender).toBe('ZZZ');
+    expect(out.probeTargets[0]).toMatchObject({ index: 0, scenarioField: 'gender', value: 'ZZZ' });
+  });
+
+  test("mode 'invalid' falls back to omit for a field with no invalid form", () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].detail.firstName', tag: 'booking', additional: [{ updateFirstName: 'Bob' }],
+      specs: [{ type: 'PERSON' }], passengerCount: 1, mode: 'invalid', assert: m.assert, log: m.log,
+    });
+    expect(out.additional[0].updateFirstName).toBe('');
+    expect(out.probeTargets[0]).toEqual({ index: 0, scenarioField: 'firstName' });
+  });
+});
+
+describe('validateProblemResponse', () => {
+  test('N1+N2 pass on a 4xx RFC-9457 Problem; N3 logs that the field is named', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 400,
+      body: { title: 'Bad Request', detail: 'gender is required', status: 400 },
+      targets: [{ index: 0, scenarioField: 'gender' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(true);
+    expect(m.asserts.find((a) => /Problem/.test(a.name)).ok).toBe(true);
+    expect(m.logs.some((l) => l.lvl === 'INFO' && /identifies the offending field/.test(l.msg))).toBe(true);
+  });
+
+  test('N1 fails when the provider silently accepts (200)', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({ status: 200, body: {}, targets: [], assert: m.assert, log: m.log });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
+  });
+
+  test('N2 fails when the body is not a Problem', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({ status: 400, body: 'oops', targets: [], assert: m.assert, log: m.log });
+    expect(m.asserts.find((a) => /Problem/.test(a.name)).ok).toBe(false);
+  });
+
+  test('N3 warns when the error does not identify the offending field', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 422, body: { title: 'Unprocessable', detail: 'something failed' },
+      targets: [{ index: 0, scenarioField: 'gender' }], assert: m.assert, log: m.log,
+    });
+    expect(m.logs.some((l) => l.lvl === 'WARNING' && /does not clearly identify/.test(l.msg))).toBe(true);
+  });
+
+  test('N3 accepts a Problem.pointers array as field identification', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 400, body: { title: 'Bad', pointers: [{ pointer: '/passengers/0/gender' }] },
+      targets: [{ index: 0, scenarioField: 'gender' }], assert: m.assert, log: m.log,
+    });
+    expect(m.logs.some((l) => l.lvl === 'INFO' && /identifies the offending field/.test(l.msg))).toBe(true);
+  });
+});

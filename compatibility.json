@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.89",
+  "current_release": "2026.90",
   "releases": [
+    {
+      "release": "2026.90",
+      "date": "2026-05-27",
+      "server": "1.11.62",
+      "collection": "OTST_V2.0.18",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258, Phase 3c): negative-flow probe for requestedInformation. A new per-scenario field requestedInformationProbe = off (default) | omit | invalid (datafile.schema.json + scenarioParser.js env var). With omit/invalid, OSCAR deliberately withholds or sets invalid values for the demanded passenger fields (instead of auto-feeding) so the gated step is submitted with bad data, then asserts the provider rejects it correctly. library-bruno/requestedInformation.js: processRequestedInformation now takes mode ('autofeed'|'omit'|'invalid'; legacy autoFeedOn still honoured) and returns probeTargets; new invalidValueForField (gender=ZZZ, email=not-an-email, dateOfBirth=not-a-date; names/type fall back to omit) and validateProblemResponse (Group N: N1 client-error 4xx [FAIL], N2 RFC-9457 Problem with title/detail/code [FAIL], N3 error identifies the offending field via Problem.pointers or detail text [WARN], N4 message non-empty). offers.js/bookings.js compute the mode, apply the probe, and accumulate requestedInfoProbeTargets. The PATCH Multi Passenger step (03) is now probe-aware: when a probe is active AND a field was actually withheld/corrupted, it grades the rejection (validateProblemResponse) and stops the chain; when the probe is off (default for all existing scenarios) the happy path is byte-identical. Authoring UI dropdown follows in 3c-2. Jest extended (invalidValueForField, probe modes, validateProblemResponse incl. pointers). Bruno_Collection/VERSION OTST_V2.0.17 -> OTST_V2.0.18; server 1.11.61 -> 1.11.62.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.90 / server-v1.11.62 / OTST_V2.0.18 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.89",
       "date": "2026-05-27",
