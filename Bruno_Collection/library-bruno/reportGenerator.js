@@ -18,6 +18,13 @@ unless otherwise agreed by UIC."
 
 'use strict';
 
+/**
+ * reportGenerator.js — build the HTML validation report's per-request entries.
+ *
+ * `initReport()` resets the report at scenario start; `appendRequest()` adds an
+ * entry per HTTP call (request/response bodies + captured assertions/logs) that
+ * the collection-level after-response renders into the final HTML report.
+ */
 module.exports = { initReport, appendRequest };
 
 // ─── Credential redaction (issue #17) ────────────────────────────────────────

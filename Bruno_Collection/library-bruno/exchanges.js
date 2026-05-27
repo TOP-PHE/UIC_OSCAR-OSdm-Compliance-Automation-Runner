@@ -1,3 +1,10 @@
+/**
+ * exchanges.js — validate the after-sales EXCHANGE flow responses.
+ *
+ * Runs in the Exchange scenario folder (after an initial sale). Validates the
+ * PATCH exchange-offers and exchange-operations responses against OSDM
+ * (amounts to-be-paid / refundable, status transitions).
+ */
 // Import needed library files
 require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');

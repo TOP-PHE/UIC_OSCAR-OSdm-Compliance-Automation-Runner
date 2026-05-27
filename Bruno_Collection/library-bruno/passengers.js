@@ -1,3 +1,10 @@
+/**
+ * passengers.js — validate the per-passenger PATCH/GET responses (`03`/`04`).
+ *
+ * After OSCAR PATCHes each passenger's details (name, DOB, gender, contact),
+ * this checks the response echoed the sent data back correctly and that the
+ * passenger object is OSDM-conformant (e.g. type in the PassengerType enum).
+ */
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');

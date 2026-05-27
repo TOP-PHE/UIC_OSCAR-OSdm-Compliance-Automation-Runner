@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.78] — 2026-05-27
+
+Newcomer-readability pass over `library-bruno` — **#216 / #221.**
+**Bruno collection bumped (OTST_V2.0.30 → OTST_V2.0.31). Comments only — no behaviour change.**
+
+### Changed
+- **Added a concise file-objective header** (what the module does + where it sits in the
+  offer → booking → fulfillment flow) to the 12 modules that lacked one: `offers.js`,
+  `bookings.js`, `fulfillments.js`, `passengers.js`, `refunds.js`, `exchanges.js`,
+  `displays.js`, `requestsBuilder.js`, `scenarioParser.js`, `validators.js`, `model.js`,
+  `schema.js`, `reportGenerator.js` — so a new contributor can grasp each module's purpose
+  at a glance (addresses the audit gap on #216).
+- **Removed** the dead, empty, unreferenced `library-bruno/swagger.js` (the Swagger schema
+  logic lives in `validators.js`).
+
+### Notes
+- Comments/headers + one dead-file removal only; **zero runtime change.**
+
+---
+
 ## [server-v1.11.77] — 2026-05-27
 
 Passenger negative-probe **sweep** (companion to the purchaser sweep) — **#258.**

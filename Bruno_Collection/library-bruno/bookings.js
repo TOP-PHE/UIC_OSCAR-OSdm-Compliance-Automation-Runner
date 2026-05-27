@@ -1,4 +1,12 @@
-﻿const { validationLogger } = require('./displays.js');
+﻿/**
+ * bookings.js — validate the BOOKING response (POST /bookings → Booking).
+ *
+ * Runs after `02. POST Create Booking`. Asserts offer↔booking consistency on each
+ * booked part (price / products / dates / after-sales conditions), the booked
+ * offers are present, fulfillment docs are well-formed, and processes the
+ * booking-level `requestedInformation` (passenger + purchaser channels, #258).
+ */
+const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { processRequestedInformation, summariseRequestedInformation } = require('./requestedInformation.js');
 
