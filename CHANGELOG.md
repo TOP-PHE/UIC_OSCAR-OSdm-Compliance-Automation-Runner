@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.80] — 2026-05-27
+
+Expired-booking negative test — **#204 (OTST_TI_EXPIRED_BOOKING).**
+**Bruno collection bumped (OTST_V2.0.32 → OTST_V2.0.33).**
+
+### Added
+- **#204 — a scenario can now request that OSCAR wait until *after* the booking's
+  confirmation deadline before it tries to fulfill, and assert the provider correctly
+  refuses the late confirmation.** A new scenario field **`expiredBookingTest`** (`off`
+  default / `on`) drives the flow. When `on`, after the booking is created OSCAR reads
+  `booking.confirmationTimeLimit`, waits until **15 s past** that deadline, then issues
+  `POST /fulfillments` and asserts the provider **REJECTS it** with a `4xx` + an
+  RFC-9457 `Problem` (hard **FAIL** if the booking is fulfilled after expiry). It then
+  `GET /bookings/{id}` and asserts the admissions/reservations (or the booking itself)
+  are **EXPIRED / RELEASED / CANCELLED**. A `404` on the follow-up GET is accepted as a
+  legitimate purge.
+- **Run-budget guard.** Because the wait can exceed the worker's `RUN_TIMEOUT_MS`
+  (default 10 min), the runner now injects a read-only `runHardDeadlineMs` env var
+  (`Date.now() + RUN_TIMEOUT_MS`) so the test can tell, *before sleeping*, whether the
+  wait would blow the run budget. If it would, the test is **skipped with a `[WARNING]`**
+  (advising to raise `RUN_TIMEOUT_MS`) instead of letting the worker SIGTERM mid-run.
+
+### Notes
+- New scenario field surfaced in the wizard (`public/js/scenarios.js`) and the datafile
+  schema (`json_validator/datafile.schema.json`); `scenarioParser.js` accepts
+  `true`/`"true"`/`"on"`/`"yes"` and resets the per-run state between scenarios.
+
+---
+
 ## [server-v1.11.79] — 2026-05-27
 
 Fulfillment documents: recognise the OSDM `content` field — **#202.**

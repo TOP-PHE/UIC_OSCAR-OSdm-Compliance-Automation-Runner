@@ -24,6 +24,50 @@ runtime:
         const { validationLogger, displayFulFilledBooking } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base")+"bookings.js");
 
+        // #204 EXPIRED-BOOKING: when armed, this GET verifies the booking is expired
+        // (not fulfilled). The normal FULFILLED/CONFIRMED validation below would
+        // wrongly fail, so short-circuit: assert admissions/reservations (or the
+        // booking itself) are EXPIRED/RELEASED/CANCELLED, then continue the loop.
+        if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
+            const _st = res.getStatus();
+            const EXPIRED = ["EXPIRED", "RELEASED", "CANCELLED"];
+            let _jd; try { _jd = res.getBody(); } catch (_e) { _jd = null; }
+            const _bk = _jd && _jd.booking ? _jd.booking : _jd;
+            if (_st === 404) {
+                validationLogger("[INFO] Expired booking: GET /bookings returned 404 — the provider purged the expired booking (acceptable).");
+                test("Expired booking: booking is gone (404) or its parts are expired/released", () => { expect(true).to.be.true; });
+            } else if (_st === 200 && _bk && typeof _bk === "object") {
+                const _parts = [];
+                (Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : []).forEach((bo) => {
+                    ["admissions", "reservations", "ancillaries"].forEach((pt) => {
+                        (Array.isArray(bo[pt]) ? bo[pt] : []).forEach((p) => { if (p && p.status) _parts.push(String(p.status).toUpperCase()); });
+                    });
+                });
+                const _bookingExpired = _bk.status && EXPIRED.includes(String(_bk.status).toUpperCase());
+                const _allPartsExpired = _parts.length > 0 && _parts.every((s) => EXPIRED.includes(s));
+                validationLogger(`[INFO] Expired booking: booking.status=${_bk.status || "(none)"}, parts=[${_parts.join(", ") || "(none)"}]`);
+                test("Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED after the deadline", () => {
+                    expect(_bookingExpired || _allPartsExpired,
+                        `expected expired/released; booking.status=${_bk.status}, parts=[${_parts.join(", ")}]`).to.be.true;
+                });
+            } else {
+                validationLogger(`[WARNING] Expired booking: unexpected GET /bookings status ${_st} — cannot confirm expiry.`);
+                test(`Expired booking: GET /bookings is retrievable (200) or purged (404), got ${_st}`, () => {
+                    expect([200, 404]).to.include(_st);
+                });
+            }
+            try { displayFulFilledBooking(_jd); } catch (_e) { /* display only */ }
+            // Continue the multi-scenario loop (same tail as the normal path).
+            const _scList2    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx2 = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList2.length > 0 && _scNextIdx2 < _scList2.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
 
         // Validate HTTP response status
         test("Status code is 200", () => {
