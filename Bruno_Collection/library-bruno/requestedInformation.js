@@ -369,6 +369,175 @@ function buildPassengerModelFromAdditionalData(additionalArr, specsArr) {
   });
 }
 
+// ─── Static conformance (Phase 3b) ────────────────────────────────────────────
+// Known passenger attributes OSCAR recognises (last path segment). Anything else
+// is reported as an unknown path (S3 — WARN, allow-list may be incomplete).
+const KNOWN_LAST_SEGMENTS = new Set(Object.keys(SCENARIO_FIELDS));
+
+/**
+ * Static issues for a parsed expression's leaves.
+ * @param {object} ast              parsed AST
+ * @param {number} [passengerCount] number of passengers in the request (for index range)
+ * @returns {{ indexErrors:Array, unknownPaths:string[] }}
+ */
+function staticIssues(ast, passengerCount) {
+  const leaves = ast ? collectLeaves(ast) : [];
+  const indexErrors = [];
+  const unknownPaths = [];
+  leaves.forEach((l) => {
+    if (typeof l.index === 'number'
+        && typeof passengerCount === 'number' && passengerCount >= 0
+        && l.index >= passengerCount) {
+      indexErrors.push({ index: l.index, passengerCount, path: l.path.join('.') });
+    }
+    const last = l.path[l.path.length - 1];
+    if (!KNOWN_LAST_SEGMENTS.has(last)) unknownPaths.push(l.path.join('.'));
+  });
+  return { indexErrors, unknownPaths };
+}
+
+// ─── Auto-feed (Phase 3a) ──────────────────────────────────────────────────────
+// Maps a scenario field to the passengerAdditionalData key the PATCH step reads.
+const AUTO_FEED_UPDATE_KEYS = {
+  firstName: 'updateFirstName',
+  lastName: 'updateLastName',
+  gender: 'updateGender',
+  dateOfBirth: 'updateDateOfBirth',
+  email: 'updateEmail',
+  phoneNumber: 'updatePhoneNumber',
+};
+
+/** A valid sample value for a demanded field (gender uses the OSDM enum). */
+function sampleValueForField(scenarioField, index, passengerType) {
+  const n = (typeof index === 'number' ? index : 0) + 1;
+  switch (scenarioField) {
+    case 'firstName':  return 'Test';
+    case 'lastName':   return 'Passenger' + n;
+    case 'email':      return `oscar.autofeed+${n}@example.org`;
+    case 'phoneNumber': return '+3310000000' + (n % 10);
+    case 'gender':     return 'MALE'; // valid OSDM Gender enum [MALE, FEMALE, X]
+    case 'dateOfBirth': {
+      const t = String(passengerType || '').toUpperCase();
+      if (t.includes('CHILD') || t.includes('YOUTH') || t.includes('INFANT')) return '2016-01-01';
+      if (t.includes('SENIOR')) return '1950-01-01';
+      return '1990-01-01';
+    }
+    default: return null;
+  }
+}
+
+/**
+ * Fill auto-feed values for unmet, mappable leaves into a copy of the
+ * passengerAdditionalData array. Only fills fields that are currently empty
+ * (never overwrites tester-provided data). `ANY`/non-numeric indices are skipped
+ * — evaluateRequestedInformation already expands ANY to concrete passenger
+ * indices in unmetLeaves.
+ * @returns {{ additional:Array, provided:Array }}
+ */
+function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
+  const additional = Array.isArray(additionalArr) ? additionalArr.map((x) => Object.assign({}, x)) : [];
+  const specs = Array.isArray(specsArr) ? specsArr : [];
+  const provided = [];
+  (unmetLeaves || []).forEach((u) => {
+    const updateKey = AUTO_FEED_UPDATE_KEYS[u.scenarioField];
+    if (!updateKey) return;                       // unmappable (taxId/card) or type → can't PATCH
+    if (typeof u.index !== 'number') return;      // unmet leaves carry concrete indices
+    while (additional.length <= u.index) additional.push({});
+    const entry = additional[u.index];
+    if (isSet(entry[updateKey])) return;          // keep tester-provided values
+    const passengerType = (specs[u.index] && specs[u.index].type) || entry.type || null;
+    const value = sampleValueForField(u.scenarioField, u.index, passengerType);
+    if (value === null) return;
+    entry[updateKey] = value;
+    provided.push({
+      index: u.index, scenarioField: u.scenarioField, updateKey,
+      value, fieldLabel: u.fieldLabel, passengerRef: u.passengerRef,
+    });
+  });
+  return { additional, provided };
+}
+
+// ─── Orchestrator (used by the offer & booking handlers) ──────────────────────
+/**
+ * Process one requestedInformation value end-to-end: static assertions (S1/S2/
+ * S3/S4), evaluation against the passenger data OSCAR will send, and — unless a
+ * negative probe is active — auto-feed of missing demanded fields. Pure except
+ * via injected callbacks, so it is unit-testable with mocks.
+ *
+ * @param {object} o
+ * @param {string}   o.expr            raw requestedInformation string
+ * @param {string}   o.tag             context label (e.g. "admissionOfferParts[0]" / "booking")
+ * @param {Array}    o.additional      passengerAdditionalData (not mutated; a new array is returned)
+ * @param {Array}    o.specs           passenger specs (for `type` + count)
+ * @param {number}   o.passengerCount  passenger count for index-range checks
+ * @param {boolean}  o.autoFeedOn      whether to auto-provide missing fields
+ * @param {function} o.assert          (name, okBool, failMsg) — FAIL semantics
+ * @param {function} o.log             (level, msg) — 'INFO' | 'WARNING'
+ * @returns {{ additional:Array, provided:Array, satisfied:boolean, parseOk:boolean }}
+ */
+function processRequestedInformation(o) {
+  const { expr, tag, specs, passengerCount, autoFeedOn, assert, log } = o;
+  let additional = Array.isArray(o.additional) ? o.additional : [];
+  const s = summariseRequestedInformation(expr);
+
+  assert(`${tag}.requestedInformation is a valid OSDM type (string, <=${MAX_LENGTH})`,
+    s.typeOk, `type errors: ${s.typeErrors.join('; ')}`);
+  assert(`${tag}.requestedInformation parses against the OSDM grammar`,
+    s.parseOk, `parse error: ${s.parseError}`);
+  if (!s.parseOk) return { additional, provided: [], satisfied: false, parseOk: false };
+
+  log('INFO', `${tag} requests additional information before the next step: ${s.description}`);
+
+  const issues = staticIssues(s.ast, passengerCount);
+  assert(`${tag}.requestedInformation passenger indices are in range`,
+    issues.indexErrors.length === 0,
+    `out-of-range index(es): ${issues.indexErrors.map((e) => `[${e.index}] >= ${e.passengerCount}`).join(', ')}`);
+  if (issues.unknownPaths.length) {
+    log('WARNING', `${tag}.requestedInformation references attribute(s) OSCAR does not recognise: ${[...new Set(issues.unknownPaths)].join(', ')}`);
+  }
+
+  s.leaves.forEach((l) => {
+    if (l.scenarioField) {
+      log('INFO', `  → '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+    } else {
+      log('WARNING', `  → '${l.path.join('.')}' on ${l.passengerRef} is not configurable in OSCAR — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+    }
+  });
+
+  const evalNow = () => evaluateRequestedInformation(
+    s.ast, { passengerSpecifications: buildPassengerModelFromAdditionalData(additional, specs) });
+
+  let res = evalNow();
+  const provided = [];
+  if (res.satisfied) {
+    log('INFO', `${tag} requestedInformation is already satisfied by the scenario's passenger data.`);
+    return { additional, provided, satisfied: true, parseOk: true };
+  }
+
+  if (autoFeedOn) {
+    const r = applyAutoFeed(additional, res.unmetLeaves, specs);
+    additional = r.additional;
+    r.provided.forEach((p) => {
+      provided.push(p);
+      log('INFO', `Auto-provided '${p.scenarioField}' (${p.fieldLabel}) = '${p.value}' for ${p.passengerRef} to satisfy ${tag}.requestedInformation`);
+    });
+    res = evalNow();
+    const mappableRemaining = res.unmetLeaves.filter((u) => u.scenarioField);
+    assert(`${tag}.requestedInformation is satisfiable from OSCAR scenario fields (auto-fed)`,
+      mappableRemaining.length === 0,
+      `still unmet after auto-feed: ${mappableRemaining.map((u) => `${u.scenarioField}@${u.passengerRef}`).join(', ')}`);
+    res.unmetLeaves.filter((u) => !u.scenarioField).forEach((u) => {
+      log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
+    });
+  } else {
+    log('INFO', `${tag} requestedInformation unmet and auto-feed disabled — expecting the provider to reject the next step.`);
+    res.unmetLeaves.forEach((u) => {
+      log('INFO', `  → withholding '${u.scenarioField || u.path.join('.')}' for ${u.passengerRef}`);
+    });
+  }
+  return { additional, provided, satisfied: res.satisfied, parseOk: true };
+}
+
 module.exports = {
   parseRequestedInformation,
   describeRequestedInformation,
@@ -376,6 +545,11 @@ module.exports = {
   summariseRequestedInformation,
   evaluateRequestedInformation,
   buildPassengerModelFromAdditionalData,
+  staticIssues,
+  sampleValueForField,
+  applyAutoFeed,
+  processRequestedInformation,
+  AUTO_FEED_UPDATE_KEYS,
   MAX_LENGTH,
 };
 

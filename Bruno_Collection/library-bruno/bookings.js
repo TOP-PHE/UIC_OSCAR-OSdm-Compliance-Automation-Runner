@@ -1,6 +1,6 @@
 ﻿const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
-const { summariseRequestedInformation, evaluateRequestedInformation } = require('./requestedInformation.js');
+const { processRequestedInformation, summariseRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   postCreateBookingResponse,
@@ -332,39 +332,49 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     validationLogger(`[INFO] booking.confirmationTimeLimit absent → test skipped`);
   }
 
-  // RI (#258 Phase 1): surface booking-level requestedInformation — what the
-  // client must additionally set before the booking can be confirmed.
+  // RI (#258): booking-level requestedInformation — static assertions, evaluate
+  // against the passenger data OSCAR will PATCH, and auto-provide missing fields
+  // (Phase 3a/3b). The PATCH step (03) runs after this and carries the values.
   const _bookingRi = booking.requestedInformation;
   if (_bookingRi !== undefined && _bookingRi !== null && _bookingRi !== '') {
-    const s = summariseRequestedInformation(_bookingRi);
-    test(`booking.requestedInformation is a valid OSDM type (string, <=32768)`, () => {
-      expect(s.typeOk, `requestedInformation type errors: ${s.typeErrors.join('; ')}`).to.be.true;
+    const _read = (n) => {
+      const r = bru.getEnvVar(n);
+      if (r === null || r === undefined || r === '') return [];
+      try { return typeof r === 'string' ? JSON.parse(r) : r; } catch (_e) { return []; }
+    };
+    const _add = _read('passengerAdditionalData');
+    const _specs = _read('bookingPassengerSpecifications');
+    const _count = Number(bru.getEnvVar('offerPassengerNumber')) || (booking.passengers || []).length || _add.length || 0;
+    const _autoFeedOn = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase() === 'off';
+
+    const out = processRequestedInformation({
+      expr: _bookingRi,
+      tag: 'booking',
+      additional: _add,
+      specs: _specs,
+      passengerCount: _count,
+      autoFeedOn: _autoFeedOn,
+      assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
+      log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
     });
-    if (s.parseOk) {
-      validationLogger(`[INFO] booking requests additional information before confirmation: ${s.description}`);
-      s.leaves.forEach(l => {
-        if (l.scenarioField) {
-          validationLogger(`[INFO]   → set '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
-        } else {
-          validationLogger(`[WARNING]   → provider requires '${l.path.join('.')}' on ${l.passengerRef}, not currently configurable in OSCAR scenario authoring — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
-        }
-      });
-      // Phase 2: evaluate against the booking's own passengers.
-      const _res = evaluateRequestedInformation(s.ast, { passengerSpecifications: booking.passengers || [] });
-      if (_res.satisfied) {
-        validationLogger(`[INFO] booking.requestedInformation is satisfied by the booking's passenger data.`);
-      } else {
-        validationLogger(`[WARNING] booking.requestedInformation is NOT satisfied by the booking's passenger data — confirmation will likely be rejected unless these are set:`);
-        _res.unmetLeaves.forEach(u => {
-          if (u.scenarioField) {
-            validationLogger(`[WARNING]   → missing '${u.scenarioField}' (${u.fieldLabel}) for ${u.passengerRef}`);
-          } else {
-            validationLogger(`[WARNING]   → missing '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR authoring)`);
-          }
-        });
+    if (out.provided.length) {
+      bru.setEnvVar('passengerAdditionalData', JSON.stringify(out.additional));
+      if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
+        bru.setEnvVar('skipPatchPassengerRequest', 'false');
       }
-    } else {
-      validationLogger(`[WARNING] booking.requestedInformation could not be parsed as an OSDM requested-information expression: ${s.parseError}`);
+    }
+
+    // P2: the provider should stop requesting what OSCAR already provided at the
+    // offer step. If it still asks, flag it (WARN — requestedInformation should
+    // shrink as data is supplied).
+    const _autoFed = _read('requestedInfoAutoFed');
+    if (_autoFed.length) {
+      const s = summariseRequestedInformation(_bookingRi);
+      if (s.parseOk) {
+        s.leaves
+          .filter(l => l.scenarioField && _autoFed.some(a => a.scenarioField === l.scenarioField && (l.index === 'ANY' || a.index === l.index)))
+          .forEach(l => validationLogger(`[WARNING] [P2] booking.requestedInformation still requests '${l.scenarioField}' for ${l.passengerRef}, which OSCAR already provided — requestedInformation should clear once satisfied.`));
+      }
     }
   } else {
     validationLogger(`[INFO] booking.requestedInformation absent → nothing additionally required`);
