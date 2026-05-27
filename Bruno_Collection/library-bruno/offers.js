@@ -663,10 +663,12 @@ function validateOfferParts(selectedOffer) {
   const _riSpecs = _riReadJson('offerPassengerSpecifications');
   let _riAdditional = _riReadJson('passengerAdditionalData');
   const _riCount = Number(bru.getEnvVar('offerPassengerNumber')) || _riAdditional.length || 0;
-  const _riAutoFeedOn = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase() === 'off';
+  const _riProbe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();
+  const _riMode = (_riProbe === 'omit' || _riProbe === 'invalid') ? _riProbe : 'autofeed';
   const _riAssert = (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; });
   const _riLog = (lvl, msg) => validationLogger(`[${lvl}] ${msg}`);
   const _riAutoFed = [];
+  const _riProbeTargets = [];
   let _riChanged = false;
 
   ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].forEach(partType => {
@@ -679,27 +681,30 @@ function validateOfferParts(selectedOffer) {
         additional: _riAdditional,
         specs: _riSpecs,
         passengerCount: _riCount,
-        autoFeedOn: _riAutoFeedOn,
+        mode: _riMode,
         assert: _riAssert,
         log: _riLog,
       });
-      if (out.provided.length) {
+      // autofeed (provided) and negative probe (probeTargets) both mutate the data.
+      if (out.provided.length || (out.probeTargets && out.probeTargets.length)) {
         _riAdditional = out.additional;
         _riChanged = true;
-        out.provided.forEach(p => _riAutoFed.push({ index: p.index, scenarioField: p.scenarioField }));
       }
+      out.provided.forEach(p => _riAutoFed.push({ index: p.index, scenarioField: p.scenarioField }));
+      (out.probeTargets || []).forEach(t => _riProbeTargets.push(t));
     });
   });
 
   if (_riChanged) {
     bru.setEnvVar('passengerAdditionalData', JSON.stringify(_riAdditional));
     // The PATCH step is skipped when no passenger update was configured; auto-fed
-    // values must actually be sent, so re-enable it.
+    // (or deliberately probed) values must actually be sent, so re-enable it.
     if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
       bru.setEnvVar('skipPatchPassengerRequest', 'false');
     }
   }
   if (_riAutoFed.length) bru.setEnvVar('requestedInfoAutoFed', JSON.stringify(_riAutoFed));
+  if (_riProbeTargets.length) bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_riProbeTargets));
 }
 
 // Admission validation

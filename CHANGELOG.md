@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.62] — 2026-05-27
+
+OSDM `requestedInformation` — **#258 Phase 3c**: negative-flow probe + error-quality
+assertions. Bruno collection change (OTST_V2.0.17 → OTST_V2.0.18); server in
+lockstep (1.11.61 → 1.11.62).
+
+### Added
+- **Negative-flow probe** — a per-scenario `requestedInformationProbe` =
+  `off` (default) | `omit` | `invalid` (`datafile.schema.json` + `scenarioParser.js`).
+  With `omit`/`invalid`, OSCAR deliberately **withholds** or sets **invalid** values
+  for the fields a provider demanded (instead of auto-feeding), so the gated step is
+  submitted with bad data — then asserts the provider rejects it.
+- **`Problem` (RFC 9457) validator** (`validateProblemResponse`) grading the
+  rejection — **N1** client-error 4xx *(FAIL)*, **N2** Problem shape with
+  `title`/`detail`/`code` *(FAIL)*, **N3** error identifies the offending field via
+  `Problem.pointers` or `detail` text *(WARN)*, **N4** non-empty message.
+- The **PATCH Multi Passenger** step is now probe-aware: when a probe is active and a
+  field was actually withheld/corrupted it grades the rejection and stops the chain.
+  **When the probe is off (default for every existing scenario) the happy path is
+  byte-identical.**
+- `processRequestedInformation` now takes a `mode` (`autofeed`/`omit`/`invalid`; the
+  legacy `autoFeedOn` boolean is still honoured) and returns `probeTargets`; new
+  `invalidValueForField` helper. Jest suite extended (invalid values, probe modes,
+  Problem validator incl. `pointers`).
+
+The scenario-authoring UI dropdown for the probe follows in a small **3c-2** PR; the
+field can be set directly in the data file today (documented in the schema).
+
+---
+
 ## [server-v1.11.61] — 2026-05-27
 
 OSDM `requestedInformation` — **#258 Phase 3a + 3b**: auto-feed + static

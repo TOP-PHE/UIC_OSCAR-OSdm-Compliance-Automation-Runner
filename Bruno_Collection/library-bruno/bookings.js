@@ -345,7 +345,8 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     const _add = _read('passengerAdditionalData');
     const _specs = _read('bookingPassengerSpecifications');
     const _count = Number(bru.getEnvVar('offerPassengerNumber')) || (booking.passengers || []).length || _add.length || 0;
-    const _autoFeedOn = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase() === 'off';
+    const _probe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();
+    const _mode = (_probe === 'omit' || _probe === 'invalid') ? _probe : 'autofeed';
 
     const out = processRequestedInformation({
       expr: _bookingRi,
@@ -353,15 +354,19 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       additional: _add,
       specs: _specs,
       passengerCount: _count,
-      autoFeedOn: _autoFeedOn,
+      mode: _mode,
       assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
       log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
     });
-    if (out.provided.length) {
+    if (out.provided.length || (out.probeTargets && out.probeTargets.length)) {
       bru.setEnvVar('passengerAdditionalData', JSON.stringify(out.additional));
       if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
         bru.setEnvVar('skipPatchPassengerRequest', 'false');
       }
+    }
+    if (out.probeTargets && out.probeTargets.length) {
+      const _existing = _read('requestedInfoProbeTargets');
+      bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
     }
 
     // P2: the provider should stop requesting what OSCAR already provided at the
