@@ -21,7 +21,9 @@ module.exports = {
   validateAncillaries,
   getTripLegCoverage,
   handleAccommodationAndPlaceSelection,
-  ensureYesWhenRefundOrExchangeSelected
+  ensureYesWhenRefundOrExchangeSelected,
+  deriveOfferFlexibilityFromProducts,
+  offerFlexibility
 };
 
 // Function to check warnings and problems in the response
@@ -225,6 +227,33 @@ function postOfferResponse(jsonData) {
   bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", bru.getEnvVar("admissionReservationAncillaryOfferPartsIds"));
 }
 
+// OSDM Flexibility ordered least → most restrictive. An offer's overall
+// flexibility is the MOST RESTRICTIVE of its products: a multi-leg journey is
+// only as flexible as its least-flexible leg (e.g. TGV FULL_FLEXIBLE + TER
+// NON_FLEXIBLE → the offer is NON_FLEXIBLE). Unknown/vendor-specific values are
+// ignored for the aggregation. (#223)
+const FLEX_ORDER = ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'];
+
+function deriveOfferFlexibilityFromProducts(offer) {
+  const flits = ((offer && offer.products) || []).map(p => p && p.flexibility).filter(Boolean);
+  let result;
+  flits.forEach(f => {
+    const rank = FLEX_ORDER.indexOf(f);
+    if (rank === -1) return; // unknown value → ignore for aggregation
+    if (result === undefined || rank > FLEX_ORDER.indexOf(result)) result = f;
+  });
+  return result;
+}
+
+// Overall flexibility of an offer: the provider's offerSummary.overallFlexibility
+// when present (it is OPTIONAL in OSDM), otherwise derived from the offer's
+// products (#223 — providers that omit offerSummary). Returns undefined if
+// neither is available.
+function offerFlexibility(offer) {
+  return (offer && offer.offerSummary && offer.offerSummary.overallFlexibility)
+    || deriveOfferFlexibilityFromProducts(offer);
+}
+
 // select and set offer based on criteria
 function selectAndSetOffer(jsonData) {
   validationLogger("[INFO] ➤ selectAndSetOffer");
@@ -263,12 +292,15 @@ function selectAndSetOffer(jsonData) {
     validationLogger("[INFO] No accommodation filter applied");
   }
 
-  // Apply flexibility filter if specified
+  // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
+  // when a provider omits it we derive the offer's overall flexibility from its
+  // products (most restrictive wins) instead of dropping every offer. (#223)
   if (desiredFlexibility) {
     validationLogger(`[INFO] Applying flexibility filter: ${desiredFlexibility}`);
-    filteredOffers = filteredOffers.filter(o =>
-      o.offerSummary?.overallFlexibility === desiredFlexibility
-    );
+    if (!filteredOffers.some(o => o.offerSummary && o.offerSummary.overallFlexibility)) {
+      validationLogger(`[INFO] No offerSummary.overallFlexibility on these offers — deriving flexibility from offer products (most restrictive leg wins).`);
+    }
+    filteredOffers = filteredOffers.filter(o => offerFlexibility(o) === desiredFlexibility);
   }
 
   // Select the first matching offer or default to the first offer
@@ -303,8 +335,12 @@ function selectAndSetOffer(jsonData) {
   bru.setEnvVar("offers", jsonData.offers);
 
   if (desiredFlexibility) {
-    const actual = selectedOffer.offerSummary?.overallFlexibility;
-    test(`Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}`, () => {
+    const _summaryFlex = selectedOffer.offerSummary?.overallFlexibility;
+    const actual = offerFlexibility(selectedOffer);
+    if (!_summaryFlex) {
+      validationLogger(`[INFO] Selected offer has no offerSummary — overall flexibility derived from products [${(selectedOffer.products || []).map(p => p.flexibility).filter(Boolean).join(', ')}] → most restrictive = ${actual}`);
+    }
+    test(`Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}${_summaryFlex ? '' : ' (derived from products; no offerSummary)'}`, () => {
       validationLogger(`[INFO] Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}`);
       expect(actual).to.eql(desiredFlexibility);
     });
@@ -606,15 +642,23 @@ function validateOfferParts(selectedOffer) {
     expect(minimalPrice).to.be.at.least(sumPartsPrice);
   });
 
-  // Flexibility calculation
-  const productFlex = Array.from(new Set(selectedOffer?.products?.map(p => p.flexibility).filter(Boolean)));
-  const flexibilityResult = productFlex.includes("FULL_FLEXIBLE") ? "FULL_FLEXIBLE" : (productFlex.length === 1 ? productFlex[0] : "SEMI_FLEXIBLE");
+  // Flexibility consistency. The offer's overall flexibility is the MOST
+  // RESTRICTIVE of its products (least-flexible leg governs the journey). When
+  // the provider sends offerSummary.overallFlexibility we assert it matches that
+  // derivation; when it omits offerSummary (OPTIONAL in OSDM) there is nothing to
+  // be consistent with — we just log the derived value. (#223)
+  const productFlex = Array.from(new Set((selectedOffer?.products || []).map(p => p.flexibility).filter(Boolean)));
+  const derivedFlex = deriveOfferFlexibilityFromProducts(selectedOffer);
   const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
 
-  test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, flexibilityResult: ${flexibilityResult}`, () => {
-    validationLogger(`[INFO] productFlex: ${productFlex.join(", ")}, Result: ${flexibilityResult}`);
-    expect(overallFlex).to.eql(flexibilityResult);
-  });
+  if (overallFlex) {
+    test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
+      validationLogger(`[INFO] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
+      expect(overallFlex).to.eql(derivedFlex);
+    });
+  } else {
+    validationLogger(`[INFO] offerSummary absent — overall flexibility derived from products [${productFlex.join(", ")}] → most restrictive = ${derivedFlex}`);
+  }
 
   // capture coveredTripId if value exists
   const coveredTripId = selectedOffer.tripCoverage && selectedOffer.tripCoverage.coveredTripId;
