@@ -205,7 +205,13 @@ function buildBookingPurchaserBody() {
   if ("updateGender"      in add) setOrClear(body.detail,         "gender",      add.updateGender);
   if ("updateDateOfBirth" in add) setOrClear(body.detail,         "dateOfBirth", add.updateDateOfBirth);
 
-  if (mode === "invalid" && !body.detail.contact.email) {
+  if (mode === "invalid") {
+    // Force a clearly-invalid value so the provider MUST reject. Overwrite any
+    // valid scenario email — the earlier "only if empty" guard let a complete
+    // scenario purchaser through unchanged, so the negative probe was sending
+    // VALID data and never exercised the provider's validation. (#258 fix)
+    body.detail = (body.detail && typeof body.detail === "object") ? body.detail : {};
+    body.detail.contact = (body.detail.contact && typeof body.detail.contact === "object") ? body.detail.contact : {};
     body.detail.contact.email = "not-an-email";
   }
 
