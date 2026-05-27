@@ -69,6 +69,18 @@
               null
             ]
           },
+          "expiredBookingTest": {
+            "description": "Negative test for an EXPIRED booking (#204). When on, OSCAR waits until just past booking.confirmationTimeLimit, then attempts POST /fulfillments and asserts the provider REJECTS it (4xx + RFC-9457 Problem) and that the booking's admissions/reservations are EXPIRED/RELEASED/CANCELLED. If waiting until the deadline would exceed the run budget (RUN_TIMEOUT_MS), the test is skipped with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
           "osdmVersion": {
             "type": "string"
           },

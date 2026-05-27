@@ -21,11 +21,83 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: |-
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+
+        // #204 EXPIRED-BOOKING TEST: when armed, wait until just past the booking's
+        // confirmationTimeLimit, THEN let the fulfillment fire — the after-response
+        // asserts the provider rejects it. Skips (with a WARNING) when the wait would
+        // overrun the run budget, or when the provider set no confirmationTimeLimit.
+        if (String(bru.getEnvVar("expiredBookingTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const limitRaw = bru.getEnvVar("bookingConfirmationTimeLimit");
+          const nowMs = Date.now();
+          const BUFFER_MS = 15000;       // wait 15s past the deadline to be safely expired
+          const POST_MARGIN_MS = 45000;  // leave budget for the fulfillment + GET booking + report
+          const hardDeadlineMs = parseInt(bru.getEnvVar("runHardDeadlineMs") || "0", 10) || 0;
+
+          if (!limitRaw) {
+            validationLogger("[WARNING] expiredBookingTest: provider returned no booking.confirmationTimeLimit — cannot deterministically test expiry. Proceeding without the expiry assertion.");
+            bru.setEnvVar("__expiredBookingArmed", "false");
+          } else {
+            const limitMs = new Date(limitRaw).getTime();
+            const wakeAtMs = limitMs + BUFFER_MS;
+            const waitMs = wakeAtMs - nowMs;
+            // Effective budget: the runner's hard deadline if known, else a conservative
+            // 8-min cap (protects when runHardDeadlineMs isn't injected yet).
+            const budgetEndMs = hardDeadlineMs || (nowMs + 480000);
+            if (isNaN(limitMs)) {
+              validationLogger(`[WARNING] expiredBookingTest: confirmationTimeLimit '${limitRaw}' is not a valid date — skipping the expiry assertion.`);
+              bru.setEnvVar("__expiredBookingArmed", "false");
+            } else if (waitMs <= 0) {
+              validationLogger(`[INFO] expiredBookingTest: confirmationTimeLimit already passed (${limitRaw}) — attempting fulfillment now, expecting rejection.`);
+              bru.setEnvVar("__expiredBookingArmed", "true");
+            } else if ((wakeAtMs + POST_MARGIN_MS) > budgetEndMs) {
+              const needS = Math.ceil((wakeAtMs + POST_MARGIN_MS - nowMs) / 1000);
+              validationLogger(`[WARNING] expiredBookingTest SKIPPED: waiting ~${Math.ceil(waitMs/1000)}s until past confirmationTimeLimit (${limitRaw}) would exceed this run's budget. Raise RUN_TIMEOUT_MS to >= ~${needS}s and re-run to exercise the expiry. Proceeding without the expiry assertion.`);
+              bru.setEnvVar("__expiredBookingArmed", "false");
+            } else {
+              validationLogger(`[INFO] expiredBookingTest: waiting ~${Math.ceil(waitMs/1000)}s until just past confirmationTimeLimit (${limitRaw}) before attempting fulfillment...`);
+              await new Promise((r) => setTimeout(r, waitMs));
+              validationLogger(`[INFO] expiredBookingTest: wait complete — attempting fulfillment, expecting the provider to reject it (booking expired).`);
+              bru.setEnvVar("__expiredBookingArmed", "true");
+            }
+          }
+        }
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
         const { validateFulfillments } = require(bru.getEnvVar("library_base")+"bookings.js");
+
+        // #204 EXPIRED-BOOKING: if the wait armed the test, the fulfillment MUST be
+        // rejected — an expired booking must not be fulfillable. Grade the rejection
+        // and fall through to 07. GET Booking after Fulfillments to verify the
+        // admissions/reservations are EXPIRED/RELEASED/CANCELLED.
+        if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
+            const _status = res.getStatus();
+            let _body; try { _body = res.getBody(); } catch (_e) { _body = null; }
+            const _isClientError = _status >= 400 && _status < 500;
+            test(`Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_status})`, () => {
+                expect(_isClientError, `expected a 4xx rejection, got ${_status}`).to.be.true;
+            });
+            if (_status >= 400) {
+                const _isObj = _body !== null && typeof _body === "object";
+                const _hasMsg = _isObj && (_body.title || _body.detail || _body.code);
+                test("Expired booking: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                    expect(!!_hasMsg, "response body did not contain title/detail/code").to.be.true;
+                });
+                const _blob = _isObj ? JSON.stringify(_body).toLowerCase() : "";
+                if (/expir|time ?limit|deadline|too late|no longer|timed? ?out/.test(_blob)) {
+                    validationLogger("[INFO] Expired booking: the error message indicates the booking/confirmation expired.");
+                } else {
+                    validationLogger("[WARNING] Expired booking: the provider rejected the fulfillment but the error does not clearly indicate expiry — recommended for diagnosability.");
+                }
+            } else {
+                validationLogger(`[ERROR] Expired booking: provider returned ${_status} and may have FULFILLED an expired booking — this should have been rejected.`);
+            }
+            // Continue to 07 (GET booking) to assert the parts are expired/released.
+            return;
+        }
 
         // Validate HTTP response status
         test('Status code is 200 or 202', () => {

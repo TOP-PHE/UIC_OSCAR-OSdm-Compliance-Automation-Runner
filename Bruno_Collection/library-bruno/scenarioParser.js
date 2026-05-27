@@ -64,6 +64,7 @@ function resetScenarioEnvVars() {
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
+    "expiredBookingTest", "__expiredBookingArmed",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
@@ -439,6 +440,10 @@ function parseScenarioData(jsonData) {
       // booking request) | deferred (omit, then POST it to satisfy the demand) |
       // omit (never supply) | invalid (POST a bad purchaser → expect rejection).
       bru.setEnvVar("bookingPurchaserMode", ["", "null", null, undefined].includes(scenario.bookingPurchaserMode) ? "inline" : String(scenario.bookingPurchaserMode).toLowerCase());
+      // Expired-booking negative test (#204): when true, OSCAR waits until just
+      // past booking.confirmationTimeLimit, then attempts fulfillment and asserts
+      // the provider rejects it (booking expired). Default false.
+      bru.setEnvVar("expiredBookingTest", (scenario.expiredBookingTest === true || ["true", "on", "yes"].includes(String(scenario.expiredBookingTest).toLowerCase())) ? "true" : "false");
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
       // The data file is the per-scenario source of truth; the env file is the fallback

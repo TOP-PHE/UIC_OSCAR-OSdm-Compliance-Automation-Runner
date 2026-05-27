@@ -330,6 +330,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // B2: confirmationTimeLimit must be a valid future datetime when present (OSDM)
   if (booking.confirmationTimeLimit) {
     const confirmLimit = new Date(booking.confirmationTimeLimit);
+    // #204: stash the deadline so the expired-booking test (06. fulfillments) can
+    // wait until just past it before attempting confirmation.
+    bru.setEnvVar('bookingConfirmationTimeLimit', String(booking.confirmationTimeLimit));
     test(`booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)`, () => {
       expect(isNaN(confirmLimit.getTime()), `confirmationTimeLimit is not a valid date`).to.be.false;
       expect(confirmLimit.getTime()).to.be.above(Date.now(),
@@ -337,6 +340,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       validationLogger(`[INFO] booking.confirmationTimeLimit: ${booking.confirmationTimeLimit}`);
     });
   } else {
+    bru.setEnvVar('bookingConfirmationTimeLimit', '');
     validationLogger(`[INFO] booking.confirmationTimeLimit absent → test skipped`);
   }
 

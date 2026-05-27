@@ -28,6 +28,7 @@ const ENUMS = {
   scenarioAction:     [null, 'PATCH', 'DELETE'],
   requestedInformationProbe: [null, 'omit', 'invalid'],
   bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
+  expiredBookingTest: ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
@@ -1259,6 +1260,8 @@ function buildDetailHTML(idx) {
           'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
           'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
+        ${buildSelect(idx, 'expiredBookingTest', 'Expired-booking test', ENUMS.expiredBookingTest,
+          'Negative test (#204). On: after booking, OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment and asserts the provider rejects it (booking expired) and the parts are EXPIRED/RELEASED/CANCELLED. Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS).')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
@@ -4967,6 +4970,9 @@ async function wizGenerateScenario() {
       // sent in the booking request); deferred/omit/invalid in the detail panel
       // to omit it at booking and set/probe it via POST /bookings/{id}/purchaser.
       bookingPurchaserMode: 'inline',
+      // Expired-booking negative test (issue #204) — 'off' by default; 'on' makes
+      // OSCAR wait past confirmationTimeLimit then assert fulfillment is rejected.
+      expiredBookingTest: 'off',
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,

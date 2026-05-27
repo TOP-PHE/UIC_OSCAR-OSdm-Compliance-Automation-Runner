@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.107",
+  "current_release": "2026.108",
   "releases": [
+    {
+      "release": "2026.108",
+      "date": "2026-05-27",
+      "server": "1.11.80",
+      "collection": "OTST_V2.0.33",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#204): expired-booking negative test (OTST_TI_EXPIRED_BOOKING). New scenario field expiredBookingTest (off/on). When on, after the booking is created OSCAR WAITS until just past booking.confirmationTimeLimit (+15s buffer; the wait is derived from the deadline per the issue), then POST /fulfillments must be REJECTED (4xx + RFC-9457 Problem; hard FAIL if the provider fulfills an expired booking), and GET /bookings must show admissions/reservations EXPIRED/RELEASED/CANCELLED (or a 404 purge). If waiting until the deadline would overrun the run budget, the test SKIPS with a [WARNING] telling the operator to raise RUN_TIMEOUT_MS (the runner now injects runHardDeadlineMs into the Bruno env so the wait can make this decision). Default off; existing scenarios unaffected. Bruno_Collection/VERSION OTST_V2.0.32 -> OTST_V2.0.33; server 1.11.79 -> 1.11.80.",
+        "Operator action required: none for default runs. To exercise expiredBookingTest against a provider whose confirmationTimeLimit exceeds ~9 min, raise RUN_TIMEOUT_MS accordingly. Chip shows 2026.108 / server-v1.11.80 / OTST_V2.0.33 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.107",
       "date": "2026-05-27",
