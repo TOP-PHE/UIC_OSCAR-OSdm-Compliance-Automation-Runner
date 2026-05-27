@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.96",
+  "current_release": "2026.97",
   "releases": [
+    {
+      "release": "2026.97",
+      "date": "2026-05-27",
+      "server": "1.11.69",
+      "collection": "OTST_V2.0.23",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#208, root cause): invalidate the per-tester OAuth token cache when credentials change (server-only; Bruno collection unchanged, OTST_V2.0.23). Real cause of the 'invalid credentials still ran all test cases' report: worker/access-token.js resolveAccessToken reused a still-valid CACHED token (cached_token_enc) regardless of whether the credentials had changed, so switching to invalid creds within the token TTL was never exercised (the token request is fetched server-side before Bruno and never appears in the report; fetchToken DOES throw on a real 401, so only the cache could have returned a token). Now a SHA-256 fingerprint of the credentials (profile + token_url + client_id + client_secret + scope + extra; secret hashed one-way, never stored) is saved with the cached token (new users.cached_token_cred_fp column) and the cache is reused only when the fingerprint matches; a credential change forces a re-fetch, so invalid credentials now throw -> the run is marked FAILED before Bruno with '[runner] Auth failed: HTTP 401 ...' in the Execution Log and no scenarios run. Schema + migration added (existing rows have NULL fp -> one safe re-fetch post-deploy). Server 1.11.68 -> 1.11.69; Bruno collection unchanged.",
+        "Operator action required: none. Hard-refresh after Watchtower promotes :stable. Chip shows 2026.97 / server-v1.11.69 / OTST_V2.0.23."
+      ]
+    },
     {
       "release": "2026.96",
       "date": "2026-05-27",

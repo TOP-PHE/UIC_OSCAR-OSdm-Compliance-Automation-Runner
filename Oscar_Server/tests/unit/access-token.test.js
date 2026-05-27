@@ -72,13 +72,42 @@ describe('resolveAccessToken — oauth2 cache', () => {
     oauth_scope: '',
   };
 
+  // Resolve once with an empty cache so the implementation computes AND persists
+  // its OWN credential fingerprint (#208), then read it back from the persist
+  // call. Capturing the real value avoids re-implementing the hashing formula in
+  // the test — the cache-hit test then supplies a fingerprint the code is
+  // guaranteed to recognise for `base`'s exact credentials.
+  async function captureCredFp() {
+    fetchToken.mockResolvedValue({ token: 'seed', expiresIn: 3600 });
+    await resolveAccessToken({ ...base }, log);
+    const persist = db.run.mock.calls.find(([sql]) => /cached_token_cred_fp = \?/.test(sql));
+    return persist[1][2]; // 3rd bound param of the persist UPDATE = credFp
+  }
+
   test('reuses a still-valid cached token without fetching', async () => {
+    const fp = await captureCredFp();
+    fetchToken.mockClear(); // forget the seed fetch — a cache hit must not refetch
     const future = new Date(Date.now() + 3600 * 1000).toISOString();
     const tok = await resolveAccessToken(
-      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future }, log
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: fp }, log
     );
     expect(tok).toBe('cachedtok');
     expect(fetchToken).not.toHaveBeenCalled();
+  });
+
+  test('refetches when the credentials changed even though the cached token is still valid (#208)', async () => {
+    fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+    const future = new Date(Date.now() + 3600 * 1000).toISOString();
+    const tok = await resolveAccessToken(
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: 'STALE_FINGERPRINT_FROM_OLD_CREDS' }, log
+    );
+    // The still-valid-but-stale cache is bypassed; the current credentials are used.
+    expect(tok).toBe('freshtok');
+    expect(fetchToken).toHaveBeenCalledWith('oauth2_basic', expect.objectContaining({
+      tokenUrl: 'https://token', clientId: 'cid', clientSecret: 'secret',
+    }), log);
   });
 
   test('refetches when the cache is expired/within margin and persists when expires_in is given', async () => {

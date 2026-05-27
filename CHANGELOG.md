@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.69] — 2026-05-27
+
+Invalidate the OAuth token cache on credential change — **#208 (root cause).**
+**Server‑only; Bruno collection unchanged (OTST_V2.0.23).**
+
+### Fixed
+- **Changing credentials now actually re‑fetches the token** (`worker/access-token.js`).
+  Root cause of "invalid credentials still ran all test cases": the per‑tester
+  token cache (`cached_token_enc`) was reused while still time‑valid **regardless
+  of whether the credentials had changed**, so switching to invalid creds within
+  the token's lifetime silently reused the previous valid token and never
+  exercised them (the token is fetched server‑side before Bruno, so it never
+  shows in the report; `fetchToken` *does* throw on a real 401 — only the cache
+  could have returned a token). Now a **SHA‑256 fingerprint** of the credentials
+  (`profile`+`token_url`+`client_id`+`client_secret`+`scope`+`extra`; the secret
+  is hashed one‑way, never stored) is saved with the cached token
+  (new `users.cached_token_cred_fp` column + migration) and the cache is reused
+  **only when the fingerprint matches**. A credential change forces a re‑fetch →
+  invalid credentials now throw → the run is marked **FAILED before Bruno** with
+  `[runner] Auth failed: HTTP 401 …` in the Execution Log and **no scenarios run**.
+  Existing rows have a NULL fingerprint → one safe re‑fetch on the first run after
+  deploy.
+
+---
+
 ## [server-v1.11.68] — 2026-05-27
 
 Auth-rejection fail-fast (mid-flow) — **#208 follow-up**. Bruno collection change
