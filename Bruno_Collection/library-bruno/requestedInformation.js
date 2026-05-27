@@ -246,10 +246,127 @@ function summariseRequestedInformation(expr) {
     typeErrors,
     parseOk: parsed.ok,
     parseError: parsed.ok ? null : parsed.error,
+    ast: parsed.ok ? parsed.ast : null,
     description: parsed.ok ? renderNode(parsed.ast) : null,
     leaves,
     unmappedFields,
   };
+}
+
+// ─── Evaluation (Phase 2) ─────────────────────────────────────────────────────
+function isSet(v) {
+  return v !== undefined && v !== null && v !== '';
+}
+
+function getByPath(obj, pathArr) {
+  return pathArr.reduce((o, k) => (o === null || o === undefined ? undefined : o[k]), obj);
+}
+
+// Candidate locations for a leaf so a demand for the 3.1+ contact path is also
+// satisfied by the deprecated 3.0 flat field (and vice-versa) — mirrors #231.
+function leafCandidatePaths(path) {
+  const last = path[path.length - 1];
+  if (last === 'email') return [['detail', 'contact', 'email'], ['detail', 'email']];
+  if (last === 'phoneNumber') return [['detail', 'contact', 'phoneNumber'], ['detail', 'phoneNumber']];
+  return [path];
+}
+
+function leafSatisfiedFor(passenger, leaf) {
+  if (!passenger) return false;
+  return leafCandidatePaths(leaf.path).some((p) => isSet(getByPath(passenger, p)));
+}
+
+function collectionFor(model, root) {
+  if (model && Array.isArray(model[root])) return model[root];
+  if (model && Array.isArray(model.passengerSpecifications)) return model.passengerSpecifications;
+  return [];
+}
+
+function evalNode(node, model) {
+  if (node.type === 'leaf') {
+    const collection = collectionFor(model, node.root);
+    if (node.index === 'ANY') {
+      if (!collection.length) return { satisfied: false, unmet: [{ leaf: node, index: 'ANY' }] };
+      const failing = [];
+      collection.forEach((pax, i) => { if (!leafSatisfiedFor(pax, node)) failing.push(i); });
+      return failing.length === 0
+        ? { satisfied: true, unmet: [] }
+        : { satisfied: false, unmet: failing.map((i) => ({ leaf: node, index: i })) };
+    }
+    const pax = collection[node.index];
+    return leafSatisfiedFor(pax, node)
+      ? { satisfied: true, unmet: [] }
+      : { satisfied: false, unmet: [{ leaf: node, index: node.index }] };
+  }
+  const l = evalNode(node.left, model);
+  const r = evalNode(node.right, model);
+  if (node.type === 'and') {
+    return { satisfied: l.satisfied && r.satisfied, unmet: l.unmet.concat(r.unmet) };
+  }
+  // 'or': satisfied if either side is; only surface unmet when neither is met.
+  const satisfied = l.satisfied || r.satisfied;
+  return { satisfied, unmet: satisfied ? [] : l.unmet.concat(r.unmet) };
+}
+
+function unmetDescriptor(u) {
+  const fi = fieldInfo(u.leaf.path);
+  return {
+    fieldLabel: fi.label,
+    scenarioField: fi.scenarioField,
+    root: u.leaf.root,
+    path: u.leaf.path,
+    index: u.index,
+    passengerRef: passengerRef(u.index),
+  };
+}
+
+/**
+ * Evaluate a parsed expression against a passenger data model.
+ * @param {object} ast    parsed AST from parseRequestedInformation / summarise.ast
+ * @param {object} model  { passengerSpecifications: [ {type, dateOfBirth, gender,
+ *                          detail:{firstName,lastName,contact:{email,phoneNumber}}}, … ] }
+ * @returns {{satisfied:boolean, unmetLeaves:Array}}
+ */
+function evaluateRequestedInformation(ast, model) {
+  if (!ast) return { satisfied: false, unmetLeaves: [] };
+  const res = evalNode(ast, model || {});
+  // Dedupe unmet by (field, passengerRef) for clean reporting.
+  const seen = new Set();
+  const unmetLeaves = [];
+  res.unmet.map(unmetDescriptor).forEach((d) => {
+    const key = `${d.scenarioField || d.path.join('.')}|${d.passengerRef}`;
+    if (!seen.has(key)) { seen.add(key); unmetLeaves.push(d); }
+  });
+  return { satisfied: res.satisfied, unmetLeaves };
+}
+
+/**
+ * Build the offer-time passenger data model from OSCAR's scenario data. The
+ * `passengerAdditionalData` env var carries the per-passenger values OSCAR will
+ * send (update* fields); `offerPassengerSpecifications` supplies `type`.
+ * @returns {Array} normalised passengers (OSDM-ish shape) for evaluation.
+ */
+function buildPassengerModelFromAdditionalData(additionalArr, specsArr) {
+  const add = Array.isArray(additionalArr) ? additionalArr : [];
+  const specs = Array.isArray(specsArr) ? specsArr : [];
+  return add.map((raw, i) => {
+    const a = raw || {};
+    const spec = specs[i] || {};
+    const pick = (...vals) => { for (const v of vals) { if (v !== undefined && v !== null) return v; } return null; };
+    return {
+      type: pick(spec.type, a.type),
+      dateOfBirth: pick(a.updateDateOfBirth, spec.dateOfBirth),
+      gender: pick(a.updateGender, spec.gender),
+      detail: {
+        firstName: pick(a.updateFirstName),
+        lastName: pick(a.updateLastName),
+        contact: {
+          email: pick(a.updateEmail),
+          phoneNumber: pick(a.updatePhoneNumber),
+        },
+      },
+    };
+  });
 }
 
 module.exports = {
@@ -257,6 +374,8 @@ module.exports = {
   describeRequestedInformation,
   collectRequestedInformationLeaves: collectLeaves,
   summariseRequestedInformation,
+  evaluateRequestedInformation,
+  buildPassengerModelFromAdditionalData,
   MAX_LENGTH,
 };
 

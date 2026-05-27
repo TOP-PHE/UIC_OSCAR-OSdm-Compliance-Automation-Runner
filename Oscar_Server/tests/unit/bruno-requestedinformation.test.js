@@ -141,4 +141,112 @@ describe('summariseRequestedInformation', () => {
     expect(s.present).toBe(false);
     expect(s.parseOk).toBe(false);
   });
+
+  test('summary exposes the parsed ast for evaluation', () => {
+    const s = ri.summariseRequestedInformation(EX1);
+    expect(s.ast).not.toBeNull();
+    expect(s.ast.type).toBe('leaf');
+  });
+});
+
+// ─── Phase 2 ──────────────────────────────────────────────────────────────────
+function pax(overrides) {
+  return Object.assign({
+    type: 'PERSON',
+    dateOfBirth: null,
+    gender: null,
+    detail: { firstName: null, lastName: null, contact: { email: null, phoneNumber: null } },
+  }, overrides || {});
+}
+function model(passengers) {
+  return { passengerSpecifications: passengers };
+}
+function astOf(expr) {
+  return ri.parseRequestedInformation(expr).ast;
+}
+
+describe('evaluateRequestedInformation', () => {
+  test('single leaf satisfied when the field is populated (example 1)', () => {
+    const m = model([pax({ detail: { contact: { phoneNumber: '+3312345678' } } })]);
+    const r = ri.evaluateRequestedInformation(astOf(EX1), m);
+    expect(r.satisfied).toBe(true);
+    expect(r.unmetLeaves).toHaveLength(0);
+  });
+
+  test('single leaf unmet when the field is empty', () => {
+    const r = ri.evaluateRequestedInformation(astOf(EX1), model([pax()]));
+    expect(r.satisfied).toBe(false);
+    expect(r.unmetLeaves).toHaveLength(1);
+    expect(r.unmetLeaves[0].scenarioField).toBe('phoneNumber');
+    expect(r.unmetLeaves[0].passengerRef).toBe('passenger 0');
+  });
+
+  test('contact path satisfied by the flat 3.0 field (detail.email)', () => {
+    // Demand the 3.1+ contact path; supply only the deprecated flat field.
+    const m = model([{ detail: { email: 'a@b.c' } }]);
+    const r = ri.evaluateRequestedInformation(astOf('passengerSpecifications[0].detail.contact.email'), m);
+    expect(r.satisfied).toBe(true);
+  });
+
+  test("ANY satisfied only when every passenger has the field", () => {
+    const all = model([
+      pax({ detail: { contact: { phoneNumber: '+1' } } }),
+      pax({ detail: { contact: { phoneNumber: '+2' } } }),
+    ]);
+    expect(ri.evaluateRequestedInformation(astOf(EX4), all).satisfied).toBe(true);
+
+    const one = model([
+      pax({ detail: { contact: { phoneNumber: '+1' } } }),
+      pax(), // no phone
+    ]);
+    const r = ri.evaluateRequestedInformation(astOf(EX4), one);
+    expect(r.satisfied).toBe(false);
+    expect(r.unmetLeaves.map((u) => u.passengerRef)).toContain('passenger 1');
+  });
+
+  test('OR group satisfied by either side (example 3)', () => {
+    const m = model([pax({ detail: { firstName: 'A', lastName: 'B', contact: { email: 'a@b.c' } } })]);
+    expect(ri.evaluateRequestedInformation(astOf(EX3), m).satisfied).toBe(true);
+  });
+
+  test('OR group unmet reports both alternatives when neither is set (example 3)', () => {
+    const m = model([pax({ detail: { firstName: 'A', lastName: 'B' } })]); // no email, no phone
+    const r = ri.evaluateRequestedInformation(astOf(EX3), m);
+    expect(r.satisfied).toBe(false);
+    const fields = r.unmetLeaves.map((u) => u.scenarioField).sort();
+    expect(fields).toEqual(['email', 'phoneNumber']);
+  });
+});
+
+describe('buildPassengerModelFromAdditionalData', () => {
+  test('maps update* fields + spec type into the OSDM-ish shape', () => {
+    const m = ri.buildPassengerModelFromAdditionalData(
+      [{
+        updateFirstName: 'Ada', updateLastName: 'Lovelace', updateDateOfBirth: '1990-01-01',
+        updateEmail: 'ada@x.io', updatePhoneNumber: '+3312', updateGender: 'F',
+      }],
+      [{ type: 'PERSON' }]
+    );
+    expect(m).toHaveLength(1);
+    expect(m[0].type).toBe('PERSON');
+    expect(m[0].dateOfBirth).toBe('1990-01-01');
+    expect(m[0].gender).toBe('F');
+    expect(m[0].detail.firstName).toBe('Ada');
+    expect(m[0].detail.contact.email).toBe('ada@x.io');
+    expect(m[0].detail.contact.phoneNumber).toBe('+3312');
+  });
+
+  test('leaves unset fields null and round-trips through the evaluator', () => {
+    const m = model(ri.buildPassengerModelFromAdditionalData(
+      [{ updateFirstName: 'A', updateLastName: 'B' }], // no email/phone
+      [{ type: 'PERSON' }]
+    ));
+    expect(m.passengerSpecifications[0].detail.contact.email).toBeNull();
+    // A phone demand is therefore unmet for this scenario data.
+    expect(ri.evaluateRequestedInformation(astOf(EX1), m).satisfied).toBe(false);
+  });
+
+  test('tolerates empty / non-array input', () => {
+    expect(ri.buildPassengerModelFromAdditionalData(null, null)).toEqual([]);
+  });
 });
