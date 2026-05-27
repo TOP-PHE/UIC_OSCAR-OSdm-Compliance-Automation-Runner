@@ -14,6 +14,15 @@ No reproduction nor distribution shall be allowed without the following notice
 “This material is copyrighted by UIC, Union Internationale des Chemins de fer © 2023  – 2024 , OSDM is a trademark belonging to UIC, and any use of this trademark is strictly prohibited unless otherwise agreed by UIC.”
 */
 
+/**
+ * model.js — OSDM REQUEST data-model classes.
+ *
+ * Plain constructors for the request-body shapes (PassengerSpec /
+ * AnonymousPassengerSpec, Purchaser / PurchaserContact, Detail / DetailContact,
+ * Contact, TripSpecification / TripLegSpecification, DatedJourney, …) plus the
+ * GV/TRIP key constants. requestsBuilder.js instantiates these to assemble the
+ * offer / booking / purchaser request bodies.
+ */
 var GV = {
   ACCESS_TOKEN: "access_token",
 };

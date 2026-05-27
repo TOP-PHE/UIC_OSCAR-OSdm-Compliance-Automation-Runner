@@ -1,3 +1,12 @@
+/**
+ * offers.js — validate the OFFER response (POST /offers → OfferCollection).
+ *
+ * First validation step of the sale flow (after `01. POST Get Offer`). Checks the
+ * offer parts one array at a time — admissions / reservations / ancillaries —
+ * selects an offer for the rest of the flow (sets offerId, etc.), and surfaces any
+ * `requestedInformation` the provider attached. Response-side counterpart to
+ * requestsBuilder.js (which builds the request bodies).
+ */
 // Import needed library files
 require('./displays.js');
 require('./requestsBuilder.js');

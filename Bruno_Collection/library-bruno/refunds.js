@@ -1,3 +1,10 @@
+/**
+ * refunds.js — validate the after-sales REFUND flow responses.
+ *
+ * Runs in the Refund scenario folder (after an initial sale). Validates the
+ * PATCH refund-offer response and the refund fee/amount against OSDM and the
+ * offer's after-sales conditions.
+ */
 // Import needed library files
 require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');

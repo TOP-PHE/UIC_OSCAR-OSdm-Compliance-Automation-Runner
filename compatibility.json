@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.105",
+  "current_release": "2026.106",
   "releases": [
+    {
+      "release": "2026.106",
+      "date": "2026-05-27",
+      "server": "1.11.78",
+      "collection": "OTST_V2.0.31",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(#216): newcomer-readability pass over library-bruno. Added a concise file-objective header (what the module does + where it sits in the offer->booking->fulfillment flow) to the 12 modules that lacked one (offers, bookings, fulfillments, passengers, refunds, exchanges, displays, requestsBuilder, scenarioParser, validators, model, schema, reportGenerator) so a new contributor can understand each module's purpose at a glance. Removed the dead, empty, unreferenced library-bruno/swagger.js (the Swagger logic lives in validators.js). Comments/headers only — ZERO runtime/behaviour change. Bruno_Collection/VERSION OTST_V2.0.30 -> OTST_V2.0.31; server 1.11.77 -> 1.11.78.",
+        "Operator action required: none. Chip shows 2026.106 / server-v1.11.78 / OTST_V2.0.31 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.105",
       "date": "2026-05-27",

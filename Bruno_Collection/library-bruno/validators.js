@@ -1,3 +1,10 @@
+/**
+ * validators.js — Swagger/OpenAPI schema-validation helpers + auth-token capture.
+ *
+ * Loads the OSDM OpenAPI schema and validates request/response payloads and the
+ * scenario data file against it; also captures the bearer/access token for the
+ * run. Used by scenarioParser (data-file validation) and the response steps.
+ */
 // Import needed library files
 require('./displays.js');
 

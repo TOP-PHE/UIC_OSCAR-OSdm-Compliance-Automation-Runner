@@ -1,3 +1,10 @@
+/**
+ * displays.js — reporting/console output helpers shared across the collection.
+ *
+ * `validationLogger(msg)` is the env-scoped logger every step uses (its lines are
+ * captured into the HTML report); the display* functions pretty-print the offer /
+ * booking / fulfilled-booking responses for the console + report.
+ */
 module.exports = {
   validationLogger,
   displayOfferResponse,

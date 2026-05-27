@@ -1,3 +1,12 @@
+/**
+ * scenarioParser.js — load the active scenario from the data file into env vars.
+ *
+ * The bridge from a data-file scenario to the Bruno run: it resets the per-scenario
+ * env vars (so one scenario can't leak into the next), then sets everything the
+ * request builders and steps consume — trip(s), passengers, purchaser, flexibility,
+ * fulfillment options, place-selection mode, and the negative-probe modes
+ * (requestedInformationProbe / bookingPurchaserMode). Runs at collection start.
+ */
 // Import needed library files
 require('./displays.js');
 require('./validators.js');

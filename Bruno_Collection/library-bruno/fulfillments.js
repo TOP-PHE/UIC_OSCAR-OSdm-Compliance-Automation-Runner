@@ -1,3 +1,10 @@
+/**
+ * fulfillments.js — validate the FULFILLMENT documents on a booking.
+ *
+ * Runs after fulfillments are obtained (`06`/`07`). Checks each fulfillment
+ * document is OSDM-conformant: carries a downloadLink OR rawData (#254), the
+ * expected booked offer parts, and the passenger/purchaser details echoed on it.
+ */
 // Import needed library files
 require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
