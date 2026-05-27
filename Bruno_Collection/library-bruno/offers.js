@@ -4,6 +4,7 @@ require('./requestsBuilder.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
+const { summariseRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   checkWarningsAndProblems,
@@ -648,6 +649,32 @@ function validateOfferParts(selectedOffer) {
     });
     validationLogger(`[INFO] A8 currency consistency checked for all offer parts against summaryCurrency=${_summaryCurrency}`);
   }
+
+  // RI (#258 Phase 1): surface any requestedInformation a provider attached to
+  // offer parts — what the client must additionally set before the next step.
+  // Layer-1 type check + human-readable guidance mapped to the scenario field.
+  ['admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts'].forEach(partType => {
+    (selectedOffer[partType] || []).forEach((part, pi) => {
+      const ri = part && part.requestedInformation;
+      if (ri === undefined || ri === null || ri === '') return;
+      const s = summariseRequestedInformation(ri);
+      test(`${partType}[${pi}].requestedInformation is a valid OSDM type (string, <=32768)`, () => {
+        expect(s.typeOk, `requestedInformation type errors: ${s.typeErrors.join('; ')}`).to.be.true;
+      });
+      if (s.parseOk) {
+        validationLogger(`[INFO] ${partType}[${pi}] (offer part id ${part.id}) requests additional information before the next step: ${s.description}`);
+        s.leaves.forEach(l => {
+          if (l.scenarioField) {
+            validationLogger(`[INFO]   → set '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+          } else {
+            validationLogger(`[WARNING]   → provider requires '${l.path.join('.')}' on ${l.passengerRef}, not currently configurable in OSCAR scenario authoring — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+          }
+        });
+      } else {
+        validationLogger(`[WARNING] ${partType}[${pi}].requestedInformation could not be parsed as an OSDM requested-information expression: ${s.parseError}`);
+      }
+    });
+  });
 }
 
 // Admission validation
