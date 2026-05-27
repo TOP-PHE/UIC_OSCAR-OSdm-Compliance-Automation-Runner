@@ -14,6 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.71] — 2026-05-27
+
+**CRITICAL regression fix** — valid OAuth credentials failed on every run (**#208**).
+**Server-only; Bruno collection unchanged (OTST_V2.0.24).**
+
+### Fixed
+- **OAuth runs no longer fail with a missing-column error.** The 2026.97 fix added
+  `users.cached_token_cred_fp`, but the `ALTER TABLE` was placed inside the
+  **already-applied v12 migration**. The version-gated migration runner skips
+  applied migrations (`if (m.version <= current) continue`), so the column was
+  **never created on existing databases**. `resolveAccessToken()` then persisted
+  the token cache with `UPDATE users SET … cached_token_cred_fp = ?`, which threw
+  `no such column: cached_token_cred_fp` and **failed every `oauth2` run — including
+  valid, unchanged credentials** (e.g. Bileto).
+  - **New migration v20** (`users-cached-token-cred-fp`) adds the column on
+    existing DBs (idempotent; `companies` too for schema parity with `schema.sql`).
+  - **`access-token.js` cache persistence is now best-effort** — a token we just
+    fetched is returned even if the cache write fails, so a DB-bookkeeping error
+    can never fail an otherwise-valid auth.
+  - Regression test added: caching throws → the freshly-fetched token is still returned.
+
+### Notes
+- **Operator action required: none.** The migration runs automatically on boot; the
+  first `oauth2` run per tester re-fetches once and re-populates the cache.
+
+---
+
 ## [server-v1.11.70] — 2026-05-27
 
 Purchaser-aware `requestedInformation` + a purchaser-on-booking step — **#258, #203.**
