@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.90",
+  "current_release": "2026.91",
   "releases": [
+    {
+      "release": "2026.91",
+      "date": "2026-05-27",
+      "server": "1.11.63",
+      "collection": "OTST_V2.0.18",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "ui(#258, Phase 3c-2): scenario-authoring control for the requestedInformation negative probe (server-only; Bruno collection unchanged, OTST_V2.0.18). public/js/scenarios.js: added requestedInformationProbe to the ENUMS (off/omit/invalid), a labelled dropdown in the scenario detail panel (auto-persists via the set-scenario handler) with an explanatory hint, and initialised the field to null in wizard-generated scenarios. The datafile schema + Bruno-side behaviour shipped in 2026.90; this only makes the probe selectable in the UI instead of hand-editing the data file. No behaviour change for scenarios that leave it off. Server 1.11.62 -> 1.11.63.",
+        "Operator action required: none. Hard-refresh after Watchtower promotes :stable. Chip shows 2026.91 / server-v1.11.63 / OTST_V2.0.18."
+      ]
+    },
     {
       "release": "2026.90",
       "date": "2026-05-27",
