@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.73] — 2026-05-27
+
+Purchaser **create-or-update (upsert)** — probe first, then PATCH or POST — **#258 / #203.**
+**Bruno collection bumped (OTST_V2.0.25 → OTST_V2.0.26).**
+
+### Changed
+- **The deferred-purchaser flow no longer guesses POST vs PATCH.** It now probes
+  first with a new **`12. GET Booking Purchaser`** step (`getBookingPurchaser`):
+  - **2xx** → a purchaser already exists → **`13. PATCH Booking Purchaser`** (update)
+  - **404 / none** → no purchaser → **`14. POST Booking Purchaser`** (create)
+
+  This works on both provider styles without hardcoding a method — those that
+  materialise an empty purchaser on the booking (PATCH; e.g. **Bileto**) and those
+  that don't (POST). Shared body assembly moved to
+  `requestsBuilder.buildBookingPurchaserBody()`; `04. GET Passenger` routes to the
+  GET probe; the smart-run filter gates each step so a write step runs only for the
+  method the probe selected.
+
+### Notes
+- **Operator action required: none.** Only affects `bookingPurchaserMode = deferred`/
+  `invalid`; the default `inline` is unchanged.
+
+---
+
 ## [server-v1.11.72] — 2026-05-27
 
 Deferred-purchaser step uses **PATCH** instead of POST — **#258 / #203.**

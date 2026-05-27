@@ -1,0 +1,84 @@
+info:
+  name: 14. POST Booking Purchaser
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings/{{bookingId}}/purchaser"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: |
+      {{bookingPurchaserBody}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // #258/#203 — CREATE the purchaser (postBookingPurchaser). Reached only
+        // when 12. GET Booking Purchaser found NO purchaser (non-2xx) and set
+        // __purchaserWriteMethod=POST. Body is the shared assembly (scenario
+        // purchaser + booking-level RI overrides).
+        console.log("⏩ [STEP] Executing request : " + req.getName());
+        const { buildBookingPurchaserBody } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        buildBookingPurchaserBody();
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+
+        const mode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
+        const endpoint = "/bookings/{id}/purchaser";
+        const status = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) { body = null; }
+
+        if (mode === "invalid") {
+          const { validateProblemResponse } = require(bru.getEnvVar("library_base") + "requestedInformation.js");
+          let targets = [];
+          try { targets = JSON.parse(bru.getEnvVar("requestedInfoPurchaserProbeTargets") || "[]"); } catch (_e) { targets = []; }
+          validationLogger(`[INFO] Purchaser negative probe (invalid) — expecting POST ${endpoint} to be rejected.`);
+          validateProblemResponse({
+            status: status,
+            body: body,
+            targets: targets,
+            assert: (name, ok, msg) => { bruTest(name, () => { expect(ok, msg).to.be.true; }); },
+            log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
+          });
+        } else {
+          const ok2xx = status >= 200 && status < 300;
+          if (ok2xx) {
+            bruTest(`POST ${endpoint} → ${status} (purchaser created on the booking)`, () => {
+              expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
+            });
+            validationLogger(`[INFO] POST ${endpoint} → ${status} — purchaser created on the booking after deferral.`);
+            const hasPurchaser = !!(body && typeof body === "object" && body.purchaser);
+            bruTest(`POST ${endpoint} response carries 'purchaser' (PurchaserResponse)`, () => {
+              expect(hasPurchaser, "no 'purchaser' in the PurchaserResponse").to.be.true;
+            });
+          } else {
+            validationLogger(`[ERROR] POST ${endpoint} → ${status} (expected 2xx creating the deferred purchaser)`);
+            bruTest(`POST ${endpoint} → ${status} (FAIL)`, () => {
+              expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
+            });
+          }
+        }
+
+        bru.setEnvVar("__purchaserStepDone", "true");
+        bru.runner.setNextRequest("05. GET Booking before Fulfillments");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

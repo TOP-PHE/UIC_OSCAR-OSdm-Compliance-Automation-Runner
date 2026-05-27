@@ -123,7 +123,10 @@ request:
           var _isOfferPlaceMap = _isPlaceMap && !_isPostBookingPlaceMap;
           var _isAddReservation = _rn.includes('add reservation');
           var _isAddAncillary   = _rn.includes('add ancillary');
-          var _isPurchaserStep  = _rn.includes('booking purchaser');
+          var _isPurchaserGet   = _rn.includes('get booking purchaser');
+          var _isPurchaserPatch = _rn.includes('patch booking purchaser');
+          var _isPurchaserPost  = _rn.includes('post booking purchaser');
+          var _isPurchaserStep  = _isPurchaserGet || _isPurchaserPatch || _isPurchaserPost;
           var _isReturnOffer    = _rn.includes('return offer');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
@@ -169,6 +172,9 @@ request:
           // 'inline' (default) and 'omit' never run the dedicated step.
           var _purMode = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
           var _runPurchaserStep = (_purMode === 'deferred' || _purMode === 'invalid');
+          // The GET probe (12) decides create-vs-update and sets the method; the
+          // two write steps run only for the method the probe selected.
+          var _purWriteMethod = String(bru.getEnvVar('__purchaserWriteMethod') || '');
 
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
@@ -186,6 +192,8 @@ request:
             else if (_isPurchaserStep && !_runPurchaserStep)              { _skipReason = 'purchaser step not enabled (bookingPurchaserMode is inline/omit)'; }
             else if (_isPurchaserStep && !bru.getEnvVar('bookingId'))     { _skipReason = 'purchaser step needs a booking first'; }
             else if (_isPurchaserStep && bru.getEnvVar('__purchaserStepDone') === 'true') { _skipReason = 'purchaser step already done this scenario'; }
+            else if (_isPurchaserPatch && _purWriteMethod !== 'PATCH')    { _skipReason = 'purchaser exists-check selected POST (or has not run yet)'; }
+            else if (_isPurchaserPost && _purWriteMethod !== 'POST')      { _skipReason = 'purchaser exists-check selected PATCH (or has not run yet)'; }
             else if (_isReturnOffer && !_isReturnScenario)                { _skipReason = 'not a return-trip scenario'; }
             else if (_isReturnOffer && bru.getEnvVar('__returnInboundDone') === 'true') { _skipReason = 'inward (return) offer already fetched this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
