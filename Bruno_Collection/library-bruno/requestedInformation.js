@@ -457,12 +457,24 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
   return { additional, provided };
 }
 
+/** A deliberately INVALID value for a field, for the negative probe (Phase 3c).
+ *  Returns null for fields with no clear invalid form (those get omitted instead). */
+function invalidValueForField(scenarioField) {
+  switch (scenarioField) {
+    case 'gender':      return 'ZZZ';            // not in OSDM enum [MALE, FEMALE, X]
+    case 'email':       return 'not-an-email';   // no '@'
+    case 'phoneNumber': return 'not-a-phone';
+    case 'dateOfBirth': return 'not-a-date';
+    default:            return null;             // names/type: no clear invalid form
+  }
+}
+
 // ─── Orchestrator (used by the offer & booking handlers) ──────────────────────
 /**
  * Process one requestedInformation value end-to-end: static assertions (S1/S2/
- * S3/S4), evaluation against the passenger data OSCAR will send, and — unless a
- * negative probe is active — auto-feed of missing demanded fields. Pure except
- * via injected callbacks, so it is unit-testable with mocks.
+ * S3/S4), then either AUTO-FEED missing demanded fields (happy path) or, under a
+ * negative probe, deliberately OMIT or set INVALID values so the provider must
+ * reject. Pure except via injected callbacks, so it is unit-testable with mocks.
  *
  * @param {object} o
  * @param {string}   o.expr            raw requestedInformation string
@@ -470,21 +482,23 @@ function applyAutoFeed(additionalArr, unmetLeaves, specsArr) {
  * @param {Array}    o.additional      passengerAdditionalData (not mutated; a new array is returned)
  * @param {Array}    o.specs           passenger specs (for `type` + count)
  * @param {number}   o.passengerCount  passenger count for index-range checks
- * @param {boolean}  o.autoFeedOn      whether to auto-provide missing fields
+ * @param {string}   [o.mode]          'autofeed' | 'omit' | 'invalid'
+ * @param {boolean}  [o.autoFeedOn]    legacy: true→'autofeed', false→'omit' (used if mode absent)
  * @param {function} o.assert          (name, okBool, failMsg) — FAIL semantics
  * @param {function} o.log             (level, msg) — 'INFO' | 'WARNING'
- * @returns {{ additional:Array, provided:Array, satisfied:boolean, parseOk:boolean }}
+ * @returns {{ additional:Array, provided:Array, probeTargets:Array, satisfied:boolean, parseOk:boolean }}
  */
 function processRequestedInformation(o) {
-  const { expr, tag, specs, passengerCount, autoFeedOn, assert, log } = o;
-  let additional = Array.isArray(o.additional) ? o.additional : [];
+  const { expr, tag, specs, passengerCount, assert, log } = o;
+  const mode = o.mode || (o.autoFeedOn === false ? 'omit' : 'autofeed');
+  let additional = Array.isArray(o.additional) ? o.additional.map((x) => Object.assign({}, x)) : [];
   const s = summariseRequestedInformation(expr);
 
   assert(`${tag}.requestedInformation is a valid OSDM type (string, <=${MAX_LENGTH})`,
     s.typeOk, `type errors: ${s.typeErrors.join('; ')}`);
   assert(`${tag}.requestedInformation parses against the OSDM grammar`,
     s.parseOk, `parse error: ${s.parseError}`);
-  if (!s.parseOk) return { additional, provided: [], satisfied: false, parseOk: false };
+  if (!s.parseOk) return { additional, provided: [], probeTargets: [], satisfied: false, parseOk: false };
 
   log('INFO', `${tag} requests additional information before the next step: ${s.description}`);
 
@@ -504,17 +518,17 @@ function processRequestedInformation(o) {
     }
   });
 
-  const evalNow = () => evaluateRequestedInformation(
-    s.ast, { passengerSpecifications: buildPassengerModelFromAdditionalData(additional, specs) });
-
-  let res = evalNow();
   const provided = [];
-  if (res.satisfied) {
-    log('INFO', `${tag} requestedInformation is already satisfied by the scenario's passenger data.`);
-    return { additional, provided, satisfied: true, parseOk: true };
-  }
+  const probeTargets = [];
 
-  if (autoFeedOn) {
+  if (mode === 'autofeed') {
+    const evalNow = () => evaluateRequestedInformation(
+      s.ast, { passengerSpecifications: buildPassengerModelFromAdditionalData(additional, specs) });
+    let res = evalNow();
+    if (res.satisfied) {
+      log('INFO', `${tag} requestedInformation is already satisfied by the scenario's passenger data.`);
+      return { additional, provided, probeTargets, satisfied: true, parseOk: true };
+    }
     const r = applyAutoFeed(additional, res.unmetLeaves, specs);
     additional = r.additional;
     r.provided.forEach((p) => {
@@ -529,13 +543,65 @@ function processRequestedInformation(o) {
     res.unmetLeaves.filter((u) => !u.scenarioField).forEach((u) => {
       log('WARNING', `${tag}: cannot auto-provide '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR) — booking/confirmation may be rejected.`);
     });
-  } else {
-    log('INFO', `${tag} requestedInformation unmet and auto-feed disabled — expecting the provider to reject the next step.`);
-    res.unmetLeaves.forEach((u) => {
-      log('INFO', `  → withholding '${u.scenarioField || u.path.join('.')}' for ${u.passengerRef}`);
-    });
+    return { additional, provided, probeTargets, satisfied: res.satisfied, parseOk: true };
   }
-  return { additional, provided, satisfied: res.satisfied, parseOk: true };
+
+  // Negative probe: omit or set INVALID the demanded mappable fields so the next
+  // step is submitted with missing/invalid data → the provider must reject it.
+  const count = (typeof passengerCount === 'number' && passengerCount > 0) ? passengerCount : additional.length;
+  s.leaves.forEach((l) => {
+    const updateKey = AUTO_FEED_UPDATE_KEYS[l.scenarioField];
+    if (!updateKey) return; // unmappable → cannot manipulate via the PATCH body
+    const indices = (l.index === 'ANY') ? Array.from({ length: count }, (_, i) => i) : [l.index];
+    indices.forEach((i) => {
+      if (typeof i !== 'number' || i < 0) return;
+      while (additional.length <= i) additional.push({});
+      const entry = additional[i];
+      const bad = (mode === 'invalid') ? invalidValueForField(l.scenarioField) : null;
+      if (mode === 'invalid' && bad !== null) {
+        entry[updateKey] = bad;
+        probeTargets.push({ index: i, scenarioField: l.scenarioField, value: bad });
+        log('WARNING', `${tag} negative probe: set INVALID '${l.scenarioField}' = '${bad}' for passenger ${i} — expecting the provider to reject the next step`);
+      } else {
+        entry[updateKey] = '';
+        probeTargets.push({ index: i, scenarioField: l.scenarioField });
+        log('WARNING', `${tag} negative probe: withholding required '${l.scenarioField}' for passenger ${i} — expecting the provider to reject the next step`);
+      }
+    });
+  });
+  return { additional, provided, probeTargets, satisfied: false, parseOk: true };
+}
+
+/**
+ * Grade a provider's rejection of a negative requestedInformation probe (Group N).
+ * @param {object} o
+ * @param {number}   o.status   HTTP status of the rejected step
+ * @param {*}        o.body     response body
+ * @param {Array}    [o.targets] probe targets [{index, scenarioField}] for field-pointer check
+ * @param {function} o.assert   (name, okBool, failMsg) — FAIL semantics
+ * @param {function} o.log      (level, msg)
+ */
+function validateProblemResponse(o) {
+  const { status, body, targets, assert, log } = o;
+  // N1 — must be a client error, never a silent accept.
+  assert('Negative requestedInformation: provider rejects with a client error (4xx)',
+    typeof status === 'number' && status >= 400 && status < 500,
+    `expected 4xx, got ${status}`);
+  // N2/N4 — body is an RFC-9457 Problem carrying a human-readable message.
+  const isObj = body !== null && typeof body === 'object';
+  const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
+  assert('Negative requestedInformation: error body is an RFC-9457 Problem (title/detail/code present)',
+    !!hasMessage, 'response body did not contain title/detail/code');
+  // N3 — should identify the offending field (WARN; Problem.pointers optional @3.1).
+  const fields = [...new Set((targets || []).map((t) => t.scenarioField).filter(Boolean))];
+  const blob = isObj ? JSON.stringify(body).toLowerCase() : '';
+  const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
+  const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
+  if (hasPointers || namesField) {
+    log('INFO', 'Negative requestedInformation: error identifies the offending field.');
+  } else {
+    log('WARNING', `Negative requestedInformation: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+  }
 }
 
 module.exports = {
@@ -548,7 +614,9 @@ module.exports = {
   staticIssues,
   sampleValueForField,
   applyAutoFeed,
+  invalidValueForField,
   processRequestedInformation,
+  validateProblemResponse,
   AUTO_FEED_UPDATE_KEYS,
   MAX_LENGTH,
 };

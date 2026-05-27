@@ -46,6 +46,17 @@
               null
             ]
           },
+          "requestedInformationProbe": {
+            "description": "Negative-test probe for OSDM requestedInformation (#258 Phase 3c). 'off' (default): auto-provide demanded fields so the happy flow completes. 'omit': withhold required fields. 'invalid': send invalid values. With omit/invalid OSCAR asserts the provider rejects with a conformant RFC-9457 Problem.",
+            "type": ["string", "null"],
+            "enum": [
+              "off",
+              "omit",
+              "invalid",
+              "",
+              null
+            ]
+          },
           "osdmVersion": {
             "type": "string"
           },
