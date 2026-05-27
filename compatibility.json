@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.94",
+  "current_release": "2026.95",
   "releases": [
+    {
+      "release": "2026.95",
+      "date": "2026-05-27",
+      "server": "1.11.67",
+      "collection": "OTST_V2.0.22",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#208): clear, fail-fast diagnostic when the access token cannot be obtained (invalid OAuth credentials). Previously each vendor 'Access Token' request only console.error'd on a missing access_token — no assertion, no message, no stop — so invalid credentials let the run continue and cascade into misleading 4xx errors on every downstream request (and the success path logged the token value, a leak). New library-bruno/auth.js handleAccessTokenResponse(res, {vendor}) is now called by all six 00-Access Token requests (Benerail/Bileto/Chaps/Paxone/Sqills/Turnit): on success it stores access_token and records a passing assertion WITHOUT logging the token; on failure (non-2xx or no token, trying access_token/accessToken/token) it emits a clear [ERROR] naming the likely cause (client_id/client_secret/scope/token URL), surfaces the provider's OAuth error/error_description, records a FAILING 'access token acquired' assertion, clears any stale token, and calls bru.runner.stopExecution() so the cascade never happens. Token request http definitions (endpoints/grants/bodies) unchanged. Bruno_Collection/VERSION OTST_V2.0.21 -> OTST_V2.0.22; server 1.11.66 -> 1.11.67.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.95 / server-v1.11.67 / OTST_V2.0.22 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.94",
       "date": "2026-05-27",

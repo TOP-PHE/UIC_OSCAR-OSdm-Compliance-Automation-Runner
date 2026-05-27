@@ -28,17 +28,9 @@ runtime:
   scripts:
     - type: after-response
       code: |-
-        // Parse the response JSON
-        const response = res.getBody();
-        // Check if the response contains the access_token
-        if (response.access_token) {
-            // Set the access_token in the environment variable
-            bru.setEnvVar("access_token", response.access_token);
-            console.log("Access token saved to environment: ", response.accessToken);
-        } else {
-            // Log an error if access_token is not found
-            console.error("No access_token found in the response");
-        }
+        // #208: clear, fail-fast handling of the token response (never logs the token).
+        const { handleAccessTokenResponse } = require(bru.getEnvVar("library_base") + "auth.js");
+        handleAccessTokenResponse(res, { vendor: "Chaps" });
 
 settings:
   encodeUrl: true
