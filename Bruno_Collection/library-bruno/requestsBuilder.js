@@ -1,3 +1,11 @@
+/**
+ * requestsBuilder.js — assemble every OSDM REQUEST body from the scenario data.
+ *
+ * The write-side counterpart to the response validators: turns the env vars
+ * scenarioParser set (trip, passengers, purchaser, fulfillment options, place
+ * selection, refund/exchange) into the JSON bodies for the offer, booking,
+ * purchaser and after-sales requests. Pure assembly — no assertions.
+ */
 const { parseEnvJson } = require('./envUtils.js');
 
 module.exports = {
