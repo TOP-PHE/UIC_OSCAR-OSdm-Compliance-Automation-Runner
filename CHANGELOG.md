@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.66] — 2026-05-27
+
+Two offer/booking conformance checks — **#250 + #251**. Bruno collection change
+(OTST_V2.0.20 → OTST_V2.0.21); server in lockstep (1.11.65 → 1.11.66).
+
+### Added
+- **#250 — the booking must embed its fulfillments after fulfillment.** After
+  `POST /bookings/{id}/fulfillments`, the subsequent `GET /bookings/{id}` must
+  contain the generated fulfillments (the provider has to keep the booking object
+  updated). `library-bruno/bookings.js` (`validateFulfillments` /
+  `postCreateBookingResponse`) gains a `requireFulfillments` flag; the
+  **`07. GET Booking after Fulfillments`** step passes it `true`, so an empty
+  `booking.fulfillments` after fulfillment now **fails** instead of silently
+  passing. Pre-fulfillment / other callers stay lenient (unchanged).
+- **#251 — offer→trip link.** `tripCoverage` is optional on an offer part, but
+  when present OSDM requires `coveredTripId` (`TripCoverage.required=[coveredTripId]`).
+  `offers.js` `validateOfferParts` now **asserts** `tripCoverage.coveredTripId` is
+  a non-empty string when `tripCoverage` is present, and **WARNs** (does not fail)
+  when the offer has no `tripCoverage` at all — clients then derive the link from
+  `offerParts`; the spec recommends returning `coveredTripId` at offer level.
+
+---
+
 ## [server-v1.11.65] — 2026-05-27
 
 Fulfillment document payload — **#254**. Bruno collection change
