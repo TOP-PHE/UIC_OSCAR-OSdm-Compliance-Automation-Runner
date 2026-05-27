@@ -250,3 +250,132 @@ describe('buildPassengerModelFromAdditionalData', () => {
     expect(ri.buildPassengerModelFromAdditionalData(null, null)).toEqual([]);
   });
 });
+
+// ─── Phase 3a / 3b ──────────────────────────────────────────────────────────
+describe('staticIssues', () => {
+  test('flags a numeric index >= passenger count', () => {
+    const ast = astOf('passengerSpecifications[5].detail.gender');
+    const r = ri.staticIssues(ast, 2);
+    expect(r.indexErrors).toHaveLength(1);
+    expect(r.indexErrors[0].index).toBe(5);
+  });
+
+  test('does not flag ANY or in-range indices', () => {
+    expect(ri.staticIssues(astOf(EX4), 3).indexErrors).toHaveLength(0);
+    expect(ri.staticIssues(astOf('passengerSpecifications[0].detail.gender'), 1).indexErrors).toHaveLength(0);
+  });
+
+  test('reports unknown attribute paths', () => {
+    const r = ri.staticIssues(astOf('passengerSpecifications[0].detail.taxId'), 1);
+    expect(r.unknownPaths).toContain('detail.taxId');
+  });
+
+  test('known paths are not reported', () => {
+    expect(ri.staticIssues(astOf(EX3), 1).unknownPaths).toHaveLength(0);
+  });
+});
+
+describe('sampleValueForField', () => {
+  test('gender is a valid OSDM enum value', () => {
+    expect(['MALE', 'FEMALE', 'X']).toContain(ri.sampleValueForField('gender', 0, 'PERSON'));
+  });
+  test('email looks like an email; phone like E.164', () => {
+    expect(ri.sampleValueForField('email', 0)).toMatch(/@/);
+    expect(ri.sampleValueForField('phoneNumber', 0)).toMatch(/^\+\d+$/);
+  });
+  test('dateOfBirth is type-aware', () => {
+    expect(ri.sampleValueForField('dateOfBirth', 0, 'CHILD')).toBe('2016-01-01');
+    expect(ri.sampleValueForField('dateOfBirth', 0, 'PERSON')).toBe('1990-01-01');
+  });
+  test('unmappable field yields null', () => {
+    expect(ri.sampleValueForField('taxId', 0)).toBeNull();
+  });
+});
+
+describe('applyAutoFeed', () => {
+  test('fills an empty mapped field and reports it', () => {
+    const unmet = ri.evaluateRequestedInformation(astOf(EX1), { passengerSpecifications: [{}] }).unmetLeaves;
+    const { additional, provided } = ri.applyAutoFeed([{}], unmet, [{ type: 'PERSON' }]);
+    expect(provided).toHaveLength(1);
+    expect(provided[0].scenarioField).toBe('phoneNumber');
+    expect(additional[0].updatePhoneNumber).toBeTruthy();
+  });
+
+  test('never overwrites a tester-provided value', () => {
+    const unmet = [{ scenarioField: 'gender', index: 0, fieldLabel: 'gender', passengerRef: 'passenger 0', path: ['gender'] }];
+    const { additional, provided } = ri.applyAutoFeed([{ updateGender: 'FEMALE' }], unmet, []);
+    expect(provided).toHaveLength(0);
+    expect(additional[0].updateGender).toBe('FEMALE');
+  });
+
+  test('skips unmappable fields', () => {
+    const unmet = [{ scenarioField: null, index: 0, fieldLabel: 'detail.taxId', passengerRef: 'passenger 0', path: ['detail', 'taxId'] }];
+    expect(ri.applyAutoFeed([{}], unmet, []).provided).toHaveLength(0);
+  });
+});
+
+function mockSinks() {
+  const asserts = [];
+  const logs = [];
+  return {
+    assert: (name, ok, msg) => asserts.push({ name, ok, msg }),
+    log: (lvl, msg) => logs.push({ lvl, msg }),
+    asserts,
+    logs,
+  };
+}
+
+describe('processRequestedInformation', () => {
+  test('auto-feeds a missing field and ends satisfied', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: EX1, tag: 'admissionOfferParts[0]', additional: [{}], specs: [{ type: 'PERSON' }],
+      passengerCount: 1, autoFeedOn: true, assert: m.assert, log: m.log,
+    });
+    expect(out.provided.map((p) => p.scenarioField)).toContain('phoneNumber');
+    expect(out.satisfied).toBe(true);
+    expect(out.additional[0].updatePhoneNumber).toBeTruthy();
+    expect(m.asserts.find((a) => /satisfiable/.test(a.name)).ok).toBe(true);
+  });
+
+  test('grammar assertion fails on malformed input (S2)', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'garbage', tag: 'booking', additional: [{}], specs: [{}],
+      passengerCount: 1, autoFeedOn: true, assert: m.assert, log: m.log,
+    });
+    expect(out.parseOk).toBe(false);
+    expect(m.asserts.find((a) => /grammar/.test(a.name)).ok).toBe(false);
+  });
+
+  test('index-range assertion fails when index >= count (S4)', () => {
+    const m = mockSinks();
+    ri.processRequestedInformation({
+      expr: 'passengerSpecifications[5].detail.gender', tag: 'booking', additional: [{}], specs: [{ type: 'PERSON' }],
+      passengerCount: 1, autoFeedOn: true, assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /in range/.test(a.name)).ok).toBe(false);
+  });
+
+  test('with auto-feed off, withholds data and stays unsatisfied (negative-probe path)', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].detail.gender', tag: 'booking', additional: [{}], specs: [{ type: 'PERSON' }],
+      passengerCount: 1, autoFeedOn: false, assert: m.assert, log: m.log,
+    });
+    expect(out.provided).toHaveLength(0);
+    expect(out.satisfied).toBe(false);
+    expect(m.asserts.find((a) => /satisfiable/.test(a.name))).toBeUndefined();
+  });
+
+  test('unmappable demand cannot be auto-fed but does not fail the satisfiable assert', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].detail.taxId', tag: 'booking', additional: [{}], specs: [{ type: 'PERSON' }],
+      passengerCount: 1, autoFeedOn: true, assert: m.assert, log: m.log,
+    });
+    expect(out.provided).toHaveLength(0);
+    expect(m.asserts.find((a) => /satisfiable/.test(a.name)).ok).toBe(true);
+    expect(m.logs.some((l) => l.lvl === 'WARNING' && /cannot auto-provide/.test(l.msg))).toBe(true);
+  });
+});

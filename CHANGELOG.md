@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.61] — 2026-05-27
+
+OSDM `requestedInformation` — **#258 Phase 3a + 3b**: auto-feed + static
+conformance assertions. Bruno collection change (OTST_V2.0.16 → OTST_V2.0.17);
+server in lockstep (1.11.60 → 1.11.61).
+
+### Added
+- **Auto-feed (default on).** When a provider's `requestedInformation` demands a
+  field the scenario hasn't set, OSCAR now **auto-provides a valid value** so the
+  happy flow completes unattended, and **documents in the report** exactly what
+  it provided (field, passenger, value) and at which step. Values are filled into
+  `passengerAdditionalData` (the *PATCH Multi Passenger* body) and
+  `skipPatchPassengerRequest` is re-enabled so they are actually sent. Gender uses
+  the OSDM enum (`MALE`/`FEMALE`/`X`); `dateOfBirth` is passenger-type-aware;
+  tester-provided values are never overwritten. Fields OSCAR cannot author
+  (e.g. `taxId`) are WARNed, not invented.
+- **Static conformance assertions** on every `requestedInformation`
+  (`library-bruno/requestedInformation.js`, wired into `offers.js` and
+  `bookings.js`): **S1** type (`string` ≤ 32768), **S2** parses against the OSDM
+  grammar *(FAIL)*, **S4** numeric passenger index in range *(FAIL)*, **S3** WARN
+  on attributes OSCAR does not recognise.
+- **P2 check:** a `[WARNING]` is raised if a booking re-requests a field OSCAR
+  already provided (`requestedInformation` should shrink as data is supplied).
+- New pure helpers (`staticIssues`, `sampleValueForField`, `applyAutoFeed`) plus
+  a dependency-injected orchestrator `processRequestedInformation()` shared by
+  both handlers; Jest suite extended with mock-sink coverage.
+
+Auto-feed is suppressed when a negative probe is active
+(`requestedInformationProbe ≠ off`) — that path (deliberately omit/invalid + grade
+the provider's error) lands in **Phase 3c**.
+
+---
+
 ## [server-v1.11.60] — 2026-05-27
 
 OSDM `requestedInformation` evaluation — **#258 Phase 2**. Bruno collection change
