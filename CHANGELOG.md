@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.63] — 2026-05-27
+
+OSDM `requestedInformation` — **#258 Phase 3c-2**: scenario-authoring control for
+the negative probe. **Server-only; Bruno collection unchanged (OTST_V2.0.18).**
+
+### Added
+- **`RequestedInfo Probe` dropdown** in scenario authoring (`public/js/scenarios.js`):
+  `requestedInformationProbe` = off (default) / omit / invalid, with an explanatory
+  hint. Auto-persists through the existing `set-scenario` handler and is initialised
+  to `null` on wizard-generated scenarios. The probe's behaviour + datafile schema
+  shipped in 2026.90; this only makes it selectable in the UI instead of hand-editing
+  the data file. No behaviour change for scenarios that leave it off.
+
+---
+
 ## [server-v1.11.62] — 2026-05-27
 
 OSDM `requestedInformation` — **#258 Phase 3c**: negative-flow probe + error-quality
