@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.64] — 2026-05-27
+
+Flexibility-based offer selection without `offerSummary` — **#223**. Bruno
+collection change (OTST_V2.0.18 → OTST_V2.0.19); server in lockstep
+(1.11.63 → 1.11.64).
+
+### Fixed
+- **Offer selection by flexibility no longer requires the optional `offerSummary`**
+  (`library-bruno/offers.js`). Previously `selectAndSetOffer` filtered/asserted
+  only on `offerSummary.overallFlexibility`, so a provider that omits it (it is
+  OPTIONAL in OSDM) had **every** offer dropped → silent fallback to `offers[0]`
+  with a **failing** flexibility assertion. New `offerFlexibility(offer)` returns
+  `offerSummary.overallFlexibility` when present, else derives it from the offer's
+  products. A clear `[INFO]` line states when the value was derived from products.
+- **Correct aggregation for multi-leg offers — most restrictive wins**
+  (`NON_FLEXIBLE > SEMI_FLEXIBLE > FULL_FLEXIBLE`). A journey is only as flexible
+  as its least-flexible leg, e.g. **TGV `FULL_FLEXIBLE` + TER `NON_FLEXIBLE` →
+  `NON_FLEXIBLE`**. The previous `validateOfferParts` consistency check used a
+  *most‑flexible‑wins* heuristic that mis‑classified such offers; it now uses the
+  same most‑restrictive derivation and is skipped (logged) rather than hard‑failing
+  when `offerSummary` is absent. Unknown/vendor flexibility values are ignored.
+- Tests: `tests/unit/bruno-offer-flexibility.test.js`.
+
+---
+
 ## [server-v1.11.63] — 2026-05-27
 
 OSDM `requestedInformation` — **#258 Phase 3c-2**: scenario-authoring control for
