@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.106",
+  "current_release": "2026.107",
   "releases": [
+    {
+      "release": "2026.107",
+      "date": "2026-05-27",
+      "server": "1.11.79",
+      "collection": "OTST_V2.0.32",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#202): fulfillment-document validation now recognises the OSDM 'content' field. The check (bookings.js validateFulfillments) previously accepted only downloadLink OR the non-standard 'rawData', so a spec-conformant provider returning the inline document in OSDM's 'content' (base64) field was wrongly FAILED — the exact field #202 names. It now accepts content (OSDM) OR downloadLink (OSDM) OR rawData (vendor extension), and the report states EXACTLY which field delivered the payload and whether it is OSDM-standard or a vendor extension; a document delivered only via 'rawData' is accepted but flagged with a [WARNING] (retrievable but not OSDM-conformant). Bruno_Collection/VERSION OTST_V2.0.31 -> OTST_V2.0.32; server 1.11.78 -> 1.11.79.",
+        "Operator action required: none. Chip shows 2026.107 / server-v1.11.79 / OTST_V2.0.32 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.106",
       "date": "2026-05-27",
