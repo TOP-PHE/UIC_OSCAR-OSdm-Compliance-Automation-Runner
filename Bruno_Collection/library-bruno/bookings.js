@@ -628,18 +628,43 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         validationLogger(`[INFO] Fulfillment[${idx}] number of documents: ${fulfillment.fulfillmentDocuments.length}`);
         fulfillment.fulfillmentDocuments.forEach((doc, docIndex) => {
           test(`Fulfillment[${idx}].document[${docIndex}] - fields exist`, () => {
-            // #254: a FulfillmentDocument carries the payload as EITHER a
-            // downloadLink (URI) OR inline rawData (content) — fare/eticket
-            // providers may return either. Require at least one, not downloadLink
-            // specifically (the old check failed valid rawData-only documents).
-            const _hasLink = typeof doc.downloadLink === "string" && doc.downloadLink.trim() !== "";
-            const _hasRaw  = doc.rawData !== undefined && doc.rawData !== null && String(doc.rawData).trim() !== "";
-            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, link=${_hasLink ? doc.downloadLink : '(none)'}, rawData=${_hasRaw ? 'present' : '(none)'}`);
+            // #202/#254: a FulfillmentDocument carries the actual payload as EITHER
+            // a downloadLink (URI) OR inline `content` (base64) — BOTH are the OSDM
+            // standard ("Either downloadLink + downloadExpiry or content must be
+            // provided"). `rawData` is NOT an OSDM field; some providers use it as a
+            // vendor extension for the inline payload, so we accept it but flag it.
+            const _hasLink    = typeof doc.downloadLink === "string" && doc.downloadLink.trim() !== "";
+            const _hasContent = doc.content !== undefined && doc.content !== null && String(doc.content).trim() !== "";
+            const _hasRaw     = doc.rawData !== undefined && doc.rawData !== null && String(doc.rawData).trim() !== "";
+
+            // Report EXACTLY which field delivered the document and whether it is
+            // OSDM-standard or a vendor extension, so the tester can see at a glance.
+            let _channel, _std;
+            if (_hasContent)   { _channel = "content (base64 inline)";          _std = "OSDM-standard"; }
+            else if (_hasLink) { _channel = `downloadLink=${doc.downloadLink}`; _std = "OSDM-standard"; }
+            else if (_hasRaw)  { _channel = "rawData (inline)";                 _std = "VENDOR EXTENSION (not in the OSDM FulfillmentDocument schema)"; }
+            else               { _channel = "(none)";                           _std = "MISSING"; }
+            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, format=${doc.format}; payload via ${_channel} [${_std}]`);
+
             expect(doc.medium,       "medium missing").to.be.a("string").and.not.be.empty;
             expect(doc.type,         "type missing").to.be.a("string").and.not.be.empty;
-            expect(_hasLink || _hasRaw, "fulfillment document must carry either a downloadLink or rawData").to.be.true;
+            // Must be retrievable: OSDM `content` or `downloadLink`, or the vendor `rawData`.
+            expect(_hasContent || _hasLink || _hasRaw,
+              "fulfillment document has no payload (expected OSDM 'content' or 'downloadLink', or the vendor 'rawData')").to.be.true;
             expect(doc.format,       "format missing").to.be.a("string").and.not.be.empty;
           });
+          // Conformance note (#202): a document delivered ONLY via the non-standard
+          // `rawData` field is retrievable but NOT OSDM-conformant — OSDM requires
+          // `content` or `downloadLink`. Surface it as a WARNING (vendor extension),
+          // not a hard failure (the document IS obtainable).
+          {
+            const _hasLink2    = typeof doc.downloadLink === "string" && doc.downloadLink.trim() !== "";
+            const _hasContent2 = doc.content !== undefined && doc.content !== null && String(doc.content).trim() !== "";
+            const _hasRaw2     = doc.rawData !== undefined && doc.rawData !== null && String(doc.rawData).trim() !== "";
+            if (_hasRaw2 && !_hasContent2 && !_hasLink2) {
+              validationLogger(`[WARNING] Fulfillment[${idx}].document[${docIndex}] delivers the document only via the non-standard 'rawData' field — OSDM defines 'content' (base64) or 'downloadLink'. Accepted as a vendor extension.`);
+            }
+          }
         });
       });
     }

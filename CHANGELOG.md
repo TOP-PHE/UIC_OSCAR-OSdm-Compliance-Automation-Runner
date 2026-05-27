@@ -10,14 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **DB migration smoke test** (`tests/unit/db-migrations.test.js`, #208 / #221 rec #2) —
-  runs the real `schema.sql` + versioned migrations against throwaway temp DBs and
-  asserts (1) a fresh install produces every column the runtime depends on, and
-  (2) a column missing on an already-versioned DB is restored by a new migration.
-  Guards the exact #208 regression class (a required column buried in an
-  already-applied migration) that the mocked-DB unit tests could not catch.
-  Test-only; no runtime change.
 - (next cycle)
+
+---
+
+## [server-v1.11.79] — 2026-05-27
+
+Fulfillment documents: recognise the OSDM `content` field — **#202.**
+**Bruno collection bumped (OTST_V2.0.31 → OTST_V2.0.32).**
+
+### Fixed
+- **#202 — a spec-conformant fulfillment document delivered inline via OSDM `content`
+  was wrongly FAILED.** The check (`bookings.js` `validateFulfillments`) accepted only
+  `downloadLink` OR the non-standard `rawData` — but OSDM's `FulfillmentDocument` defines
+  the inline payload as **`content`** (base64), which is the field #202 names. It now
+  accepts **`content` (OSDM) OR `downloadLink` (OSDM) OR `rawData` (vendor extension)**,
+  and the report states **exactly which field delivered the payload and whether it is
+  OSDM-standard or a vendor extension**. A document carried only by `rawData` is accepted
+  but flagged with a `[WARNING]` (retrievable, but not OSDM-conformant).
+
+### Added
+- **DB migration smoke test** (`tests/unit/db-migrations.test.js`, #208 / #221 rec #2) —
+  runs the real `schema.sql` + versioned migrations against throwaway temp DBs and asserts
+  (1) a fresh install produces every column the runtime depends on, and (2) a column
+  missing on an already-versioned DB is restored by a new migration. Guards the exact #208
+  regression class (a required column buried in an already-applied migration) that the
+  mocked-DB unit tests could not catch. Test-only.
 
 ---
 
