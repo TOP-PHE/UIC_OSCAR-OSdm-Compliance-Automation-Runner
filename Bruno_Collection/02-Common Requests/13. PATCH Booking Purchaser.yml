@@ -44,34 +44,52 @@ runtime:
         try { body = res.getBody(); } catch (_e) { body = null; }
 
         if (mode === "invalid") {
+          // Negative SWEEP (#258): one purchaser field is corrupted per pass; grade
+          // it (FAIL for a missing required field, WARN for a malformed unconstrained
+          // string), then loop back to 12. GET Booking Purchaser for the next field.
           const { validateProblemResponse } = require(bru.getEnvVar("library_base") + "requestedInformation.js");
-          let targets = [];
-          try { targets = JSON.parse(bru.getEnvVar("requestedInfoPurchaserProbeTargets") || "[]"); } catch (_e) { targets = []; }
-          validationLogger(`[INFO] Purchaser negative probe (invalid) — expecting PATCH ${endpoint} to be rejected.`);
+          let target = null;
+          try { target = JSON.parse(bru.getEnvVar("bookingPurchaserSweepTarget") || "null"); } catch (_e) { target = null; }
+          const field = (target && target.scenarioField) ? target.scenarioField : "purchaser";
+          validationLogger(`[INFO] Purchaser negative sweep — expecting PATCH ${endpoint} to reject '${field}'.`);
           validateProblemResponse({
             status: status,
             body: body,
-            targets: targets,
+            targets: target ? [target] : [],
+            label: "purchaser." + field,
             assert: (name, ok, msg) => { bruTest(name, () => { expect(ok, msg).to.be.true; }); },
             log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
           });
-        } else {
-          const ok2xx = status >= 200 && status < 300;
-          if (ok2xx) {
-            bruTest(`PATCH ${endpoint} → ${status} (existing purchaser updated)`, () => {
-              expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
-            });
-            validationLogger(`[INFO] PATCH ${endpoint} → ${status} — purchaser updated on the booking after deferral.`);
-            const hasPurchaser = !!(body && typeof body === "object" && body.purchaser);
-            bruTest(`PATCH ${endpoint} response carries 'purchaser' (PurchaserResponse)`, () => {
-              expect(hasPurchaser, "no 'purchaser' in the PurchaserResponse").to.be.true;
-            });
-          } else {
-            validationLogger(`[ERROR] PATCH ${endpoint} → ${status} (expected 2xx updating the deferred purchaser)`);
-            bruTest(`PATCH ${endpoint} → ${status} (FAIL)`, () => {
-              expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
-            });
+          // Advance to the next field (re-probe via GET); finish after the last one.
+          let idx = parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10); if (isNaN(idx)) idx = 0;
+          const total = parseInt(bru.getEnvVar("__purchaserSweepTotal") || "1", 10) || 1;
+          if (idx < total - 1) {
+            bru.setEnvVar("__purchaserSweepIndex", String(idx + 1));
+            bru.runner.setNextRequest("12. GET Booking Purchaser");
+            return;
           }
+          bru.setEnvVar("__purchaserSweepIndex", "0");
+          bru.setEnvVar("__purchaserStepDone", "true");
+          bru.runner.setNextRequest("05. GET Booking before Fulfillments");
+          return;
+        }
+
+        // Happy path (deferred): expect a 2xx PurchaserResponse.
+        const ok2xx = status >= 200 && status < 300;
+        if (ok2xx) {
+          bruTest(`PATCH ${endpoint} → ${status} (existing purchaser updated)`, () => {
+            expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
+          });
+          validationLogger(`[INFO] PATCH ${endpoint} → ${status} — purchaser updated on the booking after deferral.`);
+          const hasPurchaser = !!(body && typeof body === "object" && body.purchaser);
+          bruTest(`PATCH ${endpoint} response carries 'purchaser' (PurchaserResponse)`, () => {
+            expect(hasPurchaser, "no 'purchaser' in the PurchaserResponse").to.be.true;
+          });
+        } else {
+          validationLogger(`[ERROR] PATCH ${endpoint} → ${status} (expected 2xx updating the deferred purchaser)`);
+          bruTest(`PATCH ${endpoint} → ${status} (FAIL)`, () => {
+            expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
+          });
         }
 
         bru.setEnvVar("__purchaserStepDone", "true");

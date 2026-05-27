@@ -206,13 +206,36 @@ function buildBookingPurchaserBody() {
   if ("updateDateOfBirth" in add) setOrClear(body.detail,         "dateOfBirth", add.updateDateOfBirth);
 
   if (mode === "invalid") {
-    // Force a clearly-invalid value so the provider MUST reject. Overwrite any
-    // valid scenario email — the earlier "only if empty" guard let a complete
-    // scenario purchaser through unchanged, so the negative probe was sending
-    // VALID data and never exercised the provider's validation. (#258 fix)
-    body.detail = (body.detail && typeof body.detail === "object") ? body.detail : {};
-    body.detail.contact = (body.detail.contact && typeof body.detail.contact === "object") ? body.detail.contact : {};
-    body.detail.contact.email = "not-an-email";
+    // Negative sweep (#258): test EACH purchaser parameter one at a time within a
+    // SINGLE run. Each pass corrupts exactly ONE field (the rest stay valid); the
+    // write step grades it, then the flow loops back to 12. GET Booking Purchaser
+    // for the next field. The purchaser PersonDetail has no enum/format-constrained
+    // field (no gender/dateOfBirth), so:
+    //   email / phoneNumber → an invalid value (unconstrained string → WARN if accepted)
+    //   firstName / lastName → OMITTED (required in PersonDetail → must reject → FAIL)
+    const SWEEP = ["firstName", "lastName", "email", "phoneNumber"];
+    bru.setEnvVar("__purchaserSweepTotal", String(SWEEP.length));
+    let idx = parseInt(bru.getEnvVar("__purchaserSweepIndex") || "0", 10);
+    if (isNaN(idx) || idx < 0) idx = 0;
+    if (idx > SWEEP.length - 1) idx = SWEEP.length - 1;
+    const field = SWEEP[idx];
+
+    let target;
+    if (field === "email") {
+      body.detail.contact.email = "not-an-email";
+      target = { scenarioField: "email", value: "not-an-email" };
+    } else if (field === "phoneNumber") {
+      body.detail.contact.phoneNumber = "not-a-phone";
+      target = { scenarioField: "phoneNumber", value: "not-a-phone" };
+    } else {
+      // firstName / lastName — no invalid form; OMIT the required field instead.
+      delete body.detail[field];
+      target = { scenarioField: field };
+    }
+    bru.setEnvVar("bookingPurchaserSweepTarget", JSON.stringify(target));
+    validationLogger(`[WARNING] Purchaser negative sweep ${idx + 1}/${SWEEP.length}: `
+      + (target.value !== undefined ? `INVALID '${field}' = '${target.value}'` : `OMIT required '${field}'`)
+      + ` — expecting the provider to reject.`);
   }
 
   bru.setVar("bookingPurchaserBody", JSON.stringify(body));

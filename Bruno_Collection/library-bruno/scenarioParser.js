@@ -55,6 +55,7 @@ function resetScenarioEnvVars() {
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
+    "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
     "overruleCode", "refundDate", "TripType",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",

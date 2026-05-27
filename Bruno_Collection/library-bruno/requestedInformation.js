@@ -778,6 +778,9 @@ const STRINGENT_FIELDS = new Set(['gender', 'dateOfBirth']);
 function validateProblemResponse(o) {
   const { status, body, targets, assert, log } = o;
   const tgs = Array.isArray(targets) ? targets : [];
+  // Optional label disambiguates assertion names when the grader runs repeatedly in
+  // a per-field sweep (e.g. "[purchaser.email]") so each field shows on its own line.
+  const lbl = o.label ? ` [${o.label}]` : '';
 
   // Rejection REQUIRED (hard) when: no targets given (caller asserts a hard expectation),
   // OR any target is an omit (missing demanded field), OR any invalid target is on an
@@ -800,14 +803,14 @@ function validateProblemResponse(o) {
   const isClientError = isError && status < 500;
 
   // N1 — provider rejects with a client error (never a silent accept).
-  grade('Negative requestedInformation: provider rejects with a client error (4xx)',
+  grade(`Negative requestedInformation${lbl}: provider rejects with a client error (4xx)`,
     isClientError, `expected 4xx, got ${status}`);
 
   // N2/N3 only apply when the provider actually returned an error body to grade.
   if (isError) {
     const isObj = body !== null && typeof body === 'object';
     const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
-    grade('Negative requestedInformation: error body is an RFC-9457 Problem (title/detail/code present)',
+    grade(`Negative requestedInformation${lbl}: error body is an RFC-9457 Problem (title/detail/code present)`,
       !!hasMessage, 'response body did not contain title/detail/code');
     // N3 — should identify the offending field (always WARN; Problem.pointers optional @3.1).
     const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];

@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.76] — 2026-05-27
+
+Purchaser negative-probe **sweep** — test every parameter one-by-one in a single run — **#258.**
+**Bruno collection bumped (OTST_V2.0.28 → OTST_V2.0.29).**
+
+### Added
+- **`bookingPurchaserMode = invalid` now sweeps each purchaser field** (`firstName`,
+  `lastName`, `email`, `phoneNumber`) **one at a time within a single run** — no more
+  one-scenario-per-parameter. Each pass corrupts exactly one field (the rest valid),
+  the write step grades it on its own line, then the flow loops back to
+  `12. GET Booking Purchaser` for the next field (re-using the GET-adaptive
+  create-or-update each pass, so it stays robust to rejections):
+  - `email` / `phoneNumber` → an **invalid value** (unconstrained string → **WARN** if accepted)
+  - `firstName` / `lastName` → **omitted** (required in `PersonDetail` → **FAIL** if not rejected)
+- `validateProblemResponse()` gains an optional `label` so each swept field is a
+  distinct assertion in the report (e.g. `… [purchaser.email] …`).
+
+### Notes
+- **Operator action required: none.** Only affects `bookingPurchaserMode = invalid`.
+- Passenger-field sweep (per-passenger × per-field) can follow as a separate increment.
+
+---
+
 ## [server-v1.11.75] — 2026-05-27
 
 Provider-fair grading of the `requestedInformation` negative probe — **#258.**
