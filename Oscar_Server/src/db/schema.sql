@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS companies (
   -- expiry means "do not cache" (vendor didn't return expires_in).
   cached_token_enc        TEXT,
   cached_token_expires_at TEXT,
+  cached_token_cred_fp    TEXT,
   -- Optional requestor header (AES-GCM encrypted, base64)
   requestor_enc       TEXT,
   -- Data file
@@ -92,9 +93,10 @@ CREATE TABLE IF NOT EXISTS users (
   oauth_scope             TEXT,
   oauth_extra_enc         TEXT,
   oauth_custom_template   TEXT,
-  -- Token cache (cleared on any credential change)
+  -- Token cache (reused only while the credential fingerprint matches; #208)
   cached_token_enc        TEXT,
   cached_token_expires_at TEXT,
+  cached_token_cred_fp    TEXT,
   -- Optional headers
   requestor_enc           TEXT,
   subscription_key_enc    TEXT,
