@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.74] — 2026-05-27
+
+`bookingPurchaserMode=invalid` now actually sends an invalid purchaser — **#258 / #203.**
+**Bruno collection bumped (OTST_V2.0.26 → OTST_V2.0.27).**
+
+### Fixed
+- **The `invalid` purchaser probe was sending VALID data.**
+  `requestsBuilder.buildBookingPurchaserBody()` forced a bad email only when the
+  email was *empty* (`!body.detail.contact.email`), so a scenario whose purchaser
+  already had a valid email (the normal case) passed straight through unchanged —
+  the negative test never exercised the provider's validation. `invalid` mode now
+  **overwrites** the email with `not-an-email`, so the PATCH/POST purchaser body is
+  guaranteed invalid and the provider must reject with an RFC-9457 `Problem`
+  (graded by `validateProblemResponse`).
+
+### Notes
+- **Operator action required: none.** Only affects `bookingPurchaserMode = invalid`.
+
+---
+
 ## [server-v1.11.73] — 2026-05-27
 
 Purchaser **create-or-update (upsert)** — probe first, then PATCH or POST — **#258 / #203.**
