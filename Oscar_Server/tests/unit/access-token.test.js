@@ -23,11 +23,21 @@ jest.mock('../../src/worker/auth-profiles', () => ({
   fetchToken: jest.fn(),
 }));
 
+const crypto = require('node:crypto');
 const db = require('../../src/db/db');
 const { fetchToken } = require('../../src/worker/auth-profiles');
 const { resolveAccessToken } = require('../../src/worker/access-token');
 
 const log = { info: jest.fn(), error: jest.fn() };
+
+// Mirror the credential fingerprint computed in access-token.js (#208) so the
+// cache-hit tests can supply a matching value. Inputs are the DECRYPTED creds in
+// this fixed order, space-joined.
+function credFp({ profile = 'oauth2_basic', tokenUrl, clientId, clientSecret, scope = '', extra = '', custom = '' }) {
+  return crypto.createHash('sha256')
+    .update([profile, tokenUrl, clientId, clientSecret, scope, extra, custom].join(' '))
+    .digest('hex');
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -72,13 +82,34 @@ describe('resolveAccessToken — oauth2 cache', () => {
     oauth_scope: '',
   };
 
+  // Fingerprint that matches `base`'s decrypted credentials (#208): the cache is
+  // only trusted while the exact credentials are unchanged.
+  const matchingFp = credFp({
+    profile: 'oauth2_basic', tokenUrl: 'https://token', clientId: 'cid', clientSecret: 'secret',
+  });
+
   test('reuses a still-valid cached token without fetching', async () => {
     const future = new Date(Date.now() + 3600 * 1000).toISOString();
     const tok = await resolveAccessToken(
-      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future }, log
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: matchingFp }, log
     );
     expect(tok).toBe('cachedtok');
     expect(fetchToken).not.toHaveBeenCalled();
+  });
+
+  test('refetches when the credentials changed even though the cached token is still valid (#208)', async () => {
+    fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+    const future = new Date(Date.now() + 3600 * 1000).toISOString();
+    const tok = await resolveAccessToken(
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: 'STALE_FINGERPRINT_FROM_OLD_CREDS' }, log
+    );
+    // The still-valid-but-stale cache is bypassed; the current credentials are used.
+    expect(tok).toBe('freshtok');
+    expect(fetchToken).toHaveBeenCalledWith('oauth2_basic', expect.objectContaining({
+      tokenUrl: 'https://token', clientId: 'cid', clientSecret: 'secret',
+    }), log);
   });
 
   test('refetches when the cache is expired/within margin and persists when expires_in is given', async () => {
