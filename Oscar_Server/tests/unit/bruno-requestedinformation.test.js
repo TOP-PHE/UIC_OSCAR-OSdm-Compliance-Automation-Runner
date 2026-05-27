@@ -631,3 +631,70 @@ describe('processRequestedInformation — purchaser channel', () => {
     expect(out.satisfied).toBe(false); // overall false: purchaser deliberately withheld
   });
 });
+
+// ─── validateProblemResponse — severity (stringent FAIL vs lenient WARN) ─────
+describe('validateProblemResponse — provider-fair severity (#258)', () => {
+  test('OMIT (missing demanded field) accepted → hard FAIL regardless of field', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 200, body: {}, // provider accepted despite a withheld required field
+      targets: [{ index: 0, scenarioField: 'firstName' }], // omit → no `value`
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
+  });
+
+  test('INVALID on a STRINGENT field (gender) accepted → hard FAIL', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 200, body: {},
+      targets: [{ index: 0, scenarioField: 'gender', value: 'ZZZ' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
+  });
+
+  test('INVALID on a STRINGENT field (dateOfBirth) rejected → assertion passes', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 400, body: { title: 'Bad', detail: 'dateOfBirth invalid' },
+      targets: [{ index: 0, scenarioField: 'dateOfBirth', value: 'not-a-date' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(true);
+  });
+
+  test('INVALID on a LENIENT field (email) accepted → WARN, NOT a failing assertion', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 200, body: {},
+      targets: [{ scenarioField: 'email', value: 'not-an-email' }],
+      assert: m.assert, log: m.log,
+    });
+    // No client-error assertion is registered for a lenient field (soft grade)…
+    expect(m.asserts.find((a) => /client error/.test(a.name))).toBeUndefined();
+    // …it is surfaced as a WARNING instead.
+    expect(m.logs.some((l) => l.lvl === 'WARNING' && /client error/.test(l.msg))).toBe(true);
+  });
+
+  test('INVALID on a LENIENT field (email) rejected → INFO, still no failing assertion', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 400, body: { title: 'Bad Request', detail: 'email looks malformed' },
+      targets: [{ scenarioField: 'email', value: 'not-an-email' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name))).toBeUndefined();
+    expect(m.logs.some((l) => l.lvl === 'INFO' && /client error/.test(l.msg))).toBe(true);
+  });
+
+  test('mixed targets (lenient email + stringent gender) → graded hard', () => {
+    const m = mockSinks();
+    ri.validateProblemResponse({
+      status: 200, body: {},
+      targets: [{ scenarioField: 'email', value: 'not-an-email' }, { scenarioField: 'gender', value: 'ZZZ' }],
+      assert: m.assert, log: m.log,
+    });
+    expect(m.asserts.find((a) => /client error/.test(a.name)).ok).toBe(false);
+  });
+});

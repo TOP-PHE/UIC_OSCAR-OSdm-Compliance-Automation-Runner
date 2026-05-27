@@ -749,35 +749,79 @@ function processRequestedInformation(o) {
   return out;
 }
 
+// Fields OSDM actually constrains, where a bad value is a HARD schema violation a
+// conformant provider MUST reject: `gender` (enum [MALE,FEMALE,X]) and `dateOfBirth`
+// (format: date). Everything else (firstName/lastName/email/phoneNumber) is a bare
+// `type: string` in the spec — no pattern/format — so a malformed value is only a
+// RECOMMENDED rejection (semantic validation), not a conformance requirement.
+const STRINGENT_FIELDS = new Set(['gender', 'dateOfBirth']);
+
 /**
  * Grade a provider's rejection of a negative requestedInformation probe (Group N).
+ *
+ * Severity is provider-fair (#258): a rejection is REQUIRED (hard FAIL if absent)
+ * only when a demanded field is MISSING (omit probe — the spec needs it populated to
+ * proceed) or an OSDM-constrained field (enum/format) carries an invalid value.
+ * For a malformed value in an UNCONSTRAINED string field (email/phone/names) the
+ * rejection is merely RECOMMENDED → a non-rejection is a WARN, not a FAIL, because a
+ * provider that accepts it is still OSDM-conformant.
+ *
  * @param {object} o
- * @param {number}   o.status   HTTP status of the rejected step
+ * @param {number}   o.status   HTTP status of the next step
  * @param {*}        o.body     response body
- * @param {Array}    [o.targets] probe targets [{index, scenarioField}] for field-pointer check
+ * @param {Array}    [o.targets] probe targets [{scenarioField[, index][, value]}] —
+ *                               a target WITHOUT `value` is an omit (missing field);
+ *                               WITH `value` is an invalid value.
  * @param {function} o.assert   (name, okBool, failMsg) — FAIL semantics
  * @param {function} o.log      (level, msg)
  */
 function validateProblemResponse(o) {
   const { status, body, targets, assert, log } = o;
-  // N1 — must be a client error, never a silent accept.
-  assert('Negative requestedInformation: provider rejects with a client error (4xx)',
-    typeof status === 'number' && status >= 400 && status < 500,
-    `expected 4xx, got ${status}`);
-  // N2/N4 — body is an RFC-9457 Problem carrying a human-readable message.
-  const isObj = body !== null && typeof body === 'object';
-  const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
-  assert('Negative requestedInformation: error body is an RFC-9457 Problem (title/detail/code present)',
-    !!hasMessage, 'response body did not contain title/detail/code');
-  // N3 — should identify the offending field (WARN; Problem.pointers optional @3.1).
-  const fields = [...new Set((targets || []).map((t) => t.scenarioField).filter(Boolean))];
-  const blob = isObj ? JSON.stringify(body).toLowerCase() : '';
-  const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
-  const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
-  if (hasPointers || namesField) {
-    log('INFO', 'Negative requestedInformation: error identifies the offending field.');
+  const tgs = Array.isArray(targets) ? targets : [];
+
+  // Rejection REQUIRED (hard) when: no targets given (caller asserts a hard expectation),
+  // OR any target is an omit (missing demanded field), OR any invalid target is on an
+  // enum/format-constrained field. Otherwise the probe only corrupted unconstrained
+  // strings → rejection is RECOMMENDED (soft / WARN).
+  const rejectionRequired = tgs.length === 0
+    || tgs.some((t) => !('value' in t) || STRINGENT_FIELDS.has(t.scenarioField));
+  const soft = !rejectionRequired;
+  const softNote = ' — OSDM defines this field as an unconstrained string (no format/pattern), '
+    + 'so rejecting a malformed value is recommended practice, not a conformance requirement.';
+
+  // grade(): hard → assert (FAIL); soft → INFO when ok, WARNING when not (never FAIL).
+  const grade = (name, ok, failMsg) => {
+    if (!soft) { assert(name, ok, failMsg); }
+    else if (ok) { log('INFO', `${name} — OK.`); }
+    else { log('WARNING', `${name}: ${failMsg}${softNote}`); }
+  };
+
+  const isError = typeof status === 'number' && status >= 400;
+  const isClientError = isError && status < 500;
+
+  // N1 — provider rejects with a client error (never a silent accept).
+  grade('Negative requestedInformation: provider rejects with a client error (4xx)',
+    isClientError, `expected 4xx, got ${status}`);
+
+  // N2/N3 only apply when the provider actually returned an error body to grade.
+  if (isError) {
+    const isObj = body !== null && typeof body === 'object';
+    const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
+    grade('Negative requestedInformation: error body is an RFC-9457 Problem (title/detail/code present)',
+      !!hasMessage, 'response body did not contain title/detail/code');
+    // N3 — should identify the offending field (always WARN; Problem.pointers optional @3.1).
+    const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];
+    const blob = isObj ? JSON.stringify(body).toLowerCase() : '';
+    const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
+    const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
+    if (hasPointers || namesField) {
+      log('INFO', 'Negative requestedInformation: error identifies the offending field.');
+    } else {
+      log('WARNING', `Negative requestedInformation: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+    }
   } else {
-    log('WARNING', `Negative requestedInformation: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+    log(soft ? 'INFO' : 'WARNING',
+      `Negative requestedInformation: provider returned ${status} with no error body to grade.`);
   }
 }
 

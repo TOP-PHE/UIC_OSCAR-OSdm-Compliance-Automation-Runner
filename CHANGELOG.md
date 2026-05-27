@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.75] — 2026-05-27
+
+Provider-fair grading of the `requestedInformation` negative probe — **#258.**
+**Bruno collection bumped (OTST_V2.0.27 → OTST_V2.0.28).**
+
+### Changed
+- **`validateProblemResponse()` now FAILs "provider must reject" only when a rejection
+  is genuinely *required*:**
+  - a demanded field is **missing** (`omit` probe — the spec needs it populated to proceed), or
+  - an **OSDM-constrained** field is violated — `gender` (enum `[MALE, FEMALE, X]`) or
+    `dateOfBirth` (`format: date`).
+- For a malformed value in an **unconstrained string** field (`firstName` / `lastName` /
+  `email` / `phoneNumber` — bare `type: string` in the spec, no pattern/format), a
+  non-rejection is now a **WARNING**, not a FAIL — a provider that accepts it is still
+  OSDM-conformant (semantic validation is recommended, not required).
+- N2 (RFC-9457 `Problem` shape) and N3 (field pointer) are graded only when an error body
+  is actually returned, and follow the same hard/soft severity.
+
+### Notes
+- **Operator action required: none.** Only changes report *severity* for negative-probe
+  (`requestedInformationProbe` / `bookingPurchaserMode = invalid`) scenarios; happy-flow
+  runs are unaffected.
+
+---
+
 ## [server-v1.11.74] — 2026-05-27
 
 `bookingPurchaserMode=invalid` now actually sends an invalid purchaser — **#258 / #203.**
