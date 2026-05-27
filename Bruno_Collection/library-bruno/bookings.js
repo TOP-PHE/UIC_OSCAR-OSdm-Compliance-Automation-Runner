@@ -1,5 +1,6 @@
 ﻿const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
+const { summariseRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   postCreateBookingResponse,
@@ -329,6 +330,30 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
   } else {
     validationLogger(`[INFO] booking.confirmationTimeLimit absent → test skipped`);
+  }
+
+  // RI (#258 Phase 1): surface booking-level requestedInformation — what the
+  // client must additionally set before the booking can be confirmed.
+  const _bookingRi = booking.requestedInformation;
+  if (_bookingRi !== undefined && _bookingRi !== null && _bookingRi !== '') {
+    const s = summariseRequestedInformation(_bookingRi);
+    test(`booking.requestedInformation is a valid OSDM type (string, <=32768)`, () => {
+      expect(s.typeOk, `requestedInformation type errors: ${s.typeErrors.join('; ')}`).to.be.true;
+    });
+    if (s.parseOk) {
+      validationLogger(`[INFO] booking requests additional information before confirmation: ${s.description}`);
+      s.leaves.forEach(l => {
+        if (l.scenarioField) {
+          validationLogger(`[INFO]   → set '${l.scenarioField}' (${l.fieldLabel}) on ${l.passengerRef} — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+        } else {
+          validationLogger(`[WARNING]   → provider requires '${l.path.join('.')}' on ${l.passengerRef}, not currently configurable in OSCAR scenario authoring — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
+        }
+      });
+    } else {
+      validationLogger(`[WARNING] booking.requestedInformation could not be parsed as an OSDM requested-information expression: ${s.parseError}`);
+    }
+  } else {
+    validationLogger(`[INFO] booking.requestedInformation absent → nothing additionally required`);
   }
 
   // B3: bookedOffers must be non-empty (OSDM: a booking must contain at least one BookedOffer)
