@@ -160,6 +160,9 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE users ADD COLUMN oauth_custom_template TEXT');
       _safeAlter('ALTER TABLE users ADD COLUMN cached_token_enc TEXT');
       _safeAlter('ALTER TABLE users ADD COLUMN cached_token_expires_at TEXT');
+      // #208: fingerprint of the credentials the cached token was issued for, so
+      // the cache is invalidated when the tester changes any credential.
+      _safeAlter('ALTER TABLE users ADD COLUMN cached_token_cred_fp TEXT');
       _safeAlter('ALTER TABLE users ADD COLUMN requestor_enc TEXT');
       _safeAlter('ALTER TABLE users ADD COLUMN subscription_key_enc TEXT');
 
