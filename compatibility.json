@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.91",
+  "current_release": "2026.92",
   "releases": [
+    {
+      "release": "2026.92",
+      "date": "2026-05-27",
+      "server": "1.11.64",
+      "collection": "OTST_V2.0.19",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#223): flexibility-based offer selection no longer depends on the optional offerSummary. library-bruno/offers.js gains deriveOfferFlexibilityFromProducts(offer) and offerFlexibility(offer): the latter returns offerSummary.overallFlexibility when present, otherwise derives the offer's overall flexibility from its products. Aggregation is MOST RESTRICTIVE wins (NON_FLEXIBLE > SEMI_FLEXIBLE > FULL_FLEXIBLE) — a multi-leg journey is only as flexible as its least-flexible leg (e.g. TGV FULL_FLEXIBLE + TER NON_FLEXIBLE -> NON_FLEXIBLE); unknown/vendor flexibility values are ignored. selectAndSetOffer now filters and asserts on offerFlexibility() (so providers that omit offerSummary still drive selection, instead of dropping every offer and falling back to offers[0] with a failing assertion), and logs a clear [INFO] line stating the flexibility was derived from offer products when offerSummary is absent. validateOfferParts' flexibility consistency check was corrected to the same most-restrictive derivation (it previously used a most-FLEXIBLE-wins heuristic that mis-classified mixed offers) and is now skipped (logged) rather than hard-failing when offerSummary is absent. Jest: tests/unit/bruno-offer-flexibility.test.js. Bruno_Collection/VERSION OTST_V2.0.18 -> OTST_V2.0.19; server 1.11.63 -> 1.11.64.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.92 / server-v1.11.64 / OTST_V2.0.19 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.91",
       "date": "2026-05-27",
