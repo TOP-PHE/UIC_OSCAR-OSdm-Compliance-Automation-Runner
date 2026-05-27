@@ -351,7 +351,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     // Purchaser channel (#258 / #203): the purchaser is a single object. Its mode
     // is driven by bookingPurchaserMode — inline/deferred → satisfy (autofeed),
     // omit/invalid → negative probe. The resulting purchaserAdditionalData /
-    // requestedInfoPurchaserProbeTargets are read by the POST Booking Purchaser
+    // requestedInfoPurchaserProbeTargets are read by the Booking Purchaser
     // step. The scenario purchaser (bookingPurchaserSpecifications) seeds the
     // model so an already-complete purchaser needs no auto-feed.
     const _readObj = (n) => {
@@ -387,7 +387,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       const _existing = _read('requestedInfoProbeTargets');
       bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
     }
-    // Persist the purchaser channel for the POST Booking Purchaser step (#258/#203).
+    // Persist the purchaser channel for the Booking Purchaser step (#258/#203).
     if ((out.purchaserProvided && out.purchaserProvided.length)
         || (out.purchaserProbeTargets && out.purchaserProbeTargets.length)) {
       bru.setEnvVar('purchaserAdditionalData', JSON.stringify(out.purchaserAdditional || {}));

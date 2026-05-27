@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.72] — 2026-05-27
+
+Deferred-purchaser step uses **PATCH** instead of POST — **#258 / #203.**
+**Bruno collection bumped (OTST_V2.0.24 → OTST_V2.0.25).**
+
+### Changed
+- **`12. POST Booking Purchaser` → `12. PATCH Booking Purchaser`** (method `POST` →
+  `PATCH`, `patchBookingPurchaser`). For a booking created without a purchaser,
+  POST-*create* is the OSDM-canonical call, but providers that already materialise
+  an (empty) purchaser on the booking (e.g. **Bileto**) return **500** on a
+  POST-create because the resource already exists. PATCH-*update* is the call that
+  works there. `04. GET Passenger` routes to the new step name; the body assembly
+  is unchanged.
+
+### Notes
+- **Operator action required: none.** Only affects scenarios with
+  `bookingPurchaserMode = deferred`/`invalid`; the default `inline` is unchanged.
+
+---
+
 ## [server-v1.11.71] — 2026-05-27
 
 **CRITICAL regression fix** — valid OAuth credentials failed on every run (**#208**).
