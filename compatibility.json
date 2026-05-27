@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.87",
+  "current_release": "2026.88",
   "releases": [
+    {
+      "release": "2026.88",
+      "date": "2026-05-27",
+      "server": "1.11.60",
+      "collection": "OTST_V2.0.16",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258, Phase 2): evaluate requestedInformation against the passenger data OSCAR will send and WARN on unmet requirements. Builds on Phase 1 (2026.87). library-bruno/requestedInformation.js gains evaluateRequestedInformation(ast, model) -> { satisfied, unmetLeaves } (AND/OR logic; ANY index requires every passenger; leaf resolution checks both detail.contact.X and the flat detail.X so a 3.1+ contact demand is satisfied by 3.0 flat data and vice-versa, mirroring #231) and buildPassengerModelFromAdditionalData(additional, specs) which normalises the scenario's passengerAdditionalData (update* fields) + offerPassengerSpecifications type into an OSDM-ish passenger shape. offers.js validateOfferParts now evaluates each offer part's expression against the scenario data and, when not satisfied, WARNs per passenger with the exact field to set; bookings.js postCreateBookingResponse evaluates the booking-level expression against the booking's own passengers. WARN-only by design: a scenario may legitimately omit an optional field, so an unmet requirement is informational (predicts a likely downstream 400) rather than a server non-conformance; absence remains a non-failure. Auto-injecting the demanded data stays a later, separate phase. Jest: tests/unit/bruno-requestedinformation.test.js extended with evaluator + model-builder cases (single/ANY/OR, flat-vs-contact fallback, unmet reporting). Bruno_Collection/VERSION OTST_V2.0.15 -> OTST_V2.0.16; server 1.11.59 -> 1.11.60.",
+        "Operator action required: none. Bruno collection refreshes on the VPS at merge; chip shows 2026.88 / server-v1.11.60 / OTST_V2.0.16 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.87",
       "date": "2026-05-27",

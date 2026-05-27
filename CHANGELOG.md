@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.60] — 2026-05-27
+
+OSDM `requestedInformation` evaluation — **#258 Phase 2**. Bruno collection change
+(OTST_V2.0.15 → OTST_V2.0.16); server in lockstep (1.11.59 → 1.11.60).
+
+### Added
+- **Evaluate `requestedInformation` against the data OSCAR will send, and WARN on
+  unmet requirements** (`library-bruno/requestedInformation.js`). Builds on the
+  Phase 1 surfacing: `evaluateRequestedInformation(ast, model)` walks the boolean
+  expression (`AND`/`OR`; `ANY` index ⇒ every passenger must satisfy it) and a
+  leaf is met when the field is populated. Leaf resolution checks **both**
+  `detail.contact.X` and the flat `detail.X`, so a 3.1+ contact demand is
+  satisfied by 3.0 flat data and vice‑versa (mirrors #231).
+  `buildPassengerModelFromAdditionalData()` normalises the scenario's
+  `passengerAdditionalData` (`update*` fields) + `offerPassengerSpecifications`
+  type into the passenger shape evaluated.
+- **Wired into both flows.** `offers.js` `validateOfferParts` evaluates each
+  offer part's expression against the scenario's passenger data; `bookings.js`
+  `postCreateBookingResponse` evaluates the booking‑level expression against the
+  booking's own passengers. When **not** satisfied, a per‑passenger `[WARNING]`
+  names the exact field to set (e.g. *"missing 'phoneNumber' (phone number) for
+  passenger 1"*) and notes the booking/confirmation will likely be rejected.
+- Tests extended in `tests/unit/bruno-requestedinformation.test.js` (evaluator +
+  model builder: single / `ANY` / `OR`, flat‑vs‑contact fallback, unmet
+  reporting).
+
+**WARN‑only by design:** a scenario may legitimately omit an optional field, so
+an unmet requirement is informational (it predicts a likely downstream 400), not
+a server non‑conformance; absence remains a non‑failure. Auto‑injecting the
+demanded data stays a later, separate phase.
+
+---
+
 ## [server-v1.11.59] — 2026-05-27
 
 OSDM `requestedInformation` surfacing — **#258 Phase 1**. Bruno collection change
