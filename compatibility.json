@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.102",
+  "current_release": "2026.103",
   "releases": [
+    {
+      "release": "2026.103",
+      "date": "2026-05-27",
+      "server": "1.11.75",
+      "collection": "OTST_V2.0.28",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258): provider-fair grading of the requestedInformation negative probe. validateProblemResponse() now FAILS the 'provider must reject' assertion only when a rejection is REQUIRED — i.e. a demanded field is MISSING (omit probe) or an OSDM-constrained field is violated (gender enum / dateOfBirth format). For a malformed value in an UNCONSTRAINED string field (firstName/lastName/email/phoneNumber — bare type:string in the spec, no pattern/format) a non-rejection is now a WARNING, not a FAIL, because a provider that accepts it is still OSDM-conformant. N2 (RFC-9457 Problem shape) and N3 (field pointer) are graded only when an error body is actually returned, and follow the same hard/soft severity. Only changes report severity for negative-probe scenarios; happy-flow runs unaffected. Bruno_Collection/VERSION OTST_V2.0.27 -> OTST_V2.0.28; server 1.11.74 -> 1.11.75.",
+        "Operator action required: none. Chip shows 2026.103 / server-v1.11.75 / OTST_V2.0.28 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.102",
       "date": "2026-05-27",
