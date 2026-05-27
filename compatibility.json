@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.104",
+  "current_release": "2026.105",
   "releases": [
+    {
+      "release": "2026.105",
+      "date": "2026-05-27",
+      "server": "1.11.77",
+      "collection": "OTST_V2.0.30",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258): PASSENGER negative-probe sweep (companion to the purchaser sweep). With requestedInformationProbe=invalid, 03. PATCH Multi Passenger now tests each passenger field one-by-one on passenger 0 within a SINGLE run: a valid baseline for every field with exactly ONE corrupted per pass (gender->ZZZ, dateOfBirth->not-a-date, email->not-an-email, phoneNumber->not-a-phone, firstName/lastName->omitted), graded on its own line ([passenger0.<field>]), then loops back to PATCH for the next field and stops after the last. Severity per validateProblemResponse: gender/dateOfBirth FAIL (enum/format), email/phoneNumber WARN (unconstrained string), firstName/lastName FAIL (required). STRICTLY gated to requestedInformationProbe=invalid; off/omit/happy paths are byte-identical. NOTE: built without live-flow validation (touches the core passenger PATCH step) — validate against a sandbox before relying on it. Bruno_Collection/VERSION OTST_V2.0.29 -> OTST_V2.0.30; server 1.11.76 -> 1.11.77.",
+        "Operator action required: none. Chip shows 2026.105 / server-v1.11.77 / OTST_V2.0.30 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.104",
       "date": "2026-05-27",
