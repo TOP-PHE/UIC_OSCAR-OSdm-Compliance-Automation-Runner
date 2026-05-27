@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.97",
+  "current_release": "2026.98",
   "releases": [
+    {
+      "release": "2026.98",
+      "date": "2026-05-27",
+      "server": "1.11.70",
+      "collection": "OTST_V2.0.24",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258, #203): purchaser-aware requestedInformation + a dedicated purchaser-on-booking step. The requestedInformation engine (library-bruno/requestedInformation.js) is now ROOT-AWARE: a leaf's root decides its subject — passengerSpecifications[i] (an indexed passenger, unchanged) or purchaser[…] (the single purchaser object, index ignored). Each kind has its own evaluation subject, report label ('the purchaser') and auto-feed/probe channel; passenger behaviour and all existing engine tests are unchanged.",
+        "New scenario field bookingPurchaserMode (inline | deferred | omit | invalid), authored in the scenario detail panel (scenarios.js) and documented in datafile.schema.json. 'inline' (default) sends the purchaser in the POST /bookings request exactly as before. 'deferred' OMITS it at booking and then POSTs it to /bookings/{id}/purchaser (postBookingPurchaser) to satisfy any purchaser requestedInformation — the OSDM-correct way to exercise a provider that requests purchaser data. 'omit' never supplies it. 'invalid' POSTs a deliberately bad purchaser and asserts the provider rejects with a conformant RFC-9457 Problem.",
+        "New Bruno step '12. POST Booking Purchaser' (gated in the smart-run filter, routed from 04. GET Passenger before fulfillment; fully inert when inline/omit) — closes #203 (purchaser endpoints exercised). buildBookingRequest gates the inline purchaser on the new mode; the booking-level RI handler (bookings.js) routes purchaser leaves to the new channel.",
+        "Operator action required: none. New scenarios default to bookingPurchaserMode=inline, so existing scenarios behave exactly as before. Bruno_Collection/VERSION OTST_V2.0.23 -> OTST_V2.0.24; server 1.11.69 -> 1.11.70; chip shows 2026.98 / server-v1.11.70 / OTST_V2.0.24 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.97",
       "date": "2026-05-27",

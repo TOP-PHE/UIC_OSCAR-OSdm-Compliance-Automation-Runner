@@ -470,3 +470,164 @@ describe('validateProblemResponse', () => {
     expect(m.logs.some((l) => l.lvl === 'INFO' && /identifies the offending field/.test(l.msg))).toBe(true);
   });
 });
+
+// ─── #258 purchaser support (root-aware engine) ─────────────────────────────
+const PUR_EMAIL = 'purchaser[0].detail.contact.email';
+
+describe('purchaser-aware parsing & description', () => {
+  test('parses a purchaser leaf with root=purchaser', () => {
+    const r = ri.parseRequestedInformation(PUR_EMAIL);
+    expect(r.ok).toBe(true);
+    expect(r.ast.root).toBe('purchaser');
+  });
+
+  test('describes a purchaser leaf as "(the purchaser)"', () => {
+    expect(ri.describeRequestedInformation(astOf(PUR_EMAIL))).toBe('email (the purchaser)');
+  });
+
+  test('summarise tags the leaf kind=purchaser + subjectRef, maps the field', () => {
+    const s = ri.summariseRequestedInformation(PUR_EMAIL);
+    expect(s.leaves[0].kind).toBe('purchaser');
+    expect(s.leaves[0].subjectRef).toBe('the purchaser');
+    expect(s.leaves[0].scenarioField).toBe('email');
+  });
+
+  test('rootKind classifies known and unknown roots', () => {
+    expect(ri.rootKind('passengerSpecifications')).toBe('passenger');
+    expect(ri.rootKind('purchaser')).toBe('purchaser');
+    expect(ri.rootKind('somethingElse')).toBe('other');
+  });
+});
+
+describe('purchaser evaluation', () => {
+  test('satisfied when the purchaser field is populated (index is immaterial)', () => {
+    const m = { purchaser: { detail: { contact: { email: 'p@x.io' } } } };
+    expect(ri.evaluateRequestedInformation(astOf(PUR_EMAIL), m).satisfied).toBe(true);
+    expect(ri.evaluateRequestedInformation(astOf('purchaser[3].detail.contact.email'), m).satisfied).toBe(true);
+  });
+
+  test('unmet when empty; flagged kind=purchaser / subjectRef', () => {
+    const r = ri.evaluateRequestedInformation(astOf(PUR_EMAIL), { purchaser: {} });
+    expect(r.satisfied).toBe(false);
+    expect(r.unmetLeaves[0].kind).toBe('purchaser');
+    expect(r.unmetLeaves[0].subjectRef).toBe('the purchaser');
+  });
+
+  test('a purchaser demand is NOT satisfied by passenger data (no cross-contamination)', () => {
+    const m = { passengerSpecifications: [{ detail: { contact: { email: 'pax@x.io' } } }], purchaser: {} };
+    expect(ri.evaluateRequestedInformation(astOf(PUR_EMAIL), m).satisfied).toBe(false);
+  });
+
+  test('contact path satisfied by the flat 3.0 purchaser field', () => {
+    const m = { purchaser: { detail: { email: 'p@x.io' } } };
+    expect(ri.evaluateRequestedInformation(astOf(PUR_EMAIL), m).satisfied).toBe(true);
+  });
+});
+
+describe('buildPurchaserModelFromAdditionalData', () => {
+  test('merges update* overrides over the scenario purchaser spec', () => {
+    const m = ri.buildPurchaserModelFromAdditionalData(
+      { updateEmail: 'override@x.io' },
+      { detail: { firstName: 'Acme', lastName: 'Corp', contact: { phoneNumber: '+331' } } }
+    );
+    expect(m.detail.firstName).toBe('Acme');
+    expect(m.detail.contact.email).toBe('override@x.io');
+    expect(m.detail.contact.phoneNumber).toBe('+331');
+  });
+
+  test('tolerates null inputs (all-null object)', () => {
+    const m = ri.buildPurchaserModelFromAdditionalData(null, null);
+    expect(m.detail.firstName).toBeNull();
+    expect(m.detail.contact.email).toBeNull();
+  });
+});
+
+describe('applyPurchaserAutoFeed', () => {
+  test('fills an empty mapped purchaser field', () => {
+    const unmet = ri.evaluateRequestedInformation(astOf(PUR_EMAIL), { purchaser: {} }).unmetLeaves;
+    const { purchaserAdditional, provided } = ri.applyPurchaserAutoFeed({}, unmet, null);
+    expect(provided).toHaveLength(1);
+    expect(provided[0].scenarioField).toBe('email');
+    expect(purchaserAdditional.updateEmail).toMatch(/@/);
+  });
+
+  test('never overwrites an existing purchaser value', () => {
+    const unmet = [{ scenarioField: 'email', fieldLabel: 'email', subjectRef: 'the purchaser', path: ['detail', 'contact', 'email'] }];
+    expect(ri.applyPurchaserAutoFeed({ updateEmail: 'keep@x.io' }, unmet, null).provided).toHaveLength(0);
+  });
+});
+
+describe('staticIssues — purchaser & unknown roots', () => {
+  test('does not flag a purchaser index as out of range', () => {
+    expect(ri.staticIssues(astOf('purchaser[3].detail.firstName'), 1).indexErrors).toHaveLength(0);
+  });
+
+  test('reports an unknown root', () => {
+    expect(ri.staticIssues(astOf('company[0].detail.firstName'), 1).unknownRoots).toContain('company');
+  });
+});
+
+describe('processRequestedInformation — purchaser channel', () => {
+  test('auto-feeds a missing purchaser field via the purchaser channel', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: PUR_EMAIL, tag: 'booking', additional: [], specs: [], passengerCount: 1,
+      purchaserAdditional: {}, purchaserSpec: null, purchaserMode: 'autofeed',
+      assert: m.assert, log: m.log,
+    });
+    expect(out.purchaserProvided.map((p) => p.scenarioField)).toContain('email');
+    expect(out.purchaserAdditional.updateEmail).toMatch(/@/);
+    expect(out.satisfied).toBe(true);
+    expect(m.asserts.find((a) => /\(purchaser\) is satisfiable/.test(a.name)).ok).toBe(true);
+    // passenger channel untouched
+    expect(out.provided).toHaveLength(0);
+    expect(out.probeTargets).toHaveLength(0);
+  });
+
+  test('purchaser already satisfied by the scenario spec → no feed, satisfied', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: PUR_EMAIL, tag: 'booking', additional: [], specs: [], passengerCount: 1,
+      purchaserSpec: { detail: { contact: { email: 'p@x.io' } } }, purchaserMode: 'autofeed',
+      assert: m.assert, log: m.log,
+    });
+    expect(out.purchaserProvided).toHaveLength(0);
+    expect(out.satisfied).toBe(true);
+  });
+
+  test("purchaser mode 'omit' withholds the field, records a target (no index)", () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: PUR_EMAIL, tag: 'booking', additional: [], specs: [], passengerCount: 1,
+      purchaserSpec: { detail: { contact: { email: 'p@x.io' } } }, purchaserMode: 'omit',
+      assert: m.assert, log: m.log,
+    });
+    expect(out.purchaserAdditional.updateEmail).toBe('');
+    expect(out.purchaserProbeTargets).toEqual([{ scenarioField: 'email' }]);
+    expect(out.satisfied).toBe(false);
+  });
+
+  test("purchaser mode 'invalid' injects an invalid value", () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: PUR_EMAIL, tag: 'booking', additional: [], specs: [], passengerCount: 1,
+      purchaserMode: 'invalid', assert: m.assert, log: m.log,
+    });
+    expect(out.purchaserAdditional.updateEmail).toBe('not-an-email');
+    expect(out.purchaserProbeTargets[0]).toMatchObject({ scenarioField: 'email', value: 'not-an-email' });
+  });
+
+  test('mixed expr: passenger auto-fed while the purchaser is withheld', () => {
+    const m = mockSinks();
+    const out = ri.processRequestedInformation({
+      expr: 'passengerSpecifications[0].detail.lastName AND purchaser[0].detail.contact.email',
+      tag: 'booking', additional: [{}], specs: [{ type: 'PERSON' }], passengerCount: 1,
+      purchaserSpec: { detail: { contact: { email: 'p@x.io' } } },
+      mode: 'autofeed', purchaserMode: 'omit', assert: m.assert, log: m.log,
+    });
+    expect(out.provided.map((p) => p.scenarioField)).toContain('lastName');
+    expect(out.additional[0].updateLastName).toBeTruthy();
+    expect(out.purchaserProbeTargets).toEqual([{ scenarioField: 'email' }]);
+    expect(out.satisfied).toBe(false); // overall false: purchaser deliberately withheld
+  });
+});

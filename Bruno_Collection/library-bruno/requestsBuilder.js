@@ -149,11 +149,20 @@ function buildBookingRequest() {
     offers.push(offer);
   }
 
-  const body = {
-    offers,
-    purchaser: parseEnvJson("bookingPurchaserSpecifications"),
-    passengerSpecifications
-  };
+  // #258: purchaser is OPTIONAL in BookingRequest (OSDM required = [offers,
+  // passengerSpecifications]). `bookingPurchaserMode` decides whether we send it
+  // inline at booking time. 'inline' (default) keeps the historic behaviour. For
+  // 'deferred'/'omit'/'invalid' the purchaser is OMITTED here so the provider's
+  // purchaser requestedInformation (or a confirmation rejection) is exercised;
+  // the POST Booking Purchaser step then supplies it (deferred) or probes it
+  // (invalid). 'omit' withholds it entirely (no later step).
+  const _purMode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
+  const body = { offers, passengerSpecifications };
+  if (_purMode === "inline") {
+    body.purchaser = parseEnvJson("bookingPurchaserSpecifications");
+  } else {
+    validationLogger(`[INFO] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the POST Booking Purchaser step where applicable).`);
+  }
 
   const sandbox = bru.getEnvVar("api_base") || "";
   if (!sandbox.includes("paxone")) {
