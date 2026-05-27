@@ -4,6 +4,7 @@ module.exports = {
   buildOfferCollectionRequest,
   buildReturnOfferCollectionRequest,
   buildBookingRequest,
+  buildBookingPurchaserBody,
   accommodationAndPlaceSelection,
   collectAvailablePlaces,
   placesForPassengers,
@@ -170,6 +171,46 @@ function buildBookingRequest() {
   }
 
   bru.setEnvVar("BookingRequest", JSON.stringify(body));
+}
+
+// #258/#203: assemble the body for the deferred-purchaser step (GET→PATCH/POST
+// upsert). Shared by both the PATCH (update) and POST (create) write steps so the
+// body is identical regardless of which one the GET-probe selected. Base is the
+// scenario purchaser (bookingPurchaserSpecifications); update* overrides from the
+// booking-level requestedInformation handler (purchaserAdditionalData) are
+// overlaid — a present value replaces the field, an empty string ("" — a probe
+// "withhold") removes it. In 'invalid' mode, force a clearly-invalid email when
+// nothing else makes the body invalid, so the provider must reject.
+function buildBookingPurchaserBody() {
+  validationLogger("[INFO] ➤ buildBookingPurchaserBody");
+  const mode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
+
+  let base = {};
+  try { base = JSON.parse(bru.getEnvVar("bookingPurchaserSpecifications") || "{}") || {}; } catch (_e) { base = {}; }
+  let add = {};
+  try { add = JSON.parse(bru.getEnvVar("purchaserAdditionalData") || "{}") || {}; } catch (_e) { add = {}; }
+
+  const body = JSON.parse(JSON.stringify(base || {}));
+  body.detail = (body.detail && typeof body.detail === "object") ? body.detail : {};
+  body.detail.contact = (body.detail.contact && typeof body.detail.contact === "object") ? body.detail.contact : {};
+
+  const setOrClear = (obj, key, val) => {
+    if (val === undefined) return;
+    if (val === "") { delete obj[key]; } else { obj[key] = val; }
+  };
+  if ("updateFirstName"   in add) setOrClear(body.detail,         "firstName",   add.updateFirstName);
+  if ("updateLastName"    in add) setOrClear(body.detail,         "lastName",    add.updateLastName);
+  if ("updateEmail"       in add) setOrClear(body.detail.contact, "email",       add.updateEmail);
+  if ("updatePhoneNumber" in add) setOrClear(body.detail.contact, "phoneNumber", add.updatePhoneNumber);
+  if ("updateGender"      in add) setOrClear(body.detail,         "gender",      add.updateGender);
+  if ("updateDateOfBirth" in add) setOrClear(body.detail,         "dateOfBirth", add.updateDateOfBirth);
+
+  if (mode === "invalid" && !body.detail.contact.email) {
+    body.detail.contact.email = "not-an-email";
+  }
+
+  bru.setVar("bookingPurchaserBody", JSON.stringify(body));
+  return body;
 }
 
 // Walk a PlaceAvailability "vehicle" (08. GET Place Maps response) and return up

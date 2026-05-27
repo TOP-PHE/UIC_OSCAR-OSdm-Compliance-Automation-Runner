@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.100",
+  "current_release": "2026.101",
   "releases": [
+    {
+      "release": "2026.101",
+      "date": "2026-05-27",
+      "server": "1.11.73",
+      "collection": "OTST_V2.0.26",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#258/#203): purchaser create-or-update (upsert) — stop guessing POST vs PATCH. The deferred-purchaser flow now PROBES first: new step '12. GET Booking Purchaser' (getBookingPurchaser) checks whether a purchaser exists on the booking, then routes to '13. PATCH Booking Purchaser' (update, when GET returns 2xx) or '14. POST Booking Purchaser' (create, when GET returns 404/none). This works on both provider styles — those that materialise an empty purchaser on the booking (PATCH-update; Bileto) and those that don't (POST-create) — without hardcoding a method. Shared body assembly moved to requestsBuilder.buildBookingPurchaserBody(); 04. GET Passenger routes to the GET probe; smart-run filter gates each step (write steps run only for the method the probe selected). Only affects bookingPurchaserMode=deferred/invalid (default inline unchanged). Bruno_Collection/VERSION OTST_V2.0.25 -> OTST_V2.0.26; server 1.11.72 -> 1.11.73.",
+        "Operator action required: none. Chip shows 2026.101 / server-v1.11.73 / OTST_V2.0.26 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.100",
       "date": "2026-05-27",

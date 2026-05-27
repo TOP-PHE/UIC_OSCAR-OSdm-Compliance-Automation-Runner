@@ -79,14 +79,16 @@ runtime:
         if (currentIndex < totalPassengers) {
             bru.runner.setNextRequest(req.getName());
         } else {
-            // #258 / #203: when the scenario deferred the purchaser, insert the
-            // POST Booking Purchaser step before fulfillment. 'deferred' supplies
-            // it (happy), 'invalid' probes it (expects rejection). 'inline'/'omit'
-            // skip the step → straight to the pre-fulfillment GET (unchanged).
+            // #258 / #203: when the scenario deferred the purchaser, run the
+            // purchaser create-or-update flow before fulfillment. 12. GET Booking
+            // Purchaser probes whether one exists, then routes to PATCH (update)
+            // or POST (create). 'deferred' supplies it (happy), 'invalid' probes
+            // it (expects rejection). 'inline'/'omit' skip it → straight to the
+            // pre-fulfillment GET (unchanged).
             const _purMode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
             const _purStepDue = (_purMode === "deferred" || _purMode === "invalid")
                 && bru.getEnvVar("__purchaserStepDone") !== "true";
-            bru.runner.setNextRequest(_purStepDue ? "12. PATCH Booking Purchaser" : "07. GET Booking before Fulfillments");
+            bru.runner.setNextRequest(_purStepDue ? "12. GET Booking Purchaser" : "07. GET Booking before Fulfillments");
         }
 
 settings:
