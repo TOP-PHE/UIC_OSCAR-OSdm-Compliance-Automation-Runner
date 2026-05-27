@@ -27,6 +27,7 @@ const ENUMS = {
   scenarioType:       [null, 'SALE', 'REFUND', 'EXCHANGE'],
   scenarioAction:     [null, 'PATCH', 'DELETE'],
   requestedInformationProbe: [null, 'omit', 'invalid'],
+  bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
   loggingType:        ['INFO', 'DEBUG'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
@@ -1256,6 +1257,8 @@ function buildDetailHTML(idx) {
         })()}
         ${buildSelect(idx, 'requestedInformationProbe', 'RequestedInfo Probe', ENUMS.requestedInformationProbe,
           'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
+        ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
+          'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
@@ -4960,6 +4963,10 @@ async function wizGenerateScenario() {
       // default (auto-provide demanded fields); set to omit/invalid in the detail
       // panel to negative-test the provider's error handling.
       requestedInformationProbe: null,
+      // Purchaser at booking (issue #258 / #203) — 'inline' by default (purchaser
+      // sent in the booking request); deferred/omit/invalid in the detail panel
+      // to omit it at booking and set/probe it via POST /bookings/{id}/purchaser.
+      bookingPurchaserMode: 'inline',
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,

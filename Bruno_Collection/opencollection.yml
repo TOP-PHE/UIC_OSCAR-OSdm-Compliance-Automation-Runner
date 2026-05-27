@@ -123,6 +123,7 @@ request:
           var _isOfferPlaceMap = _isPlaceMap && !_isPostBookingPlaceMap;
           var _isAddReservation = _rn.includes('add reservation');
           var _isAddAncillary   = _rn.includes('add ancillary');
+          var _isPurchaserStep  = _rn.includes('booking purchaser');
           var _isReturnOffer    = _rn.includes('return offer');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
@@ -163,6 +164,12 @@ request:
           // (salesFlow_addAncillary, authorised by the framework #107), once.
           var _runAddAncillary = String(bru.getEnvVar('salesFlow_addAncillary')) === 'true';
 
+          // Post-booking purchaser step (#258 / #203) runs only when the scenario
+          // deferred the purchaser ('deferred' supplies it, 'invalid' probes it).
+          // 'inline' (default) and 'omit' never run the dedicated step.
+          var _purMode = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
+          var _runPurchaserStep = (_purMode === 'deferred' || _purMode === 'invalid');
+
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
             _skipReason = 'not for "' + _sandbox + '" sandbox';
@@ -176,6 +183,9 @@ request:
             else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
             else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
             else if (_isAddAncillary && bru.getEnvVar('__addAncillaryDone') === 'true') { _skipReason = 'add-ancillary already done this scenario'; }
+            else if (_isPurchaserStep && !_runPurchaserStep)              { _skipReason = 'purchaser step not enabled (bookingPurchaserMode is inline/omit)'; }
+            else if (_isPurchaserStep && !bru.getEnvVar('bookingId'))     { _skipReason = 'purchaser step needs a booking first'; }
+            else if (_isPurchaserStep && bru.getEnvVar('__purchaserStepDone') === 'true') { _skipReason = 'purchaser step already done this scenario'; }
             else if (_isReturnOffer && !_isReturnScenario)                { _skipReason = 'not a return-trip scenario'; }
             else if (_isReturnOffer && bru.getEnvVar('__returnInboundDone') === 'true') { _skipReason = 'inward (return) offer already fetched this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
