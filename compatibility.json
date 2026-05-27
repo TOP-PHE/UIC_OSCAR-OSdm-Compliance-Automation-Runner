@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.98",
+  "current_release": "2026.99",
   "releases": [
+    {
+      "release": "2026.99",
+      "date": "2026-05-27",
+      "server": "1.11.71",
+      "collection": "OTST_V2.0.24",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#208, regression — CRITICAL): valid OAuth credentials failed on every run. The 2026.97 fix added users.cached_token_cred_fp, but the ALTER was placed inside the ALREADY-APPLIED v12 migration; the version-gated runner skips applied migrations, so the column was never created on existing DBs. resolveAccessToken() then persisted the token cache with 'UPDATE users SET ... cached_token_cred_fp = ?', which threw 'no such column: cached_token_cred_fp' and FAILED EVERY oauth2 run — including valid, unchanged credentials (e.g. Bileto). Fix: (1) new DB migration v20 'users-cached-token-cred-fp' adds the column on existing DBs (idempotent; companies too for schema parity); (2) access-token.js now treats cache persistence as best-effort — a token just fetched is returned even if the cache write fails, so a DB-bookkeeping error can never fail an otherwise-valid auth. Regression test added (caching throws -> token still returned). Server 1.11.70 -> 1.11.71; Bruno collection unchanged (OTST_V2.0.24).",
+        "Operator action required: none. The migration runs automatically on boot; the first oauth2 run per tester re-fetches once and re-populates the cache. Chip shows 2026.99 / server-v1.11.71 / OTST_V2.0.24 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.98",
       "date": "2026-05-27",
