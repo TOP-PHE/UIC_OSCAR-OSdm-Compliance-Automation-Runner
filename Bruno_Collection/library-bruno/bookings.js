@@ -1,6 +1,6 @@
 ﻿const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
-const { summariseRequestedInformation } = require('./requestedInformation.js');
+const { summariseRequestedInformation, evaluateRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   postCreateBookingResponse,
@@ -349,6 +349,20 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
           validationLogger(`[WARNING]   → provider requires '${l.path.join('.')}' on ${l.passengerRef}, not currently configurable in OSCAR scenario authoring — OSDM: ${l.root}[${l.index}].${l.path.join('.')}`);
         }
       });
+      // Phase 2: evaluate against the booking's own passengers.
+      const _res = evaluateRequestedInformation(s.ast, { passengerSpecifications: booking.passengers || [] });
+      if (_res.satisfied) {
+        validationLogger(`[INFO] booking.requestedInformation is satisfied by the booking's passenger data.`);
+      } else {
+        validationLogger(`[WARNING] booking.requestedInformation is NOT satisfied by the booking's passenger data — confirmation will likely be rejected unless these are set:`);
+        _res.unmetLeaves.forEach(u => {
+          if (u.scenarioField) {
+            validationLogger(`[WARNING]   → missing '${u.scenarioField}' (${u.fieldLabel}) for ${u.passengerRef}`);
+          } else {
+            validationLogger(`[WARNING]   → missing '${u.path.join('.')}' for ${u.passengerRef} (not configurable in OSCAR authoring)`);
+          }
+        });
+      }
     } else {
       validationLogger(`[WARNING] booking.requestedInformation could not be parsed as an OSDM requested-information expression: ${s.parseError}`);
     }
