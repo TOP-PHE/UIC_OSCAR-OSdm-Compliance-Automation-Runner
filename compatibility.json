@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.111",
+  "current_release": "2026.112",
   "releases": [
+    {
+      "release": "2026.112",
+      "date": "2026-05-28",
+      "server": "1.11.84",
+      "collection": "OTST_V2.0.36",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#204): the expired-booking test now reads the booking-level confirmation deadline from EITHER booking.confirmationTimeLimit (OSDM-standard) OR booking.confirmableUntil (vendor field at booking level used by e.g. the Bileto sandbox). Previously OSCAR only read confirmationTimeLimit; against a provider that uses confirmableUntil at the booking level (which the OSDM spec actually defines at the bookingPart level), the env var was never set so the #204 test silently took the 'no deadline found' WARNING branch and went straight to POST /fulfillments without waiting. bookings.js postCreateBookingResponse now accepts either field name and emits a [WARNING] when the vendor-deviation path is taken (so the deviation is visible in the report). 06.yml WARNING text updated to name both fields. Tester User Guide §4.8 updated. NOTE: the Bileto sandbox has a ~15 min confirmation deadline; with the default RUN_TIMEOUT_MS of 10 min the test still self-skips with the budget WARNING — raise RUN_TIMEOUT_MS to >= ~1100 s to actually exercise the wait. Bruno_Collection/VERSION OTST_V2.0.35 -> OTST_V2.0.36; server 1.11.83 -> 1.11.84.",
+        "Operator action required: for providers whose confirmation deadline exceeds the run budget (Bileto sandbox = ~15 min vs default RUN_TIMEOUT_MS = 10 min), raise RUN_TIMEOUT_MS on the server before re-running expiredBookingTest. Chip shows 2026.112 / server-v1.11.84 / OTST_V2.0.36 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.111",
       "date": "2026-05-28",
