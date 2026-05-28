@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.114",
+  "current_release": "2026.115",
   "releases": [
+    {
+      "release": "2026.115",
+      "date": "2026-05-28",
+      "server": "1.11.87",
+      "collection": "OTST_V2.0.37",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#204): the expired-booking test now also resolves the booking deadline from the bookingPart level. Paxone sandbox reports confirmableUntil ONLY at bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil and not at the booking root — which actually matches OSDM's schema placement for that field. With only the booking-root fallback (#204 follow-up in 2026.112), Paxone's booking-root had neither confirmationTimeLimit nor confirmableUntil, so OSCAR took the 'no deadline found' WARNING branch and fired POST /fulfillments immediately. Now bookings.js falls back, in this order: (1) booking.confirmationTimeLimit, (2) booking.confirmableUntil, (3) the EARLIEST bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil — because the booking effectively expires when the first part expires. Each non-standard source emits a [WARNING] documenting the vendor deviation so the report shows which shape was used. 06.yml and Tester User Guide §4.8 / §7.1 updated. Operator note: Paxone's deadline is ~15 min after creation, same as Bileto — raise RUN_TIMEOUT_MS to ≥ ~1100 s on the server before re-running, otherwise the test self-skips with the budget WARNING (by design — the runner injects runHardDeadlineMs to avoid SIGTERM mid-wait). Bruno_Collection/VERSION OTST_V2.0.36 -> OTST_V2.0.37; server 1.11.86 -> 1.11.87.",
+        "Operator action required: for providers whose confirmation deadline (anywhere — root or bookingPart) exceeds the run budget (Paxone / Bileto ≈ 15 min vs default RUN_TIMEOUT_MS = 10 min), raise RUN_TIMEOUT_MS on the server before re-running expiredBookingTest. Chip shows 2026.115 / server-v1.11.87 / OTST_V2.0.37 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.114",
       "date": "2026-05-28",
