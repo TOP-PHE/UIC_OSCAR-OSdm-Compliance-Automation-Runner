@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.121",
+  "current_release": "2026.122",
   "releases": [
+    {
+      "release": "2026.122",
+      "date": "2026-05-28",
+      "server": "1.11.94",
+      "collection": "OTST_V2.0.42",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(expired-flow PR A): ship Phases 3+4+5 — four new expired-X negative tests built on the shared expiredFlow.js helper. expiredRefundOfferTest (waits past RefundOffer.validUntil, asserts 13. PATCH Refund Offer is rejected — REFUND scenarios only). expiredExchangeOfferTest (waits past ExchangeOffer.preBookableUntil — the spec-naming quirk #25 — asserts 11. POST Exchange Operations is rejected, EXCHANGE only). expiredAddReservationOfferTest (waits past the reservationOfferPart.validUntil, asserts 09. POST Add Reservation rejected). expiredAddAncillaryOfferTest (waits past the earliest ancillary-part validUntil, sourced primarily from 11. additional-offers with a fallback to the original offer, asserts 10. POST Add Ancillary rejected).",
+        "feat(wizard): dedicated 'Non Happy Flow customisation' collapsible section in the scenario detail panel. All 6 expired-X timer pairs (Offer / Booking / AddReservation / AddAncillary / RefundOffer / ExchangeOffer) grouped here with consistent layout. RefundOffer / ExchangeOffer rows are scenarioType-gated (only shown for REFUND / EXCHANGE). Replaces the inline expired-X rows that were sprawling the SCENARIO PARAMETERS section.",
+        "feat(runner): EXPIRED_FLOW_TIMERS table extended from 2 -> 6 entries. computeEffectiveRunTimeoutMs auto-extends the worker SIGTERM for any of the 6 timers when armed by an in-scope scenario.",
+        "docs: Tester Guide section 4.8 expanded with 4 new sections (one per new test); 7.1 field-name table updated; OSDM Spec Deviations doc #25 cross-referenced.",
+        "Bruno_Collection/VERSION OTST_V2.0.41 -> OTST_V2.0.42; server 1.11.93 -> 1.11.94. Next: PR B will add auto-expansion (one scenario, N timers -> N sub-runs with NHF_XXX_<scenario_code> sub-run naming convention)."
+      ]
+    },
     {
       "release": "2026.121",
       "date": "2026-05-28",

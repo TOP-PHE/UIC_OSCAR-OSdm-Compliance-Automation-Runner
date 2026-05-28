@@ -246,4 +246,46 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.requestedMs).toBe(0);
     expect(r.effectiveMs).toBe(r.baseMs);
   });
+
+  // ── PR A (Phases 3+4+5): each of the 4 new timers must auto-extend ────
+  // Same parametric shape as the booking + offer cases above. EXPIRED_FLOW_TIMERS
+  // is the single source of truth in the runner; one passing case per timer
+  // proves the new entries are picked up by the scan loop.
+  test.each([
+    ['expiredAddReservationOfferTest', 'expiredAddReservationOfferMaxWaitMinutes', /expiredAddReservationOfferMaxWaitMinutes/],
+    ['expiredAddAncillaryOfferTest',   'expiredAddAncillaryOfferMaxWaitMinutes',   /expiredAddAncillaryOfferMaxWaitMinutes/],
+    ['expiredRefundOfferTest',         'expiredRefundOfferMaxWaitMinutes',         /expiredRefundOfferMaxWaitMinutes/],
+    ['expiredExchangeOfferTest',       'expiredExchangeOfferMaxWaitMinutes',       /expiredExchangeOfferMaxWaitMinutes/],
+  ])('extends the run budget when %s is on with a per-scenario Max wait', async (flag, wait, srcRe) => {
+    const datafile = {
+      scenariosToRun: ['SC_X'],
+      scenarios: [makeScenario('SC_X', { [flag]: 'on', [wait]: 14 })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_X');
+
+    expect(r.requestedMs).toBe(14 * 60 * 1000 + 60000);
+    expect(r.effectiveMs).toBe(r.requestedMs);
+    expect(r.helperError).toBeNull();
+    expect(r.source).toMatch(srcRe);
+  });
+
+  test('takes the LARGEST request across multiple new-PR timers on one scenario', async () => {
+    // A tester *could* enable several timers in one scenario today; the wait
+    // budget must cover the longest. (PR B's auto-expansion changes this to
+    // a sum, but that's a separate behaviour.)
+    const datafile = {
+      scenariosToRun: ['SC_MIXED'],
+      scenarios: [makeScenario('SC_MIXED', {
+        expiredRefundOfferTest:           'on', expiredRefundOfferMaxWaitMinutes:           5,
+        expiredExchangeOfferTest:         'on', expiredExchangeOfferMaxWaitMinutes:         22,
+        expiredAddAncillaryOfferTest:     'on', expiredAddAncillaryOfferMaxWaitMinutes:     11,
+      })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_MIXED');
+
+    expect(r.requestedMs).toBe(22 * 60 * 1000 + 60000);
+    expect(r.source).toMatch(/expiredExchangeOfferMaxWaitMinutes/);
+  });
 });

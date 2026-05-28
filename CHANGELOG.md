@@ -14,6 +14,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.94] — 2026-05-28
+
+Ship the **4 remaining expired-X negative tests** on top of the shared
+`expiredFlow.js` helper (PR A of the expired-flow generalization), and
+regroup all 6 timers into a dedicated **"Non Happy Flow customisation"**
+section in the wizard.
+**Bruno collection bumped (OTST_V2.0.41 → OTST_V2.0.42).**
+
+### Added — Phase 3: expired refund-offer test (`expiredRefundOfferTest`)
+- `refunds.js postPatchRefundOfferResponse` captures `refundOffers[0].validUntil`
+  → env vars `refundOfferValidUntil` + `refundOfferValidUntilSource`. Gated on
+  `expectedRefundOperationStatus` including `"PROPOSED"` so 13.yml's PATCH
+  doesn't overwrite the deadline with the post-confirmation value.
+- `03-Refund/13. PATCH Refund Offer.yml` gates the acceptance. Asserts 4xx +
+  RFC-9457 Problem; skips the downstream GET booking / DEL refund-offer chain
+  on the rejected path.
+- **REFUND scenarios only.**
+
+### Added — Phase 4: expired exchange-offer test (`expiredExchangeOfferTest`)
+- `exchanges.js postPatchExchangeOffersResponse` captures
+  `exchangeOffers[0].preBookableUntil` → env vars
+  `exchangeOfferPreBookableUntil` + `exchangeOfferPreBookableUntilSource`.
+  Env-var name mirrors the spec literal (`preBookableUntil`, not
+  `validUntil`) to keep the per-resource-type naming inconsistency
+  (Deviations doc #25) discoverable.
+- `04-Exchange/11. POST Exchange Operations.yml` gates the acceptance.
+  Asserts 4xx + Problem; skips the downstream fulfillment chain.
+- **EXCHANGE scenarios only.** No "exchange confirmation" timer needed —
+  the post-exchange booking inherits `expiredBookingTest`.
+
+### Added — Phase 5a: expired add-reservation-offer test (`expiredAddReservationOfferTest`)
+- `offers.js postOfferResponse` extends its capture: after
+  `handleAccommodationAndPlaceSelection` sets `reservationId`, looks up
+  the specific reservationOfferPart by id and stashes its `validUntil`
+  into `addReservationOfferValidUntil`. **Different source** from
+  `expiredOfferTest` (which takes earliest-across-parts) — 09.yml sends
+  a single reservation, so we wait past *that* part's deadline.
+- `02-Common Requests/09. POST Add Reservation to Booking.yml` gates.
+  Asserts 4xx + Problem; skips the AddAncillary / PATCH / GET routing.
+- Only meaningful when `salesFlow_placeSelection === "true"` AND
+  `placeSelectionMode === "ADD_TO_BOOKING"`.
+
+### Added — Phase 5b: expired add-ancillary-offer test (`expiredAddAncillaryOfferTest`)
+- **Primary capture** in `02-Common Requests/11. Add Ancillary - Get Additional Offers.yml`:
+  scans `chosen.parts` for the earliest `validUntil`. Stashed into
+  `addAncillaryOfferValidUntil`.
+- **Fallback capture** in `02-Common Requests/10. POST Add Ancillary to Booking.yml`'s
+  before-request: when 11.yml didn't supply ids, look the parts up in
+  the selected offer's `ancillaryOfferParts` matching the resolved
+  `ancillaryOfferIds`, capture the earliest. Same env vars.
+- 10.yml's before-request runs plan+wait after the body is built;
+  after-response grades + short-circuits. Asserts 4xx + Problem.
+- **Special-case skip**: when 11.yml's additional-offers returns nothing
+  addable, logs `[WARNING] expiredAddAncillaryOfferTest is on but the
+  provider returned no addable ancillary — test will SKIP` and bypasses
+  step 10.
+
+### Changed — wizard: "Non Happy Flow customisation" section
+- New `buildNonHappyFlowSection(idx, sc)` in `Oscar_Server/public/js/scenarios.js`
+  groups all 6 expired-X timer pairs in a collapsible section (icon ⏰),
+  under the scenario detail panel. Visual ordering: Offer → Booking →
+  AddReservation → AddAncillary → RefundOffer → ExchangeOffer.
+- **RefundOffer / ExchangeOffer rows are scenarioType-gated.**
+- Removed the inline `expiredBookingTest` + `expiredOfferTest` rows from
+  the SCENARIO PARAMETERS section.
+- Footer note explains the run-budget guard, OAuth refresh, and the
+  "one scenario, one test today" caveat that PR B will address.
+
+### Changed — runner: `EXPIRED_FLOW_TIMERS` table extended
+- `Oscar_Server/src/worker/runner.js`'s `EXPIRED_FLOW_TIMERS` grows from
+  2 → 6 entries. `computeEffectiveRunTimeoutMs` already scans the table
+  generically — the new timers plug in without code changes.
+
+### Added — schema + parser plumbing
+- `Bruno_Collection/json_validator/datafile.schema.json`: 4 new
+  enum/integer pairs (one per new test).
+- `Bruno_Collection/library-bruno/scenarioParser.js`: resolves the 4 new
+  pairs through a small `_expiredFlowFields` loop (kept DRY); reset list
+  updated.
+
+### Docs
+- **Tester User Guide §4.8** — 4 new subsections (one per new test) with
+  the exact deadline source, gating, and what each test asserts. §7.1
+  field-name table updated. Cross-reference to Deviations doc #25 added
+  on the exchange-offer subsection.
+
+### Versions
+- `Bruno_Collection/VERSION`: `OTST_V2.0.41` → `OTST_V2.0.42`.
+- `Oscar_Server/package.json`: `1.11.93` → `1.11.94`.
+- `compatibility.json`: new entry `2026.122`.
+
+### Not in this PR — coming in PR B
+- **Auto-expansion**: when N>1 timers are armed on one scenario, OSCAR
+  will internally run N sub-scenarios. Sub-run naming convention:
+  `NHF_<3-letter-code>_<scenario_code>` (with leading `NHF_` stripped
+  if the scenario already starts with it). Runner SIGTERM math switches
+  from `max` to `sum` of armed timers within the same scenario.
+
+---
+
 ## [server-v1.11.93] — 2026-05-28
 
 Generalize the **#204 expired-X negative-test pattern** + ship the **expired-offer**
