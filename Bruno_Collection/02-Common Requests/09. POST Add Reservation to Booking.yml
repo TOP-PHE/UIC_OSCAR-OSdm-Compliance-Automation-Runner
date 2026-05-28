@@ -123,17 +123,20 @@ runtime:
         // we do NOT continue the post-booking happy path because part of it
         // would now be against a half-populated booking.
         if (String(bru.getEnvVar("__expiredAddReservationOfferArmed")) === "true") {
-            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
             const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired add-reservation offer" });
+            const _tag = nhfTestPrefix();
             const _resource = bru.getVar('addOfferPartResource') || 'offer-parts';
-            test(`Expired add-reservation offer: POST /.../${_resource} is rejected with a client error (4xx) — an expired offer-part must not be addable to the booking (got ${_grade.status})`, () => {
+            test(`${_tag}Expired add-reservation offer: POST /.../${_resource} is rejected with a client error (4xx) — an expired offer-part must not be addable to the booking (got ${_grade.status})`, () => {
                 expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
             if (_grade.isClientError && !_grade.isAuthFailure) {
-                test("Expired add-reservation offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                test(`${_tag}Expired add-reservation offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
                     expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
             }
+            // PR B: auto-expansion — advance the queue if more timers are armed.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired add-reservation offer" })) return;
             // Multi-scenario tail: loop to next scenario or stop. We deliberately
             // skip the routing to "11. Add Ancillary" / "03. PATCH" / "04. GET
             // Passenger" — the booking did not gain the reservation, so the

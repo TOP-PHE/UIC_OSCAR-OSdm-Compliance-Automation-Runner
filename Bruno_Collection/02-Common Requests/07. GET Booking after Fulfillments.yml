@@ -29,13 +29,15 @@ runtime:
         // wrongly fail, so short-circuit: assert admissions/reservations (or the
         // booking itself) are EXPIRED/RELEASED/CANCELLED, then continue the loop.
         if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
+            const { nhfTestPrefix, advanceExpiredFlowQueueOrFinish } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _tag = nhfTestPrefix();
             const _st = res.getStatus();
             const EXPIRED = ["EXPIRED", "RELEASED", "CANCELLED"];
             let _jd; try { _jd = res.getBody(); } catch (_e) { _jd = null; }
             const _bk = _jd && _jd.booking ? _jd.booking : _jd;
             if (_st === 404) {
                 validationLogger("[INFO] Expired booking: GET /bookings returned 404 — the provider purged the expired booking (acceptable).");
-                test("Expired booking: booking is gone (404) or its parts are expired/released", () => { expect(true).to.be.true; });
+                test(`${_tag}Expired booking: booking is gone (404) or its parts are expired/released`, () => { expect(true).to.be.true; });
             } else if (_st === 200 && _bk && typeof _bk === "object") {
                 const _parts = [];
                 (Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : []).forEach((bo) => {
@@ -46,17 +48,21 @@ runtime:
                 const _bookingExpired = _bk.status && EXPIRED.includes(String(_bk.status).toUpperCase());
                 const _allPartsExpired = _parts.length > 0 && _parts.every((s) => EXPIRED.includes(s));
                 validationLogger(`[INFO] Expired booking: booking.status=${_bk.status || "(none)"}, parts=[${_parts.join(", ") || "(none)"}]`);
-                test("Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED after the deadline", () => {
+                test(`${_tag}Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED after the deadline`, () => {
                     expect(_bookingExpired || _allPartsExpired,
                         `expected expired/released; booking.status=${_bk.status}, parts=[${_parts.join(", ")}]`).to.be.true;
                 });
             } else {
                 validationLogger(`[WARNING] Expired booking: unexpected GET /bookings status ${_st} — cannot confirm expiry.`);
-                test(`Expired booking: GET /bookings is retrievable (200) or purged (404), got ${_st}`, () => {
+                test(`${_tag}Expired booking: GET /bookings is retrievable (200) or purged (404), got ${_st}`, () => {
                     expect([200, 404]).to.include(_st);
                 });
             }
             try { displayFulFilledBooking(_jd); } catch (_e) { /* display only */ }
+            // PR B: auto-expansion — if more timers are queued for this
+            // scenario, re-arm + loop. Otherwise fall through to the existing
+            // cross-scenario tail.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired booking" })) return;
             // Continue the multi-scenario loop (same tail as the normal path).
             const _scList2    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx2 = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);

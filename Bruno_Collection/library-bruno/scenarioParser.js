@@ -75,6 +75,11 @@ function resetScenarioEnvVars() {
     "refundOfferValidUntil", "refundOfferValidUntilSource",
     "expiredExchangeOfferTest", "__expiredExchangeOfferArmed", "expiredExchangeOfferMaxWaitMinutes",
     "exchangeOfferPreBookableUntil", "exchangeOfferPreBookableUntilSource",
+    // PR B: auto-expansion queue state — cleared between top-level scenarios so
+    // a fresh queue is built per scenario. Sub-run continuations skip
+    // resetScenarioEnvVars (early-return in getScenarioData) so these survive
+    // within a multi-timer scenario.
+    "__expiredFlowQueue", "__expiredFlowQueueIndex", "__expiredFlowSubRunPending",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
@@ -245,6 +250,25 @@ async function validateDataFileJsonWithTemplateSafe(json) {
 async function getScenarioData() {
   validationLogger("[DEBUG] 🪲 getScenarioData");
   validationLogger("[INFO] ⏳ Getting scenario data");
+
+  // ── Expired-flow auto-expansion sub-run continuation (PR B) ─────────────
+  // When the previous request's after-response queued another expired-flow
+  // timer for THIS SAME scenario, the next loop back to "01. POST Get Offer"
+  // should NOT re-parse the scenario from the data file — the queue
+  // advancement helper has already flipped the timer flags, and the rest of
+  // the env state (passenger refs, trip data, offerSearchCriteria, …) is
+  // still valid because it's the same scenario.
+  //
+  // Skipping the full re-init also avoids resetScenarioEnvVars() — which
+  // would WIPE the queue state we just carefully advanced.
+  if (bru.getEnvVar('__expiredFlowSubRunPending') === 'true') {
+    bru.deleteEnvVar('__expiredFlowSubRunPending');
+    const _q = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]');
+    const _i = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+    const _cur = _q[_i] || {};
+    validationLogger(`[INFO] expiredFlow sub-run continuation: scenario "${bru.getEnvVar('scenarioCode') || '?'}" pass ${_i + 1}/${_q.length} — ${_cur.code || '?'} (${_cur.label || '?'}). Skipping full scenario re-init.`);
+    return;
+  }
 
   const hasDataFile = bru.getEnvVar('data_file') != null && bru.getEnvVar('data_file') !== '';
 
@@ -561,6 +585,21 @@ function parseScenarioData(jsonData) {
       // or ADD_TO_BOOKING (reservation added to an existing booking). Chosen per
       // scenario from the framework-authorised set; null when not applicable.
       bru.setEnvVar("placeSelectionMode", ["", "null"].includes(scenario.placeSelectionMode) ? null : scenario.placeSelectionMode);
+
+      // ── Expired-flow auto-expansion: build the per-scenario queue (PR B) ──
+      // When 2+ expired-X timers are armed on this scenario, OSCAR runs the
+      // scenario N times — one pass per armed timer. The queue builder reads
+      // the timer flags + the gating env vars set above (scenarioType,
+      // salesFlow_*, placeSelectionMode) so we MUST call it after those are
+      // resolved. Single-timer scenarios behave identically to today — the
+      // queue has length 1 and the existing after-response short-circuit
+      // routes straight to the next scenario.
+      try {
+        const { buildAndArmExpiredFlowQueue } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+        buildAndArmExpiredFlowQueue();
+      } catch (_e) {
+        validationLogger(`[WARNING] expiredFlow queue build skipped: ${_e && _e.message}`);
+      }
 
       // Trip requirements
       jsonData.tripRequirements?.some(function (tripRequirement) {

@@ -1495,10 +1495,17 @@ function buildNonHappyFlowSection(idx, sc) {
           OAuth tokens are refreshed automatically across the wait — a 401/403 is flagged as an auth
           failure (not a test pass) so you can tell the two apart.
           <br><br>
-          <strong>One scenario, one test today.</strong> Enabling more than one timer on the same scenario
-          will run the FIRST one that the flow reaches; the later ones never see their request fire
-          (the earlier one short-circuits the run). A future enhancement will auto-expand multi-timer
-          scenarios into one sub-run per timer.
+          <strong>Multi-timer scenarios auto-expand into sub-runs.</strong> Enabling N timers on the
+          same scenario makes OSCAR run that scenario <strong>N times</strong>, one pass per timer
+          (in flow order: Offer → Booking → AddReservation → AddAncillary → RefundOffer →
+          ExchangeOffer). Each sub-run's assertions are tagged
+          <code>[NHF_<em>XXX</em>_<em>scenario_code</em>]</code> in the report
+          (<code>OTO</code>/<code>BTO</code>/<code>ARO</code>/<code>ATO</code>/<code>RTO</code>/<code>ETO</code>);
+          a leading <code>NHF_</code> on the scenario code is stripped so you don't get double prefixes.
+          The total wait budget is the <strong>sum</strong> of the enabled Max waits — when ticking
+          multiple timers, raise the per-timer Max wait values so their sum stays under
+          <code>RUN_HARD_MAX_TIMEOUT_MS</code> (30 min by default; the runner auto-extends and
+          clamps with a clear warning).
         </div>
       </div>
     </div>

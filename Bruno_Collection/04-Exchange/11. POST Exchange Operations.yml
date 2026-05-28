@@ -67,16 +67,19 @@ runtime:
         // (skip postPatchExchangeOperationsResponse + the downstream
         // GET booking / POST fulfillments) so the next scenario fires cleanly.
         if (String(bru.getEnvVar("__expiredExchangeOfferArmed")) === "true") {
-            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
             const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired exchange offer" });
-            test(`Expired exchange offer: POST /exchange-operations is rejected with a client error (4xx) — an exchange offer whose preBookableUntil has passed must not be bookable (got ${_grade.status})`, () => {
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired exchange offer: POST /exchange-operations is rejected with a client error (4xx) — an exchange offer whose preBookableUntil has passed must not be bookable (got ${_grade.status})`, () => {
                 expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
             if (_grade.isClientError && !_grade.isAuthFailure) {
-                test("Expired exchange offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                test(`${_tag}Expired exchange offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
                     expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
             }
+            // PR B: auto-expansion — advance the queue if more timers are armed.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired exchange offer" })) return;
             // Multi-scenario tail: loop to next scenario or stop. We do NOT
             // continue the exchange-flow validation because the exchange was
             // (correctly) never turned into a booking.

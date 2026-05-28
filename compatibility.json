@@ -1,8 +1,27 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.122",
+  "current_release": "2026.123",
   "releases": [
+    {
+      "release": "2026.123",
+      "date": "2026-05-28",
+      "server": "1.11.95",
+      "collection": "OTST_V2.0.43",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(expired-flow PR B): auto-expansion. When 2+ expired-X timers are armed on the same scenario, OSCAR now runs that scenario N times — one sub-run per timer, in flow order: OTO (offer) -> BTO (booking) -> ARO (add-reservation) -> ATO (add-ancillary) -> RTO (refund) -> ETO (exchange). Each sub-run's assertions are prefixed [NHF_<3-letter>_<scenario_code>]; leading NHF_ on the scenario code is stripped (no double prefix). Single-timer scenarios behave identically to v1.11.94 (no prefix, same flow).",
+        "feat(expiredFlow.js): three new exports — buildAndArmExpiredFlowQueue (called by scenarioParser at scenario init, builds the per-scenario queue, disarms all timer flags except queue[0]), advanceExpiredFlowQueueOrFinish (called by each gated YAML's after-response, advances the queue + re-arms next timer + routes back to 01, or returns false to let the caller run its cross-scenario tail), nhfTestPrefix (returns the assertion-name prefix for the current queue position).",
+        "feat(scenarioParser.js): sub-run continuation early-return at the top of getScenarioData — when __expiredFlowSubRunPending is set, skip the full scenario re-parse (env state is still valid; only the timer flags changed). Queue build happens after salesFlow_* / scenarioType / placeSelectionMode env vars are set so the gating functions read consistent state. Reset list extended with the three queue state vars.",
+        "feat(runner.js): EXPIRED_FLOW_TIMERS budget math switches from MAX to SUM within a scenario (a scenario with N timers takes the SUM of waits + N*60s of buffer); ACROSS scenarios still takes MAX (worker runs one scenario at a time). Clamp at RUN_HARD_MAX_TIMEOUT_MS unchanged. Source line shows '<N> timers summed' when multi-timer.",
+        "feat(YAMLs): 6 gated YAMLs updated to call advanceExpiredFlowQueueOrFinish before their cross-scenario tails — 02. POST Create Booking, 07. GET Booking after Fulfillments (booking-expiry tail), 09. POST Add Reservation, 10. POST Add Ancillary, 03-Refund/13. PATCH Refund Offer, 04-Exchange/11. POST Exchange Operations. All assertion names get the nhfTestPrefix() tag.",
+        "feat(wizard): footer note in the Non Happy Flow section updated to explain auto-expansion + the NHF_XXX_ naming convention + the sum-vs-max budget. No data-model change.",
+        "docs: Tester Guide section 4.8 expanded with a dedicated Auto-expansion subsection (sub-run order, naming convention with worked example, gating skips, wait-budget math, backwards compat).",
+        "tests: bruno-expiredflow.test.js adds three test groups (buildAndArmExpiredFlowQueue, advanceExpiredFlowQueueOrFinish, nhfTestPrefix) covering all the gating + order + advance scenarios. runner-effective-timeout.test.js adds three PR-B cases (sum within scenario, max across scenarios, clamp at RUN_HARD_MAX_TIMEOUT_MS when summed exceed cap).",
+        "Bruno_Collection/VERSION OTST_V2.0.42 -> OTST_V2.0.43; server 1.11.94 -> 1.11.95."
+      ]
+    },
     {
       "release": "2026.122",
       "date": "2026-05-28",

@@ -390,11 +390,17 @@ the runner auto‑extends the worker SIGTERM to cover it (clamped at
 > you the minimum minutes to raise the **Max wait** to. The token‑refresh
 > safety net described above applies identically — no `401`/`403` mis‑reads.
 
-> **Don't combine offer + booking expiry in one scenario.** If `expiredOfferTest`
-> is on, `POST /bookings` fails by design and there is no booking left to age
-> out for `expiredBookingTest`. Use one scenario per expiry being tested — the
-> wizard lets you duplicate a scenario in two clicks. A future enhancement will
-> auto-expand multi-timer scenarios into one sub-run per timer.
+> **Combining multiple timers on one scenario auto-expands into sub-runs.**
+> Each enabled timer kills the flow at a different request, so OSCAR runs the
+> scenario **N times** when N timers are armed — one pass per timer, in flow
+> order: Offer → Booking → AddReservation → AddAncillary → RefundOffer →
+> ExchangeOffer. Each sub-run's assertions are prefixed
+> `[NHF_<3-letter>_<scenario_code>]` in the report — `OTO` (offer), `BTO`
+> (booking), `ARO` (add-reservation), `ATO` (add-ancillary), `RTO` (refund),
+> `ETO` (exchange). A leading `NHF_` on the scenario code is stripped so you
+> don't get `NHF_BTO_NHF_…`. The worker SIGTERM budget is the **sum** of the
+> enabled Max waits, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (default 30 min);
+> raise that env var if you arm 3+ timers with long waits.
 
 #### Expired post-booking add-reservation test (`expiredAddReservationOfferTest`)
 
@@ -451,6 +457,58 @@ Asserts that an exchange offer **cannot be turned into a booking** once its
 **EXCHANGE scenarios only.** No separate "exchange confirmation" timeout is needed — accepting an exchange creates a **new booking** with its own `confirmationTimeLimit`, which is already covered by `expiredBookingTest` running on a post-exchange leg.
 
 **Max wait (`expiredExchangeOfferMaxWaitMinutes`)** — same semantics.
+
+#### Auto-expansion: multi-timer scenarios → one sub-run per timer
+
+When a scenario has **2 or more** expired-X timers enabled, OSCAR doesn't try
+to run them all in one pass (impossible — each one kills the flow at a
+different request). Instead it **auto-expands** the scenario into **N
+sub-runs**, one per armed timer, executed sequentially in the order the
+timers fire in the flow:
+
+1. **Offer** (`OTO`) — `expiredOfferTest`
+2. **Booking** (`BTO`) — `expiredBookingTest`
+3. **Add-reservation** (`ARO`) — `expiredAddReservationOfferTest`
+4. **Add-ancillary** (`ATO`) — `expiredAddAncillaryOfferTest`
+5. **Refund-offer** (`RTO`) — `expiredRefundOfferTest`
+6. **Exchange-offer** (`ETO`) — `expiredExchangeOfferTest`
+
+**How to read the report.** Each sub-run's Bruno assertions are prefixed with
+`[NHF_<3-letter>_<scenario_code>]`. For a scenario named `SC_PARIS_LYON` with
+`expiredOfferTest` + `expiredBookingTest` both on, you'll see two distinct
+sub-runs' assertions interleaved in the report:
+
+```
+[NHF_OTO_SC_PARIS_LYON] Expired offer: POST /bookings is rejected with a client error...
+[NHF_OTO_SC_PARIS_LYON] Expired offer: error body is an RFC-9457 Problem...
+[NHF_BTO_SC_PARIS_LYON] Expired booking: fulfillment is rejected with a client error...
+[NHF_BTO_SC_PARIS_LYON] Expired booking: error body is an RFC-9457 Problem...
+[NHF_BTO_SC_PARIS_LYON] Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED...
+```
+
+If your scenario code already starts with `NHF_`, the prefix isn't doubled:
+`NHF_SC_FOO` + `OTO` → `[NHF_OTO_SC_FOO]`, not `[NHF_OTO_NHF_SC_FOO]`.
+
+**Gating skips.** Timers that can't physically fire on the scenario are
+silently dropped from the queue (with a `[WARNING]` log line so you know):
+
+- `expiredRefundOfferTest` on a SALE scenario → skipped, REFUND only
+- `expiredExchangeOfferTest` on a SALE scenario → skipped, EXCHANGE only
+- `expiredAddReservationOfferTest` without `salesFlow_placeSelection` +
+  `placeSelectionMode=ADD_TO_BOOKING` → skipped
+- `expiredAddAncillaryOfferTest` without `salesFlow_addAncillary` → skipped
+
+**Wait-budget math.** The worker SIGTERM budget for a scenario is the **sum**
+of its enabled Max waits (each + 60 s buffer for the request and assertions
+that follow). Three timers at 15 min each = ~46 min total, which would
+exceed the default `RUN_HARD_MAX_TIMEOUT_MS` of 30 min — the runner clamps
+and emits a clear `[WARNING]`. Either raise `RUN_HARD_MAX_TIMEOUT_MS` on the
+server, or lower the per-timer Max waits.
+
+**Backwards compatibility.** Single-timer scenarios behave identically to
+before — same assertion names (no `NHF_…` prefix), same flow, same budget.
+The auto-expansion mechanism only kicks in when the per-scenario queue has
+2+ entries.
 
 ### 4.9 Logging verbosity (`loggingType`, optional)
 

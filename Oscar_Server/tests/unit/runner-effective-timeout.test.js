@@ -210,9 +210,10 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.source).toMatch(/SC_OFFERTIMEOUT/);
   });
 
-  test('takes the LARGEST request across booking and offer timers in one scenario', async () => {
-    // A scenario can in theory enable both; the worker SIGTERM must cover the
-    // longer of the two (the second timer is what actually runs).
+  test('PR B: SUMS booking + offer timers within one scenario (was MAX in v1.11.94)', async () => {
+    // PR #305 / #307 took the max within a scenario; PR B (this PR) changes
+    // the semantic to SUM because the scenario auto-expands into N sub-runs
+    // run sequentially. 17 + 8 = 25 min, +2 sub-runs × 60s buffer = 1,620,000 ms.
     const datafile = {
       scenariosToRun: ['SC_BOTH'],
       scenarios: [makeScenario('SC_BOTH', {
@@ -226,9 +227,9 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_BOTH');
 
-    expect(r.requestedMs).toBe(17 * 60 * 1000 + 60000);
-    // Source attribution names whichever timer drove the extension.
-    expect(r.source).toMatch(/expiredOfferMaxWaitMinutes/);
+    expect(r.requestedMs).toBe((17 + 8) * 60 * 1000 + 2 * 60000);
+    // Source line names the count + the labels when more than one timer
+    expect(r.source).toMatch(/2 timers summed/);
   });
 
   test('expiredOfferTest off (with a wait set) is a no-op', async () => {
@@ -270,22 +271,69 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.source).toMatch(srcRe);
   });
 
-  test('takes the LARGEST request across multiple new-PR timers on one scenario', async () => {
-    // A tester *could* enable several timers in one scenario today; the wait
-    // budget must cover the longest. (PR B's auto-expansion changes this to
-    // a sum, but that's a separate behaviour.)
+  // ── PR B: auto-expansion budget = SUM within scenario, MAX across ──────
+  // The per-scenario budget is the sum of armed-timer max-waits because the
+  // scenario runs N sub-runs sequentially. Across scenarios the max wins
+  // (worker only runs one scenario at a time).
+  test('PR B: sums armed-timer max-waits WITHIN a scenario (auto-expansion budget)', async () => {
     const datafile = {
-      scenariosToRun: ['SC_MIXED'],
-      scenarios: [makeScenario('SC_MIXED', {
-        expiredRefundOfferTest:           'on', expiredRefundOfferMaxWaitMinutes:           5,
-        expiredExchangeOfferTest:         'on', expiredExchangeOfferMaxWaitMinutes:         22,
-        expiredAddAncillaryOfferTest:     'on', expiredAddAncillaryOfferMaxWaitMinutes:     11,
+      scenariosToRun: ['SC_TRIPLE'],
+      scenarios: [makeScenario('SC_TRIPLE', {
+        expiredRefundOfferTest:       'on', expiredRefundOfferMaxWaitMinutes:        5,
+        expiredExchangeOfferTest:     'on', expiredExchangeOfferMaxWaitMinutes:     11,
+        expiredAddAncillaryOfferTest: 'on', expiredAddAncillaryOfferMaxWaitMinutes:  7,
       })],
     };
     const p = await writeEncryptedDatafile(datafile);
-    const r = await computeEffectiveRunTimeoutMs(p, 'SC_MIXED');
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_TRIPLE');
 
-    expect(r.requestedMs).toBe(22 * 60 * 1000 + 60000);
-    expect(r.source).toMatch(/expiredExchangeOfferMaxWaitMinutes/);
+    // 5 + 11 + 7 = 23 min, each plus 60 s buffer (3 * 60000 ms = 180000)
+    const expectedMs = (5 + 11 + 7) * 60 * 1000 + 3 * 60000;
+    expect(r.requestedMs).toBe(expectedMs);
+    // Multi-timer source line includes the count + the timer labels
+    expect(r.source).toMatch(/3 timers summed/);
+  });
+
+  test('PR B: takes the LARGEST sum ACROSS scenarios (one sub-run at a time)', async () => {
+    const datafile = {
+      scenariosToRun: 'ALL',
+      scenarios: [
+        // Scenario A: single timer at 20 min → sum = 20 min + 60s
+        makeScenario('A', { expiredOfferTest: 'on', expiredOfferMaxWaitMinutes: 20 }),
+        // Scenario B: two timers at 8 + 7 min → sum = 15 min + 2*60s
+        makeScenario('B', {
+          expiredOfferTest:   'on', expiredOfferMaxWaitMinutes:   8,
+          expiredBookingTest: 'on', expiredBookingMaxWaitMinutes: 7,
+        }),
+      ],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+    const r = await computeEffectiveRunTimeoutMs(p, null);
+
+    // A's budget is 20*60_000+60_000 = 1_260_000 ms
+    // B's budget is (8+7)*60_000 + 2*60_000 = 1_020_000 ms
+    // Max = A's = 1_260_000
+    expect(r.requestedMs).toBe(20 * 60 * 1000 + 60000);
+    expect(r.source).toMatch(/A/);   // triggered by 'A'
+  });
+
+  test('PR B: clamps at RUN_HARD_MAX_TIMEOUT_MS when summed timers exceed cap', async () => {
+    // 3 timers at 20 min each = 60 min + 3*60s buffer ≫ 30 min default cap
+    const datafile = {
+      scenariosToRun: ['SC_OVER'],
+      scenarios: [makeScenario('SC_OVER', {
+        expiredOfferTest:               'on', expiredOfferMaxWaitMinutes:               20,
+        expiredBookingTest:             'on', expiredBookingMaxWaitMinutes:             20,
+        expiredAddReservationOfferTest: 'on', expiredAddReservationOfferMaxWaitMinutes: 20,
+      })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_OVER');
+
+    const expectedSum = 60 * 60 * 1000 + 3 * 60000;
+    expect(r.requestedMs).toBe(expectedSum);
+    expect(r.effectiveMs).toBe(r.hardMaxMs);
+    expect(r.clamped).toBe(true);
+    expect(r.source).toMatch(/clamped/);
   });
 });

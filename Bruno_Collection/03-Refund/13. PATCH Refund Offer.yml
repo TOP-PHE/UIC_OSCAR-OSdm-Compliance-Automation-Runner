@@ -63,16 +63,19 @@ runtime:
         // GET booking after refund / DEL refund offer) so the next scenario in
         // the loop fires cleanly.
         if (String(bru.getEnvVar("__expiredRefundOfferArmed")) === "true") {
-            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
             const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired refund offer" });
-            test(`Expired refund offer: PATCH /refund-offers/{id} is rejected with a client error (4xx) — an expired refund offer must not be confirmable (got ${_grade.status})`, () => {
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired refund offer: PATCH /refund-offers/{id} is rejected with a client error (4xx) — an expired refund offer must not be confirmable (got ${_grade.status})`, () => {
                 expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
             if (_grade.isClientError && !_grade.isAuthFailure) {
-                test("Expired refund offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                test(`${_tag}Expired refund offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
                     expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
             }
+            // PR B: auto-expansion — advance the queue if more timers are armed.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired refund offer" })) return;
             // Multi-scenario tail: loop to next scenario or stop. We do NOT
             // continue the refund-flow validation because the refund was
             // (correctly) never confirmed.
