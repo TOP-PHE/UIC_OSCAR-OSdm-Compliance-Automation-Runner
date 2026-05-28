@@ -2,7 +2,7 @@
 
 *How to point OSCAR at an OSDM provider and build, run, and read a conformance test.*
 
-> Reflects collection **OTST_V2.0.12** / server **1.11.55** / release **2026.83**.
+> Reflects collection **OTST_V2.0.34** / server **1.11.81** / release **2026.109**.
 > Labels in **bold** match the on‑screen controls. When the UI and this guide
 > disagree, the UI wins — please open an issue so we can update the guide.
 
@@ -281,6 +281,69 @@ The two modes — the same labels appear in the framework and the scenario:
 - **Fulfillment** — media (`PDF_A4`, `UIC_PDF`, …) and type (`ETICKET`, …),
   constrained to the framework's `fulfillment`.
 
+### 4.8 Negative‑flow tests (optional)
+
+These probes drive a scenario into a **non‑happy** path and assert the provider
+**rejects** it in a conformant way (typically `4xx` + an RFC‑9457 `Problem`
+body). They all default OFF — a saved scenario keeps behaving as before until
+you opt in.
+
+#### Passenger `requestedInformation` probe (`requestedInformationProbe`) — #258
+
+OSDM lets a provider demand additional passenger info (a `requestedInformation`
+block in the offer/booking response). OSCAR auto‑feeds the demanded fields on
+the happy path. This probe lets you also test the **negative** path:
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Auto‑feed the demanded fields so the happy flow completes. |
+| **`omit`** | **Withhold** required fields → assert the provider rejects with a conformant `Problem`. |
+| **`invalid`** | Send **invalid values** (per passenger field, one at a time) → assert the provider rejects with a conformant `Problem`. |
+
+> **Provider‑fair severity.** Only the genuinely strict fields (`gender` enum,
+> `dateOfBirth` format) are hard FAILs when the provider *accepts* invalid
+> input. Free‑form fields (`firstName`, `lastName`, `email`, `phoneNumber`) are
+> WARN‑level because OSDM doesn't constrain their content.
+
+#### Purchaser placement & probe (`bookingPurchaserMode`) — #258 / #203
+
+Where (and whether) the purchaser is supplied for a booking. Covers both the
+happy path and the negative path in one field.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`inline`** *(default)* | Purchaser is sent in the `POST /bookings` request. Historic behaviour. |
+| **`deferred`** | Omit purchaser at booking, then upsert it afterwards via the dedicated endpoint. OSCAR does a **GET first** and chooses `PATCH /bookings/{id}/purchaser` (purchaser already present and empty) or `POST` (none yet). Also exercises any purchaser `requestedInformation` raised by the booking. |
+| **`omit`** | Never supply a purchaser → assert that bookings missing the purchaser are still acceptable (purchaser is optional per OSDM `BookingRequest`). |
+| **`invalid`** | Omit at booking, then `POST` an **invalid** purchaser → assert the provider rejects with a conformant `Problem`. Iterates one field at a time (`firstName`/`lastName`/`email`/`phoneNumber`). |
+
+#### Expired‑booking test (`expiredBookingTest`) — #204
+
+Asserts that a booking left to expire **cannot be fulfilled**.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | After the booking is created, **wait until 15 s past** `booking.confirmationTimeLimit`, then `POST /fulfillments`. The fulfillment **MUST be rejected** (`4xx` + `Problem`) — a hard FAIL if the provider fulfills an expired booking. The follow‑up `GET /bookings` must show admissions/reservations **EXPIRED / RELEASED / CANCELLED** (a `404` purge is accepted). |
+
+> **Run‑budget guard.** If waiting until the deadline would exceed the run's
+> `RUN_TIMEOUT_MS` (default 10 min), the test **skips with a `[WARNING]`** that
+> tells you the minimum seconds to raise the timeout to — instead of being
+> killed mid‑wait. For a provider whose `confirmationTimeLimit` exceeds ~9 min,
+> raise `RUN_TIMEOUT_MS` on the server before running.
+
+### 4.9 Logging verbosity (`loggingType`, optional)
+
+Per‑scenario verbosity for the execution log embedded in the report. Affects
+log volume only — never assertion outcomes.
+
+| Value | When to use |
+|---|---|
+| **`FULL`** | Maximum detail (default for new scenarios). Use for first‑time debugging or when reporting a bug. |
+| **`INFO`** | Steps + key counts; skips the bulky per‑offer dumps. Recommended for routine runs. |
+| **`DEBUG`** | INFO + the `[DEBUG]` traces the framework emits. |
+| **`ERROR`** | Errors and warnings only — quietest. |
+
 ---
 
 ## 5. Running tests
@@ -350,6 +413,10 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Seat‑selection mode | `SEATMAP_AT_OFFER` / `ADD_TO_BOOKING` | seat‑map step + `placeSelections` |
 | Passenger type | `PERSON` `BICYCLE` `DOG` `PRM` … | passenger specs |
 | Fulfillment type / media | `ETICKET`… / `PDF_A4`… | `requestedFulfillmentOptions` |
+| `requestedInformationProbe` | `off` / `omit` / `invalid` | passenger‑info auto‑feed *or* a negative probe (§4.8) |
+| `bookingPurchaserMode` | `inline` / `deferred` / `omit` / `invalid` | where the purchaser is sent + negative probe (§4.8) |
+| `expiredBookingTest` | `off` / `on` | wait past `confirmationTimeLimit`, assert rejection (§4.8) |
+| `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.9) |
 
 ### 7.2 Sale‑flow step → OSDM request
 
