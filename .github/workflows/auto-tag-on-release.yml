@@ -51,6 +51,10 @@ on:
     paths:
       - 'Oscar_Server/package.json'
       - 'compatibility.json'
+  # Manual trigger — useful as a "is everything still wired up?" smoke check
+  # after touching this workflow. When no version bump is detected the job is
+  # a no-op (it just doesn't push any tag), so dispatch is safe.
+  workflow_dispatch: {}
 
 # Single concurrent run on main — avoids racing if two release PRs land
 # in quick succession (would create the same tag twice and explode).
@@ -62,6 +66,10 @@ jobs:
   auto-tag:
     name: Detect bump and push tags
     runs-on: ubuntu-latest
+    # A push to a tag should never take 6h; bound the job so a stuck network
+    # call (TLS handshake hanging, etc.) fails the job fast and gets surfaced
+    # in the Actions UI rather than burning runner minutes.
+    timeout-minutes: 10
 
     # Job-level permissions only — no need for write access since the
     # `git push` is done via the App-issued token, not GITHUB_TOKEN.
@@ -142,22 +150,30 @@ jobs:
 
       - name: Push server tag
         if: steps.tags.outputs.server_tag != ''
+        env:
+          TAG: ${{ steps.tags.outputs.server_tag }}
         run: |
-          tag="${{ steps.tags.outputs.server_tag }}"
+          # NB: no `set -e` — we rely on explicit exit codes inside the loop so
+          # a failed `git push` doesn't kill the script before the retry runs.
+          set -uo pipefail
           msg="Auto-tagged on merge of $(git log -1 --pretty=format:'%h %s' HEAD)"
-          git tag -a "$tag" -m "$msg"
-          git push origin "$tag"
+          git tag -a "$TAG" -m "$msg"
+          source .github/workflows/lib/push-tag-with-retry.sh
+          push_tag_with_retry "$TAG"
 
       - name: Push release tag
         if: steps.tags.outputs.release_tag != ''
         # Push release tag *after* the server tag — promote-release.yml
         # rebuilds :stable and will pull whichever server tag is freshest;
         # we want the new server image to exist before the promote runs.
+        env:
+          TAG: ${{ steps.tags.outputs.release_tag }}
         run: |
-          tag="${{ steps.tags.outputs.release_tag }}"
+          set -uo pipefail
           msg="Auto-tagged on merge of $(git log -1 --pretty=format:'%h %s' HEAD)"
-          git tag -a "$tag" -m "$msg"
-          git push origin "$tag"
+          git tag -a "$TAG" -m "$msg"
+          source .github/workflows/lib/push-tag-with-retry.sh
+          push_tag_with_retry "$TAG"
 
       - name: Job summary
         if: always()
