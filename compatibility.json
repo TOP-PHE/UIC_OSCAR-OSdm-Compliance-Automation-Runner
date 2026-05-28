@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.120",
+  "current_release": "2026.121",
   "releases": [
+    {
+      "release": "2026.121",
+      "date": "2026-05-28",
+      "server": "1.11.93",
+      "collection": "OTST_V2.0.41",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(expired-flow): generalize the #204 expired-X negative-test pattern. New shared helper Bruno_Collection/library-bruno/expiredFlow.js exports planExpiredFlow / runExpiredFlowWait / gradeExpiredFlowResponse — extracted byte-identically from the per-resource expired-booking logic that previously lived inline in 06. POST Obtaining Fulfillments. 06.yml refactored to use the helper (~70 lines inline → ~20 lines via helper); behaviour unchanged.",
+        "feat(expired-offer): new expiredOfferTest + expiredOfferMaxWaitMinutes scenario fields. When on, OSCAR waits until just past the earliest OfferPart.validUntil from the selected offer (offers.js postOfferResponse now captures this into env vars), then attempts POST /bookings and asserts the provider rejects it (4xx + RFC-9457 Problem). 02. POST Create Booking short-circuits the happy path on the rejection and routes to the next scenario in the loop. The runner's computeEffectiveRunTimeoutMs now scans BOTH expiredBookingMaxWaitMinutes AND expiredOfferMaxWaitMinutes via a generic EXPIRED_FLOW_TIMERS table — any future expired-X timer plugs in here.",
+        "feat(wizard): new dropdown + Max wait input for the expired-offer test in the scenario detail panel. JSON schema, scenarioParser env-var resolution, wizard default seed, and reset list updated. Tester User Guide §4.8 expanded with the offer-expiry section and a note on not combining offer + booking expiry in one scenario.",
+        "docs(osdm): new entry #25 in OSDM_Spec_Deviations_Observed (\"Offer-expiry field across offer types\") documenting the spec-internal naming inconsistency between OfferPart.validUntil / RefundOffer.validUntil and ExchangeOffer.preBookableUntil — required reading before Phase 4 (expired-exchange-offer).",
+        "tests: new tests/unit/bruno-expiredflow.test.js (plan/grade/wait helpers under a mocked displays + auth), and runner-effective-timeout.test.js gets three new cases for the offer-timer auto-extension. Bruno_Collection/VERSION OTST_V2.0.40 -> OTST_V2.0.41; server 1.11.92 -> 1.11.93."
+      ]
+    },
     {
       "release": "2026.120",
       "date": "2026-05-28",

@@ -82,8 +82,9 @@
 | 22 | Shape | `ProductTagsResponse` dual-array | Defined | "Non-standard dual-array shape" relative to typical OSDM envelopes | (unspecified) |
 | 23 | Reference identity | `appliedPassengerTypes[].passengerRef` | Reference to a passenger | Offer carries `externalRef`; booking carries internal UUID | (general — all providers) |
 | 24 | Operational | Seat-map URL needs `reservationId` | URL keyed on a reservation part | Strict provider 400s when unresolved | Vendor A |
+| 25 | Spec-internal naming | Offer-expiry field across offer types | One canonical name (`validUntil`) for "this offer expires at T" | `OfferPart.validUntil` + `RefundOffer.validUntil` **vs** `ExchangeOffer.preBookableUntil` — same semantic, different name across resource types | (spec-side, not provider-specific) |
 
-**24 distinct adaptations across 4 providers explicitly named** (A–D), plus a body of "general" / "unspecified" defensive patterns. **Vendor A** and **Vendor B** account for the bulk of provider-named branches. Two further providers run on OSCAR but had no library-bruno-level branches in this snapshot.
+**25 distinct adaptations across 4 providers explicitly named** (A–D), plus a body of "general" / "unspecified" defensive patterns. **Vendor A** and **Vendor B** account for the bulk of provider-named branches. Two further providers run on OSCAR but had no library-bruno-level branches in this snapshot.
 
 ---
 
@@ -270,6 +271,20 @@
 
 ---
 
+### Theme J. Spec-internal naming inconsistencies
+
+#### 25. Offer-expiry field across offer types — `validUntil` vs `preBookableUntil`
+- **OSDM spec position.** *(Observed in the spec itself, not in any one provider.)*
+  - **`OfferPart.validUntil`** — *"DateTime up to which the offer can be confirmed."* Carried per-part on the regular OfferCollection (with `fareAdmissionOfferParts[].validUntil`, `fareReservationOfferParts[].validUntil`, etc.).
+  - **`RefundOffer.validUntil`** — *"DateTime up to which the refund offer is valid."* Same semantic, same field name, refund context.
+  - **`ExchangeOffer.preBookableUntil`** — *"DateTime up to which the exchange offer can be turned into a booking."* **Same semantic as the two above, different name** — there is no `validUntil` on `ExchangeOffer`.
+- **Observed deviation.** This is **internal to the spec, not a provider quirk.** All three types describe "the latest moment this offer can still be turned into a booking", yet two use `validUntil` and one uses `preBookableUntil`. A test that generalises "wait past the offer deadline, then assert the booking is rejected" has to special-case the third name even though the underlying semantic is identical.
+- **OSCAR adaptation.** The shared `expiredFlow.js` helper used by the expired-offer / expired-refund-offer / expired-exchange-offer tests reads `validUntil` for offers and refund offers, and **`preBookableUntil`** for exchange offers — the only divergence between three otherwise-identical wait-then-assert flows.
+- **Code:** *(at the time of this entry: the helper is introduced in `Bruno_Collection/library-bruno/expiredFlow.js`; the offer-side capture lives in `offers.js` `postOfferResponse`. The exchange-offer wiring is the next phase of this work.)*
+- **Suggested OSDM review.** Either rename `ExchangeOffer.preBookableUntil` to `validUntil` for parity with `OfferPart` / `RefundOffer`, **or** state explicitly that the three are different concepts (and clarify what the difference is). The current state forces every client testing offer expiry to keep a per-resource lookup table.
+
+---
+
 ### Theme I. Out of OSDM scope (informational)
 
 #### 13. OAuth token field name
@@ -296,6 +311,7 @@
 | **Vendor C** | #11 (singular `reservationGroup.reservationRefs`), #12 (flat `detail.email`/`phoneNumber`, OSDM <3.4), #21 (exchange-operations fixture reference) — **3 items** |
 | **Vendor D** | #12 (nested `detail.contact.*`, OSDM ≥3.4), #20 (exposes `ancillaryOfferParts` at offer time) — **2 items** |
 | **General / unspecified** | #3, #4, #13–#19, #22, #23 |
+| **Spec-internal (no provider attribution)** | #25 (offer-expiry field naming across offer types) |
 
 ---
 
@@ -310,6 +326,7 @@ In rough priority order — the items where a spec clarification would remove th
 5. **Provider-rejection contracts (#6, #9, #10, #18).** Today some providers reject spec-legal fields (`tripParameters`, empty `requestedFulfillmentOptions`, `BookingRequest.externalRef`). Are these implementation gaps to push back on, or should the spec allow provider opt-out? A "Provider MAY refuse extension fields it does not implement, but MUST NOT 400 on a defined optional field with an empty value" clause would unblock several of these.
 6. **`passengerRef` stability across offer/booking (#23).** Document whether the booking response is expected to carry the original `externalRef` or substitute its internal id.
 7. **Multi-offer booking acceptance (#8).** Confirm whether a provider may refuse a multi-offer booking and, if so, the canonical error code so a client can drive a deterministic fallback.
+8. **Offer-expiry field naming consistency (#25).** Rename `ExchangeOffer.preBookableUntil` to `validUntil` (for parity with `OfferPart` and `RefundOffer`), or document explicitly why the exchange flow needs a different name and what the semantic delta is.
 
 ## Caveats
 

@@ -36,67 +36,25 @@ runtime:
         // when the provider exposes no deadline anywhere.
         if (String(bru.getEnvVar("expiredBookingTest")) === "true") {
           const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
-          const limitRaw = bru.getEnvVar("bookingConfirmationTimeLimit");
-          const nowMs = Date.now();
-          const BUFFER_MS = 15000;       // wait 15s past the deadline to be safely expired
-          const POST_MARGIN_MS = 45000;  // leave budget for the fulfillment + GET booking + report
-          const hardDeadlineMs = parseInt(bru.getEnvVar("runHardDeadlineMs") || "0", 10) || 0;
-
-          // Per-scenario tester-set budget — when expiredBookingMaxWaitMinutes
-          // is set, use it instead of runHardDeadlineMs as the wait budget
-          // (the runner has already extended the worker SIGTERM to cover it).
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("bookingConfirmationTimeLimit");
           const maxWaitMin = parseInt(bru.getEnvVar("expiredBookingMaxWaitMinutes") || "0", 10) || 0;
-          const perScenarioBudgetEndMs = maxWaitMin > 0 ? (nowMs + maxWaitMin * 60 * 1000) : 0;
-          const budgetEndMs = perScenarioBudgetEndMs
-            || hardDeadlineMs
-            || (nowMs + 480000); // conservative 8-min cap when nothing was injected
-          const budgetSource = perScenarioBudgetEndMs
-            ? `scenario expiredBookingMaxWaitMinutes=${maxWaitMin}`
-            : (hardDeadlineMs ? "server RUN_TIMEOUT_MS" : "conservative 8-min fallback");
-
-          if (!limitRaw) {
-            validationLogger("[WARNING] expiredBookingTest: provider returned no booking-level confirmation deadline (neither booking.confirmationTimeLimit nor booking.confirmableUntil) — cannot deterministically test expiry. Proceeding without the expiry assertion.");
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "booking confirmation",
+          });
+          if (!plan.armed) {
+            // Augment the helper's reason with the booking-specific deadline-source detail.
+            const detail = limitRaw
+              ? plan.reason
+              : "provider returned no booking-level confirmation deadline (neither booking.confirmationTimeLimit nor booking.confirmableUntil) — cannot deterministically test expiry. Proceeding without the expiry assertion.";
+            validationLogger(`[WARNING] expiredBookingTest SKIPPED: ${detail}`);
             bru.setEnvVar("__expiredBookingArmed", "false");
           } else {
-            const limitMs = new Date(limitRaw).getTime();
-            const wakeAtMs = limitMs + BUFFER_MS;
-            const waitMs = wakeAtMs - nowMs;
-            if (isNaN(limitMs)) {
-              validationLogger(`[WARNING] expiredBookingTest: confirmationTimeLimit '${limitRaw}' is not a valid date — skipping the expiry assertion.`);
-              bru.setEnvVar("__expiredBookingArmed", "false");
-            } else if (waitMs <= 0) {
-              validationLogger(`[INFO] expiredBookingTest: confirmationTimeLimit already passed (${limitRaw}) — attempting fulfillment now, expecting rejection.`);
-              bru.setEnvVar("__expiredBookingArmed", "true");
-            } else if ((wakeAtMs + POST_MARGIN_MS) > budgetEndMs) {
-              const needS  = Math.ceil((wakeAtMs + POST_MARGIN_MS - nowMs) / 1000);
-              const needMin = Math.ceil(needS / 60);
-              const hint = perScenarioBudgetEndMs
-                ? `Raise the scenario's Max wait to >= ${needMin} min and re-run.`
-                : `Set the scenario's Max wait to >= ${needMin} min (or raise RUN_TIMEOUT_MS to >= ${needS}s) and re-run.`;
-              validationLogger(`[WARNING] expiredBookingTest SKIPPED: waiting ~${Math.ceil(waitMs/1000)}s until past confirmationTimeLimit (${limitRaw}) would exceed this run's budget (source: ${budgetSource}). ${hint} Proceeding without the expiry assertion.`);
-              bru.setEnvVar("__expiredBookingArmed", "false");
-            } else {
-              validationLogger(`[INFO] expiredBookingTest: waiting ~${Math.ceil(waitMs/1000)}s until just past confirmationTimeLimit (${limitRaw}) before attempting fulfillment... (budget source: ${budgetSource})`);
-              await new Promise((r) => setTimeout(r, waitMs));
-              validationLogger(`[INFO] expiredBookingTest: wait complete — refreshing access token before attempting fulfillment.`);
-
-              // #204 token-TTL fix: force-refresh the access token after the
-              // long wait so the late POST /fulfillments uses a fresh bearer.
-              // Without it, the OAuth token issued at run start (TTL often
-              // shorter than the wait — Paxone is ~15 min) returns 403 "not
-              // authenticated" and masks the booking-expiry semantics the
-              // test is grading. The shared helper handles the loopback call
-              // + env-var update + error logging.
-              try {
-                const { refreshAccessTokenIfNeeded } = require(bru.getEnvVar("library_base") + "auth.js");
-                await refreshAccessTokenIfNeeded({ force: true, callerLabel: 'POST /fulfillments (expired-booking test)' });
-              } catch (_e) {
-                validationLogger(`[WARNING] expiredBookingTest: token-refresh helper threw (${(_e && _e.message) || _e}) — fulfillment will use the original (possibly expired) token.`);
-              }
-
-              validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);
-              bru.setEnvVar("__expiredBookingArmed", "true");
-            }
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredBookingTest (POST /fulfillments)" });
+            bru.setEnvVar("__expiredBookingArmed", "true");
+            validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);
           }
         }
     - type: after-response
@@ -109,35 +67,19 @@ runtime:
         // and fall through to 07. GET Booking after Fulfillments to verify the
         // admissions/reservations are EXPIRED/RELEASED/CANCELLED.
         if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
-            const _status = res.getStatus();
-            let _body; try { _body = res.getBody(); } catch (_e) { _body = null; }
-            const _isClientError = _status >= 400 && _status < 500;
-            test(`Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_status})`, () => {
-                expect(_isClientError, `expected a 4xx rejection, got ${_status}`).to.be.true;
+            // Shared helper graded the response, emitted the WARNING/INFO/ERROR
+            // log lines (auth-failure distinguishing, expiry-keyword check, etc.).
+            // The Bruno-level test() assertions stay here so they appear in the
+            // run report's Assertions tab.
+            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired booking" });
+            test(`Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
-            if (_status === 401 || _status === 403) {
-                // #204: a 401/403 typically means the OAuth access token expired
-                // DURING the long wait (auth problem), NOT that the booking was
-                // rejected for being expired. 06.yml's before-request refreshes
-                // the token from the OSCAR loopback endpoint after the wait; if
-                // we still see auth failure here the refresh probably failed.
-                // Flag explicitly so the tester doesn't read "rejection" as
-                // "test passed" when the provider never got to evaluate the booking.
-                validationLogger(`[WARNING] Expired booking: provider returned ${_status} (auth error) — this typically means the access token expired during the long wait, not that the booking was rejected for being expired. Look for an earlier "[WARNING] expiredBookingTest: token-refresh ..." line; if the refresh failed, the OSCAR loopback endpoint at /v1/runs/{id}/refresh-access-token did not return a fresh token. Distinguishing this from a genuine booking-expiry rejection requires a re-run with a successful refresh.`);
-            } else if (_status >= 400) {
-                const _isObj = _body !== null && typeof _body === "object";
-                const _hasMsg = _isObj && (_body.title || _body.detail || _body.code);
+            if (_grade.isClientError && !_grade.isAuthFailure) {
                 test("Expired booking: error body is an RFC-9457 Problem (title/detail/code present)", () => {
-                    expect(!!_hasMsg, "response body did not contain title/detail/code").to.be.true;
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
-                const _blob = _isObj ? JSON.stringify(_body).toLowerCase() : "";
-                if (/expir|time ?limit|deadline|too late|no longer|timed? ?out/.test(_blob)) {
-                    validationLogger("[INFO] Expired booking: the error message indicates the booking/confirmation expired.");
-                } else {
-                    validationLogger("[WARNING] Expired booking: the provider rejected the fulfillment but the error does not clearly indicate expiry — recommended for diagnosability.");
-                }
-            } else {
-                validationLogger(`[ERROR] Expired booking: provider returned ${_status} and may have FULFILLED an expired booking — this should have been rejected.`);
             }
             // Continue to 07 (GET booking) to assert the parts are expired/released.
             return;
