@@ -25,9 +25,13 @@ runtime:
         console.log("⏩ [STEP] Executing request : " + req.getName());
 
         // #204 EXPIRED-BOOKING TEST: when armed, wait until just past the booking's
-        // confirmationTimeLimit, THEN let the fulfillment fire — the after-response
-        // asserts the provider rejects it. Skips (with a WARNING) when the wait would
-        // overrun the run budget, or when the provider set no confirmationTimeLimit.
+        // confirmation deadline, THEN let the fulfillment fire — the after-response
+        // asserts the provider rejects it. The deadline is read from a single env
+        // var (bookingConfirmationTimeLimit) populated by bookings.js from EITHER
+        // booking.confirmationTimeLimit (OSDM-standard) OR booking.confirmableUntil
+        // (vendor field at booking level — Bileto sandbox uses this). Skips (with a
+        // WARNING) when the wait would overrun the run budget, or when the provider
+        // set neither field.
         if (String(bru.getEnvVar("expiredBookingTest")) === "true") {
           const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
           const limitRaw = bru.getEnvVar("bookingConfirmationTimeLimit");
@@ -37,7 +41,7 @@ runtime:
           const hardDeadlineMs = parseInt(bru.getEnvVar("runHardDeadlineMs") || "0", 10) || 0;
 
           if (!limitRaw) {
-            validationLogger("[WARNING] expiredBookingTest: provider returned no booking.confirmationTimeLimit — cannot deterministically test expiry. Proceeding without the expiry assertion.");
+            validationLogger("[WARNING] expiredBookingTest: provider returned no booking-level confirmation deadline (neither booking.confirmationTimeLimit nor booking.confirmableUntil) — cannot deterministically test expiry. Proceeding without the expiry assertion.");
             bru.setEnvVar("__expiredBookingArmed", "false");
           } else {
             const limitMs = new Date(limitRaw).getTime();

@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.84] — 2026-05-28
+
+Expired-booking deadline field-name fallback — **#204 (follow-up).**
+**Bruno collection bumped (OTST_V2.0.35 → OTST_V2.0.36).**
+
+### Fixed
+- **#204 — the expired-booking test silently no-op'd against a provider that
+  exposes the booking-level deadline as `confirmableUntil` instead of the
+  OSDM-standard `confirmationTimeLimit`** (e.g. the Bileto sandbox). `bookings.js`
+  only read `booking.confirmationTimeLimit`, so the env var the wait logic
+  consumes was never set, and the test took the "no deadline found" `[WARNING]`
+  branch and went straight to `POST /fulfillments` without waiting. The booking
+  validator now reads **either** field (with `confirmationTimeLimit` taking
+  precedence). When the fallback fires it emits a `[WARNING]` so the vendor
+  deviation is **visible in the report** — OSDM defines `confirmableUntil` at
+  the bookingPart level, with an explicit note saying `confirmationTimeLimit`
+  is the booking-level field.
+
+### Notes
+- **Operator action for long deadlines.** The Bileto sandbox's confirmation
+  deadline is ~15 min. With the default `RUN_TIMEOUT_MS` of 10 min, the test
+  still self-skips with the budget `[WARNING]` ("raise `RUN_TIMEOUT_MS`
+  to >= ~N s") — that part is by design. **Raise `RUN_TIMEOUT_MS` to ≥ ~1100 s
+  (~18 min) on the server before re-running** `expiredBookingTest: on`.
+- Tester User Guide §4.8 + §7.1 updated to name both deadline fields.
+
+---
+
 ## [server-v1.11.83] — 2026-05-28
 
 Structured JSON tree view in the run-detail HTTP Traffic panel — **#287.**
