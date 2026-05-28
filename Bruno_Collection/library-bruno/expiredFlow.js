@@ -164,7 +164,233 @@ function gradeExpiredFlowResponse(opts) {
   return { status, isClientError, isAuthFailure, hasProblemBody, expiryKeywordFound, body };
 }
 
-module.exports = { planExpiredFlow, runExpiredFlowWait, gradeExpiredFlowResponse, BUFFER_MS, POST_MARGIN_MS };
+// ──────────────────────────────────────────────────────────────────────────
+// Auto-expansion: one scenario, N timers → N sub-runs (PR B)
+// ──────────────────────────────────────────────────────────────────────────
+//
+// When a tester enables more than one expired-X timer on a single scenario,
+// OSCAR auto-expands that scenario into N sub-runs — one per armed timer.
+// The timers each kill the flow at a different request, so they are
+// mutually-exclusive within a single happy-path pass; we run them sequentially.
+//
+// Mechanics:
+//   1. scenarioParser calls `buildAndArmExpiredFlowQueue(scenario)` at scenario
+//      init. The helper inspects the scenario's expired-* fields + the gating
+//      env vars (scenarioType / salesFlow_* / placeSelectionMode), produces an
+//      ordered queue of timers that will actually run in this scenario, stores
+//      it in `__expiredFlowQueue`, and DISARMS every timer flag EXCEPT
+//      queue[0]'s. The existing per-YAML gates then naturally fire only for
+//      the current timer (queue[0]) — no per-YAML changes needed for arming.
+//   2. Each gated YAML's after-response calls
+//      `advanceExpiredFlowQueueOrFinish({ scenarioLabel })` just before its
+//      cross-scenario tail. If the queue has more timers, the helper:
+//        - turns the just-tested timer OFF
+//        - turns queue[idx+1]'s timer ON
+//        - sets `__expiredFlowSubRunPending = "true"` so scenarioParser's
+//          early-return on the next 01.yml entry skips the full re-parse
+//        - routes back to `01. POST Get Offer`
+//        - returns `true` (caller MUST return — do NOT run the cross-scenario tail)
+//      If the queue is exhausted (last timer just ran) the helper returns
+//      `false` and the caller falls through to its existing cross-scenario tail.
+//   3. `nhfTestPrefix()` returns `[NHF_<3-letter>_<scenario_code>] ` (with the
+//      scenario's leading `NHF_` stripped if present) to disambiguate Bruno
+//      assertion names across sub-runs; returns empty for single-timer
+//      scenarios so legacy single-timer assertions read identically to today.
+//
+// Order matters: the queue follows the order timers fire in the flow, so
+// each sub-run plays naturally without the runner having to re-arrange:
+//   OTO (offer) → BTO (booking) → ARO (add-reservation) → ATO (add-ancillary)
+//   → RTO (refund-offer) → ETO (exchange-offer)
+// SALE flows can hit OTO/BTO/ARO/ATO; REFUND adds RTO; EXCHANGE adds ETO.
+
+/**
+ * Single source of truth: per-timer config used by both the queue builder
+ * (in expiredFlow) and the runner's SIGTERM math (in src/worker/runner.js,
+ * which mirrors this list as EXPIRED_FLOW_TIMERS). The 3-letter `code` is
+ * stable and used for sub-run assertion-name prefixes.
+ *
+ * Gate keys describe the conditions under which the timer's gated request
+ * actually fires in a scenario. `gate(env)` receives a `getEnv(name)` helper
+ * and returns true/false. If a timer is armed by the user but its gate is
+ * false the queue builder drops it with a [WARNING] (so the tester knows the
+ * test silently couldn't run, instead of believing it passed).
+ */
+const EXPIRED_FLOW_TIMERS_DEF = [
+  {
+    code: 'OTO', flag: 'expiredOfferTest', wait: 'expiredOfferMaxWaitMinutes',
+    label: 'Expired offer',
+    gate: () => true,
+    gateReason: '',
+  },
+  {
+    code: 'BTO', flag: 'expiredBookingTest', wait: 'expiredBookingMaxWaitMinutes',
+    label: 'Expired booking',
+    gate: () => true,
+    gateReason: '',
+  },
+  {
+    code: 'ARO', flag: 'expiredAddReservationOfferTest', wait: 'expiredAddReservationOfferMaxWaitMinutes',
+    label: 'Expired add-reservation offer',
+    gate: (getEnv) =>
+      String(getEnv('salesFlow_placeSelection')) === 'true' &&
+      String(getEnv('placeSelectionMode')) === 'ADD_TO_BOOKING',
+    gateReason: 'requires salesFlow_placeSelection AND placeSelectionMode=ADD_TO_BOOKING',
+  },
+  {
+    code: 'ATO', flag: 'expiredAddAncillaryOfferTest', wait: 'expiredAddAncillaryOfferMaxWaitMinutes',
+    label: 'Expired add-ancillary offer',
+    gate: (getEnv) => String(getEnv('salesFlow_addAncillary')) === 'true',
+    gateReason: 'requires salesFlow_addAncillary',
+  },
+  {
+    code: 'RTO', flag: 'expiredRefundOfferTest', wait: 'expiredRefundOfferMaxWaitMinutes',
+    label: 'Expired refund offer',
+    gate: (getEnv) => String(getEnv('scenarioType')) === 'REFUND',
+    gateReason: 'REFUND scenarios only',
+  },
+  {
+    code: 'ETO', flag: 'expiredExchangeOfferTest', wait: 'expiredExchangeOfferMaxWaitMinutes',
+    label: 'Expired exchange offer',
+    gate: (getEnv) => String(getEnv('scenarioType')) === 'EXCHANGE',
+    gateReason: 'EXCHANGE scenarios only',
+  },
+];
+
+/**
+ * Build the per-scenario expired-flow queue and arm timer[0]. Called by
+ * scenarioParser at scenario init AFTER all expired-* flags + salesFlow_* +
+ * scenarioType env vars have been set, so gate functions read consistent
+ * state.
+ *
+ * Behaviour:
+ *   - Filters EXPIRED_FLOW_TIMERS_DEF to entries that are (a) on in the
+ *     scenario AND (b) reach their gated request given current env state.
+ *     Timers armed but gated-off are SKIPPED with a [WARNING] log.
+ *   - Persists the ordered queue as `__expiredFlowQueue` (JSON), sets
+ *     `__expiredFlowQueueIndex = "0"`.
+ *   - Disarms (sets "false") every timer flag EXCEPT queue[0]'s, so the
+ *     existing per-YAML gating fires only for the currently-active timer.
+ *
+ * @returns {Array} the queue (one entry per active timer); empty when no
+ *   expired-X test is on in this scenario (normal happy-path runs).
+ */
+function buildAndArmExpiredFlowQueue() {
+  const getEnv = (k) => bru.getEnvVar(k);
+  // 1. Filter to armed+gated timers
+  const active = [];
+  for (const t of EXPIRED_FLOW_TIMERS_DEF) {
+    const raw = getEnv(t.flag);
+    const armed = raw === true || ['true', 'on', 'yes'].includes(String(raw).toLowerCase());
+    if (!armed) continue;
+    if (!t.gate(getEnv)) {
+      validationLogger(`[WARNING] ${t.flag} is on but its gated request will not fire in this scenario (${t.gateReason}) — skipping the test for this scenario.`);
+      // Also turn the flag off so its per-YAML gate (if reached by some other
+      // path) doesn't accidentally arm.
+      bru.setEnvVar(t.flag, 'false');
+      continue;
+    }
+    active.push({ code: t.code, flag: t.flag, wait: t.wait, label: t.label });
+  }
+  // 2. Persist queue + index
+  bru.setEnvVar('__expiredFlowQueue', JSON.stringify(active));
+  bru.setEnvVar('__expiredFlowQueueIndex', '0');
+  // 3. Disarm all timer flags except queue[0]. We always reset every flag
+  //    here (active or not) so a previously-active flag from a sibling
+  //    scenario can't leak — the reset list in scenarioParser is the first
+  //    line of defence, this is belt-and-braces.
+  for (const t of EXPIRED_FLOW_TIMERS_DEF) {
+    const armNow = (active.length > 0 && active[0].flag === t.flag);
+    bru.setEnvVar(t.flag, armNow ? 'true' : 'false');
+  }
+  // 4. Log the plan so the operator can see what will happen
+  if (active.length > 1) {
+    const list = active.map((t, i) => `${i + 1}. ${t.code} (${t.label})`).join(', ');
+    validationLogger(`[INFO] expiredFlow queue: ${active.length} sub-runs will execute on this scenario — ${list}. Sub-run assertions are tagged with [NHF_<code>_<scenario>].`);
+  } else if (active.length === 1) {
+    validationLogger(`[INFO] expiredFlow queue: single sub-run — ${active[0].code} (${active[0].label}).`);
+  }
+  return active;
+}
+
+/**
+ * Per-YAML helper called in each gated request's after-response, immediately
+ * before its cross-scenario tail. Decides whether the scenario has another
+ * timer queued up.
+ *
+ * @param {{ scenarioLabel: string }} opts
+ * @returns {boolean}
+ *   - `true`  → another timer is queued; the helper already routed back to
+ *               `01. POST Get Offer` and set the sub-run-pending flag. The
+ *               CALLER MUST RETURN IMMEDIATELY and not run its
+ *               cross-scenario tail.
+ *   - `false` → queue exhausted (or empty). Caller falls through to its
+ *               existing cross-scenario loop / stop logic.
+ */
+function advanceExpiredFlowQueueOrFinish(opts) {
+  opts = opts || {};
+  const scenarioLabel = String(opts.scenarioLabel || 'expired-flow sub-run');
+
+  let queue = [];
+  try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
+  catch (_e) { queue = []; }
+  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+
+  if (queue.length === 0 || idx >= queue.length - 1) {
+    // Last (or only) timer just ran. Reset the armed-flags so the next
+    // scenario's queue build starts from a clean slate — scenarioParser's
+    // resetScenarioEnvVars will also wipe these, but doing it here too keeps
+    // the env state honest even in error paths.
+    return false;
+  }
+
+  // Advance: disarm current timer, arm next one, route back to 01.
+  const cur  = queue[idx];
+  const next = queue[idx + 1];
+  bru.setEnvVar(cur.flag, 'false');
+  // Defensive: also clear the per-flag `__<...>Armed` boolean if the YAML
+  // used the standard `__<flag-without-Test>Armed` naming. Pattern:
+  // expiredXTest → __expiredXArmed.
+  const _armedKey = '__' + cur.flag.replace(/Test$/, 'Armed');
+  bru.setEnvVar(_armedKey, 'false');
+  bru.setEnvVar(next.flag, 'true');
+  bru.setEnvVar('__expiredFlowQueueIndex', String(idx + 1));
+  bru.setEnvVar('__expiredFlowSubRunPending', 'true');
+
+  validationLogger(`[INFO] ${scenarioLabel}: queue advancing to sub-run ${idx + 2}/${queue.length} — ${next.code} (${next.label}). Routing back to 01. POST Get Offer.`);
+  bru.runner.setNextRequest('01. POST Get Offer');
+  return true;
+}
+
+/**
+ * Return the assertion-name prefix for the CURRENT queue position, suitable
+ * for prepending to `test(...)` names so the report disambiguates sub-runs.
+ *
+ *   `[NHF_<3-letter>_<scenario_code>] `   when queue has 2+ entries
+ *   `''`                                  for single-timer / no-queue runs
+ *
+ * The scenario code's leading `NHF_` is stripped if present (per the agreed
+ * convention) so we don't end up with `[NHF_BTO_NHF_SC_FOO]`.
+ */
+function nhfTestPrefix() {
+  let queue = [];
+  try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
+  catch (_e) { queue = []; }
+  if (queue.length <= 1) return '';
+  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  const cur = queue[idx];
+  if (!cur) return '';
+  const baseCode = String(bru.getEnvVar('scenarioCode') || '').replace(/^NHF_/, '');
+  return `[NHF_${cur.code}_${baseCode || 'SC'}] `;
+}
+
+module.exports = {
+  planExpiredFlow, runExpiredFlowWait, gradeExpiredFlowResponse,
+  BUFFER_MS, POST_MARGIN_MS,
+  EXPIRED_FLOW_TIMERS_DEF,
+  buildAndArmExpiredFlowQueue,
+  advanceExpiredFlowQueueOrFinish,
+  nhfTestPrefix,
+};
 
 // Expose to globalThis for the eval/require loader path (matches other library-bruno modules).
 try {

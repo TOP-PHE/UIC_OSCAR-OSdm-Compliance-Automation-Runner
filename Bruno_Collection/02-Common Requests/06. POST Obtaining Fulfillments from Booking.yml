@@ -71,17 +71,20 @@ runtime:
             // log lines (auth-failure distinguishing, expiry-keyword check, etc.).
             // The Bruno-level test() assertions stay here so they appear in the
             // run report's Assertions tab.
-            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const { gradeExpiredFlowResponse, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
             const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired booking" });
-            test(`Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_grade.status})`, () => {
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_grade.status})`, () => {
                 expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
             if (_grade.isClientError && !_grade.isAuthFailure) {
-                test("Expired booking: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                test(`${_tag}Expired booking: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
                     expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
             }
             // Continue to 07 (GET booking) to assert the parts are expired/released.
+            // The PR B queue-advancement happens in 07.yml's tail, not here, so
+            // the EXPIRED/RELEASED/CANCELLED assertions land before we loop.
             return;
         }
 

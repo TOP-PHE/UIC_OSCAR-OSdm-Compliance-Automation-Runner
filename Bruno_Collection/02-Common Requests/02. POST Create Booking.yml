@@ -64,16 +64,22 @@ runtime:
         // PATCH passenger / GET booking / POST /fulfillments) so the next
         // scenario in the loop fires cleanly.
         if (String(bru.getEnvVar("__expiredOfferArmed")) === "true") {
-            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
             const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired offer" });
-            test(`Expired offer: POST /bookings is rejected with a client error (4xx) — an expired offer must not be bookable (got ${_grade.status})`, () => {
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired offer: POST /bookings is rejected with a client error (4xx) — an expired offer must not be bookable (got ${_grade.status})`, () => {
                 expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
             });
             if (_grade.isClientError && !_grade.isAuthFailure) {
-                test("Expired offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                test(`${_tag}Expired offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
                     expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
                 });
             }
+            // PR B: auto-expansion — if this scenario has more queued timers,
+            // re-arm the next one and loop back to 01 within the same scenario.
+            // If the queue is exhausted (or single-timer), fall through to the
+            // existing cross-scenario tail below.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired offer" })) return;
             // Multi-scenario tail: loop to next scenario or stop. We do NOT
             // continue the happy-path booking flow because the booking was
             // (correctly) never created.

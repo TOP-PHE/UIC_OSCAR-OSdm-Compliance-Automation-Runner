@@ -287,9 +287,13 @@ function _authLogger(runId) {
  * scenario in scope (matching `scenarioOverride` if set, else
  * `scenariosToRun`), each registered timer is inspected. When BOTH the flag
  * is on AND its max-wait field is in 1..60, a requested ms (minutes*60_000 +
- * 60s buffer) is computed; the overall budget takes the largest requested
- * value across all timers and scenarios. The effective timeout is
- * `min(hardMaxMs, max(baseMs, maxRequested))`.
+ * 60s buffer) is computed.
+ *
+ * Within a single scenario the per-timer requests are SUMMED (PR B: when 2+
+ * timers are armed on the same scenario, OSCAR runs N sub-runs sequentially,
+ * one per timer, so the wall-clock budget = sum of waits). ACROSS scenarios
+ * the largest single-scenario sum wins (the worker only runs one scenario at
+ * a time). The effective timeout is `min(hardMaxMs, max(baseMs, maxSum))`.
  *
  * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, clamped, source }.
  * Never throws — datafile read/parse errors fall back to baseMs.
@@ -337,20 +341,31 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
     for (const s of scenarios) {
       if (!s || !isInScope(s.code)) continue;
       scenariosInScope++;
+      // PR B (auto-expansion): when a scenario has 2+ expired-X timers armed,
+      // OSCAR runs that scenario N times (one sub-run per timer). The worker
+      // SIGTERM must cover the SUM of the timers' max-waits inside one
+      // scenario, not the max — running 3 timers of 15 min each takes 45 min
+      // of wall-clock, not 15. Across scenarios we still take the MAX (only
+      // one scenario runs at a time per worker). The +60s buffer is added
+      // once per armed timer (one buffer per sub-run's request + assertions).
+      let scenarioBudgetMs = 0;
+      const armedInScenario = [];
       for (const timer of EXPIRED_FLOW_TIMERS) {
         const flagVal = s[timer.flag];
         const isOn = flagVal === true || (typeof flagVal === 'string' && ['true', 'on', 'yes'].includes(flagVal.toLowerCase()));
         if (!isOn) continue;
         const m = Number(s[timer.wait]);
         if (Number.isFinite(m) && m >= 1 && m <= 60) {
-          // 60s buffer above the wait so the post-wait request + assertions fit.
-          const ms = Math.ceil(m * 60 * 1000) + 60000;
-          if (ms > requestedMs) {
-            requestedMs        = ms;
-            triggeringScenario = s.code || null;
-            triggeringTimer    = timer.label;
-          }
+          scenarioBudgetMs += Math.ceil(m * 60 * 1000) + 60000;
+          armedInScenario.push(timer.label);
         }
+      }
+      if (scenarioBudgetMs > requestedMs) {
+        requestedMs        = scenarioBudgetMs;
+        triggeringScenario = s.code || null;
+        triggeringTimer    = armedInScenario.length > 1
+          ? `${armedInScenario.length} timers summed (${armedInScenario.join(' + ')})`
+          : (armedInScenario[0] || 'expired-flow timer');
       }
     }
   } catch (err) {

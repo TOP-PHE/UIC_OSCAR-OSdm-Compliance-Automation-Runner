@@ -56,7 +56,15 @@ const {
   gradeExpiredFlowResponse,
   runExpiredFlowWait,
   BUFFER_MS,
+  buildAndArmExpiredFlowQueue,
+  advanceExpiredFlowQueueOrFinish,
+  nhfTestPrefix,
 } = require('../../../Bruno_Collection/library-bruno/expiredFlow.js');
+
+// Bruno's `runner.setNextRequest` doesn't exist in the unit-test harness — stub
+// it so advanceExpiredFlowQueueOrFinish can route without throwing.
+const mockSetNextRequest = jest.fn();
+global.bru.runner = { setNextRequest: mockSetNextRequest };
 
 beforeEach(() => {
   envStore = {};
@@ -249,5 +257,157 @@ describe('runExpiredFlowWait', () => {
     })).resolves.toBeUndefined();
 
     expect(mockLogCalls.join('\n')).toMatch(/\[WARNING\] unit-test \(throw\): token-refresh helper threw \(boom\)/);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// PR B: auto-expansion — buildAndArmExpiredFlowQueue / advance / nhfTestPrefix
+// ──────────────────────────────────────────────────────────────────────────
+describe('buildAndArmExpiredFlowQueue', () => {
+  test('single armed timer → queue = [that timer], flag stays on', () => {
+    envStore.expiredOfferTest = 'true';
+    envStore.expiredBookingTest = 'false';
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q).toHaveLength(1);
+    expect(q[0].code).toBe('OTO');
+    // Flag remains armed (it's queue[0]) so 02.yml's gate fires.
+    expect(envStore.expiredOfferTest).toBe('true');
+    // Queue + index persisted to env.
+    expect(JSON.parse(envStore.__expiredFlowQueue)[0].code).toBe('OTO');
+    expect(envStore.__expiredFlowQueueIndex).toBe('0');
+  });
+
+  test('two armed timers → queue holds both in flow order; only queue[0]\'s flag stays on', () => {
+    envStore.expiredOfferTest = 'true';
+    envStore.expiredBookingTest = 'true';
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q.map(t => t.code)).toEqual(['OTO', 'BTO']);
+    // queue[0] (OTO) flag is ON; the rest are explicitly disarmed.
+    expect(envStore.expiredOfferTest).toBe('true');
+    expect(envStore.expiredBookingTest).toBe('false');
+  });
+
+  test('refund timer on a SALE scenario → dropped from queue with WARNING (gate fails)', () => {
+    envStore.expiredRefundOfferTest = 'true';
+    envStore.scenarioType = 'SALE'; // gate requires REFUND
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q).toHaveLength(0);
+    expect(envStore.expiredRefundOfferTest).toBe('false'); // disarmed defensively
+    expect(mockLogCalls.join('\n')).toMatch(/expiredRefundOfferTest is on but its gated request will not fire/);
+  });
+
+  test('exchange timer on EXCHANGE scenario → queued', () => {
+    envStore.expiredExchangeOfferTest = 'true';
+    envStore.scenarioType = 'EXCHANGE';
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q.map(t => t.code)).toEqual(['ETO']);
+  });
+
+  test('add-reservation requires both salesFlow_placeSelection AND ADD_TO_BOOKING', () => {
+    envStore.expiredAddReservationOfferTest = 'true';
+    envStore.salesFlow_placeSelection = 'true';
+    envStore.placeSelectionMode = 'SEATMAP_AT_OFFER'; // wrong mode
+    const q1 = buildAndArmExpiredFlowQueue();
+    expect(q1).toHaveLength(0);
+
+    envStore.expiredAddReservationOfferTest = 'true';
+    envStore.placeSelectionMode = 'ADD_TO_BOOKING';
+    const q2 = buildAndArmExpiredFlowQueue();
+    expect(q2.map(t => t.code)).toEqual(['ARO']);
+  });
+
+  test('order is OTO → BTO → ARO → ATO → RTO → ETO (in-flow), regardless of scenario field order', () => {
+    envStore.expiredExchangeOfferTest = 'true'; envStore.scenarioType = 'EXCHANGE';
+    envStore.expiredBookingTest = 'true';
+    envStore.expiredOfferTest = 'true';
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q.map(t => t.code)).toEqual(['OTO', 'BTO', 'ETO']);
+    // First-in-flow is armed.
+    expect(envStore.expiredOfferTest).toBe('true');
+    expect(envStore.expiredBookingTest).toBe('false');
+    expect(envStore.expiredExchangeOfferTest).toBe('false');
+  });
+
+  test('no armed timers → empty queue; flags untouched (apart from explicit disarms)', () => {
+    envStore.expiredOfferTest = 'false';
+    const q = buildAndArmExpiredFlowQueue();
+    expect(q).toEqual([]);
+    expect(envStore.__expiredFlowQueue).toBe('[]');
+    expect(envStore.__expiredFlowQueueIndex).toBe('0');
+  });
+});
+
+describe('advanceExpiredFlowQueueOrFinish', () => {
+  beforeEach(() => { mockSetNextRequest.mockClear(); });
+
+  test('queue of 1 → returns false (no advance); caller runs cross-scenario tail', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([{ code: 'OTO', flag: 'expiredOfferTest', wait: 'expiredOfferMaxWaitMinutes', label: 'Expired offer' }]);
+    envStore.__expiredFlowQueueIndex = '0';
+    expect(advanceExpiredFlowQueueOrFinish({ scenarioLabel: 'test' })).toBe(false);
+    expect(mockSetNextRequest).not.toHaveBeenCalled();
+  });
+
+  test('queue of 2, idx=0 → advances: disarm current, arm next, set pending flag, route to 01', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([
+      { code: 'OTO', flag: 'expiredOfferTest',   wait: 'expiredOfferMaxWaitMinutes',   label: 'Expired offer' },
+      { code: 'BTO', flag: 'expiredBookingTest', wait: 'expiredBookingMaxWaitMinutes', label: 'Expired booking' },
+    ]);
+    envStore.__expiredFlowQueueIndex = '0';
+    envStore.expiredOfferTest = 'true';
+    envStore.expiredBookingTest = 'false';
+
+    const advanced = advanceExpiredFlowQueueOrFinish({ scenarioLabel: 'Expired offer' });
+
+    expect(advanced).toBe(true);
+    expect(envStore.expiredOfferTest).toBe('false');
+    expect(envStore.expiredBookingTest).toBe('true');
+    expect(envStore.__expiredFlowQueueIndex).toBe('1');
+    expect(envStore.__expiredFlowSubRunPending).toBe('true');
+    expect(mockSetNextRequest).toHaveBeenCalledWith('01. POST Get Offer');
+  });
+
+  test('queue of 2, idx=1 (last) → returns false (no further advance)', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([
+      { code: 'OTO', flag: 'expiredOfferTest',   wait: 'expiredOfferMaxWaitMinutes',   label: 'Expired offer' },
+      { code: 'BTO', flag: 'expiredBookingTest', wait: 'expiredBookingMaxWaitMinutes', label: 'Expired booking' },
+    ]);
+    envStore.__expiredFlowQueueIndex = '1';
+    expect(advanceExpiredFlowQueueOrFinish({ scenarioLabel: 'Expired booking' })).toBe(false);
+  });
+});
+
+describe('nhfTestPrefix', () => {
+  test('returns empty string for queue length 0', () => {
+    envStore.__expiredFlowQueue = '[]';
+    expect(nhfTestPrefix()).toBe('');
+  });
+
+  test('returns empty string for single-timer queue (legacy assertion names)', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([{ code: 'OTO' }]);
+    envStore.__expiredFlowQueueIndex = '0';
+    expect(nhfTestPrefix()).toBe('');
+  });
+
+  test('returns [NHF_<code>_<scenario>] for multi-timer queue', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([{ code: 'OTO' }, { code: 'BTO' }]);
+    envStore.__expiredFlowQueueIndex = '0';
+    envStore.scenarioCode = 'SC_PARIS_LYON';
+    expect(nhfTestPrefix()).toBe('[NHF_OTO_SC_PARIS_LYON] ');
+    envStore.__expiredFlowQueueIndex = '1';
+    expect(nhfTestPrefix()).toBe('[NHF_BTO_SC_PARIS_LYON] ');
+  });
+
+  test('strips leading NHF_ from scenario code (no double prefix)', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([{ code: 'OTO' }, { code: 'BTO' }]);
+    envStore.__expiredFlowQueueIndex = '0';
+    envStore.scenarioCode = 'NHF_SC_FOO';
+    expect(nhfTestPrefix()).toBe('[NHF_OTO_SC_FOO] ');
+  });
+
+  test('falls back to "SC" when scenarioCode is unset', () => {
+    envStore.__expiredFlowQueue = JSON.stringify([{ code: 'RTO' }, { code: 'OTO' }]);
+    envStore.__expiredFlowQueueIndex = '0';
+    delete envStore.scenarioCode;
+    expect(nhfTestPrefix()).toBe('[NHF_RTO_SC] ');
   });
 });
