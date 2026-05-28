@@ -49,6 +49,17 @@ runtime:
           }
         }
 
+        // #204 token-watchdog: refresh the access token at scenario start.
+        // The endpoint respects the server-side cache — when the cached token
+        // is still valid this is a ~50ms no-op; when the cache is within the
+        // safety margin OSCAR refetches a new token from the OAuth server.
+        // This guards against long-batch runs where the original token might
+        // outlive its TTL between scenarios.
+        try {
+          const { refreshAccessTokenIfNeeded } = require(bru.getEnvVar("library_base") + "auth.js");
+          await refreshAccessTokenIfNeeded({ callerLabel: 'POST /offers (scenario start)' });
+        } catch (_e) { /* helper is best-effort; checkAuthRejection covers 401/403 downstream */ }
+
         const { postOfferResponsePreRequest } = require(bru.getEnvVar("library_base")+"offers.js");
         postOfferResponsePreRequest();
     - type: after-response
