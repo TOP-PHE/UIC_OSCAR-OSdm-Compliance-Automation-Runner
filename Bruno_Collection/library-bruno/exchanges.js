@@ -204,7 +204,9 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   // Validate fulfillments
   if (exchangeOffer.fulfillments && expectedFulfillmentStatus) {
     if (typeof validateFulfillments === "function") {
-      validateFulfillments(exchangeOffer.fulfillments, index, expectedFulfillmentStatus);
+      // #253: pass the sibling exchangeOffer.fulfillmentDocuments[] (v3.8) so
+      // each fulfillment.fulfillmentDocumentRef can be checked against a sibling id.
+      validateFulfillments(exchangeOffer.fulfillments, index, expectedFulfillmentStatus, false, exchangeOffer.fulfillmentDocuments);
     }
   }
 }

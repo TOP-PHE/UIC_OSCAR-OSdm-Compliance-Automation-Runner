@@ -54,7 +54,9 @@ runtime:
             return;
         }
 
-        validateFulfillments(jsonData.fulfillments, 0, expectedFulfillmentStatus=["EXCHANGED", "FULFILLED", "CONFIRMED"])
+        // #253: pass the sibling FulfillmentResponse.fulfillmentDocuments[] (v3.8)
+        // so each fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
+        validateFulfillments(jsonData.fulfillments, 0, expectedFulfillmentStatus=["EXCHANGED", "FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments)
 
         console.log("Fulfillment status processing from CONFIRMED to FULFILLED");
         console.log("Waiting 2 secs before executing 15. GET Booking after Fulfillment...");

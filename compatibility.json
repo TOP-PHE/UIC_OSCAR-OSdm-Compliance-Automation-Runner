@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.109",
+  "current_release": "2026.110",
   "releases": [
+    {
+      "release": "2026.110",
+      "date": "2026-05-27",
+      "server": "1.11.82",
+      "collection": "OTST_V2.0.35",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#253): v3.8 FulfillmentDocument cross-reference integrity check. OSDM v3.8 moves FulfillmentDocument from a nested fulfillment.fulfillmentDocuments[] to a sibling FulfillmentResponse.fulfillmentDocuments[] / Booking.fulfillmentDocuments[], with fulfillments[].fulfillmentDocumentRefs[] pointing at the sibling .id. validateFulfillments() now accepts the sibling array and asserts each fulfillmentDocumentRef resolves to a sibling fulfillmentDocuments[].id; an unresolved ref or a missing sibling array (when refs are present) is a FAIL with a clear diagnostic listing the unresolved ref(s) and the available sibling ids. Wired through every caller: postCreateBookingResponse (booking.fulfillmentDocuments), 06. POST Obtaining Fulfillments + 04-Exchange/14. POST Obtaining Fulfillments (FulfillmentResponse.fulfillmentDocuments), exchanges.js, refunds.js (exchangeOffer/refundOffer.fulfillmentDocuments). Backwards-compatible: when the sibling array is not supplied (legacy callers / pre-v3.8 providers using the deprecated nested form), the new cross-ref check is SKIPPED with an informational log. Bruno_Collection/VERSION OTST_V2.0.34 -> OTST_V2.0.35; server 1.11.81 -> 1.11.82.",
+        "Operator action required: none. Chip shows 2026.110 / server-v1.11.82 / OTST_V2.0.35 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.109",
       "date": "2026-05-27",

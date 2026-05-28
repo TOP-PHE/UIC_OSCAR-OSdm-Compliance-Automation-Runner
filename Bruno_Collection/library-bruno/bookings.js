@@ -499,7 +499,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
 
-  validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus, requireFulfillments);
+  // #253: pass the sibling Booking.fulfillmentDocuments[] (v3.8) so each
+  // fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
+  validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus, requireFulfillments, booking.fulfillmentDocuments);
 
   // Check that booking has the same number of passengers as expected from the offer
   const expectedPassengerCount = Number(bru.getEnvVar("passengerCount") || 0);
@@ -528,7 +530,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   }
 }
 
-function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false) {
+function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false, siblingDocs = undefined) {
   validationLogger("[INFO] ► validateFulfillments");
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) {
     if (requireFulfillments) {
@@ -683,6 +685,31 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         });
         validationLogger(`[INFO] Fulfillment[${idx}] has ${fulfillment.fulfillmentDocumentRefs.length} fulfillmentDocumentRef(s)`);
       });
+
+      // #253: v3.8 cross-reference integrity — each fulfillmentDocumentRef must
+      // resolve to a sibling fulfillmentDocuments[].id (under FulfillmentResponse
+      // or Booking, NOT the deprecated nested fulfillment.fulfillmentDocuments).
+      // When `siblingDocs` is not supplied (legacy callers / pre-v3.8 providers
+      // that still use the deprecated nested form) the check is SKIPPED so the
+      // existing happy path is unaffected.
+      if (Array.isArray(siblingDocs)) {
+        const _docIds = new Set(
+          siblingDocs
+            .filter(d => d != null && d.id != null)
+            .map(d => String(d.id))
+        );
+        const _unresolved = fulfillment.fulfillmentDocumentRefs.filter(r => !_docIds.has(String(r)));
+        test(`Fulfillment[${idx}].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.8 integrity)`, () => {
+          expect(_unresolved.length,
+            `unresolved ref(s): [${_unresolved.map(r => JSON.stringify(r)).join(", ")}] — sibling ids: [${[..._docIds].join(", ") || "(none)"}]`
+          ).to.eql(0);
+        });
+        if (_unresolved.length === 0) {
+          validationLogger(`[INFO] Fulfillment[${idx}] all ${fulfillment.fulfillmentDocumentRefs.length} ref(s) resolve to sibling fulfillmentDocuments[].id (v3.8 integrity OK)`);
+        }
+      } else {
+        validationLogger(`[INFO] Fulfillment[${idx}] sibling fulfillmentDocuments[] not provided to validator — v3.8 ref→id cross-check skipped (caller did not supply it; expected for pre-v3.8 providers using the deprecated nested fulfillment.fulfillmentDocuments).`);
+      }
     } else if (!_hasLegacyDocs) {
       validationLogger(`[INFO] Fulfillment[${idx}] has no document refs or documents (may be pre-issuance state)`);
     }
