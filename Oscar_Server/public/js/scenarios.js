@@ -29,6 +29,7 @@ const ENUMS = {
   requestedInformationProbe: [null, 'omit', 'invalid'],
   bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
   expiredBookingTest: ['off', 'on'],
+  expiredOfferTest:   ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
@@ -1268,6 +1269,15 @@ function buildDetailHTML(idx) {
             value="${esc((state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes != null ? (state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes : '')}"
             placeholder="leave empty = server default"
             data-action="set-scenario-max-wait-minutes" data-idx="${esc(idx)}">
+        </div>
+        ${buildSelect(idx, 'expiredOfferTest', 'Expired-offer test', ENUMS.expiredOfferTest,
+          'Negative test. On: after the offer is selected, OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (offer expired). Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS, or set Max wait below). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.')}
+        <div class="param-field">
+          <span class="param-label">Max wait (min) <span class="param-hint">Optional. Per-scenario wait budget for the expired-offer test. When set, OSCAR auto-extends the worker timeout (clamped server-side). Leave empty to use the server's RUN_TIMEOUT_MS. Typical: 15 (covers most provider offer validity windows).</span></span>
+          <input class="param-input" type="number" min="1" max="60"
+            value="${esc((state.scenarios[idx] || {}).expiredOfferMaxWaitMinutes != null ? (state.scenarios[idx] || {}).expiredOfferMaxWaitMinutes : '')}"
+            placeholder="leave empty = server default"
+            data-action="set-scenario-max-wait-offer-minutes" data-idx="${esc(idx)}">
         </div>
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
@@ -4985,6 +4995,14 @@ async function wizGenerateScenario() {
       // and expiredBookingTest is 'on', the runner auto-extends the worker
       // SIGTERM to cover this wait (clamped to RUN_HARD_MAX_TIMEOUT_MS).
       expiredBookingMaxWaitMinutes: null,
+      // Expired-offer negative test (Phase 2 of the expired-flow generalization)
+      // — 'off' by default; 'on' makes OSCAR wait past the earliest
+      // OfferPart.validUntil then assert POST /bookings is rejected.
+      expiredOfferTest: 'off',
+      // Per-scenario max wait budget for the expired-offer test, in minutes.
+      // null = use server's RUN_TIMEOUT_MS. Same auto-extend semantics as
+      // expiredBookingMaxWaitMinutes (clamped to RUN_HARD_MAX_TIMEOUT_MS).
+      expiredOfferMaxWaitMinutes: null,
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,
@@ -5987,6 +6005,22 @@ document.body.addEventListener('input', function(e) {
         const n = parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
           setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+        }
+      }
+      break;
+    }
+    case 'set-scenario-max-wait-offer-minutes': {
+      // Per-scenario max wait budget for the expiredOfferTest, in minutes.
+      // Same semantics as set-scenario-max-wait-minutes above: empty = null
+      // (use server default RUN_TIMEOUT_MS); non-empty must be an integer in
+      // [1, 60] — anything else is ignored mid-edit.
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
         }
       }
       break;
