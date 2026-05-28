@@ -589,7 +589,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'warn',
       `[runner] expiredBookingMaxWaitMinutes requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
   }
-  const envYmlOut  = envYml + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`;
+  // #204: inject the runId so 06.yml can call the loopback refresh-access-token
+  // endpoint after the wait. The endpoint validates that the requested runId
+  // exists and only refreshes the token bound to that run.
+  const envYmlOut  = envYml
+    + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`
+    + `  - name: __runId\n    value: "${runId}"\n`
+    + `  - name: oscar_loopback_base\n    value: "http://127.0.0.1:${process.env.PORT || 3001}"\n`;
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 

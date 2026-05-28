@@ -138,6 +138,38 @@ describe('resolveAccessToken — oauth2 cache', () => {
     );
   });
 
+  // ── forceRefresh (#204 / loopback /v1/runs/:runId/refresh-access-token) ──
+  test('forceRefresh=true skips the cache and refetches even when the cache would have hit', async () => {
+    const fp = await captureCredFp();
+    fetchToken.mockClear();
+    fetchToken.mockResolvedValue({ token: 'forcedfreshtok', expiresIn: 3600 });
+    const future = new Date(Date.now() + 3600 * 1000).toISOString();
+    const tok = await resolveAccessToken(
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: fp },
+      log,
+      { forceRefresh: true }
+    );
+    // Cache WOULD have hit (timeValid + fpMatch + cached_token_enc all true).
+    // forceRefresh must bypass it and return the new token.
+    expect(tok).toBe('forcedfreshtok');
+    expect(fetchToken).toHaveBeenCalledTimes(1);
+  });
+
+  test('forceRefresh=false (default) preserves cache-hit behaviour (back-compat)', async () => {
+    const fp = await captureCredFp();
+    fetchToken.mockClear();
+    const future = new Date(Date.now() + 3600 * 1000).toISOString();
+    const tok = await resolveAccessToken(
+      { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future,
+        cached_token_cred_fp: fp },
+      log
+      // no opts arg → forceRefresh defaults to false
+    );
+    expect(tok).toBe('cachedtok');
+    expect(fetchToken).not.toHaveBeenCalled();
+  });
+
   test('returns the freshly-fetched token even when caching it throws (#208 regression)', async () => {
     // Reproduces the regression where the cached_token_cred_fp column was missing
     // on an un-migrated DB: the persist UPDATE threw "no such column" and failed

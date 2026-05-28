@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.118",
+  "current_release": "2026.119",
   "releases": [
+    {
+      "release": "2026.119",
+      "date": "2026-05-28",
+      "server": "1.11.91",
+      "collection": "OTST_V2.0.39",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#204): refresh the OAuth access token after the long wait so the late POST /fulfillments uses a fresh bearer. Tester reported 403 'not authenticated' from the provider as response to the POST after the ~15 min wait — that's the OAuth token expiring DURING the wait, not the booking being rejected for expiry. New server-side loopback endpoint POST /v1/runs/:runId/refresh-access-token (same loopback gate as /data — 127.0.0.1/::1 + no X-Forwarded-For; no session auth). resolveAccessToken takes a new forceRefresh: true option that skips the cache. Runner injects __runId + oscar_loopback_base into the Bruno env. 06.yml: after the wait completes (before Bruno fires POST /fulfillments), bru.sendRequest to the loopback endpoint, bru.setEnvVar('access_token', newToken) — Bruno re-templates {{access_token}} at request-fire time so the fulfillment uses the fresh token. After-response now distinguishes 401/403 (auth — likely refresh failed) from 4xx + Problem (genuine booking-expiry rejection) with a clear WARNING. Coverage: forceRefresh path added to tests/unit/access-token.test.js. Bruno_Collection/VERSION OTST_V2.0.38 -> OTST_V2.0.39; server 1.11.90 -> 1.11.91.",
+        "Operator action required: none. Chip shows 2026.119 / server-v1.11.91 / OTST_V2.0.39 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.118",
       "date": "2026-05-28",
