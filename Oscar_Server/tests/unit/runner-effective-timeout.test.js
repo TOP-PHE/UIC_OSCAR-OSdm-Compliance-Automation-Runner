@@ -17,19 +17,28 @@
  */
 'use strict';
 
-const fs   = require('node:fs');
-const os   = require('node:os');
-const path = require('node:path');
+const fs     = require('node:fs');
+const path   = require('node:path');
+const crypto = require('node:crypto');
 
 const { computeEffectiveRunTimeoutMs } = require('../../src/worker/runner');
 const { encryptToFileAsync }           = require('../../src/utils/at-rest');
 
+// CRITICAL: writes MUST go under the project's data/artifacts/ tree — the
+// at-rest helper's `_assertWritablePath` refuses anything outside data/artifacts
+// or data/datafiles (this is exactly what bit the first version of this test
+// in CI). Tests use a per-suite random subdir for isolation; cleanup wipes it.
+const SCRATCH = path.resolve(__dirname, '../../data/artifacts',
+                             `_test_${crypto.randomBytes(16).toString('hex')}`);
+fs.mkdirSync(SCRATCH, { mode: 0o700, recursive: true });
+
+let _counter = 0;
 function tmpFile(name) {
-  return path.join(os.tmpdir(), `oscar-runner-effective-timeout-${process.pid}-${Date.now()}-${name}.json`);
+  return path.join(SCRATCH, `${name}-${++_counter}.json`);
 }
 
 async function writeEncryptedDatafile(content) {
-  const p = tmpFile('datafile');
+  const p = tmpFile('encrypted-datafile');
   await encryptToFileAsync(Buffer.from(JSON.stringify(content), 'utf8'), p);
   return p;
 }
@@ -52,9 +61,9 @@ function makeScenario(code, overrides = {}) {
 }
 
 describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)', () => {
-  const cleanup = [];
   afterAll(() => {
-    for (const p of cleanup) { try { fs.unlinkSync(p); } catch (_) { /* ignore */ } }
+    // Best-effort wipe of the whole scratch dir.
+    try { fs.rmSync(SCRATCH, { recursive: true, force: true }); } catch (_) { /* ignore */ }
   });
 
   test('extends timeout for an in-scope scenario that opts into a longer wait (the #204 happy path)', async () => {
@@ -66,7 +75,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
       })],
     };
     const p = await writeEncryptedDatafile(datafile);
-    cleanup.push(p);
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_BKTIMEOUT');
 
@@ -89,7 +97,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
       })],
     };
     const p = await writeEncryptedDatafile(datafile);
-    cleanup.push(p);
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_NORMAL');
 
@@ -111,7 +118,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
       })],
     };
     const p = await writeEncryptedDatafile(datafile);
-    cleanup.push(p);
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_LONG');
 
@@ -123,7 +129,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
 
   test('captures helperError when the datafile is missing/unreadable (no silent fallback)', async () => {
     const missing = tmpFile('does-not-exist');
-    // Don't push to cleanup — the file does not exist
     const r = await computeEffectiveRunTimeoutMs(missing, 'ANY');
 
     expect(r.requestedMs).toBe(0);
@@ -145,7 +150,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     };
     const p = tmpFile('legacy-plaintext');
     fs.writeFileSync(p, JSON.stringify(datafile), 'utf8');
-    cleanup.push(p);
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_LEGACY');
 
@@ -164,8 +168,7 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
         })],
       };
       const p = await writeEncryptedDatafile(datafile);
-      cleanup.push(p);
-      const r = await computeEffectiveRunTimeoutMs(p, 'SC_V');
+        const r = await computeEffectiveRunTimeoutMs(p, 'SC_V');
       expect(r.requestedMs).toBe(5 * 60 * 1000 + 60000);
     }
   });
@@ -179,7 +182,6 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
       ],
     };
     const p = await writeEncryptedDatafile(datafile);
-    cleanup.push(p);
 
     const r = await computeEffectiveRunTimeoutMs(p, null);
 
