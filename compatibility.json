@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.110",
+  "current_release": "2026.111",
   "releases": [
+    {
+      "release": "2026.111",
+      "date": "2026-05-28",
+      "server": "1.11.83",
+      "collection": "OTST_V2.0.35",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#287): structured JSON tree view in the run-detail HTTP Traffic panel (PB-determination aid). Each request/response body now offers a [Raw | Tree] toggle in its header. Raw is the DEFAULT (no behaviour change for users who don't opt in); clicking Tree lazy-loads vanilla-jsoneditor v3.12.0 (ISC) from /vendor/vanilla-jsoneditor/standalone.js and mounts a read-only collapsible tree with built-in key/value search. Guards: a body that isn't valid JSON or is > 2 MB shows the toggle DISABLED with a tooltip explaining why (Raw still works). The standalone bundle is VENDORED under public/vendor/vanilla-jsoneditor/standalone.js (not an npm dep), served by the existing express.static(PUBLIC_DIR), so CSP stays 'self'; no eval, no inline scripts, no CSP changes, no package-lock churn. Bundle (~1.26 MB, ~300 KB gzipped) is fetched only when a tester clicks Tree the first time, then cached. Server-only release; no Bruno collection change. Server 1.11.82 -> 1.11.83.",
+        "Operator action required: none. After Watchtower restarts, testers can click Tree on any JSON body to get the structured view. The chip shows 2026.111 / server-v1.11.83 / OTST_V2.0.35."
+      ]
+    },
     {
       "release": "2026.110",
       "date": "2026-05-27",
