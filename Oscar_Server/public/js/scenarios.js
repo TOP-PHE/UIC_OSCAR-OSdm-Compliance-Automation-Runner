@@ -1261,7 +1261,14 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
           'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
         ${buildSelect(idx, 'expiredBookingTest', 'Expired-booking test', ENUMS.expiredBookingTest,
-          'Negative test (#204). On: after booking, OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment and asserts the provider rejects it (booking expired) and the parts are EXPIRED/RELEASED/CANCELLED. Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS).')}
+          'Negative test (#204). On: after booking, OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment and asserts the provider rejects it (booking expired) and the parts are EXPIRED/RELEASED/CANCELLED. Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS, or set Max wait below).')}
+        <div class="param-field">
+          <span class="param-label">Max wait (min) <span class="param-hint">Optional. Per-scenario wait budget for the expired-booking test. When set, OSCAR auto-extends the worker timeout (clamped server-side). Leave empty to use the server's RUN_TIMEOUT_MS. Typical: 20 (covers Bileto/Paxone's ~15 min deadlines).</span></span>
+          <input class="param-input" type="number" min="1" max="60"
+            value="${esc((state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes != null ? (state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes : '')}"
+            placeholder="leave empty = server default"
+            data-action="set-scenario-max-wait-minutes" data-idx="${esc(idx)}">
+        </div>
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
@@ -4973,6 +4980,11 @@ async function wizGenerateScenario() {
       // Expired-booking negative test (issue #204) — 'off' by default; 'on' makes
       // OSCAR wait past confirmationTimeLimit then assert fulfillment is rejected.
       expiredBookingTest: 'off',
+      // Per-scenario max wait budget for the expired-booking test (#204), in
+      // minutes. null = use server's RUN_TIMEOUT_MS (default 10 min). When set
+      // and expiredBookingTest is 'on', the runner auto-extends the worker
+      // SIGTERM to cover this wait (clamped to RUN_HARD_MAX_TIMEOUT_MS).
+      expiredBookingMaxWaitMinutes: null,
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,
@@ -5963,6 +5975,22 @@ document.body.addEventListener('input', function(e) {
   switch (action) {
     case 'set-scenario-text':
       setScenarioField(parseInt(el.dataset.idx), el.dataset.field, el.value); break;
+    case 'set-scenario-max-wait-minutes': {
+      // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
+      // Empty input clears (null = use server default RUN_TIMEOUT_MS).
+      // Non-empty must be an integer in [1, 60] — anything else is ignored
+      // until the user types a valid value (no spurious saves mid-edit).
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+        }
+      }
+      break;
+    }
     case 'set-trip-time':
       setTripTimeFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-path':

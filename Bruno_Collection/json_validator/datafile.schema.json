@@ -81,6 +81,12 @@
               null
             ]
           },
+          "expiredBookingMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for #204 expiredBookingTest, in MINUTES (1-60). When set AND expiredBookingTest is on, OSCAR uses this as the per-scenario wait budget instead of the server-wide RUN_TIMEOUT_MS, and the runner auto-extends the worker SIGTERM to cover it (clamped to the server-side RUN_HARD_MAX_TIMEOUT_MS cap, default 30 min). Leave null/empty to use the server default. Lets a tester opt into a longer wait (e.g. Bileto/Paxone deadlines ~15 min) without needing to also change the server env.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
           "osdmVersion": {
             "type": "string"
           },

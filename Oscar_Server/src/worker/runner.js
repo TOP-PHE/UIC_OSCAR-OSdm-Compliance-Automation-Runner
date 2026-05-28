@@ -271,6 +271,69 @@ function _authLogger(runId) {
 // it expects secret values to be stored in a separate encrypted secrets store.
 // Since this env file is ephemeral (deleted immediately after the run), there
 // is no security risk in writing credentials as plain variables.
+/**
+ * Compute the effective run timeout (ms) for a run, taking into account the
+ * per-scenario `expiredBookingMaxWaitMinutes` opt-in (#204 tester timer).
+ *
+ *   baseMs    = RUN_TIMEOUT_MS env (default 600000 = 10 min)
+ *   hardMaxMs = RUN_HARD_MAX_TIMEOUT_MS env (default 1800000 = 30 min)
+ *
+ * The datafile (already known to exist by the caller) is parsed; for every
+ * scenario in scope (matching `scenarioOverride` if set, else
+ * `scenariosToRun`) that has `expiredBookingTest` on AND
+ * `expiredBookingMaxWaitMinutes` in 1..60, the requested ms (minutes*60_000 + 60s buffer)
+ * is computed. The effective timeout is `min(hardMaxMs, max(baseMs, maxRequested))`.
+ *
+ * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, clamped, source }.
+ * Never throws — datafile read/parse errors fall back to baseMs.
+ */
+async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
+  const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
+  const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
+  let requestedMs = 0;
+  let triggeringScenario = null;
+  try {
+    const content = await fs.promises.readFile(datafilePath, 'utf8');
+    const data    = JSON.parse(content);
+    const scenarios     = Array.isArray(data.scenarios) ? data.scenarios : [];
+    const scenariosToRun = data.scenariosToRun;
+    const isInScope = (code) => {
+      if (scenarioOverride) return String(code) === String(scenarioOverride);
+      if (scenariosToRun === undefined || scenariosToRun === 'ALL' || scenariosToRun === '*') return true;
+      if (Array.isArray(scenariosToRun)) return scenariosToRun.map(String).includes(String(code));
+      if (typeof scenariosToRun === 'string') return scenariosToRun.split(/[,\s]+/).filter(Boolean).map(String).includes(String(code));
+      return false;
+    };
+    for (const s of scenarios) {
+      if (!s || !isInScope(s.code)) continue;
+      const expired = s.expiredBookingTest;
+      const isOn = expired === true || (typeof expired === 'string' && ['true', 'on', 'yes'].includes(expired.toLowerCase()));
+      if (!isOn) continue;
+      const m = Number(s.expiredBookingMaxWaitMinutes);
+      if (Number.isFinite(m) && m >= 1 && m <= 60) {
+        // 60s buffer above the wait so the fulfillment + GET + assertions fit.
+        const ms = Math.ceil(m * 60 * 1000) + 60000;
+        if (ms > requestedMs) { requestedMs = ms; triggeringScenario = s.code || null; }
+      }
+    }
+  } catch (_) {
+    // Best-effort: a failure to read/parse the datafile means we just stay at
+    // the base timeout; Bruno will surface a more useful error downstream.
+  }
+  const desired   = Math.max(baseMs, requestedMs);
+  const effective = Math.min(desired, hardMaxMs);
+  const clamped   = desired > hardMaxMs;
+  let source;
+  if (requestedMs > 0) {
+    source = clamped
+      ? `scenario expiredBookingMaxWaitMinutes (clamped at RUN_HARD_MAX_TIMEOUT_MS, triggered by '${triggeringScenario}')`
+      : `scenario expiredBookingMaxWaitMinutes (triggered by '${triggeringScenario}')`;
+  } else {
+    source = 'RUN_TIMEOUT_MS';
+  }
+  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source };
+}
+
 function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra) {
   // Escape backslashes then double-quotes so the token is safe inside a YAML double-quoted scalar.
   // A token with a trailing " (common typo) would otherwise produce invalid YAML and crash Bruno.
@@ -480,13 +543,26 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
   const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra);
-  // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs the
-  // run, i.e. now + RUN_TIMEOUT_MS) as a read-only env var. The expired-booking
-  // test uses it to decide whether waiting until booking.confirmationTimeLimit
-  // fits the run budget — if not, it skips with a WARNING instead of being killed
-  // mid-wait. Read-only; does not change run behaviour.
-  const _runTimeoutMsForEnv = parseInt(getConfig('RUN_TIMEOUT_MS', '600000'), 10) || 600000;
-  const envYmlOut  = envYml + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runTimeoutMsForEnv}"\n`;
+  // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
+  // the run, i.e. now + effective timeout) as a read-only env var. The
+  // expired-booking test uses it to decide whether waiting until the booking's
+  // confirmation deadline fits the run budget — if not, it skips with a
+  // WARNING instead of being killed mid-wait.
+  //
+  // #204 (tester timer): if any in-scope scenario sets
+  // `expiredBookingMaxWaitMinutes`, the effective timeout is auto-extended to
+  // cover it (clamped to RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both
+  // this env injection and the SIGTERM setTimeout below — they MUST agree.
+  const _runBudget = await computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride || null);
+  if (_runBudget.requestedMs > 0) {
+    logEvent(runId, 'info',
+      `[runner] Effective RUN_TIMEOUT_MS for this run = ${_runBudget.effectiveMs}ms (base=${_runBudget.baseMs}, requested=${_runBudget.requestedMs}, hardMax=${_runBudget.hardMaxMs}; source: ${_runBudget.source})`);
+    if (_runBudget.clamped) {
+      logEvent(runId, 'warn',
+        `[runner] expiredBookingMaxWaitMinutes requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
+    }
+  }
+  const envYmlOut  = envYml + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`;
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
@@ -563,9 +639,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // Register for emergency-stop (killRun). Cleared in close/error below.
     _activeProcs.set(runId, proc);
 
-    const runTimeoutMs = parseInt(getConfig('RUN_TIMEOUT_MS', '600000'), 10);
+    // Use the SAME effective timeout we just injected as runHardDeadlineMs.
+    // Falling back to RUN_TIMEOUT_MS would let the worker get SIGTERMed mid-
+    // wait when a scenario opted into a longer expiredBookingMaxWaitMinutes.
+    const runTimeoutMs = _runBudget.effectiveMs;
     const timeout = setTimeout(() => {
-      logEvent(runId, 'error', '[runner] Run timed out — killing process.');
+      logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);
       proc.kill('SIGTERM');
     }, runTimeoutMs);
 

@@ -326,6 +326,16 @@ Asserts that a booking left to expire **cannot be fulfilled**.
 | **`off`** *(default)* | Normal flow. |
 | **`on`** | After the booking is created, **wait until 15 s past** the booking's effective confirmation deadline. The deadline is resolved in this order: **(1)** `booking.confirmationTimeLimit` (OSDM‑standard at the booking level); else **(2)** `booking.confirmableUntil` (Bileto puts it here at the booking level); else **(3)** the **earliest** `bookedOffers[].{admissions \| reservations \| ancillaries}[].confirmableUntil` — Paxone exposes the deadline only here, which is in fact OSDM's own placement for that field. Then `POST /fulfillments`. The fulfillment **MUST be rejected** (`4xx` + `Problem`) — a hard FAIL if the provider fulfills an expired booking. The follow‑up `GET /bookings` must show admissions/reservations **EXPIRED / RELEASED / CANCELLED** (a `404` purge is accepted). |
 
+**Max wait (`expiredBookingMaxWaitMinutes`)** — optional per‑scenario timer
+shown next to the **Expired‑booking test** dropdown. Integer minutes, 1–60.
+When set, OSCAR uses this as the wait budget for **this scenario** instead of
+the server's `RUN_TIMEOUT_MS`, and the runner **auto‑extends the worker
+SIGTERM** to cover it. Use it when the provider's deadline is longer than
+the server default (Bileto / Paxone are ~15 min → set **20**). Leave empty
+to use the server default. The server clamps the effective timeout at
+`RUN_HARD_MAX_TIMEOUT_MS` (default 30 min); raise that env var if you ever
+need to test providers with deadlines longer than ~25 min.
+
 > **Run‑budget guard.** If waiting until the deadline would exceed the run's
 > `RUN_TIMEOUT_MS` (default 10 min), the test **skips with a `[WARNING]`** that
 > tells you the minimum seconds to raise the timeout to — instead of being
@@ -416,6 +426,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `requestedInformationProbe` | `off` / `omit` / `invalid` | passenger‑info auto‑feed *or* a negative probe (§4.8) |
 | `bookingPurchaserMode` | `inline` / `deferred` / `omit` / `invalid` | where the purchaser is sent + negative probe (§4.8) |
 | `expiredBookingTest` | `off` / `on` | wait past the effective confirmation deadline (booking‑root `confirmationTimeLimit` / `confirmableUntil`, or the earliest part‑level `confirmableUntil`), assert rejection (§4.8) |
+| `expiredBookingMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget for `expiredBookingTest`; auto‑extends the worker SIGTERM, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (§4.8) |
 | `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.9) |
 
 ### 7.2 Sale‑flow step → OSDM request
