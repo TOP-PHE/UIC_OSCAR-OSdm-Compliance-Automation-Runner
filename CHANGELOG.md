@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.83] — 2026-05-28
+
+Structured JSON tree view in the run-detail HTTP Traffic panel — **#287.**
+**Server-only release; no Bruno collection bump.**
+
+### Added
+- **#287 — opt-in Tree view for request/response bodies.** Each body card in the
+  **HTTP Traffic** section now offers a **`[Raw | Tree]`** toggle in its header.
+  - **Raw is the default** (no behaviour change for users who don't opt in).
+  - Clicking **Tree** lazy-loads `vanilla-jsoneditor` v3.x (ISC license) from
+    `/vendor/vanilla-jsoneditor/standalone.js` and mounts a **read-only,
+    collapsible tree** with built-in key/value search — a direct PB-determination
+    aid for deeply nested OSDM responses (offers, bookings, RFC-9457 Problems).
+  - **Guards:** a body that isn't valid JSON or is **> 2 MB** shows the toggle
+    **disabled** with a tooltip explaining why (Raw still works). If the bundle
+    fails to load or mount, the failure is logged and Raw stays in place.
+
+### Notes
+- The standalone bundle is **vendored** at
+  `Oscar_Server/public/vendor/vanilla-jsoneditor/standalone.js` (pinned to
+  upstream **3.12.0**, ISC) — served by the existing `express.static(PUBLIC_DIR)`,
+  so CSP stays **`script-src 'self' 'unsafe-inline'`** (no policy change, no
+  `node_modules` mount, no `package-lock` churn for a purely front-end asset).
+  The ~1.26 MB bundle (~300 KB gzipped) is fetched **only** when a tester clicks
+  **Tree** for the first time, then cached. Upgrade procedure is documented in
+  `Oscar_Server/public/vendor/vanilla-jsoneditor/NOTICE.md`.
+
+---
+
 ## [server-v1.11.82] — 2026-05-27
 
 OSDM v3.8 `FulfillmentDocument` cross-reference integrity — **#253.**

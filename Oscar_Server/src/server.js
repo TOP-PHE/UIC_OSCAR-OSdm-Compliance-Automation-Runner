@@ -468,6 +468,11 @@ app.get('/health', (req, res) => {
 });
 
 // ── Serve static UI ───────────────────────────────────────────────────────────
+// #287: vanilla-jsoneditor (ISC) is **vendored** under public/vendor/ rather
+// than installed as an npm dependency — keeps the dep tree (and package-lock)
+// untouched and avoids re-resolving the whole graph for one front-end asset.
+// The lazy `import('/vendor/vanilla-jsoneditor/standalone.js')` in run-detail.html
+// is served by the same express.static below (CSP stays 'self', no extra mount).
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
 app.use(express.static(PUBLIC_DIR));
 

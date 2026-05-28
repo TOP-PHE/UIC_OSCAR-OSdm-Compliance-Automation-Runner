@@ -115,6 +115,17 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .msg-meta{font-size:11px;color:#607d8b;margin-bottom:6px;word-break:break-all}
 .msg-pre{background:#1e1e1e;color:#d4d4d4;border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;margin:0}
 .msg-loading{padding:10px 32px;color:#90a4ae;font-size:12px;font-style:italic}
+/* #287: HTTP-Traffic body Tree/Raw toggle (opt-in structured viewer). */
+.msg-header{display:flex;align-items:center;gap:10px;margin:8px 0 4px}
+.msg-header .msg-label{margin:0}
+.msg-toggle-group{display:inline-flex;border:1px solid #cfd8dc;border-radius:4px;overflow:hidden;height:20px;align-items:stretch}
+.msg-toggle-group.disabled{opacity:.5;cursor:not-allowed}
+.msg-toggle{background:#fff;border:0;padding:0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#607d8b;cursor:pointer}
+.msg-toggle:not(:last-child){border-right:1px solid #cfd8dc}
+.msg-toggle:hover:not(:disabled){background:#eceff1}
+.msg-toggle.active{background:#0090D4;color:#fff}
+.msg-toggle:disabled{cursor:not-allowed;color:#90a4ae}
+.msg-tree{background:#fff;border:1px solid #eceff1;border-radius:6px;min-height:200px;max-height:480px;overflow:auto}
 </style>
 </head>
 <body>
@@ -749,12 +760,108 @@ function renderRequests() {
   document.getElementById('requests-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No requests match the selected filter.</div>';
 }
 
+// #287: HTTP-Traffic body viewer — opt-in structured Tree view.
+//   - Raw view is the DEFAULT (no behaviour change for users who don't toggle).
+//   - Tree view lazy-loads vanilla-jsoneditor only on first click.
+//   - Guards: non-JSON bodies and bodies > MSG_TREE_MAX_BYTES leave the toggle disabled.
+const MSG_TREE_MAX_BYTES = 2 * 1024 * 1024;   // 2 MB cap for tree view
+let __msgIdCounter = 0;
+let __jsoneditorModulePromise = null;          // cached module loader
+function loadJsonEditorModule() {
+  if (!__jsoneditorModulePromise) {
+    __jsoneditorModulePromise = import('/vendor/vanilla-jsoneditor/standalone.js')
+      .catch(err => { __jsoneditorModulePromise = null; throw err; });
+  }
+  return __jsoneditorModulePromise;
+}
+// Escape `</script` to prevent the inline JSON payload from breaking out of
+// its <script type="application/json"> envelope. Not executed (it's data).
+function safeJsonForInlineScript(s) {
+  return String(s).replace(/<\/(?=script)/gi, '<\\/');
+}
+
 function renderMessage(label, meta, body) {
+  const id = `m${++__msgIdCounter}`;
   let pretty = body;
-  if (body) { try { pretty = JSON.stringify(JSON.parse(body), null, 2); } catch (_) { pretty = body; } }
-  return `<div class="msg-label">${escHtml(label)}</div>`
+  let parsedOk = false;
+  let payloadSize = 0;
+  if (body) {
+    payloadSize = (typeof body === 'string') ? body.length : 0;
+    try {
+      const parsed = JSON.parse(body);
+      pretty = JSON.stringify(parsed, null, 2);
+      parsedOk = true;
+    } catch (_) {
+      pretty = body;
+    }
+  }
+  const canTree = parsedOk && payloadSize > 0 && payloadSize <= MSG_TREE_MAX_BYTES;
+  let toggleHtml = '';
+  let payloadScript = '';
+  let treeDiv = '';
+  if (canTree) {
+    toggleHtml =
+      `<div class="msg-toggle-group" data-msg-id="${id}">`
+        + `<button class="msg-toggle active" data-mode="raw" type="button">Raw</button>`
+        + `<button class="msg-toggle" data-mode="tree" type="button" title="Structured tree view with key/value search (lazy-loaded)">Tree</button>`
+      + `</div>`;
+    payloadScript = `<script type="application/json" id="${id}-payload">${safeJsonForInlineScript(pretty)}</script>`;
+    treeDiv = `<div class="msg-tree" id="${id}-tree" style="display:none"></div>`;
+  } else if (body) {
+    const reason = !parsedOk
+      ? 'Body is not JSON — tree view unavailable'
+      : payloadSize > MSG_TREE_MAX_BYTES
+        ? `Body > ${Math.round(MSG_TREE_MAX_BYTES/1024/1024)} MB — too large for tree view`
+        : '';
+    if (reason) {
+      toggleHtml =
+        `<div class="msg-toggle-group disabled" title="${escHtml(reason)}">`
+          + `<button class="msg-toggle active" disabled type="button">Raw</button>`
+          + `<button class="msg-toggle" disabled type="button">Tree</button>`
+        + `</div>`;
+    }
+  }
+  return `<div class="msg-header"><div class="msg-label">${escHtml(label)}</div>${toggleHtml}</div>`
     + (meta ? `<div class="msg-meta">${meta}</div>` : '')
-    + `<pre class="msg-pre">${escHtml(pretty || '(empty)')}</pre>`;
+    + payloadScript
+    + `<pre class="msg-pre" id="${id}-raw">${escHtml(pretty || '(empty)')}</pre>`
+    + treeDiv;
+}
+
+// Mount the tree view on demand. Idempotent — no-ops if already mounted or if
+// the payload script went missing.
+async function mountJsonTree(msgId) {
+  const target = document.getElementById(`${msgId}-tree`);
+  if (!target || target.dataset.mounted === '1') return;
+  const payloadEl = document.getElementById(`${msgId}-payload`);
+  if (!payloadEl) return;
+  let parsed;
+  try { parsed = JSON.parse(payloadEl.textContent); }
+  catch (_) { return; }
+  let mod;
+  try { mod = await loadJsonEditorModule(); }
+  catch (err) {
+    console.warn('[run-detail] vanilla-jsoneditor failed to load — Tree view unavailable, Raw view still works', err);
+    target.textContent = 'Tree view unavailable (failed to load editor).';
+    return;
+  }
+  try {
+    mod.createJSONEditor({
+      target,
+      props: {
+        content: { json: parsed },
+        readOnly: true,
+        mode: 'tree',
+        mainMenuBar: true,
+        navigationBar: true,
+        statusBar: false
+      }
+    });
+    target.dataset.mounted = '1';
+  } catch (err) {
+    console.warn('[run-detail] vanilla-jsoneditor mount failed — Raw view still works', err);
+    target.textContent = 'Tree view failed to mount.';
+  }
 }
 
 async function loadRequestBodies(reqId, bodyEl) {
@@ -778,6 +885,27 @@ async function loadRequestBodies(reqId, bodyEl) {
 
 // Collapse/expand + lazy body load for the HTTP Traffic section.
 document.getElementById('requests-content').addEventListener('click', function(e) {
+  // #287: Tree/Raw toggle inside a body panel — handle first so the click
+  // never falls through to a collapsible.
+  const tgBtn = e.target.closest('.msg-toggle-group .msg-toggle');
+  if (tgBtn && !tgBtn.disabled) {
+    const group = tgBtn.closest('.msg-toggle-group');
+    const msgId = group && group.dataset.msgId;
+    const mode  = tgBtn.dataset.mode;
+    if (!msgId || !mode) return;
+    group.querySelectorAll('.msg-toggle').forEach(b => b.classList.toggle('active', b === tgBtn));
+    const rawEl  = document.getElementById(`${msgId}-raw`);
+    const treeEl = document.getElementById(`${msgId}-tree`);
+    if (mode === 'tree') {
+      if (rawEl)  rawEl.style.display  = 'none';
+      if (treeEl) treeEl.style.display = '';
+      mountJsonTree(msgId);
+    } else {
+      if (rawEl)  rawEl.style.display  = '';
+      if (treeEl) treeEl.style.display = 'none';
+    }
+    return;
+  }
   const sh = e.target.closest('[data-action="toggle-rsuite"]');
   if (sh) { sh.parentElement.classList.toggle('open'); return; }
   const rh = e.target.closest('[data-action="toggle-rreq"]');

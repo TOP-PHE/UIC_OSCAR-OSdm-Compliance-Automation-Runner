@@ -39,5 +39,10 @@ paths = [
   '''(.*?)(package-lock\.json)$''',
   '''(.*?)(_test\.js|\.test\.js)$''',
   '''Bruno_Collection/.*''',
-  '''Documentation/.*'''
+  '''Documentation/.*''',
+  # Vendored third-party front-end bundles (e.g. vanilla-jsoneditor v3.12.0).
+  # Minified ES bundles can contain base64-like substrings that match generic
+  # secret heuristics. These files are vendored verbatim from upstream, are
+  # not OSCAR code, and never carry secrets.
+  '''Oscar_Server/public/vendor/.*'''
 ]
