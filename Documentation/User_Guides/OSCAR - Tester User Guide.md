@@ -2,7 +2,7 @@
 
 *How to point OSCAR at an OSDM provider and build, run, and read a conformance test.*
 
-> Reflects collection **OTST_V2.0.34** / server **1.11.81** / release **2026.109**.
+> Reflects collection **OTST_V2.0.40** / server **1.11.92** / release **2026.120**.
 > Labels in **bold** match the on‑screen controls. When the UI and this guide
 > disagree, the UI wins — please open an issue so we can update the guide.
 
@@ -345,6 +345,27 @@ need to test providers with deadlines longer than ~25 min.
 > tells you the minimum seconds to raise the timeout to — instead of being
 > killed mid‑wait. For a provider whose `confirmationTimeLimit` exceeds ~9 min,
 > raise `RUN_TIMEOUT_MS` on the server before running.
+
+**Automatic OAuth token refresh.** Long‑running scenarios (and long batches)
+used to fail at the very end with a provider `403 "not authenticated"` because
+the access token issued at run start outlived its TTL during the wait.
+OSCAR now refreshes the token automatically — you don't have to configure
+anything, but it's worth knowing the layers so the log lines make sense:
+
+- **Per‑scenario** — `01. POST Get Offer` checks at the start of every scenario
+  whether the cached token needs renewing (cheap cache hit when it doesn't).
+- **After the expired‑booking wait** — `06. POST Obtaining Fulfillments` forces
+  a fresh token just before the late `POST /fulfillments`, so the wait can't
+  outrun the token.
+- **Background watchdog** — the runner ticks every 5 min while the run is in
+  flight (operator‑tunable via `TOKEN_WATCHDOG_INTERVAL_MS`, see the Server
+  Admin Guide) to keep the cached token warm under long runs.
+
+If you ever **do** see a `401`/`403` from the provider, OSCAR explicitly flags
+it as an auth failure — *not* a booking‑expiry rejection — with a
+`[WARNING] … this is likely a token problem (refresh failed), not a
+booking‑expiry rejection`. So you'll never mis‑read an auth error as a test
+pass.
 
 ### 4.9 Logging verbosity (`loggingType`, optional)
 
