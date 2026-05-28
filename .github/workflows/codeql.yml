@@ -59,6 +59,8 @@ jobs:
           # checks. If you want only security findings (faster, fewer noise),
           # change to `security-extended`.
           queries: security-and-quality
+          # Path rules (e.g. excluding Oscar_Server/public/vendor/**).
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
