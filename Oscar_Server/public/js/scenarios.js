@@ -2000,7 +2000,7 @@ function buildOfferSection(idx, sc) {
     <div class="param-section-body">
     <div class="param-grid" style="padding:12px 14px 4px">
       <div class="param-field">
-        <span class="param-label">Offer Mode <span class="param-hint">(optional) — how offers are grouped</span></span>
+        <span class="param-label">Offer Mode <span class="param-hint">(optional) — INDIVIDUAL gives per-passenger admissions (refundable individually); COLLECTIVE shares one admission across the group (atomic, can't refund per pax). With only one passenger, COLLECTIVE is degenerate — the provider may accept, fall back to INDIVIDUAL with a warning, or reject. See Tester Guide §4.3.</span></span>
         <select class="param-input param-select"
           data-action="set-offer" data-idx="${esc(idx)}" data-field="offerMode">
           ${modeOpts}

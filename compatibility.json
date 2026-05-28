@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.116",
+  "current_release": "2026.117",
   "releases": [
+    {
+      "release": "2026.117",
+      "date": "2026-05-28",
+      "server": "1.11.89",
+      "collection": "OTST_V2.0.38",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(#222 Increment 1): tester-facing guidance for OfferMode=INDIVIDUAL vs COLLECTIVE, ahead of the broader #222 build-out. Wizard hint on the Offer Mode field now spells out the OSDM-defined semantics (INDIVIDUAL = per-pax admissions, refundable individually; COLLECTIVE = shared group admissions, atomic) and the 1-pax edge case (provider may accept, fall back to INDIVIDUAL with a warning, or reject). Tester User Guide §4.3 expanded with the same content plus the spec-mandated fallback behaviour and pointer to #222 for the broader test build-out. No behaviour change — OSCAR still only validates the enum value as today; full assertions (mode fidelity, refund-per-pax restriction, split-booking endpoint) are tracked as Increments 2-5 on #222. Server-only release; no Bruno collection bump. Server 1.11.88 -> 1.11.89.",
+        "Operator action required: none. Chip shows 2026.117 / server-v1.11.89 / OTST_V2.0.38 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.116",
       "date": "2026-05-28",
