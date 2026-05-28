@@ -294,6 +294,54 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   return res.end(plaintext);
 });
 
+// ── Loopback refresh of an OAuth access token mid-run (issue #204) ───────────
+// Long-running scenarios (e.g. expiredBookingTest's ~15 min wait on Paxone)
+// can outlive the OAuth token issued at run start. The provider then returns
+// 403 "not authenticated" on the next request, masking the booking-expiry
+// semantics the test is trying to grade. Bruno calls this loopback endpoint
+// AFTER the wait to obtain a fresh token; the provider then sees a valid
+// token and the test can observe the actual expiry behaviour.
+//
+// SECURITY: same loopback gate as /data — caller MUST be on 127.0.0.1/::1
+// with NO X-Forwarded-For header. There is no session/Bearer auth (Bruno is
+// a spawned child process). The endpoint only refreshes the token belonging
+// to the run being requested; it never crosses run boundaries.
+//
+// The SAFE_RUNID_RE used below is defined further down for the
+// /artifacts/:runId path — declared inline here so the order doesn't matter.
+const SAFE_RUNID_RE_FOR_REFRESH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req, res) => {
+  const { runId } = req.params;
+  if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
+  }
+  if (!isLoopbackBrunoCall(req)) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint is loopback-only.' });
+  }
+  const runRow = dbGet('SELECT id, user_id FROM runs WHERE id = ?', [runId]);
+  if (!runRow) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Run not found.' });
+  }
+  const userRow = dbGet('SELECT * FROM users WHERE id = ?', [runRow.user_id]);
+  if (!userRow) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User for this run not found.' });
+  }
+  try {
+    const { resolveAccessToken } = require('./worker/access-token');
+    const accessToken = await resolveAccessToken(
+      userRow,
+      { info: (m) => log.info({ runId }, m), error: (m) => log.error({ runId }, m) },
+      { forceRefresh: true }
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ access_token: accessToken });
+  } catch (err) {
+    const detail = err && err.message ? err.message : String(err);
+    log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
+    return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: `Token refresh failed: ${detail}` });
+  }
+});
+
 // ── Serve run artifacts (HTML reports, JSON results) ─────────────────────────
 // Route: GET /artifacts/:runId/:filename
 //
