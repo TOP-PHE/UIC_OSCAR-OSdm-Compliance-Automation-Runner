@@ -14,6 +14,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.91] — 2026-05-28
+
+Refresh the OAuth access token after the expired-booking wait — **#204
+(token-TTL collision).**
+**Bruno collection bumped (OTST_V2.0.38 → OTST_V2.0.39).**
+
+### Fixed
+- **#204 — the expired-booking test failed to grade the booking-expiry
+  rejection because the OAuth access token issued at run start expired
+  during the ~15 min wait on Paxone.** The provider then returned
+  `403 "not authenticated"` on the late `POST /fulfillments` — an auth
+  failure that masked the booking-expiry semantics the test grades.
+  Reported by a tester running `Max wait = 30` against Paxone (deadline
+  ~15 min, token TTL ~15 min).
+  - New server-side **loopback endpoint**
+    `POST /v1/runs/:runId/refresh-access-token` (same loopback gate as
+    `/data` — 127.0.0.1 / ::1 + no `X-Forwarded-For`; no session auth).
+    Forces a fresh token via
+    `resolveAccessToken(userRow, log, { forceRefresh: true })`.
+  - `access-token.js` `resolveAccessToken` accepts a `forceRefresh`
+    option that skips the cache and refetches.
+  - `runner.js` injects `__runId` and `oscar_loopback_base` into the
+    Bruno env alongside `runHardDeadlineMs`.
+  - `06. POST Obtaining Fulfillments from Booking.yml`: after the wait
+    completes, `bru.sendRequest` to the loopback endpoint, then
+    `bru.setEnvVar('access_token', …)` with the fresh token. Bruno
+    re-templates `Authorization: Bearer {{access_token}}` at
+    request-fire time, so the fulfillment uses the fresh token.
+
+### Changed
+- Expired-booking after-response **distinguishes 401/403 (auth) from
+  4xx + Problem (genuine booking-expiry rejection)**. A 401/403 fires a
+  `[WARNING]` saying "this is likely a token problem (refresh failed),
+  not a booking-expiry rejection" — so the tester doesn't mis-read an
+  auth error as a test pass.
+
+### Added
+- `tests/unit/access-token.test.js` — two new cases for `forceRefresh`:
+  bypasses a still-valid cache; default (`forceRefresh: false`) preserves
+  the existing cache-hit behaviour (back-compat).
+
+---
+
 ## [server-v1.11.90] — 2026-05-28
 
 Fix the per-scenario expired-booking timer silently failing because the

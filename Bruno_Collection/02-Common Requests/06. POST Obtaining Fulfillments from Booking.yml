@@ -78,7 +78,46 @@ runtime:
             } else {
               validationLogger(`[INFO] expiredBookingTest: waiting ~${Math.ceil(waitMs/1000)}s until just past confirmationTimeLimit (${limitRaw}) before attempting fulfillment... (budget source: ${budgetSource})`);
               await new Promise((r) => setTimeout(r, waitMs));
-              validationLogger(`[INFO] expiredBookingTest: wait complete — attempting fulfillment, expecting the provider to reject it (booking expired).`);
+              validationLogger(`[INFO] expiredBookingTest: wait complete — refreshing access token before attempting fulfillment.`);
+
+              // #204 token-TTL fix: the OAuth access token issued at run start
+              // may have expired during the long wait — Paxone returned 403
+              // "not authenticated" on the late POST /fulfillments, masking
+              // the booking-expiry semantics the test is grading. Call OSCAR's
+              // loopback refresh-access-token endpoint (force=true) to obtain
+              // a fresh token and replace {{access_token}} in this env before
+              // Bruno fires the request.
+              const _runId           = bru.getEnvVar("__runId");
+              const _loopbackBase    = bru.getEnvVar("oscar_loopback_base") || "http://127.0.0.1:3001";
+              if (_runId) {
+                try {
+                  const _refreshUrl = `${_loopbackBase}/v1/runs/${_runId}/refresh-access-token`;
+                  const _resp = await new Promise((resolve, reject) => {
+                    bru.sendRequest(
+                      { url: _refreshUrl, method: "POST", proxy: false, headers: { "Content-Type": "application/json" } },
+                      (err, res) => { if (err) reject(err); else resolve(res); }
+                    );
+                  });
+                  const _status = (_resp && (_resp.status || _resp.statusCode)) || 0;
+                  let _body;
+                  try {
+                    _body = typeof _resp.body === "string" ? JSON.parse(_resp.body) : (_resp.body || _resp.data || null);
+                  } catch (_) { _body = null; }
+                  if (_status >= 200 && _status < 300 && _body && _body.access_token) {
+                    bru.setEnvVar("access_token", _body.access_token);
+                    validationLogger(`[INFO] expiredBookingTest: access_token refreshed via OSCAR loopback endpoint — fulfillment will use the fresh token.`);
+                  } else {
+                    validationLogger(`[WARNING] expiredBookingTest: token-refresh endpoint returned ${_status} — fulfillment will use the original (possibly expired) token. The provider may reject with 401/403; if so, distinguish auth failure from booking-expiry failure in the report.`);
+                  }
+                } catch (_e) {
+                  const _msg = (_e && _e.message) ? _e.message : String(_e);
+                  validationLogger(`[WARNING] expiredBookingTest: token-refresh request failed (${_msg}) — fulfillment will use the original (possibly expired) token.`);
+                }
+              } else {
+                validationLogger(`[WARNING] expiredBookingTest: __runId env var is not set — cannot call the OSCAR loopback refresh endpoint. Fulfillment will use the original token (may have expired during the wait).`);
+              }
+
+              validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);
               bru.setEnvVar("__expiredBookingArmed", "true");
             }
           }
@@ -99,7 +138,16 @@ runtime:
             test(`Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_status})`, () => {
                 expect(_isClientError, `expected a 4xx rejection, got ${_status}`).to.be.true;
             });
-            if (_status >= 400) {
+            if (_status === 401 || _status === 403) {
+                // #204: a 401/403 typically means the OAuth access token expired
+                // DURING the long wait (auth problem), NOT that the booking was
+                // rejected for being expired. 06.yml's before-request refreshes
+                // the token from the OSCAR loopback endpoint after the wait; if
+                // we still see auth failure here the refresh probably failed.
+                // Flag explicitly so the tester doesn't read "rejection" as
+                // "test passed" when the provider never got to evaluate the booking.
+                validationLogger(`[WARNING] Expired booking: provider returned ${_status} (auth error) — this typically means the access token expired during the long wait, not that the booking was rejected for being expired. Look for an earlier "[WARNING] expiredBookingTest: token-refresh ..." line; if the refresh failed, the OSCAR loopback endpoint at /v1/runs/{id}/refresh-access-token did not return a fresh token. Distinguishing this from a genuine booking-expiry rejection requires a re-run with a successful refresh.`);
+            } else if (_status >= 400) {
                 const _isObj = _body !== null && typeof _body === "object";
                 const _hasMsg = _isObj && (_body.title || _body.detail || _body.code);
                 test("Expired booking: error body is an RFC-9457 Problem (title/detail/code present)", () => {
