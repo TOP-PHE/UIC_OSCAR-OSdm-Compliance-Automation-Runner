@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.115",
+  "current_release": "2026.116",
   "releases": [
+    {
+      "release": "2026.116",
+      "date": "2026-05-28",
+      "server": "1.11.88",
+      "collection": "OTST_V2.0.38",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#204): per-scenario Max wait timer for the expired-booking test (tester's personal choice). New optional integer field expiredBookingMaxWaitMinutes (1..60) surfaced in the wizard next to the Expired-booking test dropdown. When set AND expiredBookingTest is on, 06.yml uses this as the wait budget instead of the server's RUN_TIMEOUT_MS, AND the runner auto-extends the worker SIGTERM to cover the wait (clamped to a new server-wide ceiling RUN_HARD_MAX_TIMEOUT_MS, default 30 min). Lets a tester opt into longer waits (Bileto/Paxone deadlines ~15 min → set 20) without needing to also raise the server env. Wired through datafile.schema.json, public/js/scenarios.js (UI + handler + default), library-bruno/scenarioParser.js (env-var resolve + reset), 02-Common Requests/06. POST Obtaining Fulfillments from Booking.yml (budget source switch + clearer SKIP WARNING), src/worker/runner.js (new computeEffectiveRunTimeoutMs helper that scans in-scope scenarios; the SAME effective ms drives the runHardDeadlineMs env injection AND the SIGTERM setTimeout — they MUST agree). New server env var RUN_HARD_MAX_TIMEOUT_MS documented in .env.example. Tester User Guide §4.8 / §7.1 updated. Bruno_Collection/VERSION OTST_V2.0.37 -> OTST_V2.0.38; server 1.11.87 -> 1.11.88.",
+        "Operator action required: none for default runs. If you need a per-scenario wait > 30 min, raise RUN_HARD_MAX_TIMEOUT_MS on the server. Chip shows 2026.116 / server-v1.11.88 / OTST_V2.0.38 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.115",
       "date": "2026-05-28",

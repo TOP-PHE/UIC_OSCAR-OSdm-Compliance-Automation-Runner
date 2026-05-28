@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.88] — 2026-05-28
+
+Per-scenario **Max wait** timer for the expired-booking test — **#204 (tester's
+personal choice).**
+**Bruno collection bumped (OTST_V2.0.37 → OTST_V2.0.38).**
+
+### Added
+- **New optional scenario field `expiredBookingMaxWaitMinutes`** (integer 1–60)
+  surfaced in the wizard next to the **Expired‑booking test** dropdown.
+  When set AND `expiredBookingTest` is `on`, OSCAR:
+  - uses **this** as the wait budget for the scenario (instead of the
+    server-wide `RUN_TIMEOUT_MS`); and
+  - the runner **auto-extends the worker's SIGTERM** to cover the wait —
+    so the tester does **not** need to also raise `RUN_TIMEOUT_MS` on the
+    server. Clamped to a new server-side ceiling
+    `RUN_HARD_MAX_TIMEOUT_MS` (default 30 min).
+  Typical use: Bileto / Paxone deadlines are ~15 min → set `20` and re-run.
+- New env var **`RUN_HARD_MAX_TIMEOUT_MS`** documented in `.env.example`.
+
+### Notes
+- The same effective timeout drives **both** the `runHardDeadlineMs` env
+  injection AND the SIGTERM `setTimeout` in `runner.js` — they must agree
+  or 06.yml's pre-sleep budget check disagrees with reality. The new
+  `computeEffectiveRunTimeoutMs` helper computes the value once and feeds
+  it to both sites.
+- The 06.yml SKIP message now says **which budget source was used**
+  (per-scenario timer vs `RUN_TIMEOUT_MS` vs the conservative 8-min
+  fallback) and the suggested fix is phrased per-source ("raise the
+  scenario's Max wait" vs "raise RUN_TIMEOUT_MS").
+
+---
+
 ## [server-v1.11.87] — 2026-05-28
 
 Expired-booking deadline — bookingPart-level fallback for providers that
