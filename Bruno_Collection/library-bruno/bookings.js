@@ -327,21 +327,37 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     validationLogger(`[WARNING] Invalid date - bookingDate: ${booking.createdOn}, offerDate: ${selectedOffer.createdOn}`);
   }
 
-  // B2: confirmationTimeLimit must be a valid future datetime when present (OSDM)
-  if (booking.confirmationTimeLimit) {
-    const confirmLimit = new Date(booking.confirmationTimeLimit);
-    // #204: stash the deadline so the expired-booking test (06. fulfillments) can
-    // wait until just past it before attempting confirmation.
-    bru.setEnvVar('bookingConfirmationTimeLimit', String(booking.confirmationTimeLimit));
-    test(`booking.confirmationTimeLimit is a valid future datetime (OSDM: must confirm before this deadline)`, () => {
-      expect(isNaN(confirmLimit.getTime()), `confirmationTimeLimit is not a valid date`).to.be.false;
+  // B2 / #204: booking-level confirmation deadline must be a valid future datetime
+  // when present (OSDM).
+  //
+  // The OSDM-standard field at the BOOKING level is `Booking.confirmationTimeLimit`.
+  // Some providers (e.g. Bileto sandbox) instead expose the booking-level deadline
+  // as `Booking.confirmableUntil` — a field the OSDM spec defines at the *bookingPart*
+  // level (PREBOOKED state), with an explicit note saying "confirmationTimeLimit in
+  // booking should be used" at the booking level. Accept either so the validation
+  // and the #204 expired-booking test work against both shapes, and surface the
+  // vendor-deviation case as a `[WARNING]` so it's visible in the report.
+  const _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
+  const _confirmSource   = booking.confirmationTimeLimit
+    ? 'booking.confirmationTimeLimit (OSDM-standard)'
+    : (booking.confirmableUntil ? 'booking.confirmableUntil (vendor extension at booking level)' : null);
+  if (_confirmDeadline) {
+    const confirmLimit = new Date(_confirmDeadline);
+    // #204: stash the deadline (regardless of source name) so 06. fulfillments
+    // can wait until just past it before attempting confirmation.
+    bru.setEnvVar('bookingConfirmationTimeLimit', String(_confirmDeadline));
+    test(`booking confirmation deadline is a valid future datetime — source: ${_confirmSource}`, () => {
+      expect(isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
       expect(confirmLimit.getTime()).to.be.above(Date.now(),
-        `confirmationTimeLimit is already in the past: ${booking.confirmationTimeLimit}`);
-      validationLogger(`[INFO] booking.confirmationTimeLimit: ${booking.confirmationTimeLimit}`);
+        `confirmation deadline is already in the past: ${_confirmDeadline}`);
+      validationLogger(`[INFO] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
     });
+    if (!booking.confirmationTimeLimit && booking.confirmableUntil) {
+      validationLogger(`[WARNING] Provider exposes the booking-level confirmation deadline as 'confirmableUntil' rather than the OSDM-standard 'confirmationTimeLimit'. The OSDM spec defines 'confirmableUntil' at the bookingPart level only — at the booking level the standard field is 'confirmationTimeLimit'. OSCAR accepts both, but a strict OSDM consumer might not.`);
+    }
   } else {
     bru.setEnvVar('bookingConfirmationTimeLimit', '');
-    validationLogger(`[INFO] booking.confirmationTimeLimit absent → test skipped`);
+    validationLogger(`[INFO] booking has no confirmation deadline at the booking level (neither confirmationTimeLimit nor confirmableUntil) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
   }
 
   // RI (#258): booking-level requestedInformation — static assertions, evaluate
