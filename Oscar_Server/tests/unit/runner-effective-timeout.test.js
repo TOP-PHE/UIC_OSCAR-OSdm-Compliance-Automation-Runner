@@ -210,9 +210,10 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.source).toMatch(/SC_OFFERTIMEOUT/);
   });
 
-  test('takes the LARGEST request across booking and offer timers in one scenario', async () => {
-    // A scenario can in theory enable both; the worker SIGTERM must cover the
-    // longer of the two (the second timer is what actually runs).
+  test('PR B: SUMS booking + offer timers within one scenario (was MAX in v1.11.94)', async () => {
+    // PR #305 / #307 took the max within a scenario; PR B (this PR) changes
+    // the semantic to SUM because the scenario auto-expands into N sub-runs
+    // run sequentially. 17 + 8 = 25 min, +2 sub-runs × 60s buffer = 1,620,000 ms.
     const datafile = {
       scenariosToRun: ['SC_BOTH'],
       scenarios: [makeScenario('SC_BOTH', {
@@ -226,9 +227,9 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
 
     const r = await computeEffectiveRunTimeoutMs(p, 'SC_BOTH');
 
-    expect(r.requestedMs).toBe(17 * 60 * 1000 + 60000);
-    // Source attribution names whichever timer drove the extension.
-    expect(r.source).toMatch(/expiredOfferMaxWaitMinutes/);
+    expect(r.requestedMs).toBe((17 + 8) * 60 * 1000 + 2 * 60000);
+    // Source line names the count + the labels when more than one timer
+    expect(r.source).toMatch(/2 timers summed/);
   });
 
   test('expiredOfferTest off (with a wait set) is a no-op', async () => {
