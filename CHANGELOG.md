@@ -14,6 +14,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.95] — 2026-05-28
+
+**Expired-flow auto-expansion (PR B).** When 2+ expired-X timers are armed
+on the same scenario, OSCAR runs that scenario **N times** — one sub-run
+per timer, in flow order — instead of forcing the tester to duplicate the
+scenario N times.
+**Bruno collection bumped (OTST_V2.0.42 → OTST_V2.0.43).**
+
+### Added — `expiredFlow.js` auto-expansion exports
+- `buildAndArmExpiredFlowQueue()` — called by scenarioParser at scenario
+  init. Inspects timer flags + gating env vars (`scenarioType`,
+  `salesFlow_*`, `placeSelectionMode`), builds an ordered queue, persists
+  it, and disarms every timer flag except queue[0]. Existing per-YAML
+  gates naturally fire only for the current timer.
+- `advanceExpiredFlowQueueOrFinish({ scenarioLabel })` — called by each
+  gated YAML's after-response. Returns `true` if more timers queued
+  (already routed back to `01.`); `false` if queue exhausted (caller runs
+  its cross-scenario tail).
+- `nhfTestPrefix()` — assertion-name prefix
+  `[NHF_<3-letter>_<scenario_code>] ` for multi-timer queues; empty string
+  for single-timer (backwards-compatible).
+- **3-letter codes**: `OTO` / `BTO` / `ARO` / `ATO` / `RTO` / `ETO`. Stable.
+
+### Added — `scenarioParser.js` sub-run continuation
+- Early-return at the top of `getScenarioData` when
+  `__expiredFlowSubRunPending === "true"` — skip the full re-parse (env
+  state is still valid; only timer flags changed).
+- Queue build runs after `salesFlow_*` / `scenarioType` /
+  `placeSelectionMode` are resolved so gate functions see consistent state.
+- Reset list extended with `__expiredFlowQueue`,
+  `__expiredFlowQueueIndex`, `__expiredFlowSubRunPending`.
+
+### Changed — runner SIGTERM math: sum within, max across
+- `EXPIRED_FLOW_TIMERS` budget math switches from MAX to SUM within a
+  single scenario. 3 timers of 10/15/20 min → `45 min + 3×60s` buffer.
+  Across scenarios still MAX (one scenario per worker at a time).
+- `RUN_HARD_MAX_TIMEOUT_MS` clamp unchanged.
+- Source line shows `<N> timers summed (label1 + label2 + …)` when
+  multi-timer.
+
+### Changed — YAMLs
+- All 6 gated YAMLs (`02. POST Create Booking`,
+  `07. GET Booking after Fulfillments` for booking-expiry,
+  `09. POST Add Reservation`, `10. POST Add Ancillary`,
+  `03-Refund/13. PATCH Refund Offer`,
+  `04-Exchange/11. POST Exchange Operations`) call
+  `advanceExpiredFlowQueueOrFinish` before their cross-scenario tails.
+- All `test()` assertion names get `nhfTestPrefix()` so multi-timer
+  sub-runs are distinguishable in the report.
+
+### Changed — wizard
+- Footer note in the "Non Happy Flow customisation" section rewritten:
+  describes auto-expansion, the `NHF_XXX_` naming convention, and the
+  sum-vs-max budget. The previous "one scenario, one test today" caveat
+  is gone.
+
+### Docs
+- **Tester Guide §4.8** — new "Auto-expansion: multi-timer scenarios → one
+  sub-run per timer" subsection with the assertion-name worked example,
+  gating-skip rules, and wait-budget math.
+
+### Tests
+- `bruno-expiredflow.test.js`: 3 new test groups (~20 cases) for
+  `buildAndArmExpiredFlowQueue` (single, multi, scenarioType gates, add-
+  reservation gates, order), `advanceExpiredFlowQueueOrFinish`
+  (no-advance, advance + route, last-position), and `nhfTestPrefix`
+  (empty ≤1, NHF format ≥2, leading-NHF strip).
+- `runner-effective-timeout.test.js`: 3 new PR-B cases — sum within
+  scenario, max across mixed-timer-count scenarios, clamp at
+  `RUN_HARD_MAX_TIMEOUT_MS`.
+
+### Versions
+- `Bruno_Collection/VERSION`: `OTST_V2.0.42` → `OTST_V2.0.43`.
+- `Oscar_Server/package.json`: `1.11.94` → `1.11.95`.
+- `compatibility.json`: new entry `2026.123`.
+
+### Backwards compatibility
+- **Single-timer scenarios unchanged**: same assertion names (no `NHF_…`
+  prefix), same routing, same budget (sum-of-one == one).
+- **Multi-timer behaviour changed**: previously the first-in-flow timer
+  fired and the rest never ran. Now all armed timers run as sub-runs. If
+  you relied on the "first wins" pattern, update the data file to enable
+  only the intended timer.
+
+---
+
 ## [server-v1.11.94] — 2026-05-28
 
 Ship the **4 remaining expired-X negative tests** on top of the shared
