@@ -324,7 +324,7 @@ Asserts that a booking left to expire **cannot be fulfilled**.
 | Mode | What OSCAR does |
 |---|---|
 | **`off`** *(default)* | Normal flow. |
-| **`on`** | After the booking is created, **wait until 15 s past** the booking‑level confirmation deadline — read from `booking.confirmationTimeLimit` (OSDM‑standard) OR, if absent, `booking.confirmableUntil` (vendor field at booking level used by some sandboxes, e.g. Bileto). Then `POST /fulfillments`. The fulfillment **MUST be rejected** (`4xx` + `Problem`) — a hard FAIL if the provider fulfills an expired booking. The follow‑up `GET /bookings` must show admissions/reservations **EXPIRED / RELEASED / CANCELLED** (a `404` purge is accepted). |
+| **`on`** | After the booking is created, **wait until 15 s past** the booking's effective confirmation deadline. The deadline is resolved in this order: **(1)** `booking.confirmationTimeLimit` (OSDM‑standard at the booking level); else **(2)** `booking.confirmableUntil` (Bileto puts it here at the booking level); else **(3)** the **earliest** `bookedOffers[].{admissions \| reservations \| ancillaries}[].confirmableUntil` — Paxone exposes the deadline only here, which is in fact OSDM's own placement for that field. Then `POST /fulfillments`. The fulfillment **MUST be rejected** (`4xx` + `Problem`) — a hard FAIL if the provider fulfills an expired booking. The follow‑up `GET /bookings` must show admissions/reservations **EXPIRED / RELEASED / CANCELLED** (a `404` purge is accepted). |
 
 > **Run‑budget guard.** If waiting until the deadline would exceed the run's
 > `RUN_TIMEOUT_MS` (default 10 min), the test **skips with a `[WARNING]`** that
@@ -415,7 +415,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Fulfillment type / media | `ETICKET`… / `PDF_A4`… | `requestedFulfillmentOptions` |
 | `requestedInformationProbe` | `off` / `omit` / `invalid` | passenger‑info auto‑feed *or* a negative probe (§4.8) |
 | `bookingPurchaserMode` | `inline` / `deferred` / `omit` / `invalid` | where the purchaser is sent + negative probe (§4.8) |
-| `expiredBookingTest` | `off` / `on` | wait past `confirmationTimeLimit` (or `confirmableUntil`), assert rejection (§4.8) |
+| `expiredBookingTest` | `off` / `on` | wait past the effective confirmation deadline (booking‑root `confirmationTimeLimit` / `confirmableUntil`, or the earliest part‑level `confirmableUntil`), assert rejection (§4.8) |
 | `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.9) |
 
 ### 7.2 Sale‑flow step → OSDM request

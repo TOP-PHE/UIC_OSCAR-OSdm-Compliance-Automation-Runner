@@ -330,21 +330,53 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // B2 / #204: booking-level confirmation deadline must be a valid future datetime
   // when present (OSDM).
   //
-  // The OSDM-standard field at the BOOKING level is `Booking.confirmationTimeLimit`.
-  // Some providers (e.g. Bileto sandbox) instead expose the booking-level deadline
-  // as `Booking.confirmableUntil` — a field the OSDM spec defines at the *bookingPart*
-  // level (PREBOOKED state), with an explicit note saying "confirmationTimeLimit in
-  // booking should be used" at the booking level. Accept either so the validation
-  // and the #204 expired-booking test work against both shapes, and surface the
-  // vendor-deviation case as a `[WARNING]` so it's visible in the report.
-  const _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
-  const _confirmSource   = booking.confirmationTimeLimit
+  // Field-name resolution order (most-standard → least-standard):
+  //   1. `Booking.confirmationTimeLimit` — OSDM-standard at the booking level.
+  //   2. `Booking.confirmableUntil` — Bileto sandbox sets this at the booking
+  //       level (OSDM defines this field at the *bookingPart* level only).
+  //   3. **Earliest** `bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil`
+  //       — Paxone sandbox sets `confirmableUntil` ONLY at the bookingPart level,
+  //       not at the booking root (matching the OSDM schema's own placement of
+  //       the field). The booking effectively expires when the FIRST part
+  //       expires, so the earliest part-level deadline is the booking deadline.
+  //
+  // Each fallback emits a `[WARNING]` documenting the vendor deviation so the
+  // tester can see in the report which shape was used.
+  let _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
+  let _confirmSource   = booking.confirmationTimeLimit
     ? 'booking.confirmationTimeLimit (OSDM-standard)'
     : (booking.confirmableUntil ? 'booking.confirmableUntil (vendor extension at booking level)' : null);
+
+  // Fallback 3 — dig into bookingParts and pick the earliest confirmableUntil.
+  if (!_confirmDeadline) {
+    const _partDeadlines = [];
+    const _bos = Array.isArray(booking.bookedOffers) ? booking.bookedOffers : [];
+    for (const bo of _bos) {
+      for (const pt of ['admissions', 'reservations', 'ancillaries']) {
+        const parts = Array.isArray(bo[pt]) ? bo[pt] : [];
+        for (const p of parts) {
+          if (p && p.confirmableUntil) {
+            const t = new Date(p.confirmableUntil).getTime();
+            if (!isNaN(t)) _partDeadlines.push({ ts: t, raw: p.confirmableUntil, pt });
+          }
+        }
+      }
+    }
+    if (_partDeadlines.length > 0) {
+      _partDeadlines.sort((a, b) => a.ts - b.ts);
+      const earliest = _partDeadlines[0];
+      _confirmDeadline = earliest.raw;
+      _confirmSource =
+        `min(bookedOffers[].${earliest.pt}[].confirmableUntil) — bookingPart-level ` +
+        `(OSDM-standard location for this field). Picked the earliest of ${_partDeadlines.length} ` +
+        `part deadline(s); the booking effectively expires when the first part expires.`;
+    }
+  }
+
   if (_confirmDeadline) {
     const confirmLimit = new Date(_confirmDeadline);
-    // #204: stash the deadline (regardless of source name) so 06. fulfillments
-    // can wait until just past it before attempting confirmation.
+    // #204: stash the effective booking deadline so 06. fulfillments can wait
+    // until just past it before attempting confirmation.
     bru.setEnvVar('bookingConfirmationTimeLimit', String(_confirmDeadline));
     test(`booking confirmation deadline is a valid future datetime — source: ${_confirmSource}`, () => {
       expect(isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
@@ -352,12 +384,15 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
         `confirmation deadline is already in the past: ${_confirmDeadline}`);
       validationLogger(`[INFO] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
     });
+    // Document vendor deviations from OSDM-standard placement.
     if (!booking.confirmationTimeLimit && booking.confirmableUntil) {
       validationLogger(`[WARNING] Provider exposes the booking-level confirmation deadline as 'confirmableUntil' rather than the OSDM-standard 'confirmationTimeLimit'. The OSDM spec defines 'confirmableUntil' at the bookingPart level only — at the booking level the standard field is 'confirmationTimeLimit'. OSCAR accepts both, but a strict OSDM consumer might not.`);
+    } else if (!booking.confirmationTimeLimit && !booking.confirmableUntil) {
+      validationLogger(`[WARNING] Provider does not expose a booking-level confirmation deadline (neither 'confirmationTimeLimit' nor 'confirmableUntil' at the booking root). OSCAR fell back to the earliest bookingPart-level 'confirmableUntil' (${_confirmDeadline}). This matches OSDM's schema placement for 'confirmableUntil' (it's defined on the bookingPart), but OSDM also recommends 'confirmationTimeLimit' at the booking root for clients that don't walk parts — a strict consumer might expect that.`);
     }
   } else {
     bru.setEnvVar('bookingConfirmationTimeLimit', '');
-    validationLogger(`[INFO] booking has no confirmation deadline at the booking level (neither confirmationTimeLimit nor confirmableUntil) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
+    validationLogger(`[INFO] booking has no confirmation deadline anywhere (not at the booking root, not on any bookingPart) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
   }
 
   // RI (#258): booking-level requestedInformation — static assertions, evaluate

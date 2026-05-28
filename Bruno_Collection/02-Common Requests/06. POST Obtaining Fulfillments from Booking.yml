@@ -27,11 +27,13 @@ runtime:
         // #204 EXPIRED-BOOKING TEST: when armed, wait until just past the booking's
         // confirmation deadline, THEN let the fulfillment fire — the after-response
         // asserts the provider rejects it. The deadline is read from a single env
-        // var (bookingConfirmationTimeLimit) populated by bookings.js from EITHER
-        // booking.confirmationTimeLimit (OSDM-standard) OR booking.confirmableUntil
-        // (vendor field at booking level — Bileto sandbox uses this). Skips (with a
-        // WARNING) when the wait would overrun the run budget, or when the provider
-        // set neither field.
+        // var (bookingConfirmationTimeLimit) populated by bookings.js from one of:
+        //   1. booking.confirmationTimeLimit (OSDM-standard at booking level)
+        //   2. booking.confirmableUntil (Bileto-style at booking level)
+        //   3. earliest bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil
+        //      (Paxone-style — the OSDM schema's actual placement for the field)
+        // Skips (with a WARNING) when the wait would overrun the run budget, or
+        // when the provider exposes no deadline anywhere.
         if (String(bru.getEnvVar("expiredBookingTest")) === "true") {
           const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
           const limitRaw = bru.getEnvVar("bookingConfirmationTimeLimit");
