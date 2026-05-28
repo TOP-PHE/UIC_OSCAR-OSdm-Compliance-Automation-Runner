@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.89] — 2026-05-28
+
+Collective-booking — tester-facing documentation + wizard hint — **#222
+Increment 1.**
+**Server-only release; no Bruno collection bump.**
+
+### Changed
+- **#222 Inc 1 — clarify what `OfferMode` actually means.** The wizard hint
+  on the **Offer Mode** field now spells out the OSDM-defined semantics:
+  - `INDIVIDUAL` — each passenger gets their own admission/reservation;
+    refund of a single passenger is possible.
+  - `COLLECTIVE` — admissions/reservations are shared across the group
+    (atomic — can't refund per passenger).
+  - The 1-passenger edge case: COLLECTIVE is semantically degenerate; the
+    provider may accept, fall back to INDIVIDUAL with a warning (per OSDM
+    spec), or reject.
+- Tester User Guide **§4.3** expanded with the same content plus the
+  spec-mandated provider-fallback behaviour, and a pointer to **#222**
+  for the broader test build-out.
+
+### Notes
+- **No behaviour change** — OSCAR still only validates that
+  `offer.admissions[*].offerMode` is a member of the enum, exactly as
+  before. Real assertions (mode fidelity, refund-per-pax restriction,
+  `POST /bookings/{id}/split` endpoint behaviour, scenario guardrail
+  when COLLECTIVE + 1 pax) are tracked as Increments 2–5 on #222 and
+  will land in later releases.
+
+---
+
 ## [server-v1.11.88] — 2026-05-28
 
 Per-scenario **Max wait** timer for the expired-booking test — **#204 (tester's

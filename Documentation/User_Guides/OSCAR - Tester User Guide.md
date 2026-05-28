@@ -203,7 +203,11 @@ framework authorised.
 - **Requested offer parts** — `ADMISSION`, `RESERVATION`, `ANCILLARY`, `FARE_*`,
   `CONTINUOUS_SERVICE`, `ALL`. (Include `RESERVATION` if you intend to pick seats.)
 - **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`.
-- **Offer mode** — `INDIVIDUAL`, `COLLECTIVE`.
+- **Offer mode** — `INDIVIDUAL`, `COLLECTIVE`. The OSDM spec defines:
+  - `INDIVIDUAL` — each passenger gets their **own** admission/reservation (N admissions for N passengers). Refund of a **single passenger** is possible.
+  - `COLLECTIVE` — the admissions/reservations are **shared across the group** (one admission with N `passengerRefs`). The group is **atomic** — you cannot refund an individual passenger; the whole booking moves together.
+  - If a provider does **not support** the requested mode, the spec mandates that it **fall back** to the supported mode and emit a **warning** in the response.
+  - With only **one passenger**, `COLLECTIVE` is semantically degenerate ("collective of one"). Depending on the provider, OSCAR may see the request **accepted as-is**, **silently fallen back to INDIVIDUAL** (with a warning), or **rejected** with an error (e.g. minimum group size). Today OSCAR doesn't constrain or fully assert this — see #222 for the broader test build-out.
 
 ### 4.4 Return trip (optional)
 
