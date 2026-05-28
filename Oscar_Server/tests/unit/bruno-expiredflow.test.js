@@ -30,16 +30,19 @@ global.bru = {
   setEnvVar:    (k, v) => { envStore[k] = v; },
   deleteEnvVar: (k) => { delete envStore[k]; },
 };
-// Capturing log array — populated by the displays.js mock below.
-const _logCalls = [];
-
 // displays.js is required by expiredFlow.js at load (`const { validationLogger }
 // = require('./displays.js')`). Mock it to capture the log lines emitted by the
 // helper rather than letting the real implementation hit console.log / bru.getVar.
 // (The real implementation honours loggingType filtering and also pushes into a
 // __rptLogs var — neither is relevant to grading-logic assertions here.)
+//
+// Babel-jest's `jest.mock` factory only allows references to variables whose
+// NAME is prefixed with `mock` (case-insensitive); any other out-of-scope var
+// triggers `ReferenceError: Invalid variable access`. So the capture array MUST
+// be named `mockLogCalls`, not `_logCalls`.
+const mockLogCalls = [];
 jest.mock('../../../Bruno_Collection/library-bruno/displays.js', () => ({
-  validationLogger: (msg) => { _logCallsRef.push(String(msg)); },
+  validationLogger: (msg) => { mockLogCalls.push(String(msg)); },
 }));
 
 // auth.js is transitively required by expiredFlow; mock it so runExpiredFlowWait
@@ -47,11 +50,6 @@ jest.mock('../../../Bruno_Collection/library-bruno/displays.js', () => ({
 jest.mock('../../../Bruno_Collection/library-bruno/auth.js', () => ({
   refreshAccessTokenIfNeeded: jest.fn().mockResolvedValue({ ok: true }),
 }));
-
-// jest.mock factories are hoisted ABOVE this point, so we can't close over
-// _logCalls directly (TDZ). Use a global reference array the mock factory can
-// reach via globalThis at call time.
-globalThis._logCallsRef = _logCalls;
 
 const {
   planExpiredFlow,
@@ -62,7 +60,7 @@ const {
 
 beforeEach(() => {
   envStore = {};
-  _logCalls.length = 0;
+  mockLogCalls.length = 0;
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -145,7 +143,7 @@ describe('gradeExpiredFlowResponse', () => {
     expect(g.status).toBe(401);
     expect(g.isAuthFailure).toBe(true);
     expect(g.isClientError).toBe(true);
-    expect(_logCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: provider returned 401/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: provider returned 401/);
   });
 
   test('403 → isAuthFailure=true (same path as 401)', () => {
@@ -159,7 +157,7 @@ describe('gradeExpiredFlowResponse', () => {
     expect(g.status).toBe(200);
     expect(g.isClientError).toBe(false);
     expect(g.isAuthFailure).toBe(false);
-    expect(_logCalls.join('\n')).toMatch(/\[ERROR\] Expired offer: provider returned 200/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[ERROR\] Expired offer: provider returned 200/);
   });
 
   test('4xx + Problem body with expiry keyword → INFO log + hasProblemBody=true', () => {
@@ -177,7 +175,7 @@ describe('gradeExpiredFlowResponse', () => {
     expect(g.isAuthFailure).toBe(false);
     expect(g.hasProblemBody).toBe(true);
     expect(g.expiryKeywordFound).toBe(true);
-    expect(_logCalls.join('\n')).toMatch(/\[INFO\] Expired offer: the error message indicates expiry/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[INFO\] Expired offer: the error message indicates expiry/);
   });
 
   test('4xx + Problem body without expiry keyword → WARNING (rejected but unclear)', () => {
@@ -185,7 +183,7 @@ describe('gradeExpiredFlowResponse', () => {
     const g = gradeExpiredFlowResponse({ res: fakeRes(400, body), scenarioLabel: 'Expired offer' });
     expect(g.expiryKeywordFound).toBe(false);
     expect(g.hasProblemBody).toBe(true);
-    expect(_logCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: the provider rejected the request but the error does not clearly indicate expiry/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: the provider rejected the request but the error does not clearly indicate expiry/);
   });
 
   test('4xx with no body → no Problem body, still graded as client error', () => {
@@ -197,7 +195,7 @@ describe('gradeExpiredFlowResponse', () => {
   test('5xx → WARNING (unexpected status)', () => {
     const g = gradeExpiredFlowResponse({ res: fakeRes(503, null), scenarioLabel: 'Expired offer' });
     expect(g.isClientError).toBe(false);
-    expect(_logCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: unexpected status 503/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[WARNING\] Expired offer: unexpected status 503/);
   });
 
   test('detects expiry keyword in any case ("Time limit exceeded", "timed out", "no longer", ...)', () => {
@@ -209,7 +207,7 @@ describe('gradeExpiredFlowResponse', () => {
       'too late — try again',
     ];
     for (const detail of cases) {
-      _logCalls.length = 0;
+      mockLogCalls.length = 0;
       const g = gradeExpiredFlowResponse({
         res: fakeRes(422, { title: 'rejected', detail }),
         scenarioLabel: 'Expired offer',
@@ -237,7 +235,7 @@ describe('runExpiredFlowWait', () => {
       expect.objectContaining({ force: true, callerLabel: 'unit-test (no-wait)' }),
     );
     // The "deadline already passed" log line tells the operator we're firing now.
-    expect(_logCalls.join('\n')).toMatch(/deadline already passed/);
+    expect(mockLogCalls.join('\n')).toMatch(/deadline already passed/);
   });
 
   test('a refresh throw degrades to a warning but still resolves (request will use the old token)', async () => {
@@ -250,6 +248,6 @@ describe('runExpiredFlowWait', () => {
       scenarioLabel: 'unit-test (throw)',
     })).resolves.toBeUndefined();
 
-    expect(_logCalls.join('\n')).toMatch(/\[WARNING\] unit-test \(throw\): token-refresh helper threw \(boom\)/);
+    expect(mockLogCalls.join('\n')).toMatch(/\[WARNING\] unit-test \(throw\): token-refresh helper threw \(boom\)/);
   });
 });
