@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.90] — 2026-05-28
+
+Fix the per-scenario expired-booking timer silently failing because the
+runner couldn't read the encrypted datafile — **#204 (regression).**
+**Server-only release; no Bruno collection bump.**
+
+### Fixed
+- **#204 — the per-scenario `expiredBookingMaxWaitMinutes` timer (shipped
+  in 2026.116) silently did not extend the worker SIGTERM.** The helper
+  `computeEffectiveRunTimeoutMs` in `runner.js` read the datafile with
+  plain `fs.readFile` + `JSON.parse` — but since OSCAR v1.11.0 (Phase 2 of
+  issue #60) the datafile on disk is AES-256-GCM encrypted under the
+  OSCAR1 envelope. `JSON.parse(ciphertext)` threw, the catch block silently
+  swallowed the error, and the helper fell back to base `RUN_TIMEOUT_MS`
+  — so every scenario opting into Max wait got SIGTERMed at the 10 min
+  default. Reported by a tester: Max wait = 30 on Paxone (deadline ~15 min)
+  → run died at exactly 10 min with exit 1 and no transaction reports.
+  - The helper now uses `decryptFromFileAsync` (same pattern as the
+    `/v1/runs` POST handler in `api/routes/runs.js`), which handles both
+    the encrypted form and any legacy plaintext datafiles.
+
+### Changed
+- **Always log the effective `RUN_TIMEOUT_MS`** for every run, with `base`
+  / `requested` / `hardMax` / `source` / `helperError` fields. Previously
+  the diagnostic line only fired when the extension *actually* fired —
+  which is exactly when this class of failure can't be diagnosed.
+  New log line example:
+  ```
+  [runner] Effective RUN_TIMEOUT_MS = 1260000ms (1260s); base=600000ms hardMax=1800000ms; source: scenario expiredBookingMaxWaitMinutes (triggered by 'SC_BKTIMEOUT')
+  ```
+- Helper-error captured (no longer silently swallowed) and surfaced as a
+  `warn`-level log line so the operator can tell *why* an expected
+  extension didn't fire.
+
+### Added
+- **`tests/unit/runner-effective-timeout.test.js`** — regression guard for
+  this class. Pins the contract: encrypted+plaintext datafiles both work;
+  clamping at `RUN_HARD_MAX_TIMEOUT_MS`; helper-error reporting; sanity
+  (extension off when `expiredBookingTest` is off); `scenariosToRun: 'ALL'`
+  fan-out; all four truthy forms of `expiredBookingTest` (`true`, `'true'`,
+  `'on'`, `'YES'`).
+
+---
+
 ## [server-v1.11.89] — 2026-05-28
 
 Collective-booking — tester-facing documentation + wizard hint — **#222

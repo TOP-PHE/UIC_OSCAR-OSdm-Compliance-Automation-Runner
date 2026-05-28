@@ -26,7 +26,7 @@ const fs          = require('fs');
 const { spawn }   = require('child_process');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
-const { copyAndEncryptFileAsync } = require('../utils/at-rest');
+const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
@@ -292,10 +292,24 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
   let requestedMs = 0;
   let triggeringScenario = null;
+  let helperError = null;
+  let scenariosConsidered = 0;
+  let scenariosInScope = 0;
   try {
-    const content = await fs.promises.readFile(datafilePath, 'utf8');
-    const data    = JSON.parse(content);
+    // CRITICAL: since OSCAR v1.11.0 (Phase 2 of issue #60) the datafile on disk
+    // is AES-256-GCM encrypted under the OSCAR1 envelope. Plain fs.readFile here
+    // returns the CIPHERTEXT and the subsequent JSON.parse throws on the magic
+    // header — which was the actual cause of the #204 extension silently failing:
+    // the helper hit its catch block, fell back to baseMs, and the worker SIGTERMed
+    // the wait at the default 10 min RUN_TIMEOUT_MS.
+    //
+    // decryptFromFileAsync handles BOTH the encrypted form AND legacy plaintext
+    // datafiles (it detects the OSCAR1 magic header). Same pattern as the
+    // /v1/runs POST handler in api/routes/runs.js.
+    const buf = await decryptFromFileAsync(datafilePath);
+    const data = JSON.parse(buf.toString('utf8'));
     const scenarios     = Array.isArray(data.scenarios) ? data.scenarios : [];
+    scenariosConsidered = scenarios.length;
     const scenariosToRun = data.scenariosToRun;
     const isInScope = (code) => {
       if (scenarioOverride) return String(code) === String(scenarioOverride);
@@ -306,6 +320,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
     };
     for (const s of scenarios) {
       if (!s || !isInScope(s.code)) continue;
+      scenariosInScope++;
       const expired = s.expiredBookingTest;
       const isOn = expired === true || (typeof expired === 'string' && ['true', 'on', 'yes'].includes(expired.toLowerCase()));
       if (!isOn) continue;
@@ -316,9 +331,10 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
         if (ms > requestedMs) { requestedMs = ms; triggeringScenario = s.code || null; }
       }
     }
-  } catch (_) {
-    // Best-effort: a failure to read/parse the datafile means we just stay at
-    // the base timeout; Bruno will surface a more useful error downstream.
+  } catch (err) {
+    // Capture (don't swallow) — the caller logs this so the operator can tell
+    // why an expected extension didn't fire.
+    helperError = err && err.message ? err.message : String(err);
   }
   const desired   = Math.max(baseMs, requestedMs);
   const effective = Math.min(desired, hardMaxMs);
@@ -328,10 +344,12 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
     source = clamped
       ? `scenario expiredBookingMaxWaitMinutes (clamped at RUN_HARD_MAX_TIMEOUT_MS, triggered by '${triggeringScenario}')`
       : `scenario expiredBookingMaxWaitMinutes (triggered by '${triggeringScenario}')`;
+  } else if (helperError) {
+    source = `RUN_TIMEOUT_MS (datafile decrypt/parse FAILED — fell back to base; error: ${helperError})`;
   } else {
-    source = 'RUN_TIMEOUT_MS';
+    source = `RUN_TIMEOUT_MS (no in-scope scenario requested an extension; ${scenariosConsidered} scenarios in datafile, ${scenariosInScope} matched the run scope)`;
   }
-  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source };
+  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
 }
 
 function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra) {
@@ -554,13 +572,22 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // cover it (clamped to RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both
   // this env injection and the SIGTERM setTimeout below — they MUST agree.
   const _runBudget = await computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride || null);
-  if (_runBudget.requestedMs > 0) {
-    logEvent(runId, 'info',
-      `[runner] Effective RUN_TIMEOUT_MS for this run = ${_runBudget.effectiveMs}ms (base=${_runBudget.baseMs}, requested=${_runBudget.requestedMs}, hardMax=${_runBudget.hardMaxMs}; source: ${_runBudget.source})`);
-    if (_runBudget.clamped) {
-      logEvent(runId, 'warn',
-        `[runner] expiredBookingMaxWaitMinutes requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
-    }
+  // Always emit the chosen budget so the operator can tell exactly what the
+  // runner decided — whether the extension fired, fell back silently, or hit
+  // an error during datafile decrypt/parse. Previously this only logged when
+  // the extension actually fired, which silently masked the #204 extension
+  // failure (the datafile read returned ciphertext, JSON.parse threw, the
+  // catch swallowed the error, and the run got SIGTERMed at the default 10
+  // min).
+  logEvent(runId, 'info',
+    `[runner] Effective RUN_TIMEOUT_MS = ${_runBudget.effectiveMs}ms (${Math.round(_runBudget.effectiveMs / 1000)}s); base=${_runBudget.baseMs}ms hardMax=${_runBudget.hardMaxMs}ms; source: ${_runBudget.source}`);
+  if (_runBudget.helperError) {
+    logEvent(runId, 'warn',
+      `[runner] computeEffectiveRunTimeoutMs hit an error reading the datafile (${_runBudget.helperError}) — fell back to base RUN_TIMEOUT_MS. The #204 expired-booking test will NOT get its requested extension; investigate above.`);
+  }
+  if (_runBudget.clamped) {
+    logEvent(runId, 'warn',
+      `[runner] expiredBookingMaxWaitMinutes requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
   }
   const envYmlOut  = envYml + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`;
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
@@ -879,4 +906,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun };
+module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs };
