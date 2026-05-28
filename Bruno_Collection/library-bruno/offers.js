@@ -221,6 +221,47 @@ function postOfferResponse(jsonData) {
 
   let selectedOffer = selectAndSetOffer(jsonData);
 
+  // #expired-offer: stash the earliest validUntil across all parts of the
+  // SELECTED offer (OSDM AbstractOfferPart.validUntil — admission, reservation,
+  // ancillary, fareAdmission, fareReservation, fareAncillary, …). The shared
+  // expiredFlow.js helper will read this in 02. POST Create Booking's
+  // before-request if expiredOfferTest is on, wait past the earliest
+  // validUntil, then fire the booking and assert the provider rejects it.
+  //
+  // Earliest, not latest: a SINGLE expired part is enough for the booking to
+  // be invalid — the booking is only as valid as its earliest-expiring part.
+  if (selectedOffer && typeof selectedOffer === 'object') {
+    const _partLists = [
+      'admissionOfferParts', 'reservationOfferParts', 'ancillaryOfferParts',
+      'fareAdmissionOfferParts', 'fareReservationOfferParts', 'fareAncillaryOfferParts',
+    ];
+    let _earliestMs = Infinity;
+    let _earliestRaw = null;
+    let _earliestSrc = null;
+    _partLists.forEach(function (pt) {
+      const parts = Array.isArray(selectedOffer[pt]) ? selectedOffer[pt] : [];
+      parts.forEach(function (p, i) {
+        if (p && p.validUntil) {
+          const t = new Date(p.validUntil).getTime();
+          if (!isNaN(t) && t < _earliestMs) {
+            _earliestMs  = t;
+            _earliestRaw = p.validUntil;
+            _earliestSrc = `selectedOffer.${pt}[${i}].validUntil`;
+          }
+        }
+      });
+    });
+    if (_earliestRaw) {
+      bru.setEnvVar('offerValidUntil', String(_earliestRaw));
+      bru.setEnvVar('offerValidUntilSource', String(_earliestSrc));
+      validationLogger(`[INFO] Earliest offer-part validUntil = ${_earliestRaw} (${_earliestSrc}) — drives the #expiredOfferTest deadline if enabled.`);
+    } else {
+      bru.setEnvVar('offerValidUntil', '');
+      bru.setEnvVar('offerValidUntilSource', '');
+      validationLogger('[INFO] Selected offer has no validUntil on any part — #expiredOfferTest (if on) will skip with a WARNING.');
+    }
+  }
+
   validateOfferSummary(selectedOffer);
   validatePassengers(jsonData);
   validateOfferParts(selectedOffer);

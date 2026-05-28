@@ -272,26 +272,38 @@ function _authLogger(runId) {
 // Since this env file is ephemeral (deleted immediately after the run), there
 // is no security risk in writing credentials as plain variables.
 /**
- * Compute the effective run timeout (ms) for a run, taking into account the
- * per-scenario `expiredBookingMaxWaitMinutes` opt-in (#204 tester timer).
+ * Compute the effective run timeout (ms) for a run, taking into account
+ * per-scenario expired-flow tester-timer opt-ins:
+ *   • `expiredBookingTest` + `expiredBookingMaxWaitMinutes`  (#204)
+ *   • `expiredOfferTest`   + `expiredOfferMaxWaitMinutes`    (Phase 2)
+ * Any future expired-X flow that follows the same `<flag>` / `<maxWait>` shape
+ * can be added to the EXPIRED_FLOW_TIMERS table below without touching the
+ * scan loop or the budget arithmetic.
  *
  *   baseMs    = RUN_TIMEOUT_MS env (default 600000 = 10 min)
  *   hardMaxMs = RUN_HARD_MAX_TIMEOUT_MS env (default 1800000 = 30 min)
  *
  * The datafile (already known to exist by the caller) is parsed; for every
  * scenario in scope (matching `scenarioOverride` if set, else
- * `scenariosToRun`) that has `expiredBookingTest` on AND
- * `expiredBookingMaxWaitMinutes` in 1..60, the requested ms (minutes*60_000 + 60s buffer)
- * is computed. The effective timeout is `min(hardMaxMs, max(baseMs, maxRequested))`.
+ * `scenariosToRun`), each registered timer is inspected. When BOTH the flag
+ * is on AND its max-wait field is in 1..60, a requested ms (minutes*60_000 +
+ * 60s buffer) is computed; the overall budget takes the largest requested
+ * value across all timers and scenarios. The effective timeout is
+ * `min(hardMaxMs, max(baseMs, maxRequested))`.
  *
  * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, clamped, source }.
  * Never throws — datafile read/parse errors fall back to baseMs.
  */
+const EXPIRED_FLOW_TIMERS = [
+  { flag: 'expiredBookingTest', wait: 'expiredBookingMaxWaitMinutes', label: 'expiredBookingMaxWaitMinutes' },
+  { flag: 'expiredOfferTest',   wait: 'expiredOfferMaxWaitMinutes',   label: 'expiredOfferMaxWaitMinutes'   },
+];
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
   const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
   let requestedMs = 0;
   let triggeringScenario = null;
+  let triggeringTimer    = null;   // which expired-X timer drove the extension
   let helperError = null;
   let scenariosConsidered = 0;
   let scenariosInScope = 0;
@@ -321,14 +333,20 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
     for (const s of scenarios) {
       if (!s || !isInScope(s.code)) continue;
       scenariosInScope++;
-      const expired = s.expiredBookingTest;
-      const isOn = expired === true || (typeof expired === 'string' && ['true', 'on', 'yes'].includes(expired.toLowerCase()));
-      if (!isOn) continue;
-      const m = Number(s.expiredBookingMaxWaitMinutes);
-      if (Number.isFinite(m) && m >= 1 && m <= 60) {
-        // 60s buffer above the wait so the fulfillment + GET + assertions fit.
-        const ms = Math.ceil(m * 60 * 1000) + 60000;
-        if (ms > requestedMs) { requestedMs = ms; triggeringScenario = s.code || null; }
+      for (const timer of EXPIRED_FLOW_TIMERS) {
+        const flagVal = s[timer.flag];
+        const isOn = flagVal === true || (typeof flagVal === 'string' && ['true', 'on', 'yes'].includes(flagVal.toLowerCase()));
+        if (!isOn) continue;
+        const m = Number(s[timer.wait]);
+        if (Number.isFinite(m) && m >= 1 && m <= 60) {
+          // 60s buffer above the wait so the post-wait request + assertions fit.
+          const ms = Math.ceil(m * 60 * 1000) + 60000;
+          if (ms > requestedMs) {
+            requestedMs        = ms;
+            triggeringScenario = s.code || null;
+            triggeringTimer    = timer.label;
+          }
+        }
       }
     }
   } catch (err) {
@@ -341,9 +359,10 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const clamped   = desired > hardMaxMs;
   let source;
   if (requestedMs > 0) {
+    const _timerLbl = triggeringTimer || 'expired-flow timer';
     source = clamped
-      ? `scenario expiredBookingMaxWaitMinutes (clamped at RUN_HARD_MAX_TIMEOUT_MS, triggered by '${triggeringScenario}')`
-      : `scenario expiredBookingMaxWaitMinutes (triggered by '${triggeringScenario}')`;
+      ? `scenario ${_timerLbl} (clamped at RUN_HARD_MAX_TIMEOUT_MS, triggered by '${triggeringScenario}')`
+      : `scenario ${_timerLbl} (triggered by '${triggeringScenario}')`;
   } else if (helperError) {
     source = `RUN_TIMEOUT_MS (datafile decrypt/parse FAILED — fell back to base; error: ${helperError})`;
   } else {
@@ -567,10 +586,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // confirmation deadline fits the run budget — if not, it skips with a
   // WARNING instead of being killed mid-wait.
   //
-  // #204 (tester timer): if any in-scope scenario sets
-  // `expiredBookingMaxWaitMinutes`, the effective timeout is auto-extended to
-  // cover it (clamped to RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both
-  // this env injection and the SIGTERM setTimeout below — they MUST agree.
+  // Tester timer (#204 + Phase 2): if any in-scope scenario sets a per-scenario
+  // expired-flow max-wait — currently `expiredBookingMaxWaitMinutes` or
+  // `expiredOfferMaxWaitMinutes` (see EXPIRED_FLOW_TIMERS) — the effective
+  // timeout is auto-extended to cover the largest request (clamped to
+  // RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both this env injection
+  // and the SIGTERM setTimeout below — they MUST agree.
   const _runBudget = await computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride || null);
   // Always emit the chosen budget so the operator can tell exactly what the
   // runner decided — whether the extension fired, fell back silently, or hit
@@ -583,11 +604,11 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     `[runner] Effective RUN_TIMEOUT_MS = ${_runBudget.effectiveMs}ms (${Math.round(_runBudget.effectiveMs / 1000)}s); base=${_runBudget.baseMs}ms hardMax=${_runBudget.hardMaxMs}ms; source: ${_runBudget.source}`);
   if (_runBudget.helperError) {
     logEvent(runId, 'warn',
-      `[runner] computeEffectiveRunTimeoutMs hit an error reading the datafile (${_runBudget.helperError}) — fell back to base RUN_TIMEOUT_MS. The #204 expired-booking test will NOT get its requested extension; investigate above.`);
+      `[runner] computeEffectiveRunTimeoutMs hit an error reading the datafile (${_runBudget.helperError}) — fell back to base RUN_TIMEOUT_MS. Expired-flow tests (expiredBookingTest / expiredOfferTest / ...) will NOT get their requested extension; investigate above.`);
   }
   if (_runBudget.clamped) {
     logEvent(runId, 'warn',
-      `[runner] expiredBookingMaxWaitMinutes requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
+      `[runner] expired-flow per-scenario max-wait requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
   }
   // #204: inject the runId so 06.yml can call the loopback refresh-access-token
   // endpoint after the wait. The endpoint validates that the requested runId
@@ -674,7 +695,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
     // Use the SAME effective timeout we just injected as runHardDeadlineMs.
     // Falling back to RUN_TIMEOUT_MS would let the worker get SIGTERMed mid-
-    // wait when a scenario opted into a longer expiredBookingMaxWaitMinutes.
+    // wait when a scenario opted into a longer expired-flow per-scenario
+    // max-wait (expiredBookingMaxWaitMinutes, expiredOfferMaxWaitMinutes, …).
     const runTimeoutMs = _runBudget.effectiveMs;
     const timeout = setTimeout(() => {
       logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);

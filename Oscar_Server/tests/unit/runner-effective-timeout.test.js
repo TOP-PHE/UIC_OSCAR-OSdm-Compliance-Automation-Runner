@@ -188,4 +188,62 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.requestedMs).toBe(10 * 60 * 1000 + 60000);
     expect(r.scenariosInScope).toBe(2);
   });
+
+  // ── Phase 2: expiredOfferTest must drive the SAME auto-extension path ─────
+  test('extends timeout for an in-scope scenario that opts into a longer expiredOfferMaxWaitMinutes', async () => {
+    const datafile = {
+      scenariosToRun: ['SC_OFFERTIMEOUT'],
+      scenarios: [makeScenario('SC_OFFERTIMEOUT', {
+        expiredOfferTest: 'on',
+        expiredOfferMaxWaitMinutes: 12,
+      })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_OFFERTIMEOUT');
+
+    expect(r.requestedMs).toBe(12 * 60 * 1000 + 60000);
+    expect(r.effectiveMs).toBe(r.requestedMs);
+    expect(r.helperError).toBeNull();
+    expect(r.clamped).toBe(false);
+    expect(r.source).toMatch(/expiredOfferMaxWaitMinutes/);
+    expect(r.source).toMatch(/SC_OFFERTIMEOUT/);
+  });
+
+  test('takes the LARGEST request across booking and offer timers in one scenario', async () => {
+    // A scenario can in theory enable both; the worker SIGTERM must cover the
+    // longer of the two (the second timer is what actually runs).
+    const datafile = {
+      scenariosToRun: ['SC_BOTH'],
+      scenarios: [makeScenario('SC_BOTH', {
+        expiredBookingTest: 'on',
+        expiredBookingMaxWaitMinutes: 8,
+        expiredOfferTest: 'on',
+        expiredOfferMaxWaitMinutes: 17,
+      })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_BOTH');
+
+    expect(r.requestedMs).toBe(17 * 60 * 1000 + 60000);
+    // Source attribution names whichever timer drove the extension.
+    expect(r.source).toMatch(/expiredOfferMaxWaitMinutes/);
+  });
+
+  test('expiredOfferTest off (with a wait set) is a no-op', async () => {
+    const datafile = {
+      scenariosToRun: ['SC_OFFER_NOOP'],
+      scenarios: [makeScenario('SC_OFFER_NOOP', {
+        expiredOfferTest: 'off',
+        expiredOfferMaxWaitMinutes: 25,
+      })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_OFFER_NOOP');
+
+    expect(r.requestedMs).toBe(0);
+    expect(r.effectiveMs).toBe(r.baseMs);
+  });
 });

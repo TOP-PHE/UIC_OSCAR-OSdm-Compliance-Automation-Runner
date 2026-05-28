@@ -367,6 +367,34 @@ it as an auth failure — *not* a booking‑expiry rejection — with a
 booking‑expiry rejection`. So you'll never mis‑read an auth error as a test
 pass.
 
+#### Expired‑offer test (`expiredOfferTest`)
+
+Asserts that an offer left to expire **cannot be booked**. Same pattern as the
+expired‑booking test above, one step earlier in the flow.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | After the offer is selected, **wait until 15 s past** the earliest `OfferPart.validUntil` from the chosen offer (scanned across admission / reservation / ancillary parts and the fare‑* equivalents). Then `POST /bookings`. The booking **MUST be rejected** (`4xx` + `Problem`) — a hard FAIL if the provider accepts a booking against an expired offer. The post‑booking happy path (passenger PATCH, GET, fulfillments) is then **skipped** for this scenario because no booking was created. |
+
+**Max wait (`expiredOfferMaxWaitMinutes`)** — optional per‑scenario timer
+shown next to the **Expired‑offer test** dropdown. Same semantics as
+`expiredBookingMaxWaitMinutes`: integer 1–60 minutes; OSCAR uses it as the
+wait budget for this scenario instead of the server's `RUN_TIMEOUT_MS`, and
+the runner auto‑extends the worker SIGTERM to cover it (clamped at
+`RUN_HARD_MAX_TIMEOUT_MS`). Typical: **15** (most provider offer windows are
+≤ 15 min). Leave empty to use the server default.
+
+> **Same run‑budget guard, same WARNING.** If waiting until the deadline
+> exceeds the run's budget, the test **skips with a `[WARNING]`** that tells
+> you the minimum minutes to raise the **Max wait** to. The token‑refresh
+> safety net described above applies identically — no `401`/`403` mis‑reads.
+
+> **Don't combine offer + booking expiry in one scenario.** If `expiredOfferTest`
+> is on, `POST /bookings` fails by design and there is no booking left to age
+> out for `expiredBookingTest`. Use one scenario per expiry being tested — the
+> wizard lets you duplicate a scenario in two clicks.
+
 ### 4.9 Logging verbosity (`loggingType`, optional)
 
 Per‑scenario verbosity for the execution log embedded in the report. Affects
@@ -452,6 +480,8 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `bookingPurchaserMode` | `inline` / `deferred` / `omit` / `invalid` | where the purchaser is sent + negative probe (§4.8) |
 | `expiredBookingTest` | `off` / `on` | wait past the effective confirmation deadline (booking‑root `confirmationTimeLimit` / `confirmableUntil`, or the earliest part‑level `confirmableUntil`), assert rejection (§4.8) |
 | `expiredBookingMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget for `expiredBookingTest`; auto‑extends the worker SIGTERM, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (§4.8) |
+| `expiredOfferTest` | `off` / `on` | wait past the earliest `OfferPart.validUntil`, assert `POST /bookings` is rejected (§4.8) |
+| `expiredOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget for `expiredOfferTest`; auto‑extends the worker SIGTERM, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (§4.8) |
 | `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.9) |
 
 ### 7.2 Sale‑flow step → OSDM request

@@ -28,10 +28,65 @@ runtime:
         const { buildBookingRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
         console.log("⏩ [STEP] Executing request : " + req.getName());
         buildBookingRequest();
+
+        // #expired-offer test: when armed, wait until just past the EARLIEST
+        // offer-part validUntil (stashed by offers.js / postOfferResponse),
+        // then let the booking POST fire — the after-response asserts the
+        // provider correctly rejects the booking of a stale offer.
+        if (String(bru.getEnvVar("expiredOfferTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("offerValidUntil");
+          const limitSrc   = bru.getEnvVar("offerValidUntilSource") || "offer-part validUntil";
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredOfferMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "offer (" + limitSrc + ")",
+          });
+          if (!plan.armed) {
+            validationLogger(`[WARNING] expiredOfferTest SKIPPED: ${plan.reason}`);
+            bru.setEnvVar("__expiredOfferArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredOfferTest (POST /bookings)" });
+            bru.setEnvVar("__expiredOfferArmed", "true");
+            validationLogger(`[INFO] expiredOfferTest: attempting POST /bookings, expecting the provider to reject it (offer expired).`);
+          }
+        }
     - type: after-response
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
         const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+
+        // #expired-offer: when armed, the booking MUST be rejected — an expired
+        // offer must not be bookable. Grade the rejection here and short-circuit
+        // (skip the normal happy-path postCreateBookingResponse + downstream
+        // PATCH passenger / GET booking / POST /fulfillments) so the next
+        // scenario in the loop fires cleanly.
+        if (String(bru.getEnvVar("__expiredOfferArmed")) === "true") {
+            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired offer" });
+            test(`Expired offer: POST /bookings is rejected with a client error (4xx) — an expired offer must not be bookable (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test("Expired offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // Multi-scenario tail: loop to next scenario or stop. We do NOT
+            // continue the happy-path booking flow because the booking was
+            // (correctly) never created.
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
 
         const _status = res.getStatus();
         let _body = null;

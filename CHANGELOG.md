@@ -14,6 +14,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.93] — 2026-05-28
+
+Generalize the **#204 expired-X negative-test pattern** + ship the **expired-offer**
+test on top of the new shared helper.
+**Bruno collection bumped (OTST_V2.0.40 → OTST_V2.0.41).**
+
+### Added — Phase 1: shared `expiredFlow.js` library helper
+- New `Bruno_Collection/library-bruno/expiredFlow.js` exporting three functions
+  that every expired-X test now shares:
+  - `planExpiredFlow({ deadlineRaw, maxWaitMinutes, resourceLabel })` →
+    `{ armed, waitMs, budgetSource, reason }`. Resolves the deadline, computes
+    the wait, checks it fits the run budget (per-scenario Max wait →
+    server's `runHardDeadlineMs` → conservative 8-min fallback).
+  - `runExpiredFlowWait({ plan, scenarioLabel, deadlineRaw })` — sleeps,
+    then **forces an OAuth token refresh** via `refreshAccessTokenIfNeeded`
+    so the post-wait request authenticates with a fresh token.
+  - `gradeExpiredFlowResponse({ res, scenarioLabel })` →
+    `{ status, isClientError, isAuthFailure, hasProblemBody, expiryKeywordFound, body }`.
+    Categorises the response (auth / 2xx / expiry keyword / other 4xx / 5xx)
+    and emits the appropriate `[INFO]` / `[WARNING]` / `[ERROR]` line.
+- `06. POST Obtaining Fulfillments from Booking.yml` refactored to use the
+  helper — `~70` lines of inline plan/wait/grade logic replaced with `~20`
+  lines that call the helper. **Byte-identical behaviour** (constants and
+  budget arithmetic preserved); the existing #204 expired-booking test
+  continues to fire the same way.
+
+### Added — Phase 2: expired-offer test (`expiredOfferTest`)
+- **New scenario fields** in `datafile.schema.json` and the wizard:
+  - `expiredOfferTest` — `off` (default) / `on`.
+  - `expiredOfferMaxWaitMinutes` — optional `1..60`, same auto-extension
+    semantics as `expiredBookingMaxWaitMinutes`.
+- `Bruno_Collection/library-bruno/offers.js` `postOfferResponse` now scans
+  the selected offer's `admissionOfferParts` / `reservationOfferParts` /
+  `ancillaryOfferParts` and their `fare*` equivalents for the **earliest**
+  `OfferPart.validUntil` and stashes it (plus a source label) into env vars.
+- `02. POST Create Booking.yml` gains a before-request block that calls
+  `planExpiredFlow` + `runExpiredFlowWait` when armed, and an after-response
+  block that grades the rejection via `gradeExpiredFlowResponse`, emits
+  Bruno `test()` assertions (status 4xx + RFC-9457 Problem body), and
+  short-circuits the post-booking happy path — the multi-scenario loop
+  continues cleanly to the next scenario via `bru.runner.setNextRequest('01.
+  POST Get Offer')` (or `stopExecution()` when done).
+- `scenarioParser.js` resolves the new env vars and resets them between
+  scenarios; the wizard seeds them on new scenarios; the SonarCloud-friendly
+  numeric-input handler (`set-scenario-max-wait-offer-minutes`) mirrors the
+  existing booking-timer one.
+
+### Changed — runner auto-extension scans all expired-X timers
+- `Oscar_Server/src/worker/runner.js` `computeEffectiveRunTimeoutMs` now
+  iterates over a generic `EXPIRED_FLOW_TIMERS` table — currently
+  `[expiredBookingTest/expiredBookingMaxWaitMinutes,
+  expiredOfferTest/expiredOfferMaxWaitMinutes]`. Any future expired-X
+  scenario field plugs in there without touching the scan loop or the
+  budget arithmetic. The triggering timer label is preserved in
+  `source` for diagnostics; clamp/error log lines were generalised away
+  from the booking-specific phrasing.
+
+### Docs
+- **Tester User Guide §4.8** — new *Expired-offer test* section with the
+  same flow-deadline-budget framing as the booking test, plus an explicit
+  "don't combine offer + booking expiry in one scenario" note (the booking
+  step fails by design when the offer expiry test is on, so there's no
+  booking left to age out). §7.1 field-name table updated.
+- **OSDM Spec Deviations** — new entry **#25 *(Theme J, spec-internal naming
+  inconsistencies)*** documenting `OfferPart.validUntil` /
+  `RefundOffer.validUntil` vs `ExchangeOffer.preBookableUntil` — the
+  per-resource-type naming inconsistency that any expired-X generalisation
+  has to special-case. Added to the summary table, per-provider
+  concentration table, and "Suggested clarifications for OSDM architects"
+  list as item 8.
+
+### Tests
+- `Oscar_Server/tests/unit/bruno-expiredflow.test.js` — unit-tests
+  `planExpiredFlow` (no deadline / bad date / already past / future-in-budget
+  / overrun-with-hint / fallback-budget paths), `gradeExpiredFlowResponse`
+  (401/403 auth path / 2xx ERROR / 4xx with-and-without expiry keyword and
+  Problem body / 5xx WARNING / multi-keyword detection), and
+  `runExpiredFlowWait` (token refresh on no-wait path, throw-degrades-to-
+  warning fallback).
+- `Oscar_Server/tests/unit/runner-effective-timeout.test.js` — three new
+  cases for the offer-timer auto-extension: offer-test on with offer Max
+  wait, both booking+offer set (largest wins), offer-test off no-op.
+
+### Versions
+- `Bruno_Collection/VERSION`: `OTST_V2.0.40` → `OTST_V2.0.41`.
+- `Oscar_Server/package.json`: `1.11.92` → `1.11.93`.
+- `compatibility.json`: new entry `2026.121`.
+
+---
+
 ## [server-v1.11.92] — 2026-05-28
 
 OAuth token watchdog for long-running scenario series — **#204

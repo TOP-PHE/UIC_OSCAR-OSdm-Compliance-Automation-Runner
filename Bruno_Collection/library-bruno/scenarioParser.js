@@ -65,6 +65,8 @@ function resetScenarioEnvVars() {
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
     "expiredBookingTest", "__expiredBookingArmed", "expiredBookingMaxWaitMinutes",
+    "expiredOfferTest", "__expiredOfferArmed", "expiredOfferMaxWaitMinutes",
+    "offerValidUntil", "offerValidUntilSource",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
@@ -475,6 +477,25 @@ function parseScenarioData(jsonData) {
         bru.setEnvVar("expiredBookingMaxWaitMinutes", String(Math.floor(_maxWaitN)));
       } else {
         bru.setEnvVar("expiredBookingMaxWaitMinutes", "");
+      }
+
+      // Expired-offer negative test (Phase 2 of the expired-flow generalization):
+      // when true, OSCAR waits until just past the earliest OfferPart.validUntil
+      // from the selected offer, then attempts POST /bookings and asserts the
+      // provider rejects it (offer expired). Default false. Mirrors the
+      // expiredBookingTest plumbing above.
+      bru.setEnvVar("expiredOfferTest", (scenario.expiredOfferTest === true || ["true", "on", "yes"].includes(String(scenario.expiredOfferTest).toLowerCase())) ? "true" : "false");
+
+      // Per-scenario max wait budget for the expired-offer test, in minutes
+      // (1..60). Same semantics as expiredBookingMaxWaitMinutes (see above): the
+      // runner auto-extends the worker SIGTERM to cover this wait, clamped to
+      // RUN_HARD_MAX_TIMEOUT_MS. Empty / null / out-of-range = unset (default).
+      const _maxOfferWaitRaw = scenario.expiredOfferMaxWaitMinutes;
+      const _maxOfferWaitN   = Number(_maxOfferWaitRaw);
+      if (Number.isFinite(_maxOfferWaitN) && _maxOfferWaitN >= 1 && _maxOfferWaitN <= 60) {
+        bru.setEnvVar("expiredOfferMaxWaitMinutes", String(Math.floor(_maxOfferWaitN)));
+      } else {
+        bru.setEnvVar("expiredOfferMaxWaitMinutes", "");
       }
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
