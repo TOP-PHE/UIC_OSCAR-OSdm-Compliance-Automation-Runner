@@ -64,7 +64,7 @@ function resetScenarioEnvVars() {
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
-    "expiredBookingTest", "__expiredBookingArmed",
+    "expiredBookingTest", "__expiredBookingArmed", "expiredBookingMaxWaitMinutes",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
@@ -462,6 +462,20 @@ function parseScenarioData(jsonData) {
       // past booking.confirmationTimeLimit, then attempts fulfillment and asserts
       // the provider rejects it (booking expired). Default false.
       bru.setEnvVar("expiredBookingTest", (scenario.expiredBookingTest === true || ["true", "on", "yes"].includes(String(scenario.expiredBookingTest).toLowerCase())) ? "true" : "false");
+
+      // Per-scenario max wait budget for the expired-booking test (#204), in
+      // minutes (1..60). When set AND expiredBookingTest is 'on', 06.yml uses
+      // this as the wait budget instead of the runner-injected runHardDeadlineMs
+      // (which reflects the server-wide RUN_TIMEOUT_MS). The runner also
+      // auto-extends the worker SIGTERM to cover this wait, clamped to
+      // RUN_HARD_MAX_TIMEOUT_MS. Empty / null / out-of-range = unset (default).
+      const _maxWaitRaw = scenario.expiredBookingMaxWaitMinutes;
+      const _maxWaitN   = Number(_maxWaitRaw);
+      if (Number.isFinite(_maxWaitN) && _maxWaitN >= 1 && _maxWaitN <= 60) {
+        bru.setEnvVar("expiredBookingMaxWaitMinutes", String(Math.floor(_maxWaitN)));
+      } else {
+        bru.setEnvVar("expiredBookingMaxWaitMinutes", "");
+      }
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
       // The data file is the per-scenario source of truth; the env file is the fallback
