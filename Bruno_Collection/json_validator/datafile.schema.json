@@ -105,6 +105,78 @@
             "minimum": 1,
             "maximum": 60
           },
+          "expiredAddReservationOfferTest": {
+            "description": "Negative test for an EXPIRED post-booking add-reservation offer-part (Phase 5a of the expired-flow generalization). When on, OSCAR waits until just past the validUntil of the reservationOfferPart that 09. POST Add Reservation to Booking is about to send, then attempts the add and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful when salesFlow_placeSelection is on AND placeSelectionMode is ADD_TO_BOOKING (otherwise step 09 doesn't run). Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredAddReservationOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredAddReservationOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredAddAncillaryOfferTest": {
+            "description": "Negative test for an EXPIRED post-booking add-ancillary offer-part (Phase 5b of the expired-flow generalization). When on, OSCAR waits until just past the EARLIEST validUntil across the ancillary offer-parts that 10. POST Add Ancillary to Booking is about to send (sourced primarily from 11. additional-offers, falling back to the selected offer's own ancillaryOfferParts), then attempts the add and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful when salesFlow_addAncillary is on. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredAddAncillaryOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredAddAncillaryOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredRefundOfferTest": {
+            "description": "Negative test for an EXPIRED refund offer (Phase 3 of the expired-flow generalization). When on, OSCAR waits until just past the RefundOffer.validUntil of the first refund offer returned by 10. POST Refund Offers, then attempts 13. PATCH Refund Offer (CONFIRMED) and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful in REFUND-type scenarios. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredRefundOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredRefundOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredExchangeOfferTest": {
+            "description": "Negative test for an EXPIRED exchange offer (Phase 4 of the expired-flow generalization). When on, OSCAR waits until just past the ExchangeOffer.preBookableUntil of the first exchange offer returned by 10. POST Exchange Offers, then attempts 11. POST Exchange Operations and asserts the provider REJECTS it (4xx + RFC-9457 Problem). NOTE: the spec field on ExchangeOffer is `preBookableUntil`, NOT `validUntil` — see OSDM_Spec_Deviations #25 for the per-resource-type naming inconsistency. Skips with a WARNING if the wait would exceed the run budget. Only meaningful in EXCHANGE-type scenarios. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredExchangeOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredExchangeOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
           "osdmVersion": {
             "type": "string"
           },

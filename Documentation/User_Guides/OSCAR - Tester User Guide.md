@@ -393,7 +393,64 @@ the runner auto‑extends the worker SIGTERM to cover it (clamped at
 > **Don't combine offer + booking expiry in one scenario.** If `expiredOfferTest`
 > is on, `POST /bookings` fails by design and there is no booking left to age
 > out for `expiredBookingTest`. Use one scenario per expiry being tested — the
-> wizard lets you duplicate a scenario in two clicks.
+> wizard lets you duplicate a scenario in two clicks. A future enhancement will
+> auto-expand multi-timer scenarios into one sub-run per timer.
+
+#### Expired post-booking add-reservation test (`expiredAddReservationOfferTest`)
+
+Asserts that an offer-part **cannot be added** to an existing booking once its
+`validUntil` has passed.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | Just before `09. POST Add Reservation to Booking` fires, OSCAR waits until 15 s past the `validUntil` of the specific `reservationOfferPart` that 09 is about to send. Then fires 09. The **POST must be rejected** (`4xx` + `Problem`). The downstream post-booking happy path (Add Ancillary / PATCH passenger / GET passenger) is **skipped** because the reservation was not added. |
+
+Only meaningful when the scenario uses **Place selection** in **ADD_TO_BOOKING** mode (enable it in the **Booking Flow Actions** section). When the offer carries no `validUntil` on its reservation parts the test skips with a `[WARNING]`.
+
+**Max wait (`expiredAddReservationOfferMaxWaitMinutes`)** — same semantics as `expiredOfferMaxWaitMinutes`. Typical: 15.
+
+#### Expired post-booking add-ancillary test (`expiredAddAncillaryOfferTest`)
+
+Asserts that an ancillary offer-part **cannot be added** to an existing booking once its `validUntil` has passed.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | Just before `10. POST Add Ancillary to Booking` fires, OSCAR waits until 15 s past the **earliest** `validUntil` across the ancillary offer-parts that 10 will send. The deadline is sourced from `11. additional-offers` (primary — booking-specific add-ancillary offers) or the original offer's `ancillaryOfferParts` (fallback). Then fires 10. The **POST must be rejected** (`4xx` + `Problem`). The downstream PATCH/GET passenger chain is **skipped**. |
+
+Only meaningful when **Add ancillary** is enabled in the **Booking Flow Actions** section. If `11. additional-offers` returns nothing addable, the test skips with a `[WARNING]`.
+
+**Max wait (`expiredAddAncillaryOfferMaxWaitMinutes`)** — same semantics.
+
+#### Expired refund-offer test (`expiredRefundOfferTest`)
+
+Asserts that a refund offer **cannot be confirmed** once its `validUntil` has passed.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | After `10. POST Refund Offers` returns the proposed refund, OSCAR waits until 15 s past `refundOffers[0].validUntil`. Then fires `13. PATCH Refund Offer` with `status: "CONFIRMED"`. The **PATCH must be rejected** (`4xx` + `Problem`). The downstream `14. GET Booking after Patch Refund` / `15. DEL Refund Offer` / `16. GET Booking after Delete Refund` steps are **skipped**. |
+
+**REFUND scenarios only** — the field is shown in the wizard only when `scenarioType = REFUND`. There is no separate "refund confirmation" timeout because OSDM refund execution is synchronous (no PREBOOKED→CONFIRMED holding state).
+
+**Max wait (`expiredRefundOfferMaxWaitMinutes`)** — same semantics. Typical refund-offer windows are similar to sale offers (~15 min) — set 20.
+
+#### Expired exchange-offer test (`expiredExchangeOfferTest`)
+
+Asserts that an exchange offer **cannot be turned into a booking** once its
+**`preBookableUntil`** has passed.
+
+> **Spec naming quirk.** Every other expired-X test waits past a `validUntil`. The exchange flow waits past **`preBookableUntil`** — same semantic ("the latest moment this offer can still be accepted"), but the OSDM spec uses a different field name on `ExchangeOffer` for it. See [OSDM Spec Deviations #25](../OSDM/OSDM_Spec_Deviations_Observed_2026-05-28.md) for the cross-resource naming inconsistency this surfaces.
+
+| Mode | What OSCAR does |
+|---|---|
+| **`off`** *(default)* | Normal flow. |
+| **`on`** | After `10. POST Exchange Offers` returns the proposed exchange, OSCAR waits until 15 s past `exchangeOffers[0].preBookableUntil`. Then fires `11. POST Exchange Operations`. The **POST must be rejected** (`4xx` + `Problem`). The downstream `GET booking before fulfillment` / `POST fulfillments` chain is **skipped**. |
+
+**EXCHANGE scenarios only.** No separate "exchange confirmation" timeout is needed — accepting an exchange creates a **new booking** with its own `confirmationTimeLimit`, which is already covered by `expiredBookingTest` running on a post-exchange leg.
+
+**Max wait (`expiredExchangeOfferMaxWaitMinutes`)** — same semantics.
 
 ### 4.9 Logging verbosity (`loggingType`, optional)
 
@@ -482,6 +539,14 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `expiredBookingMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget for `expiredBookingTest`; auto‑extends the worker SIGTERM, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (§4.8) |
 | `expiredOfferTest` | `off` / `on` | wait past the earliest `OfferPart.validUntil`, assert `POST /bookings` is rejected (§4.8) |
 | `expiredOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget for `expiredOfferTest`; auto‑extends the worker SIGTERM, clamped at `RUN_HARD_MAX_TIMEOUT_MS` (§4.8) |
+| `expiredAddReservationOfferTest` | `off` / `on` | wait past the reservation-part `validUntil`, assert `09. POST Add Reservation` is rejected (§4.8). ADD_TO_BOOKING scenarios only |
+| `expiredAddReservationOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget (§4.8) |
+| `expiredAddAncillaryOfferTest` | `off` / `on` | wait past the earliest ancillary-part `validUntil`, assert `10. POST Add Ancillary` is rejected (§4.8). Add-ancillary scenarios only |
+| `expiredAddAncillaryOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget (§4.8) |
+| `expiredRefundOfferTest` | `off` / `on` | wait past `RefundOffer.validUntil`, assert `13. PATCH Refund Offer` is rejected (§4.8). REFUND scenarios only |
+| `expiredRefundOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget (§4.8) |
+| `expiredExchangeOfferTest` | `off` / `on` | wait past `ExchangeOffer.preBookableUntil` *(spec-naming quirk)*, assert `11. POST Exchange Operations` is rejected (§4.8). EXCHANGE scenarios only |
+| `expiredExchangeOfferMaxWaitMinutes` | `1`–`60` (optional) | per‑scenario wait budget (§4.8) |
 | `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.9) |
 
 ### 7.2 Sale‑flow step → OSDM request

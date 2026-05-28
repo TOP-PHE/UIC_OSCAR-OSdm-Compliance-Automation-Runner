@@ -295,8 +295,12 @@ function _authLogger(runId) {
  * Never throws — datafile read/parse errors fall back to baseMs.
  */
 const EXPIRED_FLOW_TIMERS = [
-  { flag: 'expiredBookingTest', wait: 'expiredBookingMaxWaitMinutes', label: 'expiredBookingMaxWaitMinutes' },
-  { flag: 'expiredOfferTest',   wait: 'expiredOfferMaxWaitMinutes',   label: 'expiredOfferMaxWaitMinutes'   },
+  { flag: 'expiredBookingTest',             wait: 'expiredBookingMaxWaitMinutes',             label: 'expiredBookingMaxWaitMinutes'             },
+  { flag: 'expiredOfferTest',               wait: 'expiredOfferMaxWaitMinutes',               label: 'expiredOfferMaxWaitMinutes'               },
+  { flag: 'expiredAddReservationOfferTest', wait: 'expiredAddReservationOfferMaxWaitMinutes', label: 'expiredAddReservationOfferMaxWaitMinutes' },
+  { flag: 'expiredAddAncillaryOfferTest',   wait: 'expiredAddAncillaryOfferMaxWaitMinutes',   label: 'expiredAddAncillaryOfferMaxWaitMinutes'   },
+  { flag: 'expiredRefundOfferTest',         wait: 'expiredRefundOfferMaxWaitMinutes',         label: 'expiredRefundOfferMaxWaitMinutes'         },
+  { flag: 'expiredExchangeOfferTest',       wait: 'expiredExchangeOfferMaxWaitMinutes',       label: 'expiredExchangeOfferMaxWaitMinutes'       },
 ];
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;

@@ -271,6 +271,33 @@ function postOfferResponse(jsonData) {
   validateAncillaries(selectedOffer);
 
   handleAccommodationAndPlaceSelection(selectedOffer);
+
+  // Expired-add-reservation-offer test (Phase 5a): capture the validUntil of
+  // the SPECIFIC reservationOfferPart that the post-booking
+  // `09. POST Add Reservation to Booking` will send. handleAccommodationAnd-
+  // PlaceSelection just set `reservationId` to the chosen part's id; look it
+  // up by id and stash its validUntil. The earliest-across-parts logic above
+  // (which drives the pre-booking expiredOfferTest) is the wrong source here:
+  // 09.yml sends a single reservation, not the whole offer, so we want THAT
+  // specific part's deadline.
+  if (selectedOffer && typeof selectedOffer === 'object') {
+    const _resId = bru.getEnvVar('reservationId');
+    if (_resId) {
+      const _resParts = Array.isArray(selectedOffer.reservationOfferParts)
+        ? selectedOffer.reservationOfferParts : [];
+      const _matchPart = _resParts.find(function (p) { return p && p.id === _resId; });
+      if (_matchPart && _matchPart.validUntil) {
+        bru.setEnvVar('addReservationOfferValidUntil', String(_matchPart.validUntil));
+        bru.setEnvVar('addReservationOfferValidUntilSource',
+          `selectedOffer.reservationOfferParts[id=${_resId}].validUntil`);
+        validationLogger(`[INFO] Captured add-reservation offer-part validUntil = ${_matchPart.validUntil} — drives the #expiredAddReservationOfferTest deadline if enabled.`);
+      } else {
+        bru.setEnvVar('addReservationOfferValidUntil', '');
+        bru.setEnvVar('addReservationOfferValidUntilSource', '');
+      }
+    }
+  }
+
   ensureYesWhenRefundOrExchangeSelected(selectedOffer);
 
   // Mirror original no-op env set (kept for compatibility)

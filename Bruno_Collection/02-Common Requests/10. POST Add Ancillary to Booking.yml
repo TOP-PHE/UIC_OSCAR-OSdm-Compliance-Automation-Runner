@@ -74,11 +74,92 @@ runtime:
           : { offerId: offerId, ancillaryOfferId: ancillaryOfferIds[0], passengerRefs: passengerRefs };
         bru.setVar('addAncillaryBody', JSON.stringify(body));
 
+        // #expired-add-ancillary-offer test (Phase 5b): when armed, wait until
+        // just past the earliest validUntil on the ancillary offer-parts this
+        // POST will send. The PRIMARY capture happens in 11.yml's after-response
+        // (additional-offers source); the FALLBACK below covers scenarios that
+        // never went through 11 (referencedAncillaryIds / original-offer source).
+        if (String(bru.getEnvVar("expiredAddAncillaryOfferTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+
+          // Fallback capture: if 11.yml did not stash a deadline, derive it
+          // from the selected offer's ancillaryOfferParts (matching the ids
+          // about to be sent).
+          if (!bru.getEnvVar("addAncillaryOfferValidUntil")) {
+            let _offer = bru.getEnvVar('offer');
+            try { if (typeof _offer === 'string') _offer = JSON.parse(_offer); } catch (_e) { _offer = null; }
+            const _parts = (_offer && Array.isArray(_offer.ancillaryOfferParts)) ? _offer.ancillaryOfferParts : [];
+            const _wantIds = new Set(ancillaryOfferIds);
+            let _earliestMs = Infinity, _earliestRaw = null, _earliestSrc = null;
+            _parts.forEach(function (p, i) {
+              if (!p || !p.id || !_wantIds.has(p.id) || !p.validUntil) return;
+              const t = new Date(p.validUntil).getTime();
+              if (!isNaN(t) && t < _earliestMs) {
+                _earliestMs  = t;
+                _earliestRaw = p.validUntil;
+                _earliestSrc = `selectedOffer.ancillaryOfferParts[${i}].validUntil`;
+              }
+            });
+            if (_earliestRaw) {
+              bru.setEnvVar("addAncillaryOfferValidUntil", String(_earliestRaw));
+              bru.setEnvVar("addAncillaryOfferValidUntilSource", String(_earliestSrc));
+              validationLogger(`[INFO] Fallback capture: add-ancillary offer-part validUntil = ${_earliestRaw} (${_earliestSrc}).`);
+            }
+          }
+
+          const limitRaw   = bru.getEnvVar("addAncillaryOfferValidUntil");
+          const limitSrc   = bru.getEnvVar("addAncillaryOfferValidUntilSource") || "ancillary offer-part validUntil";
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredAddAncillaryOfferMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "add-ancillary offer-part (" + limitSrc + ")",
+          });
+          if (!plan.armed) {
+            validationLogger(`[WARNING] expiredAddAncillaryOfferTest SKIPPED: ${plan.reason}`);
+            bru.setEnvVar("__expiredAddAncillaryOfferArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredAddAncillaryOfferTest (POST /bookings/{id}/.../add-ancillary)" });
+            bru.setEnvVar("__expiredAddAncillaryOfferArmed", "true");
+            validationLogger(`[INFO] expiredAddAncillaryOfferTest: attempting POST add-ancillary, expecting the provider to reject it (ancillary offer-part validUntil passed).`);
+          }
+        }
+
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
         const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        // #expired-add-ancillary-offer: when armed, the POST MUST be rejected —
+        // adding an expired ancillary offer-part to the booking must not
+        // succeed. Grade here and short-circuit (skip the compliance validator
+        // + the routing tail to PATCH / GET Passenger) so the next scenario
+        // fires cleanly. The booking continues to exist without the ancillary.
+        if (String(bru.getEnvVar("__expiredAddAncillaryOfferArmed")) === "true") {
+            const { gradeExpiredFlowResponse } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired add-ancillary offer" });
+            const _resource = bru.getVar('addAncillaryResource') || 'offer-parts';
+            test(`Expired add-ancillary offer: POST /.../${_resource} (ancillary) is rejected with a client error (4xx) — an expired ancillary offer-part must not be addable to the booking (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test("Expired add-ancillary offer: error body is an RFC-9457 Problem (title/detail/code present)", () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // Multi-scenario tail: loop to next scenario or stop.
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
 
         const resource = bru.getVar('addAncillaryResource') || 'offer-parts';
         const endpoint = `/bookings/{id}/booked-offers/{id}/${resource}`;

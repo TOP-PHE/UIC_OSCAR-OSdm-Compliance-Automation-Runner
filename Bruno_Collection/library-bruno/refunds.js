@@ -51,6 +51,26 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
   // Store first offer ID
   bru.setEnvVar("refundOffersOfferId", jsonData.refundOffers[0].id);
   validationLogger(`[INFO] Stored refundOffersOfferId: ${jsonData.refundOffers[0].id}`);
+
+  // Expired-refund-offer test (Phase 3): capture the RefundOffer.validUntil of
+  // the offer the PATCH will accept (refundOffers[0]), but ONLY on the POST
+  // /refund-offers callsite — that's where the offer is freshly PROPOSED. The
+  // same helper is reused by 11.yml (GET, also PROPOSED → safe to recapture
+  // the same value) and 13.yml (PATCH → expects CONFIRMED), so we gate on
+  // expectedRefundOperationStatus including "PROPOSED" to avoid 13.yml
+  // overwriting the deadline with a post-confirmation value that would either
+  // be null or already in the past.
+  const _expectedStatuses = Array.isArray(expectedRefundOperationStatus)
+    ? expectedRefundOperationStatus
+    : [expectedRefundOperationStatus];
+  if (_expectedStatuses.includes("PROPOSED")) {
+    const _firstRefundOffer = jsonData.refundOffers[0];
+    if (_firstRefundOffer && _firstRefundOffer.validUntil) {
+      bru.setEnvVar("refundOfferValidUntil", String(_firstRefundOffer.validUntil));
+      bru.setEnvVar("refundOfferValidUntilSource", "refundOffers[0].validUntil");
+      validationLogger(`[INFO] Captured refundOffer validUntil = ${_firstRefundOffer.validUntil}`);
+    }
+  }
 }
 
 // Function to validate a single refund offer

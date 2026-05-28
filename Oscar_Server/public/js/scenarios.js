@@ -28,8 +28,12 @@ const ENUMS = {
   scenarioAction:     [null, 'PATCH', 'DELETE'],
   requestedInformationProbe: [null, 'omit', 'invalid'],
   bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
-  expiredBookingTest: ['off', 'on'],
-  expiredOfferTest:   ['off', 'on'],
+  expiredBookingTest:             ['off', 'on'],
+  expiredOfferTest:               ['off', 'on'],
+  expiredAddReservationOfferTest: ['off', 'on'],
+  expiredAddAncillaryOfferTest:   ['off', 'on'],
+  expiredRefundOfferTest:         ['off', 'on'],
+  expiredExchangeOfferTest:       ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
@@ -1261,24 +1265,6 @@ function buildDetailHTML(idx) {
           'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
           'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
-        ${buildSelect(idx, 'expiredBookingTest', 'Expired-booking test', ENUMS.expiredBookingTest,
-          'Negative test (#204). On: after booking, OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment and asserts the provider rejects it (booking expired) and the parts are EXPIRED/RELEASED/CANCELLED. Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS, or set Max wait below).')}
-        <div class="param-field">
-          <span class="param-label">Max wait (min) <span class="param-hint">Optional. Per-scenario wait budget for the expired-booking test. When set, OSCAR auto-extends the worker timeout (clamped server-side). Leave empty to use the server's RUN_TIMEOUT_MS. Typical: 20 (covers Bileto/Paxone's ~15 min deadlines).</span></span>
-          <input class="param-input" type="number" min="1" max="60"
-            value="${esc((state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes != null ? (state.scenarios[idx] || {}).expiredBookingMaxWaitMinutes : '')}"
-            placeholder="leave empty = server default"
-            data-action="set-scenario-max-wait-minutes" data-idx="${esc(idx)}">
-        </div>
-        ${buildSelect(idx, 'expiredOfferTest', 'Expired-offer test', ENUMS.expiredOfferTest,
-          'Negative test. On: after the offer is selected, OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (offer expired). Skips with a WARNING if the wait would exceed the run budget (raise RUN_TIMEOUT_MS, or set Max wait below). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.')}
-        <div class="param-field">
-          <span class="param-label">Max wait (min) <span class="param-hint">Optional. Per-scenario wait budget for the expired-offer test. When set, OSCAR auto-extends the worker timeout (clamped server-side). Leave empty to use the server's RUN_TIMEOUT_MS. Typical: 15 (covers most provider offer validity windows).</span></span>
-          <input class="param-input" type="number" min="1" max="60"
-            value="${esc((state.scenarios[idx] || {}).expiredOfferMaxWaitMinutes != null ? (state.scenarios[idx] || {}).expiredOfferMaxWaitMinutes : '')}"
-            placeholder="leave empty = server default"
-            data-action="set-scenario-max-wait-offer-minutes" data-idx="${esc(idx)}">
-        </div>
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
@@ -1298,6 +1284,9 @@ function buildDetailHTML(idx) {
       </div>
     </div>
   </div>
+
+  <!-- Non Happy Flow customisation — all expired-X negative tests grouped -->
+  ${buildNonHappyFlowSection(idx, sc)}
 
   <!-- Sales flow actions (SALE scenarios only) -->
   ${buildSalesFlowActionsSection(idx, sc)}
@@ -1407,6 +1396,115 @@ function migrateMissingOfferSearchCriteria() {
 // REFUND and EXCHANGE run the same booking → fulfilment prelude before
 // their dedicated aftersales steps. Hidden only when the scenario type is
 // unset (null).
+// ── Non Happy Flow customisation section ─────────────────────────────────
+//
+// All "expired-X" negative tests live here, grouped by the OSDM resource that
+// expires (Offer / Booking / AddReservation / AddAncillary / RefundOffer /
+// ExchangeOffer). Each row is one timer pair: an on/off dropdown + an
+// optional per-scenario Max wait (min) input. The runner auto-extends the
+// worker SIGTERM to cover the largest Max wait among the enabled timers
+// (see EXPIRED_FLOW_TIMERS in src/worker/runner.js); clamped at
+// RUN_HARD_MAX_TIMEOUT_MS.
+//
+// Refund/Exchange rows are conditionally shown — they only make sense for
+// REFUND / EXCHANGE scenarios respectively (the underlying request flows
+// don't even fire on a SALE scenario). When hidden, the underlying enum
+// stays 'off' so an existing tester-saved value doesn't accidentally arm
+// a test that can never reach its request.
+function buildNonHappyFlowSection(idx, sc) {
+  const scType = (sc && sc.scenarioType) || '';
+  const showRefund   = (scType === 'REFUND');
+  const showExchange = (scType === 'EXCHANGE');
+
+  // One timer row = the test-on/off select + the Max wait number input.
+  // `action` is the dataset.action of the Max-wait input (must be registered
+  // in the input event-delegation switch below).
+  function timerRow(testField, testLabel, testHint, waitField, waitHint, action) {
+    const val = (state.scenarios[idx] || {})[waitField];
+    return `
+      ${buildSelect(idx, testField, testLabel, ENUMS[testField], testHint)}
+      <div class="param-field">
+        <span class="param-label">Max wait (min) <span class="param-hint">${esc(waitHint)}</span></span>
+        <input class="param-input" type="number" min="1" max="60"
+          value="${esc(val != null ? val : '')}"
+          placeholder="leave empty = server default"
+          data-action="${esc(action)}" data-idx="${esc(idx)}">
+      </div>`;
+  }
+
+  // Refund / Exchange rows hidden when the scenarioType doesn't enable that
+  // flow at all — keeps the section honest.
+  const refundRow = showRefund ? timerRow(
+    'expiredRefundOfferTest',         'Expired refund-offer test',
+    'Negative test. On: after refund offers are returned (10. POST Refund Offers), OSCAR waits until just past refundOffers[0].validUntil, then attempts 13. PATCH Refund Offer (CONFIRMED) and asserts the provider rejects it. Skips with a WARNING if the wait would exceed the run budget. REFUND scenarios only.',
+    'expiredRefundOfferMaxWaitMinutes',
+    'Optional. Per-scenario wait budget for the expired-refund-offer test. Same auto-extend semantics as the other expired-X tests.',
+    'set-scenario-max-wait-refund-offer-minutes',
+  ) : '';
+
+  const exchangeRow = showExchange ? timerRow(
+    'expiredExchangeOfferTest',       'Expired exchange-offer test',
+    'Negative test. On: after exchange offers are returned (10. POST Exchange Offers), OSCAR waits until just past exchangeOffers[0].preBookableUntil (note the spec uses preBookableUntil here, NOT validUntil — see OSDM Spec Deviations #25), then attempts 11. POST Exchange Operations and asserts the provider rejects it. EXCHANGE scenarios only.',
+    'expiredExchangeOfferMaxWaitMinutes',
+    'Optional. Per-scenario wait budget for the expired-exchange-offer test.',
+    'set-scenario-max-wait-exchange-offer-minutes',
+  ) : '';
+
+  return `
+  <div class="param-section">
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">expired-X negative tests — wait past a deadline, assert the provider rejects the next request</span><span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+      <div style="padding:12px 14px">
+        <div class="param-row">
+          ${timerRow(
+            'expiredOfferTest', 'Expired-offer test',
+            'Negative test. On: after the offer is selected (01. POST Get Offer), OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (4xx + Problem). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.',
+            'expiredOfferMaxWaitMinutes',
+            'Optional. Per-scenario wait budget for the expired-offer test. Typical: 15 (covers most provider offer validity windows).',
+            'set-scenario-max-wait-offer-minutes',
+          )}
+          ${timerRow(
+            'expiredBookingTest', 'Expired-booking test',
+            'Negative test (#204). On: after the booking is created (02. POST Create Booking), OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment (06) and asserts the provider rejects it and the booking parts are EXPIRED/RELEASED/CANCELLED.',
+            'expiredBookingMaxWaitMinutes',
+            'Optional. Per-scenario wait budget for the expired-booking test. Typical: 20 (covers Bileto/Paxone ~15 min deadlines).',
+            'set-scenario-max-wait-minutes',
+          )}
+          ${timerRow(
+            'expiredAddReservationOfferTest', 'Expired add-reservation-offer test',
+            'Negative test. On: just before 09. POST Add Reservation to Booking fires, OSCAR waits until just past the validUntil of the reservationOfferPart that 09 will send, then attempts the add and asserts the provider rejects it. Only meaningful when the scenario uses Place selection in ADD_TO_BOOKING mode (Booking Flow Actions below).',
+            'expiredAddReservationOfferMaxWaitMinutes',
+            'Optional. Per-scenario wait budget.',
+            'set-scenario-max-wait-addres-minutes',
+          )}
+          ${timerRow(
+            'expiredAddAncillaryOfferTest', 'Expired add-ancillary-offer test',
+            'Negative test. On: just before 10. POST Add Ancillary to Booking fires, OSCAR waits until just past the earliest validUntil of the ancillary offer-parts that 10 will send (sourced from 11. additional-offers or the original offer), then attempts the add and asserts the provider rejects it. Only meaningful when "Add ancillary" is enabled in Booking Flow Actions below.',
+            'expiredAddAncillaryOfferMaxWaitMinutes',
+            'Optional. Per-scenario wait budget.',
+            'set-scenario-max-wait-addanc-minutes',
+          )}
+          ${refundRow}
+          ${exchangeRow}
+        </div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
+          Each enabled test waits past its resource's deadline, then asserts the next request is rejected
+          with a <strong>4xx + RFC-9457 Problem</strong> body. If the wait would exceed the run budget
+          (server's <code>RUN_TIMEOUT_MS</code> or the per-scenario Max wait above), the test
+          <strong>skips with a <code>[WARNING]</code></strong> instead of being killed mid-wait.
+          OAuth tokens are refreshed automatically across the wait — a 401/403 is flagged as an auth
+          failure (not a test pass) so you can tell the two apart.
+          <br><br>
+          <strong>One scenario, one test today.</strong> Enabling more than one timer on the same scenario
+          will run the FIRST one that the flow reaches; the later ones never see their request fire
+          (the earlier one short-circuits the run). A future enhancement will auto-expand multi-timer
+          scenarios into one sub-run per timer.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function buildSalesFlowActionsSection(idx, sc) {
   if (!sc.scenarioType) return '';
   const readOnly = isTester && sc.shared;
@@ -5003,6 +5101,26 @@ async function wizGenerateScenario() {
       // null = use server's RUN_TIMEOUT_MS. Same auto-extend semantics as
       // expiredBookingMaxWaitMinutes (clamped to RUN_HARD_MAX_TIMEOUT_MS).
       expiredOfferMaxWaitMinutes: null,
+      // Phase 5a — expired post-booking add-reservation offer-part test.
+      // 'off' by default; 'on' makes OSCAR wait past the validUntil of the
+      // reservationOfferPart 09 will send, then assert the POST is rejected.
+      expiredAddReservationOfferTest: 'off',
+      expiredAddReservationOfferMaxWaitMinutes: null,
+      // Phase 5b — expired post-booking add-ancillary offer-part test.
+      // 'off' by default; 'on' makes OSCAR wait past the earliest validUntil
+      // across the ancillary parts 10 will send, then assert rejection.
+      expiredAddAncillaryOfferTest: 'off',
+      expiredAddAncillaryOfferMaxWaitMinutes: null,
+      // Phase 3 — expired refund-offer test. REFUND scenarios only.
+      // 'on' → wait past refundOffers[0].validUntil, assert PATCH rejection.
+      expiredRefundOfferTest: 'off',
+      expiredRefundOfferMaxWaitMinutes: null,
+      // Phase 4 — expired exchange-offer test. EXCHANGE scenarios only.
+      // 'on' → wait past exchangeOffers[0].preBookableUntil, assert POST
+      // /exchange-operations rejection. NOTE: the spec field is
+      // `preBookableUntil`, NOT `validUntil` (Deviations doc #25).
+      expiredExchangeOfferTest: 'off',
+      expiredExchangeOfferMaxWaitMinutes: null,
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,
@@ -6021,6 +6139,32 @@ document.body.addEventListener('input', function(e) {
         const n = parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
           setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
+        }
+      }
+      break;
+    }
+    case 'set-scenario-max-wait-addres-minutes':
+    case 'set-scenario-max-wait-addanc-minutes':
+    case 'set-scenario-max-wait-refund-offer-minutes':
+    case 'set-scenario-max-wait-exchange-offer-minutes': {
+      // Per-scenario Max wait inputs for Phase 3/4/5 expired-X tests. All
+      // share the empty=null / [1,60] integer semantics of the booking/offer
+      // timers above. Action → field-name map kept local so renaming a field
+      // is a one-place edit.
+      const _maxWaitFieldByAction = {
+        'set-scenario-max-wait-addres-minutes':         'expiredAddReservationOfferMaxWaitMinutes',
+        'set-scenario-max-wait-addanc-minutes':         'expiredAddAncillaryOfferMaxWaitMinutes',
+        'set-scenario-max-wait-refund-offer-minutes':   'expiredRefundOfferMaxWaitMinutes',
+        'set-scenario-max-wait-exchange-offer-minutes': 'expiredExchangeOfferMaxWaitMinutes',
+      };
+      const _field = _maxWaitFieldByAction[action];
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), _field, null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), _field, n);
         }
       }
       break;
