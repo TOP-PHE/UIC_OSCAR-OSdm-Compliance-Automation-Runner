@@ -230,8 +230,9 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   if (refundOffer.fulfillments) {
     if (typeof validateFulfillments === "function") {
       // Support both signatures: (fulfillments, expected) and (fulfillments, index, expected)
+      // #253: pass refundOffer.fulfillmentDocuments[] (v3.8 sibling) for ref→id integrity.
       if (validateFulfillments.length >= 3) {
-        validateFulfillments(refundOffer.fulfillments, index, expectedFulfillmentStatus);
+        validateFulfillments(refundOffer.fulfillments, index, expectedFulfillmentStatus, false, refundOffer.fulfillmentDocuments);
       } else {
         validateFulfillments(refundOffer.fulfillments, expectedFulfillmentStatus);
       }
@@ -363,8 +364,9 @@ function getBookingRefundResponse(response, scenarioType) {
 
       if (typeof validateFulfillments === "function") {
         // Signature handling as above
+        // #253: pass refundOffer.fulfillmentDocuments[] (v3.8 sibling) for ref→id integrity.
         if (validateFulfillments.length >= 3) {
-          validateFulfillments(refundOffer.fulfillments, 0, expectedStatus);
+          validateFulfillments(refundOffer.fulfillments, 0, expectedStatus, false, refundOffer.fulfillmentDocuments);
         } else {
           validateFulfillments(refundOffer.fulfillments, expectedStatus);
         }

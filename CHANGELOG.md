@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.82] — 2026-05-27
+
+OSDM v3.8 `FulfillmentDocument` cross-reference integrity — **#253.**
+**Bruno collection bumped (OTST_V2.0.34 → OTST_V2.0.35).**
+
+### Added
+- **#253 — `fulfillmentDocumentRefs` ↔ sibling `fulfillmentDocuments[].id` integrity
+  check.** OSDM v3.8 moves `FulfillmentDocument` from a nested
+  `fulfillment.fulfillmentDocuments[]` to a **sibling**
+  `FulfillmentResponse.fulfillmentDocuments[]` / `Booking.fulfillmentDocuments[]`,
+  with `fulfillments[].fulfillmentDocumentRefs[]` pointing at the sibling
+  `.id`. `validateFulfillments()` now accepts the sibling array and asserts
+  **each `fulfillmentDocumentRef` resolves to a sibling `fulfillmentDocuments[].id`** —
+  an unresolved ref (or refs present with no sibling array at all) **FAILs** with a
+  clear diagnostic listing the unresolved ref(s) and the available sibling ids.
+  Wired through every caller: `postCreateBookingResponse` (passes
+  `booking.fulfillmentDocuments`), `06. POST … Fulfillments` + `04-Exchange/14. POST … Fulfillments`
+  (FulfillmentResponse-level `jsonData.fulfillmentDocuments`), `exchanges.js`,
+  `refunds.js` (`exchangeOffer.fulfillmentDocuments` / `refundOffer.fulfillmentDocuments`).
+
+### Notes
+- **Backwards-compatible.** When the sibling array is not supplied — legacy
+  callers, or pre-v3.8 providers that still use the deprecated nested
+  `fulfillment.fulfillmentDocuments[]` form — the new cross-ref check is
+  **SKIPPED** with an informational log. The existing happy path is unchanged.
+
+---
+
 ## [server-v1.11.81] — 2026-05-27
 
 Data-file robustness — **#210 (pt. 3).**
