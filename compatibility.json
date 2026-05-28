@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.113",
+  "current_release": "2026.114",
   "releases": [
+    {
+      "release": "2026.114",
+      "date": "2026-05-28",
+      "server": "1.11.86",
+      "collection": "OTST_V2.0.36",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#291, #292): two checks that catch the #287 regression class (literal '</script>' inside an inline <script> block closing the outer script early) BEFORE it ships. (#292) scripts/lint-inline-scripts.js — a Node-only static linter wired into the existing `lint` npm script: walks Oscar_Server/public/*.html with HTML5 script-data state rules, compares raw '</script>' counts to walker-matched closes, names file+line of any stray. Runs in CI Lint/audit/test. (#291) tests/unit/dashboard-pages.test.js — Jest test that does the same walk, asserts every <script> is properly closed, raw and matched close counts match, and run-detail.html's outer inline block reaches its tail marker `poll();` (proving the parser saw the script through to the end). Note: #291 originally proposed Playwright; this implementation deliberately avoids adding @playwright/test (and re-resolving package-lock.json) — the deterministic walker catches the exact regression class at zero dep cost. A real-browser smoke test can be a separate scope if richer DOM-execution coverage is wanted. Server 1.11.85 -> 1.11.86; no Bruno collection change.",
+        "Operator action required: none. Chip shows 2026.114 / server-v1.11.86 / OTST_V2.0.36 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.113",
       "date": "2026-05-28",

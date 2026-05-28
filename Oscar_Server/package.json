@@ -1,13 +1,14 @@
 {
   "name": "oscar-server",
-  "version": "1.11.85",
+  "version": "1.11.86",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "lint": "eslint src/",
+    "lint": "eslint src/ && node scripts/lint-inline-scripts.js",
     "lint:fix": "eslint src/ --fix",
+    "lint:html": "node scripts/lint-inline-scripts.js",
     "test": "jest",
     "test:watch": "jest --watch"
   },
