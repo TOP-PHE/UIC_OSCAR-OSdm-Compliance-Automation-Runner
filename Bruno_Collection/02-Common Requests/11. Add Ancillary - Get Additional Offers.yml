@@ -49,23 +49,56 @@ runtime:
         }
 
         // Pick the first additional offer that carries an ancillary part; its
-        // offerId + ancillaryOfferParts[].id are valid for this booking.
+        // offerId + ancillaryOfferParts[].id are valid for this booking. We
+        // keep the full part objects (not just ids) so the Phase-5b expired-
+        // add-ancillary capture below can read their `validUntil` values.
         const offers = (body && Array.isArray(body.offers)) ? body.offers : [];
         let chosen = null;
         for (const o of offers) {
           const parts = (o && Array.isArray(o.ancillaryOfferParts)) ? o.ancillaryOfferParts.filter((p) => p && p.id) : [];
-          if (parts.length > 0) { chosen = { offerId: o.offerId, ids: parts.map((p) => p.id) }; break; }
+          if (parts.length > 0) { chosen = { offerId: o.offerId, ids: parts.map((p) => p.id), parts: parts }; break; }
         }
 
         if (chosen && chosen.offerId && chosen.ids.length > 0) {
           bru.setEnvVar("addAncillaryParentOfferId", chosen.offerId);
           bru.setEnvVar("addAncillaryOfferIds", JSON.stringify(chosen.ids));
           validationLogger(`[INFO] additional-offers → offerId=${chosen.offerId} ancillaryOfferIds=[${chosen.ids.join(", ")}]`);
+
+          // Expired-add-ancillary-offer test (Phase 5b, primary capture site):
+          // stash the EARLIEST validUntil across chosen.parts. The add-ancillary
+          // body sends all chosen.ids (>=3.7) or chosen.ids[0] (<3.7); either
+          // way a single-part-stale → whole-add stale, so the earliest is the
+          // correct deadline to wait past. Fallback capture in 10.yml handles
+          // the case where 11.yml never ran but the original-offer ancillary
+          // parts are used.
+          let _earliestMs = Infinity, _earliestRaw = null, _earliestSrc = null;
+          chosen.parts.forEach(function (p, i) {
+            if (p && p.validUntil) {
+              const t = new Date(p.validUntil).getTime();
+              if (!isNaN(t) && t < _earliestMs) {
+                _earliestMs  = t;
+                _earliestRaw = p.validUntil;
+                _earliestSrc = `additionalOffers.ancillaryOfferParts[${i}].validUntil`;
+              }
+            }
+          });
+          if (_earliestRaw) {
+            bru.setEnvVar("addAncillaryOfferValidUntil", String(_earliestRaw));
+            bru.setEnvVar("addAncillaryOfferValidUntilSource", String(_earliestSrc));
+            validationLogger(`[INFO] Captured add-ancillary offer-part validUntil = ${_earliestRaw} (${_earliestSrc}) — drives the #expiredAddAncillaryOfferTest deadline if enabled.`);
+          } else {
+            bru.setEnvVar("addAncillaryOfferValidUntil", "");
+            bru.setEnvVar("addAncillaryOfferValidUntilSource", "");
+          }
+
           bru.runner.setNextRequest("10. POST Add Ancillary to Booking");
         } else {
           // Nothing addable — skip the POST and continue the sale flow so the
           // scenario doesn't dead-end. Mark done so the filter won't loop back.
           validationLogger(`[WARNING] No additional ancillary offer available for this booking — add-ancillary skipped.`);
+          if (String(bru.getEnvVar("expiredAddAncillaryOfferTest")) === "true") {
+            validationLogger(`[WARNING] expiredAddAncillaryOfferTest is on but the provider returned no addable ancillary — test will SKIP (no offer-part to age out).`);
+          }
           bru.setEnvVar("__addAncillaryDone", "true");
           if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
               || bru.getEnvVar("salesFlow_patchPassengers") === "false") {

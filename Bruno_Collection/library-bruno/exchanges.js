@@ -40,6 +40,21 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
   // Store first offer ID
   bru.setEnvVar("exchangeOffersOfferId", jsonData.exchangeOffers[0].offerId);
   validationLogger(`[INFO] Stored exchangeOffersOfferId: ${jsonData.exchangeOffers[0].offerId}`);
+
+  // Expired-exchange-offer test (Phase 4): capture the
+  // ExchangeOffer.preBookableUntil of the offer the POST /exchange-operations
+  // will accept (exchangeOffers[0]). Note the SPEC FIELD NAME is
+  // `preBookableUntil`, NOT `validUntil` — this is the per-resource-type
+  // naming inconsistency #25 documented in OSDM_Spec_Deviations: every other
+  // offer-expiry field uses `validUntil`, the exchange flow uses
+  // `preBookableUntil` for the same semantic. The env-var name mirrors the
+  // spec literal so the deviation stays discoverable.
+  const _firstExchangeOffer = jsonData.exchangeOffers[0];
+  if (_firstExchangeOffer && _firstExchangeOffer.preBookableUntil) {
+    bru.setEnvVar("exchangeOfferPreBookableUntil", String(_firstExchangeOffer.preBookableUntil));
+    bru.setEnvVar("exchangeOfferPreBookableUntilSource", "exchangeOffers[0].preBookableUntil");
+    validationLogger(`[INFO] Captured exchangeOffer preBookableUntil = ${_firstExchangeOffer.preBookableUntil}`);
+  }
 }
 
 // Function to validate exchange operations response (using 11_turnit_exchange.json structure)

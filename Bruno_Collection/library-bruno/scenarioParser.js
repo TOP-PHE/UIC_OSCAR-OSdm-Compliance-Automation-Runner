@@ -67,6 +67,14 @@ function resetScenarioEnvVars() {
     "expiredBookingTest", "__expiredBookingArmed", "expiredBookingMaxWaitMinutes",
     "expiredOfferTest", "__expiredOfferArmed", "expiredOfferMaxWaitMinutes",
     "offerValidUntil", "offerValidUntilSource",
+    "expiredAddReservationOfferTest", "__expiredAddReservationOfferArmed", "expiredAddReservationOfferMaxWaitMinutes",
+    "addReservationOfferValidUntil", "addReservationOfferValidUntilSource",
+    "expiredAddAncillaryOfferTest", "__expiredAddAncillaryOfferArmed", "expiredAddAncillaryOfferMaxWaitMinutes",
+    "addAncillaryOfferValidUntil", "addAncillaryOfferValidUntilSource",
+    "expiredRefundOfferTest", "__expiredRefundOfferArmed", "expiredRefundOfferMaxWaitMinutes",
+    "refundOfferValidUntil", "refundOfferValidUntilSource",
+    "expiredExchangeOfferTest", "__expiredExchangeOfferArmed", "expiredExchangeOfferMaxWaitMinutes",
+    "exchangeOfferPreBookableUntil", "exchangeOfferPreBookableUntilSource",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
@@ -496,6 +504,27 @@ function parseScenarioData(jsonData) {
         bru.setEnvVar("expiredOfferMaxWaitMinutes", String(Math.floor(_maxOfferWaitN)));
       } else {
         bru.setEnvVar("expiredOfferMaxWaitMinutes", "");
+      }
+
+      // Phase 3+4+5a+5b: expired-X negative tests for refund / exchange /
+      // add-reservation / add-ancillary. All follow the same shape as
+      // expiredOfferTest / expiredBookingTest above. Each has a per-scenario
+      // Max wait input with identical semantics (1..60 min, auto-extends the
+      // runner SIGTERM via EXPIRED_FLOW_TIMERS in runner.js).
+      const _expiredFlowFields = [
+        ["expiredAddReservationOfferTest", "expiredAddReservationOfferMaxWaitMinutes"],
+        ["expiredAddAncillaryOfferTest",   "expiredAddAncillaryOfferMaxWaitMinutes"],
+        ["expiredRefundOfferTest",         "expiredRefundOfferMaxWaitMinutes"],
+        ["expiredExchangeOfferTest",       "expiredExchangeOfferMaxWaitMinutes"],
+      ];
+      for (const [_flagKey, _waitKey] of _expiredFlowFields) {
+        const _raw = scenario[_flagKey];
+        bru.setEnvVar(_flagKey,
+          (_raw === true || ["true", "on", "yes"].includes(String(_raw).toLowerCase())) ? "true" : "false");
+        const _wRaw = scenario[_waitKey];
+        const _wN   = Number(_wRaw);
+        bru.setEnvVar(_waitKey,
+          (Number.isFinite(_wN) && _wN >= 1 && _wN <= 60) ? String(Math.floor(_wN)) : "");
       }
 
       // osdmVersion priority: scenario value (data file) > environment file value > null
