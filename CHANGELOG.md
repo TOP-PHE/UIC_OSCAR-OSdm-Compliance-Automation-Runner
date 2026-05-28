@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.85] — 2026-05-28
+
+HOTFIX — run-detail page broken by stray `</script>` inside the JSON-viewer
+template literal — **#287 (follow-up).**
+**Server-only release; no Bruno collection bump.**
+
+### Fixed
+- **The run-detail page was unrenderable on releases 2026.111 and 2026.112.**
+  `run-detail.html`'s inline `<script>` block contained a literal `</script>`
+  substring inside the `renderMessage` template literal that emits the inline
+  JSON payload envelope for the Tree viewer. HTML parsers terminate a script
+  element at any `</script>` regardless of JS string context, so the outer
+  inline script ended early there and the rest of the JS source bled out as
+  visible page text — the broken view a tester reported. Every literal
+  `</script` inside the inline block (the template, plus three comments)
+  now spells `<\/script` instead — JS reads `\/` as `/`, so the emitted HTML
+  and resulting DOM are correct, while the HTML parser does not see `</` and
+  keeps the outer script open. **Hard-refresh the dashboard** (Ctrl+Shift+R)
+  once Watchtower restarts so the cached broken HTML is replaced.
+
+---
+
 ## [server-v1.11.84] — 2026-05-28
 
 Expired-booking deadline field-name fallback — **#204 (follow-up).**

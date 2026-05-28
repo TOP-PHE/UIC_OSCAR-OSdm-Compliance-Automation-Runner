@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.112",
+  "current_release": "2026.113",
   "releases": [
+    {
+      "release": "2026.113",
+      "date": "2026-05-28",
+      "server": "1.11.85",
+      "collection": "OTST_V2.0.36",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#287): HOTFIX — the run-detail page was broken on releases 2026.111 and 2026.112 because run-detail.html contained a literal '</script>' substring inside the inline <script> block (in the renderMessage template literal that emits the inline JSON payload envelope for the Tree viewer). HTML parsers terminate the script element at any '</script>' regardless of JS string context, so the outer script ended early and the rest of the inline JS bled into the page as visible text — exactly the broken view a tester reported. Fix: every literal '</script' inside the inline block (the template, plus three comments) now spells '<\\/script' instead. JS interprets '\\/' as '/', so the emitted HTML and resulting DOM are correct. Server-only release; no Bruno collection change. Server 1.11.84 -> 1.11.85.",
+        "Operator action required: none. Hard-refresh (Ctrl+Shift+R) the dashboard once Watchtower restarts so the cached broken run-detail.html is replaced. Chip shows 2026.113 / server-v1.11.85 / OTST_V2.0.36."
+      ]
+    },
     {
       "release": "2026.112",
       "date": "2026-05-28",

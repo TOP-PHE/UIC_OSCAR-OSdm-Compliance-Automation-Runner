@@ -774,8 +774,13 @@ function loadJsonEditorModule() {
   }
   return __jsoneditorModulePromise;
 }
-// Escape `</script` to prevent the inline JSON payload from breaking out of
-// its <script type="application/json"> envelope. Not executed (it's data).
+// Escape "<\/script" inside the inline JSON payload so it cannot terminate
+// its inline <script type="application/json"> envelope (the JSON is data,
+// not executed). Anywhere in this source where the literal sequence
+// "<\/script" would otherwise appear is written as "<\/script" — the JS
+// engine collapses "\/" to "/", so the EMITTED HTML is correct, while the
+// HTML parser scanning this <script> block does NOT see "</" and therefore
+// does NOT terminate this outer <script> while reading the source.
 function safeJsonForInlineScript(s) {
   return String(s).replace(/<\/(?=script)/gi, '<\\/');
 }
@@ -805,7 +810,10 @@ function renderMessage(label, meta, body) {
         + `<button class="msg-toggle active" data-mode="raw" type="button">Raw</button>`
         + `<button class="msg-toggle" data-mode="tree" type="button" title="Structured tree view with key/value search (lazy-loaded)">Tree</button>`
       + `</div>`;
-    payloadScript = `<script type="application/json" id="${id}-payload">${safeJsonForInlineScript(pretty)}</script>`;
+    // IMPORTANT: write "<\/script>" (not the literal closing tag) so the HTML
+    // parser does NOT terminate this outer <script> block while reading the
+    // source. JS interprets "\/" as "/", so the EMITTED HTML is correct.
+    payloadScript = `<script type="application/json" id="${id}-payload">${safeJsonForInlineScript(pretty)}<\/script>`;
     treeDiv = `<div class="msg-tree" id="${id}-tree" style="display:none"></div>`;
   } else if (body) {
     const reason = !parsedOk
