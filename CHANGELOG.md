@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.87] — 2026-05-28
+
+Expired-booking deadline — bookingPart-level fallback for providers that
+don't set the deadline at the booking root — **#204 (third follow-up).**
+**Bruno collection bumped (OTST_V2.0.36 → OTST_V2.0.37).**
+
+### Fixed
+- **#204 — the expired-booking test silently no-op'd against a provider
+  (e.g. Paxone sandbox) that reports `confirmableUntil` ONLY on the
+  individual bookingParts (admissions / reservations / ancillaries), not
+  at the booking root.** This is in fact OSDM's own schema placement
+  for the field — but the previous two follow-ups (2026.112, 2026.114)
+  only read the root-level fields, so the env var was never set and
+  06.yml fired `POST /fulfillments` immediately. `bookings.js`
+  `postCreateBookingResponse` now resolves the booking deadline in this
+  order:
+  1. `booking.confirmationTimeLimit` (OSDM-standard at booking root)
+  2. `booking.confirmableUntil` (Bileto-style at booking root)
+  3. **earliest** `bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil`
+     (Paxone-style — bookingPart level, OSDM schema's own placement)
+  Each non-standard source emits a `[WARNING]` documenting which shape
+  was used. 06.yml header comment + Tester User Guide §4.8 / §7.1
+  updated.
+
+### Notes
+- **Operator action for long deadlines (unchanged from 2026.112).**
+  Paxone's deadline is ~15 min after creation — same as Bileto. With the
+  default `RUN_TIMEOUT_MS` of 10 min, the test self-skips with the
+  budget `[WARNING]` (by design: the runner injects `runHardDeadlineMs`
+  to avoid SIGTERM mid-wait). **Raise `RUN_TIMEOUT_MS` to ≥ ~1200 s
+  (20 min)** on the server before re-running `expiredBookingTest: on`
+  against either sandbox.
+
+---
+
 ## [server-v1.11.86] — 2026-05-28
 
 Regression guards for the #287 stray-`</script>` class — **#291 and #292.**
