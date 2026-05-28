@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.92] — 2026-05-28
+
+OAuth token watchdog for long-running scenario series — **#204
+(belt-and-braces).**
+**Bruno collection bumped (OTST_V2.0.39 → OTST_V2.0.40).**
+
+### Added — three layers of token-freshness defence
+1. **Server endpoint accepts `?force`.**
+   `POST /v1/runs/:runId/refresh-access-token?force=1` forces an OAuth
+   round-trip (skip the cache); default (no query) respects the per-tester
+   server-side cache. Lets Bruno call us cheaply at scenario start.
+2. **`library-bruno/auth.js` gains `refreshAccessTokenIfNeeded()`.**
+   Wraps the loopback call + env-var update + error logging. Wired into
+   **`01. POST Get Offer`'s before-request** so every scenario starts with
+   a fresh-or-cached token (~50ms cache hit). `06. POST Obtaining
+   Fulfillments` now uses the shared helper with `force: true` (replaces
+   the previous inline `bru.sendRequest`).
+3. **`runner.js` background token watchdog.**
+   Spawns a `setInterval` ticker (every `TOKEN_WATCHDOG_INTERVAL_MS`, default
+   300000 = 5 min) that calls `resolveAccessToken` on the cached token
+   **without `forceRefresh`**. The cache's safety-margin check decides
+   whether to refetch or no-op — so this is a cheap background guard
+   that keeps the cached token fresh enough for the next scenario start.
+   Skipped for bearer-mode runs. Operator opt-out: `TOKEN_WATCHDOG_INTERVAL_MS=0`.
+   Cleaned up in `proc.on('close'|'error')`.
+
+### Notes
+- Why three layers when one might suffice: PR #302 fixed the only
+  *currently observed* token-TTL collision (the expired-booking test's
+  long wait). This release adds defence-in-depth for the broader class
+  the tester raised: *"if we run a long series of scenarios one after the
+  other, we could fall in this trap."* In practice the per-scenario
+  `resolveAccessToken` call in `runner.js` already handled batches via
+  the server-side cache — but layer (2) makes that explicit at scenario
+  start, and layer (3) keeps the cache warm under any in-flight run.
+
+---
+
 ## [server-v1.11.91] — 2026-05-28
 
 Refresh the OAuth access token after the expired-booking wait — **#204

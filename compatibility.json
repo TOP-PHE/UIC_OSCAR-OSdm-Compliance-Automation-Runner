@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.119",
+  "current_release": "2026.120",
   "releases": [
+    {
+      "release": "2026.120",
+      "date": "2026-05-28",
+      "server": "1.11.92",
+      "collection": "OTST_V2.0.40",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#204): OAuth token watchdog — full belt-and-braces token freshness for long-running scenario series, on top of #302's expired-booking-wait refresh. Three new layers: (1) loopback endpoint POST /v1/runs/:runId/refresh-access-token now accepts ?force=1 (default: respect server-side per-tester cache). (2) library-bruno/auth.js gains refreshAccessTokenIfNeeded() that wraps the loopback call + env-var update + error logging. Wired into 01. POST Get Offer's before-request so every scenario starts with a fresh-or-cached token (~50ms cache hit). 06. POST Obtaining Fulfillments now uses the shared helper with force=true (replaces the previous inline bru.sendRequest). (3) runner.js spawns a background token-watchdog interval that ticks every TOKEN_WATCHDOG_INTERVAL_MS (default 300000 = 5 min) while the run is in flight, calls resolveAccessToken without force — the cache's safety-margin check decides whether to refetch or no-op. Cleaned up in proc.on(close|error). Skipped for bearer-mode runs. Operator opt-out: TOKEN_WATCHDOG_INTERVAL_MS=0. Bruno_Collection/VERSION OTST_V2.0.39 -> OTST_V2.0.40; server 1.11.91 -> 1.11.92.",
+        "Operator action required: none. New TOKEN_WATCHDOG_INTERVAL_MS env var documented in .env.example. Chip shows 2026.120 / server-v1.11.92 / OTST_V2.0.40 after Watchtower restarts."
+      ]
+    },
     {
       "release": "2026.119",
       "date": "2026-05-28",
