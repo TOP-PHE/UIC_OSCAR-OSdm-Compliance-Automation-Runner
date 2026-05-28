@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.86] — 2026-05-28
+
+Regression guards for the #287 stray-`</script>` class — **#291 and #292.**
+**Server-only release; no Bruno collection bump.**
+
+### Added
+- **#292 — `Oscar_Server/scripts/lint-inline-scripts.js`**, wired into the
+  existing `lint` npm script (and therefore the CI Lint/audit/test job).
+  Walks every `Oscar_Server/public/*.html` with the HTML5 *script-data state*
+  rules, compares the raw `</script>` count to the count of blocks the walker
+  actually paired up, and **fails the build** if there's a stray — naming
+  the offending file + line and suggesting `<\/script>` as the escape.
+  Deterministic, zero new dependencies, runs in milliseconds.
+- **#291 — `Oscar_Server/tests/unit/dashboard-pages.test.js`**, a Jest test
+  using the same walker logic. For every public HTML page it asserts every
+  `<script>` is properly closed and that no stray `</script>` exists inside
+  inline blocks. For `run-detail.html` specifically it asserts the outer
+  inline block's parser-visible content reaches its **tail marker**
+  (`poll();`) — a direct regression guard for #287 that would have failed
+  loudly when the broken page was committed.
+
+### Notes
+- **Scope choice:** #291 originally proposed Playwright for a real-browser
+  smoke test. This implementation deliberately avoids adding
+  `@playwright/test` and its browser binaries — and avoids re-resolving
+  `package-lock.json` — because the deterministic walker already catches the
+  exact regression class at **zero dep cost**. A real-browser smoke test
+  can be added as a separate scope if richer DOM-execution coverage is
+  wanted later.
+
+---
+
 ## [server-v1.11.85] — 2026-05-28
 
 HOTFIX — run-detail page broken by stray `</script>` inside the JSON-viewer
