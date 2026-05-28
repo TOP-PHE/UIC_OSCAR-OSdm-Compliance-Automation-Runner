@@ -80,41 +80,18 @@ runtime:
               await new Promise((r) => setTimeout(r, waitMs));
               validationLogger(`[INFO] expiredBookingTest: wait complete — refreshing access token before attempting fulfillment.`);
 
-              // #204 token-TTL fix: the OAuth access token issued at run start
-              // may have expired during the long wait — Paxone returned 403
-              // "not authenticated" on the late POST /fulfillments, masking
-              // the booking-expiry semantics the test is grading. Call OSCAR's
-              // loopback refresh-access-token endpoint (force=true) to obtain
-              // a fresh token and replace {{access_token}} in this env before
-              // Bruno fires the request.
-              const _runId           = bru.getEnvVar("__runId");
-              const _loopbackBase    = bru.getEnvVar("oscar_loopback_base") || "http://127.0.0.1:3001";
-              if (_runId) {
-                try {
-                  const _refreshUrl = `${_loopbackBase}/v1/runs/${_runId}/refresh-access-token`;
-                  const _resp = await new Promise((resolve, reject) => {
-                    bru.sendRequest(
-                      { url: _refreshUrl, method: "POST", proxy: false, headers: { "Content-Type": "application/json" } },
-                      (err, res) => { if (err) reject(err); else resolve(res); }
-                    );
-                  });
-                  const _status = (_resp && (_resp.status || _resp.statusCode)) || 0;
-                  let _body;
-                  try {
-                    _body = typeof _resp.body === "string" ? JSON.parse(_resp.body) : (_resp.body || _resp.data || null);
-                  } catch (_) { _body = null; }
-                  if (_status >= 200 && _status < 300 && _body && _body.access_token) {
-                    bru.setEnvVar("access_token", _body.access_token);
-                    validationLogger(`[INFO] expiredBookingTest: access_token refreshed via OSCAR loopback endpoint — fulfillment will use the fresh token.`);
-                  } else {
-                    validationLogger(`[WARNING] expiredBookingTest: token-refresh endpoint returned ${_status} — fulfillment will use the original (possibly expired) token. The provider may reject with 401/403; if so, distinguish auth failure from booking-expiry failure in the report.`);
-                  }
-                } catch (_e) {
-                  const _msg = (_e && _e.message) ? _e.message : String(_e);
-                  validationLogger(`[WARNING] expiredBookingTest: token-refresh request failed (${_msg}) — fulfillment will use the original (possibly expired) token.`);
-                }
-              } else {
-                validationLogger(`[WARNING] expiredBookingTest: __runId env var is not set — cannot call the OSCAR loopback refresh endpoint. Fulfillment will use the original token (may have expired during the wait).`);
+              // #204 token-TTL fix: force-refresh the access token after the
+              // long wait so the late POST /fulfillments uses a fresh bearer.
+              // Without it, the OAuth token issued at run start (TTL often
+              // shorter than the wait — Paxone is ~15 min) returns 403 "not
+              // authenticated" and masks the booking-expiry semantics the
+              // test is grading. The shared helper handles the loopback call
+              // + env-var update + error logging.
+              try {
+                const { refreshAccessTokenIfNeeded } = require(bru.getEnvVar("library_base") + "auth.js");
+                await refreshAccessTokenIfNeeded({ force: true, callerLabel: 'POST /fulfillments (expired-booking test)' });
+              } catch (_e) {
+                validationLogger(`[WARNING] expiredBookingTest: token-refresh helper threw (${(_e && _e.message) || _e}) — fulfillment will use the original (possibly expired) token.`);
               }
 
               validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);

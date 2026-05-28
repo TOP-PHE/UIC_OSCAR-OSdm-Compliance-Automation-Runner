@@ -681,6 +681,43 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       proc.kill('SIGTERM');
     }, runTimeoutMs);
 
+    // #204 token-watchdog (Piece 3 / defense-in-depth): periodically refresh
+    // the per-tester cached access token while the run is in flight, so the
+    // server-side cache never expires under an in-flight Bruno process. The
+    // ticker calls resolveAccessToken with forceRefresh:false; resolve's own
+    // safety-margin check decides whether to refetch or no-op against cache.
+    // This is BELT to the BRACES of (a) 01.yml's per-scenario refresh-on-start
+    // (Piece 2) and (b) 06.yml's force-refresh after the expired-booking wait.
+    //
+    // Skipped for bearer-auth runs (no cache to keep warm). Skipped when
+    // userRow is null (probably an admin/run-as-other context that hit the
+    // run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
+    // default 300000 (5 min).
+    let tokenWatchdog = null;
+    if (userRow && userRow.auth_mode === 'oauth2') {
+      const tickMs = parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
+      // Disabled when set to 0 (operator opt-out).
+      if (tickMs > 0) {
+        tokenWatchdog = setInterval(async () => {
+          try {
+            await resolveAccessToken(
+              userRow,
+              { info: (m) => logEvent(runId, 'info', `[token-watchdog] ${m}`),
+                error: (m) => logEvent(runId, 'error', `[token-watchdog] ${m}`) }
+              // no forceRefresh — let the safety-margin check decide
+            );
+          } catch (err) {
+            logEvent(runId, 'warn',
+              `[token-watchdog] tick failed: ${err && err.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
+          }
+        }, tickMs);
+        logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
+      }
+    }
+    function stopTokenWatchdog() {
+      if (tokenWatchdog) { clearInterval(tokenWatchdog); tokenWatchdog = null; }
+    }
+
     const logParser = new LogParser();
     // Seed the parser's scenario state from the run record. Single-scenario
     // runs (scenarioOverride set, or multi-scenario runs with one scenario_code)
@@ -715,11 +752,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
     proc.on('close', code => {
       clearTimeout(timeout);
+      stopTokenWatchdog();
       _activeProcs.delete(runId);
       resolve(code ?? 1);
     });
     proc.on('error', err => {
       clearTimeout(timeout);
+      stopTokenWatchdog();
       _activeProcs.delete(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);

@@ -326,15 +326,22 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   if (!userRow) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User for this run not found.' });
   }
+  // Query: ?force=1 / ?force=true → force a fresh fetch (skip the server-side
+  // cache). Default (no query) → respect the cache (returns the cached token
+  // when valid). This lets Bruno call us at scenario start as a cheap
+  // refresh-if-needed check (#204 token-watchdog), AND call us with force=1
+  // after a known long wait (the expired-booking test) to guarantee a fresh
+  // token regardless of what the cache thinks.
+  const force = req.query.force === '1' || String(req.query.force).toLowerCase() === 'true';
   try {
     const { resolveAccessToken } = require('./worker/access-token');
     const accessToken = await resolveAccessToken(
       userRow,
       { info: (m) => log.info({ runId }, m), error: (m) => log.error({ runId }, m) },
-      { forceRefresh: true }
+      { forceRefresh: force }
     );
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ access_token: accessToken });
+    return res.json({ access_token: accessToken, forced: force });
   } catch (err) {
     const detail = err && err.message ? err.message : String(err);
     log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
