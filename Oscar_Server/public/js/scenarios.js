@@ -34,6 +34,13 @@ const ENUMS = {
   expiredAddAncillaryOfferTest:   ['off', 'on'],
   expiredRefundOfferTest:         ['off', 'on'],
   expiredExchangeOfferTest:       ['off', 'on'],
+  // Partial refund (#218) — two orthogonal axes (legs / passengers) each with
+  // its own scope picker. Outbound / inbound on the leg axis are only valid
+  // for return-trips; the wizard hides them when the trip isn't a return.
+  partialRefundByLeg:             ['off', 'on'],
+  partialRefundByPax:             ['off', 'on'],
+  partialRefundLegSelection:      ['first', 'last', 'outbound', 'inbound'],
+  partialRefundPaxSelection:      ['first', 'last'],
   loggingType:        ['INFO', 'DEBUG'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
@@ -1280,6 +1287,7 @@ function buildDetailHTML(idx) {
           return buildSelect(idx, 'overruleCode', 'Overrule Code', codes,
             'Reason code used when overruling the refund/exchange policy');
         })()}
+        ${buildPartialRefundFields(idx, sc)}
         ${buildText(idx,   'osdmVersion',        'OSDM Version',         'e.g. 3.4')}
       </div>
     </div>
@@ -1411,6 +1419,75 @@ function migrateMissingOfferSearchCriteria() {
 // don't even fire on a SALE scenario). When hidden, the underlying enum
 // stays 'off' so an existing tester-saved value doesn't accidentally arm
 // a test that can never reach its request.
+// ── Partial refund fields (#218) ────────────────────────────────────────────
+// Inline block inside the SCENARIO PARAMETERS section, only shown when the
+// scenario type is REFUND. Two orthogonal axes (legs / passengers) each with
+// their own scope picker. Inline validation hints when the configured scope
+// can't be satisfied:
+//   - per-pax requires ≥2 passengers in the resolved passengersList
+//   - per-leg with a SPECIFICATION trip requires the trip to have ≥2 legs
+//     (a multi-leg one-way OR a return-trip)
+//   - outbound / inbound scope require a return-trip; hidden otherwise
+// SEARCH-mode trips can't be statically checked for leg-count — the runtime
+// degradation in 10.yml handles that case with a WARNING.
+function buildPartialRefundFields(idx, sc) {
+  if (!sc || sc.scenarioType !== 'REFUND') return '';
+
+  // Resolve passengersList + tripRequirement to drive context-aware messaging.
+  const resolvedPassengerCount = (function () {
+    const list = (wizData.passengersLists || []).find(p => p && p.id === sc.passengersListId);
+    return Array.isArray(list && list.passengers) ? list.passengers.length : 0;
+  })();
+  const tripRequirement = (wizData.tripRequirements || []).find(t => t && t.id === sc.tripRequirementId) || null;
+  const isSpec  = tripRequirement && tripRequirement.tripType === 'SPECIFICATION';
+  const specLegCount = isSpec && Array.isArray(tripRequirement.legs) ? tripRequirement.legs.length : 0;
+  const isReturn = !!(tripRequirement && (tripRequirement.returnSearchParameters || tripRequirement.tripType === 'RETURN'));
+
+  // Build leg-selection options: drop outbound/inbound when not a return-trip.
+  const legOptions = isReturn
+    ? ENUMS.partialRefundLegSelection
+    : ENUMS.partialRefundLegSelection.filter(v => v !== 'outbound' && v !== 'inbound');
+
+  const byLegOn = sc.partialRefundByLeg === 'on' || sc.partialRefundByLeg === true;
+  const byPaxOn = sc.partialRefundByPax === 'on' || sc.partialRefundByPax === true;
+
+  // Inline warnings — emit only when the user has TURNED THE OPTION ON and it
+  // can't be satisfied, so the editor isn't noisy.
+  let warnings = '';
+  if (byPaxOn && resolvedPassengerCount < 2) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ Per-passenger partial refund requires ≥2 passengers. The selected passengersList has ${resolvedPassengerCount}.</div>`;
+  }
+  if (byLegOn && isSpec && specLegCount < 2) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ Per-leg partial refund requires a multi-leg trip. The SPECIFICATION trip has ${specLegCount} leg(s).</div>`;
+  }
+  if (byLegOn && isSpec && !isReturn &&
+      (sc.partialRefundLegSelection === 'outbound' || sc.partialRefundLegSelection === 'inbound')) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ 'outbound' / 'inbound' selection requires a return-trip; this scenario's trip is one-way. OSCAR will fall back to 'first'.</div>`;
+  }
+  if (byLegOn && !isSpec) {
+    warnings += `<div style="color:#90a4ae;font-size:11px;margin-top:4px">ℹ SEARCH-mode trip: leg count is unknown at authoring time. If the returned offer has only one leg, the test degrades to full refund with a [WARNING].</div>`;
+  }
+
+  return `
+    <div class="param-field" style="grid-column: span 2; padding:8px;border:1px dashed #b0bec5;border-radius:6px;margin-top:6px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">Partial refund (#218)</div>
+      ${buildSelect(idx, 'partialRefundByLeg', 'Per-leg', ENUMS.partialRefundByLeg,
+        'When on, scope the refund to one leg of a multi-leg trip via OSDM RefundSpecification.bookingPartIds. Requires the booking to have ≥2 admissions (= legs).')}
+      ${byLegOn ? buildSelect(idx, 'partialRefundLegSelection', 'Leg target', legOptions,
+        'Which leg to refund. outbound / inbound require a return-trip.') : ''}
+      ${buildSelect(idx, 'partialRefundByPax', 'Per-passenger', ENUMS.partialRefundByPax,
+        'When on, scope the refund to one passenger via OSDM RefundSpecification.passengerIds. Requires ≥2 passengers in the booking.')}
+      ${byPaxOn ? buildSelect(idx, 'partialRefundPaxSelection', 'Passenger target', ENUMS.partialRefundPaxSelection,
+        'Which passenger to refund (first or last in the booking order).') : ''}
+      ${warnings}
+      <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
+        Both axes can be combined (per-leg AND per-pax) → refund one passenger on one leg.
+        When the booking can't satisfy the requested scope at runtime (single-leg trip / single passenger),
+        OSCAR logs a <code>[WARNING]</code> and degrades to full refund.
+      </div>
+    </div>`;
+}
+
 function buildNonHappyFlowSection(idx, sc) {
   const scType = (sc && sc.scenarioType) || '';
   const showRefund   = (scType === 'REFUND');
@@ -5128,6 +5205,16 @@ async function wizGenerateScenario() {
       // `preBookableUntil`, NOT `validUntil` (Deviations doc #25).
       expiredExchangeOfferTest: 'off',
       expiredExchangeOfferMaxWaitMinutes: null,
+      // Partial refund (#218) — both axes off by default for backwards-compat.
+      // When turned on, OSCAR scopes the refund-offer request via OSDM's
+      // RefundSpecification[].bookingPartIds / passengerIds. Wizard validates
+      // consistency (≥2 pax, ≥2 legs for SPECIFICATION trips); SEARCH-mode
+      // leg checks happen at offer-runtime and degrade to full refund with
+      // a [WARNING] when the offer returns only one leg.
+      partialRefundByLeg: 'off',
+      partialRefundLegSelection: 'first',
+      partialRefundByPax: 'off',
+      partialRefundPaxSelection: 'first',
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,

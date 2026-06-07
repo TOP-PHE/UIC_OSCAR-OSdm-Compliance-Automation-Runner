@@ -282,13 +282,46 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
   validationLogger(`[INFO] RefundOffer.refundFee.amount: ${refundOffer.refundFee.amount}`);
   validationLogger(`[INFO] OverruleCode: ${overruleCode}`);
 
+  // Partial refund (#218) — the strict full-refund financial identity
+  // `refundFee + refundableAmount = confirmedPrice` does NOT hold when the
+  // refund is scoped to a subset of booking parts or passengers. In that
+  // case we assert the WEAKER but meaningful identity:
+  //   refundFee + refundableAmount  <  confirmedPrice
+  // (partial scope must return strictly less than the full booking price).
+  // When partial refund was REQUESTED but DEGRADED to full at runtime, the
+  // standard full-refund identity applies — the degradation flag tells us
+  // which mode to use.
+  const _partialArmed = (
+    String(bru.getEnvVar("partialRefundByLeg")) === "true" ||
+    String(bru.getEnvVar("partialRefundByPax")) === "true"
+  );
+  const _partialDegraded = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
+  const _isPartial = _partialArmed && !_partialDegraded;
+
   if (!overruleCode || overruleCode === "CODE_DOES_NOT_EXIST") {
     test(`Refundable amount is 0 because overruleCode is null or CODE_DOES_NOT_EXIST`, () => {
       expect(refundOffer.refundableAmount.amount).to.equal(0);
       validationLogger(`[INFO] Refundable amount is 0 as expected (no valid overrule code)`);
     });
+  } else if (_isPartial) {
+    // E2-partial: integer arithmetic; sum must be STRICTLY LESS than confirmed
+    // (and ≥ 0 — sanity). Records the actual delta so reviewers see what scope
+    // the provider applied.
+    const _scale       = Math.pow(10, refundOffer.refundableAmount?.scale || 2);
+    const _feeInt      = Math.round(refundOffer.refundFee.amount * _scale);
+    const _refundInt   = Math.round(refundOffer.refundableAmount.amount * _scale);
+    const _confirmedInt = Math.round(Number(confirmedPriceAmount) * _scale);
+    test(`Partial refund: refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (OSDM: partial scope returns strictly less)`, () => {
+      expect(_feeInt + _refundInt).to.be.below(_confirmedInt,
+        `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`);
+      expect(_feeInt + _refundInt).to.be.at.least(0,
+        `Partial-refund sum is negative — fee(${_feeInt}) + refundable(${_refundInt})`);
+      const _diff = _confirmedInt - (_feeInt + _refundInt);
+      validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+    });
   } else {
-    // E2: Use integer arithmetic to avoid floating-point rounding errors on monetary values
+    // E2-full: standard full-refund identity. Fires for full-refund scenarios
+    // AND for partial-refund scenarios that DEGRADED to full at runtime.
     const _scale       = Math.pow(10, refundOffer.refundableAmount?.scale || 2);
     const _feeInt      = Math.round(refundOffer.refundFee.amount * _scale);
     const _refundInt   = Math.round(refundOffer.refundableAmount.amount * _scale);
@@ -298,6 +331,38 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
         `Financial identity broken: fee(${_feeInt}) + refundable(${_refundInt}) ≠ confirmed(${_confirmedInt})`);
       validationLogger(`[INFO] Financial identity verified (scaled): ${_feeInt} + ${_refundInt} = ${_confirmedInt}`);
     });
+  }
+
+  // Partial-scope structural check: when partial is armed and not degraded,
+  // the refundOfferBreakdownItems[].bookingParts referenced by the response
+  // should be a SUBSET of the parts we asked to refund. If the response has
+  // no breakdown (some providers omit it) we log INFO instead of failing.
+  if (_isPartial) {
+    const _resolved = (function () {
+      try { return JSON.parse(bru.getEnvVar("__partialRefundResolvedSpec") || "[]"); }
+      catch (_e) { return []; }
+    })();
+    const _requestedPartIds = new Set();
+    for (const s of _resolved) {
+      for (const pid of (s.bookingPartIds || [])) _requestedPartIds.add(pid);
+    }
+    const _breakdown = Array.isArray(refundOffer.refundOfferBreakdownItems)
+      ? refundOffer.refundOfferBreakdownItems : [];
+    if (_breakdown.length === 0 || _requestedPartIds.size === 0) {
+      validationLogger(`[INFO] Partial-refund breakdown check skipped (no breakdown returned, or no bookingPartIds requested).`);
+    } else {
+      const _responsePartIds = new Set();
+      for (const b of _breakdown) {
+        for (const bp of (b.bookingParts || [])) {
+          if (bp && bp.id) _responsePartIds.add(bp.id);
+        }
+      }
+      const _outOfScope = [..._responsePartIds].filter((id) => !_requestedPartIds.has(id));
+      test(`Partial refund: response.refundOfferBreakdownItems[].bookingParts is a subset of the requested bookingPartIds (no extra parts refunded)`, () => {
+        expect(_outOfScope, `Response includes booking parts that were NOT in refundSpecifications: [${_outOfScope.join(", ")}]`).to.be.empty;
+        validationLogger(`[INFO] Partial-refund scope conformance: response parts=[${[..._responsePartIds].join(", ")}] ⊆ requested=[${[..._requestedPartIds].join(", ")}]`);
+      });
+    }
   }
 }
 

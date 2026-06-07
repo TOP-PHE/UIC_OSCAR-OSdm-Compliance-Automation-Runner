@@ -113,6 +113,20 @@ runtime:
 
         displayFulFilledBooking(jsonData);
 
+        // Partial refund (#218): when armed on this scenario, stash the just-
+        // fetched booking JSON so 10. POST Refund Offers can resolve scope
+        // (bookingPartIds for the chosen leg, passengerIds for the chosen
+        // passenger). Gated on partial flags to keep env vars lean for the
+        // common full-refund and SALE-only paths.
+        if (String(bru.getEnvVar("partialRefundByLeg")) === "true" ||
+            String(bru.getEnvVar("partialRefundByPax")) === "true") {
+            // Prefer the `booking` wrapper if the provider returns one
+            // (response shape varies); fall back to the root object.
+            const _bk = (jsonData && jsonData.booking) ? jsonData.booking : jsonData;
+            try { bru.setEnvVar("__bookingForRefund", JSON.stringify(_bk)); }
+            catch (_e) { /* leave unset on serialise failure */ }
+        }
+
         if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
             bru.runner.setNextRequest("10. POST Refund Offers");
             console.log("scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")

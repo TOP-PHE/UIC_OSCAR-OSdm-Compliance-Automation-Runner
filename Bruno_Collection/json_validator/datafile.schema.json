@@ -194,6 +194,26 @@
               "null"
             ]
           },
+          "partialRefundByLeg": {
+            "description": "Per-leg partial refund scope (issue #218). When on, OSCAR scopes the refund to one leg of a multi-leg trip via OSDM's RefundSpecification.bookingPartIds. Requires a multi-leg trip — wizard blocks save when SPECIFICATION trip is single-leg; SEARCH-mode trips are checked at offer-runtime and the test degrades to full-refund with a [WARNING] when only one leg comes back. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "partialRefundLegSelection": {
+            "description": "Which leg to refund when partialRefundByLeg is on. 'first' / 'last' are valid for any multi-leg trip; 'outbound' / 'inbound' are only valid when the trip is a return-trip. Default 'first'.",
+            "type": ["string", "null"],
+            "enum": ["first", "last", "outbound", "inbound", "", null]
+          },
+          "partialRefundByPax": {
+            "description": "Per-passenger partial refund scope (issue #218). When on, OSCAR scopes the refund to one passenger of a multi-passenger booking via OSDM's RefundSpecification.passengerIds. Requires ≥2 passengers — wizard blocks save when the passengersList has only 1 entry. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "partialRefundPaxSelection": {
+            "description": "Which passenger to refund when partialRefundByPax is on. 'first' refunds passenger #1, 'last' refunds the last passenger. Default 'first'.",
+            "type": ["string", "null"],
+            "enum": ["first", "last", "", null]
+          },
           "overruleCode": {
             "type": "string"
           },

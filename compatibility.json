@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.123",
+  "current_release": "2026.124",
   "releases": [
+    {
+      "release": "2026.124",
+      "date": "2026-05-28",
+      "server": "1.11.96",
+      "collection": "OTST_V2.0.44",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#218): partial refund. New REFUND-only scenario fields partialRefundByLeg + partialRefundLegSelection (first/last/outbound/inbound) + partialRefundByPax + partialRefundPaxSelection (first/last). When armed, OSCAR scopes the POST /bookings/{id}/refund-offers via OSDM's RefundOfferRequest.refundSpecifications[] — each spec carries fulfillmentId + optional bookingPartIds (per-leg axis) + optional passengerIds (per-pax axis). Both axes can be combined.",
+        "feat(wizard): partial-refund pair shown inline in the SCENARIO PARAMETERS section for REFUND scenarios. Inline validation warnings when: per-pax with <2 passengers in the resolved passengersList; per-leg with a SPECIFICATION trip that's <2 legs; outbound/inbound with a one-way trip. SEARCH-mode trips show an info note that runtime degradation handles the leg-count check.",
+        "feat(runtime): 10. POST Refund Offers' before-request resolves the partial scope from the booking JSON captured in 07. GET Booking after Fulfillments. If the booking has <2 admissions (per-leg) or <2 passengers (per-pax), OSCAR logs [WARNING] Partial refund degraded to full and sends the historical full-refund body — the rest of the refund happy path runs unchanged. Only the partial-scope assertions skip.",
+        "feat(validators): refunds.js validateRefundableAmountLocal is partial-aware. When the scenario is in partial mode AND not degraded, asserts refundFee + refundableAmount < confirmedPrice (strict-less) instead of the equality identity. New structural check: refundOfferBreakdownItems[].bookingParts must be a SUBSET of the requested bookingPartIds (no extra parts refunded).",
+        "tests: new tests/unit/bruno-partialrefund.test.js covering resolvePartialRefundScope (single-leg degradation, single-pax degradation, first/last/outbound/inbound selection, both-axes combo, fallback to booking.passengers[].id) and buildRefundSpecifications (null when not armed or degraded, correct OSDM shape otherwise).",
+        "Bruno_Collection/VERSION OTST_V2.0.43 -> OTST_V2.0.44; server 1.11.95 -> 1.11.96. Closes #218."
+      ]
+    },
     {
       "release": "2026.123",
       "date": "2026-05-28",
