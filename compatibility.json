@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.124",
+  "current_release": "2026.125",
   "releases": [
+    {
+      "release": "2026.125",
+      "date": "2026-06-07",
+      "server": "1.11.97",
+      "collection": "OTST_V2.0.45",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#218): wizard partial-refund check used wizData.passengersLists / wizData.tripRequirements but the canonical data lives in state.passengersList / state.tripRequirements (already exposed via getPassengers(id) / getTrip(id) at the top of scenarios.js). Result: passenger count and leg count resolved to 0 every time, the per-pax warning fired on every multi-pax REFUND scenario (reported via screenshot — 5-passenger list showed 'has 0'). Switched to the canonical helpers; warnings now only fire when the configuration genuinely can't be satisfied.",
+        "Bruno_Collection/VERSION OTST_V2.0.44 -> OTST_V2.0.45; server 1.11.96 -> 1.11.97. No data-file format change."
+      ]
+    },
     {
       "release": "2026.124",
       "date": "2026-05-28",

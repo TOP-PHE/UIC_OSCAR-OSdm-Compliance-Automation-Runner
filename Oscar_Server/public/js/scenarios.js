@@ -1433,12 +1433,15 @@ function migrateMissingOfferSearchCriteria() {
 function buildPartialRefundFields(idx, sc) {
   if (!sc || sc.scenarioType !== 'REFUND') return '';
 
-  // Resolve passengersList + tripRequirement to drive context-aware messaging.
-  const resolvedPassengerCount = (function () {
-    const list = (wizData.passengersLists || []).find(p => p && p.id === sc.passengersListId);
-    return Array.isArray(list && list.passengers) ? list.passengers.length : 0;
-  })();
-  const tripRequirement = (wizData.tripRequirements || []).find(t => t && t.id === sc.tripRequirementId) || null;
+  // Resolve passengersList + tripRequirement via the canonical state.* helpers
+  // already defined at the top of this file (getPassengers / getTrip). The
+  // earlier wizData.* lookups never matched anything because wizData is the
+  // collection-export shape and uses singular `passengersList` / plural
+  // `tripRequirements` under `state`, not `wizData`. Reported via screenshot:
+  // the per-pax warning fired even on a 5-passenger scenario.
+  const paxGroup = getPassengers(sc.passengersListId);
+  const resolvedPassengerCount = Array.isArray(paxGroup.passengers) ? paxGroup.passengers.length : 0;
+  const tripRequirement = getTrip(sc.tripRequirementId);
   const isSpec  = tripRequirement && tripRequirement.tripType === 'SPECIFICATION';
   const specLegCount = isSpec && Array.isArray(tripRequirement.legs) ? tripRequirement.legs.length : 0;
   const isReturn = !!(tripRequirement && (tripRequirement.returnSearchParameters || tripRequirement.tripType === 'RETURN'));

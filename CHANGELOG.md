@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.97] — 2026-06-07
+
+**Hotfix #218.** The wizard's per-passenger / per-leg validation for partial
+refunds always reported `0 passengers` and `0 legs`, firing the inline
+warning even when the resolved passengersList had 5 passengers (reported via
+screenshot of a `NHF_ETO_…_5ADT_…_PARTIAL_REFUND` scenario).
+**Bruno collection bumped (OTST_V2.0.44 → OTST_V2.0.45).**
+
+### Fixed
+
+- `Oscar_Server/public/js/scenarios.js` `buildPartialRefundFields` reached
+  for `wizData.passengersLists` and `wizData.tripRequirements` — neither
+  exists. The canonical lookups are `state.passengersList` (singular noun,
+  array of lists) and `state.tripRequirements` (plural), already wrapped by
+  the `getPassengers(id)` / `getTrip(id)` helpers defined at the top of
+  the file. Switched to the helpers so `resolvedPassengerCount` and
+  `specLegCount` actually count the resolved entries.
+- The inline warnings now fire only when the configuration genuinely
+  can't be satisfied — multi-pax REFUND scenarios no longer get a
+  spurious "Per-passenger partial refund requires ≥2 passengers" red message.
+
+### Versions
+
+- `Bruno_Collection/VERSION`: `OTST_V2.0.44` → `OTST_V2.0.45`.
+- `Oscar_Server/package.json`: `1.11.96` → `1.11.97`.
+- `compatibility.json`: new entry `2026.125`.
+
+### Not affected
+
+- The runtime check in `10. POST Refund Offers.yml` was already correct
+  (it reads the booking JSON, not the wizard's data model) — so partial
+  refunds that the tester forced through with the bug-affected wizard
+  still ran correctly at execution time.
+- `scenarioParser.js` setup-time validation was already correct (it reads
+  `jsonData.passengersLists` from the data file, not the wizard state).
+
+---
+
 ## [server-v1.11.96] — 2026-05-28
 
 **Partial refund (#218).** REFUND scenarios can now scope the refund-offer
