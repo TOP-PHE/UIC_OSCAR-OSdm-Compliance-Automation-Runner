@@ -416,12 +416,22 @@ function parseFulfillmentIds() {
 }
 
 // Function to create request body for refund offers
-function requestRefundOffersBody(overruleCode, refundDate = null) {
+//
+// Optional third arg `refundSpecifications` carries the OSDM v3.8
+// RefundSpecification[] for partial refunds (issue #218). When passed as a
+// non-empty array, OSCAR is scoping the refund to a subset of booking parts
+// and/or passengers within a single fulfillment. Otherwise the body is the
+// historical full-refund shape.
+function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecifications = null) {
   validationLogger("[INFO] ➤ requestRefundOffersBody");
 
   const body = { fulfillmentIds: parseFulfillmentIds() };
   if (overruleCode != null) body.overruleCode = overruleCode;
   if (refundDate != null)   body.refundDate   = refundDate;
+  if (Array.isArray(refundSpecifications) && refundSpecifications.length > 0) {
+    body.refundSpecifications = refundSpecifications;
+    validationLogger(`[INFO] Partial refund armed — refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
+  }
 
   bru.setEnvVar("requestRefundOffersBodyData", JSON.stringify(body));
 }
