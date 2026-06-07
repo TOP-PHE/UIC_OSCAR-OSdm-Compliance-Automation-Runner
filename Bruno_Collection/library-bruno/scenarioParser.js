@@ -128,6 +128,11 @@ function resetScenarioEnvVars() {
     "requestRefundOffersBodyData",
     "afterSaleCondition_EXCHANGE_amount", "afterSaleCondition_EXCHANGE_currency", "afterSaleCondition_EXCHANGE_scale",
     "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
+    // Partial refund (issue #218)
+    "partialRefundByLeg", "partialRefundLegSelection",
+    "partialRefundByPax", "partialRefundPaxSelection",
+    "__partialRefundDegradedToFull", "__partialRefundResolvedSpec",
+    "__bookingForRefund",
     // Misc
     "data_base_tmp", "scriptContent", "swaggerJson",
     "scenarioCode",
@@ -563,6 +568,61 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);
+
+      // ── Partial refund (issue #218) ─────────────────────────────────────
+      // Two orthogonal scope axes: by leg (subset of admissions/reservations)
+      // and by passenger (subset of pax). The wizard blocks save in the
+      // OBVIOUSLY-impossible cases (per-pax with only 1 passenger; per-leg
+      // with a SPECIFICATION trip that's already single-leg); the SEARCH-mode
+      // per-leg case is validated at offer-runtime in 10. POST Refund Offers'
+      // before-request and degrades to full refund with a [WARNING].
+      const _prByLeg = (scenario.partialRefundByLeg === true ||
+                        ["true", "on", "yes"].includes(String(scenario.partialRefundByLeg).toLowerCase()));
+      const _prByPax = (scenario.partialRefundByPax === true ||
+                        ["true", "on", "yes"].includes(String(scenario.partialRefundByPax).toLowerCase()));
+      bru.setEnvVar("partialRefundByLeg", _prByLeg ? "true" : "false");
+      bru.setEnvVar("partialRefundByPax", _prByPax ? "true" : "false");
+      bru.setEnvVar("partialRefundLegSelection",
+        ["", "null", null, undefined].includes(scenario.partialRefundLegSelection)
+          ? (_prByLeg ? "first" : "")  // default to first when armed
+          : String(scenario.partialRefundLegSelection));
+      bru.setEnvVar("partialRefundPaxSelection",
+        ["", "null", null, undefined].includes(scenario.partialRefundPaxSelection)
+          ? (_prByPax ? "first" : "")
+          : String(scenario.partialRefundPaxSelection));
+
+      // Setup-time consistency checks. The wizard does these proactively too;
+      // re-check here so a hand-edited data file can't bypass the wizard.
+      if (_prByPax || _prByLeg) {
+        // Per-pax requires >=2 passengers in the resolved passenger list.
+        if (_prByPax) {
+          const _passengersList = jsonData.passengersLists?.find(
+            (pl) => pl && pl.id === scenario.passengersListId);
+          const _paxCount = Array.isArray(_passengersList?.passengers)
+            ? _passengersList.passengers.length : 0;
+          if (_paxCount < 2) {
+            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} has only ${_paxCount} passenger(s) — per-pax partial refund cannot fire. Add a passenger or turn partialRefundByPax off.`);
+          }
+        }
+        // Per-leg with SPECIFICATION trip can be statically validated.
+        // (SEARCH mode is checked at offer time in 10.yml.)
+        if (_prByLeg) {
+          const _tripReq = jsonData.tripRequirements?.find(
+            (tr) => tr && tr.id === scenario.tripRequirementId);
+          if (_tripReq && _tripReq.tripType === "SPECIFICATION") {
+            const _legCount = Array.isArray(_tripReq.legs) ? _tripReq.legs.length : 0;
+            if (_legCount < 2) {
+              validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByLeg is on but the SPECIFICATION trip has ${_legCount} leg(s) — per-leg partial refund cannot fire. Either turn partialRefundByLeg off, or use a multi-leg trip.`);
+            }
+            const _hasReturn = !!(_tripReq.returnSearchParameters || _tripReq.tripType === "RETURN");
+            const _legSel = String(scenario.partialRefundLegSelection || "first");
+            if ((_legSel === "outbound" || _legSel === "inbound") && !_hasReturn) {
+              validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundLegSelection='${_legSel}' is only valid for return-trips; this trip is one-way. OSCAR will fall back to 'first'.`);
+              bru.setEnvVar("partialRefundLegSelection", "first");
+            }
+          }
+        }
+      }
 
       // Optional intermediate booking-flow actions. The scenario may carry a
       // `salesFlowActions` map { patchPassengers, placeSelection, addAncillary,

@@ -26,13 +26,55 @@ runtime:
     - type: before-request
       code: |-
         const { requestRefundOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
+        const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
 
         console.log("⏩ [STEP] Executing request : " + req.getName());
 
+        // Partial refund (#218): when partialRefundByLeg or partialRefundByPax
+        // is on for this scenario, resolve the OSDM RefundSpecification[]
+        // payload from the booking-after-fulfillments JSON saved in 07.yml.
+        // Degradation rules (per #218 design):
+        //   - SEARCH-mode trips can return a single leg even though the scenario
+        //     asked for per-leg; the helper detects "<2 admissions" and degrades.
+        //   - Per-pax with a single-pax booking degrades.
+        //   - The degraded run STILL produces a full refund (the historical
+        //     behaviour); only the partial-scope assertions skip.
+        let _refundSpecs = null;
+        const _byLeg = String(bru.getEnvVar("partialRefundByLeg")) === "true";
+        const _byPax = String(bru.getEnvVar("partialRefundByPax")) === "true";
+        bru.setEnvVar("__partialRefundDegradedToFull", "false");
+        bru.setEnvVar("__partialRefundResolvedSpec", "");
+        if (_byLeg || _byPax) {
+          const { resolvePartialRefundScope } = require(bru.getEnvVar("library_base") + "partialRefund.js");
+          let _bk = null;
+          try { _bk = JSON.parse(bru.getEnvVar("__bookingForRefund") || "null"); }
+          catch (_e) { _bk = null; }
+          if (!_bk) {
+            validationLogger(`[WARNING] Partial refund requested but no booking JSON was captured in 07.yml — falling back to full refund.`);
+            bru.setEnvVar("__partialRefundDegradedToFull", "true");
+          } else {
+            const _r = resolvePartialRefundScope(_bk, {
+              byLeg: _byLeg, byPax: _byPax,
+              legSel: bru.getEnvVar("partialRefundLegSelection") || "first",
+              paxSel: bru.getEnvVar("partialRefundPaxSelection") || "first",
+            });
+            if (_r.degraded) {
+              validationLogger(`[WARNING] Partial refund degraded to full: ${_r.reason}. The full-refund happy path runs; partial-scope assertions skip.`);
+              bru.setEnvVar("__partialRefundDegradedToFull", "true");
+            } else if (_r.armed) {
+              _refundSpecs = [{ fulfillmentId: _r.fulfillmentId }];
+              if (_r.bookingPartIds.length > 0) _refundSpecs[0].bookingPartIds = _r.bookingPartIds;
+              if (_r.passengerIds.length   > 0) _refundSpecs[0].passengerIds   = _r.passengerIds;
+              bru.setEnvVar("__partialRefundResolvedSpec", JSON.stringify(_refundSpecs));
+              validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_r.fulfillmentId}, bookingPartIds=[${_r.bookingPartIds.join(", ")}], passengerIds=[${_r.passengerIds.join(", ")}]`);
+            }
+          }
+        }
+
         if (bru.getEnvVar("refundDate") != null) {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), bru.getEnvVar("refundDate"));
+            requestRefundOffersBody(bru.getEnvVar("overruleCode"), bru.getEnvVar("refundDate"), _refundSpecs);
         } else {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), null);
+            requestRefundOffersBody(bru.getEnvVar("overruleCode"), null, _refundSpecs);
         }
     - type: after-response
       code: |-

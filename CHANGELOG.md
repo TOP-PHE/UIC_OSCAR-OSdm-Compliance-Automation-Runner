@@ -14,6 +14,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.96] — 2026-05-28
+
+**Partial refund (#218).** REFUND scenarios can now scope the refund-offer
+request to a subset of the booking — one leg, one passenger, or one
+passenger on one leg — via OSDM's `RefundOfferRequest.refundSpecifications[]`.
+**Bruno collection bumped (OTST_V2.0.43 → OTST_V2.0.44).**
+
+### Added — partial-refund scenario fields (REFUND scenarios only)
+- **`partialRefundByLeg`** (off/on) — scope refund to one leg via
+  `RefundSpecification.bookingPartIds`. Requires the booking to have
+  ≥2 admissions at run time; degrades to full refund with a `[WARNING]`
+  when single-leg.
+- **`partialRefundLegSelection`** (`first` / `last` / `outbound` / `inbound`) —
+  which leg. `outbound` / `inbound` only valid for return-trips; the wizard
+  hides them on one-way and auto-falls-back to `first` if hand-edited.
+- **`partialRefundByPax`** (off/on) — scope refund to one passenger via
+  `RefundSpecification.passengerIds`. Requires the booking to have
+  ≥2 passengers; degrades to full refund when single-pax.
+- **`partialRefundPaxSelection`** (`first` / `last`) — which passenger.
+- Both axes can be combined → refund one passenger on one leg.
+
+### Added — `library-bruno/partialRefund.js`
+- `resolvePartialRefundScope(booking, opts)` — pure mapper. Given a booking
+  response + the two axis-on flags + leg/pax selections, returns:
+  - `{ armed: false }` when neither axis is on;
+  - `{ armed: true, degraded: true, reason }` when the booking can't satisfy
+    the requested scope (single-leg / single-pax / missing fulfillment.id);
+  - `{ armed: true, degraded: false, fulfillmentId, bookingPartIds, passengerIds }`
+    when ready to send.
+- `buildRefundSpecifications(booking, opts)` — returns the OSDM array form
+  (or `null` when not armed / degraded so the caller falls back to a full
+  refund body).
+- Leg mapping: `bookedOffers[].admissions[]` is the leg-list; for the chosen
+  admission, OSCAR also collects linked `reservations` (matching
+  `requiredAdmissionKey` / `admissionRef`) and `ancillaries`. All three id
+  classes go into `bookingPartIds`.
+- Pax mapping: union of `bookedOffer.passengerRefs[]` across bookedOffers,
+  with fallback to `booking.passengers[].id` when `passengerRefs` is empty.
+
+### Added — wizard
+- Inline pair of dropdowns (4 fields) shown in SCENARIO PARAMETERS when
+  `scenarioType === "REFUND"`. Inline warnings when the configuration can't
+  be satisfied:
+  - per-pax with <2 passengers in the resolved `passengersList`;
+  - per-leg with a `SPECIFICATION` trip that has <2 legs;
+  - `outbound` / `inbound` selection on a one-way trip.
+- SEARCH-mode trips can't be statically checked — info note explains that
+  runtime degradation in `10. POST Refund Offers` handles it.
+
+### Changed — `10. POST Refund Offers.yml` before-request
+- When partial refund is armed, reads `__bookingForRefund` (captured in
+  `07. GET Booking after Fulfillments.yml`), resolves scope via the helper,
+  sets `__partialRefundDegradedToFull` on degradation, passes
+  `refundSpecifications` to `requestRefundOffersBody`.
+
+### Changed — `requestsBuilder.js requestRefundOffersBody`
+- Extended signature accepts an optional third `refundSpecifications` array;
+  attaches it to the body when non-empty.
+
+### Changed — `refunds.js validateRefundableAmountLocal`
+- Now partial-refund-aware. When partial mode is armed AND not degraded:
+  - Asserts **`refundFee + refundableAmount < confirmedPrice`** (strict-less)
+    instead of the equality identity (which would fail by design when only
+    a subset is refunded).
+  - Additional structural check: `refundOfferBreakdownItems[].bookingParts`
+    must be a **subset of the requested `bookingPartIds`** — flags any
+    out-of-scope parts the provider refunded.
+- When degraded: the standard full-refund identity fires unchanged (full
+  refund actually happened, regular assertions apply).
+
+### Changed — `07. GET Booking after Fulfillments.yml`
+- Captures the booking JSON to `__bookingForRefund` when partial refund is
+  armed (only — keeps env-var size lean for SALE and full-refund paths).
+
+### Schema / parser plumbing
+- `Bruno_Collection/json_validator/datafile.schema.json`: 4 new fields.
+- `Bruno_Collection/library-bruno/scenarioParser.js`: resolves all 4 fields
+  + emits a `[WARNING]` when a hand-edited data file bypasses wizard
+  validation (per-pax with single pax, per-leg with single-leg SPEC trip,
+  outbound/inbound on one-way). Reset list extended.
+
+### Docs
+- **Tester Guide §4.9 (NEW)** — full partial-refund subsection with the
+  field table, setup-time validation rules, runtime degradation behaviour,
+  and the modified assertion set. §4.10 is now Logging verbosity.
+- §7.1 field-name table updated with the 4 new fields.
+
+### Tests
+- `tests/unit/bruno-partialrefund.test.js` — covers `resolvePartialRefundScope`
+  (no-op / per-leg / per-pax / both / single-leg degradation / single-pax
+  degradation / fulfillment.id missing / empty bookedOffers / passengerRefs
+  fallback) and `buildRefundSpecifications` (null vs single-entry array,
+  correct OSDM shape).
+
+### Versions
+- `Bruno_Collection/VERSION`: `OTST_V2.0.43` → `OTST_V2.0.44`.
+- `Oscar_Server/package.json`: `1.11.95` → `1.11.96`.
+- `compatibility.json`: new entry `2026.124`.
+
+Closes #218.
+
+---
+
 ## [server-v1.11.95] — 2026-05-28
 
 **Expired-flow auto-expansion (PR B).** When 2+ expired-X timers are armed
