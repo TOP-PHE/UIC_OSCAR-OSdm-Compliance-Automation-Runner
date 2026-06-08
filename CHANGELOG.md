@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.102] — 2026-06-08
+
+**Wizard UX — passenger category change no longer snaps the viewport
+to the top of the panel.** Reported by a tester after v1.11.101 shipped:
+editing in the Passengers section required scrolling all the way down
+again every time the type dropdown changed value (ADULT → CHILD etc.),
+and any other param-section the tester had open (NHF, Booking Flow
+Actions, …) collapsed back to default along with the scroll loss.
+
+### Fixed
+- `Oscar_Server/public/js/scenarios.js` — `reRenderScenarioDetail`
+  (line ~1974) now captures `window.scrollY` at entry and restores it
+  after the innerHTML swap. Transparent improvement for every caller of
+  the helper (family-group change, apply-trip-train, set-pax-text on
+  firstName/lastName, etc.). No-op when the scroll position is
+  unchanged across the swap.
+- `Oscar_Server/public/js/scenarios.js` — the `change-pax-category`
+  handler (`case 'change-pax-category'`, line ~6299) now routes through
+  `reRenderScenarioDetail` instead of doing an inline
+  `det.innerHTML = buildDetailHTML(...)`. Picks up the section-state
+  preservation that the inline path bypassed (previously every section
+  except Passengers collapsed) AND the new scroll preservation.
+- Same handler — the category dropdown is re-focused after the
+  re-render so the keyboard / pointer can continue editing without an
+  extra click.
+
+### Behaviour guarantees
+- Wizard-only change. Runtime, data semantics, and save behaviour
+  unchanged.
+- No data-file schema change. No backend change.
+- Other handlers that use the same inline `det.innerHTML = …` pattern
+  (lines 5593, 5729, 6061, 6098) are NOT touched in this PR — they live
+  on different edit paths (scenario type change, framework apply,
+  scenario delete, scenario re-order) where the viewport reset is
+  arguably more expected than during in-row editing. Worth a follow-up
+  sweep if testers report similar friction on those paths.
+
+### Operator action
+None.
+
+### Bumps
+- `Oscar_Server/package.json` 1.11.101 → 1.11.102
+- `Bruno_Collection/VERSION` OTST_V2.0.49 → OTST_V2.0.50
+- New compatibility row `release-2026.130`
+
+---
+
 ## [server-v1.11.101] — 2026-06-08
 
 **Wizard UX — RequestedInfo probe presentation matched to the format

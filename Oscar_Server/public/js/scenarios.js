@@ -1968,9 +1968,19 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
 }
 
 // Re-render one scenario detail panel in place, preserving which
-// param-sections were expanded. Used by handlers that change fields whose
-// edits reshape the markup (scenarioType, tripType, purchaser link toggle,
-// passenger category, …). Quietly returns if the detail isn't rendered.
+// param-sections were expanded AND the window scroll position. Used by
+// handlers that change fields whose edits reshape the markup (scenarioType,
+// tripType, purchaser link toggle, passenger category, …). Quietly returns
+// if the detail isn't rendered.
+//
+// Scroll preservation (v1.11.102) was added after a tester reported that
+// changing a passenger's type (e.g. ADULT → CHILD) snapped the viewport
+// back to the top of the panel, forcing them to scroll all the way down
+// to the Passengers section again just to keep editing. We capture
+// window.scrollY at function entry, do the re-render, then restore. The
+// browser preserves scroll across innerHTML replacement only when the
+// document height doesn't change between the two snapshots — for safety
+// we restore explicitly so it's not subject to that condition.
 function reRenderScenarioDetail(scIdx) {
   const detail = document.getElementById('detail-' + scIdx);
   if (!detail || !detail.dataset.rendered) return;
@@ -1980,6 +1990,7 @@ function reRenderScenarioDetail(scIdx) {
       openSections.add((h.textContent || '').trim());
     }
   });
+  const _savedScrollY = window.scrollY;
   detail.innerHTML = buildDetailHTML(scIdx);
   detail.querySelectorAll('.param-section-head').forEach(h => {
     const label = (h.textContent || '').trim();
@@ -1988,6 +1999,10 @@ function reRenderScenarioDetail(scIdx) {
     const arrow = h.querySelector('.ps-arrow');
     if (arrow) arrow.classList.toggle('open', isOpen);
   });
+  // Restore in the same microtask so the viewport doesn't visibly flicker.
+  // (Using requestAnimationFrame would defer to the next paint and the user
+  // would see a brief jump to the top.)
+  if (window.scrollY !== _savedScrollY) window.scrollTo(0, _savedScrollY);
 }
 
 // ── Passengers section ────────────────────────────────────────────────────────
@@ -6313,17 +6328,20 @@ document.body.addEventListener('change', function(e) {
         if (pax.updateDateOfBirth) pax.updateDateOfBirth = genDateOfBirth(ar.min, ar.max);
       }
       markDirty();
-      // Re-render the detail
-      const det = document.getElementById(`detail-${esc(cpScIdx)}`);
-      if (det && det.innerHTML) {
-        det.innerHTML = buildDetailHTML(cpScIdx);
-        det.querySelectorAll('.param-section-head').forEach(h => {
-          if (h.textContent.includes('Passengers')) {
-            h.nextElementSibling?.classList.add('open');
-            h.querySelector('.ps-arrow')?.classList.add('open');
-          }
-        });
-      }
+      // Re-render through the canonical reRenderScenarioDetail helper —
+      // this preserves every param-section's open/closed state AND the
+      // window scroll position. The previous inline `det.innerHTML = …`
+      // collapsed every section except Passengers and snapped the viewport
+      // back to the top, forcing the tester to scroll all the way down and
+      // re-open whatever they had open just to keep editing. (v1.11.102)
+      reRenderScenarioDetail(cpScIdx);
+      // Re-focus the category dropdown so the keyboard / pointer can
+      // continue editing without an extra click. The DOM nodes are fresh
+      // after the re-render, so we re-query by the same data-attrs.
+      const _restored = document.querySelector(
+        `select[data-action="change-pax-category"][data-pidx="${cpIdx}"][data-pi="${cpPi}"]`
+      );
+      if (_restored) _restored.focus();
       break;
     }
     case 'set-offer':
