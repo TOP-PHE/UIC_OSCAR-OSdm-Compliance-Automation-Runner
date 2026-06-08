@@ -302,12 +302,31 @@ The two modes — the same labels appear in the framework and the scenario:
 > `bookingPassengerSpecifications` if you materialised those fields by hand.
 > Bileto, Sqills, Turnit and Benerail accept both formats and are unaffected.
 
-### 4.8 Negative‑flow tests (optional)
+### 4.8 Non Happy Flow customisation — negative tests and conformance probes
 
 These probes drive a scenario into a **non‑happy** path and assert the provider
 **rejects** it in a conformant way (typically `4xx` + an RFC‑9457 `Problem`
 body). They all default OFF — a saved scenario keeps behaving as before until
 you opt in.
+
+**Wizard layout (since server‑v1.11.100).** The NHF section is organised into
+two collapsible sub‑groups, each with a badge showing how many of its probes
+are currently armed:
+
+```
+▼ Non Happy Flow customisation        — N probes armed
+    ▶ ⏰ Expiry timers                  — N of 6 armed
+         (Expired offer / booking / add‑res / add‑anc / refund‑offer / exchange‑offer)
+    ▶ 🪪 Field‑shape & payload probes  — N of 2 armed
+         (RequestedInfo probe, Passenger external‑ref format)
+```
+
+Each sub‑group auto‑expands when anything inside it is armed and auto‑collapses
+when it isn't. Manual toggles are preserved across re‑renders.
+
+`requestedInformationProbe` lives in this section since **v1.11.100** — it was
+previously rendered in the SCENARIO PARAMETERS panel, but the Tester Guide
+always classified it as NHF; the wizard now matches.
 
 #### Passenger external‑ref format probe (`passengerExternalRefFormat`)
 

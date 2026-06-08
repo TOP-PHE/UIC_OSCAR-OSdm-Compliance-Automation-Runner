@@ -1268,8 +1268,10 @@ function buildDetailHTML(idx) {
           if (scType !== 'REFUND' && scType !== 'EXCHANGE') return '';
           return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction);
         })()}
-        ${buildSelect(idx, 'requestedInformationProbe', 'RequestedInfo Probe', ENUMS.requestedInformationProbe,
-          'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
+        ${/* requestedInformationProbe moved to the Non Happy Flow customisation
+            section in v1.11.100 — sits alongside passengerExternalRefFormat in
+            the new "Field-shape & payload probes" sub-group. The Tester Guide
+            §4.8 always classified it as NHF; the wizard now matches. */ ''}
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
           'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
@@ -1553,95 +1555,175 @@ function buildNonHappyFlowSection(idx, sc) {
     'set-scenario-max-wait-exchange-offer-minutes',
   ) : '';
 
+  // ── Counters for the badge UI ─────────────────────────────────────────────
+  // Counted on the wizard side rather than computed in a derived state — kept
+  // tiny so the badge updates correctly on every keystroke / dropdown change.
+  const TIMER_FIELDS = [
+    'expiredOfferTest',
+    'expiredBookingTest',
+    'expiredAddReservationOfferTest',
+    'expiredAddAncillaryOfferTest',
+    'expiredRefundOfferTest',
+    'expiredExchangeOfferTest',
+  ];
+  const sc0 = state.scenarios[idx] || {};
+  const totalTimers = (showRefund && showExchange) ? 6
+                    : (showRefund || showExchange) ? 5 : 4;
+  const armedTimers = TIMER_FIELDS.filter(f => sc0[f] === 'on').length;
+
+  // Shape-probe armed when:
+  //   - requestedInformationProbe is set to a non-null value other than 'off'
+  //     (the null sentinel renders as "— none —" in the wizard);
+  //   - passengerExternalRefFormat contains a %d / %0Nd placeholder.
+  // Both armed conditions match what the runtime actually does — a malformed
+  // ref-format value still arms the probe in spirit, but the runtime logs a
+  // [WARNING] and degrades to default; counting it as armed would mislead.
+  const SHAPE_PROBES_TOTAL = 2;
+  let armedShapes = 0;
+  if (sc0.requestedInformationProbe != null && sc0.requestedInformationProbe !== 'off') armedShapes++;
+  if (sc0.passengerExternalRefFormat && /%0?\d*d/.test(sc0.passengerExternalRefFormat)) armedShapes++;
+
+  const totalArmed = armedTimers + armedShapes;
+
+  // ── Badge renderer ────────────────────────────────────────────────────────
+  // One small inline-block pill; amber when anything is armed, neutral grey
+  // when not. Same shape as the rest of the wizard's count badges so we don't
+  // introduce a new visual vocabulary.
+  function badge(n, total, suffix) {
+    const armed = n > 0;
+    const bg    = armed ? '#FCC44D' : '#eceff1';
+    const fg    = armed ? '#005A8A' : '#90a4ae';
+    return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
+  }
+
+  // Auto-expand a sub-group when anything inside it is armed; otherwise stay
+  // collapsed. The user can still toggle manually via the standard
+  // toggle-param-section handler — re-renders preserve the manual state by
+  // matching on header text (see reRenderScenarioDetail).
+  const timersOpenClass = armedTimers > 0 ? ' open' : '';
+  const shapesOpenClass = armedShapes > 0 ? ' open' : '';
+  const topOpenClass    = totalArmed > 0 ? ' open' : '';
+
+  // ── Field-shape probes sub-section (requestedInfoProbe + format probe) ────
+  // requestedInformationProbe MOVED here from SCENARIO PARAMETERS in v1.11.100.
+  // The Tester Guide §4.8 always classified it as NHF; the wizard now matches.
+  const shapeProbesSubsection = `
+        <div class="param-section" style="margin-top:14px;border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            🪪 Field-shape &amp; payload probes
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">alter the request, document provider strictness</span>
+            ${badge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
+            <span class="ps-arrow${shapesOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${shapesOpenClass}" style="padding:10px 14px">
+            <div class="param-grid">
+              ${buildSelect(idx, 'requestedInformationProbe', 'RequestedInfo Probe', ENUMS.requestedInformationProbe,
+                'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
+            </div>
+            <!-- Passenger external-ref format probe — non-timer NHF parameter.
+                 Runtime applies the printf-style pattern to every passenger
+                 reference sent to the provider; empty = default 00001-style. -->
+            ${(function buildExternalRefFormatProbe() {
+              const sc = state.scenarios[idx] || {};
+              const current = sc.passengerExternalRefFormat || '';
+              const hasPlaceholder = /%0?\d*d/.test(current);
+              const isError = current && !hasPlaceholder;
+              const previewLine = (current && hasPlaceholder)
+                ? `<div style="font-size:11px;color:#37474f;margin-top:6px">Preview · ${esc(previewExternalRef(current, 1))}, ${esc(previewExternalRef(current, 2))}, ${esc(previewExternalRef(current, 3))}, …</div>`
+                : '';
+              const errorLine = isError
+                ? `<div style="color:#c81010;font-size:12px;margin-top:6px">⚠ Pattern must contain <code>%d</code> or <code>%0Nd</code> (e.g. <code>%04d</code>). Without a placeholder, the runtime can't substitute the passenger index.</div>`
+                : '';
+              const hintLine = !current
+                ? `<div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">Empty (default): wizard generates <code>00001</code>, <code>00002</code>, … — accepted by every production provider. Set to e.g. <code>PAX%04d</code> to probe how a provider handles a non-standard shape. The same pattern is applied across the entire run (offer → booking → refund/exchange).</div>`
+                : '';
+              return `
+              <div style="margin-top:10px;padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">Passenger external-ref format probe</div>
+                <input class="param-input" type="text" style="font-family:Consolas,monospace;font-size:13px;width:100%;max-width:340px"
+                  value="${esc(current)}"
+                  placeholder="off — leave empty for default 00001-style"
+                  data-action="set-scenario-text" data-field="passengerExternalRefFormat" data-idx="${esc(idx)}">
+                ${previewLine}
+                ${errorLine}
+                ${hintLine}
+              </div>`;
+            })()}
+          </div>
+        </div>`;
+
+  // ── Expiry timers sub-section ─────────────────────────────────────────────
+  const expiryTimersSubsection = `
+        <div class="param-section" style="border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            ⏰ Expiry timers
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">wait past a deadline, assert next request is rejected</span>
+            ${badge(armedTimers, totalTimers, 'armed')}
+            <span class="ps-arrow${timersOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${timersOpenClass}" style="padding:10px 14px">
+            <div class="param-row">
+              ${timerRow(
+                'expiredOfferTest', 'Expired-offer test',
+                'Negative test. On: after the offer is selected (01. POST Get Offer), OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (4xx + Problem). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.',
+                'expiredOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget for the expired-offer test. Typical: 15 (covers most provider offer validity windows).',
+                'set-scenario-max-wait-offer-minutes',
+              )}
+              ${timerRow(
+                'expiredBookingTest', 'Expired-booking test',
+                'Negative test (#204). On: after the booking is created (02. POST Create Booking), OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment (06) and asserts the provider rejects it and the booking parts are EXPIRED/RELEASED/CANCELLED.',
+                'expiredBookingMaxWaitMinutes',
+                'Optional. Per-scenario wait budget for the expired-booking test. Typical: 20 (covers Bileto/Paxone ~15 min deadlines).',
+                'set-scenario-max-wait-minutes',
+              )}
+              ${timerRow(
+                'expiredAddReservationOfferTest', 'Expired add-reservation-offer test',
+                'Negative test. On: just before 09. POST Add Reservation to Booking fires, OSCAR waits until just past the validUntil of the reservationOfferPart that 09 will send, then attempts the add and asserts the provider rejects it. Only meaningful when the scenario uses Place selection in ADD_TO_BOOKING mode (Booking Flow Actions below).',
+                'expiredAddReservationOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget.',
+                'set-scenario-max-wait-addres-minutes',
+              )}
+              ${timerRow(
+                'expiredAddAncillaryOfferTest', 'Expired add-ancillary-offer test',
+                'Negative test. On: just before 10. POST Add Ancillary to Booking fires, OSCAR waits until just past the earliest validUntil of the ancillary offer-parts that 10 will send (sourced from 11. additional-offers or the original offer), then attempts the add and asserts the provider rejects it. Only meaningful when "Add ancillary" is enabled in Booking Flow Actions below.',
+                'expiredAddAncillaryOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget.',
+                'set-scenario-max-wait-addanc-minutes',
+              )}
+              ${refundRow}
+              ${exchangeRow}
+            </div>
+            <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
+              Each enabled test waits past its resource's deadline, then asserts the next request is rejected
+              with a <strong>4xx + RFC-9457 Problem</strong> body. If the wait would exceed the run budget
+              (server's <code>RUN_TIMEOUT_MS</code> or the per-scenario Max wait above), the test
+              <strong>skips with a <code>[WARNING]</code></strong> instead of being killed mid-wait.
+              OAuth tokens are refreshed automatically across the wait — a 401/403 is flagged as an auth
+              failure (not a test pass) so you can tell the two apart.
+              <br><br>
+              <strong>Multi-timer scenarios auto-expand into sub-runs.</strong> Enabling N timers on the
+              same scenario makes OSCAR run that scenario <strong>N times</strong>, one pass per timer
+              (in flow order: Offer → Booking → AddReservation → AddAncillary → RefundOffer →
+              ExchangeOffer). Each sub-run's assertions are tagged
+              <code>[NHF_<em>XXX</em>_<em>scenario_code</em>]</code> in the report
+              (<code>OTO</code>/<code>BTO</code>/<code>ARO</code>/<code>ATO</code>/<code>RTO</code>/<code>ETO</code>);
+              a leading <code>NHF_</code> on the scenario code is stripped so you don't get double prefixes.
+              The total wait budget is the <strong>sum</strong> of the enabled Max waits — when ticking
+              multiple timers, raise the per-timer Max wait values so their sum stays under
+              <code>RUN_HARD_MAX_TIMEOUT_MS</code> (30 min by default; the runner auto-extends and
+              clamps with a clear warning).
+            </div>
+          </div>
+        </div>`;
+
   return `
   <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">expired-X negative tests — wait past a deadline, assert the provider rejects the next request</span><span class="ps-arrow">▶</span></div>
-    <div class="param-section-body">
-      <div style="padding:12px 14px">
-        <div class="param-row">
-          ${timerRow(
-            'expiredOfferTest', 'Expired-offer test',
-            'Negative test. On: after the offer is selected (01. POST Get Offer), OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (4xx + Problem). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.',
-            'expiredOfferMaxWaitMinutes',
-            'Optional. Per-scenario wait budget for the expired-offer test. Typical: 15 (covers most provider offer validity windows).',
-            'set-scenario-max-wait-offer-minutes',
-          )}
-          ${timerRow(
-            'expiredBookingTest', 'Expired-booking test',
-            'Negative test (#204). On: after the booking is created (02. POST Create Booking), OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment (06) and asserts the provider rejects it and the booking parts are EXPIRED/RELEASED/CANCELLED.',
-            'expiredBookingMaxWaitMinutes',
-            'Optional. Per-scenario wait budget for the expired-booking test. Typical: 20 (covers Bileto/Paxone ~15 min deadlines).',
-            'set-scenario-max-wait-minutes',
-          )}
-          ${timerRow(
-            'expiredAddReservationOfferTest', 'Expired add-reservation-offer test',
-            'Negative test. On: just before 09. POST Add Reservation to Booking fires, OSCAR waits until just past the validUntil of the reservationOfferPart that 09 will send, then attempts the add and asserts the provider rejects it. Only meaningful when the scenario uses Place selection in ADD_TO_BOOKING mode (Booking Flow Actions below).',
-            'expiredAddReservationOfferMaxWaitMinutes',
-            'Optional. Per-scenario wait budget.',
-            'set-scenario-max-wait-addres-minutes',
-          )}
-          ${timerRow(
-            'expiredAddAncillaryOfferTest', 'Expired add-ancillary-offer test',
-            'Negative test. On: just before 10. POST Add Ancillary to Booking fires, OSCAR waits until just past the earliest validUntil of the ancillary offer-parts that 10 will send (sourced from 11. additional-offers or the original offer), then attempts the add and asserts the provider rejects it. Only meaningful when "Add ancillary" is enabled in Booking Flow Actions below.',
-            'expiredAddAncillaryOfferMaxWaitMinutes',
-            'Optional. Per-scenario wait budget.',
-            'set-scenario-max-wait-addanc-minutes',
-          )}
-          ${refundRow}
-          ${exchangeRow}
-        </div>
-
-        <!-- Passenger external-ref format probe — non-timer NHF parameter.
-             Tester types a printf-style pattern; runtime applies it to every
-             passenger reference sent to the provider. Empty = default
-             00001-style refs (every provider accepts them). -->
-        ${(function buildExternalRefFormatProbe() {
-          const sc = state.scenarios[idx] || {};
-          const current = sc.passengerExternalRefFormat || '';
-          const hasPlaceholder = /%0?\d*d/.test(current);
-          const isError = current && !hasPlaceholder;
-          const previewLine = (current && hasPlaceholder)
-            ? `<div style="font-size:11px;color:#37474f;margin-top:6px">Preview · ${esc(previewExternalRef(current, 1))}, ${esc(previewExternalRef(current, 2))}, ${esc(previewExternalRef(current, 3))}, …</div>`
-            : '';
-          const errorLine = isError
-            ? `<div style="color:#c81010;font-size:12px;margin-top:6px">⚠ Pattern must contain <code>%d</code> or <code>%0Nd</code> (e.g. <code>%04d</code>). Without a placeholder, the runtime can't substitute the passenger index.</div>`
-            : '';
-          const hintLine = !current
-            ? `<div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">Empty (default): wizard generates <code>00001</code>, <code>00002</code>, … — accepted by every production provider. Set to e.g. <code>PAX%04d</code> to probe how a provider handles a non-standard shape. The same pattern is applied across the entire run (offer → booking → refund/exchange).</div>`
-            : '';
-          return `
-          <div class="param-section" style="margin-top:14px;border:1px dashed #b0bec5;border-radius:6px;padding:10px 14px">
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">🪪 Passenger external-ref format probe</div>
-            <input class="param-input" type="text" style="font-family:Consolas,monospace;font-size:13px;width:100%;max-width:340px"
-              value="${esc(current)}"
-              placeholder="off — leave empty for default 00001-style"
-              data-action="set-scenario-text" data-field="passengerExternalRefFormat" data-idx="${esc(idx)}">
-            ${previewLine}
-            ${errorLine}
-            ${hintLine}
-          </div>`;
-        })()}
-
-        <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
-          Each enabled test waits past its resource's deadline, then asserts the next request is rejected
-          with a <strong>4xx + RFC-9457 Problem</strong> body. If the wait would exceed the run budget
-          (server's <code>RUN_TIMEOUT_MS</code> or the per-scenario Max wait above), the test
-          <strong>skips with a <code>[WARNING]</code></strong> instead of being killed mid-wait.
-          OAuth tokens are refreshed automatically across the wait — a 401/403 is flagged as an auth
-          failure (not a test pass) so you can tell the two apart.
-          <br><br>
-          <strong>Multi-timer scenarios auto-expand into sub-runs.</strong> Enabling N timers on the
-          same scenario makes OSCAR run that scenario <strong>N times</strong>, one pass per timer
-          (in flow order: Offer → Booking → AddReservation → AddAncillary → RefundOffer →
-          ExchangeOffer). Each sub-run's assertions are tagged
-          <code>[NHF_<em>XXX</em>_<em>scenario_code</em>]</code> in the report
-          (<code>OTO</code>/<code>BTO</code>/<code>ARO</code>/<code>ATO</code>/<code>RTO</code>/<code>ETO</code>);
-          a leading <code>NHF_</code> on the scenario code is stripped so you don't get double prefixes.
-          The total wait budget is the <strong>sum</strong> of the enabled Max waits — when ticking
-          multiple timers, raise the per-timer Max wait values so their sum stays under
-          <code>RUN_HARD_MAX_TIMEOUT_MS</code> (30 min by default; the runner auto-extends and
-          clamps with a clear warning).
-        </div>
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
+    <div class="param-section-body${topOpenClass}">
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        ${expiryTimersSubsection}
+        ${shapeProbesSubsection}
       </div>
     </div>
   </div>`;
