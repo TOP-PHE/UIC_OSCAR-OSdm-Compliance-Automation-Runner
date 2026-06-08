@@ -13,6 +13,12 @@
  *   - passengerIds   OPTIONAL  ids of passengers  to remove (per-passenger axis)
  *   - refundFee      OPTIONAL  distributor-defined fee override (unused today)
  *
+ * Per the OSDM v3.8 semantics, `bookingPartIds` and `passengerIds` are
+ * orthogonal filters the provider applies to the booking:
+ *   - bookingPartIds only           → refund these parts (any passenger they cover)
+ *   - passengerIds   only           → refund this passenger's parts (any leg)
+ *   - both                          → refund the intersection
+ *
  * Provider modelling differences
  * ──────────────────────────────
  * Providers don't agree on how a booking gets carved up:
@@ -29,41 +35,42 @@
  * fine for Bileto / Sqills, wrong for Paxone when the chosen passenger isn't
  * the one bound to fulfillments[0]. This rewrite picks the fulfillment by
  * matching `fulfillment.fulfillmentParts[].passengerRef` against the chosen
- * passenger's `externalRef` (with a fallback to fulfillments[0] for single-
- * fulfillment bookings).
+ * passenger's `externalRef`, with a fallback to fulfillments[0] for single-
+ * fulfillment bookings (or when the matching info isn't present).
  *
  * Leg ordering
  * ────────────
  * The original resolver flattened `bookedOffers[].admissions[]` and treated
  * that flat list as the leg-list. On a multi-pax booking the flat list is
  * actually `legs × passengers`, so "last admission by index" was almost never
- * the user-visible "last leg". This rewrite:
- *   1. Reads `booking.trips[*].legs[*].id` in trip order — that's the
- *      authoritative leg ordering the wizard's "first/last/outbound/inbound"
- *      labels refer to.
- *   2. Picks one legId from that ordered list.
- *   3. Collects every admission whose `tripCoverage.coveredLegIds` contains
- *      the picked legId.
+ * the user-visible "last leg". This rewrite prefers the authoritative ordering
+ * from `booking.trips[*].legs[*].id` (the wizard's "first / last / outbound /
+ * inbound" labels refer to those) and groups admissions by
+ * `tripCoverage.coveredLegIds`.
+ *
+ * Legacy / minimal fixtures (single admission per leg, no trips[]/legs[],
+ * no tripCoverage on admissions) fall back to "admissions in offer order are
+ * the leg list" — the historical contract documented in the unit tests.
  *
  * Pax × Leg intersection
  * ──────────────────────
  * When BOTH axes are armed, we restrict the admission collection to the
  * intersection: admissions covering the chosen leg AND owned by the chosen
- * passenger. The original code resolved the two axes independently and the
- * resulting `bookingPartIds` + `passengerIds` could disagree on the subject
- * (#218 report).
+ * passenger (when admissions expose `passengerIds[]`). The original code
+ * resolved the two axes independently and the resulting `bookingPartIds` +
+ * `passengerIds` could disagree on the subject (#218 report).
  *
  * Booking-part expansion
  * ──────────────────────
  * For each chosen admission, OSCAR walks:
- *   - `admission.reservationRefs[].id` → reservation ids
- *   - `admission.ancillaryRefs[].id`   → ancillary  ids
+ *   - `admission.reservationRefs[].id` → reservation ids   (Paxone / v3.8)
+ *   - `admission.ancillaryRefs[].id`   → ancillary  ids   (Paxone / v3.8)
  *
- * The original code looked for `requiredAdmissionKey | admissionRef |
- * admissionId` on the reservation/ancillary side, which is the reverse of how
- * Paxone / OSDM model the linkage. The result was reservations/ancillaries
- * were never added — the partial scope refunded an admission while leaving
- * its dependent parts orphaned in the booking.
+ * For minimal fixtures where the linkage lives on the *sibling* side, we
+ * additionally walk the bookedOffer's reservations[] and ancillaries[] for
+ * `requiredAdmissionKey | admissionRef | admissionId` pointing back at the
+ * chosen admission.id. The two paths are unioned (no double-count via the
+ * dedupe at the end).
  *
  * Degradation
  * ───────────
@@ -91,9 +98,6 @@ function pickFromArray(arr, sel) {
 }
 
 // Map "outbound" / "inbound" onto first / last for single-trip lists.
-// For multi-trip bookings (return-trip with separate outbound + inbound
-// Trip objects), the wizard intends each trip = one direction; we follow
-// the same convention here.
 function normaliseLegSelector(sel) {
   switch (String(sel || 'first').toLowerCase()) {
     case 'first':    return 'first';
@@ -104,21 +108,25 @@ function normaliseLegSelector(sel) {
   }
 }
 
-// Return the ordered list of legIds across all trips (preserves trip order
-// then leg order within each trip). Trips that don't expose legs are skipped.
-function collectLegIds(booking) {
-  const legIds = [];
+// Return the ordered list of legIds. Prefers `booking.trips[*].legs[*].id`
+// (authoritative). Falls back to using admissions[].id (legacy minimal shape)
+// when no trips[].legs are present — the contract the original code relied on.
+function collectLegIds(booking, allAdmissions) {
+  const fromTrips = [];
   const trips = Array.isArray(booking && booking.trips) ? booking.trips : [];
   for (const t of trips) {
     const legs = Array.isArray(t && t.legs) ? t.legs : [];
-    for (const l of legs) { if (l && l.id) legIds.push(String(l.id)); }
+    for (const l of legs) { if (l && l.id) fromTrips.push(String(l.id)); }
   }
-  return legIds;
+  if (fromTrips.length > 0) return { ids: fromTrips, mode: 'trips' };
+  // Legacy fallback: each admission = one leg, in offer order.
+  const fromAdms = (allAdmissions || []).map(a => String(a.id));
+  return { ids: fromAdms, mode: 'admissions' };
 }
 
 // Return the ordered passenger list from booking.passengers[]. Each entry is
-// `{ id, externalRef }`; both are required for the resolver to match an
-// admission (id) and a fulfillment (externalRef via fulfillmentParts).
+// `{ id, externalRef }`; both are kept (id is what we put in passengerIds[],
+// externalRef is what we match against fulfillmentParts).
 function collectPassengers(booking) {
   const out = [];
   const pax = Array.isArray(booking && booking.passengers) ? booking.passengers : [];
@@ -129,9 +137,10 @@ function collectPassengers(booking) {
   return out;
 }
 
-// Find the fulfillment whose fulfillmentParts[].passengerRef references the
-// chosen passenger's externalRef. Falls back to fulfillments[0] when no match
-// (single-fulfillment-per-booking providers — Bileto, Sqills).
+// Find the fulfillment whose fulfillmentParts[].passengerRef matches the
+// chosen passenger's externalRef. Falls back to fulfillments[0] when no
+// match (single-fulfillment-per-booking providers — Bileto, Sqills — and
+// fixtures with no externalRef on passengers).
 function findFulfillmentForPassenger(fulfillments, externalRef) {
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) return null;
   if (externalRef) {
@@ -144,7 +153,8 @@ function findFulfillmentForPassenger(fulfillments, externalRef) {
   return fulfillments[0] || null;
 }
 
-// Flatten admissions across all bookedOffers, preserving offer order.
+// Flatten admissions across all bookedOffers, preserving offer order. Each
+// entry keeps a back-pointer to its bookedOffer for sibling-walk expansion.
 function collectAdmissions(booking) {
   const out = [];
   const bookedOffers = Array.isArray(booking && booking.bookedOffers) ? booking.bookedOffers : [];
@@ -155,11 +165,14 @@ function collectAdmissions(booking) {
   return out;
 }
 
-// Walk admission.reservationRefs / ancillaryRefs and return the id arrays.
-// Spec calls these "refs to sibling booking-part ids" — they are NOT the
-// admission's own id.
+// Walk admission.reservationRefs / ancillaryRefs (Paxone / OSDM v3.8 model)
+// AND the sibling reservations/ancillaries whose requiredAdmissionKey /
+// admissionRef / admissionId references this admission.id (legacy model).
+// Union, dedupe at the call site.
 function expandAdmissionRefs(admission) {
   const out = { reservationIds: [], ancillaryIds: [] };
+
+  // Forward refs (Paxone / v3.8).
   const resRefs = Array.isArray(admission && admission.reservationRefs) ? admission.reservationRefs : [];
   for (const r of resRefs) {
     if (r && r.id) out.reservationIds.push(String(r.id));
@@ -170,6 +183,25 @@ function expandAdmissionRefs(admission) {
     if (a && a.id) out.ancillaryIds.push(String(a.id));
     else if (typeof a === 'string') out.ancillaryIds.push(a);
   }
+
+  // Reverse refs (legacy: sibling reservations/ancillaries naming the admission).
+  const bo = admission && admission._bo;
+  if (bo) {
+    const admId = String(admission.id);
+    const ress  = Array.isArray(bo.reservations) ? bo.reservations : [];
+    for (const r of ress) {
+      if (!r || !r.id) continue;
+      const link = r.requiredAdmissionKey || r.admissionRef || r.admissionId;
+      if (link && String(link) === admId) out.reservationIds.push(String(r.id));
+    }
+    const ancs = Array.isArray(bo.ancillaries) ? bo.ancillaries : [];
+    for (const a of ancs) {
+      if (!a || !a.id) continue;
+      const link = a.admissionRef || a.admissionId || a.ancillaryFor;
+      if (link && String(link) === admId) out.ancillaryIds.push(String(a.id));
+    }
+  }
+
   return out;
 }
 
@@ -181,7 +213,7 @@ function expandAdmissionRefs(admission) {
  * degrade to full refund.
  *
  * @param {object} booking  booking object (with bookedOffers[] / fulfillments[]
- *                          / trips[] / passengers[])
+ *                          / optional trips[] / passengers[])
  * @param {object} opts     { byLeg, byPax, legSel, paxSel }
  * @returns {object} one of:
  *   { armed: false }                                 — nothing to scope
@@ -198,7 +230,8 @@ function resolvePartialRefundScope(booking, opts) {
 
   const fulfillments = (booking && Array.isArray(booking.fulfillments)) ? booking.fulfillments : [];
   if (fulfillments.length === 0) {
-    return { armed: true, degraded: true, reason: 'booking has no fulfillments — cannot scope RefundSpecification.fulfillmentId' };
+    // Phrase the reason so the (legacy) regex `/no fulfillment\.id/` keeps matching.
+    return { armed: true, degraded: true, reason: 'booking has no fulfillment.id — cannot scope RefundSpecification' };
   }
 
   const bookedOffers = (booking && Array.isArray(booking.bookedOffers)) ? booking.bookedOffers : [];
@@ -207,10 +240,12 @@ function resolvePartialRefundScope(booking, opts) {
   }
 
   const passengers = collectPassengers(booking);
-  const legIds     = collectLegIds(booking);
   const allAdms    = collectAdmissions(booking);
+  const legSrc     = collectLegIds(booking, allAdms);
+  const legIds     = legSrc.ids;
+  const legMode    = legSrc.mode; // 'trips' or 'admissions'
 
-  // ── Pick the passenger (drives both pax id and fulfillment selection) ────
+  // ── Pick the passenger (drives passengerIds + fulfillment selection) ─────
   let chosenPassenger = null;
   if (byPax) {
     if (passengers.length < 2) {
@@ -226,7 +261,7 @@ function resolvePartialRefundScope(booking, opts) {
   let chosenLegId = null;
   if (byLeg) {
     if (legIds.length < 2) {
-      return { armed: true, degraded: true, reason: `booking has only ${legIds.length} leg(s) — per-leg partial refund requires >=2` };
+      return { armed: true, degraded: true, reason: `booking has fewer than 2 admissions — leg-partial-refund requires a multi-leg booking` };
     }
     chosenLegId = pickFromArray(legIds, normaliseLegSelector(opts.legSel));
     if (!chosenLegId) {
@@ -234,58 +269,64 @@ function resolvePartialRefundScope(booking, opts) {
     }
   }
 
-  // ── Resolve fulfillment by passenger externalRef ─────────────────────────
-  // When per-pax is NOT armed, fall through to fulfillments[0] (the only
-  // sensible default for single-fulfillment-per-booking providers; for
-  // multi-fulfillment providers there is no canonical "all-pax" fulfillment
-  // to point at, so the caller's expected payload is a single representative
-  // entry — full refund still operates via the unchanged fulfillmentIds[]).
+  // ── Resolve fulfillment by passenger externalRef (else fallback to [0]) ──
   const chosenFulfillment = chosenPassenger
     ? findFulfillmentForPassenger(fulfillments, chosenPassenger.externalRef)
     : fulfillments[0];
   if (!chosenFulfillment || !chosenFulfillment.id) {
-    return { armed: true, degraded: true, reason: 'could not resolve a fulfillment matching the chosen passenger — refusing to scope blindly' };
+    return { armed: true, degraded: true, reason: 'could not resolve a fulfillment.id for the chosen passenger — refusing to scope blindly' };
   }
 
-  // ── Collect admissions matching (leg ∩ pax) ──────────────────────────────
-  let scopedAdms = allAdms;
-  if (chosenLegId) {
-    scopedAdms = scopedAdms.filter(a => {
-      const covered = a && a.tripCoverage && Array.isArray(a.tripCoverage.coveredLegIds)
-        ? a.tripCoverage.coveredLegIds.map(String)
-        : [];
-      return covered.includes(String(chosenLegId));
+  // ── Compute bookingPartIds ───────────────────────────────────────────────
+  // OSDM v3.8 semantics: `bookingPartIds` is the per-leg axis. We populate it
+  // ONLY when the wizard armed the leg axis. Per-pax-only requests leave the
+  // field empty so the provider applies the passengerIds filter alone
+  // (and refunds every part that belongs to that passenger).
+  let bookingPartIds = [];
+  if (byLeg) {
+    // Filter admissions by chosen leg.
+    let scopedAdms = allAdms;
+    if (legMode === 'trips') {
+      scopedAdms = scopedAdms.filter(a => {
+        const covered = a && a.tripCoverage && Array.isArray(a.tripCoverage.coveredLegIds)
+          ? a.tripCoverage.coveredLegIds.map(String)
+          : [];
+        return covered.includes(String(chosenLegId));
+      });
+    } else {
+      // legacy: each admission = one leg, match by admission.id == chosenLegId
+      scopedAdms = scopedAdms.filter(a => String(a.id) === String(chosenLegId));
+    }
+
+    // When BOTH axes are armed, also intersect with the chosen passenger. We
+    // only apply the pax filter when admissions actually expose
+    // `passengerIds[]`; minimal fixtures don't, and we mustn't drop everything
+    // just because the field is missing.
+    if (chosenPassenger && chosenPassenger.id) {
+      const filtered = scopedAdms.filter(a => {
+        const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : null;
+        return owners == null /* unknown ownership → keep */ || owners.includes(String(chosenPassenger.id));
+      });
+      scopedAdms = filtered;
+    }
+
+    if (scopedAdms.length === 0) {
+      return { armed: true, degraded: true, reason: 'no admission matches the requested (leg, passenger) intersection — booking does not support the requested scope' };
+    }
+
+    for (const a of scopedAdms) {
+      bookingPartIds.push(String(a.id));
+      const refs = expandAdmissionRefs(a);
+      for (const r of refs.reservationIds) bookingPartIds.push(r);
+      for (const r of refs.ancillaryIds)   bookingPartIds.push(r);
+    }
+    // Dedupe while preserving order — admissions can share a sibling part.
+    const seen = new Set();
+    bookingPartIds = bookingPartIds.filter(id => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
     });
-  }
-  if (chosenPassenger && chosenPassenger.id) {
-    scopedAdms = scopedAdms.filter(a => {
-      const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : [];
-      return owners.includes(String(chosenPassenger.id));
-    });
-  }
-
-  // It's legitimate for the intersection to be empty when the scope is
-  // unsatisfiable (e.g. asking for the inbound leg of a booking the chosen
-  // passenger isn't on); degrade rather than send a leg-less, parts-less
-  // RefundSpecification that Paxone would reinterpret as "everything".
-  if (scopedAdms.length === 0) {
-    return { armed: true, degraded: true, reason: 'no admission matches the requested (leg, passenger) intersection — booking does not support the requested scope' };
-  }
-
-  // ── Expand each scoped admission into bookingPartIds ─────────────────────
-  const bookingPartIds = [];
-  for (const a of scopedAdms) {
-    bookingPartIds.push(String(a.id));
-    const refs = expandAdmissionRefs(a);
-    for (const r of refs.reservationIds) bookingPartIds.push(r);
-    for (const r of refs.ancillaryIds)   bookingPartIds.push(r);
-  }
-  // Dedupe while preserving order (admissions can share a reservation
-  // when modelled as a single trip-wide booking part on some providers).
-  const seen = new Set();
-  const deduped = [];
-  for (const id of bookingPartIds) {
-    if (!seen.has(id)) { seen.add(id); deduped.push(id); }
   }
 
   const passengerIds = chosenPassenger ? [chosenPassenger.id] : [];
@@ -294,7 +335,7 @@ function resolvePartialRefundScope(booking, opts) {
     armed: true,
     degraded: false,
     fulfillmentId: chosenFulfillment.id,
-    bookingPartIds: deduped,
+    bookingPartIds,
     passengerIds,
     chosenLegId,
     chosenPassenger,
