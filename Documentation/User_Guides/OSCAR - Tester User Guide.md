@@ -285,6 +285,23 @@ The two modes — the same labels appear in the framework and the scenario:
 - **Fulfillment** — media (`PDF_A4`, `UIC_PDF`, …) and type (`ETICKET`, …),
   constrained to the framework's `fulfillment`.
 
+> **Passenger reference format (since server‑v1.11.98).** The wizard generates
+> passenger references as 5‑digit zero‑padded strings (`"00001"`, `"00002"`,
+> …) — these become the OSDM `externalRef` on every passenger‑bearing call.
+> OSDM v3.8 permits any non‑null string, but at least one production provider
+> (Paxone) enforces a numeric / zero‑padded shape and rejects `"PAX1"`-style
+> references with a catch‑all `Schema validation error`. **Scenarios authored
+> before v1.11.98** still carry the old `PAX1`, `PAX2`, … format in their
+> data file and will continue to fail on Paxone. Two paths to fix them:
+> (1) **re‑author the scenario** in the wizard — passengers regenerate with
+> the new format; or (2) **hand‑edit the data file** — rename every `PAXn`
+> to its zero‑padded equivalent. The reference appears in three places per
+> scenario: `passengersList[].passengers[].reference`,
+> `bookingPassengerReferences` (flat array of strings), and any echoed
+> `externalRef` inside `offerPassengerSpecifications` /
+> `bookingPassengerSpecifications` if you materialised those fields by hand.
+> Bileto, Sqills, Turnit and Benerail accept both formats and are unaffected.
+
 ### 4.8 Negative‑flow tests (optional)
 
 These probes drive a scenario into a **non‑happy** path and assert the provider
