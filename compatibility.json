@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.129",
+  "current_release": "2026.130",
   "releases": [
+    {
+      "release": "2026.130",
+      "date": "2026-06-08",
+      "server": "1.11.102",
+      "collection": "OTST_V2.0.50",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(wizard, UX): changing a passenger's category (e.g. ADULT -> CHILD) no longer snaps the viewport back to the top of the scenario detail panel. Reported by a tester after the v1.11.101 cycle: editing in the Passengers section required scrolling all the way down again every time the type dropdown changed value, and any other param-section the tester had open (NHF, Booking Flow Actions, …) collapsed back to default. Two fixes: (1) the canonical reRenderScenarioDetail helper now captures window.scrollY at entry and restores it after the innerHTML swap so the viewport stays where the tester left it; (2) the change-pax-category handler now routes through reRenderScenarioDetail instead of doing an inline `det.innerHTML = buildDetailHTML(...)`, picking up the section-state preservation that the inline path bypassed. Bonus: the category dropdown is re-focused after the re-render so the keyboard / pointer can continue editing without an extra click. Wizard-only change; runtime / data semantics unchanged.",
+        "Bruno_Collection/VERSION OTST_V2.0.49 -> OTST_V2.0.50; server 1.11.101 -> 1.11.102. No data-file schema change, no backend change."
+      ]
+    },
     {
       "release": "2026.129",
       "date": "2026-06-08",
