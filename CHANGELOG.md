@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.101] — 2026-06-08
+
+**Wizard UX — RequestedInfo probe presentation matched to the format
+probe.** Tester feedback after v1.11.100 shipped: the new
+*Field-shape & payload probes* sub-group rendered the format probe
+inside a clean dashed-border box (uppercase mini-header, dropdown,
+full-width hint underneath) while RequestedInfo probe still used
+`buildSelect`'s grid layout — its long multi-sentence hint got
+squeezed into a narrow vertical strip next to the dropdown. Now both
+probes use the same dashed-border presentation, so the hint sentence
+flows across the full sub-group width.
+
+### Changed
+- `Oscar_Server/public/js/scenarios.js`: inside
+  `buildNonHappyFlowSection`'s shape-probes sub-section,
+  `requestedInformationProbe` is now rendered by a small inlined
+  builder that matches the format-probe block — same uppercase
+  mini-header, same dropdown width cap, same hint placement.
+  `buildSelect` no longer used for this field.
+
+### Behaviour guarantees
+- `data-action="set-scenario"` and `data-field="requestedInformationProbe"`
+  unchanged — the save handler at `case 'set-scenario'` (line ~6010)
+  picks up the new dropdown the same way.
+- Field name, enum values, and runtime semantics unchanged. Pre-existing
+  scenarios behave identically; only the visual presentation moved.
+
+### Operator action
+None. No data-file schema change.
+
+### Bumps
+- `Oscar_Server/package.json` 1.11.100 → 1.11.101
+- `Bruno_Collection/VERSION` OTST_V2.0.48 → OTST_V2.0.49
+- New compatibility row `release-2026.129`
+
+---
+
 ## [server-v1.11.100] — 2026-06-08
 
 **Wizard UX — Non Happy Flow customisation reorganised.** Two new
