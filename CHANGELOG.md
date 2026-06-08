@@ -14,6 +14,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.99] — 2026-06-08
+
+**New NHF probe.** A multi-passenger SALE scenario can now arm the
+`passengerExternalRefFormat` probe to override the default `00001`-style
+passenger reference with a printf-style pattern, applied at scenario-parse
+time and propagated through every downstream call (offer, booking,
+refund, exchange) consistently. The probe is exposed in the wizard's
+**Non Happy Flow customisation** section with a live preview of the first
+three generated references as the tester types.
+
+The probe documents real-world provider variance:
+
+| Vendor | `00001` | `PAX1` | `PAX0001` |
+|---|---|---|---|
+| Bileto | ✅ | ✅ | ✅ |
+| Sqills | ✅ | ✅ | ✅ |
+| Turnit | ✅ | ✅ | ✅ |
+| Benerail | ✅ | ✅ | ✅ |
+| **Paxone** | ✅ | **❌ Schema validation error** | ✅ |
+
+OSDM v3.8 declares `externalRef` as `type: string` with no `pattern` —
+Paxone enforces a tighter rule client-invisibly. This probe lets the
+tester drive that variance into the test report deliberately.
+
+### Added — wizard
+- `Oscar_Server/public/js/scenarios.js`: new optional scenario field
+  `passengerExternalRefFormat` (string, default empty). Rendered as a
+  text input inside the NHF section with a live preview of the first
+  three generated refs and a validation hint when the pattern lacks a
+  `%d` / `%0Nd` placeholder.
+- `previewExternalRef()` helper inlined locally for the wizard preview —
+  same parser as the runtime side, kept in sync via the unit test.
+
+### Added — runtime
+- `Bruno_Collection/library-bruno/scenarioParser.js`: new exported
+  function `applyExternalRefFormat(pattern, n)` — pure parser for the
+  printf-style pattern. Recognises `%d`, `%Nd` and `%0Nd`. Returns the
+  pattern unchanged if it lacks a placeholder; returns `String(n)` if
+  the pattern is null/empty.
+- The passenger loop in `parseScenarioData` rewrites
+  `passenger.reference` in-place when the probe is armed, BEFORE the
+  downstream `AnonymousPassengerSpec` / `PassengerSpec` /
+  `passengerReferences` / `updateXxx_<i>` env vars are materialised.
+  The mutation is run-local — `jsonData` is re-parsed from the data
+  file on every scenario load, so no state leaks across runs.
+
+### Added — schema
+- `Bruno_Collection/json_validator/datafile.schema.json`: new optional
+  `passengerExternalRefFormat` field on the scenario object (`type:
+  ["string", "null"]`, no pattern enum — the runtime validates the
+  pattern shape on its own).
+
+### Added — tests
+- `Oscar_Server/tests/unit/bruno-externalrefformat.test.js`: 16 cases
+  covering the documented happy paths (`PAX%04d`, `%05d`,
+  `ABC-%03d-XYZ`), width edge cases (no padding, undersized width,
+  zero-width), graceful degradation (null / undefined / empty pattern,
+  pattern without a placeholder, pattern with two placeholders), and
+  table-driven parity with the wizard's preview parser.
+
+### Documentation
+- Tester Guide section 4.8 expanded with the new probe, including a
+  vendor-conformance table and the wizard preview behaviour.
+
+### Operator action
+None. The probe is OFF by default; pre-existing scenarios behave
+exactly as before. Watchtower picks up `:stable` automatically once
+`promote-release` republishes the image.
+
+---
+
 ## [server-v1.11.98] — 2026-06-08
 
 **Wizard hotfix.** Multi-passenger SALE scenarios failed `POST /offers` on
