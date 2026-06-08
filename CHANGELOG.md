@@ -14,6 +14,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.104] — 2026-06-08
+
+**Partial refund (#218) — alignment assertion now compares against the
+actual wire scope, not the resolver's internal intent.**
+
+Follow-up to v1.11.103. After v1.11.103 shipped, a Paxone test against
+a 4-pax / 2-leg booking with both axes armed (`partialRefundByLeg=on
+(last)` + `partialRefundByPax=on (last)`) produced the correct
+behaviour at every layer except the alignment assertion:
+
+- ✅ Request: `fulfillmentIds: ["<nicolas's fulfillment>"]` (1 entry,
+  scoped, OSDM-3.5 compatible). The duplicate-push and trim-list
+  fixes from v1.11.103 worked.
+- ✅ `refundSpecifications` correctly omitted (Paxone on osdmVersion
+  3.5). The OSDM version guard worked.
+- ✅ Paxone returned `refundableAmount=5000 EUR` = sum of all 6 of
+  nicolas's booking parts (admissions + reservations + ancillaries on
+  BOTH legs of the trip). The fulfillment maps to one passenger's
+  parts on Paxone.
+- ❌ The new alignment assertion still failed with
+  `expected=2500, got 5000` and falsely blamed the provider.
+
+The bug: the assertion was computing expected from the resolver's
+per-leg × per-pax intersection (3 parts on the last leg only =
+2500 EUR), but on OSDM v3.5 the per-leg axis is silently dropped at
+the wire because `refundSpecifications.bookingPartIds` isn't yet
+supported. The wire actually conveyed "all of nicolas's parts" via
+`fulfillmentIds[]` alone — and Paxone honoured exactly that.
+
+### Fixed
+
+- `Bruno_Collection/03-Refund/10. POST Refund Offers.yml` — expected
+  refundable amount is now computed against what the request body
+  actually contains:
+  - `refundSpecifications.bookingPartIds` present → provider refunds
+    exactly those parts → expected = sum of those parts' prices.
+  - `refundSpecifications.passengerIds` only (no bookingPartIds) →
+    provider expands to every part owned by the named passengers →
+    expected = sum of those parts walked from `bookedOffers[].*`.
+  - No `refundSpecifications` at all (e.g. OSDM v3.5 path) → wire
+    scope is just the referenced fulfillment → expected = sum of
+    parts named in `fulfillment.bookingParts[].id`.
+- The assertion error message now names the wire-scope shape (e.g.
+  `fulfillment[b90ddfa8…].bookingParts (6 part(s))`) so the failure
+  is self-explanatory instead of leaving the reader to guess what
+  was being measured.
+
+### Added
+
+- `Bruno_Collection/03-Refund/10. POST Refund Offers.yml` — explicit
+  `[WARNING]` log line emitted when an axis is silently dropped due
+  to `osdmVersion < 3.8`. Spells out in plain English why a per-leg
+  request can't be conveyed and that the response will cover every
+  leg of the chosen passenger / every passenger on a single-
+  fulfillment booking. Per-leg-only on a multi-fulfillment booking
+  triggers an extra `[WARNING]` because picking one fulfillment
+  refunds one passenger across all legs — never "the chosen leg
+  across all passengers" — and the wizard's intent is lost.
+
+### Behaviour guarantees
+
+- Full-refund scenarios unchanged.
+- v1.11.103 fixes (duplicate-push, trim list, fulfillment-by-pax
+  match, leg ordering via trips, reservationRefs walk) unchanged.
+- Existing 21 partial-refund Jest unit tests still pass.
+- No data-file schema change. No backend change. No wizard UI change.
+
+### Known unrelated
+
+The separate pre-existing assertion *"Refundable amount is 0 because
+overruleCode is null or CODE_DOES_NOT_EXIST"* fails on the same
+Paxone REFUND scenario because the booking's
+`afterSalesConditions[].validFrom` is in the future (refund window
+opens on the day of travel) and Paxone returned a refund offer
+anyway. That's a separate provider-vs-OSDM semantic question
+(strict-window reading vs free-text-condition reading) that was
+present before v1.11.103 and is unchanged here.
+
+---
+
 ## [server-v1.11.103] — 2026-06-08
 
 **Partial refund (#218) — request was malformed in five ways and the
