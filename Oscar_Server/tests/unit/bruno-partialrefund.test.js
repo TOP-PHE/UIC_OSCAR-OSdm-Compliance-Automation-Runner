@@ -231,3 +231,119 @@ describe('buildRefundSpecifications', () => {
     expect(arr[0].bookingPartIds).toContain('adm-leg1');
   });
 });
+
+// ─── Paxone v3.8 shape (regression guard for #218 follow-up) ──────────────
+// Booking with one fulfillment per passenger, trips[].legs[].id as the
+// authoritative leg ordering, and admission.tripCoverage.coveredLegIds +
+// admission.passengerIds for scoping. Admission has forward
+// reservationRefs[]/ancillaryRefs[] (the spec model). The original resolver
+// always picked fulfillments[0] which is wrong when the chosen passenger
+// isn't the first; this fixture would expose that.
+function paxoneMultiFulfillmentBooking() {
+  return {
+    fulfillments: [
+      // Fulfillment order intentionally does NOT match passenger order so
+      // fulfillments[0] is not pax-D's. The chosen passenger here is pax-D.
+      { id: 'ff-pax-A', fulfillmentParts: [{ passengerRef: 'EXT-A' }] },
+      { id: 'ff-pax-B', fulfillmentParts: [{ passengerRef: 'EXT-B' }] },
+      { id: 'ff-pax-C', fulfillmentParts: [{ passengerRef: 'EXT-C' }] },
+      { id: 'ff-pax-D', fulfillmentParts: [{ passengerRef: 'EXT-D' }] },
+    ],
+    passengers: [
+      { id: 'pax-A', externalRef: 'EXT-A' },
+      { id: 'pax-B', externalRef: 'EXT-B' },
+      { id: 'pax-C', externalRef: 'EXT-C' },
+      { id: 'pax-D', externalRef: 'EXT-D' },
+    ],
+    trips: [{
+      legs: [
+        { id: 'leg-first' },  // outbound
+        { id: 'leg-last' },   // inbound
+      ],
+    }],
+    bookedOffers: [{
+      admissions: [
+        { id: 'adm-A-first', passengerIds: ['pax-A'],
+          tripCoverage: { coveredLegIds: ['leg-first'] },
+          reservationRefs: [{ id: 'res-A-first' }],
+          ancillaryRefs:   [{ id: 'anc-A-first' }] },
+        { id: 'adm-A-last',  passengerIds: ['pax-A'],
+          tripCoverage: { coveredLegIds: ['leg-last'] },
+          reservationRefs: [{ id: 'res-A-last' }],
+          ancillaryRefs:   [{ id: 'anc-A-last' }] },
+        { id: 'adm-D-first', passengerIds: ['pax-D'],
+          tripCoverage: { coveredLegIds: ['leg-first'] },
+          reservationRefs: [{ id: 'res-D-first' }],
+          ancillaryRefs:   [{ id: 'anc-D-first' }] },
+        { id: 'adm-D-last',  passengerIds: ['pax-D'],
+          tripCoverage: { coveredLegIds: ['leg-last'] },
+          reservationRefs: [{ id: 'res-D-last' }],
+          ancillaryRefs:   [{ id: 'anc-D-last' }] },
+      ],
+      reservations: [
+        { id: 'res-A-first' }, { id: 'res-A-last' },
+        { id: 'res-D-first' }, { id: 'res-D-last' },
+      ],
+      ancillaries: [
+        { id: 'anc-A-first' }, { id: 'anc-A-last' },
+        { id: 'anc-D-first' }, { id: 'anc-D-last' },
+      ],
+    }],
+  };
+}
+
+describe('Paxone v3.8 multi-fulfillment shape', () => {
+  test('per-pax last + per-leg last → matches pax-D fulfillment and intersects on last leg', () => {
+    const r = resolvePartialRefundScope(paxoneMultiFulfillmentBooking(), {
+      byLeg: true, legSel: 'last',
+      byPax: true, paxSel: 'last',
+    });
+    expect(r.degraded).toBe(false);
+    // The bug we just fixed: blindly using fulfillments[0] would pick ff-pax-A.
+    expect(r.fulfillmentId).toBe('ff-pax-D');
+    expect(r.passengerIds).toEqual(['pax-D']);
+    // Intersection: pax-D × leg-last → just adm-D-last (NOT adm-D-first, NOT adm-A-last)
+    expect(r.bookingPartIds).toEqual(expect.arrayContaining([
+      'adm-D-last', 'res-D-last', 'anc-D-last',
+    ]));
+    expect(r.bookingPartIds).not.toContain('adm-D-first');
+    expect(r.bookingPartIds).not.toContain('adm-A-last');
+    expect(r.chosenLegId).toBe('leg-last');
+  });
+
+  test('per-pax first + per-leg outbound → pax-A fulfillment, leg-first admissions', () => {
+    const r = resolvePartialRefundScope(paxoneMultiFulfillmentBooking(), {
+      byLeg: true, legSel: 'outbound',
+      byPax: true, paxSel: 'first',
+    });
+    expect(r.fulfillmentId).toBe('ff-pax-A');
+    expect(r.chosenLegId).toBe('leg-first');
+    expect(r.bookingPartIds).toEqual(['adm-A-first', 'res-A-first', 'anc-A-first']);
+    expect(r.passengerIds).toEqual(['pax-A']);
+  });
+
+  test('per-pax last only → pax-D fulfillment, NO bookingPartIds (provider expands)', () => {
+    const r = resolvePartialRefundScope(paxoneMultiFulfillmentBooking(), {
+      byPax: true, paxSel: 'last',
+    });
+    expect(r.degraded).toBe(false);
+    expect(r.fulfillmentId).toBe('ff-pax-D');
+    expect(r.passengerIds).toEqual(['pax-D']);
+    expect(r.bookingPartIds).toEqual([]);
+  });
+
+  test('per-leg last only → fulfillments[0] (no pax chosen), both passengers’ last-leg admissions', () => {
+    const r = resolvePartialRefundScope(paxoneMultiFulfillmentBooking(), {
+      byLeg: true, legSel: 'last',
+    });
+    expect(r.degraded).toBe(false);
+    expect(r.fulfillmentId).toBe('ff-pax-A'); // fulfillments[0] fallback when no pax chosen
+    expect(r.passengerIds).toEqual([]);
+    expect(r.bookingPartIds).toEqual(expect.arrayContaining([
+      'adm-A-last', 'res-A-last', 'anc-A-last',
+      'adm-D-last', 'res-D-last', 'anc-D-last',
+    ]));
+    expect(r.bookingPartIds).not.toContain('adm-A-first');
+    expect(r.bookingPartIds).not.toContain('adm-D-first');
+  });
+});

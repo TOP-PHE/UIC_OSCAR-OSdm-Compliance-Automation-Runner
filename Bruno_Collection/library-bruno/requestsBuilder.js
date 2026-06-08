@@ -422,15 +422,58 @@ function parseFulfillmentIds() {
 // non-empty array, OSCAR is scoping the refund to a subset of booking parts
 // and/or passengers within a single fulfillment. Otherwise the body is the
 // historical full-refund shape.
+//
+// When partial is armed we also TRIM `fulfillmentIds[]` down to the scoped
+// fulfillment. Otherwise the provider sees:
+//   fulfillmentIds      = every fulfillment in the booking
+//   refundSpecifications = partial scope for ONE fulfillment
+// and (correctly per OSDM) interprets the fulfillmentIds list as "refund all
+// these in full". Paxone in particular ignores refundSpecifications as an
+// unknown field on its current spec version, so the partial scope is then
+// silently lost — see #218 follow-up.
 function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecifications = null) {
   validationLogger("[INFO] ➤ requestRefundOffersBody");
 
-  const body = { fulfillmentIds: parseFulfillmentIds() };
+  let fulfillmentIds = parseFulfillmentIds();
+  // Side-channel: when partial scope is resolved but the OSDM version doesn't
+  // yet support refundSpecifications[] (Paxone on v3.5 today), 10.yml stashes
+  // the target fulfillmentId here so we still trim fulfillmentIds[].
+  const _scopeOnly = bru.getEnvVar("__partialRefundScopeFulfillmentId");
+  const _hasSpec   = Array.isArray(refundSpecifications) && refundSpecifications.length > 0;
+  if (_hasSpec || (_scopeOnly && String(_scopeOnly).length > 0)) {
+    // Trim to the scoped fulfillment(s) only; preserve order.
+    const wanted = new Set(
+      _hasSpec
+        ? refundSpecifications.map(s => s && s.fulfillmentId).filter(Boolean).map(String)
+        : [String(_scopeOnly)]
+    );
+    const trimmed = Array.isArray(fulfillmentIds)
+      ? fulfillmentIds.filter(id => wanted.has(String(id)))
+      : [];
+    if (trimmed.length === 0) {
+      // Fail safe: if the trim leaves nothing (env var was empty / mismatched)
+      // fall back to just listing the scoped fulfillment(s) so the request is
+      // at least internally consistent.
+      fulfillmentIds = [...wanted];
+    } else {
+      // De-dupe while keeping the first occurrence — guards against legacy
+      // duplicates from older bookings.js that pushed every fulfillment twice.
+      const seen = new Set();
+      fulfillmentIds = trimmed.filter(id => {
+        const k = String(id);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    }
+  }
+
+  const body = { fulfillmentIds };
   if (overruleCode != null) body.overruleCode = overruleCode;
   if (refundDate != null)   body.refundDate   = refundDate;
   if (Array.isArray(refundSpecifications) && refundSpecifications.length > 0) {
     body.refundSpecifications = refundSpecifications;
-    validationLogger(`[INFO] Partial refund armed — refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
+    validationLogger(`[INFO] Partial refund armed — fulfillmentIds scoped to [${fulfillmentIds.join(", ")}], refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
   }
 
   bru.setEnvVar("requestRefundOffersBodyData", JSON.stringify(body));

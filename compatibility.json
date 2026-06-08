@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.130",
+  "current_release": "2026.131",
   "releases": [
+    {
+      "release": "2026.131",
+      "date": "2026-06-08",
+      "server": "1.11.103",
+      "collection": "OTST_V2.0.51",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#218, partial refund): the wizard-generated request was malformed in five distinct ways and the response was treated as a partial refund even when the provider had silently produced a full one. Discovered debugging a Paxone REFUND scenario where the response refundableAmount equalled the booking's full confirmedPrice — i.e. partial scope was never actually applied. Five fixes: (1) `Bruno_Collection/library-bruno/bookings.js` was pushing every fulfillment id TWICE into the env var, so refund / exchange requests carried each id duplicated — providers tolerated it for full-flow but partial scope couldn't work. Dedupe to one push per fulfillment. (2) `library-bruno/requestsBuilder.js` now trims `fulfillmentIds[]` to the scoped fulfillment when partial is armed; the original code kept the full list AND added refundSpecifications, which providers correctly interpreted as 'refund all these in full'. (3) `library-bruno/partialRefund.js` now resolves `RefundSpecification.fulfillmentId` by matching `fulfillment.fulfillmentParts[].passengerRef` against the chosen passenger's externalRef — the old code blindly picked fulfillments[0], which is wrong on providers like Paxone that model one-fulfillment-per-passenger. (4) Leg ordering now reads `booking.trips[*].legs[*].id` (the user-visible leg list the wizard's first/last/outbound/inbound labels refer to), instead of treating the legs × passengers cross-product of admissions as the leg list. (5) Booking-part expansion now walks `admission.reservationRefs[].id` and `admission.ancillaryRefs[].id` instead of looking for `requiredAdmissionKey | admissionRef | admissionId` on the reservation/ancillary side — those fields don't exist in OSDM / Paxone. The two axes also now intersect explicitly (admissions covering the chosen leg AND owned by the chosen passenger), so leg-target and pax-target never disagree on the subject. Plus: when the negotiated `osdmVersion < 3.8` (e.g. Paxone sandbox on 3.5), `refundSpecifications[]` is omitted (the provider would reject it as OSDM_EXTRA_REQUEST_FIELDS_IGNORED and silently full-refund); scoping then happens via the trimmed `fulfillmentIds[]` alone. New after-response alignment assertion compares `response.refundOffers[0].refundableAmount` against the sum of the in-scope booking-part prices computed before the request and fails with a clear message if the provider ignored the scope — the symptom that started this investigation now surfaces as a test failure instead of a silent full refund. Resolver covered by a 4-case smoke trace against a Paxone-shaped fixture (deleted before commit).",
+        "Bruno_Collection/VERSION OTST_V2.0.50 -> OTST_V2.0.51; server 1.11.102 -> 1.11.103. No data-file schema change, no backend change."
+      ]
+    },
     {
       "release": "2026.130",
       "date": "2026-06-08",
