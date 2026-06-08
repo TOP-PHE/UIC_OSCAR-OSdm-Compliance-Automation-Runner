@@ -290,6 +290,12 @@ request:
                 "requestExchangeOffersBodyData", "requestExchangeOperationsBodyData",
                 "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed",
                 "requestRefundOffersBodyData",
+                // Partial refund (#218) — runtime-only side channels
+                "__bookingForRefund",
+                "__partialRefundDegradedToFull", "__partialRefundResolvedSpec",
+                "__partialRefundExpectedAmount", "__partialRefundExpectedPartIds",
+                "__partialRefundScopeFulfillmentId",
+                "__refundOfferRetryCount",
                 "afterSaleCondition_EXCHANGE_amount", "afterSaleCondition_EXCHANGE_currency", "afterSaleCondition_EXCHANGE_scale",
                 "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
                 // Misc

@@ -44,6 +44,8 @@ runtime:
         const _byPax = String(bru.getEnvVar("partialRefundByPax")) === "true";
         bru.setEnvVar("__partialRefundDegradedToFull", "false");
         bru.setEnvVar("__partialRefundResolvedSpec", "");
+        bru.setEnvVar("__partialRefundExpectedAmount", "");
+        bru.setEnvVar("__partialRefundExpectedPartIds", "");
         if (_byLeg || _byPax) {
           const { resolvePartialRefundScope } = require(bru.getEnvVar("library_base") + "partialRefund.js");
           let _bk = null;
@@ -62,13 +64,66 @@ runtime:
               validationLogger(`[WARNING] Partial refund degraded to full: ${_r.reason}. The full-refund happy path runs; partial-scope assertions skip.`);
               bru.setEnvVar("__partialRefundDegradedToFull", "true");
             } else if (_r.armed) {
-              _refundSpecs = [{ fulfillmentId: _r.fulfillmentId }];
-              if (_r.bookingPartIds.length > 0) _refundSpecs[0].bookingPartIds = _r.bookingPartIds;
-              if (_r.passengerIds.length   > 0) _refundSpecs[0].passengerIds   = _r.passengerIds;
-              bru.setEnvVar("__partialRefundResolvedSpec", JSON.stringify(_refundSpecs));
-              validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_r.fulfillmentId}, bookingPartIds=[${_r.bookingPartIds.join(", ")}], passengerIds=[${_r.passengerIds.join(", ")}]`);
+              // OSDM-version guard: RefundSpecification[] only landed in v3.8.
+              // Older negotiated versions (e.g. 3.5 = Paxone's current sandbox)
+              // reject the field as OSDM_EXTRA_REQUEST_FIELDS_IGNORED and would
+              // silently produce a full refund. Skip the field; scope only via
+              // the trimmed fulfillmentIds[] (which v3.5+ already supports).
+              const _osdm = String(bru.getEnvVar("osdmVersion") || "").trim();
+              const _osdmParts = _osdm.split(".").map(p => parseInt(p, 10));
+              const _osdmOk = _osdmParts.length >= 2 && !isNaN(_osdmParts[0]) && !isNaN(_osdmParts[1])
+                && (_osdmParts[0] > 3 || (_osdmParts[0] === 3 && _osdmParts[1] >= 8));
+              if (_osdmOk) {
+                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId }];
+                if (_r.bookingPartIds.length > 0) _refundSpecs[0].bookingPartIds = _r.bookingPartIds;
+                if (_r.passengerIds.length   > 0) _refundSpecs[0].passengerIds   = _r.passengerIds;
+                bru.setEnvVar("__partialRefundResolvedSpec", JSON.stringify(_refundSpecs));
+                validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_r.fulfillmentId}, bookingPartIds=[${_r.bookingPartIds.join(", ")}], passengerIds=[${_r.passengerIds.join(", ")}]`);
+              } else {
+                // Still scope via fulfillmentIds[] — requestRefundOffersBody
+                // will trim the list down because _refundSpecs is non-null.
+                // We attach the bare {fulfillmentId} so the trimmer keeps only
+                // the target fulfillment but we don't actually send the field.
+                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId, __scopeOnly: true }];
+                validationLogger(`[INFO] Partial refund scope resolved but osdmVersion=${_osdm || "(unset)"} < 3.8 — refundSpecifications[] omitted from the request; scoping via fulfillmentIds[] only.`);
+              }
+              // Compute the expected refundable amount for the after-response
+              // alignment assertion. Sum the prices of every admission /
+              // reservation / ancillary in the resolved bookingPartIds set —
+              // crawl the booking we have in hand.
+              const _wantIds = new Set((_r.bookingPartIds || []).map(String));
+              let _expected = 0;
+              let _currency = null;
+              let _scale    = null;
+              const _bos = Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : [];
+              for (const _bo of _bos) {
+                for (const _grp of ["admissions", "reservations", "ancillaries"]) {
+                  const _arr = Array.isArray(_bo[_grp]) ? _bo[_grp] : [];
+                  for (const _p of _arr) {
+                    if (!_p || !_wantIds.has(String(_p.id))) continue;
+                    const _pr = _p.price || {};
+                    if (typeof _pr.amount === "number") _expected += _pr.amount;
+                    if (!_currency && _pr.currency) _currency = _pr.currency;
+                    if (_scale == null && typeof _pr.scale === "number") _scale = _pr.scale;
+                  }
+                }
+              }
+              bru.setEnvVar("__partialRefundExpectedAmount", JSON.stringify({ amount: _expected, currency: _currency, scale: _scale }));
+              bru.setEnvVar("__partialRefundExpectedPartIds", JSON.stringify([...(_r.bookingPartIds || [])]));
+              validationLogger(`[INFO] Partial refund expected refundableAmount=${_expected} ${_currency || ""} (scale=${_scale}); ${_wantIds.size} booking part(s) in scope.`);
             }
           }
+        }
+        // Strip the internal __scopeOnly marker before sending — requestsBuilder
+        // checks Array.isArray()/length > 0 only, so a stripped/null value here
+        // means "do NOT attach refundSpecifications to the body".
+        if (Array.isArray(_refundSpecs) && _refundSpecs[0] && _refundSpecs[0].__scopeOnly) {
+          // The trimmer in requestRefundOffersBody still needs the fulfillmentId
+          // to scope fulfillmentIds[]; pass it via a side channel instead.
+          bru.setEnvVar("__partialRefundScopeFulfillmentId", _refundSpecs[0].fulfillmentId);
+          _refundSpecs = null;
+        } else {
+          bru.setEnvVar("__partialRefundScopeFulfillmentId", "");
         }
 
         if (bru.getEnvVar("refundDate") != null) {
@@ -128,6 +183,51 @@ runtime:
           });
           postPatchRefundOfferResponse(jsonData, expectedexchangeOperationStatus=["PROPOSED"], expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
           bru.setEnvVar('__refundOfferRetryCount', '0'); // reset on success
+
+          // Partial-refund alignment check (#218 follow-up).
+          // If the scenario armed partial scope AND we didn't have to degrade,
+          // verify the provider honoured it: the returned refundableAmount
+          // must match the sum of the in-scope booking-part prices computed
+          // before-request. Any drift means the provider either ignored the
+          // refundSpecifications field (Paxone OSDM_EXTRA_REQUEST_FIELDS_IGNORED
+          // warning) or fell back to a full refund — both are bugs we want to
+          // surface, not silently accept.
+          try {
+            const _degraded   = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
+            const _expRaw     = bru.getEnvVar("__partialRefundExpectedAmount") || "";
+            if (!_degraded && _expRaw) {
+              const _exp = JSON.parse(_expRaw);
+              const _firstOffer = jsonData.refundOffers[0] || {};
+              const _refAmount  = (_firstOffer.refundableAmount && typeof _firstOffer.refundableAmount.amount === "number")
+                ? _firstOffer.refundableAmount.amount : null;
+              const _refCurrency = (_firstOffer.refundableAmount && _firstOffer.refundableAmount.currency) || null;
+
+              test("Partial refund: response refundableAmount matches expected partial sum", () => {
+                if (_refAmount == null) {
+                  throw new Error("[ERROR] response refundOffers[0].refundableAmount.amount missing — cannot verify partial scope was honoured");
+                }
+                if (_exp.currency && _refCurrency && _exp.currency !== _refCurrency) {
+                  throw new Error(`[ERROR] Currency mismatch: expected ${_exp.currency}, got ${_refCurrency}`);
+                }
+                if (_refAmount !== _exp.amount) {
+                  throw new Error(
+                    `[ERROR] Provider returned refundableAmount=${_refAmount} but partial scope expected ${_exp.amount}` +
+                    ` (${_refCurrency || _exp.currency || ""}, scale=${_exp.scale}). ` +
+                    `Provider likely ignored refundSpecifications[] (see response.warnings.OSDM_EXTRA_REQUEST_FIELDS_IGNORED) ` +
+                    `or refunded the full booking instead of the requested scope.`
+                  );
+                }
+                validationLogger(`[INFO] Partial refund alignment OK — refundableAmount=${_refAmount} matches expected partial sum.`);
+              });
+            } else if (_degraded) {
+              validationLogger(`[INFO] Partial refund degraded earlier — alignment assertion skipped (full refund is the contract in that case).`);
+            }
+          } catch (_alignErr) {
+            // Don't swallow — the test() above already emits the failure. The
+            // try/catch is here so a JSON.parse glitch on the env var doesn't
+            // crash the after-response handler.
+            validationLogger(`[WARNING] Partial-refund alignment check threw: ${_alignErr && _alignErr.message}`);
+          }
         } catch (noOffersErr) {
           test("Refund offers found in response", () => { throw noOffersErr; });
           const _retryCount = parseInt(bru.getEnvVar('__refundOfferRetryCount') || '0', 10) + 1;

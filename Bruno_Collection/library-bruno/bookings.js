@@ -609,6 +609,13 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
   });
 
   fulfillments.forEach((fulfillment, idx) => {
+    // Push the id exactly once per fulfillment. Historically this loop pushed
+    // the id twice (once inside the `if` guard, once again unconditionally
+    // below) so the POST /refund-offers and POST /exchange-offers bodies ended
+    // up with every fulfillment id duplicated in fulfillmentIds[]. Providers
+    // tolerated it for full-refund/full-exchange because the duplicate was
+    // semantically the same instruction; partial-refund scoping (#218) however
+    // depended on a clean list to scope correctly.
     if (fulfillment?.id) {
       fulfillmentIds.push(fulfillment.id);
     }
@@ -616,7 +623,6 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     test(`Fulfillment[${idx}] id exists`, () => {
       validationLogger(`[INFO] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
     });
-    fulfillmentIds.push(fulfillment.id);
     bru.setEnvVar("fulfillmentIds", fulfillmentIds);
 
     test(`Fulfillment[${idx}] bookingRef exists`, () => {
