@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.126",
+  "current_release": "2026.127",
   "releases": [
+    {
+      "release": "2026.127",
+      "date": "2026-06-08",
+      "server": "1.11.99",
+      "collection": "OTST_V2.0.47",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(wizard, NHF): new non-happy-flow probe — passengerExternalRefFormat — lets the tester override the wizard-default 00001-style passenger reference with a printf-style pattern (e.g. PAX%04d -> PAX0001, ABC-%03d -> ABC-001, %d -> 1 no padding). The new value is applied at scenario-parse time and propagates through every downstream call (offer, booking, refund, exchange) consistently. Empty/missing pattern keeps the default behaviour. Designed to document provider variance — at time of writing Paxone rejects PAX1-style refs with a catch-all Schema validation error while Bileto / Sqills / Turnit / Benerail accept any non-empty string per OSDM v3.8 spec. Wizard renders a live preview of the first three generated refs as the tester types.",
+        "Bruno_Collection/VERSION OTST_V2.0.46 -> OTST_V2.0.47; server 1.11.98 -> 1.11.99. Data-file schema gains an optional passengerExternalRefFormat field on the scenario object (string, no pattern enum).",
+        "New unit test Oscar_Server/tests/unit/bruno-externalrefformat.test.js — 16 cases covering the documented happy paths, width edge cases, graceful degradation on null/missing/placeholder-less patterns, and parity with the wizard's live-preview parser."
+      ]
+    },
     {
       "release": "2026.126",
       "date": "2026-06-08",

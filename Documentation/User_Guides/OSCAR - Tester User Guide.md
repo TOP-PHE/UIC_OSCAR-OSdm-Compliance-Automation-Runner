@@ -309,6 +309,30 @@ These probes drive a scenario into a **non‑happy** path and assert the provide
 body). They all default OFF — a saved scenario keeps behaving as before until
 you opt in.
 
+#### Passenger external‑ref format probe (`passengerExternalRefFormat`)
+
+Override the default `00001`-style passenger reference with a custom
+printf‑style pattern, applied at scenario‑parse time and propagated through
+every downstream call (offer, booking, refund, exchange). Designed to
+document provider variance — at the time of writing, **Paxone rejects
+`PAX1`‑style refs with a catch‑all `Schema validation error`** while Bileto,
+Sqills, Turnit and Benerail accept any non‑empty string per OSDM v3.8 spec.
+
+| Pattern (wizard input) | Generated refs for a 3‑pax scenario |
+|---|---|
+| *(empty — default)* | `"00001"`, `"00002"`, `"00003"` |
+| `PAX%04d` | `"PAX0001"`, `"PAX0002"`, `"PAX0003"` |
+| `ABC-%03d-XYZ` | `"ABC-001-XYZ"`, `"ABC-002-XYZ"`, `"ABC-003-XYZ"` |
+| `%d` | `"1"`, `"2"`, `"3"` (no padding) |
+| `%05d` | `"00001"`, `"00002"`, `"00003"` (same as default) |
+
+The pattern must contain a `%d` or `%0Nd` placeholder. Without one, the
+probe is ignored at runtime and a `[WARNING]` is logged — the run continues
+with the default refs.
+
+The wizard renders a **live preview** under the input box so you can see
+what the first three passenger refs will look like before saving.
+
 #### Passenger `requestedInformation` probe (`requestedInformationProbe`) — #258
 
 OSDM lets a provider demand additional passenger info (a `requestedInformation`

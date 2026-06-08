@@ -214,6 +214,10 @@
             "type": ["string", "null"],
             "enum": ["first", "last", "", null]
           },
+          "passengerExternalRefFormat": {
+            "description": "Non-happy-flow probe. When set to a printf-style pattern, OSCAR rewrites every passenger reference at scenario-parse time to use that pattern. The new ref propagates through every downstream call (offer, booking, refund, exchange). Empty / missing = no rewrite, wizard-default '00001', '00002', ... is used (every production provider accepts this). Examples: 'PAX%04d' -> 'PAX0001', 'ABC-%03d' -> 'ABC-001', '%d' -> '1' (no padding). The pattern must contain a %d or %0Nd placeholder; without one, the probe is ignored at runtime and a [WARNING] is logged. Designed to document provider variance — e.g. Paxone rejects 'PAX1'-style refs with a catch-all Schema validation error, while Bileto / Sqills / Turnit / Benerail accept any non-empty string per OSDM v3.8 spec.",
+            "type": ["string", "null"]
+          },
           "overruleCode": {
             "type": "string"
           },
