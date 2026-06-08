@@ -14,6 +14,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.103] — 2026-06-08
+
+**Partial refund (#218) — request was malformed in five ways and the
+response was treated as a partial refund even when the provider had
+silently produced a full one.** Discovered debugging a Paxone REFUND
+scenario where the response `refundableAmount` equalled the booking's
+full `confirmedPrice` — partial scope was never actually applied.
+
+### Fixed
+
+- `Bruno_Collection/library-bruno/bookings.js` — duplicate
+  `fulfillmentIds[]` push. The `fulfillments.forEach` loop pushed each
+  fulfillment id **twice** (once inside the `if (fulfillment?.id)`
+  guard, once unconditionally below) so the env var carried every id
+  duplicated. Providers tolerated it for full-refund / full-exchange,
+  but partial-refund scoping (#218) couldn't work. Dedupe to one push
+  per fulfillment.
+
+- `Bruno_Collection/library-bruno/requestsBuilder.js` —
+  `requestRefundOffersBody` now trims `fulfillmentIds[]` down to the
+  scoped fulfillment when partial is armed. The original code kept the
+  full list **and** added `refundSpecifications`, which providers
+  correctly interpreted as "refund all these in full".
+
+- `Bruno_Collection/library-bruno/partialRefund.js` — full resolver
+  rewrite to address three logic bugs:
+  - **Fulfillment selection.** The old resolver picked
+    `booking.fulfillments[0].id` unconditionally. Paxone models
+    one-fulfillment-per-passenger; on a 4-pax booking,
+    `fulfillments[0]` is for the first passenger regardless of which
+    passenger the scenario targeted. Now matches
+    `fulfillment.fulfillmentParts[].passengerRef` against the chosen
+    passenger's `externalRef`, with a fallback to `fulfillments[0]`
+    for single-fulfillment providers (Bileto, Sqills).
+  - **Leg ordering.** The old resolver flattened
+    `bookedOffers[].admissions[]` and treated that flat list as the
+    "leg list" — on a multi-pax booking the flat list is
+    `legs × passengers` so "last by index" almost never matched the
+    user-visible "last leg". Now reads
+    `booking.trips[*].legs[*].id` (the authoritative ordering the
+    wizard's first/last/outbound/inbound labels refer to) and
+    collects admissions whose
+    `tripCoverage.coveredLegIds` contains the picked leg.
+  - **Booking-part expansion.** The old resolver looked for
+    `requiredAdmissionKey | admissionRef | admissionId` on the
+    reservation / ancillary side — those fields don't exist on
+    OSDM / Paxone bookings. Now walks `admission.reservationRefs[].id`
+    and `admission.ancillaryRefs[].id` (the actual linkage) so the
+    in-scope set includes dependent parts.
+
+  Plus: when both axes are armed, admissions are filtered by the
+  intersection (covering the chosen leg **AND** owned by the chosen
+  passenger). Previously the two axes resolved independently and
+  could disagree on the subject (`refundSpecifications[].passengerIds`
+  pointing at one passenger, `bookingPartIds` pointing at another).
+  An empty intersection now degrades instead of sending a leg-less,
+  parts-less spec that the provider would re-interpret as full refund.
+
+### Added
+
+- `Bruno_Collection/03-Refund/10. POST Refund Offers.yml` — OSDM
+  version guard. When the negotiated `osdmVersion < 3.8` (e.g. Paxone
+  sandbox currently on 3.5), `refundSpecifications[]` is omitted from
+  the request body (the provider would reject it as
+  `OSDM_EXTRA_REQUEST_FIELDS_IGNORED` and silently produce a full
+  refund); scoping then happens via the trimmed `fulfillmentIds[]`
+  alone, which v3.5+ already supports.
+
+- `Bruno_Collection/03-Refund/10. POST Refund Offers.yml` —
+  after-response alignment assertion. Compares
+  `response.refundOffers[0].refundableAmount` against the sum of the
+  in-scope booking-part prices computed before the request, and fails
+  with a clear message if the provider ignored the scope. The symptom
+  that started this investigation (Paxone returning the full
+  `confirmedPrice` instead of the partial sum) now surfaces as a test
+  failure instead of a silent full refund.
+
+### Behaviour guarantees
+
+- Full-refund scenarios (`partialRefundByLeg=off` and
+  `partialRefundByPax=off`) are unchanged: `fulfillmentIds[]` carries
+  every fulfillment in the booking (deduped) and no
+  `refundSpecifications` field is sent.
+- Exchange-offers requests benefit from the duplicate-push fix
+  automatically — they share the same `fulfillmentIds` env var. The
+  scoping logic in `requestRefundOffersBody` is refund-only.
+- No data-file schema change. No backend change.
+
+---
+
 ## [server-v1.11.102] — 2026-06-08
 
 **Wizard UX — passenger category change no longer snaps the viewport
