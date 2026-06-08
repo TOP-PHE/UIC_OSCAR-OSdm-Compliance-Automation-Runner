@@ -4957,7 +4957,15 @@ function wizGenPassengers() {
       const paxPhone   = genPhone();
 
       const pax = {
-        reference:   `PAX${refNum++}`,       // required by schema
+        // Reference is sent verbatim as externalRef on the OSDM
+        // anonymousPassengerSpecifications[] entry. OSDM v3.8 itself accepts any
+        // non-null string, but at least one provider (Paxone) enforces a stricter
+        // numeric / zero-padded shape and rejects "PAX1", "PAX2", … with a
+        // catch-all 422 "Schema validation error" per non-conformant passenger.
+        // Use the 5-digit zero-padded shape already used by requestsBuilder.js
+        // (lines 178 / 455 / 468) so wizard-generated scenarios run on every
+        // production provider.
+        reference:   String(refNum++).padStart(5, '0'),
         type:        osdmType,
         // OSCAR-side passenger category (ADULT / CHILD / YOUTH / SENIOR / …).
         // The OSDM `type` is PERSON for all humans (age differentiated by
@@ -5390,7 +5398,8 @@ document.body.addEventListener('click', function(e) {
       // set-pax sets the field. Omitting from the initial object means the
       // data file JSON does not carry `gender: "X"` until the user asks for it.
       const newPax = {
-        reference: `PAX${paxList.passengers.length + 1}`,
+        // 5-digit zero-padded — see comment at wizGenPassengers() for rationale.
+        reference: String(paxList.passengers.length + 1).padStart(5, '0'),
         type: osdmType,
         category: category,
         firstName: fn,
@@ -5536,8 +5545,8 @@ document.body.addEventListener('click', function(e) {
       // When a passenger is removed, drop its stale Edit-open entry so the
       // remaining passengers don't inherit an expanded state at their index.
       _paxEditOpen.delete(rpIdx + ':' + rpPi);
-      // Re-number references
-      rpList.passengers.forEach((p, i) => p.reference = `PAX${i + 1}`);
+      // Re-number references — 5-digit zero-padded; see comment at wizGenPassengers().
+      rpList.passengers.forEach((p, i) => p.reference = String(i + 1).padStart(5, '0'));
       markDirty();
       // Find which scenario detail is open and re-render
       document.querySelectorAll('.scenario-detail').forEach(det => {
