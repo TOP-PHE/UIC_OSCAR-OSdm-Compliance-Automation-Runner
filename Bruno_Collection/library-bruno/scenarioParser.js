@@ -31,7 +31,8 @@ module.exports = {
   osdmTripSpecification,
   osdmOfferSearchCriteria,
   osdmFulfillmentOptions,
-  buildReturnSearchParameters
+  buildReturnSearchParameters,
+  applyExternalRefFormat
 };
 
 // Resolve the optional intermediate booking-flow actions for a scenario.
@@ -150,6 +151,32 @@ function _errMsg(e) {
   if (e.message) return e.message;
   if (e.code || e.status) return `code=${e.code || e.status} ${e.message || JSON.stringify(e)}`;
   try { return JSON.stringify(e); } catch (_) { return String(e); }
+}
+
+// Apply a printf-style pattern to a passenger index, producing the
+// externalRef that will be sent on every offer / booking / refund / exchange
+// call for that passenger. Recognises:
+//   "%d"        → no padding         → "1", "2", "3", ...
+//   "%0Nd"      → N-wide zero padding → "00001", "00042", ...
+//   "%Nd"       → treated same as %0Nd (pad with zero — there is no
+//                 space-padding case for an externalRef)
+// The pattern may carry leading / trailing literals: "PAX%04d" → "PAX0001",
+// "ABC-%03d-XYZ" → "ABC-001-XYZ". Only the FIRST %d / %0Nd is substituted —
+// passing a second placeholder leaves it untouched (we have only one index
+// per passenger). If the pattern lacks any placeholder, returns the pattern
+// unchanged (the caller should validate up-front and skip the rewrite, but
+// we don't throw — silent degrade keeps the run alive).
+//
+// Mirrors previewExternalRef() in Oscar_Server/public/js/scenarios.js so the
+// wizard preview matches the runtime output exactly. A unit test in
+// Oscar_Server/tests/unit/bruno-externalrefformat.test.js anchors the
+// canonical behaviour against this function — keep both in sync.
+function applyExternalRefFormat(pattern, n) {
+  if (pattern == null || pattern === '') return String(n);
+  return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
+    const w = parseInt(width || '0', 10);
+    return String(n).padStart(w, '0');
+  });
 }
 
 // Normalize to OffsetDateTime string (required for TripSpecifications in this suite):
@@ -781,6 +808,28 @@ function parseScenarioData(jsonData) {
           const passengerReferences = [];
           const passengerAdditionalData = [];
           let passengerIndex = 0;
+
+          // ── Passenger external-ref format probe ────────────────────────────
+          // NHF parameter: when scenario.passengerExternalRefFormat is set to
+          // a printf-style pattern (e.g. "PAX%04d"), rewrite every passenger
+          // reference in-place BEFORE the loop below uses it. The rewrite
+          // propagates through every downstream env var (offerPassengerSpecs,
+          // bookingPassengerSpecifications, bookingPassengerReferences,
+          // updateFirstName_<i> etc.) because they all read passenger.reference.
+          // Empty / missing pattern → no rewrite, default 00001-style is kept.
+          //
+          // Mutating the loaded data is safe: jsonData is parsed fresh from the
+          // data file on each scenario load (see getScenarioData()), so the
+          // rewrite doesn't leak across runs.
+          const _refFormatProbe = scenario.passengerExternalRefFormat;
+          if (_refFormatProbe && /%0?\d*d/.test(String(_refFormatProbe))) {
+            passengersList.passengers.forEach(function (p, i) {
+              p.reference = applyExternalRefFormat(_refFormatProbe, i + 1);
+            });
+            validationLogger('[INFO] 🪪 passengerExternalRefFormat probe armed (pattern: "' + _refFormatProbe + '") — refs rewritten to: ' + passengersList.passengers.map(function (p) { return p.reference; }).join(', '));
+          } else if (_refFormatProbe) {
+            validationLogger('[WARNING] passengerExternalRefFormat set ("' + _refFormatProbe + '") but missing a %d / %0Nd placeholder — probe ignored, default refs kept.');
+          }
 
           passengersList.passengers.forEach(function (passenger) {
             offerPassengerSpecs.push(new AnonymousPassengerSpec(

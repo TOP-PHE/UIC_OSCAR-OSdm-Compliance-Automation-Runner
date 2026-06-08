@@ -1404,6 +1404,20 @@ function migrateMissingOfferSearchCriteria() {
 // REFUND and EXCHANGE run the same booking → fulfilment prelude before
 // their dedicated aftersales steps. Hidden only when the scenario type is
 // unset (null).
+// ── Tiny printf-style preview helper for the externalRef format probe ─────
+// Same parser as library-bruno/scenarioParser.js applyExternalRefFormat() —
+// duplicated here only because the wizard renders a live preview and we
+// don't want a server round-trip per keystroke. Keep the two in sync (a
+// unit test in bruno-externalrefformat.test.js anchors the canonical
+// behaviour; if the regex changes there, change it here too).
+function previewExternalRef(pattern, n) {
+  if (!pattern) return '';
+  return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
+    const w = parseInt(width || '0', 10);
+    return String(n).padStart(w, '0');
+  });
+}
+
 // ── Non Happy Flow customisation section ─────────────────────────────────
 //
 // All "expired-X" negative tests live here, grouped by the OSDM resource that
@@ -1413,6 +1427,15 @@ function migrateMissingOfferSearchCriteria() {
 // worker SIGTERM to cover the largest Max wait among the enabled timers
 // (see EXPIRED_FLOW_TIMERS in src/worker/runner.js); clamped at
 // RUN_HARD_MAX_TIMEOUT_MS.
+//
+// In addition to the expired-X timers, this section hosts the
+// `passengerExternalRefFormat` probe — a text input that overrides the
+// default 00001-style passenger reference used everywhere in the offer and
+// booking requests. Lets the tester probe how providers handle non-standard
+// shapes (e.g. Paxone rejects "PAX1" with a catch-all Schema validation
+// error; v1.11.98 made the wizard default to "00001" — this probe lets you
+// deliberately go back to the rejected shape, or try ABC-001, etc., and
+// document what each provider accepts).
 //
 // Refund/Exchange rows are conditionally shown — they only make sense for
 // REFUND / EXCHANGE scenarios respectively (the underlying request flows
@@ -1567,6 +1590,38 @@ function buildNonHappyFlowSection(idx, sc) {
           ${refundRow}
           ${exchangeRow}
         </div>
+
+        <!-- Passenger external-ref format probe — non-timer NHF parameter.
+             Tester types a printf-style pattern; runtime applies it to every
+             passenger reference sent to the provider. Empty = default
+             00001-style refs (every provider accepts them). -->
+        ${(function buildExternalRefFormatProbe() {
+          const sc = state.scenarios[idx] || {};
+          const current = sc.passengerExternalRefFormat || '';
+          const hasPlaceholder = /%0?\d*d/.test(current);
+          const isError = current && !hasPlaceholder;
+          const previewLine = (current && hasPlaceholder)
+            ? `<div style="font-size:11px;color:#37474f;margin-top:6px">Preview · ${esc(previewExternalRef(current, 1))}, ${esc(previewExternalRef(current, 2))}, ${esc(previewExternalRef(current, 3))}, …</div>`
+            : '';
+          const errorLine = isError
+            ? `<div style="color:#c81010;font-size:12px;margin-top:6px">⚠ Pattern must contain <code>%d</code> or <code>%0Nd</code> (e.g. <code>%04d</code>). Without a placeholder, the runtime can't substitute the passenger index.</div>`
+            : '';
+          const hintLine = !current
+            ? `<div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">Empty (default): wizard generates <code>00001</code>, <code>00002</code>, … — accepted by every production provider. Set to e.g. <code>PAX%04d</code> to probe how a provider handles a non-standard shape. The same pattern is applied across the entire run (offer → booking → refund/exchange).</div>`
+            : '';
+          return `
+          <div class="param-section" style="margin-top:14px;border:1px dashed #b0bec5;border-radius:6px;padding:10px 14px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">🪪 Passenger external-ref format probe</div>
+            <input class="param-input" type="text" style="font-family:Consolas,monospace;font-size:13px;width:100%;max-width:340px"
+              value="${esc(current)}"
+              placeholder="off — leave empty for default 00001-style"
+              data-action="set-scenario-text" data-field="passengerExternalRefFormat" data-idx="${esc(idx)}">
+            ${previewLine}
+            ${errorLine}
+            ${hintLine}
+          </div>`;
+        })()}
+
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Each enabled test waits past its resource's deadline, then asserts the next request is rejected
           with a <strong>4xx + RFC-9457 Problem</strong> body. If the wait would exceed the run budget
@@ -5216,6 +5271,16 @@ async function wizGenerateScenario() {
       // `preBookableUntil`, NOT `validUntil` (Deviations doc #25).
       expiredExchangeOfferTest: 'off',
       expiredExchangeOfferMaxWaitMinutes: null,
+      // Passenger external-ref format probe. Default empty → wizard generates
+      // 5-digit zero-padded refs ("00001", "00002", …) which every production
+      // provider accepts. When set to a printf-style pattern, the runtime
+      // overrides those refs at scenario-parse time, propagating the new
+      // values through the offer + booking + refund/exchange flows
+      // consistently. Lets the tester probe how providers handle non-standard
+      // externalRef shapes (e.g. "PAX%04d" → "PAX0001", "ABC-%03d" → "ABC-001",
+      // "%d" → "1" no-padding). The pattern is parsed by a small helper in
+      // library-bruno/scenarioParser.js — see applyExternalRefFormat().
+      passengerExternalRefFormat: '',
       // Partial refund (#218) — both axes off by default for backwards-compat.
       // When turned on, OSCAR scopes the refund-offer request via OSDM's
       // RefundSpecification[].bookingPartIds / passengerIds. Wizard validates
