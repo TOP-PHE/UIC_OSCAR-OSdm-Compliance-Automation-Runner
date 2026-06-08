@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.131",
+  "current_release": "2026.132",
   "releases": [
+    {
+      "release": "2026.132",
+      "date": "2026-06-08",
+      "server": "1.11.104",
+      "collection": "OTST_V2.0.52",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#218, partial refund): alignment assertion now compares against the actual wire scope, not the resolver's internal intent. Follow-up to v1.11.103: a Paxone test against a 4-pax / 2-leg booking with both axes armed (per-leg=last + per-pax=last) sent the correct fulfillmentIds=['<nicolas's fulfillment>'] (single, scoped, OSDM-3.5 compatible) and Paxone correctly refunded all 6 of nicolas's parts across both legs (refundableAmount=5000 EUR = sum of the fulfillment.bookingParts). The new alignment assertion however computed expected=2500 (the resolver's per-leg-x-per-pax intersection of 3 parts on the last leg only) and cried wolf — because on OSDM v3.5 the per-leg axis is silently dropped at the wire (refundSpecifications.bookingPartIds is not yet supported). The expected sum now depends on what was actually conveyed: refundSpecifications.bookingPartIds when on the wire (provider refunds exactly those), refundSpecifications.passengerIds-only when on the wire (provider expands to every part owned by those passengers), or fulfillment.bookingParts[].id when only fulfillmentIds[] is on the wire (provider refunds everything in the scoped fulfillment). Plus a new [WARNING] log line when an axis is silently dropped due to osdmVersion < 3.8 — explains in plain English that the per-leg request couldn't be conveyed and the response will cover all legs of the chosen passenger. The error message now also names the wire-scope shape so the failure is self-explanatory.",
+        "Bruno_Collection/VERSION OTST_V2.0.51 -> OTST_V2.0.52; server 1.11.103 -> 1.11.104. No data-file schema change, no backend change, no wizard UI change. Existing 21 partial-refund unit tests still pass."
+      ]
+    },
     {
       "release": "2026.131",
       "date": "2026-06-08",
