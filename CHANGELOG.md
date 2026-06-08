@@ -14,6 +14,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.98] — 2026-06-08
+
+**Wizard hotfix.** Multi-passenger SALE scenarios failed `POST /offers` on
+Paxone with four `Schema validation error` messages (one per passenger from
+the second onwards), while the same scenario succeeded on Bileto, Sqills,
+Turnit and Benerail. Root cause: the wizard generated passenger references
+in the form `PAX1`, `PAX2`, `PAX3`, ... but Paxone's `externalRef` validator
+enforces a stricter-than-OSDM shape and rejects anything that isn't numeric /
+zero-padded. OSDM v3.8 itself permits any non-null string
+(`AnonymousPassengerSpecification.externalRef`: `type: string`, no `pattern`),
+but the wizard was the only place in OSCAR that didn't use the 5-digit
+zero-padded shape already used by `Bruno_Collection/library-bruno/requestsBuilder.js`
+(lines 178 / 455 / 468). One-side inconsistency, one-side fix.
+
+**Bruno collection bumped (OTST_V2.0.45 → OTST_V2.0.46).** No data-file
+schema change — the schema accepts any non-empty string for the `reference`
+field on a passenger.
+
+### Fixed
+- `Oscar_Server/public/js/scenarios.js`: three sites that build passenger
+  references now produce `"00001"`, `"00002"`, … instead of `"PAX1"`,
+  `"PAX2"`, … :
+  - `wizGenPassengers()` (line ~4960) — initial generation for a new
+    scenario;
+  - the "add passenger" UI handler (line ~5393) — appending to an existing
+    passengersList;
+  - the re-indexer after a passenger is removed (line ~5549).
+
+### Tester action — pre-existing scenarios
+Scenarios authored **before** this release keep their old `PAX1`-style
+references in the data file. They continue to fail on Paxone until you
+either:
+
+1. **Re-author the scenario** in the wizard — the regenerated passenger
+   list uses the new format and overwrites the old refs.
+2. **Hand-edit the data file** — rename every `"PAXn"` occurrence to its
+   zero-padded equivalent (`PAX1 → "00001"`, `PAX2 → "00002"`, …). The
+   reference appears in three places per scenario:
+   - `passengersList[].passengers[].reference`
+   - `bookingPassengerReferences` (a flat array of strings)
+   - any echoed `externalRef` inside `offerPassengerSpecifications` /
+     `bookingPassengerSpecifications` if your data file was hand-edited
+     before to materialise those fields.
+
+Bileto, Sqills, Turnit, Benerail accept both formats and are unaffected
+by either choice.
+
+### Spec-side observation
+OSDM v3.8 declares `externalRef` as `type: string` with no `pattern`. Paxone
+enforces a tighter rule client-invisibly. Worth raising with the OSDM
+working group: either tighten the spec (so OSCAR can validate client-side
+and fail fast) or document Paxone's local rule in their connector notes.
+
+---
+
 ## [server-v1.11.97] — 2026-06-07
 
 **Hotfix #218.** The wizard's per-passenger / per-leg validation for partial
