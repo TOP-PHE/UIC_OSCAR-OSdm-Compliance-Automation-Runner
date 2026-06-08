@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.127",
+  "current_release": "2026.128",
   "releases": [
+    {
+      "release": "2026.128",
+      "date": "2026-06-08",
+      "server": "1.11.100",
+      "collection": "OTST_V2.0.48",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(wizard, UX): Non Happy Flow customisation section reorganised into two collapsible sub-groups with per-group badge counters. Sub-group 1 'Expiry timers' holds the six expired-X timer pairs that were already there (offer, booking, add-reservation, add-ancillary, refund-offer, exchange-offer). Sub-group 2 'Field-shape & payload probes' holds the requestedInformationProbe (MOVED out of SCENARIO PARAMETERS — the Tester Guide §4.8 always classified it as NHF; the wizard now matches) + the passengerExternalRefFormat probe (introduced in v1.11.99). Each sub-group auto-expands when anything inside it is armed; the top NHF section also auto-expands when total armed > 0. Badge style: amber pill 'N of M armed' when N>0, neutral grey when N=0 — same vocabulary the wizard already uses for the Test Framework pill counters.",
+        "Subtitle on the NHF section header broadened from 'expired-X negative tests — wait past a deadline, assert the provider rejects the next request' to 'negative tests and conformance probes' so the description no longer lies about what lives there.",
+        "No data-file schema change. No backend / runtime change. requestedInformationProbe field name unchanged — pre-existing scenarios behave identically; only the wizard's rendering location moved.",
+        "Bruno_Collection/VERSION OTST_V2.0.47 -> OTST_V2.0.48; server 1.11.99 -> 1.11.100. Manually authored data files don't need any migration."
+      ]
+    },
     {
       "release": "2026.127",
       "date": "2026-06-08",

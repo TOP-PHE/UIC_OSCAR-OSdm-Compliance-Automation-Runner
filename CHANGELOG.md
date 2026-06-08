@@ -14,6 +14,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.100] — 2026-06-08
+
+**Wizard UX — Non Happy Flow customisation reorganised.** Two new
+collapsible sub-groups inside the existing NHF section, each with a badge
+counter showing how many of its probes are currently armed:
+
+```
+▼ Non Happy Flow customisation        — N probes armed
+    ▶ ⏰ Expiry timers                  — N of 6 armed
+    ▶ 🪪 Field-shape & payload probes  — N of 2 armed
+```
+
+### Moved
+- `requestedInformationProbe` now renders in the **Field-shape & payload
+  probes** sub-group instead of the SCENARIO PARAMETERS panel. The
+  Tester Guide §4.8 always classified it as an NHF probe; the wizard now
+  matches. Field name unchanged — pre-existing scenarios behave
+  identically.
+
+### Added
+- Per-sub-group badge counters: amber pill *"N of M armed"* when N > 0,
+  neutral grey when N = 0. Same visual vocabulary as the Test Framework
+  pill counters elsewhere in the wizard.
+- Auto-expand behaviour — each sub-group opens automatically when
+  anything inside it is armed and stays collapsed otherwise. The top
+  NHF section follows the same rule based on the total. Manual toggles
+  are preserved across re-renders.
+
+### Changed
+- NHF section subtitle broadened from *"expired-X negative tests — wait
+  past a deadline, assert the provider rejects the next request"* to
+  *"negative tests and conformance probes"* so the description no longer
+  lies about what lives there.
+
+### Not changed (deliberately)
+- `bookingPurchaserMode` stays in SCENARIO PARAMETERS because it mixes
+  happy modes (`inline`, `deferred`) with NHF modes (`omit`, `invalid`).
+  Splitting one field across two sections would be worse than the small
+  inconsistency.
+- **Partial refund** stays in SCENARIO PARAMETERS — it's a scope
+  refinement of the refund request, not a probe. The `NHF_…_PARTIAL_REFUND`
+  prefix in scenario *names* comes from the expired-X test you arm on
+  top of it, not from partial refund itself.
+
+### Operator action
+None. No data-file schema change, no backend / runtime change. Pre-existing
+scenarios render identically (the moved probe field name is unchanged) and
+behave identically at run time.
+
+### Bumps
+- `Oscar_Server/package.json` 1.11.99 → 1.11.100
+- `Bruno_Collection/VERSION` OTST_V2.0.47 → OTST_V2.0.48
+- New compatibility row `release-2026.128`
+
+---
+
 ## [server-v1.11.99] — 2026-06-08
 
 **New NHF probe.** A multi-passenger SALE scenario can now arm the
