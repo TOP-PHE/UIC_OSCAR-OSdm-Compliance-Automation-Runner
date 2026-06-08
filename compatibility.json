@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.128",
+  "current_release": "2026.129",
   "releases": [
+    {
+      "release": "2026.129",
+      "date": "2026-06-08",
+      "server": "1.11.101",
+      "collection": "OTST_V2.0.49",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(wizard, UX): RequestedInfo Probe now matches the Passenger external-ref format probe's presentation — dashed-border box with an uppercase mini-header, the dropdown sized to its longest enum value, and the explanation as a full-width hint underneath. Previously it used buildSelect's grid layout, which cramped the multi-sentence hint into a narrow vertical strip next to the dropdown. Same data-action / data-field as before — runtime and save semantics unchanged. Pure CSS / markup change inside buildNonHappyFlowSection.",
+        "Bruno_Collection/VERSION OTST_V2.0.48 -> OTST_V2.0.49; server 1.11.100 -> 1.11.101. No data-file schema change, no backend change."
+      ]
+    },
     {
       "release": "2026.128",
       "date": "2026-06-08",

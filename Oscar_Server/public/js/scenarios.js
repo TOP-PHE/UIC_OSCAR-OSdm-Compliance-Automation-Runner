@@ -1616,10 +1616,35 @@ function buildNonHappyFlowSection(idx, sc) {
             <span class="ps-arrow${shapesOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${shapesOpenClass}" style="padding:10px 14px">
-            <div class="param-grid">
-              ${buildSelect(idx, 'requestedInformationProbe', 'RequestedInfo Probe', ENUMS.requestedInformationProbe,
-                'Negative test for OSDM requestedInformation. Off: auto-provide demanded fields (happy path). Omit / Invalid: deliberately withhold or send bad values, then assert the provider rejects with a conformant RFC-9457 Problem.')}
-            </div>
+            <!-- RequestedInfo probe — matched to the format-probe presentation:
+                 dashed-border box with an uppercase mini-header, the dropdown
+                 sized to its longest enum value, and the explanation as a
+                 full-width hint underneath. Drops the cramped param-grid
+                 label-column buildSelect produces so the long hint stops
+                 squeezing into a narrow vertical strip. Same data-action
+                 ('set-scenario') and data-field ('requestedInformationProbe')
+                 as before — runtime / save semantics unchanged. -->
+            ${(function buildRequestedInfoProbe() {
+              const sc = state.scenarios[idx] || {};
+              const current = sc.requestedInformationProbe;
+              const opts = ENUMS.requestedInformationProbe.map(o =>
+                `<option value="${esc(o == null ? '' : o)}" ${(current == null ? '' : current) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+              ).join('');
+              return `
+              <div style="padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">RequestedInfo probe</div>
+                <select class="param-input param-select" style="max-width:340px"
+                  data-action="set-scenario" data-idx="${esc(idx)}" data-field="requestedInformationProbe" data-nullable="true">
+                  ${opts}
+                </select>
+                <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">
+                  Negative test for OSDM <code>requestedInformation</code>.
+                  <strong>Off</strong>: auto-provide demanded fields (happy path).
+                  <strong>Omit</strong> / <strong>Invalid</strong>: deliberately withhold or send bad values,
+                  then assert the provider rejects with a conformant RFC-9457 <code>Problem</code>.
+                </div>
+              </div>`;
+            })()}
             <!-- Passenger external-ref format probe — non-timer NHF parameter.
                  Runtime applies the printf-style pattern to every passenger
                  reference sent to the provider; empty = default 00001-style. -->
