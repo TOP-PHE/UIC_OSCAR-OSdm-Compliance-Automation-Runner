@@ -733,6 +733,74 @@ function parseScenarioData(jsonData) {
         if (tripRequirement.id === scenario.tripRequirementId) {
           bru.setEnvVar("TripType", tripRequirement.tripType);
 
+          // #330 (v1.11.110): the SEARCH branch reads tripRequirement.trip.*
+          // and the SPECIFICATION branch reads tripRequirement.legs[*].* —
+          // without these the silent failure mode is that osdmTripSearchCriteria
+          // / osdmTripSpecification never get called and the downstream symptom
+          // is "Required scenario variable offerTripSearchCriteria is empty".
+          // Validate the shape BEFORE entering the branch so the user sees the
+          // precise data-shape gap instead of the downstream consequence.
+          // [DEBUG] dump of the actual structure is included for deeper
+          // investigation but stays invisible at default INFO logging level.
+          const _trCtx = 'tripRequirement #' + JSON.stringify(tripRequirement.id);
+          if (tripRequirement.tripType === "SEARCH") {
+            const _missing = [];
+            if (!tripRequirement.trip || typeof tripRequirement.trip !== 'object') {
+              _missing.push('trip (sub-object missing)');
+            } else {
+              if (!tripRequirement.trip.origin)        _missing.push('trip.origin');
+              if (!tripRequirement.trip.destination)   _missing.push('trip.destination');
+              if (!tripRequirement.trip.startDatetime) _missing.push('trip.startDatetime');
+            }
+            if (_missing.length > 0) {
+              validationLogger(
+                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+                ' has tripType=SEARCH but the .trip sub-object is missing required field(s): [' +
+                _missing.join(', ') + ']. The SEARCH branch needs origin / destination / startDatetime to build a TripSearchCriteria; offerTripSearchCriteria stays unset and the request body cannot be built. ' +
+                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete the SEARCH trip\'s origin, destination, and start datetime.'
+              );
+              validationLogger('[DEBUG] ' + _trCtx + '.trip dump = ' + JSON.stringify(tripRequirement.trip));
+              return true;  // stop iterating; the downstream parseEnvJson error will name the same problem.
+            }
+          } else if (tripRequirement.tripType === "SPECIFICATION") {
+            if (!Array.isArray(tripRequirement.legs) || tripRequirement.legs.length === 0) {
+              validationLogger(
+                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+                ' has tripType=SPECIFICATION but .legs[] is empty or missing. The SPECIFICATION branch needs at least one leg with origin / destination / startDatetime / endDatetime to build a TripSpecification; offerTripSpecifications stays unset and the request body cannot be built. ' +
+                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and add at least one leg.'
+              );
+              validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+              return true;
+            }
+            const _badLegs = [];
+            tripRequirement.legs.forEach(function (leg, i) {
+              const _m = [];
+              if (!leg || typeof leg !== 'object') { _badLegs.push({ index: i, missing: ['leg (not an object)'] }); return; }
+              if (!leg.origin)        _m.push('origin');
+              if (!leg.destination)   _m.push('destination');
+              if (!leg.startDatetime) _m.push('startDatetime');
+              if (!leg.endDatetime)   _m.push('endDatetime');
+              if (_m.length > 0) _badLegs.push({ index: i, missing: _m });
+            });
+            if (_badLegs.length > 0) {
+              const _summary = _badLegs.map(function (b) { return 'legs[' + b.index + '] missing [' + b.missing.join(', ') + ']'; }).join('; ');
+              validationLogger(
+                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+                ' has tripType=SPECIFICATION but ' + _badLegs.length + ' leg(s) are incomplete: ' + _summary + '. ' +
+                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete each leg\'s origin / destination / start+end datetimes.'
+              );
+              validationLogger('[DEBUG] ' + _trCtx + '.legs dump = ' + JSON.stringify(tripRequirement.legs));
+              return true;
+            }
+          }
+
+          // #330: wrap the switch so any unexpected throw inside the SEARCH /
+          // SPECIFICATION branches (e.g. subTripDate refusing the format, a
+          // deeper malformed sub-field the validators above didn't catch)
+          // surfaces with the tripRequirement context rather than propagating
+          // as an opaque "Cannot read property X of undefined" or
+          // "Invalid date format".
+          try {
           switch (tripRequirement.tripType) {
             case "SPECIFICATION":
               validationLogger('[INFO] ⏳ processing a specification');
@@ -799,6 +867,23 @@ function parseScenarioData(jsonData) {
                 )
               ], returnOptsFromScenario(scenario));
               break;
+          }
+          } catch (_branchErr) {
+            // #330 (v1.11.110): name the context so the user sees which
+            // tripRequirement and which branch failed instead of a bare
+            // "Cannot read property X of undefined" propagating up.
+            validationLogger(
+              '[ERROR] Scenario "' + scenario.code + '": building TripType=' +
+              tripRequirement.tripType + ' criteria for ' + _trCtx +
+              ' threw: ' + (_branchErr && _branchErr.message ? _branchErr.message : String(_branchErr)) +
+              '. offerTripSearchCriteria / offerTripSpecifications stays unset and the request body cannot be built. ' +
+              'Fix in the wizard: open Test Data → Trip Requirements, open this entry and verify the trip data is complete and dates parse correctly.'
+            );
+            validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+            // Don't rethrow — the downstream parseEnvJson error (with the
+            // v1.11.109 hint) is the actionable signal the user follows. We
+            // just want the named [ERROR] above to appear FIRST so the report
+            // surfaces the root cause before the consequence.
           }
           return true;
         }

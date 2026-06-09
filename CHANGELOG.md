@@ -14,6 +14,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.110] — 2026-06-09
+
+**Trip-branch validation in scenarioParser — silent failures inside
+the SEARCH / SPECIFICATION branches now surface as precise `[ERROR]`
+lines naming the missing data fields.** Resolves the second OBB
+onboarding case where the v1.11.109 upfront *unresolved
+tripRequirementId* `[ERROR]` didn't fire (because the id resolved)
+but the branch still left `offerTripSearchCriteria` unset because
+the `.trip` sub-object was missing required fields.
+
+### Context
+
+After v1.11.109 deployed, the new-user log showed:
+
+```
+[INFO] Build using TripType: SEARCH
+[02-Common Requests/01. POST Get Offer.yml] Pre-request script error:
+Error: [ERROR] Required scenario variable "offerTripSearchCriteria" is empty or not set.
+... Upstream resolver: scenarioParser.osdmTripSearchCriteria() ...
+```
+
+`TripType=SEARCH` was set, meaning `tripRequirement` WAS resolved
+(the v1.11.109 upfront `[ERROR]` correctly didn't fire — there was
+nothing to flag). The actual failure was downstream **inside** the
+SEARCH branch at `tripRequirement.trip.startDatetime` — the
+`.trip` sub-object was missing or incomplete in the OBB datafile,
+the branch threw on the first undefined access, the throw was
+swallowed silently, and `offerTripSearchCriteria` stayed unset.
+
+### Added
+
+- `Bruno_Collection/library-bruno/scenarioParser.js` — upfront
+  shape validation for each branch:
+  - **SEARCH**: verify `tripRequirement.trip` exists and has
+    `origin`, `destination`, `startDatetime`. Emit a precise
+    `[ERROR]` naming the missing field(s) if not:
+
+    > *"Scenario `OBB_SALE_1ADT_1LEG`: tripRequirement #1 has
+    > tripType=SEARCH but the .trip sub-object is missing
+    > required field(s): [trip.origin, trip.startDatetime]. The
+    > SEARCH branch needs origin / destination / startDatetime
+    > to build a TripSearchCriteria... Fix in the wizard: open
+    > Test Data → Trip Requirements, open this entry and complete
+    > the SEARCH trip's origin, destination, and start datetime."*
+
+  - **SPECIFICATION**: verify `tripRequirement.legs` is a
+    non-empty array and each leg has `origin`, `destination`,
+    `startDatetime`, `endDatetime`. Emit a precise `[ERROR]` per
+    incomplete leg.
+
+  - Both validators also emit a `[DEBUG]` dump of the actual
+    structure (`tripRequirement.trip` for SEARCH,
+    `tripRequirement.legs` for SPECIFICATION) so a Test Manager
+    can see the raw data without grepping the datafile. The
+    `[DEBUG]` line stays invisible at default `INFO` logging
+    level — it only appears when `loggingType=DEBUG` or `FULL`.
+
+- **Try/catch around the SEARCH/SPECIFICATION switch.** Any
+  unexpected throw inside the branches (e.g. `subTripDate`
+  refusing a date format, a malformed sub-field the validators
+  didn't catch) now surfaces with the tripRequirement context:
+
+  > *"Scenario `…`: building TripType=SEARCH criteria for
+  > tripRequirement #1 threw: Cannot read property '...' of
+  > undefined. offerTripSearchCriteria stays unset and the request
+  > body cannot be built. Fix in the wizard: open Test Data → Trip
+  > Requirements, open this entry and verify the trip data is
+  > complete and dates parse correctly."*
+
+  The catch does NOT rethrow — the downstream `parseEnvJson`
+  hint from v1.11.109 still fires after, but now the report
+  shows the **root cause** (`[ERROR]` line above) BEFORE the
+  **consequence** (`Required scenario variable
+  "offerTripSearchCriteria" is empty`).
+
+### Log-level policy used here
+
+| Type of log | Level | Visible at default INFO? |
+|---|---|---|
+| Fatal data gap (missing trip fields) | `[ERROR]` | ✅ |
+| Verbose structure dump for investigation | `[DEBUG]` | ❌ (DEBUG/FULL only) |
+| Normal happy-path status | `[INFO]` | ✅ |
+| Suspect but non-fatal | `[WARNING]` | ✅ (WARN/INFO/FULL) |
+
+This release follows the policy consistently: the new `[ERROR]`
+lines only fire when there's actually a data gap, and the verbose
+`[DEBUG]` structure dumps stay invisible at default logging level
+— so happy-path runs don't get hundreds of extra log lines.
+
+### Behaviour guarantees
+
+- All new log lines are advisory. No assertion contracts change.
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- `npm run lint` clean.
+- No data-file schema change. No backend behaviour change. No
+  wizard UI change.
+- Branches with complete data are unchanged — the validators only
+  early-return when they detect a gap.
+
+---
+
 ## [server-v1.11.109] — 2026-06-09
 
 **Precise new-user diagnostics — five log lines that turn opaque
