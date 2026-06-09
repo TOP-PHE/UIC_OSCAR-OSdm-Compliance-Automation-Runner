@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.142",
+  "current_release": "2026.143",
   "releases": [
+    {
+      "release": "2026.143",
+      "date": "2026-06-09",
+      "server": "1.11.115",
+      "collection": "OTST_V2.0.63",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): added the 'Partial refund is here' announcement to the welcome-page news carousel (Oscar_Server/public/news/index.json). Announces the #218 partial-refund capability shipped across v1.11.100–v1.11.106: the two combinable scope axes (per-leg via RefundSpecification.bookingPartIds with first/last/outbound/inbound targets; per-passenger via RefundSpecification.passengerIds with first/last targets), the OSDM v3.8 refundSpecifications[] wire format, the provider-modelling adaptation (Paxone one-fulfillment-per-passenger vs Bileto/Sqills one-per-booking), the scope-aware refundableAmount alignment assertion, the REFUND_PARTIAL framework-gating declaration, the graceful WARNING+full-refund degradation when the booking can't satisfy the requested scope, and the 21-test resolver coverage.",
+        "fix(JSON_SCHEMA_URL rollout — the v1.11.112 fix never reached running installs): a user run on 2026-06-09 still validated against the deprecated raw.githubusercontent.com/.../exch_dev/.../datafile.schema.json URL and produced the known false-positive \"Required field 'scenarios[N].offerSearchCriteriaListId' is missing\" cascade — AFTER release-2026.140 was deployed. Root cause is twofold. (1) The v1.11.112 change updated .env.example (template for NEW installs) and added the local schema route, but an existing VPS keeps its OSCAR_Deploy/.env untouched — the old URL stays until the operator edits it. (2) Our own remediation instruction — in the v1.11.112 [WARNING] text AND the installation guide — said 'docker compose restart oscar', which DOES NOT apply .env edits: env_file values are baked into a container at CREATE time; restart keeps the same container. (Watchtower image updates clone the old container's env too.) The only command that applies an edited .env is 'docker compose up -d oscar' (recreate on config change). Three fixes: validators.js [WARNING] now instructs 'docker compose up -d oscar — NOT restart' with the reason; installation-guide.md remediation block updated the same way plus a printenv verification step; the stale exch_dev URL example in the Server Admin Guide replaced with the local-route value.",
+        "feat(runner.js, JSON_SCHEMA_URL default): when JSON_SCHEMA_URL is unset, the runner now defaults to the self-served loopback route (http://127.0.0.1:<PORT>/json_validator/datafile.schema.json, PORT-aware) instead of writing an empty json_schema env var that failed every datafile validation with 'Missing env var json_schema'. Operators can now simply DELETE the line from .env (then 'docker compose up -d oscar') and get correct behaviour out of the box.",
+        "Bruno_Collection/VERSION OTST_V2.0.62 -> OTST_V2.0.63 (validators.js warning text); server 1.11.114 -> 1.11.115. No data-file schema change, no payload change, no assertion-behaviour change."
+      ]
+    },
     {
       "release": "2026.142",
       "date": "2026-06-09",

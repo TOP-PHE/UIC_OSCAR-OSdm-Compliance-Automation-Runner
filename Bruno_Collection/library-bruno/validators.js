@@ -298,12 +298,20 @@ function validateDataFileJsonWithTemplate(jsonData) {
         const _staleNote = _isExchDev
           ? 'The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). '
           : 'A GitHub-hosted schema URL is fragile (depends on the repo staying public and the branch / file path not moving). ';
+        // v1.11.115: the previous text said `docker compose restart oscar` —
+        // WRONG: `restart` keeps the existing container, and env_file values
+        // are baked in at container CREATE time, so an edited .env is never
+        // picked up. Only `docker compose up -d oscar` (recreate on config
+        // change) applies a new JSON_SCHEMA_URL. (Watchtower image updates
+        // clone the old container's env, so they don't pick it up either.)
         validationLogger(
           '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl + '). ' +
           _staleNote +
           'OSCAR_Server now bundles the schema and serves it locally — preferred value: ' +
           'http://127.0.0.1:3001/json_validator/datafile.schema.json. ' +
-          'Operator action on the VPS: edit OSCAR_Deploy/.env, set JSON_SCHEMA_URL to that URL, restart with "docker compose restart oscar".'
+          'Operator action on the VPS: edit OSCAR_Deploy/.env, set JSON_SCHEMA_URL to that URL, then apply with ' +
+          '"docker compose up -d oscar" — NOT "docker compose restart" (restart does not re-read .env; ' +
+          'env values are fixed when the container is created).'
         );
       }
     }
