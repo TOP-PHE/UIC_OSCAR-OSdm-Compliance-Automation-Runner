@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-v1.11.115] — 2026-06-09
 
-**News: partial-refund availability announced on the welcome page.**
+**News: partial-refund availability announced + JSON_SCHEMA_URL
+rollout fix (the v1.11.112 fix never reached running installs).**
 
 ### Added
 
@@ -31,11 +32,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   graceful degradation to full refund when the booking can't
   satisfy the requested scope.
 
+- **`JSON_SCHEMA_URL` now defaults to the self-served loopback
+  route** in `runner.js` (`http://127.0.0.1:<PORT>/json_validator/
+  datafile.schema.json`, PORT-aware). Previously an unset variable
+  produced an empty `json_schema` env var and every run failed
+  datafile validation with *"Missing env var json_schema"*.
+  Operators can now simply delete the line from `.env`.
+
+### Fixed
+
+- **The v1.11.112 schema-URL fix never reached running installs —
+  and our own remediation instruction was wrong.** A user run on
+  2026-06-09 still validated against the deprecated
+  `OSDM-testing/exch_dev` GitHub schema and produced the known
+  false-positive *"Required field 'scenarios[N].
+  offerSearchCriteriaListId' is missing"* cascade, **after**
+  release-2026.140 was deployed. Two compounding causes:
+  1. v1.11.112 changed `.env.example` — the template for NEW
+     installs. An existing VPS keeps its `OSCAR_Deploy/.env`
+     untouched, old URL included.
+  2. The remediation we shipped — in the run-log `[WARNING]` and
+     the installation guide — said `docker compose restart oscar`.
+     **`restart` does not apply `.env` edits**: `env_file` values
+     are baked into a container at *create* time; `restart` keeps
+     the same container. (Watchtower image updates clone the old
+     container's env too.) The only command that applies an edited
+     `.env` is `docker compose up -d oscar`.
+
+  Fixed in three places: the `validators.js` `[WARNING]` text now
+  instructs `up -d` (with the reason), the installation guide's
+  remediation block does the same and adds a `printenv`
+  verification step, and the stale `exch_dev` URL example in the
+  Server Admin Guide is replaced with the local-route value.
+
 ### Versions
 
 - `Oscar_Server/package.json` `1.11.114` → `1.11.115`
-- `compatibility.json` `release-2026.143` (collection unchanged
-  at `OTST_V2.0.62` — static content only, no code change)
+- `Bruno_Collection/VERSION` `OTST_V2.0.62` → `OTST_V2.0.63`
+- `compatibility.json` `release-2026.143`
 
 ---
 

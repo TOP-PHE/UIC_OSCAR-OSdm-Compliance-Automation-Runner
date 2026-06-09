@@ -39,7 +39,14 @@ const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-
 // ── Config ────────────────────────────────────────────────────────────────────
 const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
 const BRU_CMD         = process.env.BRU_CMD || 'bru.cmd';
-const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL || '';
+// v1.11.115: default to the schema OSCAR serves itself (loopback — Bruno
+// runs inside the same container as the server). Previously an unset
+// JSON_SCHEMA_URL produced an empty json_schema env var and every run
+// failed datafile validation with "Missing env var json_schema". The
+// loopback route exists since v1.11.112 and always matches the running
+// collection, so it is the correct out-of-the-box value.
+const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL ||
+  `http://127.0.0.1:${process.env.PORT || 3001}/json_validator/datafile.schema.json`;
 const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');
 const ENVS_DIR        = path.join(COLLECTION_PATH, 'environments');
 const WORKSPACES_DIR  = path.resolve(__dirname, '../../data/workspaces');
