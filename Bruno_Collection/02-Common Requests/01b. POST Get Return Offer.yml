@@ -42,7 +42,7 @@ runtime:
         // into another return fetch.
         bru.setEnvVar('__returnInboundDone', 'true');
 
-        bruTest(`Status code is 200`, () => {
+        bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
         });
 

@@ -14,6 +14,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.108] — 2026-06-09
+
+**Three assertion wording / semantic fixes surfaced by a tester
+walking through a real Paxone REFUND run.** All in `refunds.js` +
+a sweep across 17 `.yml` files. No data-file schema change, no
+backend change, no wizard UI change.
+
+### Fixed
+
+- **`AppliedOverruleCode is null as expected` ✗ false-positive
+  when provider OMITS the field.** Paxone responds with the
+  `appliedOverruleCode` field absent from the JSON body (so chai
+  sees `undefined`); the test expects `null`. Both omitted-field
+  and explicit-null are valid OSDM responses meaning the same
+  thing — *"no overrule applied"*. `validateRefundAppliedOverruleCode`
+  in `Bruno_Collection/library-bruno/refunds.js` now normalises
+  `undefined → null` before the chai equality check. The
+  assertion title also annotates which form the provider returned
+  so the report reader sees it explicitly:
+
+  > `AppliedOverruleCode is null as expected (actual: undefined → treated as null)`
+
+- **`Refund offer[N] refundFee exists and is valid, amount: 0,
+  currency: EUR` wording confused readers.** *"exists and is
+  valid"* sounded like an economic claim about the fee, but per
+  OSDM (`RefundOffer.refundFee: "Amount kept by the carrier and/or
+  distributor"`) the assertion is structural — the Price object
+  must be present even when amount=0 (no retention). Rephrased to
+  name the structural check explicitly and annotate amount=0 vs
+  amount>0 with the OSDM semantic:
+
+  > `Refund offer[0] refundFee Price structure is well-formed — amount: 0 EUR (= no carrier retention), scale: 2`
+
+  or, for non-zero:
+
+  > `Refund offer[0] refundFee Price structure is well-formed — amount: 1000 EUR (= kept by carrier per OSDM), scale: 2`
+
+- **`Status code is 200 ✗ expected 405 to deeply equal 200`
+  misleading test name.** The historical title *"Status code is
+  200"* asserted "200" as if it were a claim about the actual
+  response, which read poorly when the response was 405. Renamed
+  to a self-documenting dynamic name that names both expected
+  and actual in the title:
+
+  > `HTTP response status — expected 200, actual: ${res.getStatus()}`
+
+  Swept across 17 `.yml` files (main test + the throw-on-failure
+  branch). Two patterns deliberately left unchanged:
+  `bruTest("Status code is 200 — STOP on failure", ...)` (the
+  suffix already self-documents) and
+  `test('Status code is 200 or 202', ...)` (different assertion,
+  not a "must be 200" claim).
+
+### Behaviour guarantees
+
+- The chai comparisons themselves are unchanged — these are
+  wording / normalisation fixes only.
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- `npm run lint` clean.
+
+---
+
 ## [server-v1.11.107] — 2026-06-09
 
 **Tester ergonomics — request timestamp logging + Copy/Download

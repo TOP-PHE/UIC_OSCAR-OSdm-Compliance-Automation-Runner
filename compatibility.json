@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.135",
+  "current_release": "2026.136",
   "releases": [
+    {
+      "release": "2026.136",
+      "date": "2026-06-09",
+      "server": "1.11.108",
+      "collection": "OTST_V2.0.56",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(refunds, semantic): `AppliedOverruleCode is null as expected` was firing as a false-positive failure when the provider OMITS the appliedOverruleCode field from the JSON response (so chai sees undefined while the test expects null). Both omitted-field and explicit-null are valid OSDM responses meaning the same thing — 'no overrule applied'. validateRefundAppliedOverruleCode in `Bruno_Collection/library-bruno/refunds.js` now normalises undefined -> null before the chai equality check. The assertion title also annotates which form the provider returned so the report reader sees it explicitly: 'AppliedOverruleCode is null as expected (actual: undefined -> treated as null)'.",
+        "fix(refunds, clarity): the `Refund offer[N] refundFee exists and is valid, amount: 0, currency: EUR` wording was confusing — 'exists and is valid' sounded like an economic claim about the fee, but per OSDM (RefundOffer.refundFee: 'Amount kept by the carrier and/or distributor') the assertion is structural — the Price object must be present even when amount=0 (no retention). Rephrased to name the structural check explicitly and annotate amount=0 vs amount>0 with the OSDM semantic: 'Refund offer[0] refundFee Price structure is well-formed — amount: 0 EUR (= no carrier retention), scale: 2' for zero; '... amount: 1000 EUR (= kept by carrier per OSDM), scale: 2' for non-zero.",
+        "fix(http assertions, clarity): the `Status code is 200` test name was misleading when the response was NOT 200 — the title asserted '200' as if it were a claim ('Status code is 200 ✗ expected 405 to deeply equal 200'). Renamed to a self-documenting dynamic name `HTTP response status — expected 200, actual: ${res.getStatus()}` so the reader immediately sees both expected and actual in the test name. Sweep across 17 .yml files (main test + the throw-on-failure branch). Two patterns deliberately left: `bruTest('Status code is 200 — STOP on failure', ...)` (the suffix already self-documents) and `test('Status code is 200 or 202', ...)` (different assertion).",
+        "Bruno_Collection/VERSION OTST_V2.0.55 -> OTST_V2.0.56; server 1.11.107 -> 1.11.108. No data-file schema change, no backend change, no wizard UI change. 21 partial-refund + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.135",
       "date": "2026-06-09",
