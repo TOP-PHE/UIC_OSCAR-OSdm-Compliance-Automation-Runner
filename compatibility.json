@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.142",
+  "current_release": "2026.143",
   "releases": [
+    {
+      "release": "2026.143",
+      "date": "2026-06-09",
+      "server": "1.11.115",
+      "collection": "OTST_V2.0.62",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): added the 'Partial refund is here' announcement to the welcome-page news carousel (Oscar_Server/public/news/index.json). Announces the #218 partial-refund capability shipped across v1.11.100–v1.11.106: the two combinable scope axes (per-leg via RefundSpecification.bookingPartIds with first/last/outbound/inbound targets; per-passenger via RefundSpecification.passengerIds with first/last targets), the OSDM v3.8 refundSpecifications[] wire format, the provider-modelling adaptation (Paxone one-fulfillment-per-passenger vs Bileto/Sqills one-per-booking), the scope-aware refundableAmount alignment assertion, the REFUND_PARTIAL framework-gating declaration, the graceful WARNING+full-refund degradation when the booking can't satisfy the requested scope, and the 21-test resolver coverage. Static content only — no code change, no behaviour change, no schema change. Server 1.11.114 -> 1.11.115; collection unchanged at OTST_V2.0.62."
+      ]
+    },
     {
       "release": "2026.142",
       "date": "2026-06-09",

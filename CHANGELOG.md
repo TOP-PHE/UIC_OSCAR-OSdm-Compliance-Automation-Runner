@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.115] — 2026-06-09
+
+**News: partial-refund availability announced on the welcome page.**
+
+### Added
+
+- **"Partial refund is here" news item** in the welcome-page
+  carousel ([index.json](Oscar_Server/public/news/index.json)).
+  Announces the #218 partial-refund capability to OSCAR users:
+  the two combinable scope axes (per-leg / per-passenger), the
+  OSDM v3.8 `refundSpecifications[]` wire format, provider-
+  modelling adaptation (Paxone vs Bileto/Sqills fulfillment
+  shapes), the scope-aware refund-amount alignment assertion,
+  the `REFUND_PARTIAL` framework-gating declaration, and the
+  graceful degradation to full refund when the booking can't
+  satisfy the requested scope.
+
+### Versions
+
+- `Oscar_Server/package.json` `1.11.114` → `1.11.115`
+- `compatibility.json` `release-2026.143` (collection unchanged
+  at `OTST_V2.0.62` — static content only, no code change)
+
+---
+
 ## [server-v1.11.114] — 2026-06-09
 
 **Refund/booking assertion-message clarity.** User feedback on the
