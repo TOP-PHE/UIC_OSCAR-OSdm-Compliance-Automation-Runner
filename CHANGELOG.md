@@ -14,6 +14,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.111] — 2026-06-09
+
+**`loggingType=DEBUG` was BACKWARDS — it dropped `[ERROR]` and
+`[WARN]` instead of showing more detail than `INFO`.** Surfaced
+exactly the case the v1.11.110 trip-branch diagnostics were
+designed for: the OBB user switched to DEBUG to see more, and
+the new `[ERROR]` lines vanished.
+
+### Fixed
+
+- `Bruno_Collection/library-bruno/displays.js` — `validationLogger`'s
+  `case "DEBUG"` was passing only `[DEBUG]` and `[INFO]` messages
+  and silently dropping `[WARN]` / `[WARNING]` / `[ERROR]`. A Test
+  Manager setting `loggingType=DEBUG` (expecting MORE detail than
+  INFO) actually saw FEWER critical lines than the default. Now
+  matches the standard logging pyramid:
+
+| Level | Shown when `loggingType=` |
+|---|---|
+| `[ERROR]` | ERROR · WARN · INFO · DEBUG · FULL |
+| `[WARN]` / `[WARNING]` | WARN · INFO · DEBUG · FULL |
+| `[INFO]` | INFO · DEBUG · FULL |
+| `[DEBUG]` | DEBUG · FULL |
+| Untagged | FULL only |
+
+DEBUG is now the most verbose tagged-only level. FULL still picks
+up untagged messages too (unchanged). INFO, WARN, ERROR cases
+unchanged.
+
+### Why this matters
+
+After v1.11.110 deployed, the OBB user switched their scenario's
+`loggingType` to DEBUG to see more detail about why
+`offerTripSearchCriteria` was empty. The new trip-branch
+`[ERROR]` lines we shipped in v1.11.110 became INVISIBLE at
+DEBUG level because of this bug — defeating the whole point of
+the v1.11.110 diagnostics. After v1.11.111:
+
+- At default `INFO` level: trip-branch `[ERROR]` shows (unchanged)
+- At `DEBUG` level: trip-branch `[ERROR]` shows AND the `[DEBUG]`
+  structure dumps show — Test Manager has the complete picture
+- The `[DEBUG]` structure dumps still don't pollute INFO-level
+  reports (this is the property your "don't add hundreds of INFO
+  logs" concern was about — preserved)
+
+### Behaviour guarantees
+
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- `npm run lint` clean.
+- No data-file schema change. No backend behaviour change. No
+  wizard UI change.
+- All other log levels (FULL, INFO, WARN, ERROR) unchanged.
+
+---
+
 ## [server-v1.11.110] — 2026-06-09
 
 **Trip-branch validation in scenarioParser — silent failures inside

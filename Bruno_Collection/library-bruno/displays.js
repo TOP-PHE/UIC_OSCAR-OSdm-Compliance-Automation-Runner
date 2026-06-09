@@ -80,7 +80,21 @@ function validationLogger(message) {
       }
       break;
     case "DEBUG":
-      if (message.includes("[DEBUG]") || message.includes("[INFO]")) {
+      // v1.11.111 fix: DEBUG is the MOST verbose level — it must include
+      // every less-verbose level too (the standard logging pyramid). Before
+      // this fix DEBUG passed only [DEBUG] and [INFO] but DROPPED [WARN] /
+      // [WARNING] / [ERROR], so a Test Manager who set loggingType=DEBUG
+      // (expecting MORE detail) actually saw FEWER critical lines than at
+      // the default INFO level — including the v1.11.110 trip-branch
+      // diagnostic [ERROR] lines, which is the exact case that surfaced
+      // this bug.
+      if (
+        message.includes("[DEBUG]")   ||
+        message.includes("[INFO]")    ||
+        message.includes("[WARN]")    ||
+        message.includes("[WARNING]") ||
+        message.includes("[ERROR]")
+      ) {
         shouldLog = true;
       }
       break;
