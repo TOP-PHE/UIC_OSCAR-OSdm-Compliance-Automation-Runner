@@ -37,7 +37,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         // #258 PASSENGER NEGATIVE SWEEP — gated strictly to requestedInformationProbe
         // === 'invalid'. Tests each passenger field ONE AT A TIME on passenger 0: a

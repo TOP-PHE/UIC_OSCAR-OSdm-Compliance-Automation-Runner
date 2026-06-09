@@ -22,7 +22,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         // #204 EXPIRED-BOOKING TEST: when armed, wait until just past the booking's
         // confirmation deadline, THEN let the fulfillment fire — the after-response

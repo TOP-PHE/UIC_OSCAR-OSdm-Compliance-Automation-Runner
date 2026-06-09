@@ -31,7 +31,7 @@ runtime:
       code: |-
         const { requestExchangeOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
 
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         requestExchangeOffersBody(bru.getEnvVar("overruleCode"));
     - type: after-response

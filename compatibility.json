@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.134",
+  "current_release": "2026.135",
   "releases": [
+    {
+      "release": "2026.135",
+      "date": "2026-06-09",
+      "server": "1.11.107",
+      "collection": "OTST_V2.0.55",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#324, tester ergonomics): every Bruno step now logs a millisecond-precision UTC timestamp on start, with a Europe/Paris local-time annotation. Previously each step printed `⏩ [STEP] Executing request : <name>` with no wall-clock — testers correlating an OSCAR run with provider-side logs (Paxone, Bileto, …) had to do that math from the run start time + cumulative durations. Now the step-start line reads: `⏩ [STEP] [2026-06-09T07:23:26.087Z (= 2026-06-09 09:23:26.087 Europe/Paris)] Executing request : 10. POST Refund Offers`. Implemented as a single `logStepStart(req)` helper in `Bruno_Collection/library-bruno/displays.js` (matches the same Europe/Paris timestamp pattern shipped for refund-offer createdOn/validFrom/validUntil in v1.11.106). Swept across all 30 .yml files that previously hardcoded the console.log line. The bracketed prefix sits AFTER the existing `⏩ [STEP]` marker so any downstream tool matching on that marker still finds the line.",
+        "feat(#325, tester ergonomics): Copy + Download buttons on every request and response body in both the live dashboard (run-detail.html) AND the Open Report (report-builder.html). The dashboard previously showed the body in a 360px-tall scrollable box with no per-message Copy or Download, forcing testers to switch to the Open Report and select-all-and-copy manually. Now: (1) the dashboard renderMessage() emits Copy / Download / ⌄ Expand buttons next to the existing Raw/Tree toggle; Copy puts the body on the clipboard, Download saves a self-named JSON file, Expand removes the 360px scroll cap in place; (2) the Open Report's existing Copy button gains a sibling Download button using the same filename pattern. Filename: `${scenarioCode}_${stepName}_${kind}.json` with non-filesystem-safe characters (\\ / : * ? \" < > | whitespace) collapsed to underscores so files move cleanly between Windows, macOS, and Linux. A file downloaded from either view (dashboard vs Open Report) has the same name. The 100 KB server-side MAX_BODY_SIZE cap behaviour is unchanged (separate config knob via MAX_BODY_SIZE env var); when a body hits that cap the truncation marker `[truncated NNN bytes]` is visible in the copy/download too, so testers see the truncation explicitly.",
+        "Bruno_Collection/VERSION OTST_V2.0.54 -> OTST_V2.0.55; server 1.11.106 -> 1.11.107. No data-file schema change, no backend behaviour change, no wizard UI change. Resolves issues #324 and #325. 21 partial-refund + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.134",
       "date": "2026-06-09",

@@ -1481,7 +1481,10 @@ document.getElementById('http-content').addEventListener('click', function(e) {
     if (tab) switchHttpTab(tab);
     // or copy
     var cpy = e.target.closest('[data-copy-target]');
-    if (cpy) copyJsonContent(cpy);
+    if (cpy) { copyJsonContent(cpy); return; }
+    // #325: or download
+    var dnl = e.target.closest('[data-download-target]');
+    if (dnl) { downloadJsonContent(dnl); return; }
     return;
   }
   toggleHttpRow(row);
@@ -1567,13 +1570,23 @@ function renderHttpTabBody(r, kind) {
   try { parsed = JSON.parse(raw); } catch (_e) { isJson = false; }
 
   var copyId = 'http-raw-' + r.id + '-' + kind;
+  // #325: tester-ergonomics — Download button next to Copy. Filename built
+  // from the same context used in the run-detail dashboard so files moved
+  // between the two views match.
+  var scenarioForName = r.scenario_code || r.scenario_name || r.suite_name || '';
+  var stepForName     = r.request_name || '';
   var copyBtn = '<button class="copy-btn" data-copy-target="' + copyId + '">Copy</button>';
+  var downloadBtn = '<button class="copy-btn" data-download-target="' + copyId + '"'
+    + ' data-download-scenario="' + escAttr(scenarioForName) + '"'
+    + ' data-download-step="' + escAttr(stepForName) + '"'
+    + ' data-download-kind="' + escAttr(kind) + '">Download</button>';
+  var actionsBtn = copyBtn + downloadBtn;
 
   if (isJson) {
-    return copyBtn
+    return actionsBtn
       + '<div class="json-tree" id="' + copyId + '" data-raw="' + escAttr(raw) + '">' + renderJsonNode(parsed, '', true) + '</div>';
   }
-  return copyBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
+  return actionsBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
 }
 
 function renderHeaders(jsonStr) {
@@ -1665,6 +1678,41 @@ function copyJsonContent(btn) {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
   });
+}
+
+// #325: tester-ergonomics — Download a request/response body as a JSON file.
+// Filename pattern: ${scenario}_${step}_${kind}.json with non-FS-safe chars
+// collapsed to underscores so the file moves cleanly between Windows, macOS,
+// and Linux. Matches the pattern used by the run-detail dashboard so a
+// downloaded file from either view has the same name.
+function _rbSanitiseFilename(s) {
+  return String(s == null ? '' : s)
+    .replace(/[\\\/:*?"<>|\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+function downloadJsonContent(btn) {
+  var targetId = btn.getAttribute('data-download-target');
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  var text = el.getAttribute('data-raw') || el.textContent || '';
+  if (!text) return;
+  var scenario = btn.getAttribute('data-download-scenario') || '';
+  var step     = btn.getAttribute('data-download-step')     || '';
+  var kind     = btn.getAttribute('data-download-kind')     || 'response';
+  var filename = [
+    _rbSanitiseFilename(scenario) || 'oscar',
+    _rbSanitiseFilename(step)     || 'request',
+    kind
+  ].join('_') + '.json';
+  var blob = new Blob([text], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+  btn.textContent = '✓ Downloaded';
+  setTimeout(function() { btn.textContent = 'Download'; }, 1400);
 }
 
 function escAttr(s) { return escHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }

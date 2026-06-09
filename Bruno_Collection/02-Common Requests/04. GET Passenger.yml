@@ -19,7 +19,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         const totalPassengers = bru.getEnvVar("offerPassengerNumber") || 0;
         const currentIndex    = bru.getEnvVar("currentPassengerIndex") || 0;

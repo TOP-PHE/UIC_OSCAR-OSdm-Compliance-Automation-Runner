@@ -25,7 +25,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         // #expired-refund-offer test (Phase 3): when armed, wait until just past
         // the refundOffers[0].validUntil (stashed by refunds.js

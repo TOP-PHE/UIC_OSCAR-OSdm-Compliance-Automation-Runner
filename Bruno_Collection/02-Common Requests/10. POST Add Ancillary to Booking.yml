@@ -33,7 +33,7 @@ runtime:
         // (salesFlow_addAncillary) AND the offer carried ancillary parts;
         // otherwise the smart run filter skips it.
         const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
         bru.setVar('addAncillaryResource', useOfferParts ? 'offer-parts' : 'ancillaries');

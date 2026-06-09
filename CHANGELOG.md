@@ -14,6 +14,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.107] — 2026-06-09
+
+**Tester ergonomics — request timestamp logging + Copy/Download
+buttons on JSON bodies in both report views.** Two pieces of
+feedback from a tester, bundled into one PR. Resolves
+[#324](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/324)
+and [#325](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/325).
+
+### Added
+
+- **#324 — request start timestamp on every step.** A new
+  `logStepStart(req)` helper in
+  `Bruno_Collection/library-bruno/displays.js` prints a
+  millisecond-precision UTC timestamp + Europe/Paris local-time
+  annotation:
+
+  ```
+  ⏩ [STEP] [2026-06-09T07:23:26.087Z (= 2026-06-09 09:23:26.087 Europe/Paris)] Executing request : 10. POST Refund Offers
+  ```
+
+  Swept across all 30 `.yml` files that previously hardcoded
+  `console.log("⏩ [STEP] Executing request : " + req.getName())`.
+  The bracketed prefix sits after the existing `⏩ [STEP]` marker
+  so any tool matching on that marker still finds the line. Same
+  timestamp pattern as the refund-offer `createdOn / validFrom /
+  validUntil` annotations shipped in v1.11.106.
+
+  Why this matters: testers correlating an OSCAR run with provider-
+  side logs (Paxone, Bileto, …) previously had to compute the
+  request wall-clock from run start time + cumulative durations.
+  Now it's right there next to the step.
+
+- **#325 — per-message Copy + Download buttons.**
+
+  - **Dashboard** (`Oscar_Server/public/run-detail.html`): each
+    request and response body in the HTTP Traffic section now has
+    Copy / Download / ⌄ Expand buttons in the message header (next
+    to the existing Raw/Tree toggle). Copy puts the body on the
+    clipboard; Download saves it as a self-named JSON file;
+    Expand removes the 360px scroll-cap in place so the full body
+    is readable without leaving the dashboard.
+  - **Open Report** (`Oscar_Server/public/report-builder.html`):
+    the existing Copy button gains a sibling Download button using
+    the same filename pattern.
+
+  Filename pattern:
+  `${scenarioCode}_${stepName}_${kind}.json` with non-FS-safe
+  characters (`\ / : * ? " < > |` + whitespace) collapsed to
+  underscores. A file downloaded from either view has the same
+  name, so they can be reconciled without renaming.
+
+### Behaviour guarantees
+
+- The dashboard 360px scroll-box (`.msg-pre max-height`) was a
+  display constraint, not data truncation. The full body was
+  always in the DOM. The Expand toggle just lifts the CSS cap.
+- The 100 KB server-side `MAX_BODY_SIZE` cap behaviour is
+  unchanged (separate config knob via `MAX_BODY_SIZE` env var).
+  When a body hits that cap, the truncation marker
+  `[truncated NNN bytes]` appears in the copy/download too — the
+  tester sees the truncation explicitly.
+- No data-file schema change. No backend behaviour change. No
+  wizard UI change. 21 partial-refund + 26 framework-gating
+  unit tests still pass.
+
+---
+
 ## [server-v1.11.106] — 2026-06-09
 
 **Refund assertion semantics corrected — OSCAR no longer asserts a
