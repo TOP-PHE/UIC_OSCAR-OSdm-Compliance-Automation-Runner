@@ -1,8 +1,28 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.141",
+  "current_release": "2026.142",
   "releases": [
+    {
+      "release": "2026.142",
+      "date": "2026-06-09",
+      "server": "1.11.114",
+      "collection": "OTST_V2.0.62",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#336, refund/booking assertion clarity): 10 small fixes across Bruno_Collection/library-bruno/bookings.js + refunds.js that together make refund-flow test failures decodable in the dashboard. User feedback: \"those failed messages on Refund Offer are quite difficult to decode for me\" — many failures were either misleading (titles preformatted unrelated fields' values as if everything passed), noisy (one provider gap cascading into 18+ near-duplicate failures), or pointing the operator at the wrong root cause.",
+        "fix(#336, bookings.js cascade-kill on afterSalesConditions): validateAfterSalesConditions used to fire one parent 'exist in both' test AND THEN unconditionally iterate offerConditions.forEach() emitting one child 'REFUND exists in booking' test per offered condition — so when the booking response was missing afterSalesConditions entirely, a 3-admission+3-reservation×2-conditions-each offer produced 18 failures from a single root cause. Now: when bookedConditions is empty, emit ONE explicit parent failure naming the root cause (offer declared N condition(s) [REFUND,REFUND,...] — booking returned 0; per-condition checks SKIPPED to avoid duplicate cascading failures) and early-return before the forEach.",
+        "fix(#336, bookings.js FulfillmentStatus enum was stale): bookings.js:698 enum did not include FULFILLED, so every FULFILLED fulfillment under a v3.8 booking failed the D1 enum check — even though our own fulfillments.js:144-146 lists FULFILLED as expected. Added FULFILLED. Also: the enum-check error message now NAMES the full valid list ('Valid OSDM values: [AVAILABLE,USED,...,FULFILLED].') so the reader doesn't have to grep the source to find allowable values.",
+        "fix(#336, bookings.js fulfillmentStatus null guard): the v3.8 fulfillmentStatus optional field was guarded by `!== undefined`, which let the JSON-literal-null case through and stringified it into a nonsense test title like `'null' is a valid FulfillmentSummaryStatus`. Changed to `!= null` so both null AND undefined are treated as 'absent' (which is the v3.8 spec semantic). Skip-INFO message updated to acknowledge either source. Same valid-list naming added to the error message as the FulfillmentStatus fix above.",
+        "fix(#336, bookings.js fulfillmentDocumentRefs unresolved): the #253/#336 v3.8 cross-check failure message correctly named the unresolved ref UUIDs and the sibling-id pool, but didn't spell out the root cause. Added a plain-language one-liner: 'Provider emits both fulfillmentDocumentRefs[] AND a sibling fulfillmentDocuments[] list, but the UUIDs don't reconcile — the refs and the docs are independently generated instead of linked.' Same payload, dramatically clearer report.",
+        "fix(#336, bookings.js price-field expect context): the 'Price fields exist (currency, scale) in provisionalPrice and confirmedPrice' assertion's expect() calls now include the actual JSON value of the field that was missing — 'provisionalPrice.scale missing in booking (got: undefined)' is self-explaining; the prior bare 'provisionalPrice.scale missing' left the reader unsure whether it was null, undefined, or a wrong type.",
+        "fix(#336, bookings.js BookingPartStatus error message): consistency with the FulfillmentStatus fix — the BookingPartStatus enum error now also names the valid list.",
+        "fix(#336, refunds.js validFrom/validUntil date guards): `new Date(null)` returns epoch 0 (1970-01-01), not Invalid Date — so the `!isNaN(getTime())` guards in refunds.js let JSON null through. The test then fired with an empty title and failed at `expect(refundOffer.validFrom).to.exist`, leaving 'expected null to exist' as the only breadcrumb. Replaced the parseable-date check with a _toDate helper that only attempts new Date() on non-null strings, and a new _checkDatePresent helper that emits an explicit, self-explaining ABSENT-vs-MALFORMED failure when the field doesn't pass. Applied to createdOn, validFrom, validUntil. Plus added context strings to the createdOn-in-the-past, validUntil-future, and validUntil-15min-window assertions so each failure names what specifically went wrong.",
+        "fix(#336, refunds.js refundableAmount/refundFee title built from shape, not happy-path): the test titles used to preformat 'amount: 0, currency: CZK' even when scale was missing — so failures looked like everything passed up to a mystery 'expected undefined to be a number'. Rewrote the label-builder _priceShape() to report each sub-field as either 'amount=0' (if valid) or 'amount=MISSING(got null)' (if not) — the broken sub-field now shows in the test title even when other fields look fine. Plus per-field expect() context strings naming exactly which OSDM Price sub-field failed and why ('refundableAmount.scale is not a number (OSDM Price.scale: required integer, typically 0)').",
+        "Bruno_Collection/VERSION OTST_V2.0.61 -> OTST_V2.0.62; server 1.11.113 -> 1.11.114. 21 partial-refund + 26 framework-gating unit tests still pass. No data-file schema change. No payload / wire-format change. Passing scenarios are unaffected — only failure-message text and one cascade structure changed."
+      ]
+    },
     {
       "release": "2026.141",
       "date": "2026-06-09",
