@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.144",
+  "current_release": "2026.145",
   "releases": [
+    {
+      "release": "2026.145",
+      "date": "2026-06-10",
+      "server": "1.11.117",
+      "collection": "OTST_V2.0.63",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(run_events.ts, milliseconds never stored): the v1.11.113 dashboard change (slice(11,23) on the timestamp) claimed to 'unhide' millisecond precision — but the run_events.ts column was populated by its SQLite schema default datetime('now'), which is SECOND-precision ('2026-06-09 21:25:16'). There were no milliseconds to unhide; the user kept seeing [21:25:16] even on release-2026.144. Fix: logEvent() in Oscar_Server/src/worker/runner.js now passes ts explicitly as new Date().toISOString() ('2026-06-10T07:42:13.123Z') on both INSERT sites (regular event + cap-reached warning). Same UTC storage convention as everywhere else; the dashboard slice(11,23) now yields 'HH:MM:SS.mmm' as designed. Pre-existing rows keep the second-precision format and degrade gracefully (slice shows 'HH:MM:SS'). All run_events consumers paginate/order by the autoincrement id, never by ts string comparison, so mixed formats are safe. No schema migration needed — the column is TEXT; the DEFAULT stays as a fallback.",
+        "fix(run-detail log truncated at ~500 lines — 'log stops before the offer request'): a FAILED Bileto run (709 assertions, 21 HTTP requests — the full offer/booking/refund flow executed) showed an execution log that ended mid-system-infos. Root cause: the GET /v1/runs/:id/logs endpoint caps each fetch at 500 rows (LIMIT 500 with a since_id cursor), and run-detail.html stopped polling the moment the run reported a terminal status (COMPLETED/FAILED/CANCELLED) — so opening a finished run fetched exactly ONE page and stranded everything behind the cursor. The run never stopped; the log VIEW did. Fix in three parts: (1) the logs endpoint now returns has_more (rows hit the SQL limit → backlog continues); (2) the dashboard poll loop drains the backlog with immediate 50ms follow-up fetches while has_more (length>=500 fallback), and only then lets the terminal status end the loop; (3) the terminal-status side-effects (artifacts/assertions/requests loads, delete + share buttons) are guarded by a terminalHandled flag so the extra drain iterations don't re-fire them. Verified in a browser harness against a stubbed 1250-event FAILED-run backlog: 1250/1250 lines rendered across 3 pages, side-effect loaders called exactly once, polling stopped cleanly after the drain.",
+        "Server 1.11.116 -> 1.11.117; collection unchanged at OTST_V2.0.63 (server-only change). No payload change, no behaviour change beyond timestamp precision and complete log display."
+      ]
+    },
     {
       "release": "2026.144",
       "date": "2026-06-09",
