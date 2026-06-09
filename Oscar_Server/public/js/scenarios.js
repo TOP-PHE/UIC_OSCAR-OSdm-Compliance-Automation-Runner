@@ -171,6 +171,37 @@ function fwSupportsIrops(scenarioType) {
   return flows.includes(String(scenarioType).toUpperCase() + '_IROPS');
 }
 
+// Does the framework declare partial refund/exchange support? (#218 v1.11.105)
+// The "golden rule" check: a scenario must not arm partialRefundBy{Leg,Pax}
+// or partialExchangeBy{Leg,Pax} unless the framework declares the matching
+// flow in salesFlows[] (REFUND_PARTIAL / EXCHANGE_PARTIAL).
+function fwDeclaresPartialRefund(scenarioType) {
+  if (!scenarioType || scenarioType === 'SALE') return false;
+  const fw = (wizData && wizData.framework) || {};
+  const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
+  return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
+}
+
+// Count of scenarios in the current datafile whose armed feature is not
+// declared in the framework — used by the top-of-scenarios banner.
+// Kept in sync with Oscar_Server/src/utils/frameworkGating.js scenarioWarnings()
+// (the server-side authority). Add new field/flow pairs as features land.
+function fwUndeclaredArmedCount() {
+  const scenarios = (state && state.scenarios) || [];
+  const fw = (wizData && wizData.framework) || {};
+  const flows = new Set(Array.isArray(fw.salesFlows) ? fw.salesFlows : []);
+  function armed(v) { return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1; }
+  let n = 0;
+  for (const sc of scenarios) {
+    const t = String((sc && sc.scenarioType) || 'SALE').toUpperCase();
+    if (t === 'REFUND' && (armed(sc.partialRefundByLeg) || armed(sc.partialRefundByPax))
+        && !flows.has('REFUND_PARTIAL')) {
+      n++;
+    }
+  }
+  return n;
+}
+
 // ── Decode scenario code → human description ──────────────────────────────────
 function decodeCode(code) {
   // Only decode codes that follow the OSDM test-suite naming convention
@@ -858,8 +889,24 @@ function renderScenariosSection(framework, resources, datafile) {
     badge.textContent = `✅ ${scenarios.length} scenario(s) · ${toRun.length} in run`;
     summary.innerHTML = `${esc(scenarios.length)} scenario(s) defined, ${esc(toRun.length)} selected for next run`;
 
+    // Framework-gating soft-validation banner (#218 follow-up — golden rule).
+    // Surfaces the count of scenarios in this datafile whose armed feature
+    // isn't declared in the Test Framework. The banner only renders when
+    // there's at least one such scenario; otherwise it stays out of the way.
+    const _undeclaredCount = fwUndeclaredArmedCount();
+    const _gatingBanner = _undeclaredCount > 0 ? `
+      <div style="margin:0 0 12px;padding:10px 14px;border:1px solid #ffb74d;border-radius:6px;background:#fff8e1;color:#bf6f00;font-size:13px;line-height:1.5">
+        ⚠ ${_undeclaredCount} scenario(s) arm a feature the Test Framework does not declare
+        (currently <strong>REFUND_PARTIAL</strong> on REFUND scenarios with partial-refund flags armed).
+        The run is not blocked — the runtime will emit a <code>[WARNING]</code> and degrade
+        where the wire can't carry the requested scope. Tick the matching Partial card in
+        Test Framework → ✂️ Refund/Exchange row to silence both this banner and the
+        runtime warning.
+      </div>` : '';
+
     // Build merged scenario list with checkbox + expandable details
     body.innerHTML = `
+      ${_gatingBanner}
       <div class="card" style="margin-bottom:14px">
         <div class="card-head">
           <span class="card-head-title">📋 Scenarios
@@ -1494,6 +1541,22 @@ function buildPartialRefundFields(idx, sc) {
   }
   if (byLegOn && !isSpec) {
     warnings += `<div style="color:#90a4ae;font-size:11px;margin-top:4px">ℹ SEARCH-mode trip: leg count is unknown at authoring time. If the returned offer has only one leg, the test degrades to full refund with a [WARNING].</div>`;
+  }
+  // Framework-gating soft validation (#218 follow-up — "golden rule" v1.11.105).
+  // The Test Framework wizard's REFUND_PARTIAL after-sales card declares
+  // whether the provider supports partial-refund scope. When the scenario
+  // arms partial without the framework declaring it, surface an amber
+  // banner with a deep-link to Step 1 so the Test Manager can either
+  // tick the declaration or unset the scenario flag. Soft: save is not
+  // blocked; the runtime emits an equivalent [WARNING].
+  if ((byLegOn || byPaxOn) && !fwDeclaresPartialRefund(sc.scenarioType)) {
+    warnings += `<div style="color:#e65100;font-size:12px;margin-top:4px;padding:6px 8px;border:1px solid #ffb74d;border-radius:4px;background:#fff8e1">
+      ⚠ Test Framework does not declare <strong>REFUND_PARTIAL</strong> for ${esc(sc.scenarioType || 'REFUND')} scenarios.
+      The scenario will still run; runtime will degrade where the wire can't carry the scope.
+      <span style="display:block;margin-top:3px;font-size:11px;color:#bf6f00">
+        Fix: tick the Partial card in Test Framework → ✂️ Refund row, or unset the per-leg/per-pax flags here.
+      </span>
+    </div>`;
   }
 
   return `

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.132",
+  "current_release": "2026.133",
   "releases": [
+    {
+      "release": "2026.133",
+      "date": "2026-06-08",
+      "server": "1.11.105",
+      "collection": "OTST_V2.0.53",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#218 follow-up, golden rule): the Test Framework now gates scenario features. A scenario may not silently exercise a capability the framework hasn't declared — 'what is not defined in the framework cannot be tested'. Implemented as SOFT validation (option (a)-with-scan): existing scenarios keep working, runs are never blocked, but warnings are surfaced at three levels so the gap is visible. First feature gated: partial refund (partialRefundByLeg / partialRefundByPax → REFUND_PARTIAL in salesFlows[]). New `Oscar_Server/src/utils/frameworkGating.js` is the single source of truth for the field↔flow rule table (`gatingRules()`), the per-scenario warning resolver (`scenarioWarnings()`), the lazy server-side migration (`applyFrameworkMigration()`), and the datafile annotator (`annotateDatafile()`). Three integration points: (1) `GET /v1/company/test-framework` now runs a one-time lazy migration per framework — when the framework's salesFlows[] doesn't include REFUND_PARTIAL but at least one of the company's scenarios arms partialRefundByLeg/byPax, REFUND_PARTIAL is added to salesFlows[], a `_salesFlowsMigratedAt` audit stamp is written, and the row is re-encrypted. Conservative: adds only, never removes — so a Test Manager's running configuration is preserved exactly while the new declaration baseline reflects what they're actually using. (2) `GET /v1/company/datafile` now annotates each scenario whose armed feature isn't declared with `__featureNotDeclaredWarnings: [field, ...]` before serving — on-disk file is unchanged; only the served bytes carry the annotation. (3) `Bruno_Collection/library-bruno/scenarioParser.js` reads the annotation and emits a `[WARNING]` log line per entry at scenario load, explaining which capability isn't declared and how to silence the warning. Wizard UI (`Oscar_Server/public/js/scenarios.js`): an inline amber chip next to the partial-refund block when the scenario arms it without the framework declaring it, plus a top-of-scenarios banner with the count of affected scenarios and a pointer to Test Framework → ✂️ Refund/Exchange row. Both check `fwDeclaresPartialRefund(scenarioType)` against the framework's salesFlows[]. New `tests/unit/framework-gating.test.js` covers 26 cases including the integration scenario: pre-migration warnings → migration runs → re-annotation finds nothing to warn about. No data-file schema change, no backend behaviour change beyond the warnings.",
+        "Bruno_Collection/VERSION OTST_V2.0.52 -> OTST_V2.0.53; server 1.11.104 -> 1.11.105. The annotator and warning emission are forward-compatible: pre-v1.11.105 Bruno collections ignore `__featureNotDeclaredWarnings` as an unknown field. The migration runs once per framework and is idempotent."
+      ]
+    },
     {
       "release": "2026.132",
       "date": "2026-06-08",

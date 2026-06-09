@@ -22,7 +22,8 @@ const fs        = require('fs');
 const crypto    = require('crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
-const { get, all, run } = require('../../db/db');
+const { get, all, run, colDecrypt } = require('../../db/db');
+const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope } = require('../helpers/shared');
@@ -398,10 +399,39 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
     log.error({ err, companyId: targetCompanyId }, 'Failed to decrypt datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Datafile decryption failed.' });
   }
+
+  // ── #218 follow-up: framework-gating annotation ─────────────────────────
+  // Each scenario whose armed field isn't declared in the current framework
+  // gets `__featureNotDeclaredWarnings: [field, ...]` so the Bruno collection
+  // can emit a [WARNING] log line at scenario load (golden rule: what's not
+  // declared in the framework can't be tested). The on-disk file is NOT
+  // changed; only the bytes served to the client are augmented. If the
+  // framework can't be read for any reason we serve the raw datafile —
+  // soft validation: the warning is best-effort, never blocks the run.
+  let serveBytes = plaintext;
+  try {
+    const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
+    if (fwRow && fwRow.config) {
+      let fwConfig = null;
+      try { fwConfig = JSON.parse(colDecrypt(fwRow.config)); } catch (_) {}
+      if (fwConfig) {
+        const df = JSON.parse(plaintext.toString('utf8'));
+        const { annotatedCount } = annotateDatafile(df, fwConfig);
+        if (annotatedCount > 0) {
+          log.info({ companyId: targetCompanyId, annotatedCount }, 'datafile: annotated scenarios with feature-not-declared warnings');
+        }
+        serveBytes = Buffer.from(JSON.stringify(df), 'utf8');
+      }
+    }
+  } catch (err) {
+    log.warn({ err, companyId: targetCompanyId }, 'datafile annotator failed — serving unannotated bytes');
+    serveBytes = plaintext;
+  }
+
   res.setHeader('Content-Disposition', `attachment; filename="${company.slug}-datafile.json"`);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Length', String(plaintext.length));
-  return res.end(plaintext);
+  res.setHeader('Content-Length', String(serveBytes.length));
+  return res.end(serveBytes);
 });
 
 module.exports = router;

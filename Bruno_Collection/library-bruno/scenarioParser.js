@@ -512,6 +512,22 @@ function parseScenarioData(jsonData) {
     const scenario = jsonData.scenarios[dataFileIndex];
 
     if (scenario.code === scenarioCode) {
+      // ── Framework-gating warnings (#218 follow-up) ─────────────────────
+      // The Oscar_Server's GET /v1/company/datafile annotator injects
+      // __featureNotDeclaredWarnings on each scenario whose armed feature
+      // isn't declared in the test framework's salesFlows[]. Emit one
+      // [WARNING] per entry so the test report explains that the scenario
+      // is exercising an undeclared capability (soft validation — the run
+      // proceeds anyway, the runtime will degrade as the underlying
+      // feature requires).
+      const _fwWarnings = Array.isArray(scenario.__featureNotDeclaredWarnings)
+        ? scenario.__featureNotDeclaredWarnings : [];
+      for (const _field of _fwWarnings) {
+        validationLogger(
+          `[WARNING] Scenario "${scenario.code}" arms ${_field}=on but the Test Framework does not declare the corresponding capability (REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows). The run will proceed; the runtime will degrade where the wire cannot convey the requested scope. Declare the capability in the Test Framework wizard to silence this warning, or unset ${_field} on the scenario.`
+        );
+      }
+
       // Set environment variables for the scenario
       bru.setEnvVar("osdmVersion", ["", "null"].includes(scenario.osdmVersion) ? null : scenario.osdmVersion);
       bru.setEnvVar("loggingType", ["", "null"].includes(scenario.loggingType) ? null : scenario.loggingType);
