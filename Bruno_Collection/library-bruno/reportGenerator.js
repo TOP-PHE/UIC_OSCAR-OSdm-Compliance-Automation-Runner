@@ -143,24 +143,24 @@ function initReport(libraryBase) {
       try {
         const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
         prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
-      } catch (re) { console.log('[reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
+      } catch (re) { console.log('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
       let currentScenarioCode = null;
       try {
         if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
           currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
         }
-      } catch (be) { console.log('[reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
+      } catch (be) { console.log('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
-        console.log('[reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
+        console.log('[INFO] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
       } else {
         fs.unlinkSync(tmp);
-        console.log('[reportGenerator] 🗑️  Previous run data cleared.');
+        console.log('[DEBUG] [reportGenerator] 🗑️  Previous run data cleared.');
       }
     }
-    console.log('[reportGenerator] ✅ Report directory: ' + dir);
+    console.log('[INFO] [reportGenerator] ✅ Report directory: ' + dir);
   } catch (e) {
-    console.log('[reportGenerator] initReport error: ' + e.message);
+    console.log('[ERROR] [reportGenerator] initReport error: ' + e.message);
   }
 }
 
@@ -205,7 +205,7 @@ function appendRequest(data) {
       // (CodeQL js/useless-conditional). ENOENT ("no tmp yet") is normal →
       // stay silent; anything else (corrupt JSON, perms) is logged.
       if (e.code !== 'ENOENT') {
-        console.log('[reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
+        console.log('[DEBUG] [reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
       }
     }
 
@@ -272,7 +272,7 @@ function appendRequest(data) {
 
     return htmlPath;
   } catch (e) {
-    console.log('[reportGenerator] appendRequest error: ' + e.message);
+    console.log('[ERROR] [reportGenerator] appendRequest error: ' + e.message);
     return null;
   }
 }

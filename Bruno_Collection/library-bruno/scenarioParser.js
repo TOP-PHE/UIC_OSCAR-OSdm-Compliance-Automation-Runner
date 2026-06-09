@@ -471,7 +471,7 @@ function parseScenarioData(jsonData) {
     if (idx >= effectiveList.length) {
       if (effectiveList.length > 0 && bru.getEnvVar('__scenariosList')) {
         // Multi-scenario run completed — stop gracefully
-        console.log('✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
+        console.log('[INFO] ✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
         bru.runner.stopExecution();
         return;
       }

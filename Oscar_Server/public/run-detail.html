@@ -399,7 +399,12 @@ function appendLogs(events) {
     const line = document.createElement('div');
     line.className = `log-line l-${e.level}`;
     line.dataset.level = e.level;
-    line.textContent = `[${e.ts.slice(11,19)}] ${e.message}`;
+    // #336 (v1.11.113): show milliseconds in the timestamp prefix. ts is
+    // an ISO string like "2026-06-09T19:12:42.123Z" — slice(11,23) gives
+    // "19:12:42.123". Previously slice(11,19) dropped the ms portion,
+    // making it hard to correlate OSCAR log lines with provider-side logs
+    // at sub-second precision.
+    line.textContent = `[${e.ts.slice(11,23)}] ${e.message}`;
     // Apply current filters to new lines
     if (activeLogLevel !== 'all' && e.level !== activeLogLevel) line.classList.add('hidden');
     if (logSearchTerm && !e.message.toLowerCase().includes(logSearchTerm)) line.classList.add('hidden');

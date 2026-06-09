@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.140",
+  "current_release": "2026.141",
   "releases": [
+    {
+      "release": "2026.141",
+      "date": "2026-06-09",
+      "server": "1.11.113",
+      "collection": "OTST_V2.0.61",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#336, dashboard ms display): run-detail.html log timestamps were truncated to seconds (slice(11,19) → '19:12:42'), so two events emitted in the same wall-clock second showed identical timestamps and could not be correlated with provider-side logs at sub-second precision. Changed to slice(11,23) → '19:12:42.123'. UI-only change, no payload change. Run log persistence already stored full ISO ms timestamps — this fix just unhides them on the dashboard.",
+        "feat(#336, runner-side level inference): the Bruno child-process stdout/stderr listeners in Oscar_Server/src/worker/runner.js were storing every line with level='stdout' or 'stderr' regardless of content — so the level filter in the dashboard was useless for Bruno-emitted lines (a [ERROR] line and a [DEBUG] line both showed as 'stdout'). Added inferLevel(line, streamFallback) that classifies by: (1) explicit [LEVEL] tag → that level, (2) Bruno CLI native markers (✓ → info / ✕ → error), (3) JS stack-trace shapes (Error:/AssertionError:/at … lines → error), (4) known harmless platform noise (OpenSSL 'Cannot open directory /etc/ssl/certs' → warn instead of leaking as stderr), (5) stderr-stream fallback → error, (6) stdout-stream fallback → info. The dashboard level filter now actually filters correctly for the full run output.",
+        "feat(#336, Bruno library [LEVEL] sweep): added [INFO]/[WARN]/[WARNING]/[ERROR]/[DEBUG] prefixes to ~25 untagged console.log/console.error calls across Bruno_Collection/library-bruno/ (auth.js, bookings.js, displays.js, envUtils.js, exchanges.js, expiredFlow.js, fulfillments.js, loopback.js, mergeReport.js, model.js, offers.js, osdmCompliance.js, osdmSchema.js, osdmSchemas.js, osdmVersion.js, partialRefund.js, passengers.js, refunds.js, reportGenerator.js, requestedInformation.js, scenarioParser.js, validators.js). Every line now carries its true severity (e.g. the omnipresent '[library-bruno] globalThis exposure skipped' diagnostic is now [DEBUG] — only visible at the user's choice). Combined with the runner-side inference above, the dashboard level filter is now reliable end-to-end.",
+        "fix(#336, #253 followup — fulfillmentDocuments empty-array): the v3.8 fulfillmentDocumentRefs → siblingDocuments[].id cross-check in bookings.js validateFulfillmentDocumentRefs() was guarded by `if (Array.isArray(siblingDocs))`, which correctly skipped the check when callers didn't pass siblingDocs at all, but INCORRECTLY ran the check (and reported every ref as 'unresolved') when callers passed an empty array — the real-world pre-issuance shape `fulfillmentDocuments: []`. Tightened the guard to also require length > 0, and split the else-branch in two: an empty-but-present array now logs '[INFO] sibling fulfillmentDocuments[] is present but empty — legal pre-issuance shape', while a fully absent array keeps the original 'not provided to validator' [INFO]. No assertion change for the populated-array happy path. Test name updated to '...when siblings present' to clarify the conditional scope.",
+        "Bruno_Collection/VERSION OTST_V2.0.60 -> OTST_V2.0.61; server 1.11.112 -> 1.11.113. 21 partial-refund + 26 framework-gating unit tests still pass. No data-file schema change. No payload/wire-format change."
+      ]
+    },
     {
       "release": "2026.140",
       "date": "2026-06-09",
