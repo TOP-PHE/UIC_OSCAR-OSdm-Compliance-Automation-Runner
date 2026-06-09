@@ -16,14 +16,33 @@
  */
 
 const express = require('express');
+const fs = require('node:fs');
+const rateLimit = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
+const { decryptFromFileAsync } = require('../../utils/at-rest');
+const { applyFrameworkMigration } = require('../../utils/frameworkGating');
+const log = require('../../utils/logger');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
+
+// Rate limiter for GET /test-framework (CodeQL js/missing-rate-limiting).
+// The lazy migration introduced in v1.11.105 reads + decrypts the company's
+// datafile from disk; even though the endpoint is auth-gated, a leaked
+// session token shouldn't be usable to mass-poll this route in a tight
+// loop. Same window / cap as the datafile read limiter for consistency.
+const frameworkReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests',
+             detail: 'Too many test-framework reads in a short window.' }
+});
 
 // ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
 // Test framework is the company's vendor capability declaration. It is test
@@ -48,7 +67,7 @@ function requireTestManager(req, res) {
 }
 
 // ── GET /v1/company/test-framework ────────────────────────────────────────────
-router.get('/test-framework', (req, res) => {
+router.get('/test-framework', frameworkReadLimiter, async (req, res) => {
   if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
@@ -60,6 +79,46 @@ router.get('/test-framework', (req, res) => {
   // before parsing. Legacy plaintext rows pass through colDecrypt() as-is.
   let config = {};
   try { config = JSON.parse(colDecrypt(row.config)); } catch (_) {}
+
+  // ── #218 follow-up: framework-gating lazy migration ────────────────────
+  // The "golden rule" introduced in v1.11.105: a scenario may not arm a
+  // feature the framework hasn't declared. Pre-existing frameworks were
+  // never asked to declare partial refund, so we derive the missing
+  // declarations from the company's own scenarios — conservative migration
+  // that ADDS to salesFlows[] (never removes), so the running configuration
+  // is preserved exactly. Runs once per framework (stamped with
+  // _salesFlowsMigratedAt) and is silent when nothing needs to change.
+  if (!config._salesFlowsMigratedAt) {
+    let scenarios = [];
+    try {
+      const company = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
+      if (company && company.datafile_path && fs.existsSync(company.datafile_path)) {
+        const buf = await decryptFromFileAsync(company.datafile_path);
+        const df  = JSON.parse(buf.toString('utf8'));
+        scenarios = Array.isArray(df.scenarios) ? df.scenarios : [];
+      }
+    } catch (err) {
+      // Datafile missing / unreadable / unparsable is not a fatal error
+      // here — the migration just runs against zero scenarios and stamps.
+      log.warn({ err, companyId: targetCompanyId }, 'framework-gating migration: datafile unreadable, stamping with empty scenarios');
+    }
+    const { migrated, additions } = applyFrameworkMigration(config, scenarios, new Date().toISOString());
+    if (migrated) {
+      try {
+        const reEncrypted = colEncrypt(JSON.stringify(config));
+        run(`UPDATE test_frameworks SET config = ?, updated_at = datetime('now') WHERE company_id = ?`,
+            [reEncrypted, targetCompanyId]);
+        if (additions.length > 0) {
+          log.info({ companyId: targetCompanyId, additions }, 'framework-gating: salesFlows additions derived from scenarios');
+        }
+      } catch (err) {
+        // Persistence failure shouldn't block the GET — we already have
+        // the migrated object in memory and return it. Next GET will retry.
+        log.warn({ err, companyId: targetCompanyId }, 'framework-gating migration: persistence failed, returning in-memory result');
+      }
+    }
+  }
+
   return res.json({ id: row.id, config, created_at: row.created_at, updated_at: row.updated_at });
 });
 

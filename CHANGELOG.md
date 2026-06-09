@@ -14,6 +14,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.105] — 2026-06-08
+
+**Framework-gating "golden rule" — Test Framework now declares what
+scenarios may exercise.** *"What is not defined in the framework
+cannot be tested."* First feature gated: partial refund. Soft
+validation: existing scenarios keep working, runs are never blocked,
+but the gap is surfaced at three levels (UI banner + inline chip,
+served-datafile annotation, runtime `[WARNING]`).
+
+### Added
+
+- `Oscar_Server/src/utils/frameworkGating.js` — single source of
+  truth for the field↔flow mapping. Five pure functions:
+  - `gatingRules()` — rule table (currently
+    `partialRefundByLeg / partialRefundByPax → REFUND_PARTIAL`).
+  - `isScenarioArmedForField(scenario, rule)` — value normalisation,
+    scenario-type scoping.
+  - `scenarioWarnings(scenario, framework)` — per-scenario list of
+    armed-but-not-declared fields.
+  - `deriveSalesFlowsAdditions(scenarios, framework)` — derive
+    missing flow declarations from existing scenarios (migration).
+  - `applyFrameworkMigration(framework, scenarios, nowIso)` — one-
+    time mutation with `_salesFlowsMigratedAt` stamp; idempotent.
+  - `annotateDatafile(datafile, framework)` — inject
+    `__featureNotDeclaredWarnings` into each scenario; remove stale
+    annotations when the framework now declares the feature.
+
+- `Oscar_Server/tests/unit/framework-gating.test.js` — 26 cases
+  covering all five helpers plus the integration scenario
+  (pre-migration warnings → migration runs → re-annotation clean).
+
+### Changed
+
+- `Oscar_Server/src/api/routes/company-test-framework.js` —
+  `GET /test-framework` runs the lazy migration once per framework
+  (gated by `_salesFlowsMigratedAt`). The company's datafile is
+  decrypted in-process, scenarios scanned, missing flow declarations
+  derived, framework re-encrypted and persisted. Conservative:
+  ADDS to `salesFlows[]`, never removes — so a Test Manager's
+  running configuration is preserved exactly. Datafile unreadable
+  is non-fatal (warn-and-stamp); persistence failure returns the
+  in-memory result and lets the next GET retry.
+
+- `Oscar_Server/src/api/routes/company.js` — `GET /datafile` now
+  annotates the served bytes. Each scenario whose armed feature
+  isn't declared in the current framework gets
+  `__featureNotDeclaredWarnings: [field, ...]`. The on-disk file
+  is unchanged. Framework lookup / annotation failures fall back
+  to serving the raw datafile (soft validation: warnings are
+  best-effort, never block the run).
+
+- `Bruno_Collection/library-bruno/scenarioParser.js` — reads
+  `scenario.__featureNotDeclaredWarnings` at scenario load and
+  emits one `[WARNING]` per entry. Message names the field and
+  points the Test Manager at the Test Framework wizard. The
+  warning is purely advisory: the scenario still runs, the
+  runtime degrades downstream where the wire can't carry the
+  scope.
+
+- `Oscar_Server/public/js/scenarios.js` — wizard UI:
+  - New `fwDeclaresPartialRefund(scenarioType)` helper alongside
+    the existing `fwSupportsIrops` pattern.
+  - Inline amber chip in the partial-refund block when the
+    scenario arms `partialRefundByLeg` or `partialRefundByPax`
+    without the framework declaring `REFUND_PARTIAL`. Names the
+    fix path (tick the Partial card in Test Framework ✂️ Refund
+    row, or unset the scenario flag).
+  - Top-of-scenarios soft-validation banner with the count of
+    affected scenarios and the same fix path. Renders only when
+    the count > 0.
+
+### Behaviour guarantees
+
+- Existing scenarios keep working. The migration ADDS flow
+  declarations; it never removes anything.
+- Existing tests (21 `bruno-partialrefund.test.js`) still pass.
+- The annotator and warning emission are forward-compatible:
+  pre-v1.11.105 Bruno collections ignore `__featureNotDeclaredWarnings`
+  as an unknown field.
+- No data-file schema change. No wizard breakage. No backend
+  behaviour change beyond the warnings.
+
+### Known limitations
+
+- This PR ships the rule for **partial refund only**. The same
+  pattern will be extended in follow-ups to `partialExchangeByLeg / byPax`,
+  the RequestedInformation probe, the `refundDate` time-travel overrule,
+  and the overrule-code catalogue. New rules go into `gatingRules()`
+  in `frameworkGating.js` — no schema migration needed beyond the
+  one-time `_salesFlowsMigratedAt` already added here.
+
+---
+
 ## [server-v1.11.104] — 2026-06-08
 
 **Partial refund (#218) — alignment assertion now compares against the
