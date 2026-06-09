@@ -262,12 +262,20 @@ function isLoopbackBrunoCall(req) {
 // Cache the file aggressively (the collection only changes on deploy).
 const COLLECTION_PATH_SAFE = path.resolve(process.env.COLLECTION_PATH || '/collection');
 const SCHEMA_FILE_PATH     = path.join(COLLECTION_PATH_SAFE, 'json_validator', 'datafile.schema.json');
-app.get('/json_validator/datafile.schema.json', (req, res) => {
+// Apply the same rate limiter we already use for /data/:filename
+// (CodeQL js/missing-rate-limiting — file-system access behind a route
+// should be rate-limited even if it's auth-less, to prevent abusive
+// polling). 300/min is generous — the schema is fetched once per scenario
+// run via the loopback Bruno subprocess.
+app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, (req, res) => {
   res.set('Cache-Control', 'public, max-age=300');
   res.type('application/json');
   res.sendFile(SCHEMA_FILE_PATH, err => {
-    if (err) {
-      log.warn({ err: err && err.message, path: SCHEMA_FILE_PATH },
+    // CodeQL js/trivial-conditional — err is only present on failure;
+    // check explicitly against null/undefined and inspect the structured
+    // err code so the conditional has visible truthiness semantics.
+    if (err != null) {
+      log.warn({ errMsg: err.message, errCode: err.code, path: SCHEMA_FILE_PATH },
         '[schema-route] sendFile failed — collection bind-mount missing or schema file moved?');
       if (!res.headersSent) res.status(404).type('text/plain').send('schema file not found');
     }
