@@ -99,6 +99,29 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
     }
     return;
   }
+  // #337 cascade-kill: when the booking has NO afterSalesConditions at all,
+  // emit ONE parent failure naming the root cause (per part) and skip the
+  // per-condition child REFUND-exists tests below. Previously each
+  // offerConditions[N] iteration fired a child test that ALSO failed with
+  // "Condition 'REFUND' not found in booking", producing N+1 failures per
+  // affected part — for a 3-admission, 3-reservation, 2-conditions-each offer
+  // that meant 18 cascading failures from a single provider-side gap
+  // (booking response missing afterSalesConditions).
+  const _offerConditionTypes = offerConditions
+    .map(c => c && c.condition).filter(Boolean);
+  if (!Array.isArray(bookedConditions) || bookedConditions.length === 0) {
+    test(`${partType}[${index}] afterSalesConditions exist in both offer and booking`, () => {
+      expect(bookedConditions.length,
+        `afterSalesConditions missing or empty in booking. ` +
+        `Offer declared ${offerConditions.length} condition(s) (${_offerConditionTypes.join(', ') || '?'}) ` +
+        `— booking returned 0. The provider did not echo afterSalesConditions ` +
+        `back into the booking object. Per-condition checks for this part are ` +
+        `SKIPPED to avoid duplicate cascading failures (one root cause).`
+      ).to.be.above(0);
+    });
+    validationLogger(`[ERROR] ${partType}[${index}] afterSalesConditions missing in booking — offer had ${offerConditions.length} (${_offerConditionTypes.join(', ') || '?'}). Per-condition tests skipped (cascade-kill).`);
+    return;
+  }
   test(`${partType}[${index}] afterSalesConditions exist in both offer and booking`, () => {
     expect(bookedConditions.length, `afterSalesConditions missing or empty in booking`).to.be.above(0);
     expect(bookedConditions).to.be.an('array');
@@ -260,7 +283,8 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
       'CANCELLED','RELEASED','REFUNDED','EXCHANGE_ONGOING','EXCHANGED','ERROR'];
     test(`${partType}[${index}].status '${bookedPart.status}' is a valid OSDM BookingPartStatus`, () => {
       expect(_validBookingPartStatuses).to.include(bookedPart.status,
-        `'${bookedPart.status}' is not a valid BookingPartStatus enum value`);
+        `'${bookedPart.status}' is not a valid BookingPartStatus enum value. ` +
+        `Valid OSDM values: [${_validBookingPartStatuses.join(', ')}].`);
     });
 
     validatePartPrices(offerParts, bookedParts, partType);
@@ -509,8 +533,10 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   });
   test(`Price fields exist (currency, scale) in provisionalPrice and confirmedPrice`, () => {
     ['currency', 'scale'].forEach(field => {
-      expect(prov[field],      `provisionalPrice.${field} missing`).to.exist;
-      expect(confirmed[field], `confirmedPrice.${field} missing`).to.exist;
+      expect(prov[field],
+        `provisionalPrice.${field} missing in booking (got: ${JSON.stringify(prov[field])})`).to.exist;
+      expect(confirmed[field],
+        `confirmedPrice.${field} missing in booking (got: ${JSON.stringify(confirmed[field])})`).to.exist;
     });
     bru.setEnvVar("provisionalPriceAmount", prov.amount);
     bru.setEnvVar("confirmedPriceAmount",   confirmed.amount);
@@ -567,17 +593,22 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     }
   });
 
-  // C2: fulfillmentStatus (OSDM v3.8 new field) must be a valid FulfillmentSummaryStatus enum when present
+  // C2: fulfillmentStatus (OSDM v3.8 new field) must be a valid FulfillmentSummaryStatus enum when present.
+  // #337: guard was `!== undefined`, which let the JSON-literal-null case through
+  // and stringified it into a nonsense test title like `'null' is a valid
+  // FulfillmentSummaryStatus`. Treat null AND undefined as "absent" — the field is
+  // optional in OSDM v3.8 and absence is encoded either way in practice.
   const _validFulfillmentSummaryStatuses = ['UNISSUED','PARTIALLY_ISSUED','ISSUED',
     'PARTIALLY_USED','COMPLETELY_USED','REFUNDED','CANCELLED','EXPIRED'];
-  if (booking.fulfillmentStatus !== undefined) {
+  if (booking.fulfillmentStatus != null) {
     test(`booking.fulfillmentStatus '${booking.fulfillmentStatus}' is a valid FulfillmentSummaryStatus (OSDM v3.8)`, () => {
       expect(_validFulfillmentSummaryStatuses).to.include(booking.fulfillmentStatus,
-        `'${booking.fulfillmentStatus}' is not a valid FulfillmentSummaryStatus`);
+        `'${booking.fulfillmentStatus}' is not a valid FulfillmentSummaryStatus. ` +
+        `Valid OSDM v3.8 values: [${_validFulfillmentSummaryStatuses.join(', ')}].`);
       validationLogger(`[INFO] booking.fulfillmentStatus: ${booking.fulfillmentStatus}`);
     });
   } else {
-    validationLogger(`[INFO] booking.fulfillmentStatus absent (optional in OSDM v3.8) → test skipped`);
+    validationLogger(`[INFO] booking.fulfillmentStatus absent (null or undefined; optional in OSDM v3.8) → test skipped`);
   }
 }
 
@@ -661,12 +692,16 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       }
     });
 
-    // D1: status must be a valid OSDM FulfillmentStatus enum value
+    // D1: status must be a valid OSDM FulfillmentStatus enum value.
+    // #337: aligned with fulfillments.js (which already accepts FULFILLED). The
+    // bookings.js enum was missing FULFILLED, producing a false-positive
+    // failure on every FULFILLED fulfillment under a v3.8 booking.
     const _validFulfillmentStatuses = ['AVAILABLE','USED','PARTIALLY_USED','RESERVED',
-      'EXCHANGED','REFUNDED','RELEASED','CANCELLED','EXPIRED','ON_HOLD','CONFIRMED'];
+      'EXCHANGED','REFUNDED','RELEASED','CANCELLED','EXPIRED','ON_HOLD','CONFIRMED','FULFILLED'];
     test(`Fulfillment[${idx}].status '${fulfillment.status}' is a valid OSDM FulfillmentStatus`, () => {
       expect(_validFulfillmentStatuses).to.include(fulfillment.status,
-        `'${fulfillment.status}' is not a valid FulfillmentStatus enum value`);
+        `'${fulfillment.status}' is not a valid FulfillmentStatus enum value. ` +
+        `Valid OSDM values: [${_validFulfillmentStatuses.join(', ')}].`);
     });
 
     if (fulfillment.controlNumber != null) {
@@ -771,8 +806,18 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         );
         const _unresolved = fulfillment.fulfillmentDocumentRefs.filter(r => !_docIds.has(String(r)));
         test(`Fulfillment[${idx}].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.8 integrity, when siblings present)`, () => {
+          // #337: the existing message correctly named the unresolved refs and
+          // the sibling-id pool, but didn't spell out the root cause — the
+          // provider emits BOTH lists but their UUIDs don't link up. Add a
+          // plain-language explanation so the report reader doesn't have to
+          // diff the two sets in their head.
           expect(_unresolved.length,
-            `unresolved ref(s): [${_unresolved.map(r => JSON.stringify(r)).join(", ")}] — sibling ids: [${[..._docIds].join(", ") || "(none)"}]`
+            `Provider emits both fulfillmentDocumentRefs[] AND a sibling ` +
+            `fulfillmentDocuments[] list, but the UUIDs don't reconcile — ` +
+            `the refs and the docs are independently generated instead of ` +
+            `linked. ` +
+            `unresolved ref(s): [${_unresolved.map(r => JSON.stringify(r)).join(", ")}] — ` +
+            `sibling ids: [${[..._docIds].join(", ") || "(none)"}].`
           ).to.eql(0);
         });
         if (_unresolved.length === 0) {
