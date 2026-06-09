@@ -252,6 +252,33 @@ function validateDataFileJsonWithTemplate(jsonData) {
     return;
   }
 
+  // #328 (v1.11.109): warn about stale schema URLs. Several pre-existing
+  // env files point at the external GitHub repo OSDM-testing/refs/heads/
+  // exch_dev/json_validator/datafile.schema.json — that branch has been
+  // deprecated and its schema is OUT OF SYNC with what the wizard
+  // produces (it still requires the legacy offerSearchCriteriaList +
+  // offerSearchCriteriaListId linkage, but OSCAR's modern datafiles
+  // use the inline scenario.offerSearchCriteria model). Validating
+  // against the stale schema produces false-positive failures that
+  // mislead new users.
+  //
+  // The canonical local schema is bundled with OSCAR at
+  //   http://localhost:8080/json_validator/datafile.schema.json
+  // and that's what every fresh env file should reference. When we
+  // detect the GitHub URL we emit a [WARNING] naming both the issue
+  // and the fix, so the new user has a clear next step instead of
+  // chasing "Required property 'offerSearchCriteriaList' is missing"
+  // through the codebase.
+  try {
+    if (typeof schemaUrl === "string" && /github(?:usercontent)?\.com/i.test(schemaUrl)) {
+      validationLogger(
+        '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl +
+        '). The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). ' +
+        'Update the company\'s environment file to point at the OSCAR-bundled local schema: http://localhost:8080/json_validator/datafile.schema.json'
+      );
+    }
+  } catch (_logErr) { /* logging is best-effort */ }
+
   bru.sendRequest(
     { url: schemaUrl, method: 'GET', proxy: false },
     function (err, res) {
