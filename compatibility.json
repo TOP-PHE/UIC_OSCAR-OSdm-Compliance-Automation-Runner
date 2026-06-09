@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.136",
+  "current_release": "2026.137",
   "releases": [
+    {
+      "release": "2026.137",
+      "date": "2026-06-09",
+      "server": "1.11.109",
+      "collection": "OTST_V2.0.57",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#328, new-user diagnostics): four precise [ERROR]/[WARNING] log lines surfaced by an OBB onboarding case where a tester chased a confusing 'Required scenario variable offerTripSearchCriteria is empty or not set' down to a stale schema URL and an unresolved tripRequirementId. (1) `Bruno_Collection/library-bruno/validators.js` — detect when json_schema points at `github*.com` and emit a [WARNING] explaining that the UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference and is out of sync with the modern OSCAR datafile shape (it still requires the legacy offerSearchCriteriaList linkage that produces false-positive 'Required property offerSearchCriteriaList is missing'); message names the fix (use http://localhost:8080/json_validator/datafile.schema.json). (2) `Bruno_Collection/library-bruno/scenarioParser.js` — upfront [ERROR] when scenario.tripRequirementId doesn't resolve to any datafile.tripRequirements[].id, naming the unresolved id, the available ids, and the fix path (Test Data → Trip Requirements section in the wizard). Same upfront check added for (3) passengersListId and (4) requestedFulfillmentOptionsListId, each pointing at the matching wizard section. (5) `Bruno_Collection/library-bruno/envUtils.js` — when parseEnvJson throws on offerTripSearchCriteria / offerTripSpecifications / offerPassengerSpecifications / offerSearchCriteria, the message now appends a per-variable hint naming the upstream resolver and the most-likely cause (unresolved scenario id-reference), so the tester sees the precise gap instead of a generic 'check data_base' message. Resolves the OBB onboarding case where the tester chased an opaque 'TripSearchCriteria empty' error through scenarioParser before discovering the stale env file. No data-file schema change, no behaviour change beyond the new diagnostics.",
+        "Bruno_Collection/VERSION OTST_V2.0.56 -> OTST_V2.0.57; server 1.11.108 -> 1.11.109. 21 partial-refund + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.136",
       "date": "2026-06-09",
