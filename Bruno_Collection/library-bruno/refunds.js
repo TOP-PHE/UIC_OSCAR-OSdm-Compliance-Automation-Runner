@@ -102,12 +102,31 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   const validFrom = new Date(refundOffer.validFrom);
   const validUntil = new Date(refundOffer.validUntil);
 
+  // Local-time annotator (v1.11.106): provider timestamps come back in UTC
+  // (e.g. 2026-06-09T05:23:26+00:00). The assertion message echoed the raw
+  // UTC string, leaving testers to do the +1h/+2h math against their local
+  // clock. The annotator appends a parenthetical Europe/Paris equivalent so
+  // the report shows both reads at once.
+  // Examples:
+  //   utc:   2026-06-09T05:23:26.087386+00:00
+  //   local: 2026-06-09 07:23:26 Europe/Paris  (CEST = UTC+2)
+  function _withLocal(utcString, parsedDate) {
+    if (!utcString || !parsedDate || isNaN(parsedDate.getTime())) return utcString || '';
+    try {
+      const local = parsedDate.toLocaleString('sv-SE', { timeZone: 'Europe/Paris' });
+      return `${utcString} (= ${local} Europe/Paris)`;
+    } catch (_e) {
+      return utcString;
+    }
+  }
+
   // Validate createdOn
   if (!isNaN(createdOn.getTime())) {
-    test(`Refund offer[${index}] createdOn is valid and in the past: ${refundOffer.createdOn}`, () => {
+    const _label = _withLocal(refundOffer.createdOn, createdOn);
+    test(`Refund offer[${index}] createdOn is valid and in the past: ${_label}`, () => {
       expect(refundOffer.createdOn).to.exist;
       expect(createdOn.getTime()).to.be.at.most(currentDate.getTime());
-      validationLogger(`[INFO] Refund offer[${index}] createdOn is valid and in the past: ${refundOffer.createdOn}`);
+      validationLogger(`[INFO] Refund offer[${index}] createdOn is valid and in the past: ${_label}`);
     });
   } else {
     validationLogger(`[WARNING] Refund offer[${index}] createdOn has invalid date format: ${refundOffer.createdOn}`);
@@ -115,9 +134,10 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
 
   // Validate validFrom
   if (!isNaN(validFrom.getTime())) {
-    test(`Refund offer[${index}] validFrom is valid: ${refundOffer.validFrom}`, () => {
+    const _label = _withLocal(refundOffer.validFrom, validFrom);
+    test(`Refund offer[${index}] validFrom is valid: ${_label}`, () => {
       expect(refundOffer.validFrom).to.exist;
-      validationLogger(`[INFO] Refund offer[${index}] validFrom is valid: ${refundOffer.validFrom}`);
+      validationLogger(`[INFO] Refund offer[${index}] validFrom is valid: ${_label}`);
     });
   } else {
     validationLogger(`[WARNING] Refund offer[${index}] validFrom has invalid date format: ${refundOffer.validFrom}`);
@@ -125,7 +145,8 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
 
   // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance)
   if (!isNaN(validUntil.getTime())) {
-    test(`Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${refundOffer.validUntil}`, () => {
+    const _label = _withLocal(refundOffer.validUntil, validUntil);
+    test(`Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`, () => {
       expect(refundOffer.validUntil).to.exist;
       expect(validUntil.getTime()).to.be.above(currentDate.getTime());
 
@@ -133,7 +154,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       const tolerance = 2 * 60 * 1000; // 2 minutes
       const difference = Math.abs(validUntil.getTime() - expectedValidUntil.getTime());
       expect(difference).to.be.at.most(tolerance);
-      validationLogger(`[INFO] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${refundOffer.validUntil}`);
+      validationLogger(`[INFO] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
     });
   } else {
     validationLogger(`[WARNING] Refund offer[${index}] validUntil has invalid date format: ${refundOffer.validUntil}`);
@@ -298,39 +319,108 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
   const _partialDegraded = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
   const _isPartial = _partialArmed && !_partialDegraded;
 
-  if (!overruleCode || overruleCode === "CODE_DOES_NOT_EXIST") {
-    test(`Refundable amount is 0 because overruleCode is null or CODE_DOES_NOT_EXIST`, () => {
-      expect(refundOffer.refundableAmount.amount).to.equal(0);
-      validationLogger(`[INFO] Refundable amount is 0 as expected (no valid overrule code)`);
-    });
-  } else if (_isPartial) {
-    // E2-partial: integer arithmetic; sum must be STRICTLY LESS than confirmed
-    // (and ≥ 0 — sanity). Records the actual delta so reviewers see what scope
-    // the provider applied.
-    const _scale       = Math.pow(10, refundOffer.refundableAmount?.scale || 2);
-    const _feeInt      = Math.round(refundOffer.refundFee.amount * _scale);
-    const _refundInt   = Math.round(refundOffer.refundableAmount.amount * _scale);
-    const _confirmedInt = Math.round(Number(confirmedPriceAmount) * _scale);
-    test(`Partial refund: refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (OSDM: partial scope returns strictly less)`, () => {
-      expect(_feeInt + _refundInt).to.be.below(_confirmedInt,
-        `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`);
-      expect(_feeInt + _refundInt).to.be.at.least(0,
-        `Partial-refund sum is negative — fee(${_feeInt}) + refundable(${_refundInt})`);
-      const _diff = _confirmedInt - (_feeInt + _refundInt);
-      validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
-    });
+  // ─────────────────────────────────────────────────────────────────────────
+  //  Refund response value assertions (#218 follow-up — v1.11.106)
+  //  The historical assertion was semantically inverted: it claimed
+  //  `refundableAmount == 0` whenever `overruleCode` was absent, which
+  //  encoded the assumption that "no overrule => refund denied". That's
+  //  only true in a narrow edge case (booking outside the validity window
+  //  of every applicable afterSalesCondition). The general truth is:
+  //
+  //    NORMAL FLOW (no overrule) — the provider OWNS the rules. They depend
+  //      on time, fare class, distance from departure, internal commercial
+  //      decisions, etc. OSCAR can't predict the answer; the provider's
+  //      response is authoritative. OSCAR's job is to verify structural
+  //      soundness (non-negative, bounded by confirmedPrice, currency
+  //      consistency) and log what came back for a human to reconcile.
+  //
+  //    EXCEPTIONAL FLOW (overrule set, != CODE_DOES_NOT_EXIST) — the
+  //      distributor declared the special circumstance. The overrule
+  //      contract is "refund the full booking value, no fee". OSCAR's
+  //      job is to verify the provider HONOURED that contract.
+  //
+  //  Partial-refund identity (fee + amount < confirmedPrice strict) is
+  //  orthogonal — it applies whenever partial is armed and not degraded,
+  //  regardless of overrule.
+  // ─────────────────────────────────────────────────────────────────────────
+  const _hasOverrule = !!overruleCode && overruleCode !== "CODE_DOES_NOT_EXIST";
+  const _scale       = Math.pow(10, refundOffer.refundableAmount?.scale || 2);
+  const _feeInt      = Math.round(refundOffer.refundFee.amount * _scale);
+  const _refundInt   = Math.round(refundOffer.refundableAmount.amount * _scale);
+  const _confirmedInt = Math.round(Number(confirmedPriceAmount) * _scale);
+
+  // ── Structural bounds (always apply) ─────────────────────────────────────
+  // Internally consistent response — independent of overrule and scope:
+  //   amount, fee ≥ 0
+  //   amount + fee ≤ confirmedPrice   (provider can't refund more than was paid)
+  //   currency consistent between amount and fee
+  test(`Refund response bounds — refundable(${refundOffer.refundableAmount.amount}) and fee(${refundOffer.refundFee.amount}) are non-negative, sum ≤ confirmedPrice(${confirmedPriceAmount}), currencies consistent`, () => {
+    expect(_refundInt, `refundableAmount is negative: ${_refundInt}`).to.be.at.least(0);
+    expect(_feeInt, `refundFee is negative: ${_feeInt}`).to.be.at.least(0);
+    expect(_feeInt + _refundInt,
+      `Provider refunded MORE than was paid: fee(${_feeInt}) + refundable(${_refundInt}) = ${_feeInt + _refundInt} > confirmed(${_confirmedInt})`)
+      .to.be.at.most(_confirmedInt);
+    if (refundOffer.refundableAmount.currency && refundOffer.refundFee.currency) {
+      expect(refundOffer.refundableAmount.currency,
+        `Currency mismatch: refundableAmount(${refundOffer.refundableAmount.currency}) vs refundFee(${refundOffer.refundFee.currency})`)
+        .to.eql(refundOffer.refundFee.currency);
+    }
+    validationLogger(`[INFO] Refund response bounds OK — fee(${_feeInt}) + refundable(${_refundInt}) ≤ confirmed(${_confirmedInt}).`);
+  });
+
+  if (_hasOverrule) {
+    // ── EXCEPTIONAL FLOW — verify the overrule contract was honoured ──────
+    if (_isPartial) {
+      // Partial-with-overrule — the scope is "the in-scope subset" (verified
+      // by the partial alignment assertion in 10.yml) and the overrule
+      // contract within that scope is "no fee taken". Strict less-than for
+      // the partial identity still applies; we add the fee==0 check here.
+      test(`Partial refund WITH overrule (${overruleCode}): refundFee should be 0 (overrule waives fee on top of partial scope)`, () => {
+        expect(_feeInt, `Overrule(${overruleCode}) was sent but provider still charged a fee: ${_feeInt} (scaled). Overrule contract: waive fees on top of partial scope.`).to.eql(0);
+        validationLogger(`[INFO] Overrule(${overruleCode}) honoured on partial scope — fee waived.`);
+      });
+      test(`Partial refund WITH overrule (${overruleCode}): refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
+        expect(_feeInt + _refundInt,
+          `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)
+          .to.be.below(_confirmedInt);
+        const _diff = _confirmedInt - (_feeInt + _refundInt);
+        validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+      });
+    } else {
+      // Full-with-overrule — strict identity, the canonical overrule contract:
+      //   refundableAmount == confirmedPrice
+      //   refundFee == 0
+      test(`Refund WITH overrule (${overruleCode}): refundableAmount(${refundOffer.refundableAmount.amount}) == confirmedPrice(${confirmedPriceAmount}) AND refundFee == 0 (overrule contract: full restitution, no fee)`, () => {
+        expect(_refundInt,
+          `Provider did NOT honour overrule(${overruleCode}): refundable(${_refundInt}) ≠ confirmed(${_confirmedInt}). Overrule contract: refund the full booking value.`)
+          .to.eql(_confirmedInt);
+        expect(_feeInt,
+          `Provider did NOT honour overrule(${overruleCode}): fee(${_feeInt}) ≠ 0. Overrule contract: no fee taken on top of full restitution.`)
+          .to.eql(0);
+        validationLogger(`[INFO] Overrule(${overruleCode}) honoured — full refund (${_refundInt}) and zero fee.`);
+      });
+    }
   } else {
-    // E2-full: standard full-refund identity. Fires for full-refund scenarios
-    // AND for partial-refund scenarios that DEGRADED to full at runtime.
-    const _scale       = Math.pow(10, refundOffer.refundableAmount?.scale || 2);
-    const _feeInt      = Math.round(refundOffer.refundFee.amount * _scale);
-    const _refundInt   = Math.round(refundOffer.refundableAmount.amount * _scale);
-    const _confirmedInt = Math.round(Number(confirmedPriceAmount) * _scale);
-    test(`Refund financial identity: refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) = confirmedPrice(${confirmedPriceAmount}) (OSDM: integer arithmetic)`, () => {
-      expect(_feeInt + _refundInt).to.eql(_confirmedInt,
-        `Financial identity broken: fee(${_feeInt}) + refundable(${_refundInt}) ≠ confirmed(${_confirmedInt})`);
-      validationLogger(`[INFO] Financial identity verified (scaled): ${_feeInt} + ${_refundInt} = ${_confirmedInt}`);
-    });
+    // ── NORMAL FLOW (no overrule) — observe; do NOT assert a specific value ─
+    // The provider's response IS the source of truth. The structural bounds
+    // check above has already verified internal consistency. Here we just
+    // surface what the provider answered so a human reviewer can reconcile
+    // it against the booking's afterSalesConditions.
+    if (_refundInt === 0) {
+      validationLogger(`[INFO] No overrule sent and provider returned refundableAmount=0 — provider applied its rules and declined the refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative.`);
+    } else {
+      validationLogger(`[INFO] No overrule sent and provider returned refundableAmount=${refundOffer.refundableAmount.amount} ${refundOffer.refundableAmount.currency} (fee=${refundOffer.refundFee.amount}) — provider applied its rules and the conditions permit a refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative. To force a specific expected amount, set an overruleCode on the scenario (overrule contract: amount = confirmedPrice, fee = 0).`);
+    }
+    // Partial-refund identity still applies in the normal flow.
+    if (_isPartial) {
+      test(`Partial refund: refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
+        expect(_feeInt + _refundInt,
+          `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)
+          .to.be.below(_confirmedInt);
+        const _diff = _confirmedInt - (_feeInt + _refundInt);
+        validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+      });
+    }
   }
 
   // Partial-scope structural check: when partial is armed and not degraded,

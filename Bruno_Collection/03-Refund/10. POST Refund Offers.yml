@@ -276,7 +276,7 @@ runtime:
                 ? _firstOffer.refundableAmount.amount : null;
               const _refCurrency = (_firstOffer.refundableAmount && _firstOffer.refundableAmount.currency) || null;
 
-              test("Partial refund: response refundableAmount matches expected partial sum", () => {
+              test("Partial refund: request/response alignment — response refundableAmount matches the sum of in-scope parts", () => {
                 if (_refAmount == null) {
                   throw new Error("[ERROR] response refundOffers[0].refundableAmount.amount missing — cannot verify partial scope was honoured");
                 }
@@ -291,7 +291,7 @@ runtime:
                     `or refunded the full booking instead of the requested scope.`
                   );
                 }
-                validationLogger(`[INFO] Partial refund alignment OK — refundableAmount=${_refAmount} matches expected wire-scope sum (${_exp.shape || "n/a"}).`);
+                validationLogger(`[INFO] Partial refund request/response alignment OK — refundableAmount=${_refAmount} matches the sum of in-scope parts (${_exp.shape || "n/a"}).`);
               });
             } else if (_degraded) {
               validationLogger(`[INFO] Partial refund degraded earlier — alignment assertion skipped (full refund is the contract in that case).`);
