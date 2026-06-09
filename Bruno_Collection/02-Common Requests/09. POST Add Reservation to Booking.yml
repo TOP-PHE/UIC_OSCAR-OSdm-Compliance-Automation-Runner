@@ -32,7 +32,7 @@ runtime:
         // /reservations. Reached only when 02. POST Create Booking routed here
         // (place selection enabled in ADD_TO_BOOKING mode); otherwise skipped.
         const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
         bru.setVar('addOfferPartResource', useOfferParts ? 'offer-parts' : 'reservations');

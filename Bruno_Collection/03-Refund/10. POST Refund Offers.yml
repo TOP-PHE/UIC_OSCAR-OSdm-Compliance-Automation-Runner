@@ -28,7 +28,7 @@ runtime:
         const { requestRefundOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
 
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         // Partial refund (#218): when partialRefundByLeg or partialRefundByPax
         // is on for this scenario, resolve the OSDM RefundSpecification[]

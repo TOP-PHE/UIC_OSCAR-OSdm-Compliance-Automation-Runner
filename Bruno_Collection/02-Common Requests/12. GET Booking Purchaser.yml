@@ -19,7 +19,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
     - type: after-response
       code: |-
         // #258/#203 — purchaser create-or-update probe. We deliberately omitted
