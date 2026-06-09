@@ -58,7 +58,7 @@ function setAuthToken(responseBody) {
       validationLogger("[WARNING] PHE access_token not found in response");
     }
   } catch (e) {
-    console.error("setAuthToken error:", e && e.stack ? e.stack : e);
+    console.error("[ERROR] setAuthToken error: " + (e && e.stack ? e.stack : e));
   }
 }
 
@@ -67,7 +67,7 @@ function captureSwaggerSchemaValidator() {
 
   const url = bru.getEnvVar("swaggerSchema");
   if (!url) {
-    console.error("❌ Missing env var swaggerSchema");
+    console.error("[ERROR] ❌ Missing env var swaggerSchema");
     return;
   }
 
@@ -75,7 +75,7 @@ function captureSwaggerSchemaValidator() {
     { url, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("❌ Error during Swagger request:", err);
+        console.log("[ERROR] ❌ Error during Swagger request: " + (err && err.message ? err.message : err));
         return;
       }
       try {
@@ -85,12 +85,12 @@ function captureSwaggerSchemaValidator() {
           const swaggerJson = typeof body === 'string' ? JSON.parse(body) : body;
           const swaggerJsonString = JSON.stringify(swaggerJson);
           bru.setEnvVar("swaggerJson", swaggerJsonString);
-          console.log("✅ Swagger JSON captured");
+          console.log("[INFO] ✅ Swagger JSON captured");
         } else {
-          console.error(`❌ Swagger load failed: HTTP ${status}`);
+          console.error(`[ERROR] ❌ Swagger load failed: HTTP ${status}`);
         }
       } catch (e) {
-        console.error("❌ Failed to parse Swagger JSON:", e);
+        console.error("[ERROR] ❌ Failed to parse Swagger JSON: " + (e && e.message ? e.message : e));
       }
     }
   );
@@ -99,7 +99,7 @@ function captureSwaggerSchemaValidator() {
 function swaggerSchemaValidatorContent() {
   const ajvUrl = bru.getEnvVar("ajvMinified");
   if (!ajvUrl) {
-    console.error("❌ Missing env var ajvMinified");
+    console.error("[ERROR] ❌ Missing env var ajvMinified");
     return;
   }
 
@@ -107,7 +107,7 @@ function swaggerSchemaValidatorContent() {
     { url: ajvUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("❌ Error while loading AJV:", err);
+        console.log("[ERROR] ❌ Error while loading AJV: " + (err && err.message ? err.message : err));
         return;
       }
 
@@ -115,13 +115,13 @@ function swaggerSchemaValidatorContent() {
         const status = res.status || res.statusCode || 200;
         const text = res.data || "";
         if (status >= 200 && status < 300 && String(text).length > 0) {
-          console.log("✅ AJV script successfully loaded");
+          console.log("[INFO] ✅ AJV script successfully loaded");
           const scriptContent = String(text);
           bru.setEnvVar("scriptContent", scriptContent);
 
           const swaggerJsonString = bru.getEnvVar("swaggerJson");
           if (!swaggerJsonString) {
-            console.error("❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
+            console.error("[ERROR] ❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
             return;
           }
           const swaggerSchema = JSON.parse(swaggerJsonString);
@@ -136,10 +136,10 @@ function swaggerSchemaValidatorContent() {
             url: bru.getEnvVar("url")
           });
         } else {
-          console.error(`❌ Failed to load AJV script. HTTP ${status}`);
+          console.error(`[ERROR] ❌ Failed to load AJV script. HTTP ${status}`);
         }
       } catch (e) {
-        console.error("❌ Error during AJV script evaluation/usage:", e);
+        console.error("[ERROR] ❌ Error during AJV script evaluation/usage: " + (e && e.message ? e.message : e));
       }
     }
   );
@@ -168,14 +168,14 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     }
 
     if (!matchedPath) {
-      console.error(`❌ No matching path found in Swagger for URL: ${url}`);
+      console.error(`[ERROR] ❌ No matching path found in Swagger for URL: ${url}`);
       return;
     }
 
     const m = String(method || "").toLowerCase();
     const pathSchema = schema.paths[matchedPath]?.[m];
     if (!pathSchema) {
-      console.error(`❌ No matching method '${method}' for path '${matchedPath}'`);
+      console.error(`[ERROR] ❌ No matching method '${method}' for path '${matchedPath}'`);
       return;
     }
 
@@ -183,7 +183,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     try {
       Ajv = resolveAjvConstructor();
     } catch (e) {
-      console.error("❌ Failed to initialize AJV:", e && e.message ? e.message : e);
+      console.error("[ERROR] ❌ Failed to initialize AJV: " + (e && e.message ? e.message : e));
       return;
     }
 
@@ -203,12 +203,12 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
         }
         const valid = validateBody(bodyToValidate);
         if (!valid) {
-          console.error(`❌ Invalid request body for ${method} ${matchedPath}:`, validateBody.errors);
+          console.error(`[ERROR] ❌ Invalid request body for ${method} ${matchedPath}: ` + JSON.stringify(validateBody.errors));
         } else {
-          console.log(`✅ Request body is valid for ${method} ${matchedPath}`);
+          console.log(`[INFO] ✅ Request body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("❌ Failed to validate request body:", e);
+        console.error("[ERROR] ❌ Failed to validate request body: " + (e && e.message ? e.message : e));
       }
     }
 
@@ -228,16 +228,16 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
         }
         const valid = validateResponse(bodyToValidate);
         if (!valid) {
-          console.error(`❌ Invalid response body for ${method} ${matchedPath}:`, validateResponse.errors);
+          console.error(`[ERROR] ❌ Invalid response body for ${method} ${matchedPath}: ` + JSON.stringify(validateResponse.errors));
         } else {
-          console.log(`✅ Response body is valid for ${method} ${matchedPath}`);
+          console.log(`[INFO] ✅ Response body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("❌ Failed to validate response body:", e);
+        console.error("[ERROR] ❌ Failed to validate response body: " + (e && e.message ? e.message : e));
       }
     }
   } catch (e) {
-    console.error("swaggerSchemaValidator error:", e && e.stack ? e.stack : e);
+    console.error("[ERROR] swaggerSchemaValidator error: " + (e && e.stack ? e.stack : e));
   }
 }
 
@@ -245,7 +245,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
 function validateDataFileJsonWithTemplate(jsonData) {
   const schemaUrl = bru.getEnvVar("json_schema");
   if (!schemaUrl) {
-    console.error("❌ Missing env var json_schema");
+    console.error("[ERROR] ❌ Missing env var json_schema");
     test("Schema load failed", function () {
       throw new Error("Schema load failed: json_schema env var missing");
     });
@@ -310,7 +310,7 @@ function validateDataFileJsonWithTemplate(jsonData) {
     { url: schemaUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.error("Error loading the schema: ", err);
+        console.error("[ERROR] Error loading the schema: " + (err && err.message ? err.message : err));
         test("Schema load failed", function () {
           throw new Error("Schema load failed: " + err);
         });
@@ -448,13 +448,13 @@ function validateDataFileJsonWithTemplate(jsonData) {
           });
         } else {
           validationLogger(`[INFO] ⛔ Invalid JSON Data file structure with schema from : ${schemaUrl}`);
-          validationErrors.forEach(err => console.error(err));
+          validationErrors.forEach(err => console.error("[ERROR] " + err));
           test("⛔ Invalid JSON Data file structure", function () {
             throw new Error("Validation errors:\n" + validationErrors.join("\n"));
           });
         }
       } catch (e) {
-        console.error("Schema parsing/validation error:", e);
+        console.error("[ERROR] Schema parsing/validation error: " + (e && e.message ? e.message : e));
         test("Schema parse/validate failure", function () {
           throw new Error("Schema parse/validate failure: " + (e.message || e));
         });

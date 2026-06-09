@@ -770,12 +770,47 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       logParser.currentScenario = runRow.scenario_code;
     }
 
+    // #336 (v1.11.113): infer the actual log level from the line content
+    // instead of storing the literal stream name as the level. The
+    // dashboard's level filter (Info / Warn / Error) and the per-level
+    // CSS colouring rely on event.level — previously every Bruno line had
+    // level='stdout' so the filter was a no-op on Bruno output.
+    //
+    // Inference order:
+    //   1) explicit [LEVEL] tag from library-bruno emitters → that level
+    //   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
+    //   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
+    //   4) Known harmless platform noise (OpenSSL warn-once) → warn
+    //   5) stderr stream with no other signal → error (Bruno emits real
+    //      failures there; "stderr" alone is not a useful level)
+    //   6) stdout stream with no other signal → info (sensible default —
+    //      keeps the level-filter working without spamming "debug")
+    function inferLevel(line, streamFallback) {
+      // 1) explicit tag
+      if (/\[ERROR]/i.test(line))                                 return 'error';
+      if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
+      if (/\[INFO]/i.test(line))                                  return 'info';
+      if (/\[DEBUG]/i.test(line))                                 return 'debug';
+      // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
+      if (/^\s*✕\s/.test(line))                                   return 'error';
+      if (/^\s*✓\s/.test(line))                                   return 'info';
+      // 3) JS stack-trace shapes
+      if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
+      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'error';
+      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'error';
+      // 4) Known platform noise
+      if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
+      // 5/6) stream-based fallback
+      return streamFallback;
+    }
+
     proc.stdout.on('data', chunk => {
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
         const meta = logParser.parse(line);
-        logEvent(runId, 'stdout', line, meta);
+        const level = inferLevel(line, 'info');
+        logEvent(runId, level, line, meta);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });
@@ -785,7 +820,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       lines.forEach(line => {
         if (!line.trim()) return;
         const meta = logParser.parse(line);
-        logEvent(runId, 'stderr', line, meta);
+        const level = inferLevel(line, 'error');
+        logEvent(runId, level, line, meta);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });

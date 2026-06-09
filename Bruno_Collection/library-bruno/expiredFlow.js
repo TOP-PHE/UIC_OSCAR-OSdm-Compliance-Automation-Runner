@@ -396,5 +396,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] expiredFlow globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] expiredFlow globalThis exposure skipped: ' + (e && e.message));
 }

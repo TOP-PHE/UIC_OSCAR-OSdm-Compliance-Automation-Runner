@@ -71,7 +71,7 @@ function checkWarningsAndProblems(jsonData) {
 
 function postOfferResponsePreRequest() {
   const requestName = (typeof req !== 'undefined' && typeof req.getName === 'function') ? req.getName() : '';
-  console.log("⏩ [STEP] Executing request : " + requestName);
+  console.log("[INFO] ⏩ [STEP] Executing request : " + requestName);
   validationLogger("[INFO] ➤ postOfferResponsePreRequest");
 
   if (typeof buildOfferCollectionRequest === "function") {
@@ -117,7 +117,7 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      console.log('[offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
+      console.log('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
     }
 
     // Best-effort body resolve (may be empty in pre-request)
@@ -134,7 +134,7 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      console.log('[offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
+      console.log('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
     }
 
     // Preflight call using bru.sendRequest
@@ -159,17 +159,17 @@ function ensureAuthorizationOr403() {
       }
       const code = res && (res.code || res.status || res.statusCode);
       if (code === 403 || code === 401) {
-        console.log("⛔ Stop: Access forbidden (403) or Unauthorized (401). Check permissions. Access token could be expired.");
-        console.error("Authorization precheck failed with " + code);
+        console.log("[ERROR] ⛔ Stop: Access forbidden (403) or Unauthorized (401). Check permissions. Access token could be expired.");
+        console.error("[ERROR] Authorization precheck failed with " + code);
       } else if (code === 400) {
-        console.log("⛔ Stop: Bad Request (400). Check request parameters and body. Possibly due to authorization.");
-        console.error("Authorization precheck failed with 400");
+        console.log("[ERROR] ⛔ Stop: Bad Request (400). Check request parameters and body. Possibly due to authorization.");
+        console.error("[ERROR] Authorization precheck failed with 400");
       } else {
         validationLogger("[INFO] ✅ Authorization check passed.");
       }
     });
   } catch (e) {
-    console.log("ensureAuthorizationOr403 error:", e && e.stack ? e.stack : e);
+    console.log("[ERROR] ensureAuthorizationOr403 error: " + (e && e.stack ? e.stack : e));
     // Don't throw here unless you want to halt the entire run
   }
 }
@@ -1445,5 +1445,5 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

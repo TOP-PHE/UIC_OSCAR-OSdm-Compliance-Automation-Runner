@@ -365,5 +365,5 @@ function buildRefundSpecifications(booking, opts) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] partialRefund globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] partialRefund globalThis exposure skipped: ' + (e && e.message));
 }
