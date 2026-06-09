@@ -102,14 +102,21 @@ async function fsExists(p) {
 }
 
 // ── Log helper — writes to run_events with optional structured metadata ───────
+// #341 followup (v1.11.117): pass ts explicitly with millisecond precision.
+// The schema default — datetime('now') — is SECOND-precision ("2026-06-09
+// 21:25:16"), so the v1.11.113 dashboard change to slice(11,23) could never
+// show milliseconds: they were never stored. new Date().toISOString() gives
+// "2026-06-10T07:42:13.123Z" — same UTC storage convention, ms included.
+// Old rows keep the second-precision format; the dashboard slice degrades
+// gracefully on them (shows HH:MM:SS).
 function logEvent(runId, level, message, meta) {
   const lineCount = _incrementAndCheck(runId);
   if (lineCount === MAX_LOG_LINES_PER_RUN + 1) {
     // Emit one final warning and then start dropping
     try {
       dbRun(
-        `INSERT INTO run_events (run_id, level, message, event_kind) VALUES (?, ?, ?, ?)`,
-        [runId, 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
+        `INSERT INTO run_events (run_id, ts, level, message, event_kind) VALUES (?, ?, ?, ?, ?)`,
+        [runId, new Date().toISOString(), 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
       );
     } catch (_) { /* swallow */ }
     return;
@@ -125,11 +132,11 @@ function logEvent(runId, level, message, meta) {
     // remain plaintext so the structured-log filtering UI keeps working
     // without per-row decrypt/comparison cost).
     dbRun(
-      `INSERT INTO run_events (run_id, level, message,
+      `INSERT INTO run_events (run_id, ts, level, message,
          category, phase, suite_name, request_name, http_status,
          event_kind, attempt_index, attempt_total, scenario_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [runId, level, colEncrypt(String(message).slice(0, 4000)),
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [runId, new Date().toISOString(), level, colEncrypt(String(message).slice(0, 4000)),
        category || null, phase || null, suite_name || null, request_name || null, http_status || null,
        event_kind || 'log',
        Number.isInteger(attempt_index) ? attempt_index : null,

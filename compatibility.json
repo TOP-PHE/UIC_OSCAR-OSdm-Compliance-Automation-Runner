@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.144",
+  "current_release": "2026.145",
   "releases": [
+    {
+      "release": "2026.145",
+      "date": "2026-06-10",
+      "server": "1.11.117",
+      "collection": "OTST_V2.0.63",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(run_events.ts, milliseconds never stored): the v1.11.113 dashboard change (slice(11,23) on the timestamp) claimed to 'unhide' millisecond precision — but the run_events.ts column was populated by its SQLite schema default datetime('now'), which is SECOND-precision ('2026-06-09 21:25:16'). There were no milliseconds to unhide; the user kept seeing [21:25:16] even on release-2026.144. Fix: logEvent() in Oscar_Server/src/worker/runner.js now passes ts explicitly as new Date().toISOString() ('2026-06-10T07:42:13.123Z') on both INSERT sites (regular event + cap-reached warning). Same UTC storage convention as everywhere else; the dashboard slice(11,23) now yields 'HH:MM:SS.mmm' as designed. Pre-existing rows keep the second-precision format and degrade gracefully (slice shows 'HH:MM:SS'). All run_events consumers paginate/order by the autoincrement id, never by ts string comparison, so mixed formats are safe. No schema migration needed — the column is TEXT; the DEFAULT stays as a fallback.",
+        "Server 1.11.116 -> 1.11.117; collection unchanged at OTST_V2.0.63 (server-only change). No payload change, no behaviour change beyond timestamp precision."
+      ]
+    },
     {
       "release": "2026.144",
       "date": "2026-06-09",

@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.117] — 2026-06-10
+
+**Milliseconds were never stored — the v1.11.113 display fix had
+nothing to display.**
+
+### Fixed
+
+- **`run_events.ts` stored at second precision.** The v1.11.113
+  dashboard change (`slice(11,23)`) claimed to "unhide" millisecond
+  precision, but the `ts` column was populated by its SQLite schema
+  default `datetime('now')` — second-precision
+  (`2026-06-09 21:25:16`). There were no milliseconds to unhide;
+  users kept seeing `[21:25:16]` even on release-2026.144 with the
+  new page loaded.
+
+  Fix: `logEvent()` now passes `ts` explicitly as
+  `new Date().toISOString()` (`2026-06-10T07:42:13.123Z`) on both
+  INSERT sites (regular event + cap-reached warning). Same UTC
+  storage convention; the dashboard slice now yields
+  `HH:MM:SS.mmm` as designed. Pre-existing rows keep the old format
+  and degrade gracefully (slice shows `HH:MM:SS`). All `run_events`
+  consumers paginate/order by the autoincrement `id`, never by `ts`
+  string comparison, so mixed formats are safe. No migration —
+  the column is TEXT; the schema DEFAULT stays as a fallback.
+
+### Versions
+
+- `Oscar_Server/package.json` `1.11.116` → `1.11.117`
+- `compatibility.json` `release-2026.145` (collection unchanged at
+  `OTST_V2.0.63` — server-only change)
+
+---
+
 ## [server-v1.11.116] — 2026-06-09
 
 **Invisible `warn`/`debug` log lines on the run-detail page —
