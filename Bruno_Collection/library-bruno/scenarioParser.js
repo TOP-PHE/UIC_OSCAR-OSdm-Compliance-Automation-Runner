@@ -842,7 +842,18 @@ function parseScenarioData(jsonData) {
             case "SEARCH":
               validationLogger('[INFO] ⏳ processing a search');
               const _searchStart = subTripDate(tripRequirement.trip.startDatetime, nextWeekdayString, 'startDatetime', 'tripRequirement (SEARCH)');
-              const _searchEnd = subTripDate(tripRequirement.trip.endDatetime, nextWeekdayString, 'endDatetime', 'tripRequirement (SEARCH)');
+              // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
+              // per OSDM spec — you specify a departure time, not a window. And
+              // osdmTripSearchCriteria() below doesn't use the endDateTime
+              // anyway (only `startDateTime` is passed to TripSearchCriteria —
+              // see line 1171 below). Requiring it via subTripDate() was
+              // rejecting valid OSDM data (e.g. the OBB Nightjet datafile).
+              // Pass null when absent; SPECIFICATION branch keeps its strict
+              // both-required check (legs[*].endDatetime IS required when
+              // you're specifying exact trips).
+              const _searchEnd = tripRequirement.trip.endDatetime
+                ? subTripDate(tripRequirement.trip.endDatetime, nextWeekdayString, 'endDatetime', 'tripRequirement (SEARCH)')
+                : null;
               bru.setEnvVar("tripStartStopPlaceRef", tripRequirement.trip.origin);
               bru.setEnvVar("tripEndStopPlaceRef", tripRequirement.trip.destination);
               bru.setEnvVar("tripStartDatetime", _searchStart);

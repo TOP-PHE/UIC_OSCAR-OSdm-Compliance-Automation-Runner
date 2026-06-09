@@ -246,6 +246,34 @@ function isLoopbackBrunoCall(req) {
   return ip === '127.0.0.1' || ip === '::1';
 }
 
+// ── Route: GET /json_validator/datafile.schema.json (#333, v1.11.112) ───────
+// Serve the JSON schema bundled with the Bruno collection. Before this
+// route, operators had to set JSON_SCHEMA_URL to an external URL (the
+// default in .env.example pointed at a deprecated GitHub branch:
+// UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/…) that
+// produced false-positive validation failures. Serving the schema locally
+// removes the external dependency entirely — the schema always matches
+// the running collection's expectations because they're shipped together.
+//
+// Public: no auth, no rate limiter beyond the global expressjs default.
+// The file is a single static read from a path entirely under operator
+// control (COLLECTION_PATH bind-mount); there's no user-controlled
+// component in the resolved path, so path-traversal is not a vector.
+// Cache the file aggressively (the collection only changes on deploy).
+const COLLECTION_PATH_SAFE = path.resolve(process.env.COLLECTION_PATH || '/collection');
+const SCHEMA_FILE_PATH     = path.join(COLLECTION_PATH_SAFE, 'json_validator', 'datafile.schema.json');
+app.get('/json_validator/datafile.schema.json', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.type('application/json');
+  res.sendFile(SCHEMA_FILE_PATH, err => {
+    if (err) {
+      log.warn({ err: err && err.message, path: SCHEMA_FILE_PATH },
+        '[schema-route] sendFile failed — collection bind-mount missing or schema file moved?');
+      if (!res.headersSent) res.status(404).type('text/plain').send('schema file not found');
+    }
+  });
+});
+
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);

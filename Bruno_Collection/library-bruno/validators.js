@@ -283,10 +283,24 @@ function validateDataFileJsonWithTemplate(jsonData) {
       //   - any other *.github.com / *.githubusercontent.com subdomain
       const _isGitHubHost = /^(?:[^.]+\.)?github(?:usercontent)?\.com$/i.test(_hostname);
       if (_isGitHubHost) {
+        // #333 (v1.11.112): json_schema is a SERVER-wide setting, not a
+        // per-company env file. The previous WARNING text said "update the
+        // company's environment file" which is misleading — there is no
+        // such file. The value comes from JSON_SCHEMA_URL set on the OSCAR
+        // server's .env (OSCAR_Deploy/.env). v1.11.112 also serves the
+        // schema bundled with the Bruno collection at
+        // http://127.0.0.1:3001/json_validator/datafile.schema.json, so
+        // operators no longer need a public schema URL at all.
+        const _isExchDev = /exch_dev/i.test(schemaUrl) || /OSDM-testing/i.test(schemaUrl);
+        const _staleNote = _isExchDev
+          ? 'The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). '
+          : 'A GitHub-hosted schema URL is fragile (depends on the repo staying public and the branch / file path not moving). ';
         validationLogger(
-          '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl +
-          '). The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). ' +
-          'Update the company\'s environment file to point at the OSCAR-bundled local schema: http://localhost:8080/json_validator/datafile.schema.json'
+          '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl + '). ' +
+          _staleNote +
+          'OSCAR_Server now bundles the schema and serves it locally — preferred value: ' +
+          'http://127.0.0.1:3001/json_validator/datafile.schema.json. ' +
+          'Operator action on the VPS: edit OSCAR_Deploy/.env, set JSON_SCHEMA_URL to that URL, restart with "docker compose restart oscar".'
         );
       }
     }
