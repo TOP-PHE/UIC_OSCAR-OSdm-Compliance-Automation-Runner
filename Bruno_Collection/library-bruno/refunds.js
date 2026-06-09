@@ -196,10 +196,26 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   });
 
   // Validate refundFee structure
-  const refundFeeLabel = refundOffer.refundFee
-    ? `amount: ${refundOffer.refundFee.amount}, currency: ${refundOffer.refundFee.currency}`
-    : 'missing';
-  test(`Refund offer[${index}] refundFee exists and is valid, ${refundFeeLabel}`, () => {  
+  // v1.11.108: clearer wording. The assertion is structural — *"the Price
+  // object is well-formed"* — not economic — *"the carrier kept money"*.
+  // Per OSDM (RefundOffer.refundFee: 'Amount kept by the carrier and/or
+  // distributor') the field is REQUIRED on every RefundOffer; the Price
+  // object MUST be present even when amount=0 (no retention). The historical
+  // "exists and is valid, amount: 0, currency: EUR" wording was confusing
+  // because "exists" sounded like an economic claim. Rephrase to name the
+  // structural check explicitly and annotate amount=0 as "no carrier
+  // retention" so the report reader doesn't have to do the mental math.
+  let refundFeeLabel;
+  if (!refundOffer.refundFee) {
+    refundFeeLabel = 'missing';
+  } else {
+    const amt = refundOffer.refundFee.amount;
+    const cur = refundOffer.refundFee.currency;
+    const sca = refundOffer.refundFee.scale;
+    const retention = (amt === 0) ? ' (= no carrier retention)' : ' (= kept by carrier per OSDM)';
+    refundFeeLabel = `amount: ${amt} ${cur}${retention}, scale: ${sca}`;
+  }
+  test(`Refund offer[${index}] refundFee Price structure is well-formed — ${refundFeeLabel}`, () => {
     validationLogger(`[INFO] Refund offer[${index}] refundFee: ${refundOffer.refundFee?.amount} ${refundOffer.refundFee?.currency}`);
     expect(refundOffer.refundFee).to.exist;
     expect(refundOffer.refundFee).to.be.an('object');
@@ -463,11 +479,18 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
   if (typeof validateAppliedOverruleCode === "function") {
     return validateAppliedOverruleCode(appliedOverruleCode, expectedOverruleCode);
   }
+  // v1.11.108: normalise `undefined → null` before comparison. JSON-omitting
+  // providers (Paxone today) and JSON-emit-null providers both express "no
+  // overrule applied" — the chai strict-equality check used to distinguish
+  // them and fire a false-positive failure (`expected undefined to equal
+  // null`) on the omitter. Treat both as equivalent: the OSDM contract says
+  // the field is optional and absent / null are semantically the same.
+  const normalisedApplied = (appliedOverruleCode === undefined) ? null : appliedOverruleCode;
   const title = expectedOverruleCode === null
-    ? "AppliedOverruleCode is null as expected"
-    : `AppliedOverruleCode is valid, (expected: appliedOverruleCode = ${appliedOverruleCode}, actual: expectedOverruleCode = ${expectedOverruleCode})`;
+    ? `AppliedOverruleCode is null as expected (actual: ${appliedOverruleCode === undefined ? 'undefined → treated as null' : JSON.stringify(appliedOverruleCode)})`
+    : `AppliedOverruleCode matches expected — expected: ${expectedOverruleCode}, actual: ${JSON.stringify(appliedOverruleCode)}`;
   test(title, () => {
-    expect(appliedOverruleCode).to.equal(expectedOverruleCode);
+    expect(normalisedApplied).to.equal(expectedOverruleCode);
   });
 }
 
