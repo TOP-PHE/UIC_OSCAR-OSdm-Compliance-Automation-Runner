@@ -88,6 +88,42 @@ LOG_LEVEL=info
 > for backward compatibility. Setting it in `.env` makes the value
 > deterministic across DB resets.
 
+### `JSON_SCHEMA_URL` — datafile schema validation
+
+From v1.11.112 the default value points at the schema **bundled with the
+Bruno collection and served by OSCAR_Server itself** at the loopback URL:
+
+```
+JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
+```
+
+Leave this default unchanged unless you maintain a custom schema. It works
+offline and always matches the running collection's expectations because
+both ship together.
+
+**Older installs** may have an obsolete value pointing at:
+
+```
+https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+```
+
+That repo is deprecated and its schema is out of sync with the modern
+OSCAR datafile shape — you'll see a `[WARNING]` in every run log and
+false-positive validation failures (typically *"Required property
+'offerSearchCriteriaList' is missing"*). To fix:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+sudo cp .env .env.bak.$(date +%Y%m%d)
+sudo nano .env
+# → set JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
+sudo docker compose restart oscar
+```
+
+The route is public, no auth, served from the bind-mounted `/collection`
+volume inside the oscar container. There is no per-company schema — this
+is a single VPS-wide setting.
+
 ---
 
 ## 4. Start the stack
