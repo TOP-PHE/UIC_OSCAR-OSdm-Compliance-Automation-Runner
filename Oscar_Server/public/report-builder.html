@@ -138,6 +138,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-level.l-warn,.log-level.l-warning{background:#fff3e0;color:#e65100}
 .log-level.l-info{background:#e8f5e9;color:#2e7d32}
 .log-level.l-stdout,.log-level.l-stderr{background:#eceff1;color:#546e7a}
+/* v1.11.115: 'debug' level chips (emitted since the v1.11.113 runner-side
+   level inference) had no rule — readable here on the light page, but the
+   chip rendered without its badge colors. */
+.log-level.l-debug{background:#eceff1;color:#78909c}
 .log-cat{font-size:10px;color:#1565c0;background:#e3f2fd;border-radius:3px;padding:1px 6px;text-align:center;align-self:center}
 .log-msg{color:#37474f;white-space:pre-wrap;word-break:break-word}
 .log-empty{padding:20px;text-align:center;color:#90a4ae;font-size:13px}

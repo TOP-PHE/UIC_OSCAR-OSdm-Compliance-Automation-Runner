@@ -14,6 +14,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.116] — 2026-06-09
+
+**Invisible `warn`/`debug` log lines on the run-detail page —
+regression-by-omission from v1.11.113.**
+
+### Fixed
+
+- **`run-detail.html`: `warn` and `debug` log lines rendered
+  near-invisible.** The v1.11.113 runner-side level inference
+  started storing `warn` and `debug` levels in volume, but the
+  log box CSS only had color rules for `stdout` / `stderr` /
+  `info` / `error`. Lines with `l-warn` / `l-debug` inherited
+  the page's dark text color on the dark `#1e1e1e` log box —
+  whole blocks of barely-readable text between green INFO lines
+  (user screenshot, run of 2026-06-09 21:25).
+
+  Fix: `.l-warn{color:#ffb74d}` (amber), `.l-debug{color:#9e9e9e}`
+  (muted but readable grey), plus a safety-net default
+  `color:#d4d4d4` on `.log-line` itself — placed **before** the
+  `.l-*` rules (equal specificity, source order decides) — so any
+  future level without an explicit rule stays readable instead of
+  vanishing.
+
+- **Level filter row was missing `warn` and `debug` buttons** —
+  the new levels could not be isolated. Buttons added.
+
+- **`report-builder.html`: `debug` level chips unbadged** — light
+  page, so readable, but the chip rendered without its badge
+  colors. Matching `.log-level.l-debug` rule added.
+
+### Verified
+
+Injected all 7 level samples against the served stylesheet:
+`stdout #d4d4d4`, `info #81c784`, `warn #ffb74d`,
+`error #ef5350`, `debug #9e9e9e`, `stderr #ff9800`,
+unknown-level fallback `#d4d4d4`.
+
+### Versions
+
+- `Oscar_Server/package.json` `1.11.115` → `1.11.116`
+- `compatibility.json` `release-2026.144` (collection unchanged
+  at `OTST_V2.0.63` — HTML-only change)
+
+---
+
 ## [server-v1.11.115] — 2026-06-09
 
 **News: partial-refund availability announced + JSON_SCHEMA_URL
