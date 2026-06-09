@@ -14,6 +14,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.117] — 2026-06-10
+
+**Two log-pipeline fixes: milliseconds were never stored, and the
+run-detail log silently truncated at ~500 lines on finished runs.**
+
+### Fixed
+
+- **`run_events.ts` stored at second precision.** The v1.11.113
+  dashboard change (`slice(11,23)`) claimed to "unhide" millisecond
+  precision, but the `ts` column was populated by its SQLite schema
+  default `datetime('now')` — second-precision
+  (`2026-06-09 21:25:16`). There were no milliseconds to unhide;
+  users kept seeing `[21:25:16]` even on release-2026.144 with the
+  new page loaded.
+
+  Fix: `logEvent()` now passes `ts` explicitly as
+  `new Date().toISOString()` (`2026-06-10T07:42:13.123Z`) on both
+  INSERT sites (regular event + cap-reached warning). Same UTC
+  storage convention; the dashboard slice now yields
+  `HH:MM:SS.mmm` as designed. Pre-existing rows keep the old format
+  and degrade gracefully (slice shows `HH:MM:SS`). All `run_events`
+  consumers paginate/order by the autoincrement `id`, never by `ts`
+  string comparison, so mixed formats are safe. No migration —
+  the column is TEXT; the schema DEFAULT stays as a fallback.
+
+- **Run-detail log truncated at ~500 lines on finished runs —
+  "log stops before the offer request".** A FAILED Bileto run
+  (709 assertions, 21 HTTP requests — the full
+  offer/booking/refund flow executed) showed an execution log
+  ending mid-system-infos. The run never stopped; the log VIEW
+  did:
+  - `GET /v1/runs/:id/logs` caps each fetch at **500 rows**
+    (`LIMIT 500` + `since_id` cursor).
+  - `run-detail.html` stopped polling the moment the run reported
+    a terminal status — so opening a finished run fetched exactly
+    one page and stranded everything behind the cursor.
+
+  Fix, three parts:
+  1. The logs endpoint returns **`has_more`** (rows hit the SQL
+     limit → backlog continues).
+  2. The dashboard poll loop **drains the backlog** with immediate
+     50 ms follow-up fetches while `has_more` (length ≥ 500
+     fallback), and only then lets the terminal status end the
+     loop.
+  3. Terminal-status side-effects (artifacts / assertions /
+     requests loads, delete + share buttons) are guarded by a
+     `terminalHandled` flag so drain iterations don't re-fire
+     them.
+
+  Verified in a browser harness against a stubbed 1250-event
+  FAILED-run backlog: 1250/1250 lines rendered across 3 pages,
+  side-effect loaders called exactly once, polling stopped
+  cleanly after the drain.
+
+### Versions
+
+- `Oscar_Server/package.json` `1.11.116` → `1.11.117`
+- `compatibility.json` `release-2026.145` (collection unchanged at
+  `OTST_V2.0.63` — server-only change)
+
+---
+
 ## [server-v1.11.116] — 2026-06-09
 
 **Invisible `warn`/`debug` log lines on the run-detail page —
