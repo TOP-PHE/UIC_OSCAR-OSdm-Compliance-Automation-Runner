@@ -14,6 +14,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.118] — 2026-06-10
+
+**Datafile validator: two false positives in OUR bundled schema /
+walker — not in the user's datafile.**
+
+With local schema serving finally working end-to-end (v1.11.115), a
+Bileto run surfaced the remaining ❌ lines — and both were our bugs:
+
+### Fixed
+
+- **Stale `required: ["currency"]` in the bundled schema.**
+  `json_validator/datafile.schema.json` still required `currency`
+  inside `scenario.offerSearchCriteria` — but ALL offer-search
+  criteria were made optional per OSDM back in April 2026, and the
+  wizard intentionally writes only the fields the tester picked
+  (possibly an empty object). Every scenario authored without an
+  explicit currency produced a false *"Required field
+  'scenarios[N].offerSearchCriteria.currency' is missing"*.
+  The `required` block is removed.
+
+- **Walker flagged legal nulls as "Required property missing".**
+  `validateValueAgainstSchema` accepted a present-but-null property
+  only when its NAME was on a hardcoded whitelist — a maintenance
+  trap: `placeSelectionMode`, added later with schema type
+  `["string","null"]` and `null` in its enum, wasn't on the list,
+  so every scenario carrying the perfectly legal
+  `"placeSelectionMode": null` was flagged. The walker now derives
+  nullability from the **schema itself** (type includes `"null"`,
+  or the enum lists `null`), keeping the legacy name list as a
+  fallback. A null on a genuinely non-nullable field now reports
+  the precise condition (*"'X' is null but the schema type (…)
+  does not allow null"*) instead of the misleading "required
+  missing".
+
+- **⛔ header decodability.** The *"Invalid JSON Data file
+  structure"* header was tagged `[INFO]` with no error count —
+  easy to misread as a schema-ACCESS problem (it fires only AFTER
+  the schema was fetched 2xx and parsed). Now:
+  `[ERROR] ⛔ Invalid JSON Data file structure (N error(s) —
+  details below). Schema was fetched OK from: <url>`.
+
+### Verified
+
+Node harness driving the real `validateDataFileJsonWithTemplate`
+against the real bundled schema:
+- (A) scenario with `offerSearchCriteria` lacking currency +
+  `placeSelectionMode: null` → both former false positives gone
+- (B) wrong-type `placeSelectionMode: 123` → still flagged
+- (C) missing `tripRequirementId` → still flagged
+- (D) null on non-nullable `code` → new precise message
+
+### Versions
+
+- `Bruno_Collection/VERSION` `OTST_V2.0.63` → `OTST_V2.0.64`
+- `Oscar_Server/package.json` `1.11.117` → `1.11.118`
+- `compatibility.json` `release-2026.146`
+
+---
+
 ## [server-v1.11.117] — 2026-06-10
 
 **Two log-pipeline fixes: milliseconds were never stored, and the
