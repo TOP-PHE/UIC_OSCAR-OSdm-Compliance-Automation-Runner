@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.137",
+  "current_release": "2026.138",
   "releases": [
+    {
+      "release": "2026.138",
+      "date": "2026-06-09",
+      "server": "1.11.110",
+      "collection": "OTST_V2.0.58",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#330, trip-branch validation): the SEARCH and SPECIFICATION trip branches in `Bruno_Collection/library-bruno/scenarioParser.js` were reading `tripRequirement.trip.startDatetime / .origin / .destination` (SEARCH) and `tripRequirement.legs[*].origin / .destination / .startDatetime / .endDatetime` (SPECIFICATION) without checking they exist first. When the datafile had a tripRequirement entry whose id matched the scenario (so the v1.11.109 upfront 'unresolved tripRequirementId' [ERROR] didn't fire) but the .trip sub-object or .legs[] array was missing or incomplete, the branch threw at the first undefined access — and the throw was swallowed silently, leaving offerTripSearchCriteria / offerTripSpecifications unset. The user only saw the downstream 'Required scenario variable offerTripSearchCriteria is empty' from buildOfferCollectionRequest, with no [INFO]/[ERROR] line naming the actual data-shape gap. This release adds two layers of diagnostic: (1) BEFORE entering the branch, validate that the required fields exist on the trip / legs; if not, emit a precise [ERROR] naming the missing field(s) and the wizard section to fix, plus a [DEBUG] dump of the actual structure (visible only at loggingType=DEBUG/FULL — does NOT add noise to default INFO-level reports). (2) WRAP the switch in try/catch so any deeper unexpected throw (subTripDate refusing a date format, a malformed sub-field the validators didn't catch) surfaces with the tripRequirement context instead of propagating as 'Cannot read property X of undefined'. The downstream parseEnvJson hint from v1.11.109 still fires after, but the user now sees the root cause ('SEARCH trip missing origin/destination/startDatetime') BEFORE the consequence ('offerTripSearchCriteria empty'). All new log lines use [ERROR] / [DEBUG] levels — they only fire when something is actually broken AND only the [ERROR] line shows at default INFO level; the [DEBUG] dump stays invisible unless explicitly enabled.",
+        "Bruno_Collection/VERSION OTST_V2.0.57 -> OTST_V2.0.58; server 1.11.109 -> 1.11.110. No data-file schema change, no backend behaviour change, no wizard UI change. 21 partial-refund + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.137",
       "date": "2026-06-09",
