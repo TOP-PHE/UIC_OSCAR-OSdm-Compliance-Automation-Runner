@@ -24,12 +24,12 @@ runtime:
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
         const { displayFulFilledBooking } = require(bru.getEnvVar("library_base") + "displays.js");
 
-        test("Status code is 200", () => {
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");

@@ -69,7 +69,7 @@ runtime:
         const { bruTest } = require(bru.getEnvVar("library_base")+"testCapture.js");
 
         // Validate HTTP response status
-        bruTest(`Status code is 200`, () => {
+        bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
         });
 

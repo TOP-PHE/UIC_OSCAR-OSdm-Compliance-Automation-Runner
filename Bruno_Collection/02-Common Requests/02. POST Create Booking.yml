@@ -131,7 +131,7 @@ runtime:
             bru.runner.setNextRequest("02. POST Create Booking");
             return;
           } else {
-            test("Status code is 200", () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
             loopbackOrStop("POST Create Booking (combined return)");
             return;
           }
@@ -155,11 +155,11 @@ runtime:
           bru.deleteEnvVar("currentPassengerIndex");
         } else {
           // One-way (unchanged behaviour), or the combined-200 success path.
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
               expect(_status, "[ERROR] Wrong response status").to.eql(200);
           });
           if (_status !== 200) {
-            test("Status code is 200", () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
             loopbackOrStop("POST Create Booking");
             return;
           }
