@@ -17,6 +17,7 @@
 
 const express = require('express');
 const fs = require('node:fs');
+const rateLimit = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run, colEncrypt, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
@@ -28,6 +29,20 @@ const log = require('../../utils/logger');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
+
+// Rate limiter for GET /test-framework (CodeQL js/missing-rate-limiting).
+// The lazy migration introduced in v1.11.105 reads + decrypts the company's
+// datafile from disk; even though the endpoint is auth-gated, a leaked
+// session token shouldn't be usable to mass-poll this route in a tight
+// loop. Same window / cap as the datafile read limiter for consistency.
+const frameworkReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests',
+             detail: 'Too many test-framework reads in a short window.' }
+});
 
 // ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
 // Test framework is the company's vendor capability declaration. It is test
@@ -52,7 +67,7 @@ function requireTestManager(req, res) {
 }
 
 // ── GET /v1/company/test-framework ────────────────────────────────────────────
-router.get('/test-framework', async (req, res) => {
+router.get('/test-framework', frameworkReadLimiter, async (req, res) => {
   if (denyAdminAndCertifier(req, res)) return;
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
