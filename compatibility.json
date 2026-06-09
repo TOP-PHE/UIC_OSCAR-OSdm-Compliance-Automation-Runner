@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.133",
+  "current_release": "2026.134",
   "releases": [
+    {
+      "release": "2026.134",
+      "date": "2026-06-09",
+      "server": "1.11.106",
+      "collection": "OTST_V2.0.54",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(refunds, semantic): the 'Refundable amount is 0 because overruleCode is null or CODE_DOES_NOT_EXIST' assertion was inverted. It encoded the assumption 'no overrule -> refund denied -> amount must be 0' as a global truth, but that's only correct in one specific case (booking outside every applicable afterSalesCondition window). The general truth is: WITHOUT overrule, the provider OWNS the rules (time/fare/distance/internal commercial — OSCAR can't predict them) and the response is authoritative; WITH overrule, the distributor declared the exceptional circumstance and the provider's contract is to refund the full booking value with no fee. Rewrote validateRefundableAmountLocal in `Bruno_Collection/library-bruno/refunds.js` to encode this correctly: (a) a new structural-bounds assertion that ALWAYS applies regardless of overrule (amount and fee non-negative; sum <= confirmedPrice; currencies consistent); (b) overrule-set branch verifies the overrule contract (full-refund: amount == confirmedPrice AND fee == 0; partial-with-overrule: fee == 0 AND fee+amount < confirmedPrice); (c) no-overrule branch logs what the provider returned but does NOT assert a specific value (OSCAR is not the source of truth for the provider's refund rules). The partial-refund identity (fee+amount < confirmedPrice strict) is preserved in both flows. Two consequences worth noting: a provider that ignored an overrule and returned a partial amount (historically silent pass) now fails; a no-overrule scenario whose booking is within the refund window (historically false positive failure) now passes with an [INFO] line surfacing the values for human reconciliation. The Paxone partial-refund scenario reported on 2026-06-09 — where no overrule was sent and Paxone returned 5000 EUR for a booking 9 days out — now correctly passes (was failing 'expected 5000 to equal 0').",
+        "fix(refunds, clarity): rename the partial-refund alignment assertion from 'Partial refund: response refundableAmount matches expected partial sum' to 'Partial refund: request/response alignment — response refundableAmount matches the sum of in-scope parts'. The historical wording sounded like a maths claim; the new wording names what is being verified (request vs response alignment). The error message already includes the wire-scope shape (e.g. `fulfillment[b90ddfa8...].bookingParts (6 part(s))`) so a failure is self-explanatory.",
+        "fix(refunds, clarity): provider timestamps come back in UTC (e.g. createdOn=2026-06-09T05:23:26+00:00); the assertion messages now append a parenthetical Europe/Paris equivalent so the report shows both the UTC string and the local-time read at once (e.g. '... is valid and in the past: 2026-06-09T05:23:26+00:00 (= 2026-06-09 07:23:26 Europe/Paris)'). No assertion-logic change; pure display improvement that prevents the tester from mentally doing the +1h/+2h offset against their local clock.",
+        "Bruno_Collection/VERSION OTST_V2.0.53 -> OTST_V2.0.54; server 1.11.105 -> 1.11.106. No data-file schema change, no backend change, no wizard UI change. 21 existing partial-refund unit tests + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.133",
       "date": "2026-06-08",

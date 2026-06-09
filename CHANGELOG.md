@@ -14,6 +14,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.106] — 2026-06-09
+
+**Refund assertion semantics corrected — OSCAR no longer asserts a
+specific `refundableAmount` in the normal flow.** The historical
+*"Refundable amount is 0 because overruleCode is null or
+CODE_DOES_NOT_EXIST"* assertion was **semantically inverted**: it
+encoded *"no overrule → refund denied → amount must be 0"* as a
+global truth, which only holds in one specific edge case (booking
+outside every applicable `afterSalesCondition` window). The general
+truth — and the rule OSCAR now enforces:
+
+| Flow | Provider's contract | OSCAR's assertion |
+|---|---|---|
+| **Normal** (no overrule) | Provider owns the rules (time, fare, distance, internal commercial). OSCAR can't predict the answer. | Structural bounds only (non-negative, ≤ confirmedPrice, currencies match). Log the values for human reconciliation. **Do NOT assert a specific amount.** |
+| **Exceptional** (overrule set) | Bypass the normal rules, refund the full booking value with no fee. | Strict equality: `amount == confirmedPrice` AND `fee == 0`. |
+| **Partial-refund**, either flow | Scope returns strictly less than full. | `fee + amount < confirmedPrice` (strict). |
+
+### Fixed
+
+- `Bruno_Collection/library-bruno/refunds.js` —
+  `validateRefundableAmountLocal` rewritten:
+  - New always-applies **structural-bounds** test
+    (non-negative, sum ≤ confirmedPrice, currency consistent).
+  - **Overrule-set** branch verifies the overrule contract was
+    honoured (full: `amount == confirmedPrice && fee == 0`;
+    partial-with-overrule: `fee == 0` on top of the partial-scope
+    strict-less identity).
+  - **No-overrule** branch logs what the provider returned but
+    does NOT assert a specific value. The provider's response is
+    authoritative; OSCAR is not the source of truth for refund rules
+    that depend on conditions OSCAR can't compute.
+  - The Paxone partial-refund scenario reported on 2026-06-09 — no
+    overrule sent, Paxone returned 5000 EUR for a booking 9 days
+    out — now correctly passes (was failing *"expected 5000 to
+    equal 0"*).
+
+- `Bruno_Collection/library-bruno/refunds.js` — provider timestamps
+  arrive in UTC (`+00:00`). The `createdOn / validFrom / validUntil`
+  assertion messages now append a parenthetical `Europe/Paris`
+  reading so the report shows both at once:
+  > `... is valid and in the past: 2026-06-09T05:23:26+00:00 (= 2026-06-09 07:23:26 Europe/Paris)`
+
+  Pure display change; the comparison is and was always UTC-based
+  (epoch-ms), so the verdict is unchanged.
+
+### Changed
+
+- `Bruno_Collection/03-Refund/10. POST Refund Offers.yml` — the
+  partial-refund alignment assertion is renamed from
+  *"Partial refund: response refundableAmount matches expected
+  partial sum"* to *"Partial refund: request/response alignment —
+  response refundableAmount matches the sum of in-scope parts"*. The
+  historical wording sounded like a maths claim; the new wording
+  names what is being verified. The error message already includes
+  the wire-scope shape (e.g. `fulfillment[b90ddfa8…].bookingParts
+  (6 part(s))`) so a failure is self-explanatory.
+
+### Behaviour change worth knowing
+
+Two cases shift between pass and fail vs. the historical behaviour:
+
+- **Previously passed, now fails**: a provider that ignored an
+  overrule and returned a partial amount or non-zero fee was
+  silently accepted before. The exceptional-flow branch now asserts
+  the overrule contract strictly. If a real provider does this, the
+  test will surface it clearly. *(This is the intended direction —
+  the overrule contract is now genuinely tested.)*
+
+- **Previously failed, now passes**: a scenario whose booking is
+  legitimately within the refund window, with no overrule set, that
+  returns a non-zero amount from the provider. The old assertion
+  fired *"expected X to equal 0"* — a false positive failure. The
+  new no-overrule branch logs the values and does not assert. *(This
+  is the case the user surfaced on 2026-06-09 with the Paxone
+  scenario.)*
+
+### Behaviour guarantees
+
+- 21 existing partial-refund unit tests still pass.
+- 26 framework-gating unit tests still pass.
+- No data-file schema change. No backend change. No wizard UI
+  change. The partial-refund identity assertion
+  (`fee + amount < confirmedPrice` strict) is preserved exactly.
+- The partial-scope structural check
+  (response.refundOfferBreakdownItems[].bookingParts ⊆ requested)
+  is preserved exactly.
+
+---
+
 ## [server-v1.11.105] — 2026-06-08
 
 **Framework-gating "golden rule" — Test Framework now declares what
