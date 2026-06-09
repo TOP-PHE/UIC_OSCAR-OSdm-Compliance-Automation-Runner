@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.145",
+  "current_release": "2026.146",
   "releases": [
+    {
+      "release": "2026.146",
+      "date": "2026-06-10",
+      "server": "1.11.118",
+      "collection": "OTST_V2.0.64",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(datafile validator — two false positives in the BUNDLED schema/walker): with the local schema serving finally working end-to-end (v1.11.115), a Bileto run surfaced two failures that were OUR bugs, not the datafile's. (1) The bundled json_validator/datafile.schema.json still carried 'required':['currency'] inside scenario.offerSearchCriteria — stale: ALL offer-search criteria (currency, offerMode, requestedOfferParts, …) were made optional per OSDM back in the April 2026 fix, and the wizard intentionally writes only the fields the tester picked (possibly an empty object). Every scenario authored without an explicit currency produced a false 'Required field scenarios[N].offerSearchCriteria.currency is missing'. The required block is removed. (2) validators.js validateValueAgainstSchema treated a PRESENT-but-null property as 'Required property missing' unless its NAME was on a hardcoded whitelist (gender, overruleCode, …) — a maintenance trap: placeSelectionMode, added later with schema type ['string','null'] and null in its enum, wasn't on the list, so every scenario carrying the perfectly legal 'placeSelectionMode': null was flagged. The walker now derives nullability from the SCHEMA itself (type includes 'null', or the enum lists null) with the legacy name list kept as fallback; a null on a genuinely non-nullable field now reports the precise condition (''X' is null but the schema type (…) does not allow null') instead of the misleading 'required missing'.",
+        "feat(⛔ header decodability): the 'Invalid JSON Data file structure' header was tagged [INFO] with no error count — easy to misread as a schema-ACCESS problem (it fires only AFTER the schema was fetched 2xx and parsed). Now: '[ERROR] ⛔ Invalid JSON Data file structure (N error(s) — details below). Schema was fetched OK from: <url>'.",
+        "Verified with a Node harness driving the real validateDataFileJsonWithTemplate against the real bundled schema: (A) scenario with offerSearchCriteria lacking currency + placeSelectionMode:null → both former false positives gone; (B) wrong-type placeSelectionMode:123 → still flagged; (C) missing tripRequirementId → still flagged; (D) null on non-nullable 'code' → new precise message. Bruno_Collection/VERSION OTST_V2.0.63 -> OTST_V2.0.64; server 1.11.117 -> 1.11.118. No payload change; only datafile-validation verdicts and message wording."
+      ]
+    },
     {
       "release": "2026.145",
       "date": "2026-06-10",

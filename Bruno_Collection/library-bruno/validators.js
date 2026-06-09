@@ -355,20 +355,40 @@ function validateDataFileJsonWithTemplate(jsonData) {
         function validateValueAgainstSchema(key, value, propertySchema, path = "") {
           const fullPath = path ? (key ? `${path}.${key}` : path) : key;
 
-          // Check required
+          // Null handling.
+          // #345 (v1.11.118): this branch fires for a property that is PRESENT
+          // with a null value (the callers only recurse on hasOwnProperty).
+          // It used to accept null only for a hardcoded list of field names —
+          // a maintenance trap: placeSelectionMode (added later with schema
+          // type ["string","null"] and null in its enum) wasn't on the list,
+          // so every scenario carrying the perfectly legal
+          // `"placeSelectionMode": null` was flagged "Required property
+          // missing". Derive nullability from the SCHEMA itself first
+          // (type includes "null", or the enum lists null); keep the legacy
+          // name list as a fallback for older fields whose schema entries
+          // never declared nullability.
           if (value == null) {
-            if (
+            const _types = Array.isArray(propertySchema.type)
+              ? propertySchema.type
+              : [propertySchema.type];
+            const _schemaAllowsNull =
+              _types.includes("null") ||
+              (Array.isArray(propertySchema.enum) && propertySchema.enum.includes(null));
+            const _legacyNullableNames = (
               key === "gender" || key === "updateGender" || key === "requiresPlaceSelection" || key === "offerMode" ||
               key === "updateFirstName" || key === "updateLastName" || key === "updateDateOfBirth" ||
               key === "updatePhoneNumber" || key === "updateEmail" || key === "requestedOfferParts" ||
               key === "serviceClass" || key === "travelClass" || key === "refundDate" || key === "flexibilities" ||
               key === "desiredFlexibility" || key === "overruleCode" || key === "scenarioAction" ||
               key === "accommodationSelection" || key === "loggingType"
-            ) {
+            );
+            if (_schemaAllowsNull || _legacyNullableNames) {
               validationLogger(`[FULL] ⚠️ Optional field '${fullPath}' is null/missing — this is allowed.`);
               return;
             }
-            validationErrors.push(`❌ Required property '${fullPath}' is missing.`);
+            // Present-but-null on a non-nullable schema type: say THAT,
+            // not "required property missing" (the property exists).
+            validationErrors.push(`❌ '${fullPath}' is null but the schema type (${_types.join(", ")}) does not allow null.`);
             return;
           }
 
@@ -459,7 +479,13 @@ function validateDataFileJsonWithTemplate(jsonData) {
             expect(true).to.eql(true);
           });
         } else {
-          validationLogger(`[INFO] ⛔ Invalid JSON Data file structure with schema from : ${schemaUrl}`);
+          // #345 (v1.11.118): the header used to be tagged [INFO] with no
+          // error count — easy to misread as a schema-ACCESS problem. It is
+          // not: this branch only runs after the schema was fetched (2xx)
+          // and parsed; the failures below are CONTENT mismatches between
+          // the data file and the schema. Tag it [ERROR] and announce how
+          // many detail lines follow.
+          validationLogger(`[ERROR] ⛔ Invalid JSON Data file structure (${validationErrors.length} error(s) — details below). Schema was fetched OK from: ${schemaUrl}`);
           validationErrors.forEach(err => console.error("[ERROR] " + err));
           test("⛔ Invalid JSON Data file structure", function () {
             throw new Error("Validation errors:\n" + validationErrors.join("\n"));

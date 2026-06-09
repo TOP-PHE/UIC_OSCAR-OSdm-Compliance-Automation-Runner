@@ -311,10 +311,7 @@
               "inboundDate": {
                 "type": "string"
               }
-            },
-            "required": [
-              "currency"
-            ]
+            }
           },
           "requestedFulfillmentOptionsListId": {
             "type": "integer"
