@@ -14,6 +14,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.109] — 2026-06-09
+
+**Precise new-user diagnostics — five log lines that turn opaque
+"variable is empty" symptoms into actionable error messages naming
+the upstream resolver and the wizard section to fix.**
+Resolves [#328](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/328) (OBB onboarding case).
+
+### Context
+
+A tester onboarding a new ÖBB company chased a confusing chain:
+
+> `Error: [ERROR] Required scenario variable "offerTripSearchCriteria" is empty or not set. This usually means getScenarioData() did not run, or the data file failed to load...`
+
+…through `scenarioParser.js`, `requestsBuilder.js`, and the env
+file before discovering that the company's environment was pointing
+at a deprecated GitHub-hosted schema (UnionInternationalCheminsdeFer/
+OSDM-testing's `exch_dev` branch, which we no longer maintain) AND
+the scenario's `tripRequirementId` didn't resolve to any entry in
+the datafile. None of the OSCAR log lines said either of those
+things directly. This release fixes that.
+
+### Added
+
+- `Bruno_Collection/library-bruno/validators.js` — when
+  `validateDataFileJsonWithTemplate` sees the `json_schema` URL
+  point at a GitHub host, emit a `[WARNING]`:
+
+  > *"json_schema env var points at a GitHub-hosted schema (…). The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically 'Required property `offerSearchCriteriaList` is missing'). Update the company's environment file to point at the OSCAR-bundled local schema: http://localhost:8080/json_validator/datafile.schema.json"*
+
+- `Bruno_Collection/library-bruno/scenarioParser.js` — three
+  upfront `[ERROR]` lines for unresolved scenario id-references.
+  When the scenario's `tripRequirementId`,
+  `passengersListId`, or `requestedFulfillmentOptionsListId`
+  doesn't match any entry in the corresponding datafile array,
+  emit a precise error naming the unresolved id, the available
+  ids, and the wizard section to fix (Trip Requirements,
+  Passengers, or Requested Fulfillment Options respectively).
+  Example:
+
+  > *"Scenario `OBB_SALE_1ADT_1LEG` references tripRequirementId=42 but no matching entry exists in datafile.tripRequirements[]. Available ids: [1, 2, 3]. Fix in the wizard: open the Test Data → Trip Requirements section…"*
+
+  Without this check the tester only saw the downstream symptom —
+  *"Required scenario variable offerTripSearchCriteria is empty
+  or not set"* — and had to reverse-engineer the linkage gap
+  through the parser.
+
+- `Bruno_Collection/library-bruno/envUtils.js` — per-variable
+  hints appended to `parseEnvJson`'s required-but-empty error.
+  The four scenario-id-dependent variables
+  (`offerTripSearchCriteria`, `offerTripSpecifications`,
+  `offerPassengerSpecifications`, `offerSearchCriteria`) now
+  carry a tail message naming the upstream resolver and the
+  likely cause:
+
+  > *"Upstream resolver: scenarioParser.osdmTripSearchCriteria() / osdmTripSpecification(). TripType currently=\"SEARCH\". When this variable is empty the cause is almost always an unresolved scenario.tripRequirementId — look for `Scenario \"...\" references tripRequirementId=... but no matching entry exists` in the run log above. Fix: open the Test Data → Trip Requirements section in the wizard and link the scenario to a defined entry."*
+
+### Behaviour guarantees
+
+- All new log lines are advisory. No assertion contracts change.
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- `npm run lint` clean. No data-file schema change. No backend
+  behaviour change.
+
+### Known structural gap (not addressed in this PR)
+
+The OBB env file still references the GitHub `exch_dev` schema —
+the new `[WARNING]` makes that visible, but the file itself needs
+manual update (or a Test Manager re-runs the wizard's environment
+generation step). A future PR could ship a one-time migration
+that rewrites any stored env file's `json_schema` value to the
+local URL, gated on detecting the GitHub pattern.
+
+---
+
 ## [server-v1.11.108] — 2026-06-09
 
 **Three assertion wording / semantic fixes surfaced by a tester

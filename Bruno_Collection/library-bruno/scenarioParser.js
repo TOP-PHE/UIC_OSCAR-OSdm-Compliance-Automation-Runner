@@ -704,7 +704,31 @@ function parseScenarioData(jsonData) {
         validationLogger(`[WARNING] expiredFlow queue build skipped: ${_e && _e.message}`);
       }
 
-      // Trip requirements
+      // Trip requirements — verify the scenario's reference resolves BEFORE
+      // walking the list. #328 (v1.11.109): when a new user authors a
+      // datafile in the wizard and the scenario's tripRequirementId doesn't
+      // match any tripRequirements[].id, every downstream variable
+      // (offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef,
+      // …) stays unset and the user only sees the downstream symptom:
+      // "Required scenario variable 'offerTripSearchCriteria' is empty or
+      // not set." That message points at data_base but doesn't tell them
+      // the cause is the unresolved tripRequirementId. Emit a precise
+      // ERROR up front so the next reader sees the linkage gap directly.
+      const _tripList    = Array.isArray(jsonData.tripRequirements) ? jsonData.tripRequirements : [];
+      const _tripWantId  = scenario.tripRequirementId;
+      const _tripFound   = _tripList.some(function (tr) { return tr && tr.id === _tripWantId; });
+      if (!_tripFound) {
+        const _availIds = _tripList.map(function (tr) { return tr && tr.id; }).filter(function (id) { return id != null; });
+        validationLogger(
+          '[ERROR] Scenario "' + scenario.code + '" references tripRequirementId=' +
+          JSON.stringify(_tripWantId) + ' but no matching entry exists in datafile.tripRequirements[]. ' +
+          'Available ids: [' + _availIds.join(', ') + ']. ' +
+          'Fix in the wizard: open the Test Data → Trip Requirements section, ' +
+          'confirm at least one entry exists and that the scenario\'s tripRequirementId points at one of them. ' +
+          'When tripRequirementId is unresolved, every downstream variable ' +
+          '(offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef, …) stays unset and the request body cannot be built.'
+        );
+      }
       jsonData.tripRequirements?.some(function (tripRequirement) {
         if (tripRequirement.id === scenario.tripRequirementId) {
           bru.setEnvVar("TripType", tripRequirement.tripType);
@@ -814,7 +838,23 @@ function parseScenarioData(jsonData) {
         return true;
       });
 
-      // Passengers
+      // Passengers — same upfront check as tripRequirements above. #328
+      // (v1.11.109): when scenario.passengersListId doesn't resolve, the
+      // downstream symptom is a missing `offerPassengerSpecifications` env
+      // var. Emit a precise [ERROR] naming the linkage gap.
+      const _paxLists    = Array.isArray(jsonData.passengersList) ? jsonData.passengersList : [];
+      const _paxWantId   = scenario.passengersListId;
+      const _paxFound    = _paxLists.some(function (pl) { return pl && pl.id === _paxWantId; });
+      if (!_paxFound) {
+        const _availIds = _paxLists.map(function (pl) { return pl && pl.id; }).filter(function (id) { return id != null; });
+        validationLogger(
+          '[ERROR] Scenario "' + scenario.code + '" references passengersListId=' +
+          JSON.stringify(_paxWantId) + ' but no matching entry exists in datafile.passengersList[]. ' +
+          'Available ids: [' + _availIds.join(', ') + ']. ' +
+          'Fix in the wizard: open the Test Data → Passengers section, ' +
+          'confirm at least one entry exists and that the scenario\'s passengersListId points at one of them.'
+        );
+      }
       jsonData.passengersList?.some(function (passengersList) {
         if (passengersList.id === scenario.passengersListId) {
           validationLogger('[INFO] Found number of passengers: ' + passengersList.passengers.length);
@@ -969,8 +1009,24 @@ function parseScenarioData(jsonData) {
           null, null, null, null, null);
       }
 
-      // Requested fulfillment options
+      // Requested fulfillment options — same upfront check. #328
+      // (v1.11.109): unresolved requestedFulfillmentOptionsListId leaves
+      // `offerFulfillmentOptions` unset; the request goes out without a
+      // requestedFulfillmentOptions[] array.
       if (Array.isArray(jsonData.requestedFulfillmentOptionsList) && jsonData.requestedFulfillmentOptionsList.length > 0) {
+        const _ffLists   = jsonData.requestedFulfillmentOptionsList;
+        const _ffWantId  = scenario.requestedFulfillmentOptionsListId;
+        const _ffFound   = _ffLists.some(function (ff) { return ff && ff.id === _ffWantId; });
+        if (!_ffFound) {
+          const _availIds = _ffLists.map(function (ff) { return ff && ff.id; }).filter(function (id) { return id != null; });
+          validationLogger(
+            '[ERROR] Scenario "' + scenario.code + '" references requestedFulfillmentOptionsListId=' +
+            JSON.stringify(_ffWantId) + ' but no matching entry exists in datafile.requestedFulfillmentOptionsList[]. ' +
+            'Available ids: [' + _availIds.join(', ') + ']. ' +
+            'Fix in the wizard: open the Test Data → Requested Fulfillment Options section ' +
+            'and link this scenario to a defined entry.'
+          );
+        }
         jsonData.requestedFulfillmentOptionsList.some(function (requestedFulfillmentOptionList) {
           if (requestedFulfillmentOptionList.id === scenario.requestedFulfillmentOptionsListId) {
             const requestedFulfillmentOptions = [];
