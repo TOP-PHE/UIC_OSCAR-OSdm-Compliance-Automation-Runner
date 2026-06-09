@@ -43,7 +43,7 @@ function logStepStart(req) {
     }).format(now) + ' Europe/Paris)';
   } catch (_e) { /* sv-SE locale or fractionalSecondDigits unsupported — fall back to UTC only */ }
   var name = (req && typeof req.getName === 'function') ? req.getName() : String(req || '');
-  console.log('⏩ [STEP] [' + utc + local + '] Executing request : ' + name);
+  console.log('[INFO] ⏩ [STEP] [' + utc + local + '] Executing request : ' + name);
 }
 
 // Function to log validation messages based on logging type (env-scoped)
@@ -122,7 +122,7 @@ function validationLogger(message) {
       existing.push({ level: level, message: message });
       bru.setVar('__rptLogs', JSON.stringify(existing));
     } catch (e) {
-      console.log('[displays] addReportLog skipped: ' + (e && e.message));
+      console.log('[DEBUG] [displays] addReportLog skipped: ' + (e && e.message));
     }
   }
 }
@@ -477,5 +477,5 @@ function displayFulFilledBooking(response) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

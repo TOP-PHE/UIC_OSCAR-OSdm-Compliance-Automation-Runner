@@ -31,8 +31,8 @@ const htmlPath   = path.join(VAL_DIR, `${dateStr}_${envName}_Report.html`);
 
 // ─── Load data ────────────────────────────────────────────────────────────────
 if (!fs.existsSync(BRU_JSON)) {
-  console.error('[mergeReport] ERROR: Bruno JSON report not found: ' + BRU_JSON);
-  console.error('  Run with: bru.cmd run --sandbox=developer --env <EnvName> --reporter-json "Validation_Reports/.bru_results.json"');
+  console.error('[ERROR] [mergeReport] Bruno JSON report not found: ' + BRU_JSON);
+  console.error('[ERROR]   Run with: bru.cmd run --sandbox=developer --env <EnvName> --reporter-json "Validation_Reports/.bru_results.json"');
   process.exit(1);
 }
 
@@ -245,7 +245,7 @@ function prettyJson(raw) {
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch (e) {
-    console.log('[mergeReport] prettyJson: JSON-like value failed to parse (' + (e && e.message) + ') — returning raw.');
+    console.log('[WARNING] [mergeReport] prettyJson: JSON-like value failed to parse (' + (e && e.message) + ') — returning raw.');
     return String(raw);
   }
 }
@@ -480,5 +480,5 @@ ${osdmSection}
 // ─── Write ─────────────────────────────────────────────────────────────────────
 if (!fs.existsSync(VAL_DIR)) fs.mkdirSync(VAL_DIR, { recursive: true });
 fs.writeFileSync(htmlPath, html, 'utf8');
-console.log(`[mergeReport] ✅ Report written → ${htmlPath}`);
-console.log(`[mergeReport]    ${mergedRequests.length} requests | ${totalTests} assertions | ${passTests} passed | ${failTests} failed`);
+console.log(`[INFO] [mergeReport] ✅ Report written → ${htmlPath}`);
+console.log(`[INFO] [mergeReport]    ${mergedRequests.length} requests | ${totalTests} assertions | ${passTests} passed | ${failTests} failed`);

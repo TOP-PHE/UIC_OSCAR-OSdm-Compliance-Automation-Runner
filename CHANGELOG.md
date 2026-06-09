@@ -14,6 +14,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.113] — 2026-06-09
+
+**Log polish + #253 fulfillmentDocuments empty-array followup.**
+Resolves [#336](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/336)
+(also unblocks the [#253](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/253)
+empty-array edge case).
+Five coupled changes in one PR.
+
+### Fixed
+
+- **Dashboard log timestamps were truncated to seconds.**
+  `Oscar_Server/public/run-detail.html` rendered the prefix as
+  `slice(11,19)` → `"19:12:42"`. Two events emitted in the same
+  wall-clock second showed identical timestamps and could not be
+  correlated with provider-side logs at sub-second precision.
+  Now `slice(11,23)` → `"19:12:42.123"`. UI-only change — the
+  underlying log records already stored full ISO ms timestamps;
+  this just unhides them.
+
+- **Runner-side log lines stored with stream name as the level
+  instead of the actual severity.** The Bruno child-process
+  stdout/stderr listeners in `Oscar_Server/src/worker/runner.js`
+  were calling `logEvent(runId, 'stdout', line, ...)` for every
+  Bruno-emitted line — so the level filter on the run-detail page
+  was useless for the bulk of the run output (an `[ERROR]` line
+  and a `[DEBUG]` line both showed as `'stdout'`). Added an
+  `inferLevel(line, streamFallback)` helper that classifies by:
+  1. explicit `[LEVEL]` tag from library-bruno emitters → that level
+  2. Bruno CLI native test markers (`✓` → info / `✕` → error)
+  3. JS stack-trace shapes (`Error:` / `AssertionError:` / `at …` lines) → error
+  4. known harmless platform noise (`Cannot open directory /etc/ssl/certs` from OpenSSL) → warn
+  5. stderr-stream fallback → error (Bruno emits real failures there)
+  6. stdout-stream fallback → info
+
+  The dashboard level filter now actually filters correctly for the
+  whole run output.
+
+- **Bruno library — ~25 `console.log` / `console.error` calls
+  emitted without a `[LEVEL]` tag.** With the runner-side inference
+  above in place, *some* of these would still flow through correctly
+  via the stream fallback, but the explicit tagging is much more
+  reliable and makes the intent visible at the source. Added
+  `[INFO]` / `[WARN]` / `[WARNING]` / `[ERROR]` / `[DEBUG]` prefixes
+  across:
+  - `auth.js`, `bookings.js`, `displays.js`, `envUtils.js`,
+    `exchanges.js`, `expiredFlow.js`, `fulfillments.js`,
+    `loopback.js`, `mergeReport.js`, `model.js`, `offers.js`,
+    `osdmCompliance.js`, `osdmSchema.js`, `osdmSchemas.js`,
+    `osdmVersion.js`, `partialRefund.js`, `passengers.js`,
+    `refunds.js`, `reportGenerator.js`,
+    `requestedInformation.js`, `scenarioParser.js`,
+    `validators.js`.
+
+  Two patterns of note:
+  - the omnipresent `[library-bruno] globalThis exposure skipped`
+    fallback (one per module) is now `[DEBUG]` — invisible at
+    default INFO level, surfaceable on demand.
+  - the `⏩ [STEP] Executing request …` lines from `displays.js`
+    and `offers.js` are now `[INFO]` — they're the heartbeat of
+    the run and should pass the INFO filter.
+
+  Combined with the runner-side inference, the dashboard level
+  filter is now reliable end-to-end.
+
+- **#253 followup — `fulfillmentDocuments: []` empty-array case.**
+  The v3.8 cross-check `fulfillmentDocumentRefs → siblingDocs[].id`
+  in `Bruno_Collection/library-bruno/bookings.js` was guarded by
+  `if (Array.isArray(siblingDocs))`, which correctly skipped the
+  check when callers didn't pass `siblingDocs` at all, but
+  INCORRECTLY ran the check (and reported every ref as
+  "unresolved") when callers passed an **empty** array — the
+  real-world pre-issuance shape `fulfillmentDocuments: []`. An OBB
+  test response declaring the v3.8-correct location with no
+  documents in it yet (typical for a provider rolling out v3.8
+  emission incrementally) produced a false-positive integrity
+  failure on a perfectly legal shape.
+
+  **Fix**: tightened the guard to also require `length > 0`, and
+  split the else-branch into two distinct cases:
+  - **(a)** sibling array fully absent → existing
+    "not provided to validator" `[INFO]` (unchanged behaviour)
+  - **(b)** sibling array present but empty → new "is present but
+    empty — legal pre-issuance shape" `[INFO]`
+
+  Test name updated to `"... (OSDM v3.8 integrity, when siblings
+  present)"` to clarify the conditional scope. No assertion
+  change on the populated-array happy path.
+
+### Versions
+
+- `Bruno_Collection/VERSION` `OTST_V2.0.60` → `OTST_V2.0.61`
+- `Oscar_Server/package.json` `1.11.112` → `1.11.113`
+- `compatibility.json` `release-2026.141`, current_release bumped
+
+### Tests
+
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- No data-file schema change.
+- No payload / wire-format change.
+
+---
+
 ## [server-v1.11.112] — 2026-06-09
 
 **OBB onboarding follow-up — SEARCH branch was rejecting valid OSDM

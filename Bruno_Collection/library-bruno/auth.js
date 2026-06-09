@@ -189,5 +189,5 @@ module.exports = { handleAccessTokenResponse, checkAuthRejection, refreshAccessT
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

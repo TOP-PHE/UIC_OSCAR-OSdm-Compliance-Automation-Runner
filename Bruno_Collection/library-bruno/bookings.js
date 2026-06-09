@@ -749,14 +749,28 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       // When `siblingDocs` is not supplied (legacy callers / pre-v3.8 providers
       // that still use the deprecated nested form) the check is SKIPPED so the
       // existing happy path is unaffected.
-      if (Array.isArray(siblingDocs)) {
+      //
+      // #336 (v1.11.113) follow-up: distinguish two distinct cases that both
+      // should SKIP the ref→id cross-check rather than fail it as "0 resolved":
+      //   (a) caller did not pass siblingDocs at all (undefined / not an array)
+      //   (b) caller passed an empty siblingDocs array
+      // Case (b) shows up in a real-world OBB-style provider response that
+      // declares `fulfillmentDocuments: []` at the response-root level (the
+      // v3.8-correct location), but with no documents in it — typically
+      // because the provider is still rolling out v3.8 emission and only
+      // wires the array shape, not the contents, on the first iteration.
+      // Treating it as "every ref is unresolved" would produce a
+      // false-positive integrity failure on a perfectly legal pre-issuance
+      // shape. Skip with a precise diagnostic instead.
+      const _hasSiblingDocs = Array.isArray(siblingDocs) && siblingDocs.length > 0;
+      if (_hasSiblingDocs) {
         const _docIds = new Set(
           siblingDocs
             .filter(d => d != null && d.id != null)
             .map(d => String(d.id))
         );
         const _unresolved = fulfillment.fulfillmentDocumentRefs.filter(r => !_docIds.has(String(r)));
-        test(`Fulfillment[${idx}].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.8 integrity)`, () => {
+        test(`Fulfillment[${idx}].fulfillmentDocumentRefs all resolve to a sibling fulfillmentDocuments[].id (OSDM v3.8 integrity, when siblings present)`, () => {
           expect(_unresolved.length,
             `unresolved ref(s): [${_unresolved.map(r => JSON.stringify(r)).join(", ")}] — sibling ids: [${[..._docIds].join(", ") || "(none)"}]`
           ).to.eql(0);
@@ -764,7 +778,11 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         if (_unresolved.length === 0) {
           validationLogger(`[INFO] Fulfillment[${idx}] all ${fulfillment.fulfillmentDocumentRefs.length} ref(s) resolve to sibling fulfillmentDocuments[].id (v3.8 integrity OK)`);
         }
+      } else if (Array.isArray(siblingDocs)) {
+        // Case (b): sibling array present but empty — legal pre-issuance shape.
+        validationLogger(`[INFO] Fulfillment[${idx}] sibling fulfillmentDocuments[] is present but empty — v3.8 ref→id cross-check skipped (legal pre-issuance shape: provider declared the v3.8 fulfillmentDocuments[] location but emitted no documents yet).`);
       } else {
+        // Case (a): sibling array absent entirely — caller did not supply it.
         validationLogger(`[INFO] Fulfillment[${idx}] sibling fulfillmentDocuments[] not provided to validator — v3.8 ref→id cross-check skipped (caller did not supply it; expected for pre-v3.8 providers using the deprecated nested fulfillment.fulfillmentDocuments).`);
       }
     } else if (!_hasLegacyDocs) {
@@ -779,5 +797,5 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }
