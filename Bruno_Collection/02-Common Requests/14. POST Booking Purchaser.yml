@@ -29,7 +29,7 @@ runtime:
         // when 12. GET Booking Purchaser found NO purchaser (non-2xx) and set
         // __purchaserWriteMethod=POST. Body is the shared assembly (scenario
         // purchaser + booking-level RI overrides).
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
         const { buildBookingPurchaserBody } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
         buildBookingPurchaserBody();
     - type: after-response

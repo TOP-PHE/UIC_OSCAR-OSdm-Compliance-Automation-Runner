@@ -30,7 +30,7 @@ runtime:
         // request: O&D swapped, departureTime = inwardReturnDate, related to the
         // outbound via returnSearchParameters.outwardOfferIds.
         const { buildReturnOfferCollectionRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
         buildReturnOfferCollectionRequest();
     - type: after-response
       code: |-

@@ -27,7 +27,7 @@ runtime:
         // come from GET .../additional-offers, whose offerId + ancillaryOfferParts
         // ids are valid for THIS booking. The name contains "Add Ancillary" so the
         // smart run filter gates it under the same salesFlow_addAncillary rule.
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
     - type: after-response
       code: |-

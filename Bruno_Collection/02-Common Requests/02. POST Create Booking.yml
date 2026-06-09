@@ -26,7 +26,7 @@ runtime:
     - type: before-request
       code: |-
         const { buildBookingRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
         buildBookingRequest();
 
         // #expired-offer test: when armed, wait until just past the EARLIEST

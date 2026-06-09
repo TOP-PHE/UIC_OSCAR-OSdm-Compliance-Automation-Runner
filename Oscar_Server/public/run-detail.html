@@ -126,6 +126,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .msg-toggle.active{background:#0090D4;color:#fff}
 .msg-toggle:disabled{cursor:not-allowed;color:#90a4ae}
 .msg-tree{background:#fff;border:1px solid #eceff1;border-radius:6px;min-height:200px;max-height:480px;overflow:auto}
+/* #325: per-message Copy / Download / Expand buttons in the msg-header. */
+.msg-actions{display:inline-flex;gap:4px;margin-left:auto;align-items:stretch;height:20px}
+.msg-act{background:#fff;border:1px solid #cfd8dc;border-radius:4px;padding:0 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a;cursor:pointer;line-height:18px;font-family:inherit}
+.msg-act:hover{background:#eceff1;border-color:#90a4ae}
+.msg-act:active{transform:translateY(1px)}
+/* Expand toggle removes the 360px scrollable-box cap so the user can read
+   the full body in place without opening the report or copying it out. */
+.msg-pre.msg-pre--expanded{max-height:none}
 </style>
 </head>
 <body>
@@ -785,7 +793,15 @@ function safeJsonForInlineScript(s) {
   return String(s).replace(/<\/(?=script)/gi, '<\\/');
 }
 
-function renderMessage(label, meta, body) {
+function renderMessage(label, meta, body, opts) {
+  // opts: { kind: 'request'|'response', stepName: string, scenarioName: string }
+  // — used to build the Copy/Download buttons' filename. All optional;
+  // sensible fallbacks keep the function callable from existing sites that
+  // didn't pass opts.
+  opts = opts || {};
+  const kind         = opts.kind || (String(label).toLowerCase().includes('request') ? 'request' : 'response');
+  const stepName     = opts.stepName || '';
+  const scenarioName = opts.scenarioName || '';
   const id = `m${++__msgIdCounter}`;
   let pretty = body;
   let parsedOk = false;
@@ -829,7 +845,20 @@ function renderMessage(label, meta, body) {
         + `</div>`;
     }
   }
-  return `<div class="msg-header"><div class="msg-label">${escHtml(label)}</div>${toggleHtml}</div>`
+  // Tester-ergonomics buttons (#325): Copy + Download + Expand/Collapse for
+  // the raw payload. Hidden when there is no body. Filename built from the
+  // scenario + step + direction so downloaded files are self-identifying.
+  let actionsHtml = '';
+  if (body) {
+    actionsHtml =
+      `<div class="msg-actions" data-msg-id="${id}" data-msg-kind="${escHtml(kind)}" `
+        + `data-msg-step="${escHtml(stepName)}" data-msg-scenario="${escHtml(scenarioName)}">`
+        + `<button class="msg-act" data-act="copy" type="button" title="Copy body to clipboard">Copy</button>`
+        + `<button class="msg-act" data-act="download" type="button" title="Download body as JSON">Download</button>`
+        + `<button class="msg-act" data-act="expand" type="button" title="Expand / collapse the body box">⌄ Expand</button>`
+      + `</div>`;
+  }
+  return `<div class="msg-header"><div class="msg-label">${escHtml(label)}</div>${toggleHtml}${actionsHtml}</div>`
     + (meta ? `<div class="msg-meta">${meta}</div>` : '')
     + payloadScript
     + `<pre class="msg-pre" id="${id}-raw">${escHtml(pretty || '(empty)')}</pre>`
@@ -882,17 +911,86 @@ async function loadRequestBodies(reqId, bodyEl) {
     const r = d.request || {};
     const reqMeta = `${escHtml(r.http_method||'')} ${escHtml(r.http_url||'')}`.trim();
     const resMeta = r.http_status != null ? `HTTP ${escHtml(r.http_status)}` : '';
+    // #325: pass step + scenario into renderMessage so the Download button can
+    // produce a self-identifying filename like
+    //   `${scenario}_${step}_response.json`.
+    const msgOpts = { stepName: r.request_name || '', scenarioName: r.scenario_name || r.suite_name || '' };
     bodyEl.innerHTML = '<div class="msg-block">'
-      + renderMessage('Request', reqMeta, r.request_body)
-      + renderMessage('Response', resMeta, r.response_body)
+      + renderMessage('Request', reqMeta, r.request_body,
+          Object.assign({ kind: 'request' }, msgOpts))
+      + renderMessage('Response', resMeta, r.response_body,
+          Object.assign({ kind: 'response' }, msgOpts))
       + '</div>';
   } catch (_) {
     bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';
   }
 }
 
+// #325: tester ergonomics — Copy / Download / Expand handlers for the
+// per-message action buttons. Filename pattern:
+//   ${scenario}_${step}_${kind}.json
+// with non-filesystem-safe chars collapsed to underscores.
+function _msgSanitiseFilename(s) {
+  return String(s || '').replace(/[\\/:*?"<>|\s]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+}
+function _msgFlash(btn, text) {
+  const original = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1100);
+}
+function _msgGetBodyText(msgId) {
+  // The <pre> always carries the pretty-printed text (already escaped HTML
+  // entities → use textContent so the clipboard / download gets the original
+  // JSON, not the escaped HTML).
+  const rawEl = document.getElementById(`${msgId}-raw`);
+  return rawEl ? rawEl.textContent : '';
+}
+
 // Collapse/expand + lazy body load for the HTTP Traffic section.
 document.getElementById('requests-content').addEventListener('click', function(e) {
+  // #325: per-message action buttons (Copy / Download / Expand).
+  const actBtn = e.target.closest('.msg-actions .msg-act');
+  if (actBtn) {
+    const wrap     = actBtn.closest('.msg-actions');
+    const msgId    = wrap && wrap.dataset.msgId;
+    const kind     = (wrap && wrap.dataset.msgKind) || 'response';
+    const stepName = (wrap && wrap.dataset.msgStep) || '';
+    const scenario = (wrap && wrap.dataset.msgScenario) || '';
+    const act      = actBtn.dataset.act;
+    if (!msgId || !act) return;
+    const bodyText = _msgGetBodyText(msgId);
+    if (act === 'copy') {
+      if (!bodyText) return;
+      navigator.clipboard.writeText(bodyText)
+        .then(() => _msgFlash(actBtn, 'Copied!'))
+        .catch(() => _msgFlash(actBtn, 'Copy failed'));
+      return;
+    }
+    if (act === 'download') {
+      if (!bodyText) return;
+      const filename = [
+        _msgSanitiseFilename(scenario) || 'oscar',
+        _msgSanitiseFilename(stepName) || 'request',
+        kind
+      ].join('_') + '.json';
+      const blob = new Blob([bodyText], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      _msgFlash(actBtn, '✓ Downloaded');
+      return;
+    }
+    if (act === 'expand') {
+      const rawEl = document.getElementById(`${msgId}-raw`);
+      if (!rawEl) return;
+      const expanded = rawEl.classList.toggle('msg-pre--expanded');
+      actBtn.textContent = expanded ? '⌃ Collapse' : '⌄ Expand';
+      return;
+    }
+    return;
+  }
   // #287: Tree/Raw toggle inside a body panel — handle first so the click
   // never falls through to a collapsible.
   const tgBtn = e.target.closest('.msg-toggle-group .msg-toggle');
