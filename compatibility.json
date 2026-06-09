@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.138",
+  "current_release": "2026.139",
   "releases": [
+    {
+      "release": "2026.139",
+      "date": "2026-06-09",
+      "server": "1.11.111",
+      "collection": "OTST_V2.0.59",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(displays.js, log levels): the DEBUG case in validationLogger was BACKWARDS — it passed only [DEBUG] and [INFO] messages and DROPPED [WARN] / [WARNING] / [ERROR]. So a Test Manager setting loggingType=DEBUG (expecting MORE detail than INFO) actually saw FEWER critical lines than the default — including the v1.11.110 trip-branch diagnostic [ERROR] lines that the OBB onboarding case relied on. Surfaced exactly that way: after v1.11.110 deployed, the user switched to DEBUG, the trip-branch [ERROR] vanished. Fixed to match the standard logging pyramid — DEBUG is the most verbose level and now passes [DEBUG] + [INFO] + [WARN] + [WARNING] + [ERROR] (everything except untagged messages, which FULL still picks up). After this fix: at INFO level the trip-branch [ERROR] still appears (no change); at DEBUG level the [ERROR] now appears as well, AND the [DEBUG] structure dumps appear, AND the user has a complete picture. The user can switch to DEBUG and KEEP all the warnings/errors they had at INFO. Other levels (FULL, INFO, WARN, ERROR) unchanged.",
+        "Bruno_Collection/VERSION OTST_V2.0.58 -> OTST_V2.0.59; server 1.11.110 -> 1.11.111. No data-file schema change, no backend behaviour change, no wizard UI change. 21 partial-refund + 26 framework-gating unit tests still pass."
+      ]
+    },
     {
       "release": "2026.138",
       "date": "2026-06-09",
