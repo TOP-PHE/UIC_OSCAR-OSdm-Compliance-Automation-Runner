@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-v1.11.117] — 2026-06-10
 
-**Milliseconds were never stored — the v1.11.113 display fix had
-nothing to display.**
+**Two log-pipeline fixes: milliseconds were never stored, and the
+run-detail log silently truncated at ~500 lines on finished runs.**
 
 ### Fixed
 
@@ -38,6 +38,35 @@ nothing to display.**
   consumers paginate/order by the autoincrement `id`, never by `ts`
   string comparison, so mixed formats are safe. No migration —
   the column is TEXT; the schema DEFAULT stays as a fallback.
+
+- **Run-detail log truncated at ~500 lines on finished runs —
+  "log stops before the offer request".** A FAILED Bileto run
+  (709 assertions, 21 HTTP requests — the full
+  offer/booking/refund flow executed) showed an execution log
+  ending mid-system-infos. The run never stopped; the log VIEW
+  did:
+  - `GET /v1/runs/:id/logs` caps each fetch at **500 rows**
+    (`LIMIT 500` + `since_id` cursor).
+  - `run-detail.html` stopped polling the moment the run reported
+    a terminal status — so opening a finished run fetched exactly
+    one page and stranded everything behind the cursor.
+
+  Fix, three parts:
+  1. The logs endpoint returns **`has_more`** (rows hit the SQL
+     limit → backlog continues).
+  2. The dashboard poll loop **drains the backlog** with immediate
+     50 ms follow-up fetches while `has_more` (length ≥ 500
+     fallback), and only then lets the terminal status end the
+     loop.
+  3. Terminal-status side-effects (artifacts / assertions /
+     requests loads, delete + share buttons) are guarded by a
+     `terminalHandled` flag so drain iterations don't re-fire
+     them.
+
+  Verified in a browser harness against a stubbed 1250-event
+  FAILED-run backlog: 1250/1250 lines rendered across 3 pages,
+  side-effect loaders called exactly once, polling stopped
+  cleanly after the drain.
 
 ### Versions
 

@@ -262,6 +262,11 @@ const runId = _rawRunId;
 
 let lastEventId = 0;
 let polling     = true;
+// #343 followup (v1.11.117): run the terminal-status side-effects (artifacts /
+// assertions / requests loads, delete + share buttons) exactly once — the
+// poll loop now keeps spinning after a terminal status to drain the log
+// backlog, so updateStatus() can be called with a terminal run several times.
+let terminalHandled = false;
 
 // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
 function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
@@ -340,6 +345,8 @@ function updateStatus(run) {
 
   if (run.status === 'COMPLETED' || run.status === 'FAILED' || run.status === 'CANCELLED') {
     polling = false;
+    if (terminalHandled) return;
+    terminalHandled = true;
     loadArtifacts();
     loadAssertions();
     loadRequests();
@@ -474,6 +481,14 @@ function downloadLogs() {
 }
 
 async function poll() {
+  // #343 followup (v1.11.117): the /logs endpoint caps each fetch at 500
+  // rows. The old loop stopped polling the moment the run reached a terminal
+  // status — stranding everything past the first page when a finished run
+  // was opened after the fact ("log stops before the offer request"). Now a
+  // full page (has_more from the server, with a length fallback) forces an
+  // immediate follow-up fetch to drain the backlog, and only then does the
+  // terminal status end the loop.
+  let drainBacklog = false;
   try {
     const [runRes, logRes] = await Promise.all([
       fetch(`/v1/runs/${encodeURIComponent(runId)}`,       {}),
@@ -483,10 +498,13 @@ async function poll() {
     const run  = await runRes.json();
     const logs = await logRes.json();
     updateStatus(run);
-    appendLogs(logs.events || []);
+    const events = logs.events || [];
+    appendLogs(events);
+    drainBacklog = logs.has_more === true || events.length >= 500;
   } catch(e) { /* network hiccup - keep polling */ }
 
-  if (polling) setTimeout(poll, 1500);
+  if (drainBacklog)  setTimeout(poll, 50);
+  else if (polling)  setTimeout(poll, 1500);
 }
 
 async function loadArtifacts() {

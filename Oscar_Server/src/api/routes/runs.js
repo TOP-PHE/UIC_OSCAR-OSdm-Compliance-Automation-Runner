@@ -746,7 +746,8 @@ router.get('/:id/logs', (req, res) => {
   // decrypting message. Caps the fetch at 5000 rows so a runaway log
   // doesn't blow up memory.
   const wantSearch = !!req.query.search;
-  sql += wantSearch ? ' ORDER BY id ASC LIMIT 5000' : ' ORDER BY id ASC LIMIT 500';
+  const sqlLimit = wantSearch ? 5000 : 500;
+  sql += ` ORDER BY id ASC LIMIT ${sqlLimit}`;
 
   const rows = all(sql, params);
   // Transparent decrypt of the message column (handles legacy plaintext).
@@ -758,7 +759,16 @@ router.get('/:id/logs', (req, res) => {
     filtered = events.filter(e => String(e.message || '').toLowerCase().includes(needle)).slice(0, 500);
   }
 
-  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered });
+  // #343 followup (v1.11.117): tell the client whether more rows are waiting
+  // behind the cursor. The SQL fetch is capped (500 / 5000-when-searching);
+  // a full page means the backlog probably continues. Without this flag the
+  // dashboard stopped polling the moment the run reached a terminal status
+  // and silently stranded everything past the first page — a FAILED run
+  // opened after the fact showed only its first ~500 log lines ("log stops
+  // before the offer request" symptom).
+  const hasMore = rows.length === sqlLimit;
+
+  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered, has_more: hasMore });
 });
 
 // ── GET /v1/runs/:id/assertions ──────────────────────────────────────────────
