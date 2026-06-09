@@ -117,12 +117,29 @@ cd /opt/OSCAR/OSCAR_Deploy
 sudo cp .env .env.bak.$(date +%Y%m%d)
 sudo nano .env
 # → set JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
-sudo docker compose restart oscar
+sudo docker compose up -d oscar
+# verify the running container actually sees the new value:
+sudo docker compose exec oscar printenv JSON_SCHEMA_URL
 ```
+
+> **Why `up -d` and not `restart`** — environment values from `env_file`
+> are baked into a container when it is **created**. `docker compose
+> restart` keeps the existing container, so an edited `.env` is silently
+> ignored — the run logs keep showing the old URL and the false-positive
+> failures continue. `docker compose up -d oscar` detects the config
+> change and recreates the container with the new value. (Watchtower
+> image updates don't pick up `.env` edits either — it clones the old
+> container's environment — so an explicit `up -d` is the only path.)
+> The `printenv` line confirms the value landed; if it still shows the
+> old URL, the container was not recreated.
 
 The route is public, no auth, served from the bind-mounted `/collection`
 volume inside the oscar container. There is no per-company schema — this
 is a single VPS-wide setting.
+
+Since v1.11.115 the server also **defaults** to the loopback URL when
+`JSON_SCHEMA_URL` is not set at all, so removing the line from `.env`
+entirely (then `up -d`) is equally valid.
 
 ---
 
