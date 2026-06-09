@@ -169,7 +169,7 @@ function ensureAuthorizationOr403() {
       }
     });
   } catch (e) {
-    console.log("[ERROR] ensureAuthorizationOr403 error: " + (e && e.stack ? e.stack : e));
+    console.log("[ERROR] ensureAuthorizationOr403 error: " + (e.stack || e));
     // Don't throw here unless you want to halt the entire run
   }
 }

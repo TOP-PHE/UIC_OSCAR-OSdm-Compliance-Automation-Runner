@@ -58,7 +58,7 @@ function setAuthToken(responseBody) {
       validationLogger("[WARNING] PHE access_token not found in response");
     }
   } catch (e) {
-    console.error("[ERROR] setAuthToken error: " + (e && e.stack ? e.stack : e));
+    console.error("[ERROR] setAuthToken error: " + (e.stack || e));
   }
 }
 
@@ -75,7 +75,9 @@ function captureSwaggerSchemaValidator() {
     { url, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("[ERROR] ❌ Error during Swagger request: " + (err && err.message ? err.message : err));
+        // Inside `if (err)` so err is truthy — drop the `err && ` guard
+        // to keep CodeQL happy about js/useless-conditional.
+        console.log("[ERROR] ❌ Error during Swagger request: " + (err.message || err));
         return;
       }
       try {
@@ -90,7 +92,7 @@ function captureSwaggerSchemaValidator() {
           console.error(`[ERROR] ❌ Swagger load failed: HTTP ${status}`);
         }
       } catch (e) {
-        console.error("[ERROR] ❌ Failed to parse Swagger JSON: " + (e && e.message ? e.message : e));
+        console.error("[ERROR] ❌ Failed to parse Swagger JSON: " + (e.message || e));
       }
     }
   );
@@ -107,7 +109,8 @@ function swaggerSchemaValidatorContent() {
     { url: ajvUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("[ERROR] ❌ Error while loading AJV: " + (err && err.message ? err.message : err));
+        // Same as above — inside `if (err)` so err is truthy.
+        console.log("[ERROR] ❌ Error while loading AJV: " + (err.message || err));
         return;
       }
 
@@ -139,7 +142,7 @@ function swaggerSchemaValidatorContent() {
           console.error(`[ERROR] ❌ Failed to load AJV script. HTTP ${status}`);
         }
       } catch (e) {
-        console.error("[ERROR] ❌ Error during AJV script evaluation/usage: " + (e && e.message ? e.message : e));
+        console.error("[ERROR] ❌ Error during AJV script evaluation/usage: " + (e.message || e));
       }
     }
   );
@@ -183,7 +186,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     try {
       Ajv = resolveAjvConstructor();
     } catch (e) {
-      console.error("[ERROR] ❌ Failed to initialize AJV: " + (e && e.message ? e.message : e));
+      console.error("[ERROR] ❌ Failed to initialize AJV: " + (e.message || e));
       return;
     }
 
@@ -208,7 +211,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
           console.log(`[INFO] ✅ Request body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("[ERROR] ❌ Failed to validate request body: " + (e && e.message ? e.message : e));
+        console.error("[ERROR] ❌ Failed to validate request body: " + (e.message || e));
       }
     }
 
@@ -233,11 +236,11 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
           console.log(`[INFO] ✅ Response body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("[ERROR] ❌ Failed to validate response body: " + (e && e.message ? e.message : e));
+        console.error("[ERROR] ❌ Failed to validate response body: " + (e.message || e));
       }
     }
   } catch (e) {
-    console.error("[ERROR] swaggerSchemaValidator error: " + (e && e.stack ? e.stack : e));
+    console.error("[ERROR] swaggerSchemaValidator error: " + (e.stack || e));
   }
 }
 
@@ -310,7 +313,8 @@ function validateDataFileJsonWithTemplate(jsonData) {
     { url: schemaUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.error("[ERROR] Error loading the schema: " + (err && err.message ? err.message : err));
+        // Same as above — inside `if (err)` so err is truthy.
+        console.error("[ERROR] Error loading the schema: " + (err.message || err));
         test("Schema load failed", function () {
           throw new Error("Schema load failed: " + err);
         });
@@ -454,7 +458,7 @@ function validateDataFileJsonWithTemplate(jsonData) {
           });
         }
       } catch (e) {
-        console.error("[ERROR] Schema parsing/validation error: " + (e && e.message ? e.message : e));
+        console.error("[ERROR] Schema parsing/validation error: " + (e.message || e));
         test("Schema parse/validate failure", function () {
           throw new Error("Schema parse/validate failure: " + (e.message || e));
         });
