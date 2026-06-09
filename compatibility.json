@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.143",
+  "current_release": "2026.144",
   "releases": [
+    {
+      "release": "2026.144",
+      "date": "2026-06-09",
+      "server": "1.11.116",
+      "collection": "OTST_V2.0.63",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(run-detail.html, invisible warn/debug log lines): regression-by-omission from v1.11.113 — the runner-side level inference started storing 'warn' and 'debug' levels in volume, but run-detail.html's log box only had color rules for l-stdout/l-stderr/l-info/l-error. Lines with l-warn / l-debug inherited the page's dark text color on the dark #1e1e1e log box and rendered near-invisible (user screenshot: whole blocks of barely-readable text between green INFO lines). Fix: .l-warn{color:#ffb74d} (amber), .l-debug{color:#9e9e9e} (muted but readable grey), plus a safety-net default color:#d4d4d4 on .log-line itself (placed BEFORE the .l-* rules — equal specificity, source order decides) so any FUTURE level without an explicit rule stays readable instead of vanishing. Also added 'warn' and 'debug' buttons to the level filter row (previously only All/stdout/stderr/info/error, so the new levels could not be isolated). report-builder.html got the matching .log-level.l-debug chip style (light page — was readable but unbadged). Verified by injecting all 7 level samples against the served stylesheet: stdout #d4d4d4, info #81c784, warn #ffb74d, error #ef5350, debug #9e9e9e, stderr #ff9800, unknown-level fallback #d4d4d4.",
+        "Server 1.11.115 -> 1.11.116; collection unchanged at OTST_V2.0.63 (HTML-only change). No payload change, no behaviour change beyond display."
+      ]
+    },
     {
       "release": "2026.143",
       "date": "2026-06-09",

@@ -48,11 +48,21 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;overflow:hidden}
 .card-header{padding:10px 16px;background:#eceff1;font-size:12px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between}
 .log-box{background:#1e1e1e;padding:14px 16px;max-height:450px;overflow-y:auto;font-family:'Courier New',monospace;font-size:12px;line-height:1.6}
-.log-line{white-space:pre-wrap;word-break:break-all}
+/* color:#d4d4d4 doubles as the safety net — any level without an explicit
+   .l-* rule below stays readable on the dark box instead of inheriting the
+   page's dark text color (must stay BEFORE the .l-* rules: equal
+   specificity, so source order decides). */
+.log-line{white-space:pre-wrap;word-break:break-all;color:#d4d4d4}
 .l-stdout{color:#d4d4d4}
 .l-stderr{color:#ff9800}
 .l-info  {color:#81c784}
 .l-error {color:#ef5350}
+/* v1.11.115: the v1.11.113 runner-side level inference started emitting
+   'warn' and 'debug' levels in volume, but these two classes had no color
+   rule — the lines inherited the page's dark text color on the dark
+   #1e1e1e log box and rendered near-invisible. */
+.l-warn  {color:#ffb74d}
+.l-debug {color:#9e9e9e}
 .btn{padding:8px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
 .btn-dl{background:#0090D4;color:#fff}
 .btn-dl:hover{background:#005A8A}
@@ -175,7 +185,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
           <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
           <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
           <button class="btn btn-sm log-level-btn" data-level="info">info</button>
+          <button class="btn btn-sm log-level-btn" data-level="warn">warn</button>
           <button class="btn btn-sm log-level-btn" data-level="error">error</button>
+          <button class="btn btn-sm log-level-btn" data-level="debug">debug</button>
         </div>
         <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
         <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
