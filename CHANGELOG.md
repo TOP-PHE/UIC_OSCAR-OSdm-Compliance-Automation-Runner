@@ -14,6 +14,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.112] — 2026-06-09
+
+**OBB onboarding follow-up — SEARCH branch was rejecting valid OSDM
+data, schema-URL hardcoded in operator's `.env`, install guide silent
+on both.** Resolves [#333](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/333).
+Four coupled fixes in one PR.
+
+### Fixed
+
+- **SEARCH branch: `endDatetime` is OPTIONAL per OSDM, but
+  scenarioParser was requiring it.**
+  `Bruno_Collection/library-bruno/scenarioParser.js:776-777`
+  unconditionally called `subTripDate(tripRequirement.trip.endDatetime,
+  ...)`, which threw on `undefined`. But:
+  - `endDatetime` is **optional** on `TripSearchCriteria` per OSDM —
+    you specify a departure time, not a window.
+  - `osdmTripSearchCriteria()` itself doesn't even **use** the
+    `endDateTime` value — it's computed, passed through the
+    `TripLegDefinition` constructor as arg 4, and discarded when the
+    `TripSearchCriteria` is built (only `startDateTime` is used —
+    see line 1171).
+
+  So OSCAR was rejecting valid OSDM datafiles. The v1.11.110 try/catch
+  caught the throw and emitted an `[ERROR]` blaming the data, sending
+  new users on a wild goose chase. **Fix**: guard the `subTripDate`
+  call behind a truthiness check, pass `null` when absent.
+  SPECIFICATION branch unchanged (each leg's `endDatetime` IS required
+  when you're specifying exact trips). The OBB Nightjet datafile that
+  surfaced this now resolves cleanly to `offerTripSearchCriteria`.
+
+- **v1.11.109 `[WARNING]` wording was misleading.** It said *"update
+  the company's environment file"* — wrong because there is no
+  per-company env file. The value is built fresh server-side from
+  `JSON_SCHEMA_URL` on the OSCAR server itself. Updated to point at
+  the actual fix path:
+
+  > *"edit `OSCAR_Deploy/.env`, set `JSON_SCHEMA_URL` to
+  > `http://127.0.0.1:3001/json_validator/datafile.schema.json`,
+  > restart with `docker compose restart oscar`"*
+
+  Also separated *"deprecated repo"* (the `exch_dev` /
+  `OSDM-testing` case) from *"any GitHub URL is fragile"* so the
+  warning is informative for both.
+
+### Added
+
+- **`Oscar_Server/src/server.js` — new public Express route
+  `GET /json_validator/datafile.schema.json`** that serves the JSON
+  schema bundled with the Bruno collection (read from the same
+  `/collection` bind-mount the runner already uses). Removes the
+  external dependency for datafile schema validation.
+
+  Before this PR, operators had to either point `JSON_SCHEMA_URL` at
+  an external GitHub URL (fragile — depends on the repo staying
+  public and the branch / file path not moving) or set up their own
+  static HTTP server in the docker-compose (undocumented). Now the
+  schema is always co-located with the running collection — they
+  ship together so versions can't drift.
+
+- **`OSCAR_Deploy/.env.example` default updated** to
+  `http://127.0.0.1:3001/json_validator/datafile.schema.json`. Fresh
+  installs no longer land in the broken state.
+
+- **`Documentation/Server_Operations/installation-guide.md` — new
+  `JSON_SCHEMA_URL` section.** Documents the v1.11.112+ self-hosted
+  default, names the obsolete `OSDM-testing/exch_dev` URL that older
+  installs may still have, gives the exact one-line steps to update
+  an existing `.env` on the VPS plus `docker compose restart oscar`.
+
+### Behaviour guarantees
+
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- `npm run lint` clean.
+- No data-file schema change.
+- No backend behaviour change beyond serving one additional static
+  file (the schema).
+- The schema-route is public (no auth). The file path is entirely
+  under operator control via `COLLECTION_PATH` env var; there's no
+  user-controlled component in the resolved path, so path-traversal
+  is not a vector.
+- The route caches the response for 300 seconds (the collection only
+  changes on deploy).
+
+---
+
 ## [server-v1.11.111] — 2026-06-09
 
 **`loggingType=DEBUG` was BACKWARDS — it dropped `[ERROR]` and

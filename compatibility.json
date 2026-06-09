@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.139",
+  "current_release": "2026.140",
   "releases": [
+    {
+      "release": "2026.140",
+      "date": "2026-06-09",
+      "server": "1.11.112",
+      "collection": "OTST_V2.0.60",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#333, SEARCH branch endDatetime): the SEARCH trip branch in scenarioParser.js was unconditionally calling subTripDate(tripRequirement.trip.endDatetime, ...), which threw when endDatetime was absent — but endDatetime is OPTIONAL on a TripSearchCriteria per OSDM spec (you specify a departure time, not a window). osdmTripSearchCriteria() itself doesn't even USE the endDateTime — the value is computed, passed to TripLegDefinition as arg 4, and discarded when the TripSearchCriteria is built (only `startDateTime` is used — see line 1171). So OSCAR was rejecting valid OSDM datafiles. The v1.11.110 try/catch I added caught the throw and emitted a [ERROR] blaming the data, which sent new users on a wild goose chase. Fix: guard the subTripDate call behind a truthiness check, pass null when absent. SPECIFICATION branch unchanged (each leg's endDatetime IS required when you're specifying exact trips). The OBB Nightjet datafile that triggered this now resolves cleanly to offerTripSearchCriteria.",
+        "feat(#333, serve schema from OSCAR_Server): a new public Express route in Oscar_Server/src/server.js — GET /json_validator/datafile.schema.json — serves the JSON schema bundled with the Bruno collection (read from the same /collection bind-mount the runner already uses). Removes the dependency on a publicly reachable URL for datafile schema validation. Before this PR, operators had to either point JSON_SCHEMA_URL at an external GitHub URL (fragile — depends on the repo staying public and the branch / file path not moving) or set up their own static HTTP server in the docker-compose (undocumented). Now the schema is always co-located with the running collection — they ship together so versions can't drift. .env.example default updated to http://127.0.0.1:3001/json_validator/datafile.schema.json.",
+        "docs(#333, installation-guide): new section in Documentation/Server_Operations/installation-guide.md documenting JSON_SCHEMA_URL — explains the v1.11.112+ self-hosted default, names the obsolete OSDM-testing/exch_dev URL that older installs may still have, and gives the exact one-line steps to update an existing .env on the VPS plus `docker compose restart oscar` to apply.",
+        "fix(#333, [WARNING] wording): the v1.11.109 [WARNING] in validators.js said 'update the company's environment file' — wrong because there is no per-company env file; the value is built fresh server-side from JSON_SCHEMA_URL on the OSCAR server itself. Updated to point at the actual fix path: 'edit OSCAR_Deploy/.env, set JSON_SCHEMA_URL to http://127.0.0.1:3001/json_validator/datafile.schema.json, restart with docker compose restart oscar'. Also separated 'deprecated repo' (the exch_dev / OSDM-testing case) from 'any GitHub URL is fragile' so the warning is informative for both.",
+        "Bruno_Collection/VERSION OTST_V2.0.59 -> OTST_V2.0.60; server 1.11.111 -> 1.11.112. 21 partial-refund + 26 framework-gating unit tests still pass. No data-file schema change. No backend behaviour change beyond serving one additional static file."
+      ]
+    },
     {
       "release": "2026.139",
       "date": "2026-06-09",
