@@ -14,6 +14,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.114] — 2026-06-09
+
+**Refund/booking assertion-message clarity.** User feedback on the
+log-polish PR (#337): *"those failed messages on Refund Offer are
+quite difficult to decode for me…"* Same user later: *"yes and I
+have some on booking too, hope some others are not hidden and will
+pop up later."* This release answers both — fixes the visible
+messages AND audits the rest of the library for hidden equivalents
+so they don't pop up later.
+
+Continues [#336](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/336).
+Ten small fixes, all in `bookings.js` + `refunds.js`. Passing
+scenarios are unaffected — only failure-message text and one
+cascade structure changed.
+
+### Fixed
+
+- **Cascade-kill on `afterSalesConditions`.**
+  When the booking response was missing `afterSalesConditions`
+  entirely, a 3-admission + 3-reservation × 2-conditions-each
+  offer produced **18 failures from one provider gap**:
+  6 × parent "exist in both" + 12 × child "`REFUND` exists in
+  booking". The child loop fired even though the parent
+  assertion had already proven the cascade was guaranteed to
+  fail. Now: when `bookedConditions.length === 0`, emit ONE
+  parent failure naming the root cause (offer declared N
+  condition(s) [REFUND,REFUND,…] — booking returned 0;
+  per-condition checks SKIPPED to avoid duplicate cascading
+  failures) and early-return.
+
+- **`FulfillmentStatus` enum was stale — missing `FULFILLED`.**
+  `bookings.js:698` did not include `FULFILLED`, so every
+  `FULFILLED` fulfillment under a v3.8 booking failed the D1
+  enum check — even though our own `fulfillments.js:144-146`
+  lists `FULFILLED` as expected. Added `FULFILLED`. Plus: the
+  enum-check error message now NAMES the full valid list
+  (`Valid OSDM values: [AVAILABLE,USED,…,FULFILLED].`) so the
+  reader doesn't have to grep the source.
+
+- **`booking.fulfillmentStatus` null vs. undefined guard.**
+  The v3.8 `fulfillmentStatus` optional field was guarded by
+  `!== undefined`, which let the JSON-literal-null case
+  through and stringified it into a nonsense test title:
+  `'null' is a valid FulfillmentSummaryStatus`. Changed to
+  `!= null` so both null AND undefined are treated as
+  "absent" (the v3.8 spec semantic). Same valid-list naming
+  added to the error message.
+
+- **`fulfillmentDocumentRefs` unresolved — added a
+  plain-language root-cause line.**
+  The #253/#336 v3.8 cross-check failure correctly named the
+  unresolved UUIDs and the sibling-id pool, but didn't spell
+  out the root cause. Added one-liner: *"Provider emits both
+  fulfillmentDocumentRefs[] AND a sibling
+  fulfillmentDocuments[] list, but the UUIDs don't reconcile —
+  the refs and the docs are independently generated instead
+  of linked."*
+
+- **Price-field expect context** — `provisionalPrice` and
+  `confirmedPrice`: bare *"X missing"* messages now include
+  the actual JSON value (*"… missing in booking (got:
+  undefined)"*), self-explaining.
+
+- **`BookingPartStatus` error message** — same valid-list
+  naming treatment as `FulfillmentStatus` above, for
+  consistency.
+
+- **`refunds.js` `validFrom`/`validUntil` date guards —
+  `new Date(null)` trap.**
+  `new Date(null)` returns epoch 0 (1970-01-01), not
+  `Invalid Date`. So the `!isNaN(getTime())` guards in
+  `refunds.js` let JSON null through. The test then fired
+  with an empty title and failed at
+  `expect(refundOffer.validFrom).to.exist`, leaving
+  *"expected null to exist"* as the only breadcrumb.
+  Replaced with `_toDate(v)` that only constructs the Date
+  from non-null strings, and a new `_checkDatePresent` helper
+  that emits an explicit ABSENT-vs-MALFORMED failure when
+  the field doesn't pass. Applied to `createdOn`,
+  `validFrom`, `validUntil`. Plus context strings on the
+  *"in the past"*, *"in the future"*, and *"15 min window"*
+  assertions naming exactly what went wrong.
+
+- **`refundableAmount` / `refundFee` title built from SHAPE,
+  not happy-path.**
+  Test titles used to preformat *"amount: 0, currency: CZK"*
+  even when `scale` was the missing field. So failures looked
+  like everything passed up to a mystery *"expected
+  undefined to be a number"*. Rewrote `_priceShape()` to
+  report each sub-field as either `amount=0` (valid) or
+  `amount=MISSING(got null)` — the broken sub-field now
+  shows in the title even when other fields look fine. Plus
+  per-field `expect()` context strings naming exactly which
+  OSDM Price sub-field failed and why (*"refundableAmount.scale
+  is not a number (OSDM Price.scale: required integer,
+  typically 0)"*).
+
+### Versions
+
+- `Bruno_Collection/VERSION` `OTST_V2.0.61` → `OTST_V2.0.62`
+- `Oscar_Server/package.json` `1.11.113` → `1.11.114`
+- `compatibility.json` `release-2026.142`, current_release bumped
+
+### Tests
+
+- 21 partial-refund + 26 framework-gating unit tests still pass.
+- No data-file schema change.
+- No payload / wire-format change.
+- Failure messages, cascade behaviour, and two real guard bugs
+  changed; passing scenarios are unaffected.
+
+---
+
 ## [server-v1.11.113] — 2026-06-09
 
 **Log polish + #253 fulfillmentDocuments empty-array followup.**

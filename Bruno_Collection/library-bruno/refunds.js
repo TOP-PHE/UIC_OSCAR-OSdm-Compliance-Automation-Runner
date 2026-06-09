@@ -96,11 +96,20 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     validationLogger(`[INFO] Refund offer[${index}] has valid status, expected: ${expectedRefundOperationStatus}, actual: ${refundOffer.status}`);
   });
 
-  // Validate dates
+  // Validate dates.
+  // #337: `new Date(null)` returns epoch 0 (1970-01-01) instead of Invalid
+  // Date, so the downstream `!isNaN(getTime())` guards used to let the JSON-
+  // literal-null case through unnoticed. The test would then fire with an
+  // empty title (because _withLocal handles null gracefully and returns '')
+  // and fail at `expect(refundOffer.validFrom).to.exist` — leaving the
+  // reader staring at "expected null to exist" with no idea WHICH field.
+  // Build the Date only from non-null strings so the outer guard genuinely
+  // filters out the absent case, and emit an explicit [ERROR] for it.
   const currentDate = new Date();
-  const createdOn = new Date(refundOffer.createdOn);
-  const validFrom = new Date(refundOffer.validFrom);
-  const validUntil = new Date(refundOffer.validUntil);
+  const _toDate = v => (typeof v === 'string' && v.trim() !== '') ? new Date(v) : new Date(NaN);
+  const createdOn  = _toDate(refundOffer.createdOn);
+  const validFrom  = _toDate(refundOffer.validFrom);
+  const validUntil = _toDate(refundOffer.validUntil);
 
   // Local-time annotator (v1.11.106): provider timestamps come back in UTC
   // (e.g. 2026-06-09T05:23:26+00:00). The assertion message echoed the raw
@@ -120,44 +129,69 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     }
   }
 
+  // #337 helper: convert a single date-field outcome into either a passing test
+  // (when the value is a non-null parseable ISO string) or an explicit ERROR
+  // assertion that names whether the field was ABSENT vs MALFORMED. Avoids
+  // the prior "expected null to exist" mystery.
+  function _checkDatePresent(fieldName, rawValue, parsedDate, testTitle) {
+    if (rawValue == null) {
+      test(`Refund offer[${index}] ${fieldName} is present`, () => {
+        expect.fail(
+          `${fieldName} is absent in refundOffer (received ${rawValue === null ? 'JSON null' : 'undefined'}). ` +
+          `OSDM RefundOffer requires ${fieldName} as a datetime string.`
+        );
+      });
+      return false;
+    }
+    if (isNaN(parsedDate.getTime())) {
+      test(`Refund offer[${index}] ${fieldName} parses as a datetime`, () => {
+        expect.fail(
+          `${fieldName} is present but does not parse as a datetime — got: ${JSON.stringify(rawValue)}. ` +
+          `Expected ISO-8601 datetime string per OSDM.`
+        );
+      });
+      return false;
+    }
+    return true;
+  }
+
   // Validate createdOn
-  if (!isNaN(createdOn.getTime())) {
+  if (_checkDatePresent('createdOn', refundOffer.createdOn, createdOn)) {
     const _label = _withLocal(refundOffer.createdOn, createdOn);
     test(`Refund offer[${index}] createdOn is valid and in the past: ${_label}`, () => {
-      expect(refundOffer.createdOn).to.exist;
-      expect(createdOn.getTime()).to.be.at.most(currentDate.getTime());
+      expect(createdOn.getTime(),
+        `createdOn (${refundOffer.createdOn}) is in the future relative to now (${currentDate.toISOString()})`
+      ).to.be.at.most(currentDate.getTime());
       validationLogger(`[INFO] Refund offer[${index}] createdOn is valid and in the past: ${_label}`);
     });
-  } else {
-    validationLogger(`[WARNING] Refund offer[${index}] createdOn has invalid date format: ${refundOffer.createdOn}`);
   }
 
   // Validate validFrom
-  if (!isNaN(validFrom.getTime())) {
+  if (_checkDatePresent('validFrom', refundOffer.validFrom, validFrom)) {
     const _label = _withLocal(refundOffer.validFrom, validFrom);
     test(`Refund offer[${index}] validFrom is valid: ${_label}`, () => {
-      expect(refundOffer.validFrom).to.exist;
+      // Presence + parseability already checked above; this body is reserved
+      // for any future range/order assertions (currently just a heartbeat).
       validationLogger(`[INFO] Refund offer[${index}] validFrom is valid: ${_label}`);
     });
-  } else {
-    validationLogger(`[WARNING] Refund offer[${index}] validFrom has invalid date format: ${refundOffer.validFrom}`);
   }
 
   // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance)
-  if (!isNaN(validUntil.getTime())) {
+  if (_checkDatePresent('validUntil', refundOffer.validUntil, validUntil)) {
     const _label = _withLocal(refundOffer.validUntil, validUntil);
     test(`Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`, () => {
-      expect(refundOffer.validUntil).to.exist;
-      expect(validUntil.getTime()).to.be.above(currentDate.getTime());
+      expect(validUntil.getTime(),
+        `validUntil (${refundOffer.validUntil}) is not in the future relative to now (${currentDate.toISOString()})`
+      ).to.be.above(currentDate.getTime());
 
       const expectedValidUntil = new Date(currentDate.getTime() + 15 * 60 * 1000);
       const tolerance = 2 * 60 * 1000; // 2 minutes
       const difference = Math.abs(validUntil.getTime() - expectedValidUntil.getTime());
-      expect(difference).to.be.at.most(tolerance);
+      expect(difference,
+        `validUntil is ${Math.round(difference/1000)}s away from the expected ~15min mark (tolerance ±${tolerance/1000}s). Got ${refundOffer.validUntil}, expected ~${expectedValidUntil.toISOString()}.`
+      ).to.be.at.most(tolerance);
       validationLogger(`[INFO] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
     });
-  } else {
-    validationLogger(`[WARNING] Refund offer[${index}] validUntil has invalid date format: ${refundOffer.validUntil}`);
   }
 
   // E1: validFrom must be before or equal to validUntil (OSDM: temporal order required)
@@ -174,17 +208,36 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   validateRefundAppliedOverruleCode(refundOffer.appliedOverruleCode, overruleCode);
 
   // Validate refundableAmount structure, and compare amounts depending on fulfillment state
+  // #337: build the label as a SHAPE report (which sub-fields are present /
+  // what type each is) rather than as a happy-path summary, so a failure on
+  // any one sub-field (typically `scale`) doesn't leave the title saying
+  // "amount: 0, currency: CZK" as if everything was fine. Each expect() also
+  // gets a second-arg context naming the missing/wrong sub-field so the
+  // assertion failure is self-explaining.
   const expectedFulfillmentStatuses = Array.isArray(expectedFulfillmentStatus) ? expectedFulfillmentStatus : [expectedFulfillmentStatus];
-  const refundableAmountLabel = refundOffer.refundableAmount
-    ? `amount: ${refundOffer.refundableAmount.amount}, currency: ${refundOffer.refundableAmount.currency}`
-    : 'missing';
-  test(`Refund offer[${index}] refundableAmount exists and is valid, ${refundableAmountLabel}`, () => {
+  const _priceShape = (obj) => {
+    if (obj == null) return 'missing';
+    const _hasA = typeof obj.amount   === 'number';
+    const _hasC = typeof obj.currency === 'string' && obj.currency !== '';
+    const _hasS = typeof obj.scale    === 'number';
+    if (_hasA && _hasC && _hasS) return `amount=${obj.amount}, currency=${obj.currency}, scale=${obj.scale}`;
+    // SHAPE report: mark each sub-field present/MISSING so the broken one
+    // shows in the test title even when other fields look normal.
+    const _badge = (ok, name, val) => ok ? `${name}=${val}` : `${name}=MISSING(got ${JSON.stringify(val)})`;
+    return [
+      _badge(_hasA, 'amount',   obj.amount),
+      _badge(_hasC, 'currency', obj.currency),
+      _badge(_hasS, 'scale',    obj.scale),
+    ].join(', ');
+  };
+  const refundableAmountLabel = _priceShape(refundOffer.refundableAmount);
+  test(`Refund offer[${index}] refundableAmount Price structure is well-formed — ${refundableAmountLabel}`, () => {
     validationLogger(`[INFO] Refund offer[${index}] refundableAmount: ${refundOffer.refundableAmount?.amount} ${refundOffer.refundableAmount?.currency}`);
-    expect(refundOffer.refundableAmount).to.exist;
-    expect(refundOffer.refundableAmount).to.be.an('object');
-    expect(refundOffer.refundableAmount.amount).to.be.a('number');
-    expect(refundOffer.refundableAmount.currency).to.be.a('string');
-    expect(refundOffer.refundableAmount.scale).to.be.a('number');
+    expect(refundOffer.refundableAmount, 'refundableAmount missing in RefundOffer').to.exist;
+    expect(refundOffer.refundableAmount, 'refundableAmount is not an object').to.be.an('object');
+    expect(refundOffer.refundableAmount.amount,   'refundableAmount.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
+    expect(refundOffer.refundableAmount.currency, 'refundableAmount.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
+    expect(refundOffer.refundableAmount.scale,    'refundableAmount.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
 
     if (expectedFulfillmentStatuses.includes("CONFIRMED") || expectedFulfillmentStatuses.includes("FULFILLED")) {
       const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
@@ -200,28 +253,26 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // object is well-formed"* — not economic — *"the carrier kept money"*.
   // Per OSDM (RefundOffer.refundFee: 'Amount kept by the carrier and/or
   // distributor') the field is REQUIRED on every RefundOffer; the Price
-  // object MUST be present even when amount=0 (no retention). The historical
-  // "exists and is valid, amount: 0, currency: EUR" wording was confusing
-  // because "exists" sounded like an economic claim. Rephrase to name the
-  // structural check explicitly and annotate amount=0 as "no carrier
-  // retention" so the report reader doesn't have to do the mental math.
+  // object MUST be present even when amount=0 (no retention).
+  // #337: use the same SHAPE-report label as refundableAmount above so the
+  // broken sub-field shows in the title even when other fields look OK.
   let refundFeeLabel;
   if (!refundOffer.refundFee) {
     refundFeeLabel = 'missing';
   } else {
     const amt = refundOffer.refundFee.amount;
-    const cur = refundOffer.refundFee.currency;
-    const sca = refundOffer.refundFee.scale;
-    const retention = (amt === 0) ? ' (= no carrier retention)' : ' (= kept by carrier per OSDM)';
-    refundFeeLabel = `amount: ${amt} ${cur}${retention}, scale: ${sca}`;
+    const retention = (amt === 0) ? ' (= no carrier retention)'
+                    : (typeof amt === 'number') ? ' (= kept by carrier per OSDM)'
+                    : '';
+    refundFeeLabel = `${_priceShape(refundOffer.refundFee)}${retention}`;
   }
   test(`Refund offer[${index}] refundFee Price structure is well-formed — ${refundFeeLabel}`, () => {
     validationLogger(`[INFO] Refund offer[${index}] refundFee: ${refundOffer.refundFee?.amount} ${refundOffer.refundFee?.currency}`);
-    expect(refundOffer.refundFee).to.exist;
-    expect(refundOffer.refundFee).to.be.an('object');
-    expect(refundOffer.refundFee.amount).to.be.a('number');
-    expect(refundOffer.refundFee.currency).to.be.a('string');
-    expect(refundOffer.refundFee.scale).to.be.a('number');
+    expect(refundOffer.refundFee, 'refundFee missing in RefundOffer (OSDM: required even at amount=0)').to.exist;
+    expect(refundOffer.refundFee, 'refundFee is not an object').to.be.an('object');
+    expect(refundOffer.refundFee.amount,   'refundFee.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
+    expect(refundOffer.refundFee.currency, 'refundFee.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
+    expect(refundOffer.refundFee.scale, 'refundFee.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
     expect(refundOffer.refundFee.amount).to.be.at.least(0);
   });
 
