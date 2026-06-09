@@ -269,13 +269,26 @@ function validateDataFileJsonWithTemplate(jsonData) {
   // and the fix, so the new user has a clear next step instead of
   // chasing "Required property 'offerSearchCriteriaList' is missing"
   // through the codebase.
+  // Use URL.hostname so we match the host CORRECTLY (CodeQL
+  // js/regex/missing-regexp-anchor — a bare /github\.com/ would also
+  // match strings like `https://evilgithub.com.attacker.example/`).
   try {
-    if (typeof schemaUrl === "string" && /github(?:usercontent)?\.com/i.test(schemaUrl)) {
-      validationLogger(
-        '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl +
-        '). The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). ' +
-        'Update the company\'s environment file to point at the OSCAR-bundled local schema: http://localhost:8080/json_validator/datafile.schema.json'
-      );
+    if (typeof schemaUrl === "string") {
+      let _hostname = "";
+      try { _hostname = new URL(schemaUrl).hostname || ""; } catch (_urlErr) { _hostname = ""; }
+      // Match the GitHub hosts we know to warn about, anchored to the
+      // full hostname extracted from the URL. Covers:
+      //   - github.com
+      //   - raw.githubusercontent.com  (the actual host for refs/heads/... paths)
+      //   - any other *.github.com / *.githubusercontent.com subdomain
+      const _isGitHubHost = /^(?:[^.]+\.)?github(?:usercontent)?\.com$/i.test(_hostname);
+      if (_isGitHubHost) {
+        validationLogger(
+          '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl +
+          '). The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). ' +
+          'Update the company\'s environment file to point at the OSCAR-bundled local schema: http://localhost:8080/json_validator/datafile.schema.json'
+        );
+      }
     }
   } catch (_logErr) { /* logging is best-effort */ }
 
