@@ -215,10 +215,23 @@ class LogParser {
 
     // Standard line classification (only if not already classified as milestone)
     if (eventKind === 'log') {
+      // #353: two guards keep the folder/request matcher from eating library
+      // output, which created garbage per-area sections in the dashboard:
+      //  - a line carrying an explicit [LEVEL] tag is library narration
+      //    ("[DEBUG] 📊 Report updated → /app/…/report.html (39 assertions)"
+      //    matches the text/text-(parens) shape), never a Bruno CLI row;
+      //  - assertion rows are checked FIRST and include ✕ (U+2715 — what the
+      //    Bruno CLI actually prints, distinct from ✗): "✕ GET
+      //    /passenger-categories → … (HTTP 501 …)" also matches that shape.
+      const hasLevelTag = /^\[(DEBUG|INFO|WARN(?:ING)?|ERROR)\]/i.test(trimmed);
+      const isAssertionRow = /^\s*[✓✔✗✕×]/.test(trimmed) || /^\s*(pass|fail)\b/i.test(trimmed);
       // Bruno CLI prints request execution lines like:
       //   "01-System Infos Requests\00. GET System Version Check (404 Not Found) - 302 ms"
-      const folderReqMatch = trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
-      if (folderReqMatch) {
+      const folderReqMatch = !hasLevelTag && !isAssertionRow
+        && trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
+      if (isAssertionRow) {
+        category = 'assertion';
+      } else if (folderReqMatch) {
         this.currentSuite   = folderReqMatch[1].trim();
         this.currentRequest = folderReqMatch[2].trim();
         this.phase = 'execution';
@@ -233,8 +246,6 @@ class LogParser {
       } else if (/^Running Request\s+/i.test(trimmed)) {
         this.currentRequest = trimmed.replace(/^Running Request\s+/i, '').trim();
         category = 'system';
-      } else if (/^\s*[✓✗]/.test(trimmed) || /^\s*(pass|fail)/i.test(trimmed)) {
-        category = 'assertion';
       } else if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+https?:\/\//i.test(trimmed)) {
         category = 'http';
         const m = trimmed.match(/\b([1-5]\d{2})\b/);

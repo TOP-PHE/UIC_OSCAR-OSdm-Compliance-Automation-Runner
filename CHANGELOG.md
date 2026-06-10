@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.122] — 2026-06-10
+
+**System-Info "not supported" = skip, not failure + LogParser section fix
+(#353)** — tester question on 2026.149: "why for GET passenger-categories
+do we not skip like for the other ones?"
+
+### Changed
+
+- **A provider that declares a System-Information endpoint unsupported is
+  SKIPPED, like out-of-version endpoints — no failed assertion.** A clean
+  HTTP 501 (or 404 + unsupported Problem code) is exactly the
+  OSDM-conformant signal for an unimplemented optional endpoint; the old
+  classification *said* "remaining checks are skipped" but registered a
+  failing test with a red ✕, an `[ERROR]` line and ~10 stack frames.
+  Now: right signal (501/404) → one `[INFO]` "not implemented by this
+  provider — endpoint out of scope, skipped" line; wrong signal (e.g.
+  400 + OPERATION_NOT_PERMITTED) → one `[WARNING]` with the conformance
+  note (OSDM expects 501/404). No assertion registered either way — the
+  response itself stays visible in the HTTP traffic and report. Genuine
+  failures (401/403, plain in-version 404, 5xx) unchanged.
+
+### Fixed
+
+- **Garbage per-area sections in the Execution Log** (#351 follow-on).
+  The LogParser folder/request matcher accepted any "text/text (parens)"
+  line, so `[DEBUG] 📊 Report updated → /app/…/report.html (39 assertions)`
+  and `✕ GET /passenger-categories → … (HTTP 501 …)` each became their own
+  bogus section and stole the following lines. Lines carrying an explicit
+  `[LEVEL]` tag are now exempt from suite/request detection (library
+  narration, never a Bruno CLI row), and assertion markers are checked
+  first — including `✕` (U+2715, what the Bruno CLI actually prints,
+  distinct from `✗`), which also fixes those rows' category.
+
+---
+
 ## [server-v1.11.121] — 2026-06-10
 
 **Execution Log follow-up (#351)** — tester feedback on the first 2026.148
