@@ -35,44 +35,92 @@ module.exports = {
   offerFlexibility
 };
 
-// Function to check warnings and problems in the response
+// Check the OSDM response ENVELOPE for warnings[] / problems[] — both can
+// accompany a 2xx payload (partial success, deprecation notices, …).
+//
+// Log-audit round 2 rewrite — the old version had inverted semantics and a
+// broken present-path:
+//   - happy path emitted '[WARNING] ⚠️ No warnings found.' + '[WARNING] ⚠️
+//     No problems found.' on EVERY offer/refund/exchange response —
+//     warning-level lines announcing good news → ONE [DEBUG] line;
+//   - warnings present printed `Warning: ${jsonData.warnings}` → the OSDM
+//     Warning OBJECTS rendered as '[object Object]' (and an EMPTY warnings
+//     array, being truthy, hit this path too);
+//   - problems present spent 6+ lines per problem, and the 'Problems found
+//     (N):' header carried no [LEVEL] tag at all.
+// Now: one structured line per warning ([WARNING]) and per problem
+// ([ERROR] — a problem in the envelope means part of the request was not
+// honoured), each carrying the OSDM/RFC-9457 fields (code, title, status,
+// detail) + pointers, so the log line is directly actionable — same spirit
+// as the urn:uic:problem:OPERATION_NOT_PERMITTED decoding in
+// classifySystemInfoStatus.
 function checkWarningsAndProblems(jsonData) {
   try {
-    jsonData.warnings
-      ? validationLogger(`[WARNING] ⚠️ Warning: ${jsonData.warnings}`)
-      : validationLogger("[WARNING] ⚠️ No warnings found.");
+    const _fmt = (p) => {
+      const parts = ["code", "type", "title", "status", "detail"]
+        .filter((k) => p && p[k] != null && p[k] !== "")
+        .map((k) => `${k}=${JSON.stringify(p[k])}`);
+      return parts.length ? parts.join(", ") : JSON.stringify(p);
+    };
+    const warnings = Array.isArray(jsonData.warnings) ? jsonData.warnings : [];
+    const problems = Array.isArray(jsonData.problems) ? jsonData.problems : [];
 
-    if (jsonData.problems?.length > 0) {
-      validationLogger(`Problems found (${jsonData.problems.length}):`);
-      jsonData.problems.forEach((problem, index) => {
-        validationLogger(`[WARNING] ⚠️ Problem ${index + 1}:`);
-        ["code", "type", "title", "status", "detail"].forEach(key => {
-          validationLogger(`[WARNING] ⚠️ ${key.charAt(0).toUpperCase() + key.slice(1)}: ${problem[key] || 'Not available'}`);
-        });
+    warnings.forEach((w, i) => {
+      validationLogger(`[WARNING] ⚠️ Response envelope warning ${i + 1}/${warnings.length}: ${_fmt(w)}`);
+    });
+    problems.forEach((p, i) => {
+      const ptr = Array.isArray(p.pointers) && p.pointers.length > 0
+        ? ` — pointer(s): ${p.pointers.map((x) => `${(x && x.code) || "?"} @ ${(x && x.requestPointer) || "?"}`).join("; ")}`
+        : "";
+      validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
+    });
 
-        if (problem.pointers?.length > 0) {
-          problem.pointers.forEach((pointer, pointerIndex) => {
-            validationLogger(`[WARNING] ⚠️ Pointer ${pointerIndex + 1}:`);
-            ["code", "requestPointer"].forEach(key => {
-              validationLogger(`[WARNING] ⚠️ ${key.charAt(0).toUpperCase() + key.slice(1)}: ${pointer[key] || 'Not available'}`);
-            });
-          });
-        } else {
-          validationLogger("[WARNING] ⚠️ No pointers found.");
+    // Shape conformance (log-audit round 2): OSDM structures envelope
+    // warnings/problems (RFC-9457 style — a `code` from the urn:uic:*
+    // catalogue + human-readable title/detail) precisely so problem
+    // determination is machine-readable across vendors. Grade each
+    // NON-EMPTY array once, against the same bar as the NHF Problem
+    // probes (code + title/detail present); a clean envelope registers
+    // no assertion at all. Vendor-specific (non-URN) codes get a
+    // [WARNING] note, not a failure.
+    const _shapeCheck = (kind, arr) => {
+      if (arr.length === 0) return;
+      const bad = [];
+      arr.forEach((e, i) => {
+        const isObj = e !== null && typeof e === "object";
+        const hasCode = isObj && typeof e.code === "string" && e.code.trim() !== "";
+        const hasText = isObj && ((typeof e.title === "string" && e.title.trim() !== "") ||
+                                  (typeof e.detail === "string" && e.detail.trim() !== ""));
+        if (!(hasCode && hasText)) {
+          bad.push(`${kind}[${i}] missing ${[!hasCode && "code", !hasText && "title/detail"].filter(Boolean).join(" and ")}`);
+        } else if (!/^urn:/i.test(e.code)) {
+          validationLogger(`[WARNING] Response envelope ${kind}[${i}].code "${e.code}" is not a urn:uic:* catalogue code — vendor-specific codes weaken cross-vendor problem determination.`);
         }
       });
-    } else {
-      validationLogger("[WARNING] ⚠️ No problems found.");
+      try {
+        const { bruTest } = require("./testCapture.js");
+        bruTest(`Response envelope ${kind}[] entries are structured OSDM ${kind === "problems" ? "Problems" : "Warnings"} (code + title/detail)`, () => {
+          if (bad.length > 0) {
+            throw new Error(`${bad.length} of ${arr.length} entr${arr.length === 1 ? "y is" : "ies are"} non-conformant: ${bad.join("; ")}. OSDM structures envelope ${kind} (RFC-9457 style) so problem determination is machine-readable across vendors.`);
+          }
+        });
+      } catch (_te) { /* test runner unavailable (unit harness) — the log lines above suffice */ }
+    };
+    _shapeCheck("warnings", warnings);
+    _shapeCheck("problems", problems);
+
+    if (warnings.length === 0 && problems.length === 0) {
+      validationLogger("[DEBUG] Response envelope clean — no warnings[], no problems[].");
     }
   } catch (error) {
-    validationLogger(`[WARNING] ⚠️ Error processing the response: ${error.message}`);
+    validationLogger(`[WARNING] ⚠️ Error reading response envelope warnings/problems: ${error.message}`);
   }
 }
 
 function postOfferResponsePreRequest() {
   const requestName = (typeof req !== 'undefined' && typeof req.getName === 'function') ? req.getName() : '';
   console.log("[INFO] ⏩ [STEP] Executing request : " + requestName);
-  validationLogger("[INFO] ➤ postOfferResponsePreRequest");
+  validationLogger("[DEBUG] ➤ postOfferResponsePreRequest");
 
   if (typeof buildOfferCollectionRequest === "function") {
     buildOfferCollectionRequest();
@@ -84,8 +132,24 @@ function postOfferResponsePreRequest() {
 }
 
 function ensureAuthorizationOr403() {
-  validationLogger("[INFO] ➤ ensureAuthorizationOr403");
-  validationLogger("[INFO] Run a preoffer authorization check to avoid 403 errors ...");
+  // Log-audit round 2: this helper PREFLIGHTS the offer request — it sends
+  // the same POST /offers once via bru.sendRequest purely to surface auth
+  // problems with a clear message BEFORE the real call. Running it on every
+  // offer was redundant and chatty (4 log lines to say "auth works"), and it
+  // doubled the provider's /offers load: by this point the system-info
+  // requests have already succeeded with the same token, the #204
+  // token-watchdog refreshes it at every scenario start, and
+  // checkAuthRejection decodes any real 401/403 downstream. Now:
+  //   - SKIPPED (one [DEBUG] line) when this run already proved the token:
+  //     a 200 on /versions (systemVersionCheckCompleted) or an earlier
+  //     successful preflight (__authPreflightOk);
+  //   - otherwise ONE [INFO] line carries the whole story on success.
+  if (bru.getEnvVar('systemVersionCheckCompleted') === 'true' ||
+      bru.getEnvVar('__authPreflightOk') === 'true') {
+    validationLogger("[DEBUG] Authorization preflight skipped — this token already returned 200 earlier in the run.");
+    return;
+  }
+  validationLogger("[DEBUG] ➤ ensureAuthorizationOr403 — preflighting POST /offers to surface auth problems early");
 
   function resolveVars(str) {
     if (!str) return str;
@@ -165,7 +229,8 @@ function ensureAuthorizationOr403() {
         console.log("[ERROR] ⛔ Stop: Bad Request (400). Check request parameters and body. Possibly due to authorization.");
         console.error("[ERROR] Authorization precheck failed with 400");
       } else {
-        validationLogger("[INFO] ✅ Authorization check passed.");
+        bru.setEnvVar('__authPreflightOk', 'true');
+        validationLogger("[INFO] ✅ Authorization OK — preflight POST /offers accepted (HTTP " + code + "); continuing with the real request. (Checked once per run.)");
       }
     });
   } catch (e) {
@@ -176,14 +241,40 @@ function ensureAuthorizationOr403() {
 
 // Function to validate offer response
 function postOfferResponse(jsonData) {
-  validationLogger("[INFO] ➤ postOfferResponse");
+  validationLogger("[DEBUG] ➤ postOfferResponse");
   if (typeof checkWarningsAndProblems === "function") {
     checkWarningsAndProblems(jsonData);
   }
-  // Stop flow if offers invalid
+  // Stop flow if offers invalid.
+  // Log-audit round 2: 'No offers found or offers is not an array' conflated
+  // two very different situations and said nothing about what the response
+  // DID contain. Split them and summarise the whole envelope in ONE line
+  // (the thrown message doubles as the test failure text):
+  //   - offers[] MISSING / not an array → malformed OfferCollectionResponse
+  //     envelope → provider bug, [ERROR];
+  //   - offers[] EMPTY in a 200 → structurally valid per OSDM (collections
+  //     may be empty), but when the response carries trips + passengers and
+  //     neither a warning nor a problem explains the empty result, that is
+  //     an interoperability gap worth raising with the provider — [WARNING]
+  //     with the full picture. The throw still drives the existing
+  //     retry-3-then-skip flow in 01. POST Get Offer.yml.
   if (!Array.isArray(jsonData.offers) || jsonData.offers.length === 0) {
-    validationLogger("[ERROR] No offers found or 'offers' is not an array.");
-    throw new Error("No offers found or 'offers' is not an array.");
+    const _trips = Array.isArray(jsonData.trips)      ? jsonData.trips.length      : 0;
+    const _pax   = Array.isArray(jsonData.passengers) ? jsonData.passengers.length : 0;
+    const _wrn   = Array.isArray(jsonData.warnings)   ? jsonData.warnings.length   : 0;
+    const _prb   = Array.isArray(jsonData.problems)   ? jsonData.problems.length   : 0;
+    if (!Array.isArray(jsonData.offers)) {
+      const msg = `POST /offers response has no offers[] array (got ${jsonData.offers === undefined ? "no 'offers' property" : typeof jsonData.offers}) — malformed OfferCollectionResponse envelope.`;
+      validationLogger("[ERROR] " + msg);
+      throw new Error(msg);
+    }
+    const msg = `POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_pax} passenger(s) but no offer, and ` +
+      ((_wrn + _prb) > 0
+        ? `${_wrn} warning(s) / ${_prb} problem(s) (see envelope lines above for why)`
+        : `NO warning or problem explaining why`) +
+      `. An empty offers[] is structurally valid per OSDM, but a provider that finds the journey and prices nothing should explain the empty result via warnings[]/problems[] (e.g. no fares available for this date/route). OSCAR retries in case of transient inventory.`;
+    validationLogger("[WARNING] " + msg);
+    throw new Error(msg);
   }
 
   // Check offers exist
@@ -216,7 +307,7 @@ function postOfferResponse(jsonData) {
   const _offerCurrency = jsonData.offers[0]?.offerSummary?.minimalPrice?.currency;
   if (_offerCurrency) {
     bru.setEnvVar("offerCurrency", _offerCurrency);
-    validationLogger(`[INFO] Stored offerCurrency: ${_offerCurrency}`);
+    validationLogger(`[DEBUG] Stored offerCurrency: ${_offerCurrency}`);
   }
 
   let selectedOffer = selectAndSetOffer(jsonData);
@@ -258,7 +349,7 @@ function postOfferResponse(jsonData) {
     } else {
       bru.setEnvVar('offerValidUntil', '');
       bru.setEnvVar('offerValidUntilSource', '');
-      validationLogger('[INFO] Selected offer has no validUntil on any part — #expiredOfferTest (if on) will skip with a WARNING.');
+      validationLogger('[DEBUG] Selected offer has no validUntil on any part — #expiredOfferTest (if on) will skip with a WARNING.');
     }
   }
 
@@ -333,7 +424,7 @@ function offerFlexibility(offer) {
 
 // select and set offer based on criteria
 function selectAndSetOffer(jsonData) {
-  validationLogger("[INFO] ➤ selectAndSetOffer");
+  validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -354,28 +445,28 @@ function selectAndSetOffer(jsonData) {
 
   // Different accommodation selection handling
   if (accommodationSelection === "SEAT") {
-    validationLogger("[INFO] Filter: only SEAT (all places must be SEAT)");
+    validationLogger("[DEBUG] Filter: only SEAT (all places must be SEAT)");
     filteredOffers = filteredOffers.filter(o => matchesAccommodation(o, "SEAT", true));
   }
   else if (accommodationSelection === "COUCHETTE") {
-    validationLogger("[INFO] Filter: COUCHETTE (at least 1 place)");
+    validationLogger("[DEBUG] Filter: COUCHETTE (at least 1 place)");
     filteredOffers = filteredOffers.filter(o => matchesAccommodation(o, "COUCHETTE"));
   }
   else if (accommodationSelection === "BERTH") {
-    validationLogger("[INFO] Filter: BERTH (at least 1 place)");
+    validationLogger("[DEBUG] Filter: BERTH (at least 1 place)");
     filteredOffers = filteredOffers.filter(o => matchesAccommodation(o, "BERTH"));
   }
   else {
-    validationLogger("[INFO] No accommodation filter applied");
+    validationLogger("[DEBUG] No accommodation filter applied");
   }
 
   // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
   // when a provider omits it we derive the offer's overall flexibility from its
   // products (most restrictive wins) instead of dropping every offer. (#223)
   if (desiredFlexibility) {
-    validationLogger(`[INFO] Applying flexibility filter: ${desiredFlexibility}`);
+    validationLogger(`[DEBUG] Applying flexibility filter: ${desiredFlexibility}`);
     if (!filteredOffers.some(o => o.offerSummary && o.offerSummary.overallFlexibility)) {
-      validationLogger(`[INFO] No offerSummary.overallFlexibility on these offers — deriving flexibility from offer products (most restrictive leg wins).`);
+      validationLogger(`[DEBUG] No offerSummary.overallFlexibility on these offers — deriving flexibility from offer products (most restrictive leg wins).`);
     }
     filteredOffers = filteredOffers.filter(o => offerFlexibility(o) === desiredFlexibility);
   }
@@ -383,7 +474,7 @@ function selectAndSetOffer(jsonData) {
   // Select the first matching offer or default to the first offer
   const selectedOffer = filteredOffers[0] || jsonData.offers[0];
 
-  validationLogger(`[INFO] Selected Offer ID: ${selectedOffer.offerId}`);
+  validationLogger(`[DEBUG] Selected Offer ID: ${selectedOffer.offerId}`);
   // Per-part summary first, so a certifier reading the log can tell at a glance
   // which part(s) carry which flags. An Offer has no top-level refundable /
   // exchangeable — only its parts do, and a "refundable: NO" on an ancillary
@@ -404,7 +495,12 @@ function selectAndSetOffer(jsonData) {
   // JSON.stringify also serialises at full depth (no [Array] / [Object] truncation
   // from Node's util.inspect default depth=2).
   //console.log(`[JSON:selectedOffer] ${JSON.stringify(selectedOffer)}`);
-  console.log("[INFO] 🔍 Selected Offer:", selectedOffer);
+  // Log-audit round 2: the full object dump (~280 log lines at Node's
+  // depth-2 inspect, full of [Array]/[Object] stubs) is payload replay —
+  // the complete response is one click away in the run page's HTTP-traffic
+  // viewer with the JSON editor. The compact id + per-part scope lines
+  // above remain the INFO-level summary.
+  console.log("[DEBUG] 🔍 Selected Offer:", selectedOffer);
 
   // Store selected offer and related info in environment
   bru.setEnvVar("offer", selectedOffer);
@@ -415,16 +511,16 @@ function selectAndSetOffer(jsonData) {
     const _summaryFlex = selectedOffer.offerSummary?.overallFlexibility;
     const actual = offerFlexibility(selectedOffer);
     if (!_summaryFlex) {
-      validationLogger(`[INFO] Selected offer has no offerSummary — overall flexibility derived from products [${(selectedOffer.products || []).map(p => p.flexibility).filter(Boolean).join(', ')}] → most restrictive = ${actual}`);
+      validationLogger(`[DEBUG] Selected offer has no offerSummary — overall flexibility derived from products [${(selectedOffer.products || []).map(p => p.flexibility).filter(Boolean).join(', ')}] → most restrictive = ${actual}`);
     }
     test(`Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}${_summaryFlex ? '' : ' (derived from products; no offerSummary)'}`, () => {
-      validationLogger(`[INFO] Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}`);
+      validationLogger(`[DEBUG] Selected offer has expected flexibility - expected: ${desiredFlexibility}, actual: ${actual}`);
       expect(actual).to.eql(desiredFlexibility);
     });
 
     const matchingProducts = (selectedOffer.products || []).filter(p => p.flexibility === desiredFlexibility);
     test(`At least one matching product has the expected flexibility - count : ${matchingProducts.length}`, () => {
-      validationLogger(`[INFO] At least one matching product has the expected flexibility - count : ${matchingProducts.length}`);
+      validationLogger(`[DEBUG] At least one matching product has the expected flexibility - count : ${matchingProducts.length}`);
       expect(matchingProducts.length).to.be.above(0);
     });
   }
@@ -434,7 +530,7 @@ function selectAndSetOffer(jsonData) {
 
     // Do nothing if not FULL_FLEXIBLE or SEMI_FLEXIBLE
     if (overallFlexibility !== "FULL_FLEXIBLE" && overallFlexibility !== "SEMI_FLEXIBLE") {
-      validationLogger(`[INFO] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
+      validationLogger(`[DEBUG] overallFlexibility is '${overallFlexibility}' - skipping admissionOfferParts validation`);
       return;
     }
 
@@ -442,7 +538,7 @@ function selectAndSetOffer(jsonData) {
       const parts = selOffer.admissionOfferParts;
       const allYes = parts.every(p => p[field] === "YES");
       test(`All admissionOfferParts of selected offer are ${type} - expected: YES, actual: ${parts.map(p => p[field]).join(", ")}`, () => {
-        validationLogger(`[INFO] All admissionOfferParts of selected offer are ${type} - expected: YES, actual: ${parts.map(p => p[field]).join(", ")}`);
+        validationLogger(`[DEBUG] All admissionOfferParts of selected offer are ${type} - expected: YES, actual: ${parts.map(p => p[field]).join(", ")}`);
         expect(allYes, `Expected all admissionOfferParts to be ${type}`).to.be.true;
         if (!allYes) {
           validationLogger(`[ERROR] Some admissionOfferParts are not ${type}`);
@@ -461,7 +557,7 @@ function selectAndSetOffer(jsonData) {
 
 // Offer summary validation
 function validateOfferSummary(selectedOffer) {
-  validationLogger("[INFO] ➤ validateOfferSummary");
+  validationLogger("[DEBUG] ➤ validateOfferSummary");
   const offerSummary = selectedOffer.offerSummary || {};
   const mini = offerSummary.minimalPrice;
   const minimalPrice = offerSummary.minimalPrice?.amount;
@@ -471,7 +567,7 @@ function validateOfferSummary(selectedOffer) {
 
   // Minimal price validation
   test(`Offer summary - minimalPrice structure exists, is a number >= 0 : ${minimalPrice}`, function () {
-    validationLogger(`[INFO] Offer summary - minimalPrice structure exists, is a number >= 0 : ${minimalPrice}`);
+    validationLogger(`[DEBUG] Offer summary - minimalPrice structure exists, is a number >= 0 : ${minimalPrice}`);
     expect(minimalPrice).to.exist.and.is.a("number");
     expect(minimalPrice).to.be.at.least(0);
   });
@@ -480,7 +576,7 @@ function validateOfferSummary(selectedOffer) {
   const minimalOriginalPrice = offerSummary.minimalOriginalPrice;
   if (minimalOriginalPrice) {
     test(`Offer summary - minimalOriginalPrice structure is valid`, function () {
-      validationLogger(`[INFO] minimalOriginalPrice: ${minimalOriginalPrice.amount} ${minimalOriginalPrice.currency}`);
+      validationLogger(`[DEBUG] minimalOriginalPrice: ${minimalOriginalPrice.amount} ${minimalOriginalPrice.currency}`);
       expect(minimalOriginalPrice.amount, "minimalOriginalPrice.amount should be a number").to.be.a("number");
       expect(minimalOriginalPrice.amount, "minimalOriginalPrice.amount should be >= 0").to.be.at.least(0);
       expect(minimalOriginalPrice.currency, "minimalOriginalPrice.currency should exist").to.exist.and.be.a("string");
@@ -490,7 +586,7 @@ function validateOfferSummary(selectedOffer) {
   // Check all price fields (amount, currency, scale) exist in minimalPrice
   test(`Price fields exist (currency, scale) exist in minimalPrice`, () => {
     expect(mini, 'minimalPrice is missing').to.exist;
-    validationLogger(`[INFO] Price fields (currency, scale) are present in minimalPrice`);
+    validationLogger(`[DEBUG] Price fields (currency, scale) are present in minimalPrice`);
     ['currency', 'scale'].forEach(field => {
       expect(mini[field], `minimalPrice.${field} missing`).to.exist;
     });
@@ -498,7 +594,7 @@ function validateOfferSummary(selectedOffer) {
 
   // Overall flexibility validation
   test(`Offer summary - overallFlexibility is defined - overallFlexibility: ${overallFlexibility}`, function () {
-    validationLogger(`[INFO] Offer summary - overallFlexibility is defined - overallFlexibility: ${overallFlexibility}`);
+    validationLogger(`[DEBUG] Offer summary - overallFlexibility is defined - overallFlexibility: ${overallFlexibility}`);
     expect(overallFlexibility).to.be.a("string");
     bru.setEnvVar("overallFlexibility", overallFlexibility);
   });
@@ -507,7 +603,7 @@ function validateOfferSummary(selectedOffer) {
   const overallServiceClassType = offerSummary.overallServiceClass?.type;
   if (overallServiceClassType) {
   test(`Offer summary - overallServiceClass is defined - overallServiceClass: ${overallServiceClass}`, function () {
-    validationLogger(`[INFO] Offer summary - overallServiceClass is defined - overallServiceClass: ${overallServiceClass}`);
+    validationLogger(`[DEBUG] Offer summary - overallServiceClass is defined - overallServiceClass: ${overallServiceClass}`);
       expect(overallServiceClassType).to.be.oneOf(["BEST", "HIGH", "STANDARD", "BASIC", "ANY_CLASS"]);
     });
   }
@@ -515,16 +611,16 @@ function validateOfferSummary(selectedOffer) {
   // Overall travel class validation
   if (overallTravelClass) {
     test(`Offer summary - overallTravelClass is defined - overallTravelClass: ${overallTravelClass}`, function () {
-      validationLogger(`[INFO] Offer summary - overallTravelClass is defined - overallTravelClass: ${overallTravelClass}`);
+      validationLogger(`[DEBUG] Offer summary - overallTravelClass is defined - overallTravelClass: ${overallTravelClass}`);
       expect(overallTravelClass).to.be.a("string");
     });
   } else {
-    validationLogger(`[INFO] overallTravelClass is not present in offer summary → test skipped`);
+    validationLogger(`[DEBUG] overallTravelClass is not present in offer summary → test skipped`);
   }
 
   // overallFlexibility is a known OSDM value
   test(`Offer summary - overallFlexibility is a valid OSDM value: ${overallFlexibility}`, function () {
-    validationLogger(`[INFO] Offer summary - overallFlexibility valid value check: ${overallFlexibility}`);
+    validationLogger(`[DEBUG] Offer summary - overallFlexibility valid value check: ${overallFlexibility}`);
     expect(overallFlexibility).to.be.oneOf(["FULL_FLEXIBLE", "SEMI_FLEXIBLE", "NON_FLEXIBLE"]);
   });
 
@@ -532,11 +628,11 @@ function validateOfferSummary(selectedOffer) {
   const overallAccommodationType = offerSummary.overallAccommodationType;
   if (overallAccommodationType) {
     test(`Offer summary - overallAccommodationType is a valid value: ${overallAccommodationType}`, function () {
-      validationLogger(`[INFO] Offer summary - overallAccommodationType: ${overallAccommodationType}`);
+      validationLogger(`[DEBUG] Offer summary - overallAccommodationType: ${overallAccommodationType}`);
       expect(overallAccommodationType).to.be.oneOf(["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"]);
     });
   } else {
-    validationLogger(`[INFO] overallAccommodationType is not present in offer summary → test skipped`);
+    validationLogger(`[DEBUG] overallAccommodationType is not present in offer summary → test skipped`);
   }
 
   // preBookableUntil must be defined and in the future
@@ -544,36 +640,36 @@ function validateOfferSummary(selectedOffer) {
   if (preBookableUntil) {
     const preBookableDate = new Date(preBookableUntil);
     test(`Offer preBookableUntil is a valid date in the future - preBookableUntil: ${preBookableUntil}`, function () {
-      validationLogger(`[INFO] preBookableUntil: ${preBookableUntil}`);
+      validationLogger(`[DEBUG] preBookableUntil: ${preBookableUntil}`);
       expect(!isNaN(preBookableDate.getTime()), "preBookableUntil should be a valid ISO date").to.be.true;
       expect(preBookableDate.getTime(), "preBookableUntil should be in the future").to.be.above(Date.now());
     });
   } else {
-    validationLogger(`[INFO] preBookableUntil is not present → test skipped`);
+    validationLogger(`[DEBUG] preBookableUntil is not present → test skipped`);
   }
 }
 
 // Passengers validation
 function validatePassengers(jsonData) {
-  validationLogger("[INFO] ➤ validatePassengers");
+  validationLogger("[DEBUG] ➤ validatePassengers");
   const passengers = jsonData.anonymousPassengerSpecifications || [];
   bru.setEnvVar("passengerCount", passengers.length);
 
   test(`Passengers are defined - length: ${passengers.length}`, function () {
-    validationLogger(`[INFO] Passengers are defined - length: ${passengers.length}`);
+    validationLogger(`[DEBUG] Passengers are defined - length: ${passengers.length}`);
     expect(passengers.length).to.be.above(0);
   });
 
   passengers.forEach((p, i) => {
     // externalRef is defined
     test(`Passenger ${i + 1} externalRef is defined - externalRef: ${p.externalRef}`, function () {
-      validationLogger(`[INFO] Passenger ${i + 1} externalRef: ${p.externalRef}`);
+      validationLogger(`[DEBUG] Passenger ${i + 1} externalRef: ${p.externalRef}`);
       expect(p.externalRef, "externalRef should exist").to.exist.and.be.a("string");
     });
 
     // type is a known OSDM value
     test(`Passenger ${i + 1} type is a known OSDM value - type: ${p.type}`, function () {
-      validationLogger(`[INFO] Passenger ${i + 1} type valid value check: ${p.type}`);
+      validationLogger(`[DEBUG] Passenger ${i + 1} type valid value check: ${p.type}`);
       expect(p.type).to.be.oneOf(["YOUNG_CHILD", "CHILD", "YOUTH", "ADULT", "SENIOR", "FAMILY_CHILD", "ACCOMP_PRM", "PRM_CHILD", "WHEELCHAIR", "PERSON", "PRM", "DOG", "PET", "LUGGAGE", "BICYCLE", "PRAM", "COMPANION_DOG", "CAR", "MOTORCYCLE", "TRAILER"]);
     });
 
@@ -581,17 +677,17 @@ function validatePassengers(jsonData) {
     if (p.dateOfBirth) {
       const dob = new Date(p.dateOfBirth);
       test(`Passenger ${i + 1} dateOfBirth is a valid date in the past - dateOfBirth: ${p.dateOfBirth}`, function () {
-        validationLogger(`[INFO] Passenger ${i + 1} dateOfBirth: ${p.dateOfBirth}`);
+        validationLogger(`[DEBUG] Passenger ${i + 1} dateOfBirth: ${p.dateOfBirth}`);
         expect(!isNaN(dob.getTime()), "dateOfBirth should be a valid ISO date").to.be.true;
         expect(dob.getTime(), "dateOfBirth should be in the past").to.be.below(Date.now());
       });
     } else {
-      validationLogger(`[INFO] Passenger ${i + 1} no dateOfBirth → test skipped`);
+      validationLogger(`[DEBUG] Passenger ${i + 1} no dateOfBirth → test skipped`);
     }
 
     const reductionCards = p.appliedReductionCardTypes || [];
     test(`Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`, function () {
-      validationLogger(`[INFO] Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`);
+      validationLogger(`[DEBUG] Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`);
       expect(Array.isArray(reductionCards), "appliedReductionCardTypes should be an array").to.be.true;
     });
   });
@@ -599,25 +695,25 @@ function validatePassengers(jsonData) {
 
 // Trips & Legs validation
 function validateTripsAndLegs(jsonData) {
-  validationLogger("[INFO] ➤ validateTripsAndLegs");
+  validationLogger("[DEBUG] ➤ validateTripsAndLegs");
   const trips = jsonData.trips || [];
 
   test(`Trips are defined - length: ${trips.length}`, function () {
-    validationLogger(`[INFO] Trips are defined - length: ${trips.length}`);
+    validationLogger(`[DEBUG] Trips are defined - length: ${trips.length}`);
     expect(trips.length).to.be.above(0);
   });
 
   // Capture trip ids and compare to coveredTripId
   const tripIds = (jsonData.trips || []).map(trip => trip.id).filter(id => id !== undefined && id !== null);
-  validationLogger(`[INFO] tripIds found: ${JSON.stringify(tripIds)}`);
+  validationLogger(`[DEBUG] tripIds found: ${JSON.stringify(tripIds)}`);
   const coveredTripId = bru.getEnvVar("coveredTripId");
   if (coveredTripId) {
     test(`selectedOffer.tripCoverage.coveredTripId (${coveredTripId}) is part of Trip ids`, function () {
-      validationLogger(`[INFO] Checking coveredTripId ${coveredTripId} is in tripIds: ${JSON.stringify(tripIds)}`);
+      validationLogger(`[DEBUG] Checking coveredTripId ${coveredTripId} is in tripIds: ${JSON.stringify(tripIds)}`);
       expect(tripIds).to.include(coveredTripId);
     });
   } else {
-    validationLogger(`[INFO] coveredTripId is not set → tripCoverage test skipped`);
+    validationLogger(`[DEBUG] coveredTripId is not set → tripCoverage test skipped`);
   }
 
   trips.forEach((trip, tripIndex) => {
@@ -630,7 +726,7 @@ function validateTripsAndLegs(jsonData) {
       test(`Trip ${tripIndex + 1} startTime is before endTime (OSDM: temporal order)`, () => {
         expect(tripStart.getTime()).to.be.below(tripEnd.getTime(),
           `Trip startTime (${trip.startTime}) is not before endTime (${trip.endTime})`);
-        validationLogger(`[INFO] Trip ${tripIndex + 1}: startTime=${trip.startTime}, endTime=${trip.endTime} ✓`);
+        validationLogger(`[DEBUG] Trip ${tripIndex + 1}: startTime=${trip.startTime}, endTime=${trip.endTime} ✓`);
       });
     } else {
       validationLogger(`[WARNING] Trip ${tripIndex + 1}: startTime or endTime is not a valid date → A7 test skipped`);
@@ -638,17 +734,17 @@ function validateTripsAndLegs(jsonData) {
 
     // direction is a known OSDM value
     test(`Trip ${tripIndex + 1} direction is a known value - direction: ${trip.direction}`, function () {
-      validationLogger(`[INFO] Trip ${tripIndex + 1} direction: ${trip.direction}`);
+      validationLogger(`[DEBUG] Trip ${tripIndex + 1} direction: ${trip.direction}`);
       expect(trip.direction).to.be.oneOf(["OUT_BOUND", "IN_BOUND"]);
     });
 
     if (legs.length > 0) {
       test(`Trip ${tripIndex + 1} has legs - length: ${legs.length}`, function () {
-        validationLogger(`[INFO] Trip ${tripIndex + 1} has legs - length: ${legs.length}`);
+        validationLogger(`[DEBUG] Trip ${tripIndex + 1} has legs - length: ${legs.length}`);
         expect(legs.length).to.be.above(0);
       });
     } else {
-      validationLogger(`[INFO] Trip ${tripIndex + 1} has no legs (provider may not return legs) → test skipped`);
+      validationLogger(`[DEBUG] Trip ${tripIndex + 1} has no legs (provider may not return legs) → test skipped`);
     }
 
     legs.forEach((leg, legIndex) => {
@@ -657,7 +753,7 @@ function validateTripsAndLegs(jsonData) {
       const destination = leg.timedLeg?.end?.stopPlaceName;
 
       test(`Trip ${tripIndex + 1} Leg ${legIndex + 1} has TrainID, Origin & Destination - TrainID: ${trainId}, Origin: ${origin}, Destination: ${destination}`, function () {
-        validationLogger(`[INFO] Trip ${tripIndex + 1} Leg ${legIndex + 1} has TrainID, Origin & Destination - TrainID: ${trainId}, Origin: ${origin}, Destination: ${destination}`);
+        validationLogger(`[DEBUG] Trip ${tripIndex + 1} Leg ${legIndex + 1} has TrainID, Origin & Destination - TrainID: ${trainId}, Origin: ${origin}, Destination: ${destination}`);
         expect(trainId).to.not.be.undefined;
         expect(origin).to.not.be.undefined;
         expect(destination).to.not.be.undefined;
@@ -668,7 +764,7 @@ function validateTripsAndLegs(jsonData) {
 
 // Offer Parts validation
 function validateOfferParts(selectedOffer) {
-  validationLogger("[INFO] ➤ validateOfferParts");
+  validationLogger("[DEBUG] ➤ validateOfferParts");
 
   const admissionParts = selectedOffer.admissionOfferParts || [];
   const reservationParts = selectedOffer.reservationOfferParts || [];
@@ -700,9 +796,9 @@ function validateOfferParts(selectedOffer) {
   const reservationPrice = sumPrice(reservationParts);
   const ancillaryPrice = sumPrice(referencedAncillaryParts);
 
-  validationLogger(`[INFO] Admission parts price: ${admissionPrice}`);
-  validationLogger(`[INFO] Reservation parts price: ${reservationPrice}`);
-  validationLogger(`[INFO] Ancillary parts price: ${ancillaryPrice}`);
+  validationLogger(`[DEBUG] Admission parts price: ${admissionPrice}`);
+  validationLogger(`[DEBUG] Reservation parts price: ${reservationPrice}`);
+  validationLogger(`[DEBUG] Ancillary parts price: ${ancillaryPrice}`);
 
   const offerParts = [...admissionParts, ...reservationParts, ...referencedAncillaryParts];
 
@@ -715,7 +811,7 @@ function validateOfferParts(selectedOffer) {
   const sumPartsPrice = sumPrice(offerParts);
 
   test(`Offer minimalPrice >= sum of offerParts price - minimalPrice: ${minimalPrice}, sumPartsPrice: ${sumPartsPrice}`, function () {
-    validationLogger(`[INFO] Offer minimalPrice >= sum of offerParts price - minimalPrice: ${minimalPrice}, sumPartsPrice: ${sumPartsPrice}`);
+    validationLogger(`[DEBUG] Offer minimalPrice >= sum of offerParts price - minimalPrice: ${minimalPrice}, sumPartsPrice: ${sumPartsPrice}`);
     expect(minimalPrice).to.be.at.least(sumPartsPrice);
   });
 
@@ -730,8 +826,17 @@ function validateOfferParts(selectedOffer) {
 
   if (overallFlex) {
     test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
-      validationLogger(`[INFO] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
-      expect(overallFlex).to.eql(derivedFlex);
+      validationLogger(`[DEBUG] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
+      // Log-audit round 2: plain throw with the decoded reasoning instead of
+      // expect().to.eql and its chai tail ("expected 'FULL_FLEXIBLE' to
+      // deeply equal 'NON_FLEXIBLE'").
+      if (overallFlex !== derivedFlex) {
+        throw new Error(
+          `offerSummary.overallFlexibility says "${overallFlex}" but the most restrictive product flexibility in the offer is "${derivedFlex}" ` +
+          `(product flexibilities: ${productFlex.join(", ") || "none"}). Per the least-flexible-part rule (#223) the summary should reflect ` +
+          `the most restrictive product — typically the NON_FLEXIBLE reservations. Provider should align offerSummary.overallFlexibility with its products.`
+        );
+      }
     });
   } else {
     validationLogger(`[INFO] offerSummary absent — overall flexibility derived from products [${productFlex.join(", ")}] → most restrictive = ${derivedFlex}`);
@@ -740,7 +845,7 @@ function validateOfferParts(selectedOffer) {
   // capture coveredTripId if value exists
   const coveredTripId = selectedOffer.tripCoverage && selectedOffer.tripCoverage.coveredTripId;
   if (coveredTripId !== undefined && coveredTripId !== null) {
-    validationLogger(`[INFO] Covered Trip ID: ${coveredTripId}`);
+    validationLogger(`[DEBUG] Covered Trip ID: ${coveredTripId}`);
     bru.setEnvVar("coveredTripId", coveredTripId);
   }
 
@@ -762,7 +867,7 @@ function validateOfferParts(selectedOffer) {
   const coveredLegIds = selectedOffer.tripCoverage?.coveredLegIds || [];
   if (coveredLegIds.length > 0) {
     test(`Offer tripCoverage.coveredLegIds are non-empty strings - count: ${coveredLegIds.length}`, function () {
-      validationLogger(`[INFO] tripCoverage.coveredLegIds: ${JSON.stringify(coveredLegIds)}`);
+      validationLogger(`[DEBUG] tripCoverage.coveredLegIds: ${JSON.stringify(coveredLegIds)}`);
       coveredLegIds.forEach((legId, idx) => {
         expect(legId, `coveredLegIds[${idx}] should be a string`).to.be.a("string");
       });
@@ -782,7 +887,7 @@ function validateOfferParts(selectedOffer) {
         }
       });
     });
-    validationLogger(`[INFO] A8 currency consistency checked for all offer parts against summaryCurrency=${_summaryCurrency}`);
+    validationLogger(`[DEBUG] A8 currency consistency checked for all offer parts against summaryCurrency=${_summaryCurrency}`);
   }
 
   // RI (#258): for each offer part carrying requestedInformation — assert it is
@@ -844,7 +949,7 @@ function validateOfferParts(selectedOffer) {
 
 // Admission validation
 function validateAdmissions(selectedOffer) {
-  validationLogger("[INFO] ➤ validateAdmissions");
+  validationLogger("[DEBUG] ➤ validateAdmissions");
 
   const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
   const admissionParts = selectedOffer.admissionOfferParts || [];
@@ -856,7 +961,7 @@ function validateAdmissions(selectedOffer) {
 
   if (admissionParts.length > 0) {
     admissionParts.forEach((admission, i) => {
-      validationLogger(`[INFO] Validating admissionOfferParts ${i + 1} id=${admission.id}`);
+      validationLogger(`[DEBUG] Validating admissionOfferParts ${i + 1} id=${admission.id}`);
       admissionReservationAncillaryOfferPartsIds.push(admission.id);
       bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", admissionReservationAncillaryOfferPartsIds);
 
@@ -865,7 +970,7 @@ function validateAdmissions(selectedOffer) {
       if (admission.isReservationRequired && Array.isArray(admission.reservations) && admission.reservations.length > 0) type = "IRT";
 
       test(`AdmissionOfferPart ${i + 1} type: ${type}`, function () {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} type: ${type}`);
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} type: ${type}`);
         expect(["NRT", "TLT", "IRT"]).to.include(type);
       });
 
@@ -873,7 +978,7 @@ function validateAdmissions(selectedOffer) {
       if (admission.validFrom) {
         const validFrom = new Date(admission.validFrom);
         test(`AdmissionOfferPart ${i + 1} validFrom is a valid date - validFrom: ${admission.validFrom}`, function () {
-          validationLogger(`[INFO] AdmissionOfferPart ${i + 1} validFrom: ${admission.validFrom}`);
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validFrom: ${admission.validFrom}`);
           expect(!isNaN(validFrom.getTime()), "validFrom should be a valid ISO date").to.be.true;
         });
       }
@@ -881,13 +986,13 @@ function validateAdmissions(selectedOffer) {
       // validUntil must be in the future
       const validUntil = new Date(admission.validUntil);
       test(`AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${validUntil}`, function () {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${validUntil}`);
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${validUntil}`);
         expect(validUntil.getTime()).to.be.above(Date.now());
       });
 
       // price structure is valid
       test(`AdmissionOfferPart ${i + 1} price structure is valid - amount: ${admission.price?.amount}, currency: ${admission.price?.currency}`, function () {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} price: ${admission.price?.amount} ${admission.price?.currency}`);
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} price: ${admission.price?.amount} ${admission.price?.currency}`);
         expect(admission.price, "price should exist").to.be.an("object");
         expect(admission.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(admission.price.currency, "price.currency should exist").to.exist.and.be.a("string");
@@ -897,7 +1002,7 @@ function validateAdmissions(selectedOffer) {
       // offerMode is defined
       if (admission.offerMode) {
         test(`AdmissionOfferPart ${i + 1} offerMode is a known value - offerMode: ${admission.offerMode}`, function () {
-          validationLogger(`[INFO] AdmissionOfferPart ${i + 1} offerMode: ${admission.offerMode}`);
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} offerMode: ${admission.offerMode}`);
           expect(admission.offerMode).to.be.oneOf(["INDIVIDUAL", "COLLECTIVE"]);
         });
       }
@@ -906,7 +1011,7 @@ function validateAdmissions(selectedOffer) {
       const appliedPassengerTypes = admission.appliedPassengerTypes || [];
       if (appliedPassengerTypes.length > 0) {
         test(`AdmissionOfferPart ${i + 1} appliedPassengerTypes are valid - count: ${appliedPassengerTypes.length}`, function () {
-          validationLogger(`[INFO] AdmissionOfferPart ${i + 1} appliedPassengerTypes count: ${appliedPassengerTypes.length}`);
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} appliedPassengerTypes count: ${appliedPassengerTypes.length}`);
           appliedPassengerTypes.forEach((apt, aptIdx) => {
             expect(apt.passengerRef, `appliedPassengerTypes[${aptIdx}].passengerRef should exist`).to.be.a("string");
             // Use the shared OSDM PassengerType enum from osdmEnums.js so this
@@ -922,7 +1027,7 @@ function validateAdmissions(selectedOffer) {
       // isReusable is a boolean (if present)
       if (admission.isReusable !== undefined) {
         test(`AdmissionOfferPart ${i + 1} isReusable is a boolean - isReusable: ${admission.isReusable}`, function () {
-          validationLogger(`[INFO] AdmissionOfferPart ${i + 1} isReusable: ${admission.isReusable}`);
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} isReusable: ${admission.isReusable}`);
           expect(admission.isReusable, "isReusable should be a boolean").to.be.a("boolean");
         });
       }
@@ -930,7 +1035,7 @@ function validateAdmissions(selectedOffer) {
       // passengerRefs: at least one
       const passengerRefs = admission.passengerRefs || [];
       test(`AdmissionOfferPart ${i + 1} passengerRefs has at least one entry`, function () {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} passengerRefs: ${JSON.stringify(passengerRefs)}`);
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} passengerRefs: ${JSON.stringify(passengerRefs)}`);
         expect(passengerRefs.length).to.be.above(0);
       });
 
@@ -942,12 +1047,12 @@ function validateAdmissions(selectedOffer) {
         test(`Reservation linkage in admission with id ${admission.id}, reservationsRef ids should match reservationOfferParts ids`, () => {
           reservationsRefs.forEach(ref => {
             const found = reservationParts.some(r => r.id === ref.id);
-            validationLogger(`[INFO] reservationsRef.id : ${ref.id} → match in reservationOfferParts : ${found}`);
+            validationLogger(`[DEBUG] reservationsRef.id : ${ref.id} → match in reservationOfferParts : ${found}`);
             expect(found, `reservationOfferParts should contain id ${ref.id}`).to.eql(true);
           });
         });
       } else {
-        validationLogger(`[INFO] No reservationsRefs found for admission id=${admission.id} → test skipped`);
+        validationLogger(`[DEBUG] No reservationsRefs found for admission id=${admission.id} → test skipped`);
       }
 
       // Validate linkage to ancillaryOfferParts
@@ -956,33 +1061,33 @@ function validateAdmissions(selectedOffer) {
         test(`Ancillary linkage in admission with id ${admission.id}, ancillaryRef ids should match ancillaryOfferParts ids`, () => {
           ancillaryRefs.forEach(ref => {
             const found = ancillaryParts.some(a => a.id === ref.id);
-            validationLogger(`[INFO] ancillaryRef.id : ${ref.id} → match in ancillaryOfferParts : ${found}`);
+            validationLogger(`[DEBUG] ancillaryRef.id : ${ref.id} → match in ancillaryOfferParts : ${found}`);
             expect(found, `ancillaryOfferParts should contain id ${ref.id}`).to.eql(true);
           });
         });
       } else {
-        validationLogger(`[INFO] No ancillaryRefs found for admission id=${admission.id} → test skipped`);
+        validationLogger(`[DEBUG] No ancillaryRefs found for admission id=${admission.id} → test skipped`);
       }
 
       // Validate afterSalesConditions structure
       if (Array.isArray(admission.afterSalesConditions) && admission.afterSalesConditions.length > 0) {
         test(`Admission part ${i + 1} afterSalesConditions validity`, () => {
-          validationLogger(`[INFO] AdmissionOfferPart ${i + 1} has ${admission.afterSalesConditions.length} afterSalesCondition(s)`);
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} has ${admission.afterSalesConditions.length} afterSalesCondition(s)`);
 
           admission.afterSalesConditions.forEach((condition, condIndex) => {
-            validationLogger(`[INFO] Validating afterSalesCondition[${condIndex}] for admission ${admission.id}`);
+            validationLogger(`[DEBUG] Validating afterSalesCondition[${condIndex}] for admission ${admission.id}`);
 
             // Validate condition type
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should exist`).to.exist;
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should be REFUND, EXCHANGE or PLACE_CHANGE (OSDM: AfterSaleConditionType)`).to.be.oneOf(['REFUND', 'EXCHANGE', 'PLACE_CHANGE']);
-            validationLogger(`[INFO] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
+            validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
 
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
               if (!isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validFrom has invalid date format: ${condition.validFrom}`);
               }
@@ -993,7 +1098,7 @@ function validateAdmissions(selectedOffer) {
               const validUntilDate = new Date(condition.validUntil);
               if (!isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validUntil has invalid date format: ${condition.validUntil}`);
               }
@@ -1005,7 +1110,7 @@ function validateAdmissions(selectedOffer) {
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
               expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
-              validationLogger(`[INFO] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
+              validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
               if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
@@ -1021,7 +1126,7 @@ function validateAdmissions(selectedOffer) {
           });
         });
       } else {
-        validationLogger(`[INFO] No afterSalesConditions found for admission id=${admission.id} → test skipped`);
+        validationLogger(`[DEBUG] No afterSalesConditions found for admission id=${admission.id} → test skipped`);
       }
 
       // If FULL FLEXIBLE ticket, refundable and/or exchangeable must be YES
@@ -1029,25 +1134,25 @@ function validateAdmissions(selectedOffer) {
         const scenarioType = bru.getEnvVar("scenarioType") || "";
         if (scenarioType.includes("REFUND")) {
           test(`Admission part ${i + 1} refundable : ${admission.refundable}`, function () {
-            validationLogger(`[INFO] Admission part ${i + 1} refundable : ${admission.refundable}`);
+            validationLogger(`[DEBUG] Admission part ${i + 1} refundable : ${admission.refundable}`);
             expect(admission.refundable, "Refundable should be YES").to.eql("YES");
           });
         } else if (scenarioType.includes("EXCHANGE")) {
           test(`Admission part ${i + 1} exchangeable : ${admission.exchangeable}`, function () {
-            validationLogger(`[INFO] Admission part ${i + 1} exchangeable : ${admission.exchangeable}`);
+            validationLogger(`[DEBUG] Admission part ${i + 1} exchangeable : ${admission.exchangeable}`);
             expect(admission.exchangeable, "Exchangeable should be YES").to.eql("YES");
           });
         }
       }
     });
   } else {
-    validationLogger(`[INFO] No admissionOfferParts found for offer.id : ${selectedOffer.offerId} → test skipped`);
+    validationLogger(`[DEBUG] No admissionOfferParts found for offer.id : ${selectedOffer.offerId} → test skipped`);
   }
 }
 
 // Reservation validation
 function validateReservations(selectedOffer) {
-  validationLogger("[INFO] ➤ validateReservations");
+  validationLogger("[DEBUG] ➤ validateReservations");
 
   const reservationParts = selectedOffer.reservationOfferParts || [];
   const ancillaryParts = selectedOffer.ancillaryOfferParts || [];
@@ -1057,13 +1162,13 @@ function validateReservations(selectedOffer) {
 
   if (reservationParts.length > 0) {
     reservationParts.forEach((reservation, i) => {
-      validationLogger(`[INFO] Validating reservationOfferParts ${i + 1} id : ${reservation.id}`);
+      validationLogger(`[DEBUG] Validating reservationOfferParts ${i + 1} id : ${reservation.id}`);
       admissionReservationAncillaryOfferPartsIds.push(reservation.id);
       bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", admissionReservationAncillaryOfferPartsIds);
 
       // price structure is valid
       test(`ReservationOfferPart ${i + 1} price structure is valid - amount: ${reservation.price?.amount}, currency: ${reservation.price?.currency}`, function () {
-        validationLogger(`[INFO] ReservationOfferPart ${i + 1} price: ${reservation.price?.amount} ${reservation.price?.currency}`);
+        validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} price: ${reservation.price?.amount} ${reservation.price?.currency}`);
         expect(reservation.price, "price should exist").to.be.an("object");
         expect(reservation.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(reservation.price.currency, "price.currency should exist").to.exist.and.be.a("string");
@@ -1072,18 +1177,18 @@ function validateReservations(selectedOffer) {
 
       // refundable and exchangeable are valid OSDM values
       test(`ReservationOfferPart ${i + 1} refundable is a valid value - refundable: ${reservation.refundable}`, function () {
-        validationLogger(`[INFO] ReservationOfferPart ${i + 1} refundable: ${reservation.refundable}`);
+        validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} refundable: ${reservation.refundable}`);
         expect(reservation.refundable).to.be.oneOf(["YES", "NO", "WITH_CONDITION"]);
       });
       test(`ReservationOfferPart ${i + 1} exchangeable is a valid value - exchangeable: ${reservation.exchangeable}`, function () {
-        validationLogger(`[INFO] ReservationOfferPart ${i + 1} exchangeable: ${reservation.exchangeable}`);
+        validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} exchangeable: ${reservation.exchangeable}`);
         expect(reservation.exchangeable).to.be.oneOf(["YES", "NO", "WITH_CONDITION"]);
       });
 
       // offerMode is a known OSDM value (if present)
       if (reservation.offerMode) {
         test(`ReservationOfferPart ${i + 1} offerMode is a known value - offerMode: ${reservation.offerMode}`, function () {
-          validationLogger(`[INFO] ReservationOfferPart ${i + 1} offerMode: ${reservation.offerMode}`);
+          validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} offerMode: ${reservation.offerMode}`);
           expect(reservation.offerMode).to.be.oneOf(["INDIVIDUAL", "COLLECTIVE"]);
         });
       }
@@ -1091,7 +1196,7 @@ function validateReservations(selectedOffer) {
       // passengerRefs: at least one
       const reservationPassengerRefs = reservation.passengerRefs || [];
       test(`ReservationOfferPart ${i + 1} passengerRefs has at least one entry`, function () {
-        validationLogger(`[INFO] ReservationOfferPart ${i + 1} passengerRefs: ${JSON.stringify(reservationPassengerRefs)}`);
+        validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} passengerRefs: ${JSON.stringify(reservationPassengerRefs)}`);
         expect(reservationPassengerRefs.length).to.be.above(0);
       });
 
@@ -1099,10 +1204,10 @@ function validateReservations(selectedOffer) {
       const availablePlaces = reservation.availablePlaces || [];
       if (availablePlaces.length > 0) {
         test(`Reservation part ${i + 1} availablePlaces is an array and contains accommodationType and numericAvailability`, () => {
-          validationLogger(`[INFO] availablePlaces count : ${availablePlaces.length}`);
+          validationLogger(`[DEBUG] availablePlaces count : ${availablePlaces.length}`);
           expect(Array.isArray(availablePlaces)).to.eql(true);
           availablePlaces.forEach((place, pIndex) => {
-            validationLogger(`[INFO] availablePlaces[${pIndex}] accommodationType : ${place.accommodationType}, numericAvailability : ${place.numericAvailability}`);
+            validationLogger(`[DEBUG] availablePlaces[${pIndex}] accommodationType : ${place.accommodationType}, numericAvailability : ${place.numericAvailability}`);
             expect(typeof place.accommodationType).to.eql("string");
             expect(place.accommodationType, `availablePlaces[${pIndex}].accommodationType should be a known OSDM value`).to.be.oneOf(	["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"]);
             expect(typeof place.numericAvailability).to.eql("number");
@@ -1114,39 +1219,39 @@ function validateReservations(selectedOffer) {
           });
         });
       } else {
-        validationLogger(`[INFO] No availablePlaces for reservation id=${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No availablePlaces for reservation id=${reservation.id} → test skipped`);
       }
 
       // Numeric Availability
       if ("numericAvailability" in reservation) {
         test(`Reservation part ${i + 1} numericAvailability is a number - total: ${reservation.numericAvailability}`, () => {
-          validationLogger(`[INFO] numericAvailability : ${reservation.numericAvailability}`);
+          validationLogger(`[DEBUG] numericAvailability : ${reservation.numericAvailability}`);
           expect(typeof reservation.numericAvailability).to.eql("number");
         });
       } else {
-        validationLogger(`[INFO] No numericAvailability for reservation id : ${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No numericAvailability for reservation id : ${reservation.id} → test skipped`);
       }
 
       // Number of Private Compartments
       if ("numberOfPrivateCompartments" in reservation) {
         test(`Reservation part ${i + 1} numberOfPrivateCompartments is a number - total: ${reservation.numberOfPrivateCompartments}`, () => {
-          validationLogger(`[INFO] numberOfPrivateCompartments : ${reservation.numberOfPrivateCompartments}`);
+          validationLogger(`[DEBUG] numberOfPrivateCompartments : ${reservation.numberOfPrivateCompartments}`);
           expect(typeof reservation.numberOfPrivateCompartments).to.eql("number");
         });
       } else {
-        validationLogger(`[INFO] No numberOfPrivateCompartments for reservation id=${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No numberOfPrivateCompartments for reservation id=${reservation.id} → test skipped`);
       }
 
       // Available Place Preferences
       const placePrefs = reservation.availablePlacePreferences || [];
       if (placePrefs.length > 0) {
         test(`Reservation part ${i + 1} availablePlacePreferences present`, () => {
-          validationLogger(`[INFO] availablePlacePreferences : ${JSON.stringify(placePrefs)}`);
+          validationLogger(`[DEBUG] availablePlacePreferences : ${JSON.stringify(placePrefs)}`);
           expect(Array.isArray(placePrefs)).to.eql(true);
           expect(placePrefs.length).to.be.above(0);
         });
       } else {
-        validationLogger(`[INFO] No availablePlacePreferences for reservation id=${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No availablePlacePreferences for reservation id=${reservation.id} → test skipped`);
       }
 
       // Validate linkage to ancillaryOfferParts
@@ -1155,32 +1260,32 @@ function validateReservations(selectedOffer) {
         test(`Ancillary linkage — reservation id ${reservation.id}`, () => {
           ancillaryRefs.forEach(ref => {
             const found = ancillaryParts.some(a => a.id === ref.id);
-            validationLogger(`[INFO] ancillaryRef.id : ${ref.id} → match in ancillaryOfferParts : ${found}`);
+            validationLogger(`[DEBUG] ancillaryRef.id : ${ref.id} → match in ancillaryOfferParts : ${found}`);
             expect(found, `ancillaryOfferParts should contain id ${ref.id}`).to.eql(true);
           });
         });
       } else {
-        validationLogger(`[INFO] No ancillaryRefs found for reservation id : ${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No ancillaryRefs found for reservation id : ${reservation.id} → test skipped`);
       }
 
       // Validate afterSalesConditions structure
       if (Array.isArray(reservation.afterSalesConditions) && reservation.afterSalesConditions.length > 0) {
         test(`Reservation part ${i + 1} afterSalesConditions validity`, () => {
-          validationLogger(`[INFO] Reservation part ${i + 1} has ${reservation.afterSalesConditions.length} afterSalesCondition(s)`);
+          validationLogger(`[DEBUG] Reservation part ${i + 1} has ${reservation.afterSalesConditions.length} afterSalesCondition(s)`);
 
           reservation.afterSalesConditions.forEach((condition, condIndex) => {
-            validationLogger(`[INFO] Validating afterSalesCondition[${condIndex}] for reservation ${reservation.id}`);
+            validationLogger(`[DEBUG] Validating afterSalesCondition[${condIndex}] for reservation ${reservation.id}`);
             // Validate condition type
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should exist`).to.exist;
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should be REFUND, EXCHANGE or PLACE_CHANGE (OSDM: AfterSaleConditionType)`).to.be.oneOf(['REFUND', 'EXCHANGE', 'PLACE_CHANGE']);
-            validationLogger(`[INFO] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
+            validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
 
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
               if (!isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validFrom has invalid date format: ${condition.validFrom}`);
               }
@@ -1191,7 +1296,7 @@ function validateReservations(selectedOffer) {
               const validUntilDate = new Date(condition.validUntil);
               if (!isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validUntil has invalid date format: ${condition.validUntil}`);
               }
@@ -1203,7 +1308,7 @@ function validateReservations(selectedOffer) {
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
               expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
-              validationLogger(`[INFO] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
+              validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
               if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
@@ -1219,16 +1324,16 @@ function validateReservations(selectedOffer) {
           });
         });
       } else {
-        validationLogger(`[INFO] No afterSalesConditions found for reservation id : ${reservation.id} → test skipped`);
+        validationLogger(`[DEBUG] No afterSalesConditions found for reservation id : ${reservation.id} → test skipped`);
       }
     });
   } else {
-    validationLogger(`[INFO] No reservationOfferParts found for offer.id : ${selectedOffer.offerId} → test skipped`);
+    validationLogger(`[DEBUG] No reservationOfferParts found for offer.id : ${selectedOffer.offerId} → test skipped`);
   }
 }
 
 function validateAncillaries(selectedOffer) {
-  validationLogger("[INFO] ➤ validateAncillaries");
+  validationLogger("[DEBUG] ➤ validateAncillaries");
   const ancillaryParts = selectedOffer.ancillaryOfferParts || [];
   const _idsRaw3 = bru.getEnvVar("admissionReservationAncillaryOfferPartsIds");
   const admissionReservationAncillaryOfferPartsIds = Array.isArray(_idsRaw3) ? _idsRaw3 : JSON.parse(_idsRaw3 || "[]");
@@ -1240,7 +1345,7 @@ function validateAncillaries(selectedOffer) {
 
   if (ancillaryParts.length > 0) {
     ancillaryParts.forEach((ancillary, i) => {
-      validationLogger(`[INFO] Validating ancillaryOfferParts ${i + 1} id=${ancillary.id}`);
+      validationLogger(`[DEBUG] Validating ancillaryOfferParts ${i + 1} id=${ancillary.id}`);
 
       // Add ids only if referenced in admissionOfferParts
       if (referencedAncillaryIds.has(ancillary.id)) {
@@ -1249,28 +1354,28 @@ function validateAncillaries(selectedOffer) {
       }
 
       test(`Ancillary type is defined - type: ${ancillary.type}`, function () {
-        validationLogger(`[INFO] ancillaryOfferParts ${i + 1} type: ${ancillary.type}`);
+        validationLogger(`[DEBUG] ancillaryOfferParts ${i + 1} type: ${ancillary.type}`);
         expect(ancillary.type).to.be.a("string");
       });
 
       // Validate afterSalesConditions structure
       if (Array.isArray(ancillary.afterSalesConditions) && ancillary.afterSalesConditions.length > 0) {
         test(`Ancillary part ${i + 1} afterSalesConditions validity`, () => {
-          validationLogger(`[INFO] Ancillary part ${i + 1} has ${ancillary.afterSalesConditions.length} afterSalesCondition(s)`);
+          validationLogger(`[DEBUG] Ancillary part ${i + 1} has ${ancillary.afterSalesConditions.length} afterSalesCondition(s)`);
 
           ancillary.afterSalesConditions.forEach((condition, condIndex) => {
-            validationLogger(`[INFO] Validating afterSalesCondition[${condIndex}] for ancillary ${ancillary.id}`);
+            validationLogger(`[DEBUG] Validating afterSalesCondition[${condIndex}] for ancillary ${ancillary.id}`);
             // Validate condition type
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should exist`).to.exist;
             expect(condition.condition, `afterSalesCondition[${condIndex}].condition should be REFUND, EXCHANGE or PLACE_CHANGE (OSDM: AfterSaleConditionType)`).to.be.oneOf(['REFUND', 'EXCHANGE', 'PLACE_CHANGE']);
-            validationLogger(`[INFO] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
+            validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].condition: ${condition.condition}`);
 
             // Validate validFrom
             if (condition.validFrom) {
               const validFromDate = new Date(condition.validFrom);
               if (!isNaN(validFromDate.getTime())) {
                 expect(condition.validFrom, `afterSalesCondition[${condIndex}].validFrom should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validFrom: ${condition.validFrom}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validFrom has invalid date format: ${condition.validFrom}`);
               }
@@ -1281,7 +1386,7 @@ function validateAncillaries(selectedOffer) {
               const validUntilDate = new Date(condition.validUntil);
               if (!isNaN(validUntilDate.getTime())) {
                 expect(condition.validUntil, `afterSalesCondition[${condIndex}].validUntil should be a valid date`).to.be.a('string');
-                validationLogger(`[INFO] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
+                validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].validUntil: ${condition.validUntil}`);
               } else {
                 validationLogger(`[WARNING] afterSalesCondition[${condIndex}].validUntil has invalid date format: ${condition.validUntil}`);
               }
@@ -1293,7 +1398,7 @@ function validateAncillaries(selectedOffer) {
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
               expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
-              validationLogger(`[INFO] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
+              validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
               if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
@@ -1309,11 +1414,11 @@ function validateAncillaries(selectedOffer) {
           });
         });
       } else {
-        validationLogger(`[INFO] No afterSalesConditions found for ancillary id : ${ancillary.id} → test skipped`);
+        validationLogger(`[DEBUG] No afterSalesConditions found for ancillary id : ${ancillary.id} → test skipped`);
       }
     });
   } else {
-    validationLogger(`[INFO] No ancillaryOfferParts found for offer.id : ${selectedOffer.id} → test skipped`);
+    validationLogger(`[DEBUG] No ancillaryOfferParts found for offer.id : ${selectedOffer.id} → test skipped`);
   }
 }
 
@@ -1339,7 +1444,7 @@ function getTripLegCoverage(selectedOffer, accommodationSelection) {
 
 // Helper function to handle place and accommodation selection
 function handleAccommodationAndPlaceSelection(selectedOffer) {
-  validationLogger("[INFO] ➤ handleAccommodationAndPlaceSelection");
+  validationLogger("[DEBUG] ➤ handleAccommodationAndPlaceSelection");
 
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
 
@@ -1358,11 +1463,11 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
       || bru.getEnvVar("requiresPlaceSelection") === "true";
 
     if (!_placeSelEnabled) {
-      validationLogger(`[INFO] accommodationSelection is ${accommodationSelection}, place selection not enabled → skipping place selection`);
+      validationLogger(`[DEBUG] accommodationSelection is ${accommodationSelection}, place selection not enabled → skipping place selection`);
       return;
     }
     if (bru.getEnvVar("reservationId")) {
-      validationLogger(`[INFO] reservationId already set (${bru.getEnvVar("reservationId")}) → keeping it`);
+      validationLogger(`[DEBUG] reservationId already set (${bru.getEnvVar("reservationId")}) → keeping it`);
       return;
     }
     const _seatResParts = selectedOffer.reservationOfferParts || [];
@@ -1377,12 +1482,12 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     if (_firstPlace && _firstPlace.tripLegCoverage) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify([_firstPlace.tripLegCoverage]));
     }
-    validationLogger(`[INFO] Seat place selection — reservationId set from first reservationOfferPart: ${_firstRes.id}`);
+    validationLogger(`[DEBUG] Seat place selection — reservationId set from first reservationOfferPart: ${_firstRes.id}`);
     return;
   }
 
   const reservationParts = selectedOffer.reservationOfferParts || [];
-  validationLogger(`[INFO] Reservation Offer Parts count: ${reservationParts.length}`);
+  validationLogger(`[DEBUG] Reservation Offer Parts count: ${reservationParts.length}`);
 
   const matchingParts = reservationParts.filter(part =>
     Array.isArray(part.availablePlaces) &&
@@ -1397,7 +1502,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     return;
   }
 
-  matchingParts.forEach(part => validationLogger(`[INFO] ${accommodationSelection} reservationOfferPart.id: ${part.id}`));
+  matchingParts.forEach(part => validationLogger(`[DEBUG] ${accommodationSelection} reservationOfferPart.id: ${part.id}`));
   bru.setEnvVar("reservationIds", JSON.stringify(matchingParts.map(part => part.id)));
   bru.setEnvVar("reservationId", matchingParts[0].id);
 
@@ -1407,11 +1512,11 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
 
   const tripLegCoverage = getTripLegCoverage(selectedOffer, accommodationSelection);
   bru.setEnvVar("tripLegCoverage", JSON.stringify(tripLegCoverage));
-  validationLogger(`[INFO] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
+  validationLogger(`[DEBUG] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
-  validationLogger("[INFO] ➤ ensureYesWhenRefundOrExchangeSelected");
+  validationLogger("[DEBUG] ➤ ensureYesWhenRefundOrExchangeSelected");
 
   const admissionParts = selectedOffer.admissionOfferParts || [];
 
@@ -1423,7 +1528,7 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
           if (admission.refundable !== "YES") {
             validationLogger(`[ERROR] ⛔ scenarioType is REFUND but Admission part ${i + 1} is not refundable`);
           } else {
-            validationLogger(`[INFO] Admission part ${i + 1} is refundable as expected, continuing.`);
+            validationLogger(`[DEBUG] Admission part ${i + 1} is refundable as expected, continuing.`);
           }
           expect(admission.refundable, "Admission part should be refundable in REFUND scenario").to.eql("YES");
         });
@@ -1432,7 +1537,7 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
           if (admission.exchangeable !== "YES") {
             validationLogger(`[ERROR] ⛔ scenarioType is EXCHANGE but Admission part ${i + 1} is not exchangeable`);
           } else {
-            validationLogger(`[INFO] Admission part ${i + 1} is exchangeable as expected, continuing.`);
+            validationLogger(`[DEBUG] Admission part ${i + 1} is exchangeable as expected, continuing.`);
           }
           expect(admission.exchangeable, "Admission part should be exchangeable in EXCHANGE scenario").to.eql("YES");
         });

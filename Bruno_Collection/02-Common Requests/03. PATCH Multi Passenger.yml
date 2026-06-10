@@ -94,7 +94,7 @@ runtime:
         const currentIndex                = bru.getEnvVar("currentPassengerIndex") || 0;
 
         if (currentIndex >= totalPassengers) {
-            console.log("✅ All passengers processed");
+            console.log("[INFO] ✅ All passengers processed");
             return;
         }
 
@@ -168,7 +168,7 @@ runtime:
         }
 
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {

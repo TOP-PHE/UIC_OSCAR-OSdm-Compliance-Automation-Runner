@@ -25,7 +25,7 @@ runtime:
 
         const endpoint = '/reduction-cards';
         // Shared, version-aware status handling (out-of-version 404 → skip, etc.).
-        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger })) return;
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
         let body;
         try { body = res.getBody(); } catch (_e) {}
@@ -36,17 +36,17 @@ runtime:
           expect(body, 'Response body should not be null/undefined').to.exist;
           expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
         });
-        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
 
         // ── OSDM compliance (Layer 1): ReductionCardCollectionResponse ──
         // Envelope object → "reductionCardTypes" array; every entry has required
         // code (string), issuer (CompanyRef string), name (Text object).
         validateReductionCards(body).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
         const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
         validateSchema('ReductionCardType', body.reductionCardTypes, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });

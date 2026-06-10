@@ -22,7 +22,7 @@ http://www.apache.org/licenses/LICENSE-2.0
  * Usage (mapped into bruTest by the scenario, like the Layer-1 validators):
  *   const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
  *   validateSchema('Product', body.products, { endpoint: '/products' })
- *     .forEach((c) => bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; }));
+ *     .forEach((c) => bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); }));
  */
 
 const { schemas } = require('./osdmSchemas.js');
@@ -112,13 +112,29 @@ function validateSchema(component, items, opts) {
   const allIssues = [];
   list.forEach((it, i) => collectIssues(it, compSchema, `${component}[${i}]`, allIssues));
 
-  const capped = allIssues.slice(0, 8);
+  // Log-audit round 2: GROUP repeated issues instead of listing the first 8
+  // of potentially hundreds. A 416-issue dump is typically 2 distinct
+  // problems repeated across every entry — say THAT: which property, what
+  // problem, on how many entries. ("schema issue(s)" phrase kept — pinned
+  // by bruno-osdm-schema.test.js.)
+  let message = '';
+  if (allIssues.length > 0) {
+    const groups = {};
+    allIssues.forEach((iss) => {
+      const key = String(iss)
+        .replace(new RegExp('^' + component + '\\[\\d+\\]\\.?'), '')  // strip Component[N]. prefix
+        .replace(/\[\d+\]/g, '[]');                                    // normalise nested indexes
+      groups[key] = (groups[key] || 0) + 1;
+    });
+    const keys = Object.keys(groups);
+    const shown = keys.slice(0, 6).map((k) => `"${k.split(':')[0].trim()}": ${k.split(':').slice(1).join(':').trim() || 'issue'} (${groups[k]}×)`);
+    message = `${allIssues.length} schema issue(s) across ${list.length} ${component} entr${list.length === 1 ? 'y' : 'ies'} — ` +
+      `${keys.length} distinct problem(s): ${shown.join('; ')}${keys.length > 6 ? '; …' : ''}`;
+  }
   return [{
     name: `GET ${endpoint} → conforms to OSDM ${v} ${component} schema (deep)`,
     ok: allIssues.length === 0,
-    message: allIssues.length === 0
-      ? ''
-      : `${allIssues.length} schema issue(s): ${capped.join(' | ')}${allIssues.length > capped.length ? ' …' : ''}`,
+    message,
   }];
 }
 

@@ -116,16 +116,34 @@ const SENSITIVE_HEADER_NAMES = new Set([
   'x-auth-token',
   'x-access-token',
   'x-requestor',          // custom OSDM operator header (carries identity)
+  'requestor',            // OSDM Requestor header — identity, masked like the reports do
   'cookie',
   'set-cookie'
 ]);
 const REDACTED_MARKER = '[REDACTED — credential]';
 
+// Traces improvement: PARTIAL masking for credential header values. Keeping
+// the head (scheme + token start) and the tail lets a tester verify "the
+// right token was sent" and correlate two requests without exposing a usable
+// secret — same idea as card-number masking. Graduated: long values (tokens)
+// keep head 10 / tail 4; short identity-style values (Requestor) keep
+// head 3 / tail 2; anything shorter is fully redacted.
+function maskCredentialValue(v) {
+  const s = String(v == null ? '' : v);
+  if (s.length >= 24) {
+    return `${s.slice(0, 10)}…[masked ${s.length - 14} chars]…${s.slice(-4)}`;
+  }
+  if (s.length >= 8) {
+    return `${s.slice(0, 3)}…[masked ${s.length - 5} chars]…${s.slice(-2)}`;
+  }
+  return REDACTED_MARKER;
+}
+
 function redactHeaders(headersObj) {
   if (!headersObj || typeof headersObj !== 'object') return headersObj;
   const out = {};
   for (const [k, v] of Object.entries(headersObj)) {
-    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? REDACTED_MARKER : v;
+    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? maskCredentialValue(v) : v;
   }
   return out;
 }

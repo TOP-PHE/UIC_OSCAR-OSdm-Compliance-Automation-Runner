@@ -1,0 +1,46 @@
+info:
+  name: OBB Access Token
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{obb_token_url}}"
+  headers:
+    - name: Accept
+      value: application/json
+  body:
+    type: form-urlencoded
+    data:
+      - name: grant_type
+        value: client_credentials
+      - name: client_id
+        value: "{{client_id}}"
+      - name: client_secret
+        value: "{{client_secret}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // #208: clear, fail-fast handling of the token response (never logs the token).
+        const { handleAccessTokenResponse } = require(bru.getEnvVar("library_base") + "auth.js");
+        handleAccessTokenResponse(res, { vendor: "OBB" });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Standalone-Bruno token request for the OBB test system (standard OAuth2
+  client_credentials, credentials in the form-urlencoded body).
+
+  On OSCAR this request is always skipped — the runner fetches the token
+  server-side from the company's API Config credentials and injects it as
+  access_token before the run starts. It exists for developers running the
+  collection directly in Bruno with an OTST_OBB_Env environment, which must
+  define: obb_token_url (the OAuth token endpoint), client_id, client_secret.
+  If OBB requires a scope, add a `scope` field to the body in your local copy.

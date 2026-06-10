@@ -178,7 +178,18 @@ request:
 
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
-            _skipReason = 'not for "' + _sandbox + '" sandbox';
+            // Log-audit round 2: on OSCAR the env name is the company env
+            // ("bileto-sandbox_afc035bc"), which never contains a vendor word
+            // like "bileto access token" → ALL manual vendor token requests
+            // skip here, including the one matching the company's own vendor.
+            // That is CORRECT (the runner injects access_token fetched
+            // server-side from the API Config credentials) but the old
+            // wording — 'not for "bileto-sandbox_…" sandbox' — read as a
+            // sandbox-matching bug. Say what actually happened, and pick the
+            // standalone-Bruno wording only when no token was pre-provided.
+            _skipReason = bru.getEnvVar('access_token')
+              ? 'access token already provided by OSCAR (server-side OAuth from API Config) — manual vendor token requests never run on OSCAR'
+              : 'vendor token request for a different sandbox (env "' + _sandbox + '") — runs only in standalone Bruno with the matching vendor env';
           } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
             else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
             else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
@@ -202,7 +213,12 @@ request:
             else if (_st === 'EXCHANGE'      && _isRefund)                 { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
 
           if (_skipReason) {
-            console.log('[INFO] ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            // Token skips are routine plumbing (6 of them at the top of every
+            // OSCAR run) — the tester doesn't act on them → [DEBUG]. The other
+            // skip reasons SHAPE the test flow (scope gates, place-map modes,
+            // purchaser steps) and stay [INFO] so the report explains why a
+            // step is absent.
+            console.log((_isToken ? '[DEBUG]' : '[INFO]') + ' ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
             // skipRequest() MUST be the last bru call — it clears the bru context.
             // break RUNSCRIPT immediately after so no further bru.* calls run.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
@@ -416,20 +432,36 @@ request:
           console.log('[WARNING] Unitary run scenario load: ' + (_uErr && _uErr.message));
         }
 
-        test(`API base is available : ${bru.getEnvVar("api_base")}`, function () {
-            expect(bru.getEnvVar("api_base")).to.not.be.null;
-            console.log(`API base is available : ${bru.getEnvVar("api_base")}`);
-        });
-
-        test(`Library base is available : ${bru.getEnvVar("library_base")}`, function () {
-            expect(bru.getEnvVar("library_base")).not.null;
-            console.log(`Library base is available : ${bru.getEnvVar("library_base")}`);
-        });
-
-        test(`Data file is available : ${bru.getEnvVar("data_base")}`, function () {
-            expect(bru.getEnvVar("data_base")).not.null;
-            console.log(`Data file is available : ${bru.getEnvVar("data_base")}`);
-        });
+        // Env-sanity guards (api_base / library_base / data_base).
+        // Log-audit round 2: these used to register three PASSING tests on
+        // EVERY request — 3 "✓ … is available" rows under Pre-Request Tests
+        // PLUS 3 bare console echoes, ×~21 requests ≈ 120+ identical lines
+        // per run, and 3×21 filler assertions inflating every report count.
+        // Now: silent per-request check; the environment is announced ONCE
+        // per run at [INFO]; a test is registered ONLY when a variable is
+        // actually missing — failing exactly where it broke, with the fix
+        // path in the message.
+        {
+          const _envSanity = [
+            ['api_base',     'API base',     'check API Config → Company API Endpoint'],
+            ['library_base', 'Library base', 'collection environment issue — library_base should be ./library-bruno/'],
+            ['data_base',    'Data file',    'check the company data file (Test Config) / data_base env var'],
+          ];
+          const _missing = _envSanity.filter(([k]) => {
+            const v = bru.getEnvVar(k);
+            return v == null || v === '';
+          });
+          if (_missing.length > 0) {
+            _missing.forEach(([k, label, fix]) => {
+              test(`${label} env var "${k}" is set`, function () {
+                throw new Error(`${label} ("${k}") is not set — ${fix}.`);
+              });
+            });
+          } else if (bru.getEnvVar('__envSanityAnnounced') !== 'true') {
+            bru.setEnvVar('__envSanityAnnounced', 'true');
+            console.log(`[INFO] Environment OK — API: ${bru.getEnvVar("api_base")} | data file: ${bru.getEnvVar("data_base")} | library: ${bru.getEnvVar("library_base")}`);
+          }
+        }
 
         // Initialise scenario data only on the root collection offer search endpoint.
         // Using a broad "/offers" match also catches "/refund-offers" and
@@ -567,7 +599,10 @@ request:
             consoleLogs:    _consoleLogs
           });
 
-          if (_htmlPath) console.log(`[INFO] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
+          // Log-audit round 2: fires after EVERY request (incremental report
+          // write) and shows a container-internal path — testers reach the
+          // report via the run page's Artifacts section → [DEBUG].
+          if (_htmlPath) console.log(`[DEBUG] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
         } catch (_re) {
           console.log(`[WARNING] Report generation error: ${_re && _re.message}`);
         }

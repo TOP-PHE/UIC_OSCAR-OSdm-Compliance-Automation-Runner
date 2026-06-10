@@ -126,7 +126,7 @@ runtime:
             test("[OSDM] Vendor supports booking multiple offers (round trip) in one booking", () => {
               expect(false, `Vendor rejected the combined round-trip booking — ${(_body && _body.title) || ""}: ${(_body && _body.detail) || ""}. OSDM allows multiple offers; falling back to two separate bookings.`).to.be.true;
             });
-            console.log("⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
+            console.log("[WARNING] ⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
             bru.setEnvVar("__returnBookMode", "sep-out");
             bru.runner.setNextRequest("02. POST Create Booking");
             return;
@@ -140,7 +140,7 @@ runtime:
           test("Return — outbound booking created (status 200)", () => { expect(_status).to.eql(200); });
           if (_status !== 200) { loopbackOrStop("POST Create Booking (outbound leg)"); return; }
           const _ob = _body && _body.booking;
-          if (_ob && _ob.id) { bru.setEnvVar("outboundBookingId", _ob.id); console.log("🔁 Outbound booking created: " + _ob.id); }
+          if (_ob && _ob.id) { bru.setEnvVar("outboundBookingId", _ob.id); console.log("[INFO] 🔁 Outbound booking created: " + _ob.id); }
           bru.setEnvVar("__returnBookMode", "sep-in");
           bru.runner.setNextRequest("02. POST Create Booking");
           return;
@@ -151,7 +151,7 @@ runtime:
           if (_status !== 200) { loopbackOrStop("POST Create Booking (inbound leg)"); return; }
           bru.setEnvVar("__returnBookMode", "done");
           postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
-          console.log("🔁 Inbound booking created: " + bru.getEnvVar("bookingId") + " — round trip booked as 2 bookings (outbound=" + bru.getEnvVar("outboundBookingId") + ").");
+          console.log("[INFO] 🔁 Inbound booking created: " + bru.getEnvVar("bookingId") + " — round trip booked as 2 bookings (outbound=" + bru.getEnvVar("outboundBookingId") + ").");
           bru.deleteEnvVar("currentPassengerIndex");
         } else {
           // One-way (unchanged behaviour), or the combined-200 success path.

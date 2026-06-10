@@ -144,6 +144,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 /* Expand toggle removes the 360px scrollable-box cap so the user can read
    the full body in place without opening the report or copying it out. */
 .msg-pre.msg-pre--expanded{max-height:none}
+/* #350: collapsible request/response header table (between meta and body). */
+.hdr-details{margin:2px 0 8px}
+.hdr-summary{cursor:pointer;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a;user-select:none}
+.hdr-summary:hover{color:#0090D4}
+.hdr-table{width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:11px;margin:6px 0 2px;background:#fafbfc;border:1px solid #eceff1;border-radius:6px}
+.hdr-table td{border-bottom:1px solid #eceff1;padding:3px 10px;vertical-align:top}
+.hdr-table tr:last-child td{border-bottom:0}
+.hdr-table .hdr-k{color:#1565c0;white-space:nowrap;width:230px;font-weight:700}
+.hdr-table .hdr-v{color:#37474f;word-break:break-all}
 </style>
 </head>
 <body>
@@ -189,6 +198,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
           <button class="btn btn-sm log-level-btn" data-level="error">error</button>
           <button class="btn btn-sm log-level-btn" data-level="debug">debug</button>
         </div>
+        <select id="log-req-filter" title="Show only the log lines of one tested endpoint" style="padding:4px 8px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;max-width:220px">
+          <option value="all">All endpoints</option>
+        </select>
         <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
         <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
         <div style="display:flex;gap:4px">
@@ -409,6 +421,21 @@ async function shareRunWithCertifier(share) {
 
 let activeLogLevel = 'all';
 let logSearchTerm = '';
+// Endpoint filter (#350): the runner's LogParser attributes each line to the
+// request being executed (request_name); this lets the tester isolate one
+// endpoint's log, like the per-request grouping in the assertions panel.
+let activeLogRequest = 'all';
+const logRequestsSeen = new Set();
+
+function registerLogRequest(name) {
+  if (!name || logRequestsSeen.has(name)) return;
+  logRequestsSeen.add(name);
+  const sel = document.getElementById('log-req-filter');
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  sel.appendChild(opt);
+}
 
 function appendLogs(events) {
   if (!events.length) return;
@@ -418,6 +445,8 @@ function appendLogs(events) {
     const line = document.createElement('div');
     line.className = `log-line l-${e.level}`;
     line.dataset.level = e.level;
+    line.dataset.request = e.request_name || '';
+    registerLogRequest(e.request_name);
     // #336 (v1.11.113): show milliseconds in the timestamp prefix. ts is
     // an ISO string like "2026-06-09T19:12:42.123Z" — slice(11,23) gives
     // "19:12:42.123". Previously slice(11,19) dropped the ms portion,
@@ -427,6 +456,7 @@ function appendLogs(events) {
     // Apply current filters to new lines
     if (activeLogLevel !== 'all' && e.level !== activeLogLevel) line.classList.add('hidden');
     if (logSearchTerm && !e.message.toLowerCase().includes(logSearchTerm)) line.classList.add('hidden');
+    if (activeLogRequest !== 'all' && (e.request_name || '') !== activeLogRequest) line.classList.add('hidden');
     box.appendChild(line);
     lastEventId = Math.max(lastEventId, e.id);
   });
@@ -444,7 +474,8 @@ function applyLogFilters() {
     const text = line.textContent.toLowerCase();
     const levelOk = activeLogLevel === 'all' || level === activeLogLevel;
     const searchOk = !logSearchTerm || text.includes(logSearchTerm);
-    line.classList.toggle('hidden', !(levelOk && searchOk));
+    const requestOk = activeLogRequest === 'all' || (line.dataset.request || '') === activeLogRequest;
+    line.classList.toggle('hidden', !(levelOk && searchOk && requestOk));
   });
   updateLogMatchCount();
 }
@@ -731,6 +762,10 @@ document.getElementById('log-search').addEventListener('input', function() {
   logSearchTerm = this.value.toLowerCase().trim();
   applyLogFilters();
 });
+document.getElementById('log-req-filter').addEventListener('change', function() {
+  activeLogRequest = this.value;
+  applyLogFilters();
+});
 document.getElementById('log-copy-btn').addEventListener('click', copyLogs);
 document.getElementById('log-download-btn').addEventListener('click', downloadLogs);
 
@@ -893,8 +928,12 @@ function renderMessage(label, meta, body, opts) {
         + `<button class="msg-act" data-act="expand" type="button" title="Expand / collapse the body box">⌄ Expand</button>`
       + `</div>`;
   }
+  // #350: headers ride between meta and body — real HTTP message order
+  // (status line → headers → body). Collapsed by default.
+  const headersHtml = opts.headersHtml || '';
   return `<div class="msg-header"><div class="msg-label">${escHtml(label)}</div>${toggleHtml}${actionsHtml}</div>`
     + (meta ? `<div class="msg-meta">${meta}</div>` : '')
+    + headersHtml
     + payloadScript
     + `<pre class="msg-pre" id="${id}-raw">${escHtml(pretty || '(empty)')}</pre>`
     + treeDiv;
@@ -936,6 +975,25 @@ async function mountJsonTree(msgId) {
   }
 }
 
+// #350: collapsible header table for one direction (request or response).
+// Headers are stored alongside the bodies (credential values already masked
+// at capture by the server — head + last 4 chars kept so the tester can
+// check the right token was used). Includes every captured header, also the
+// non-mandatory ones (traceId, correlation ids…) useful for provider debug.
+function renderHeadersBlock(label, headersJson) {
+  let h = headersJson;
+  if (typeof h === 'string') { try { h = JSON.parse(h); } catch (_) { h = null; } }
+  if (!h || typeof h !== 'object') return '';
+  const keys = Object.keys(h).sort((a, b) => a.localeCompare(b));
+  if (!keys.length) return '';
+  const rows = keys.map(k => {
+    const v = typeof h[k] === 'string' ? h[k] : JSON.stringify(h[k]);
+    return `<tr><td class="hdr-k">${escHtml(k)}</td><td class="hdr-v">${escHtml(v)}</td></tr>`;
+  }).join('');
+  return `<details class="hdr-details"><summary class="hdr-summary">${escHtml(label)} (${keys.length})</summary>`
+    + `<table class="hdr-table"><tbody>${rows}</tbody></table></details>`;
+}
+
 async function loadRequestBodies(reqId, bodyEl) {
   bodyEl.innerHTML = '<div class="msg-loading">Loading…</div>';
   try {
@@ -952,9 +1010,11 @@ async function loadRequestBodies(reqId, bodyEl) {
     const msgOpts = { stepName: r.request_name || '', scenarioName: r.scenario_name || r.suite_name || '' };
     bodyEl.innerHTML = '<div class="msg-block">'
       + renderMessage('Request', reqMeta, r.request_body,
-          Object.assign({ kind: 'request' }, msgOpts))
+          Object.assign({ kind: 'request',
+            headersHtml: renderHeadersBlock('Request headers', r.request_headers) }, msgOpts))
       + renderMessage('Response', resMeta, r.response_body,
-          Object.assign({ kind: 'response' }, msgOpts))
+          Object.assign({ kind: 'response',
+            headersHtml: renderHeadersBlock('Response headers', r.response_headers) }, msgOpts))
       + '</div>';
   } catch (_) {
     bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';

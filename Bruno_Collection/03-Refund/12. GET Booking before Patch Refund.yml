@@ -30,7 +30,7 @@ runtime:
 
         // Validate HTTP response status
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
@@ -65,12 +65,12 @@ runtime:
 
         if(bru.getEnvVar("scenarioAction")?.includes("PATCH")) {
             bru.runner.setNextRequest("13. PATCH Refund Offer");
-            console.log("scenarioAction in data file contains 'PATCH' keyword, executing 13. PATCH Refund Offer")
+            console.log("[INFO] scenarioAction in data file contains 'PATCH' keyword, executing 13. PATCH Refund Offer")
         } else if(bru.getEnvVar("scenarioAction")?.includes("DELETE")) {
             bru.runner.setNextRequest("15. DEL Refund Offer");
-            console.log("scenarioAction in data file contains 'DELETE' keyword, executing 15. DEL Refund Offer")    
+            console.log("[INFO] scenarioAction in data file contains 'DELETE' keyword, executing 15. DEL Refund Offer")    
         } else {
-            console.log("scenarioAction in data file doesn't contain 'PATCH' or 'DELETE' keyword, ending test scenario ...");
+            console.log("[INFO] scenarioAction in data file doesn't contain 'PATCH' or 'DELETE' keyword, ending test scenario ...");
             // ── Multi-scenario: loop to next scenario or truly stop ────────────────
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
@@ -79,7 +79,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ All scenarios complete — run finished');
+              console.log('[INFO] ✅ All scenarios complete — run finished');
               bru.runner.stopExecution();
             }
         }

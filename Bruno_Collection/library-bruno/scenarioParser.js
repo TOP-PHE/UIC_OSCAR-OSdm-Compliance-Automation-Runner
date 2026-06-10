@@ -639,12 +639,22 @@ function parseScenarioData(jsonData) {
       if (_prByPax || _prByLeg) {
         // Per-pax requires >=2 passengers in the resolved passenger list.
         if (_prByPax) {
-          const _passengersList = jsonData.passengersLists?.find(
-            (pl) => pl && pl.id === scenario.passengersListId);
+          // Log-audit round 2: the root property in the data file is
+          // `passengersList` (an ARRAY of lists — the schema's required root
+          // field), not `passengersLists`. The old plural lookup was always
+          // undefined, so _paxCount was 0 for EVERY per-pax scenario and this
+          // warning fired even with 3 passengers correctly linked (list #62
+          // false-positive, 2026-06-10). Keep the plural as a fallback for
+          // hand-edited files, and compare ids loosely ("62" vs 62) since
+          // hand-edited files are exactly what this re-check exists for.
+          const _plRoot = jsonData.passengersList || jsonData.passengersLists;
+          const _passengersList = Array.isArray(_plRoot)
+            ? _plRoot.find((pl) => pl && String(pl.id) === String(scenario.passengersListId))
+            : undefined;
           const _paxCount = Array.isArray(_passengersList?.passengers)
             ? _passengersList.passengers.length : 0;
           if (_paxCount < 2) {
-            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} has only ${_paxCount} passenger(s) — per-pax partial refund cannot fire. Add a passenger or turn partialRefundByPax off.`);
+            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
           }
         }
         // Per-leg with SPECIFICATION trip can be statically validated.
@@ -698,10 +708,23 @@ function parseScenarioData(jsonData) {
       // queue has length 1 and the existing after-response short-circuit
       // routes straight to the next scenario.
       try {
-        const { buildAndArmExpiredFlowQueue } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+        // Log-audit round 2: sibling-relative require. This file lives IN
+        // library-bruno/, so the YML-style library_base prefix
+        // ("./library-bruno/") double-nested to
+        // library-bruno/library-bruno/expiredFlow.js and FAILED ON EVERY RUN
+        // ("Cannot find module ..."), emitting a confusing [WARNING] even
+        // with zero timers armed — and silently disabling the multi-timer
+        // auto-expansion for scenarios that DID arm 2+ timers. Same sibling
+        // pattern as loopback.js → envUtils.js; reportGenerator.js documents
+        // the identical trap.
+        const { buildAndArmExpiredFlowQueue } = require("./expiredFlow.js");
         buildAndArmExpiredFlowQueue();
+        // With 0 timers armed the builder is silent (empty queue, no log) —
+        // so this block emits nothing on ordinary scenarios.
       } catch (_e) {
-        validationLogger(`[WARNING] expiredFlow queue build skipped: ${_e && _e.message}`);
+        // With the path fixed, a throw here is a genuine feature failure:
+        // armed expiry timers would not run their extra passes.
+        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e && _e.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
       }
 
       // Trip requirements — verify the scenario's reference resolves BEFORE
@@ -929,7 +952,7 @@ function parseScenarioData(jsonData) {
           }
         });
 
-        validationLogger('[INFO] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
+        validationLogger('[DEBUG] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
         bru.setEnvVar("bookingPurchaserSpecifications", JSON.stringify(purchaserSpecs[0]));
         return true;
       });
@@ -1057,7 +1080,7 @@ function parseScenarioData(jsonData) {
             }
           });
 
-          validationLogger('[INFO] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
+          validationLogger('[DEBUG] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
           bru.setEnvVar("offerPassengerSpecifications", JSON.stringify(offerPassengerSpecs));
           bru.setEnvVar("bookingPassengerSpecifications", JSON.stringify(passengerSpecs));
           bru.setEnvVar("bookingPassengerReferences", JSON.stringify(passengerReferences));
@@ -1143,13 +1166,24 @@ function parseScenarioData(jsonData) {
       }
 
       foundCorrectDataSet = true;
-      validationLogger("[INFO] ✅ Correct data set was found for this scenario : " + scenarioCode);
+      // Log-audit round 2: "Correct data set was found" never said WHICH
+      // data — testers read it as a mystery term. Say what actually
+      // happened: the scenario definition was matched by code in the data
+      // file and its linked Test Data sections were resolved into the
+      // run's variables.
+      validationLogger('[INFO] ✅ Scenario "' + scenarioCode + '" loaded from the data file — linked test data resolved' +
+        ' (tripRequirement #' + scenario.tripRequirementId +
+        ', passengersList #' + scenario.passengersListId +
+        ', fulfillmentOptions #' + scenario.requestedFulfillmentOptionsListId + ')');
     }
     dataFileIndex++;
   }
 
   if (foundCorrectDataSet === false) {
-    validationLogger(`[ERROR] ⛔ Scenario code with name :  "${scenarioCode}" not found, please check`);
+    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s && s.code; }).filter(Boolean);
+    validationLogger('[ERROR] ⛔ Scenario "' + scenarioCode + '" not found in the data file\'s scenarios[]. ' +
+      'Available code(s): [' + _availCodes.slice(0, 20).join(', ') + (_availCodes.length > 20 ? ', …' : '') + ']. ' +
+      'Fix in the wizard: open Test Config and check the scenario list / scenariosToRun selection.');
     validationLogger(`[ERROR] ⛔ Stopping execution of further requests`);
     throw new Error(`Scenario code "${scenarioCode}" not found`);
   }

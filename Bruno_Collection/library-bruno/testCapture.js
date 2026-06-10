@@ -23,11 +23,19 @@ module.exports = { bruTest, resetTests };
 /**
  * Drop-in replacement for Bruno's test(name, fn).
  * Registers the assertion with Bruno AND stores result in bru.setVar.
- * Also emits an [INFO] / [WARNING] log via validationLogger so the outcome
- * is visible in the Bruno console according to the loggingType env var:
- *   loggingType=INFO  → both ✅ passes and ❌ failures are printed
- *   loggingType=WARN  → only ❌ failures are printed
- *   loggingType=FULL  → everything is printed
+ * Also emits a [DEBUG] / [WARNING] log via validationLogger:
+ *   pass → [DEBUG] ✅ (visible at loggingType=DEBUG/FULL)
+ *   fail → [WARNING] ❌ with the error inline (visible at INFO and WARN)
+ *
+ * Log-audit round 2: the pass echo used to be [INFO], so every passing
+ * assertion appeared TWICE at the default level — once here at evaluation
+ * time and once as Bruno CLI's own native "✓ name" row printed after the
+ * script (the runner classifies those as info). The native row is now the
+ * single INFO-level confirmation; this echo remains available at DEBUG.
+ * Failures stay duplicated on purpose: the [WARNING] echo fires in-flow
+ * with the error message at the exact moment, the native "✕" row at the
+ * end. The HTML report is unaffected either way (assertions flow through
+ * __rptTests, not the console log).
  */
 function bruTest(name, fn) {
   let passed = true;
@@ -41,11 +49,11 @@ function bruTest(name, fn) {
     errMsg = (e && e.message) ? e.message : String(e);
   }
 
-  // Emit INFO / WARNING log via validationLogger (respects loggingType env var)
+  // Emit DEBUG / WARNING log via validationLogger (respects loggingType env var)
   try {
     const { validationLogger } = require('./displays.js');
     if (passed) {
-      validationLogger(`[INFO] ✅ ${name}`);
+      validationLogger(`[DEBUG] ✅ ${name}`);
     } else {
       validationLogger(`[WARNING] ❌ ${name}${errMsg ? ': ' + errMsg : ''}`);
     }
