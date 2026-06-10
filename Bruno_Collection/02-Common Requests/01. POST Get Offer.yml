@@ -70,7 +70,7 @@ runtime:
 
         // Validate HTTP response status
         bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         // Stop flow if status != 200
@@ -118,7 +118,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ No more scenarios — stopping run');
+              console.log('[INFO] ✅ No more scenarios — stopping run');
               bru.runner.stopExecution();
             }
           }
@@ -158,7 +158,7 @@ runtime:
         if (_isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
           bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
           bru.setGlobalEnvVar("skipPlaceMaps", true);
-          console.log("🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
+          console.log("[INFO] 🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
           bru.runner.setNextRequest("01b. POST Get Return Offer");
         } else {
           const _psMode   = bru.getEnvVar("placeSelectionMode");

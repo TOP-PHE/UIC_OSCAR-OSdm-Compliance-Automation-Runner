@@ -77,7 +77,7 @@ runtime:
 
         // Validate HTTP response status
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
@@ -129,12 +129,12 @@ runtime:
 
         if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
             bru.runner.setNextRequest("10. POST Refund Offers");
-            console.log("scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")
+            console.log("[INFO] scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")
         } else if(bru.getEnvVar("scenarioType")?.includes("EXCHANGE")) {
             bru.runner.setNextRequest("10. POST Exchange Offers");
-            console.log("scenarioType in data file contains 'EXCHANGE' keyword, executing 10. POST Exchange Offers")    
+            console.log("[INFO] scenarioType in data file contains 'EXCHANGE' keyword, executing 10. POST Exchange Offers")    
         } else{
-            console.log("scenarioType in data file doesn't contain 'REFUND' or 'EXCHANGE' keyword, SALE scenario complete.");
+            console.log("[INFO] scenarioType in data file doesn't contain 'REFUND' or 'EXCHANGE' keyword, SALE scenario complete.");
             // ── Multi-scenario: loop to next scenario or truly stop ────────────
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
@@ -143,7 +143,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ All scenarios complete — run finished');
+              console.log('[INFO] ✅ All scenarios complete — run finished');
               bru.runner.stopExecution();
             }
         }

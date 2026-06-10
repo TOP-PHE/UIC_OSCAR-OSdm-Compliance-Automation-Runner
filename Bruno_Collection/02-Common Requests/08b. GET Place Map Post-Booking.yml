@@ -59,7 +59,7 @@ runtime:
         const _postSeatMapOk = (statusCode === 200) && !!_va;
         if (_postSeatMapOk) {
           bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
-          validationLogger(`[INFO] GET ${endpoint} → 200 OK`);
+          validationLogger(`[DEBUG] GET ${endpoint} → 200 OK`);
         } else {
           // Trackable vendor-capability finding (intentionally FAILS), like #182.
           // The booking still proceeds; 09 will let the system assign a place.
@@ -67,7 +67,7 @@ runtime:
             expect(_postSeatMapOk, `No post-booking seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Proceeding to add-reservation; the system will assign a place.`).to.be.true;
           });
           validationLogger(`[WARNING] GET ${endpoint} → ${statusCode}${_va ? "" : " (no vehicleAvailability)"} — proceeding without explicit place picks.`);
-          console.log("⚠️ [VENDOR GAP] No post-booking (BOOKING-context) seat map — letting the system assign the place at add-reservation.");
+          console.log("[WARNING] ⚠️ [VENDOR GAP] No post-booking (BOOKING-context) seat map — letting the system assign the place at add-reservation.");
         }
 
         // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
@@ -87,7 +87,7 @@ runtime:
           bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
           bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
           if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
-          console.log("✅ [PLACES] Post-booking: selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          console.log("[INFO] ✅ [PLACES] Post-booking: selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
           if (_picked.length < _paxCount) {
             validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
           }

@@ -43,7 +43,7 @@ runtime:
         // or reject additional offers on a booking." Non-200 → nothing to add.
         if (statusCode === 200) {
           bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
-          validationLogger(`[INFO] GET ${endpoint} → 200 OK`);
+          validationLogger(`[DEBUG] GET ${endpoint} → 200 OK`);
         } else {
           validationLogger(`[INFO] GET ${endpoint} → ${statusCode} (no additional offers; add-ancillary skipped)`);
         }

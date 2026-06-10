@@ -30,7 +30,7 @@ runtime:
 
         // Validate HTTP response status
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
@@ -70,7 +70,7 @@ runtime:
           bru.setEnvVar('__loopback', 'true');
           bru.runner.setNextRequest('01. POST Get Offer');
         } else {
-          console.log('✅ All scenarios complete — run finished');
+          console.log('[INFO] ✅ All scenarios complete — run finished');
           bru.runner.stopExecution();
         }
 

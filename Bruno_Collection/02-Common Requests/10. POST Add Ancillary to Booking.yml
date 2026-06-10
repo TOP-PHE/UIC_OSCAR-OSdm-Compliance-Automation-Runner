@@ -173,7 +173,7 @@ runtime:
         // ── Status ────────────────────────────────────────────────────────
         if (statusCode === 200) {
           bruTest(`POST ${endpoint} (ancillary) → 200 OK`, () => { expect(statusCode).to.eql(200); });
-          validationLogger(`[INFO] POST ${endpoint} (ancillary) → 200 OK`);
+          validationLogger(`[DEBUG] POST ${endpoint} (ancillary) → 200 OK`);
         } else {
           validationLogger(`[ERROR] POST ${endpoint} (ancillary) → ${statusCode} (expected 200 adding an ancillary to the booking)`);
           bruTest(`POST ${endpoint} (ancillary) → ${statusCode} (FAIL)`, () => {
