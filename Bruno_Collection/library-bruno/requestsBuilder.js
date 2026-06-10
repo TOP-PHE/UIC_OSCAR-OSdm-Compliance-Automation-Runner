@@ -86,7 +86,7 @@ function buildOfferCollectionRequest() {
   const tripType = bru.getEnvVar("TripType");
   const sandbox = bru.getEnvVar("api_base") || "";
   const isPaxone = sandbox.includes("paxone");
-  validationLogger("[INFO] Build using TripType: " + tripType);
+  validationLogger("[DEBUG] Build using TripType: " + tripType);
 
   const body = {};
 
@@ -170,7 +170,7 @@ function buildBookingRequest() {
   if (_purMode === "inline") {
     body.purchaser = parseEnvJson("bookingPurchaserSpecifications");
   } else {
-    validationLogger(`[INFO] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the Booking Purchaser step where applicable).`);
+    validationLogger(`[DEBUG] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the Booking Purchaser step where applicable).`);
   }
 
   const sandbox = bru.getEnvVar("api_base") || "";
@@ -514,7 +514,7 @@ function requestExchangeOffersBody(overruleCode) {
       if (updateGender != null) entry.gender = updateGender;
       return entry;
     });
-    validationLogger("[INFO] Built anonymousPassengerSpecifications for " + passengerSpecs.length + " passenger(s)");
+    validationLogger("[DEBUG] Built anonymousPassengerSpecifications for " + passengerSpecs.length + " passenger(s)");
   } catch (_e) {
     validationLogger('[WARNING] requestExchangeOffersBody: could not build passenger specs from offerPassengerSpecifications (' + _e.message + ') — falling back to single-passenger');
     const updateGender_0 = bru.getEnvVar('updateGender_0');

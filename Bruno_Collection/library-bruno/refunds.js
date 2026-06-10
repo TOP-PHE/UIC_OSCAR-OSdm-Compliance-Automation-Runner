@@ -28,7 +28,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
   // Convert single refundOffer to refundOffers array if necessary
   if (jsonData.refundOffer && !jsonData.refundOffers) {
     jsonData.refundOffers = [jsonData.refundOffer];
-    validationLogger("[INFO] Converted single refundOffer to refundOffers array");
+    validationLogger("[DEBUG] Converted single refundOffer to refundOffers array");
   }
 
   // Stop flow if refundOffers invalid
@@ -40,7 +40,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
   // Check refund offers exist
   test(`'refundOffers' array exists with ${jsonData.refundOffers.length} refund offer(s)`, () => {
     expect(jsonData.refundOffers, "[ERROR] 'refundOffers' is missing or empty").to.be.an("array").that.is.not.empty;
-    validationLogger(`[INFO] 'refundOffers' array exists with ${jsonData.refundOffers.length} refund offer(s)`);
+    validationLogger(`[DEBUG] 'refundOffers' array exists with ${jsonData.refundOffers.length} refund offer(s)`);
   });
 
   // Validate each refund offer
@@ -50,7 +50,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
 
   // Store first offer ID
   bru.setEnvVar("refundOffersOfferId", jsonData.refundOffers[0].id);
-  validationLogger(`[INFO] Stored refundOffersOfferId: ${jsonData.refundOffers[0].id}`);
+  validationLogger(`[DEBUG] Stored refundOffersOfferId: ${jsonData.refundOffers[0].id}`);
 
   // Expired-refund-offer test (Phase 3): capture the RefundOffer.validUntil of
   // the offer the PATCH will accept (refundOffers[0]), but ONLY on the POST
@@ -76,13 +76,13 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
 // Function to validate a single refund offer
 function validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus) {
   validationLogger("[DEBUG] ➤ validateRefundOfferResponse");
-  validationLogger(`[INFO] Validating refund offer at index ${index}`);
+  validationLogger(`[DEBUG] Validating refund offer at index ${index}`);
 
   // Validate refund offer ID
   test(`Refund offer at index ${index} has a valid Offer Id ${refundOffer.id}`, () => {
     expect(refundOffer.id).to.exist;
     expect(refundOffer.id).to.be.a('string').and.not.be.empty;
-    validationLogger(`[INFO] Refund offer at index ${index} has a valid Offer Id ${refundOffer.id}`);
+    validationLogger(`[DEBUG] Refund offer at index ${index} has a valid Offer Id ${refundOffer.id}`);
   });
 
   // Validate status
@@ -93,7 +93,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       ? expectedRefundOperationStatus
       : [expectedRefundOperationStatus];
     expect(expectedStatuses).to.include(refundOffer.status);
-    validationLogger(`[INFO] Refund offer[${index}] has valid status, expected: ${expectedRefundOperationStatus}, actual: ${refundOffer.status}`);
+    validationLogger(`[DEBUG] Refund offer[${index}] has valid status, expected: ${expectedRefundOperationStatus}, actual: ${refundOffer.status}`);
   });
 
   // Validate dates.
@@ -162,7 +162,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       expect(createdOn.getTime(),
         `createdOn (${refundOffer.createdOn}) is in the future relative to now (${currentDate.toISOString()})`
       ).to.be.at.most(currentDate.getTime());
-      validationLogger(`[INFO] Refund offer[${index}] createdOn is valid and in the past: ${_label}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] createdOn is valid and in the past: ${_label}`);
     });
   }
 
@@ -172,7 +172,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     test(`Refund offer[${index}] validFrom is valid: ${_label}`, () => {
       // Presence + parseability already checked above; this body is reserved
       // for any future range/order assertions (currently just a heartbeat).
-      validationLogger(`[INFO] Refund offer[${index}] validFrom is valid: ${_label}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] validFrom is valid: ${_label}`);
     });
   }
 
@@ -190,7 +190,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
       expect(difference,
         `validUntil is ${Math.round(difference/1000)}s away from the expected ~15min mark (tolerance ±${tolerance/1000}s). Got ${refundOffer.validUntil}, expected ~${expectedValidUntil.toISOString()}.`
       ).to.be.at.most(tolerance);
-      validationLogger(`[INFO] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
     });
   }
 
@@ -199,7 +199,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     test(`Refund offer[${index}] validFrom is before or equal to validUntil (OSDM: temporal order)`, () => {
       expect(validFrom.getTime()).to.be.at.most(validUntil.getTime(),
         `validFrom (${refundOffer.validFrom}) is after validUntil (${refundOffer.validUntil})`);
-      validationLogger(`[INFO] Refund offer[${index}] temporal order OK: validFrom=${refundOffer.validFrom} ≤ validUntil=${refundOffer.validUntil}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] temporal order OK: validFrom=${refundOffer.validFrom} ≤ validUntil=${refundOffer.validUntil}`);
     });
   }
 
@@ -232,7 +232,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   };
   const refundableAmountLabel = _priceShape(refundOffer.refundableAmount);
   test(`Refund offer[${index}] refundableAmount Price structure is well-formed — ${refundableAmountLabel}`, () => {
-    validationLogger(`[INFO] Refund offer[${index}] refundableAmount: ${refundOffer.refundableAmount?.amount} ${refundOffer.refundableAmount?.currency}`);
+    validationLogger(`[DEBUG] Refund offer[${index}] refundableAmount: ${refundOffer.refundableAmount?.amount} ${refundOffer.refundableAmount?.currency}`);
     expect(refundOffer.refundableAmount, 'refundableAmount missing in RefundOffer').to.exist;
     expect(refundOffer.refundableAmount, 'refundableAmount is not an object').to.be.an('object');
     expect(refundOffer.refundableAmount.amount,   'refundableAmount.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
@@ -267,7 +267,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     refundFeeLabel = `${_priceShape(refundOffer.refundFee)}${retention}`;
   }
   test(`Refund offer[${index}] refundFee Price structure is well-formed — ${refundFeeLabel}`, () => {
-    validationLogger(`[INFO] Refund offer[${index}] refundFee: ${refundOffer.refundFee?.amount} ${refundOffer.refundFee?.currency}`);
+    validationLogger(`[DEBUG] Refund offer[${index}] refundFee: ${refundOffer.refundFee?.amount} ${refundOffer.refundFee?.currency}`);
     expect(refundOffer.refundFee, 'refundFee missing in RefundOffer (OSDM: required even at amount=0)').to.exist;
     expect(refundOffer.refundFee, 'refundFee is not an object').to.be.an('object');
     expect(refundOffer.refundFee.amount,   'refundFee.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
@@ -280,7 +280,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   test(`Refund offer[${index}] fulfillments is a non-empty array (OSDM: minItems:1)`, () => {
     expect(refundOffer.fulfillments).to.be.an('array').with.lengthOf.at.least(1,
       `refundOffer.fulfillments must not be empty`);
-    validationLogger(`[INFO] Refund offer[${index}] has ${refundOffer.fulfillments?.length} fulfillment(s)`);
+    validationLogger(`[DEBUG] Refund offer[${index}] has ${refundOffer.fulfillments?.length} fulfillment(s)`);
   });
 
   // Validate reimbursementStatus
@@ -288,24 +288,24 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     test(`Refund offer[${index}] has valid reimbursementStatus: ${refundOffer.reimbursementStatus}`, () => {
       expect(refundOffer.reimbursementStatus).to.exist;
       expect(refundOffer.reimbursementStatus).to.be.oneOf(['IMMEDIATE', 'DELAYED']);
-      validationLogger(`[INFO] Refund offer[${index}] has valid reimbursementStatus: ${refundOffer.reimbursementStatus}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] has valid reimbursementStatus: ${refundOffer.reimbursementStatus}`);
     });
   } else {
-    validationLogger(`[INFO] reimbursementStatus is not present in refund offer[${index}] → test skipped`);
+    validationLogger(`[DEBUG] reimbursementStatus is not present in refund offer[${index}] → test skipped`);
   }
 
   // Validate refundOfferBreakDown
   if (Array.isArray(refundOffer.refundOfferBreakDown) && refundOffer.refundOfferBreakDown.length > 0) {
     test(`Refund offer[${index}] has ${refundOffer.refundOfferBreakDown.length} breakdown(s)`, () => {
       expect(refundOffer.refundOfferBreakDown).to.be.an('array').that.is.not.empty;
-      validationLogger(`[INFO] Refund offer[${index}] has ${refundOffer.refundOfferBreakDown.length} breakdown(s)`);
+      validationLogger(`[DEBUG] Refund offer[${index}] has ${refundOffer.refundOfferBreakDown.length} breakdown(s)`);
     });
 
     refundOffer.refundOfferBreakDown.forEach((breakdown, bdIndex) => {
       const bdLabel = `refundFee amount: ${breakdown.refundFee?.amount}, refundableAmount amount: ${breakdown.refundableAmount?.amount}`;
       test(`Refund offer[${index}] breakdown[${bdIndex}] is valid, ${bdLabel}`, () => {
         // Validate refundFee
-        validationLogger(`[INFO] Refund offer[${index}] breakdown[${bdIndex}] refundFee: ${breakdown.refundFee.amount} ${breakdown.refundFee.currency}`);
+        validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] refundFee: ${breakdown.refundFee.amount} ${breakdown.refundFee.currency}`);
         expect(breakdown.refundFee).to.exist;
         expect(breakdown.refundFee.amount).to.be.a('number').and.at.least(0);
         expect(breakdown.refundFee.currency).to.be.a('string');
@@ -323,15 +323,15 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
         // Validate fulfillmentId
         expect(breakdown.fulfillmentId).to.be.a('string').and.not.be.empty;
 
-        validationLogger(`[INFO] Refund offer[${index}] breakdown[${bdIndex}] is valid, refundFee amount: ${breakdown.refundFee.amount}, refundableAmount amount: ${breakdown.refundableAmount.amount} bookingParts=${breakdown.bookingParts.length}, fulfillmentId=${breakdown.fulfillmentId}`);
+        validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] is valid, refundFee amount: ${breakdown.refundFee.amount}, refundableAmount amount: ${breakdown.refundableAmount.amount} bookingParts=${breakdown.bookingParts.length}, fulfillmentId=${breakdown.fulfillmentId}`);
       });
 
       // Store bookingParts IDs for later validation (log only; storage optional)
       const partRefs = breakdown.bookingParts.map(bp => bp.id);
-      validationLogger(`[INFO] Refund offer[${index}] breakdown[${bdIndex}] bookingParts IDs: ${partRefs.join(', ')}`);
+      validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] bookingParts IDs: ${partRefs.join(', ')}`);
     });
   } else {
-    validationLogger(`[INFO] No refundOfferBreakDown found for refund offer[${index}]`);
+    validationLogger(`[DEBUG] No refundOfferBreakDown found for refund offer[${index}]`);
   }
 
   // Validate fulfillments
@@ -353,10 +353,10 @@ function validateRefundFeeLocal(refundFee) {
   if (typeof validateRefundFee === "function" && validateRefundFee !== validateRefundFeeLocal) {
     return validateRefundFee(refundFee);
   }
-  validationLogger(`[INFO] Validating refund fee: ${refundFee.amount} ${refundFee.currency}`);
+  validationLogger(`[DEBUG] Validating refund fee: ${refundFee.amount} ${refundFee.currency}`);
   test(`Refund fee is valid and non-negative`, () => {
     expect(refundFee.amount).to.be.at.least(0);
-    validationLogger(`[INFO] Refund fee amount: ${refundFee.amount} (non-negative)`);
+    validationLogger(`[DEBUG] Refund fee amount: ${refundFee.amount} (non-negative)`);
   });
 }
 
@@ -365,10 +365,10 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
   if (typeof validateRefundableAmount === "function" && validateRefundableAmount !== validateRefundableAmountLocal) {
     return validateRefundableAmount(refundOffer, overruleCode, confirmedPriceAmount);
   }
-  validationLogger(`[INFO] confirmedPriceAmount: ${confirmedPriceAmount}`);
-  validationLogger(`[INFO] RefundOffer.refundableAmount.amount: ${refundOffer.refundableAmount.amount}`);
-  validationLogger(`[INFO] RefundOffer.refundFee.amount: ${refundOffer.refundFee.amount}`);
-  validationLogger(`[INFO] OverruleCode: ${overruleCode}`);
+  validationLogger(`[DEBUG] confirmedPriceAmount: ${confirmedPriceAmount}`);
+  validationLogger(`[DEBUG] RefundOffer.refundableAmount.amount: ${refundOffer.refundableAmount.amount}`);
+  validationLogger(`[DEBUG] RefundOffer.refundFee.amount: ${refundOffer.refundFee.amount}`);
+  validationLogger(`[DEBUG] OverruleCode: ${overruleCode}`);
 
   // Partial refund (#218) — the strict full-refund financial identity
   // `refundFee + refundableAmount = confirmedPrice` does NOT hold when the
@@ -432,7 +432,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
         `Currency mismatch: refundableAmount(${refundOffer.refundableAmount.currency}) vs refundFee(${refundOffer.refundFee.currency})`)
         .to.eql(refundOffer.refundFee.currency);
     }
-    validationLogger(`[INFO] Refund response bounds OK — fee(${_feeInt}) + refundable(${_refundInt}) ≤ confirmed(${_confirmedInt}).`);
+    validationLogger(`[DEBUG] Refund response bounds OK — fee(${_feeInt}) + refundable(${_refundInt}) ≤ confirmed(${_confirmedInt}).`);
   });
 
   if (_hasOverrule) {
@@ -444,14 +444,14 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
       // the partial identity still applies; we add the fee==0 check here.
       test(`Partial refund WITH overrule (${overruleCode}): refundFee should be 0 (overrule waives fee on top of partial scope)`, () => {
         expect(_feeInt, `Overrule(${overruleCode}) was sent but provider still charged a fee: ${_feeInt} (scaled). Overrule contract: waive fees on top of partial scope.`).to.eql(0);
-        validationLogger(`[INFO] Overrule(${overruleCode}) honoured on partial scope — fee waived.`);
+        validationLogger(`[DEBUG] Overrule(${overruleCode}) honoured on partial scope — fee waived.`);
       });
       test(`Partial refund WITH overrule (${overruleCode}): refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
         expect(_feeInt + _refundInt,
           `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)
           .to.be.below(_confirmedInt);
         const _diff = _confirmedInt - (_feeInt + _refundInt);
-        validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+        validationLogger(`[DEBUG] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
       });
     } else {
       // Full-with-overrule — strict identity, the canonical overrule contract:
@@ -464,7 +464,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
         expect(_feeInt,
           `Provider did NOT honour overrule(${overruleCode}): fee(${_feeInt}) ≠ 0. Overrule contract: no fee taken on top of full restitution.`)
           .to.eql(0);
-        validationLogger(`[INFO] Overrule(${overruleCode}) honoured — full refund (${_refundInt}) and zero fee.`);
+        validationLogger(`[DEBUG] Overrule(${overruleCode}) honoured — full refund (${_refundInt}) and zero fee.`);
       });
     }
   } else {
@@ -474,9 +474,9 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
     // surface what the provider answered so a human reviewer can reconcile
     // it against the booking's afterSalesConditions.
     if (_refundInt === 0) {
-      validationLogger(`[INFO] No overrule sent and provider returned refundableAmount=0 — provider applied its rules and declined the refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative.`);
+      validationLogger(`[DEBUG] No overrule sent and provider returned refundableAmount=0 — provider applied its rules and declined the refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative.`);
     } else {
-      validationLogger(`[INFO] No overrule sent and provider returned refundableAmount=${refundOffer.refundableAmount.amount} ${refundOffer.refundableAmount.currency} (fee=${refundOffer.refundFee.amount}) — provider applied its rules and the conditions permit a refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative. To force a specific expected amount, set an overruleCode on the scenario (overrule contract: amount = confirmedPrice, fee = 0).`);
+      validationLogger(`[DEBUG] No overrule sent and provider returned refundableAmount=${refundOffer.refundableAmount.amount} ${refundOffer.refundableAmount.currency} (fee=${refundOffer.refundFee.amount}) — provider applied its rules and the conditions permit a refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative. To force a specific expected amount, set an overruleCode on the scenario (overrule contract: amount = confirmedPrice, fee = 0).`);
     }
     // Partial-refund identity still applies in the normal flow.
     if (_isPartial) {
@@ -485,7 +485,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
           `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)
           .to.be.below(_confirmedInt);
         const _diff = _confirmedInt - (_feeInt + _refundInt);
-        validationLogger(`[INFO] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+        validationLogger(`[DEBUG] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
       });
     }
   }
@@ -506,7 +506,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
     const _breakdown = Array.isArray(refundOffer.refundOfferBreakdownItems)
       ? refundOffer.refundOfferBreakdownItems : [];
     if (_breakdown.length === 0 || _requestedPartIds.size === 0) {
-      validationLogger(`[INFO] Partial-refund breakdown check skipped (no breakdown returned, or no bookingPartIds requested).`);
+      validationLogger(`[DEBUG] Partial-refund breakdown check skipped (no breakdown returned, or no bookingPartIds requested).`);
     } else {
       const _responsePartIds = new Set();
       for (const b of _breakdown) {
@@ -517,7 +517,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
       const _outOfScope = [..._responsePartIds].filter((id) => !_requestedPartIds.has(id));
       test(`Partial refund: response.refundOfferBreakdownItems[].bookingParts is a subset of the requested bookingPartIds (no extra parts refunded)`, () => {
         expect(_outOfScope, `Response includes booking parts that were NOT in refundSpecifications: [${_outOfScope.join(", ")}]`).to.be.empty;
-        validationLogger(`[INFO] Partial-refund scope conformance: response parts=[${[..._responsePartIds].join(", ")}] ⊆ requested=[${[..._requestedPartIds].join(", ")}]`);
+        validationLogger(`[DEBUG] Partial-refund scope conformance: response parts=[${[..._responsePartIds].join(", ")}] ⊆ requested=[${[..._requestedPartIds].join(", ")}]`);
       });
     }
   }
@@ -525,8 +525,8 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
 
 // Function to validate applied overrule code (uses global validateAppliedOverruleCode if available)
 function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverruleCode) {
-  validationLogger(`[INFO] ExpectedOverruleCode: ${expectedOverruleCode}`);
-  validationLogger(`[INFO] AppliedOverruleCode: ${appliedOverruleCode}`);
+  validationLogger(`[DEBUG] ExpectedOverruleCode: ${expectedOverruleCode}`);
+  validationLogger(`[DEBUG] AppliedOverruleCode: ${appliedOverruleCode}`);
   if (typeof validateAppliedOverruleCode === "function") {
     return validateAppliedOverruleCode(appliedOverruleCode, expectedOverruleCode);
   }
@@ -565,7 +565,7 @@ function getBookingRefundResponse(response, scenarioType) {
   if (["postRefund", "patchRefund"].includes(scenarioType)) {
     const _refsRaw = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
     const idsAdmissionAncillariesReservationReference = Array.isArray(_refsRaw) ? _refsRaw : JSON.parse(_refsRaw || "[]");
-    validationLogger(`[INFO] Reference for admissions, ancillaries and reservations: ${idsAdmissionAncillariesReservationReference}`);
+    validationLogger(`[DEBUG] Reference for admissions, ancillaries and reservations: ${idsAdmissionAncillariesReservationReference}`);
 
     idsAdmissionAncillariesReservationReference.forEach(refId => {
       const admissions = booking.bookedOffers?.[0]?.admissions || [];
@@ -642,7 +642,7 @@ function getBookingRefundResponse(response, scenarioType) {
             expect(['REFUNDED','FULFILLED'], `Part[${i}] status should be REFUNDED, got '${part.status}'`)
               .to.include(part.status);
           });
-          validationLogger(`[INFO] All ${_allParts.length} parts verified as post-refund status`);
+          validationLogger(`[DEBUG] All ${_allParts.length} parts verified as post-refund status`);
         });
       }
     }

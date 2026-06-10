@@ -28,7 +28,7 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
 
   // Check exchange offers exist
   test(`'exchangeOffers' array exists with ${jsonData.exchangeOffers.length} exchange offer(s)`, () => {
-    validationLogger(`[INFO] 'exchangeOffers' array exists with ${jsonData.exchangeOffers.length} exchange offer(s)`);
+    validationLogger(`[DEBUG] 'exchangeOffers' array exists with ${jsonData.exchangeOffers.length} exchange offer(s)`);
     expect(jsonData.exchangeOffers, "[ERROR] 'exchangeOffers' is missing or empty").to.be.an("array").that.is.not.empty;
   });
 
@@ -39,7 +39,7 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
 
   // Store first offer ID
   bru.setEnvVar("exchangeOffersOfferId", jsonData.exchangeOffers[0].offerId);
-  validationLogger(`[INFO] Stored exchangeOffersOfferId: ${jsonData.exchangeOffers[0].offerId}`);
+  validationLogger(`[DEBUG] Stored exchangeOffersOfferId: ${jsonData.exchangeOffers[0].offerId}`);
 
   // Expired-exchange-offer test (Phase 4): capture the
   // ExchangeOffer.preBookableUntil of the offer the POST /exchange-operations
@@ -71,27 +71,27 @@ function postPatchExchangeOperationsResponse(jsonData, expectedExchangeOperation
 
   // Validate exchangeOperation exists
   test(`'exchangeOperation' exists in response`, () => {
-    validationLogger("[INFO] Exchange operation found in response");
+    validationLogger("[DEBUG] Exchange operation found in response");
     expect(jsonData).to.have.property('exchangeOperation');
     expect(jsonData.exchangeOperation).to.not.be.null;
   });
 
   // Validate exchangeOperation ID
   test(`Exchange operation has a valid Id ${jsonData.exchangeOperation.id}`, () => {
-    validationLogger(`[INFO] Exchange operation has a valid Id ${jsonData.exchangeOperation.id}`);
+    validationLogger(`[DEBUG] Exchange operation has a valid Id ${jsonData.exchangeOperation.id}`);
     expect(jsonData.exchangeOperation.id).to.exist;
     expect(jsonData.exchangeOperation.id).to.be.a('string').and.not.empty;
   });
 
   // Validate exchangeOperation status
   test(`Exchange operation has valid status, expected : ${expectedExchangeOperationStatus}, actual : ${jsonData.exchangeOperation.status}`, () => {
-    validationLogger(`[INFO] Exchange operation has valid status, expected : ${expectedExchangeOperationStatus}, actual : ${jsonData.exchangeOperation.status}`);
+    validationLogger(`[DEBUG] Exchange operation has valid status, expected : ${expectedExchangeOperationStatus}, actual : ${jsonData.exchangeOperation.status}`);
     expect(expectedExchangeOperationStatus).to.include(jsonData.exchangeOperation.status);
   });
 
   // Validate exchangeOffers
   test(`Exchange operation contains exchangeOffers`, () => {
-    validationLogger(`[INFO] 🔍 ${jsonData.exchangeOperation.exchangeOffers.length} exchange offer(s) in operation`);
+    validationLogger(`[DEBUG] 🔍 ${jsonData.exchangeOperation.exchangeOffers.length} exchange offer(s) in operation`);
     expect(jsonData.exchangeOperation).to.have.property('exchangeOffers');
     expect(jsonData.exchangeOperation.exchangeOffers).to.be.an('array').that.is.not.empty;
   });
@@ -102,17 +102,17 @@ function postPatchExchangeOperationsResponse(jsonData, expectedExchangeOperation
 
   // Store exchangeOperation ID
   bru.setEnvVar("exchangeOperationId", jsonData.exchangeOperation.id);
-  validationLogger(`[INFO] Stored exchangeOperationId: ${jsonData.exchangeOperation.id}`);
+  validationLogger(`[DEBUG] Stored exchangeOperationId: ${jsonData.exchangeOperation.id}`);
 }
 
 // Function to validate exchange offer
 function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillmentStatus) {
   validationLogger("[DEBUG] ➤ validateExchangeOfferResponse");
-  validationLogger(`[INFO] Validating exchange offer at index ${index}`);
+  validationLogger(`[DEBUG] Validating exchange offer at index ${index}`);
 
   // Validate exchange offer ID
   test(`Exchange offer at index ${index} has a valid Offer Id ${exchangeOffer.offerId}`, () => {
-    validationLogger(`[INFO] Exchange offer at index ${index} has a valid Offer Id ${exchangeOffer.offerId}`);
+    validationLogger(`[DEBUG] Exchange offer at index ${index} has a valid Offer Id ${exchangeOffer.offerId}`);
     expect(exchangeOffer.offerId).to.exist;
   });
 
@@ -123,22 +123,22 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
       expect(isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
       expect(_pbu.getTime()).to.be.above(Date.now(),
         `preBookableUntil is in the past: ${exchangeOffer.preBookableUntil}`);
-      validationLogger(`[INFO] Exchange offer[${index}].preBookableUntil: ${exchangeOffer.preBookableUntil} ✓`);
+      validationLogger(`[DEBUG] Exchange offer[${index}].preBookableUntil: ${exchangeOffer.preBookableUntil} ✓`);
     });
   } else {
-    validationLogger(`[INFO] Exchange offer[${index}].preBookableUntil absent → test skipped`);
+    validationLogger(`[DEBUG] Exchange offer[${index}].preBookableUntil absent → test skipped`);
   }
 
   // F4: admissionOfferParts must be non-empty (OSDM: ExchangeOffer.admissionOfferParts required)
   test(`Exchange offer[${index}].admissionOfferParts is a non-empty array (OSDM: required field)`, () => {
     expect(exchangeOffer.admissionOfferParts).to.be.an('array').with.lengthOf.at.least(1,
       `exchangeOffer.admissionOfferParts must not be empty`);
-    validationLogger(`[INFO] Exchange offer[${index}] has ${exchangeOffer.admissionOfferParts?.length} admissionOfferPart(s)`);
+    validationLogger(`[DEBUG] Exchange offer[${index}] has ${exchangeOffer.admissionOfferParts?.length} admissionOfferPart(s)`);
   });
 
   // Validate offer structure
   test(`Exchange offer[${index}] has required properties offerSummary, exchangeFee, exchangePrice`, () => {
-    validationLogger(`[INFO] Exchange offer[${index}] has required properties offerSummary, exchangeFee, exchangePrice`);
+    validationLogger(`[DEBUG] Exchange offer[${index}] has required properties offerSummary, exchangeFee, exchangePrice`);
     expect(exchangeOffer).to.have.property('offerSummary');
     expect(exchangeOffer).to.have.property('exchangeFee');
     expect(exchangeOffer).to.have.property('exchangePrice');
@@ -147,7 +147,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   // Validate offer summary
   if (exchangeOffer.offerSummary) {
     test(`Exchange offer [${index}] has overallFlexibility: ${exchangeOffer.offerSummary.overallFlexibility} and minimal price: ${exchangeOffer.offerSummary.minimalPrice.amount}`, () => {
-      validationLogger(`[INFO] Exchange offer [${index}] has overallFlexibility: ${exchangeOffer.offerSummary.overallFlexibility} and minimal price: ${exchangeOffer.offerSummary.minimalPrice.amount}`);
+      validationLogger(`[DEBUG] Exchange offer [${index}] has overallFlexibility: ${exchangeOffer.offerSummary.overallFlexibility} and minimal price: ${exchangeOffer.offerSummary.minimalPrice.amount}`);
       expect(exchangeOffer.offerSummary).to.have.property('overallFlexibility');
       expect(exchangeOffer.offerSummary.overallFlexibility).to.be.a('string');
       expect(exchangeOffer.offerSummary).to.have.property('minimalPrice');
@@ -160,7 +160,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   // Validate amountToBePaid if present
   if (exchangeOffer.amountToBePaid) {
     test(`Exchange offer[${index}] has amount to be paid: ${exchangeOffer.amountToBePaid.amount}`, () => {
-      validationLogger(`[INFO] Exchange offer[${index}] has amount to be paid: ${exchangeOffer.amountToBePaid.amount}`);
+      validationLogger(`[DEBUG] Exchange offer[${index}] has amount to be paid: ${exchangeOffer.amountToBePaid.amount}`);
       expect(exchangeOffer.amountToBePaid.amount).to.be.a('number');
     });
     // F1: Use integer arithmetic to avoid floating-point errors (OSDM financial identity)
@@ -171,11 +171,11 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
     const _confInt    = Math.round(_confirmedPriceAmount * _scale);
     const _toPayInt   = Math.round(exchangeOffer.amountToBePaid.amount * _scale);
     test(`Exchange offer[${index}] amountToBePaid = exchangePrice + exchangeFee - confirmedPrice (OSDM financial identity, integer arithmetic)`, () => {
-      validationLogger(`[INFO] exchangePrice=${exchangeOffer.exchangePrice.amount}, exchangeFee=${exchangeOffer.exchangeFee.amount}, confirmedPrice=${_confirmedPriceAmount}`);
-      validationLogger(`[INFO] Expected amountToBePaid (scaled) = ${_exPriceInt} + ${_exFeeInt} - ${_confInt} = ${_exPriceInt + _exFeeInt - _confInt}`);
+      validationLogger(`[DEBUG] exchangePrice=${exchangeOffer.exchangePrice.amount}, exchangeFee=${exchangeOffer.exchangeFee.amount}, confirmedPrice=${_confirmedPriceAmount}`);
+      validationLogger(`[DEBUG] Expected amountToBePaid (scaled) = ${_exPriceInt} + ${_exFeeInt} - ${_confInt} = ${_exPriceInt + _exFeeInt - _confInt}`);
       expect(_toPayInt).to.eql(_exPriceInt + _exFeeInt - _confInt,
         `amountToBePaid(${_toPayInt}) ≠ exchangePrice(${_exPriceInt}) + exchangeFee(${_exFeeInt}) - confirmedPrice(${_confInt})`);
-      validationLogger(`[INFO] Exchange financial identity verified: amountToBePaid=${exchangeOffer.amountToBePaid.amount}`);
+      validationLogger(`[DEBUG] Exchange financial identity verified: amountToBePaid=${exchangeOffer.amountToBePaid.amount}`);
     });
   } else {
     validationLogger(`[WARN] Exchange offer[${index}] amountToBePaid is missing`);
@@ -193,11 +193,11 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   // Validate refundableAmount if present
   if (exchangeOffer.refundableAmount !== undefined && exchangeOffer.refundableAmount !== null && exchangeOffer.refundableAmount.amount !== null) {
     test(`Exchange offer[${index}] has refundable amount defined ${exchangeOffer.refundableAmount.amount}`, () => {
-      validationLogger(`[INFO] Exchange offer[${index}] has refundable amount defined ${exchangeOffer.refundableAmount.amount}`);
+      validationLogger(`[DEBUG] Exchange offer[${index}] has refundable amount defined ${exchangeOffer.refundableAmount.amount}`);
       expect(exchangeOffer.refundableAmount.amount).to.be.a('number');
     });
   } else {
-    validationLogger(`[INFO] Exchange offer[${index}] refundable amount is not defined`);
+    validationLogger(`[DEBUG] Exchange offer[${index}] refundable amount is not defined`);
   }
 
   // Store all offer part IDs for later fulfillment validation when on that specific request
@@ -213,7 +213,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
 
     admissionReservationAncillaryBookingPartsIds.push(...allPartIds);
     bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", admissionReservationAncillaryBookingPartsIds);
-    validationLogger(`[INFO] Collected ${allPartIds.length} exchange offer parts IDs`);
+    validationLogger(`[DEBUG] Collected ${allPartIds.length} exchange offer parts IDs`);
   }
 
   // Validate fulfillments
@@ -242,7 +242,7 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     if (Array.isArray(admission.afterSalesConditions) && admission.afterSalesConditions.length > 0) {
       admission.afterSalesConditions.forEach((condition, condIndex) => {
         if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[INFO] AdmissionOfferPart[${admIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
+          validationLogger(`[DEBUG] AdmissionOfferPart[${admIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
           const scenarioType = bru.getEnvVar("scenarioType") || "";
           if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
             totalAfterSalesFee += condition.afterSaleFee.amount;
@@ -259,7 +259,7 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     if (Array.isArray(reservation.afterSalesConditions) && reservation.afterSalesConditions.length > 0) {
       reservation.afterSalesConditions.forEach((condition, condIndex) => {
         if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[INFO] ReservationOfferPart[${resIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
+          validationLogger(`[DEBUG] ReservationOfferPart[${resIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
           const scenarioType = bru.getEnvVar("scenarioType") || "";
           if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
             totalAfterSalesFee += condition.afterSaleFee.amount;
@@ -276,7 +276,7 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     if (Array.isArray(ancillary.afterSalesConditions) && ancillary.afterSalesConditions.length > 0) {
       ancillary.afterSalesConditions.forEach((condition, condIndex) => {
         if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[INFO] AncillaryOfferPart[${ancIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
+          validationLogger(`[DEBUG] AncillaryOfferPart[${ancIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
           const scenarioType = bru.getEnvVar("scenarioType") || "";
           if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
             totalAfterSalesFee += condition.afterSaleFee.amount;
@@ -288,12 +288,12 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
     }
   });
 
-  validationLogger(`[INFO] Total afterSalesConditions fee from all offer parts: ${totalAfterSalesFee}`);
+  validationLogger(`[DEBUG] Total afterSalesConditions fee from all offer parts: ${totalAfterSalesFee}`);
 
   // Validate exchange fee if exchange fee and afterSalesConditions exist and consistent
   if (exchangeFee && typeof exchangeFee.amount === 'number') {
     test(`Exchange fee = ${exchangeFee.amount} matches total afterSalesConditions = ${totalAfterSalesFee} from all offer parts and admissionReservationAncillaryOfferPartsAftersalesConditions from offer = ${admissionReservationAncillaryOfferPartsAftersalesConditions}`, () => {
-      validationLogger(`[INFO] Exchange fee = ${exchangeFee.amount} matches total afterSalesConditions = ${totalAfterSalesFee} from all offer parts and admissionReservationAncillaryOfferPartsAftersalesConditions from offer = ${admissionReservationAncillaryOfferPartsAftersalesConditions}`);
+      validationLogger(`[DEBUG] Exchange fee = ${exchangeFee.amount} matches total afterSalesConditions = ${totalAfterSalesFee} from all offer parts and admissionReservationAncillaryOfferPartsAftersalesConditions from offer = ${admissionReservationAncillaryOfferPartsAftersalesConditions}`);
       expect(exchangeFee.amount).to.be.at.least(0, "Exchange fee should be non-negative");
       expect(exchangeFee.amount).to.eql(totalAfterSalesFee);
       expect(exchangeFee.amount).to.eql(admissionReservationAncillaryOfferPartsAftersalesConditions);
@@ -303,8 +303,8 @@ function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
 
 // Function to validate applied overrule code
 function validateExchangeAppliedOverruleCode(appliedOverruleCode, expectedOverruleCode) {
-  validationLogger(`[INFO] ExpectedOverruleCode: ${expectedOverruleCode}`);
-  validationLogger(`[INFO] AppliedOverruleCode: ${appliedOverruleCode}`);
+  validationLogger(`[DEBUG] ExpectedOverruleCode: ${expectedOverruleCode}`);
+  validationLogger(`[DEBUG] AppliedOverruleCode: ${appliedOverruleCode}`);
 
   const title = expectedOverruleCode === null
     ? "AppliedOverruleCode is null as expected"

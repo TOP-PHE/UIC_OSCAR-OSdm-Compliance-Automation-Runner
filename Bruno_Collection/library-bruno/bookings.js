@@ -25,10 +25,10 @@ function validatePartIntersectionFields(offerParts, bookedParts, partType, field
       test(`${partType} ${field} values have at least one member in common between offer and booking offer=[${offerValues}] booking=[${bookingValues}]`, () => {
         const intersection = offerValues.filter(v => bookingValues.includes(v));
         expect(intersection.length, `No common value for ${field} between offer and booking`).to.be.above(0);
-        validationLogger(`[INFO] ${partType} ${field}: offer=[${offerValues}] booking=[${bookingValues}] intersection=[${intersection}]`);
+        validationLogger(`[DEBUG] ${partType} ${field}: offer=[${offerValues}] booking=[${bookingValues}] intersection=[${intersection}]`);
       });
     } else if (offerValues.length === 0 && bookingValues.length === 0) {
-      validationLogger(`[INFO] ${partType}: '${field}' is empty in both offer and booking`);
+      validationLogger(`[DEBUG] ${partType}: '${field}' is empty in both offer and booking`);
     } else {
       validationLogger(`[WARNING] ${partType}: '${field}' missing - offer has ${offerValues.length} values, booking has ${bookingValues.length} values`);
     }
@@ -40,7 +40,7 @@ function validatePartEqualityFields(part, bookedPart, partType, index, fields) {
     if (part[field] != null && bookedPart[field] != null) {
       test(`${partType}[${index}].${field} matches between offer and booking : offer='${part[field]}' booking='${bookedPart[field]}'`, () => {
         expect(bookedPart[field]).to.eql(part[field]);
-        validationLogger(`[INFO] ${partType}[${index}].${field}: offer='${part[field]}' booking='${bookedPart[field]}'`);
+        validationLogger(`[DEBUG] ${partType}[${index}].${field}: offer='${part[field]}' booking='${bookedPart[field]}'`);
       });
     } else {
       validationLogger(`[WARNING] ${partType}[${index}]: '${field}' missing in offer or booking`);
@@ -58,11 +58,11 @@ function validatePartPrices(offerParts, bookedParts, partType) {
         const bookingValues = bookingPrices.map(p => p[field]);
         const intersection  = offerValues.filter(v => bookingValues.includes(v));
         expect(intersection.length, `No common value for price.${field} between offer and booking`).to.be.above(0);
-        validationLogger(`[INFO] ${partType} price.${field}: offer=[${offerValues}] booking=[${bookingValues}] intersection=[${intersection}]`);
+        validationLogger(`[DEBUG] ${partType} price.${field}: offer=[${offerValues}] booking=[${bookingValues}] intersection=[${intersection}]`);
       });
     });
   } else if (offerPrices.length === 0 && bookingPrices.length === 0) {
-    validationLogger(`[INFO] ${partType}: 'price' is empty in both offer and booking`);
+    validationLogger(`[DEBUG] ${partType}: 'price' is empty in both offer and booking`);
   } else {
     validationLogger(`[WARNING] ${partType}: 'price' missing - offer has ${offerPrices.length} prices, booking has ${bookingPrices.length} prices`);
   }
@@ -77,7 +77,7 @@ function validatePartDates(part, bookedPart, partType, index) {
         test(`${partType}[${index}].${field} is present in both offer and booking`, () => {
           expect(part[field]).to.exist;
           expect(bookedPart[field]).to.exist;
-          validationLogger(`[INFO] ${partType}[${index}].${field}: offer='${part[field]}' booking='${bookedPart[field]}'`);
+          validationLogger(`[DEBUG] ${partType}[${index}].${field}: offer='${part[field]}' booking='${bookedPart[field]}'`);
         });
       } else {
         validationLogger(`[WARNING] ${partType}[${index}] ${field} has invalid date format`);
@@ -125,30 +125,30 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
   test(`${partType}[${index}] afterSalesConditions exist in both offer and booking`, () => {
     expect(bookedConditions.length, `afterSalesConditions missing or empty in booking`).to.be.above(0);
     expect(bookedConditions).to.be.an('array');
-    validationLogger(`[INFO] ${partType}[${index}] has ${offerConditions.length} afterSalesCondition(s) in offer and ${bookedConditions.length} in booking`);
+    validationLogger(`[DEBUG] ${partType}[${index}] has ${offerConditions.length} afterSalesCondition(s) in offer and ${bookedConditions.length} in booking`);
   });
   offerConditions.forEach((condition, condIndex) => {
     const condType        = condition.condition;
     const bookedCondition = bookedConditions.find(c => c.condition === condType);
     test(`${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} exists in booking`, () => {
       expect(bookedCondition, `Condition '${condType}' not found in booking`).to.exist;
-      validationLogger(`[INFO] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking`);
+      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking`);
     });
     if (!bookedCondition) return;
     test(`${partType}[${index}] afterSalesConditions[${condIndex}].condition matches`, () => {
       expect(bookedCondition.condition).to.eql(condition.condition);
-      validationLogger(`[INFO] ${partType}[${index}] afterSalesConditions[${condIndex}].condition: offer='${condition.condition}' booking='${bookedCondition.condition}'`);
+      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].condition: offer='${condition.condition}' booking='${bookedCondition.condition}'`);
     });
     if (condition.afterSaleFee && bookedCondition.afterSaleFee) {
       test(`${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee exists in both`, () => {
         expect(condition.afterSaleFee).to.exist;
         expect(bookedCondition.afterSaleFee).to.exist;
-        validationLogger(`[INFO] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee exists in both offer and booking`);
+        validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee exists in both offer and booking`);
       });
       ['currency', 'amount', 'scale'].forEach(field => {
         test(`${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field} matches`, () => {
           expect(bookedCondition.afterSaleFee[field]).to.eql(condition.afterSaleFee[field]);
-          validationLogger(`[INFO] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${condition.afterSaleFee[field]}' booking='${bookedCondition.afterSaleFee[field]}'`);
+          validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${condition.afterSaleFee[field]}' booking='${bookedCondition.afterSaleFee[field]}'`);
         });
       });
       const scenarioType = bru.getEnvVar("scenarioType");
@@ -156,7 +156,7 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
         bru.setEnvVar(`afterSaleCondition_${condType}_amount`,   condition.afterSaleFee.amount);
         bru.setEnvVar(`afterSaleCondition_${condType}_currency`, condition.afterSaleFee.currency);
         bru.setEnvVar(`afterSaleCondition_${condType}_scale`,    condition.afterSaleFee.scale);
-        validationLogger(`[INFO] Stored afterSaleCondition_${condType}: amount=${condition.afterSaleFee.amount}, currency=${condition.afterSaleFee.currency}`);
+        validationLogger(`[DEBUG] Stored afterSaleCondition_${condType}: amount=${condition.afterSaleFee.amount}, currency=${condition.afterSaleFee.currency}`);
       }
     } else {
       validationLogger(`[WARNING] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee missing in offer or booking`);
@@ -174,10 +174,10 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
   test(`${partType}[${index}] appliedPassengerTypes exist in both offer and booking`, () => {
     expect(bookedPart.appliedPassengerTypes, `appliedPassengerTypes missing in booking`).to.exist;
     expect(bookedPart.appliedPassengerTypes).to.be.an('array');
-    validationLogger(`[INFO] ${partType}[${index}] has ${part.appliedPassengerTypes.length} appliedPassengerType(s) in offer and ${bookedPart.appliedPassengerTypes.length} in booking`);
+    validationLogger(`[DEBUG] ${partType}[${index}] has ${part.appliedPassengerTypes.length} appliedPassengerType(s) in offer and ${bookedPart.appliedPassengerTypes.length} in booking`);
   });
   part.appliedPassengerTypes.forEach((passengerType, ptIndex) => {
-    validationLogger(`[INFO] Validating ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type}`);
+    validationLogger(`[DEBUG] Validating ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type}`);
     // Note: passengerRef in the offer is the externalRef (e.g. "00001") while in the booking it is the
     // sandbox internal UUID → match by type only to avoid false negatives across all sandboxes.
     const bookedPassengerType = bookedPart.appliedPassengerTypes?.find(
@@ -185,24 +185,24 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
     );
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type} exists in booking`, () => {
       expect(bookedPassengerType, `PassengerType type='${passengerType.type}' not found in booking`).to.exist;
-      validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type} found in booking`);
+      validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type} found in booking`);
     });
     if (!bookedPassengerType) return;
 
     // passengerRef is intentionally not compared: offer contains externalRef, booking contains internal UUID
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef exists in booking`, () => {
       expect(bookedPassengerType.passengerRef, `passengerRef missing in booking appliedPassengerTypes`).to.be.a('string').and.not.be.empty;
-      validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef in booking: '${bookedPassengerType.passengerRef}' (offer externalRef was: '${passengerType.passengerRef}')`);
+      validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef in booking: '${bookedPassengerType.passengerRef}' (offer externalRef was: '${passengerType.passengerRef}')`);
     });
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].type matches`, () => {
       expect(bookedPassengerType.type).to.eql(passengerType.type);
-      validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].type: offer='${passengerType.type}' booking='${bookedPassengerType.type}'`);
+      validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].type: offer='${passengerType.type}' booking='${bookedPassengerType.type}'`);
     });
 
     if (passengerType.description && bookedPassengerType.description) {
       test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].description matches`, () => {
         expect(bookedPassengerType.description).to.eql(passengerType.description);
-        validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].description: offer='${passengerType.description}' booking='${bookedPassengerType.description}'`);
+        validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].description: offer='${passengerType.description}' booking='${bookedPassengerType.description}'`);
       });
     }
 
@@ -210,18 +210,18 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
       test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage exists in both`, () => {
         expect(passengerType.tripCoverage).to.exist;
         expect(bookedPassengerType.tripCoverage).to.exist;
-        validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage exists in both offer and booking`);
+        validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage exists in both offer and booking`);
       });
       if (passengerType.tripCoverage.coveredTripId && bookedPassengerType.tripCoverage.coveredTripId) {
         test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredTripId matches`, () => {
           expect(bookedPassengerType.tripCoverage.coveredTripId).to.eql(passengerType.tripCoverage.coveredTripId);
-          validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredTripId: offer='${passengerType.tripCoverage.coveredTripId}' booking='${bookedPassengerType.tripCoverage.coveredTripId}'`);
+          validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredTripId: offer='${passengerType.tripCoverage.coveredTripId}' booking='${bookedPassengerType.tripCoverage.coveredTripId}'`);
         });
       }
       if (passengerType.tripCoverage.coveredLegIds && bookedPassengerType.tripCoverage.coveredLegIds) {
         test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredLegIds matches`, () => {
           expect(bookedPassengerType.tripCoverage.coveredLegIds).to.have.members(passengerType.tripCoverage.coveredLegIds);
-          validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredLegIds: offer=[${passengerType.tripCoverage.coveredLegIds}] booking=[${bookedPassengerType.tripCoverage.coveredLegIds}]`);
+          validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].tripCoverage.coveredLegIds: offer=[${passengerType.tripCoverage.coveredLegIds}] booking=[${bookedPassengerType.tripCoverage.coveredLegIds}]`);
         });
       }
     } else if (passengerType.tripCoverage || bookedPassengerType.tripCoverage) {
@@ -233,19 +233,19 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
         test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes exist in both`, () => {
           expect(bookedPassengerType.appliedReductionCardTypes, `appliedReductionCardTypes missing in booking`).to.exist;
           expect(bookedPassengerType.appliedReductionCardTypes).to.be.an('array');
-          validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] has ${passengerType.appliedReductionCardTypes.length} appliedReductionCardType(s)`);
+          validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] has ${passengerType.appliedReductionCardTypes.length} appliedReductionCardType(s)`);
         });
         passengerType.appliedReductionCardTypes.forEach((cardType, cardIndex) => {
           const bookedCardType = bookedPassengerType.appliedReductionCardTypes?.find(c => c === cardType);
           test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}] matches`, () => {
             expect(bookedCardType).to.eql(cardType);
-            validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}]: offer='${cardType}' booking='${bookedCardType}'`);
+            validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}]: offer='${cardType}' booking='${bookedCardType}'`);
           });
         });
       } else {
         test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes is empty in both`, () => {
           expect(bookedPassengerType.appliedReductionCardTypes || []).to.be.an('array').with.lengthOf(0);
-          validationLogger(`[INFO] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes is empty in both offer and booking`);
+          validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes is empty in both offer and booking`);
         });
       }
     }
@@ -275,7 +275,7 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
       } else {
         expect(bookedPart.status).to.eql(expectedBookedOffersStatus);
       }
-      validationLogger(`[INFO] ${partType}[${index}]: status: ${bookedPart.status}`);
+      validationLogger(`[DEBUG] ${partType}[${index}]: status: ${bookedPart.status}`);
     });
 
     // B6: Status must be a known OSDM BookingPartStatus enum value
@@ -309,21 +309,21 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 
   test(`'booking' object exists`, () => {
     expect(booking, "[ERROR] 'booking' is missing or empty").to.be.an("object").that.is.not.empty;
-    validationLogger(`[INFO] 'booking' object exists`);
+    validationLogger(`[DEBUG] 'booking' object exists`);
   });
 
   test(`booking.id is a non-empty string (OSDM: Booking.id required)`, () => {
-    validationLogger(`[INFO] booking.id: ${booking.id}`);
+    validationLogger(`[DEBUG] booking.id: ${booking.id}`);
     expect(booking.id).to.be.a('string').and.not.be.empty;
   });
   bru.setEnvVar("bookingId", booking.id);
   if (booking.bookingCode !== undefined && booking.bookingCode !== null) {
     test(`booking.bookingCode is a non-empty string when present`, () => {
-      validationLogger(`[INFO] booking.bookingCode: ${booking.bookingCode}`);
+      validationLogger(`[DEBUG] booking.bookingCode: ${booking.bookingCode}`);
       expect(booking.bookingCode).to.be.a('string').and.not.be.empty;
     });
   } else {
-    validationLogger(`[INFO] booking.bookingCode is absent (optional per OSDM spec)`);
+    validationLogger(`[DEBUG] booking.bookingCode is absent (optional per OSDM spec)`);
   }
 
   // Collect passenger IDs
@@ -344,7 +344,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   const offerDate   = new Date(selectedOffer.createdOn);
   if (!isNaN(bookingDate.getTime()) && !isNaN(offerDate.getTime())) {
     test(`booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`, () => {
-      validationLogger(`[INFO] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
+      validationLogger(`[DEBUG] booking.createdOn: ${bookingDate.toISOString()}, offer.createdOn: ${offerDate.toISOString()}`);
       expect(bookingDate.getTime()).to.be.above(offerDate.getTime());
     });
   } else {
@@ -406,7 +406,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       expect(isNaN(confirmLimit.getTime()), `confirmation deadline is not a valid date`).to.be.false;
       expect(confirmLimit.getTime()).to.be.above(Date.now(),
         `confirmation deadline is already in the past: ${_confirmDeadline}`);
-      validationLogger(`[INFO] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
+      validationLogger(`[DEBUG] booking confirmation deadline: ${_confirmDeadline} (source: ${_confirmSource})`);
     });
     // Document vendor deviations from OSDM-standard placement.
     if (!booking.confirmationTimeLimit && booking.confirmableUntil) {
@@ -416,7 +416,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     }
   } else {
     bru.setEnvVar('bookingConfirmationTimeLimit', '');
-    validationLogger(`[INFO] booking has no confirmation deadline anywhere (not at the booking root, not on any bookingPart) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
+    validationLogger(`[DEBUG] booking has no confirmation deadline anywhere (not at the booking root, not on any bookingPart) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
   }
 
   // RI (#258): booking-level requestedInformation — static assertions, evaluate
@@ -496,13 +496,13 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       }
     }
   } else {
-    validationLogger(`[INFO] booking.requestedInformation absent → nothing additionally required`);
+    validationLogger(`[DEBUG] booking.requestedInformation absent → nothing additionally required`);
   }
 
   // B3: bookedOffers must be non-empty (OSDM: a booking must contain at least one BookedOffer)
   test(`booking.bookedOffers is a non-empty array (OSDM: required)`, () => {
     expect(booking.bookedOffers).to.be.an('array').with.lengthOf.at.least(1);
-    validationLogger(`[INFO] booking.bookedOffers count: ${booking.bookedOffers?.length}`);
+    validationLogger(`[DEBUG] booking.bookedOffers count: ${booking.bookedOffers?.length}`);
   });
 
   // Capture the first BookedOffer id for post-booking add-offer-part flows
@@ -525,11 +525,11 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 
   test(`provisionalPrice structure exists`, () => {
     expect(prov, `provisionalPrice missing`).to.exist;
-    validationLogger(`[INFO] provisionalPrice structure exists`);
+    validationLogger(`[DEBUG] provisionalPrice structure exists`);
   });
   test(`confirmedPrice structure exists`, () => {
     expect(confirmed, `confirmedPrice missing`).to.exist;
-    validationLogger(`[INFO] confirmedPrice structure exists`);
+    validationLogger(`[DEBUG] confirmedPrice structure exists`);
   });
   test(`Price fields exist (currency, scale) in provisionalPrice and confirmedPrice`, () => {
     ['currency', 'scale'].forEach(field => {
@@ -540,7 +540,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
     bru.setEnvVar("provisionalPriceAmount", prov.amount);
     bru.setEnvVar("confirmedPriceAmount",   confirmed.amount);
-    validationLogger(`[INFO] provisionalPrice and confirmedPrice fields present`);
+    validationLogger(`[DEBUG] provisionalPrice and confirmedPrice fields present`);
   });
 
   // B4: Both prices must use the same currency (OSDM: currency must be consistent within a booking)
@@ -548,7 +548,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     test(`provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)`, () => {
       expect(confirmed.currency).to.eql(prov.currency,
         `Currency mismatch: provisional=${prov.currency}, confirmed=${confirmed.currency}`);
-      validationLogger(`[INFO] Currency consistent across prices: ${prov.currency}`);
+      validationLogger(`[DEBUG] Currency consistent across prices: ${prov.currency}`);
     });
   }
   // H3: Offer currency must carry through to booking (OSDM: cross-flow currency consistency)
@@ -566,7 +566,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       expect(prov.amount).to.eql(mini.amount);
       expect(prov.currency).to.eql(mini.currency);
       expect(prov.scale).to.eql(mini.scale);
-      validationLogger(`[INFO] provisionalPrice matches minimalPrice: ${prov.amount} ${prov.currency} (scale: ${prov.scale})`);
+      validationLogger(`[DEBUG] provisionalPrice matches minimalPrice: ${prov.amount} ${prov.currency} (scale: ${prov.scale})`);
     });
   }
 
@@ -584,7 +584,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   const expectedPassengerCount = Number(bru.getEnvVar("passengerCount") || 0);
   const actualPassengerCount = (booking.passengers || []).length;
   test(`Booking contains exactly the expected number of passengers - expected: ${expectedPassengerCount}, actual: ${actualPassengerCount}`, () => {
-    validationLogger(`[INFO] Booking passenger count - expected: ${expectedPassengerCount}, actual: ${actualPassengerCount}`);
+    validationLogger(`[DEBUG] Booking passenger count - expected: ${expectedPassengerCount}, actual: ${actualPassengerCount}`);
     if (expectedPassengerCount > 0) {
       expect(actualPassengerCount).to.eql(expectedPassengerCount,
         `Expected exactly ${expectedPassengerCount} passengers, got ${actualPassengerCount}`);
@@ -605,10 +605,10 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       expect(_validFulfillmentSummaryStatuses).to.include(booking.fulfillmentStatus,
         `'${booking.fulfillmentStatus}' is not a valid FulfillmentSummaryStatus. ` +
         `Valid OSDM v3.8 values: [${_validFulfillmentSummaryStatuses.join(', ')}].`);
-      validationLogger(`[INFO] booking.fulfillmentStatus: ${booking.fulfillmentStatus}`);
+      validationLogger(`[DEBUG] booking.fulfillmentStatus: ${booking.fulfillmentStatus}`);
     });
   } else {
-    validationLogger(`[INFO] booking.fulfillmentStatus absent (null or undefined; optional in OSDM v3.8) → test skipped`);
+    validationLogger(`[DEBUG] booking.fulfillmentStatus absent (null or undefined; optional in OSDM v3.8) → test skipped`);
   }
 }
 
@@ -626,7 +626,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       });
       return;
     }
-    validationLogger("[INFO] No fulfillments available in the response, continue execution");
+    validationLogger("[DEBUG] No fulfillments available in the response, continue execution");
     return;
   }
 
@@ -635,7 +635,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
   const bookedPartIds    = Array.isArray(_bookedPartIdsRaw) ? _bookedPartIdsRaw : JSON.parse(_bookedPartIdsRaw || "[]");
 
   test(`Fulfillments exist at index ${index}`, () => {
-    validationLogger(`[INFO] Number of fulfillments: ${fulfillments.length}`);
+    validationLogger(`[DEBUG] Number of fulfillments: ${fulfillments.length}`);
     expect(fulfillments).to.be.an("array").that.is.not.empty;
   });
 
@@ -652,12 +652,12 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     }
 
     test(`Fulfillment[${idx}] id exists`, () => {
-      validationLogger(`[INFO] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
+      validationLogger(`[DEBUG] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
     });
     bru.setEnvVar("fulfillmentIds", fulfillmentIds);
 
     test(`Fulfillment[${idx}] bookingRef exists`, () => {
-      validationLogger(`[INFO] Fulfillment[${idx}] bookingRef exists: ${fulfillment.bookingRef}`);
+      validationLogger(`[DEBUG] Fulfillment[${idx}] bookingRef exists: ${fulfillment.bookingRef}`);
       expect(fulfillment.bookingRef).to.be.a("string").and.not.be.empty;
     });
 
@@ -667,7 +667,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       test(`Fulfillment[${idx}].bookingRef matches current bookingId (expected: ${_currentBookingId}, actual: ${fulfillment.bookingRef})`, () => {
         expect(fulfillment.bookingRef).to.eql(_currentBookingId,
           `bookingRef '${fulfillment.bookingRef}' does not match bookingId '${_currentBookingId}'`);
-        validationLogger(`[INFO] Fulfillment[${idx}].bookingRef matches bookingId ✓`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}].bookingRef matches bookingId ✓`);
       });
     }
 
@@ -677,14 +677,14 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       test(`Fulfillment[${idx}] createdOn is a valid datetime at or before now`, () => {
         expect(fulfillment.createdOn).to.be.a("string").and.not.be.empty;
         expect(createdOnDate.getTime()).to.be.at.most(Date.now());
-        validationLogger(`[INFO] Fulfillment[${idx}] createdOn: ${fulfillment.createdOn}`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] createdOn: ${fulfillment.createdOn}`);
       });
     } else {
       validationLogger(`[WARNING] Fulfillment[${idx}] createdOn has invalid date format: ${fulfillment.createdOn}`);
     }
 
     test(`Fulfillment[${idx}] status comparison - expected: ${expectedFulfillmentStatus}, actual: ${fulfillment.status}`, () => {
-      validationLogger(`[INFO] Fulfillment[${idx}] status comparison - expected: ${expectedFulfillmentStatus}, actual: ${fulfillment.status}`);
+      validationLogger(`[DEBUG] Fulfillment[${idx}] status comparison - expected: ${expectedFulfillmentStatus}, actual: ${fulfillment.status}`);
       if (Array.isArray(expectedFulfillmentStatus)) {
         expect(expectedFulfillmentStatus).to.include(fulfillment.status);
       } else {
@@ -709,13 +709,13 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         expect(fulfillment.controlNumber).to.be.a("string").and.not.be.empty;
       });
     } else {
-      validationLogger(`[INFO] Fulfillment[${idx}] controlNumber is absent (expected for CONFIRMED without document issuance yet)`);
+      validationLogger(`[DEBUG] Fulfillment[${idx}] controlNumber is absent (expected for CONFIRMED without document issuance yet)`);
     }
 
     test(`Fulfillment[${idx}] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [${bookedPartIds}], actual: [${fulfillment.bookingParts.map(bp => bp.id)}]`, () => {
       expect(fulfillment.bookingParts).to.be.an("array").that.is.not.empty;
       fulfillment.bookingParts.forEach(part => {
-        validationLogger(`[INFO] Fulfillment[${idx}] bookingPart.id: ${part.id} exists in admissionReservationAncillaryBookingPartsIds`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] bookingPart.id: ${part.id} exists in admissionReservationAncillaryBookingPartsIds`);
         expect(bookedPartIds).to.include(part.id);
       });
     });
@@ -723,7 +723,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     if (Array.isArray(fulfillment.fulfillmentDocuments) && fulfillment.fulfillmentDocuments.length > 0) {
       test(`Fulfillment[${idx}] documents exist and contain valid data`, () => {
         expect(fulfillment.fulfillmentDocuments).to.be.an("array").that.is.not.empty;
-        validationLogger(`[INFO] Fulfillment[${idx}] number of documents: ${fulfillment.fulfillmentDocuments.length}`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] number of documents: ${fulfillment.fulfillmentDocuments.length}`);
         fulfillment.fulfillmentDocuments.forEach((doc, docIndex) => {
           test(`Fulfillment[${idx}].document[${docIndex}] - fields exist`, () => {
             // #202/#254: a FulfillmentDocument carries the actual payload as EITHER
@@ -742,7 +742,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
             else if (_hasLink) { _channel = `downloadLink=${doc.downloadLink}`; _std = "OSDM-standard"; }
             else if (_hasRaw)  { _channel = "rawData (inline)";                 _std = "VENDOR EXTENSION (not in the OSDM FulfillmentDocument schema)"; }
             else               { _channel = "(none)";                           _std = "MISSING"; }
-            validationLogger(`[INFO] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, format=${doc.format}; payload via ${_channel} [${_std}]`);
+            validationLogger(`[DEBUG] Fulfillment[${idx}].document[${docIndex}] -> medium=${doc.medium}, type=${doc.type}, format=${doc.format}; payload via ${_channel} [${_std}]`);
 
             expect(doc.medium,       "medium missing").to.be.a("string").and.not.be.empty;
             expect(doc.type,         "type missing").to.be.a("string").and.not.be.empty;
@@ -775,7 +775,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
         fulfillment.fulfillmentDocumentRefs.forEach((ref, ri) => {
           expect(ref).to.be.a('string').and.not.be.empty;
         });
-        validationLogger(`[INFO] Fulfillment[${idx}] has ${fulfillment.fulfillmentDocumentRefs.length} fulfillmentDocumentRef(s)`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] has ${fulfillment.fulfillmentDocumentRefs.length} fulfillmentDocumentRef(s)`);
       });
 
       // #253: v3.8 cross-reference integrity — each fulfillmentDocumentRef must
@@ -821,17 +821,17 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
           ).to.eql(0);
         });
         if (_unresolved.length === 0) {
-          validationLogger(`[INFO] Fulfillment[${idx}] all ${fulfillment.fulfillmentDocumentRefs.length} ref(s) resolve to sibling fulfillmentDocuments[].id (v3.8 integrity OK)`);
+          validationLogger(`[DEBUG] Fulfillment[${idx}] all ${fulfillment.fulfillmentDocumentRefs.length} ref(s) resolve to sibling fulfillmentDocuments[].id (v3.8 integrity OK)`);
         }
       } else if (Array.isArray(siblingDocs)) {
         // Case (b): sibling array present but empty — legal pre-issuance shape.
-        validationLogger(`[INFO] Fulfillment[${idx}] sibling fulfillmentDocuments[] is present but empty — v3.8 ref→id cross-check skipped (legal pre-issuance shape: provider declared the v3.8 fulfillmentDocuments[] location but emitted no documents yet).`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] sibling fulfillmentDocuments[] is present but empty — v3.8 ref→id cross-check skipped (legal pre-issuance shape: provider declared the v3.8 fulfillmentDocuments[] location but emitted no documents yet).`);
       } else {
         // Case (a): sibling array absent entirely — caller did not supply it.
-        validationLogger(`[INFO] Fulfillment[${idx}] sibling fulfillmentDocuments[] not provided to validator — v3.8 ref→id cross-check skipped (caller did not supply it; expected for pre-v3.8 providers using the deprecated nested fulfillment.fulfillmentDocuments).`);
+        validationLogger(`[DEBUG] Fulfillment[${idx}] sibling fulfillmentDocuments[] not provided to validator — v3.8 ref→id cross-check skipped (caller did not supply it; expected for pre-v3.8 providers using the deprecated nested fulfillment.fulfillmentDocuments).`);
       }
     } else if (!_hasLegacyDocs) {
-      validationLogger(`[INFO] Fulfillment[${idx}] has no document refs or documents (may be pre-issuance state)`);
+      validationLogger(`[DEBUG] Fulfillment[${idx}] has no document refs or documents (may be pre-issuance state)`);
     }
   });
 

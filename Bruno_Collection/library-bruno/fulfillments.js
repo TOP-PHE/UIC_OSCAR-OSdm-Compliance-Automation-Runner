@@ -127,22 +127,22 @@ function checkFulfillment(booking, fulfillment) {
   const createdOn = new Date(fulfillment.createdOn);
 
   test("Correct booking reference is returned on fulfillment", () => {
-    validationLogger(`[INFO] Booking reference in fulfillments : ${fulfillment.bookingRef}, expected booking id : ${booking.id}`);
+    validationLogger(`[DEBUG] Booking reference in fulfillments : ${fulfillment.bookingRef}, expected booking id : ${booking.id}`);
     expect(fulfillment.bookingRef).to.equal(booking.id);
   });
 
   test("ControlNumber is returned on fulfillment", () => {
-    validationLogger(`[INFO] Fulfillment controlNumber : ${fulfillment.controlNumber}`);
+    validationLogger(`[DEBUG] Fulfillment controlNumber : ${fulfillment.controlNumber}`);
     expect(fulfillment.controlNumber).to.exist;
   });
 
   test(`CreatedOn is returned on fulfillment`, () => {
-    validationLogger(`[INFO] Fulfillment createdOn : ${fulfillment.createdOn}`);
+    validationLogger(`[DEBUG] Fulfillment createdOn : ${fulfillment.createdOn}`);
     expect(currentDate.toDateString()).to.equal(createdOn.toDateString());
   });
 
   test(`Correct state AVAILABLE, ON_HOLD, FULFILLED or CONFIRMED is returned on fulfillment: ${fulfillment.status}`, () => {
-    validationLogger(`[INFO] Fulfillment status : ${fulfillment.status}`);
+    validationLogger(`[DEBUG] Fulfillment status : ${fulfillment.status}`);
     expect(["FULFILLED", "CONFIRMED", "ON_HOLD", "AVAILABLE"]).to.include(fulfillment.status);
   });
 
@@ -163,7 +163,7 @@ function checkFulfillment(booking, fulfillment) {
 // Main function to check fulfilled booking
 function getBookingFulfillmentResponse(booking, offer, bookingState, fulfillmentState = undefined) {
   booking.bookedOffers.forEach(bookedOffer => {
-    validationLogger(`[INFO] Checking bookedOffer ${bookedOffer.offerId}`);
+    validationLogger(`[DEBUG] Checking bookedOffer ${bookedOffer.offerId}`);
 
     // Check different parts of the booked offer
     ['admissions', 'reservations', 'ancillaries', 'fees', 'fares'].forEach(partType => {
