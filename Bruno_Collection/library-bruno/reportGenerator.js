@@ -77,6 +77,17 @@ function _isAuthRequestUrl(url) {
   return /\/(token|login|auth|logon|oauth)/i.test(String(url || ''));
 }
 
+// #357: [DEBUG] prints obey the dataset loggingType. reportGenerator is
+// sandbox-self-contained (can't require displays.js), so a local gate:
+// suppressed unless loggingType is DEBUG/FULL; when bru is unavailable the
+// default (INFO) applies.
+function _debugLog(msg) {
+  try {
+    const lt = String((typeof bru !== 'undefined' && bru.getEnvVar && bru.getEnvVar('loggingType')) || 'INFO').toUpperCase();
+    if (lt === 'DEBUG' || lt === 'FULL') console.log(msg);
+  } catch (_e) { /* no logging context — stay silent like INFO */ }
+}
+
 // ─── Lazy native-module accessors ────────────────────────────────────────────
 // require('fs') / require('path') are kept INSIDE functions so that this module
 // can be loaded in Bruno's default (safe) sandbox without throwing.
@@ -160,27 +171,27 @@ function initReport(libraryBase) {
       try {
         const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
         prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
-      } catch (re) { console.log('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
+      } catch (re) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
       let currentScenarioCode = null;
       try {
         if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
           currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
         }
-      } catch (be) { console.log('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
+      } catch (be) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
         // Log-audit round 2: report-accumulator bookkeeping → DEBUG (the
         // retry itself is already announced by the loop-back [INFO] line).
-        console.log('[DEBUG] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
+        _debugLog('[DEBUG] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
       } else {
         fs.unlinkSync(tmp);
-        console.log('[DEBUG] [reportGenerator] 🗑️  Previous run data cleared.');
+        _debugLog('[DEBUG] [reportGenerator] 🗑️  Previous run data cleared.');
       }
     }
     // Log-audit round 2: container-internal path (/app/data/workspaces/…) —
     // testers reach reports via the run page's Artifacts section, never via
     // this filesystem → DEBUG.
-    console.log('[DEBUG] [reportGenerator] ✅ Report directory: ' + dir);
+    _debugLog('[DEBUG] [reportGenerator] ✅ Report directory: ' + dir);
   } catch (e) {
     console.log('[ERROR] [reportGenerator] initReport error: ' + e.message);
   }
@@ -227,7 +238,7 @@ function appendRequest(data) {
       // (CodeQL js/useless-conditional). ENOENT ("no tmp yet") is normal →
       // stay silent; anything else (corrupt JSON, perms) is logged.
       if (e.code !== 'ENOENT') {
-        console.log('[DEBUG] [reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
+        _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
       }
     }
 
