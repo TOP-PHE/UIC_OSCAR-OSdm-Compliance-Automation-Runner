@@ -35,37 +35,50 @@ module.exports = {
   offerFlexibility
 };
 
-// Function to check warnings and problems in the response
+// Check the OSDM response ENVELOPE for warnings[] / problems[] — both can
+// accompany a 2xx payload (partial success, deprecation notices, …).
+//
+// Log-audit round 2 rewrite — the old version had inverted semantics and a
+// broken present-path:
+//   - happy path emitted '[WARNING] ⚠️ No warnings found.' + '[WARNING] ⚠️
+//     No problems found.' on EVERY offer/refund/exchange response —
+//     warning-level lines announcing good news → ONE [DEBUG] line;
+//   - warnings present printed `Warning: ${jsonData.warnings}` → the OSDM
+//     Warning OBJECTS rendered as '[object Object]' (and an EMPTY warnings
+//     array, being truthy, hit this path too);
+//   - problems present spent 6+ lines per problem, and the 'Problems found
+//     (N):' header carried no [LEVEL] tag at all.
+// Now: one structured line per warning ([WARNING]) and per problem
+// ([ERROR] — a problem in the envelope means part of the request was not
+// honoured), each carrying the OSDM/RFC-9457 fields (code, title, status,
+// detail) + pointers, so the log line is directly actionable — same spirit
+// as the urn:uic:problem:OPERATION_NOT_PERMITTED decoding in
+// classifySystemInfoStatus.
 function checkWarningsAndProblems(jsonData) {
   try {
-    jsonData.warnings
-      ? validationLogger(`[WARNING] ⚠️ Warning: ${jsonData.warnings}`)
-      : validationLogger("[WARNING] ⚠️ No warnings found.");
+    const _fmt = (p) => {
+      const parts = ["code", "type", "title", "status", "detail"]
+        .filter((k) => p && p[k] != null && p[k] !== "")
+        .map((k) => `${k}=${JSON.stringify(p[k])}`);
+      return parts.length ? parts.join(", ") : JSON.stringify(p);
+    };
+    const warnings = Array.isArray(jsonData.warnings) ? jsonData.warnings : [];
+    const problems = Array.isArray(jsonData.problems) ? jsonData.problems : [];
 
-    if (jsonData.problems?.length > 0) {
-      validationLogger(`Problems found (${jsonData.problems.length}):`);
-      jsonData.problems.forEach((problem, index) => {
-        validationLogger(`[WARNING] ⚠️ Problem ${index + 1}:`);
-        ["code", "type", "title", "status", "detail"].forEach(key => {
-          validationLogger(`[WARNING] ⚠️ ${key.charAt(0).toUpperCase() + key.slice(1)}: ${problem[key] || 'Not available'}`);
-        });
-
-        if (problem.pointers?.length > 0) {
-          problem.pointers.forEach((pointer, pointerIndex) => {
-            validationLogger(`[WARNING] ⚠️ Pointer ${pointerIndex + 1}:`);
-            ["code", "requestPointer"].forEach(key => {
-              validationLogger(`[WARNING] ⚠️ ${key.charAt(0).toUpperCase() + key.slice(1)}: ${pointer[key] || 'Not available'}`);
-            });
-          });
-        } else {
-          validationLogger("[WARNING] ⚠️ No pointers found.");
-        }
-      });
-    } else {
-      validationLogger("[WARNING] ⚠️ No problems found.");
+    warnings.forEach((w, i) => {
+      validationLogger(`[WARNING] ⚠️ Response envelope warning ${i + 1}/${warnings.length}: ${_fmt(w)}`);
+    });
+    problems.forEach((p, i) => {
+      const ptr = Array.isArray(p.pointers) && p.pointers.length > 0
+        ? ` — pointer(s): ${p.pointers.map((x) => `${(x && x.code) || "?"} @ ${(x && x.requestPointer) || "?"}`).join("; ")}`
+        : "";
+      validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
+    });
+    if (warnings.length === 0 && problems.length === 0) {
+      validationLogger("[DEBUG] Response envelope clean — no warnings[], no problems[].");
     }
   } catch (error) {
-    validationLogger(`[WARNING] ⚠️ Error processing the response: ${error.message}`);
+    validationLogger(`[WARNING] ⚠️ Error reading response envelope warnings/problems: ${error.message}`);
   }
 }
 
