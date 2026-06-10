@@ -59,7 +59,11 @@ runtime:
         const _policyNext = (() => {
           const _pm = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
           const _due = (_pm === "deferred" || _pm === "invalid") && bru.getEnvVar("__purchaserStepDone") !== "true";
-          return _due ? "12. GET Booking Purchaser" : "07. GET Booking before Fulfillments";
+          // #361: the pre-fulfillment GET's real request name is
+          // "05. GET Booking before Fulfillments" — the historical
+          // "07. …" target never existed (the flow only worked because
+          // Bruno falls through to natural file order on an unknown name).
+          return _due ? "12. GET Booking Purchaser" : "05. GET Booking before Fulfillments";
         })();
 
         if (res.getStatus() !== 200) {
@@ -105,7 +109,9 @@ runtime:
             const _purMode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
             const _purStepDue = (_purMode === "deferred" || _purMode === "invalid")
                 && bru.getEnvVar("__purchaserStepDone") !== "true";
-            bru.runner.setNextRequest(_purStepDue ? "12. GET Booking Purchaser" : "07. GET Booking before Fulfillments");
+            // #361: same name fix as _policyNext above — the request is
+            // "05. GET Booking before Fulfillments" ("07. …" never existed).
+            bru.runner.setNextRequest(_purStepDue ? "12. GET Booking Purchaser" : "05. GET Booking before Fulfillments");
         }
 
 settings:

@@ -39,8 +39,25 @@ was ever tested.
   stays hard in v1. The malformed-body `⛔ Exiting script` throws in
   03/04 — which killed the script before any routing — are now a
   registered failing assertion + the same policy call, so CONTINUE
-  really continues. Purchaser steps (12–14) adopt the helper in a
-  second pass after the policy proves itself.
+  really continues.
+
+### Fixed
+
+- **04. GET Passenger routed to a request name that never existed** —
+  `"07. GET Booking before Fulfillments"`; the real request is
+  `"05. GET Booking before Fulfillments"`. The flow only worked because
+  Bruno falls through to natural file order on an unknown
+  `setNextRequest` target. Both the success path and the new CONTINUE
+  routing now use the real name.
+
+### Clarified
+
+- **Purchaser steps 12–14 already continue on failure by design**
+  (their `[ERROR]` branch registers the failing assertion and proceeds
+  to the pre-fulfillment GET — behaviour from #258). Phase 2 of #361 is
+  therefore already satisfied; their semantics are identical under both
+  policy values, and converting them to respect HARD_STOP would have
+  changed default behaviour, which this feature deliberately avoids.
 
 ---
 
