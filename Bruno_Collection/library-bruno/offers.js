@@ -74,6 +74,41 @@ function checkWarningsAndProblems(jsonData) {
         : "";
       validationLogger(`[ERROR] ⛔ Response envelope problem ${i + 1}/${problems.length}: ${_fmt(p)}${ptr}`);
     });
+
+    // Shape conformance (log-audit round 2): OSDM structures envelope
+    // warnings/problems (RFC-9457 style — a `code` from the urn:uic:*
+    // catalogue + human-readable title/detail) precisely so problem
+    // determination is machine-readable across vendors. Grade each
+    // NON-EMPTY array once, against the same bar as the NHF Problem
+    // probes (code + title/detail present); a clean envelope registers
+    // no assertion at all. Vendor-specific (non-URN) codes get a
+    // [WARNING] note, not a failure.
+    const _shapeCheck = (kind, arr) => {
+      if (arr.length === 0) return;
+      const bad = [];
+      arr.forEach((e, i) => {
+        const isObj = e !== null && typeof e === "object";
+        const hasCode = isObj && typeof e.code === "string" && e.code.trim() !== "";
+        const hasText = isObj && ((typeof e.title === "string" && e.title.trim() !== "") ||
+                                  (typeof e.detail === "string" && e.detail.trim() !== ""));
+        if (!(hasCode && hasText)) {
+          bad.push(`${kind}[${i}] missing ${[!hasCode && "code", !hasText && "title/detail"].filter(Boolean).join(" and ")}`);
+        } else if (!/^urn:/i.test(e.code)) {
+          validationLogger(`[WARNING] Response envelope ${kind}[${i}].code "${e.code}" is not a urn:uic:* catalogue code — vendor-specific codes weaken cross-vendor problem determination.`);
+        }
+      });
+      try {
+        const { bruTest } = require("./testCapture.js");
+        bruTest(`Response envelope ${kind}[] entries are structured OSDM ${kind === "problems" ? "Problems" : "Warnings"} (code + title/detail)`, () => {
+          if (bad.length > 0) {
+            throw new Error(`${bad.length} of ${arr.length} entr${arr.length === 1 ? "y is" : "ies are"} non-conformant: ${bad.join("; ")}. OSDM structures envelope ${kind} (RFC-9457 style) so problem determination is machine-readable across vendors.`);
+          }
+        });
+      } catch (_te) { /* test runner unavailable (unit harness) — the log lines above suffice */ }
+    };
+    _shapeCheck("warnings", warnings);
+    _shapeCheck("problems", problems);
+
     if (warnings.length === 0 && problems.length === 0) {
       validationLogger("[DEBUG] Response envelope clean — no warnings[], no problems[].");
     }
