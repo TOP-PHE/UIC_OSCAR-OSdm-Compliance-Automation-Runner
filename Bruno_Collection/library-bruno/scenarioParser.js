@@ -952,7 +952,7 @@ function parseScenarioData(jsonData) {
           }
         });
 
-        validationLogger('[INFO] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
+        validationLogger('[DEBUG] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
         bru.setEnvVar("bookingPurchaserSpecifications", JSON.stringify(purchaserSpecs[0]));
         return true;
       });
@@ -1080,7 +1080,7 @@ function parseScenarioData(jsonData) {
             }
           });
 
-          validationLogger('[INFO] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
+          validationLogger('[DEBUG] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
           bru.setEnvVar("offerPassengerSpecifications", JSON.stringify(offerPassengerSpecs));
           bru.setEnvVar("bookingPassengerSpecifications", JSON.stringify(passengerSpecs));
           bru.setEnvVar("bookingPassengerReferences", JSON.stringify(passengerReferences));

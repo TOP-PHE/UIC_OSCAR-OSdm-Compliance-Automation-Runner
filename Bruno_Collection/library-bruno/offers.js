@@ -591,7 +591,7 @@ function validatePassengers(jsonData) {
 
     const reductionCards = p.appliedReductionCardTypes || [];
     test(`Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`, function () {
-      validationLogger(`[INFO] Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`);
+      validationLogger(`[DEBUG] Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`);
       expect(Array.isArray(reductionCards), "appliedReductionCardTypes should be an array").to.be.true;
     });
   });
@@ -609,11 +609,11 @@ function validateTripsAndLegs(jsonData) {
 
   // Capture trip ids and compare to coveredTripId
   const tripIds = (jsonData.trips || []).map(trip => trip.id).filter(id => id !== undefined && id !== null);
-  validationLogger(`[INFO] tripIds found: ${JSON.stringify(tripIds)}`);
+  validationLogger(`[DEBUG] tripIds found: ${JSON.stringify(tripIds)}`);
   const coveredTripId = bru.getEnvVar("coveredTripId");
   if (coveredTripId) {
     test(`selectedOffer.tripCoverage.coveredTripId (${coveredTripId}) is part of Trip ids`, function () {
-      validationLogger(`[INFO] Checking coveredTripId ${coveredTripId} is in tripIds: ${JSON.stringify(tripIds)}`);
+      validationLogger(`[DEBUG] Checking coveredTripId ${coveredTripId} is in tripIds: ${JSON.stringify(tripIds)}`);
       expect(tripIds).to.include(coveredTripId);
     });
   } else {
@@ -762,7 +762,7 @@ function validateOfferParts(selectedOffer) {
   const coveredLegIds = selectedOffer.tripCoverage?.coveredLegIds || [];
   if (coveredLegIds.length > 0) {
     test(`Offer tripCoverage.coveredLegIds are non-empty strings - count: ${coveredLegIds.length}`, function () {
-      validationLogger(`[INFO] tripCoverage.coveredLegIds: ${JSON.stringify(coveredLegIds)}`);
+      validationLogger(`[DEBUG] tripCoverage.coveredLegIds: ${JSON.stringify(coveredLegIds)}`);
       coveredLegIds.forEach((legId, idx) => {
         expect(legId, `coveredLegIds[${idx}] should be a string`).to.be.a("string");
       });
@@ -930,7 +930,7 @@ function validateAdmissions(selectedOffer) {
       // passengerRefs: at least one
       const passengerRefs = admission.passengerRefs || [];
       test(`AdmissionOfferPart ${i + 1} passengerRefs has at least one entry`, function () {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} passengerRefs: ${JSON.stringify(passengerRefs)}`);
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} passengerRefs: ${JSON.stringify(passengerRefs)}`);
         expect(passengerRefs.length).to.be.above(0);
       });
 
@@ -1091,7 +1091,7 @@ function validateReservations(selectedOffer) {
       // passengerRefs: at least one
       const reservationPassengerRefs = reservation.passengerRefs || [];
       test(`ReservationOfferPart ${i + 1} passengerRefs has at least one entry`, function () {
-        validationLogger(`[INFO] ReservationOfferPart ${i + 1} passengerRefs: ${JSON.stringify(reservationPassengerRefs)}`);
+        validationLogger(`[DEBUG] ReservationOfferPart ${i + 1} passengerRefs: ${JSON.stringify(reservationPassengerRefs)}`);
         expect(reservationPassengerRefs.length).to.be.above(0);
       });
 
@@ -1141,7 +1141,7 @@ function validateReservations(selectedOffer) {
       const placePrefs = reservation.availablePlacePreferences || [];
       if (placePrefs.length > 0) {
         test(`Reservation part ${i + 1} availablePlacePreferences present`, () => {
-          validationLogger(`[INFO] availablePlacePreferences : ${JSON.stringify(placePrefs)}`);
+          validationLogger(`[DEBUG] availablePlacePreferences : ${JSON.stringify(placePrefs)}`);
           expect(Array.isArray(placePrefs)).to.eql(true);
           expect(placePrefs.length).to.be.above(0);
         });
@@ -1407,7 +1407,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
 
   const tripLegCoverage = getTripLegCoverage(selectedOffer, accommodationSelection);
   bru.setEnvVar("tripLegCoverage", JSON.stringify(tripLegCoverage));
-  validationLogger(`[INFO] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
+  validationLogger(`[DEBUG] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {

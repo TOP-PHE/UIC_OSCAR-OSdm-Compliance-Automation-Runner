@@ -473,7 +473,18 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
   if (refundDate != null)   body.refundDate   = refundDate;
   if (Array.isArray(refundSpecifications) && refundSpecifications.length > 0) {
     body.refundSpecifications = refundSpecifications;
-    validationLogger(`[INFO] Partial refund armed — fulfillmentIds scoped to [${fulfillmentIds.join(", ")}], refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
+    // Log-audit round 2: the "armed" signal is flow-shaping (the tester
+    // should see the request is a PARTIAL refund and what it scopes) →
+    // compact [INFO]; the raw refundSpecifications JSON is structure
+    // detail → [DEBUG]. The full body is also visible in the HTTP-traffic
+    // viewer on the run page.
+    const _scopeSummary = refundSpecifications.map(rs =>
+      `fulfillment ${rs.fulfillmentId}` +
+      (Array.isArray(rs.bookingPartIds) && rs.bookingPartIds.length ? `, ${rs.bookingPartIds.length} bookingPart(s)` : '') +
+      (Array.isArray(rs.passengerIds)   && rs.passengerIds.length   ? `, ${rs.passengerIds.length} passenger(s)`   : '')
+    ).join(' | ');
+    validationLogger(`[INFO] Partial refund armed — fulfillmentIds scoped to [${fulfillmentIds.join(", ")}]; scope: ${_scopeSummary}`);
+    validationLogger(`[DEBUG] refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
   }
 
   bru.setEnvVar("requestRefundOffersBodyData", JSON.stringify(body));
@@ -524,7 +535,7 @@ function requestExchangeOffersBody(overruleCode) {
     ...(overruleCode != null && { overruleCode })
   };
 
-  validationLogger("[INFO] Request Exchange Offers Body: " + JSON.stringify(body));
+  validationLogger("[DEBUG] Request Exchange Offers Body: " + JSON.stringify(body));
   bru.setEnvVar("requestExchangeOffersBodyData", JSON.stringify(body));
 }
 
@@ -539,7 +550,7 @@ function requestExchangeOperationsBody() {
     }]
   };
 
-  validationLogger("[INFO] Request Exchange Operations Body: " + JSON.stringify(body));
+  validationLogger("[DEBUG] Request Exchange Operations Body: " + JSON.stringify(body));
   bru.setEnvVar("requestExchangeOperationsBodyData", JSON.stringify(body));
 }
 
