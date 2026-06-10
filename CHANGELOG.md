@@ -50,6 +50,16 @@ on the first 2026.150 run, bundled in one PR at the Test Manager's request.
   broken list call, ONE `[INFO] Context: …` line points at the root cause —
   no extra failing assertion. On a 200 the body is validated regardless of
   how the id was obtained.
+- **Empty-offers warning printed twice, with a false "0 passenger(s)".**
+  `postOfferResponse` logged the full `[WARNING]` itself and then threw the
+  same message, which the caller re-throws inside
+  `bruTest("Offers found in response", …)` — whose failure echo printed it
+  again verbatim. The standalone log is removed (the echo owns the message;
+  same for the malformed-envelope `[ERROR]` twin). And the passenger count
+  read only `jsonData.passengers`, while providers echo the list under
+  `anonymousPassengerSpecifications` (OBB) or `passengersList` — all three
+  locations are checked now, and when nothing is echoed the line says
+  "no echoed passenger list" instead of claiming zero.
 
 ---
 
