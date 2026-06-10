@@ -91,20 +91,31 @@ runtime:
           });
         }
 
-        // Generate sanity check with warning if versions don't match
-        bruTest(`Scenario : ${scenarioCode} version used is ${expectedVersion}, version of the sytem is ${apiVersions}`, () => {
-          if (!foundMatch) {
-            validationLogger(`[INFO] Version mismatch detected`);
-            validationLogger(`[INFO] Scenario: ${scenarioCode}; version used: ${expectedVersion}; version of the sytem: ${apiVersions}`);
-            validationLogger(`[INFO] Action: Verify that the data file (osdmVersion) matches the API implementation`);
-            
-            // Log as warning, not failure
-            expect(foundMatch, 
-              `Version mismatch: Expected "${expectedVersion}" but API supports [${apiVersions}]. Check data file consistency.`)
-              .to.be.false;
-          } else {
-            validationLogger(`[✅ INFO] Version match confirmed: API supports "${expectedVersion}"`);
-          }
+        // Soft consistency check: a mismatch between the data file's
+        // osdmVersion and the versions the API advertises is a TEST-CONFIG
+        // issue, not provider non-conformance — so it warns without failing
+        // the run.
+        //
+        // Log-audit round 2 rewrite. The old block had three defects:
+        //   1. the mismatch narrative was logged at [INFO] — a discrepancy
+        //      is a [WARNING];
+        //   2. `expect(foundMatch).to.be.false` PASSED green on a mismatch
+        //      (inverted assertion standing in for "soft") — the report
+        //      showed ✓ with nothing flagging the discrepancy;
+        //   3. the match confirmation was tagged `[✅ INFO]` — a malformed
+        //      tag the level filter doesn't recognise, so it was DROPPED at
+        //      the default INFO logging level (visible only at FULL).
+        // Now: honest test title carrying both sides + the verdict, an
+        // explicit always-pass body (soft by design), [WARNING] with the
+        // action path on mismatch, well-formed [INFO] on match.
+        if (!foundMatch) {
+          validationLogger(`[WARNING] ⚠️ OSDM version mismatch — the data file expects "${expectedVersion}" but the API advertises [${apiVersions}]. Soft check: the run continues, but version-dependent validations (v3.8 fields, refundSpecifications, …) may not match this provider. Action: align Test Config → OSDM version with the provider's supported versions (or confirm the provider's /versions response).`);
+        } else {
+          validationLogger(`[INFO] ✅ Version match confirmed: API supports "${expectedVersion}"`);
+        }
+        bruTest(`OSDM version check (soft): data file "${expectedVersion}" vs API [${apiVersions}] — ${foundMatch ? 'match' : 'MISMATCH (run continues, see [WARNING] in log)'}`, () => {
+          // Soft by design — the verdict lives in the title + log line above.
+          expect(true).to.eql(true);
         });
 
         // Store version info for downstream requests to reference
