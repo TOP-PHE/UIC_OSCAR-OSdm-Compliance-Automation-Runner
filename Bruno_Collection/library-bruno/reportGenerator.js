@@ -152,13 +152,18 @@ function initReport(libraryBase) {
       } catch (be) { console.log('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
 
       if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
-        console.log('[INFO] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
+        // Log-audit round 2: report-accumulator bookkeeping → DEBUG (the
+        // retry itself is already announced by the loop-back [INFO] line).
+        console.log('[DEBUG] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
       } else {
         fs.unlinkSync(tmp);
         console.log('[DEBUG] [reportGenerator] 🗑️  Previous run data cleared.');
       }
     }
-    console.log('[INFO] [reportGenerator] ✅ Report directory: ' + dir);
+    // Log-audit round 2: container-internal path (/app/data/workspaces/…) —
+    // testers reach reports via the run page's Artifacts section, never via
+    // this filesystem → DEBUG.
+    console.log('[DEBUG] [reportGenerator] ✅ Report directory: ' + dir);
   } catch (e) {
     console.log('[ERROR] [reportGenerator] initReport error: ' + e.message);
   }
