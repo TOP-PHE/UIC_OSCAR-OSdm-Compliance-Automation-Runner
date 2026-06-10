@@ -133,7 +133,7 @@ runtime:
         // selected offer's ancillaryOfferParts when present (e.g. Sqills).
         const { validateAncillaryOfferParts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
         validateAncillaryOfferParts(bru.getEnvVar("offer"), '/offers → ancillaryOfferParts').forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── Place-selection routing (issue #104) ──────────────────────────────

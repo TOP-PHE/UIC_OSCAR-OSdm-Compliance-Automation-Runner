@@ -77,13 +77,13 @@ runtime:
           // flexibility (string). Extensible-enum fields type-checked only.
           const { validateProduct } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
           validateProduct(body).forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
           // ── OSDM compliance (Layer 2): deep, version-matched schema ──
           const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
           validateSchema('Product', body.product, { endpoint }).forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
         } else if (statusCode === 401) {

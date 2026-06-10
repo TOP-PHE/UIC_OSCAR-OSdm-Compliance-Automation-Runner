@@ -90,7 +90,7 @@ runtime:
             ? osdmCompliance.validateCoachDeckLayout(body, endpoint)
             : osdmCompliance.validateCoachLayout(body, endpoint);
           coachChecks.forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
           // ── OSDM compliance (Layer 2): deep, version-matched schema ──
@@ -98,7 +98,7 @@ runtime:
           const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
           const coachItem = (resource === 'coach-deck-layouts') ? body.coachDeckLayout : body.coachLayout;
           validateSchema(coachComponent, coachItem, { endpoint }).forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
         } else if (statusCode === 401) {

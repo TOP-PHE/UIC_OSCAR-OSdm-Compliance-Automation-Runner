@@ -21,7 +21,7 @@ http://www.apache.org/licenses/LICENSE-2.0
  *     const { validateApiVersions } =
  *       require(bru.getEnvVar("library_base") + "osdmCompliance.js");
  *     validateApiVersions(res.getBody()).forEach((c) =>
- *       bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; }));
+ *       bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); }));
  *
  * Keeping the logic here (rather than inline in the .bru script) makes it
  * unit-testable under Jest and reusable across every System-Information
@@ -180,22 +180,32 @@ function validateOsdmCollection(body, spec) {
   // reduction cards, zones, promotion codes, etc.), so there is deliberately NO
   // "at least one entry" compliance rule here. Data-presence/liveness remains a
   // separate scenario-level check.
-  const aggregate = (fields, predicate, label) => {
+  const aggregate = (fields, predicate, label, describe) => {
     Object.entries(fields || {}).forEach(([field, type]) => {
       const bad = [];
       items.forEach((it, i) => { if (predicate(it, field, type)) bad.push(i); });
-      checks.push({
-        name: label(field, type),
-        ok: bad.length === 0,
-        message: bad.length === 0 ? '' : `Entries with issue on "${field}": index ${bad.join(', ')}`,
-      });
+      // Log-audit round 2: plain-language failure summary instead of a raw
+      // dump of every failing index (the old message printed "index 0, 1,
+      // 2, … 207" — 208 numbers a tester can do nothing with). When every
+      // entry fails, say ALL; otherwise give the count and a 10-index
+      // sample so the tester can open a concrete example.
+      let message = '';
+      if (bad.length > 0) {
+        const where = bad.length === items.length
+          ? `ALL ${items.length} ${spec.itemLabel} entries`
+          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${bad.length > 10 ? `, … +${bad.length - 10} more` : ''})`;
+        message = `${describe(field, type)} on ${where}.`;
+      }
+      checks.push({ name: label(field, type), ok: bad.length === 0, message });
     });
   };
 
   aggregate(spec.required, (it, f, t) => !isType(it, 'object') || it[f] == null || !isType(it[f], t),
-    (f, t) => `GET ${ep} → every ${spec.itemLabel} has required "${f}" (${t})`);
+    (f, t) => `GET ${ep} → every ${spec.itemLabel} has required "${f}" (${t})`,
+    (f, t) => `required property "${f}" is missing or not of type ${t}`);
   aggregate(spec.optional, (it, f, t) => isType(it, 'object') && it[f] != null && !isType(it[f], t),
-    (f, t) => `GET ${ep} → "${f}" (when present) is ${t}`);
+    (f, t) => `GET ${ep} → "${f}" (when present) is ${t}`,
+    (f, t) => `optional property "${f}" is present but not of type ${t}`);
 
   Object.entries(spec.enums || {}).forEach(([field, allowed]) => {
     const bad = [];

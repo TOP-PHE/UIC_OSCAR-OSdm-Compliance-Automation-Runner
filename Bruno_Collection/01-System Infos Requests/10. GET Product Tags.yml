@@ -44,14 +44,14 @@ runtime:
         // tag string + description Text object) and productTagGroups[] (each
         // with code string + description Text object).
         validateProductTags(body).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
         const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
         validateSchema('ProductTagName', body.productTagNames, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
         validateSchema('ProductTagGroup', body.productTagGroups, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });

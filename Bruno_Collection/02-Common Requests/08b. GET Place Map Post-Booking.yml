@@ -72,7 +72,7 @@ runtime:
 
         // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
         validatePlaceAvailability(body, endpoint).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── Availability-aware selection → feeds 09. POST Add Reservation ──

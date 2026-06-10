@@ -43,11 +43,11 @@ runtime:
         // Bare array; every PassengerCategory has required title (Text object)
         // and specification (object); base/additional booleans when present.
         validatePassengerCategories(body).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
         const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
         validateSchema('PassengerCategory', body, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });

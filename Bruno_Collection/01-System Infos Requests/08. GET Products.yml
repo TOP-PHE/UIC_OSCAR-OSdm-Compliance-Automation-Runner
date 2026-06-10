@@ -83,11 +83,11 @@ runtime:
         // code (strings), owner (CompanyRef string), flexibility (string).
         // type/travelClass are x-extensible-enum strings (type-checked only).
         validateProducts(body).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
         const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
         validateSchema('Product', body.products, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });

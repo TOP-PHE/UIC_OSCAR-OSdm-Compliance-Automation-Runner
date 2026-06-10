@@ -185,7 +185,7 @@ runtime:
         // BookedOfferAncillaryResponse shares the { warnings?, problems[],
         // bookedOffers[] } envelope with BookedOfferPartResponse.
         validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // Mark done so the smart run filter does not re-run this post-booking

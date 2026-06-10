@@ -43,11 +43,11 @@ runtime:
         // Envelope object → "promotionCodes" array; every PromotionCode has
         // required code (string); issuer typed when present.
         validatePromotionCodes(body).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
         const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
         validateSchema('PromotionCode', body.promotionCodes, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
