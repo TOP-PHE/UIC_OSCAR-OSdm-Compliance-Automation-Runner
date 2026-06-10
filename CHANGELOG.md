@@ -16,14 +16,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-v1.11.123] — 2026-06-10
 
+**Execution Log & System-Info polish round (#355)** — four tester findings
+on the first 2026.150 run, bundled in one PR at the Test Manager's request.
+
 ### Fixed
 
-- **Execution Log: section headers no longer stick to the top of the log box
-  (#355).** The per-area headers (#351) used `position:sticky`, so the open
-  section's header (e.g. `📂 Runner`) pinned to the top edge while its lines
-  scrolled underneath — testers read it as a stuck display, and the pinned
-  row overlapped the first visible line. Headers now scroll naturally with
-  their content. Display-only.
+- **Execution Log: section headers no longer stick to the top of the log box.**
+  The per-area headers (#351) used `position:sticky`, so the open section's
+  header (e.g. `📂 Runner`) pinned to the top edge while its lines scrolled
+  underneath — testers read it as a stuck display, and the pinned row
+  overlapped the first visible line. Headers now scroll naturally.
+- **Benerail token-skip line landed in the Runner section.** The library's
+  token-skip line fires in the PRE-request script — before the Bruno CLI row
+  that opens the `00-Access Token` suite — so the first one (benerail) was
+  attributed to Runner. The LogParser now recognises the token-skip line and
+  attributes it to `00-Access Token` by construction (the folder name is
+  fixed in the collection); scope-gate skips keep their current suite.
+- **`[DEBUG]` lines still appeared with loggingType=INFO.** Two direct
+  `console.log` sites bypassed the validationLogger pyramid: the token-skip
+  lines and the per-request `Report updated →` line (opencollection.yml).
+  Both are now gated on the dataset's `loggingType` — at INFO they are not
+  emitted at all.
+- **GET Coach By Id / GET Product By ProductId: 501 produced a
+  prerequisite-failure cascade instead of one skip line.** Both By-Id scripts
+  checked their list-prerequisite BEFORE looking at the status, so a provider
+  that 501s the endpoint got `[ERROR] prerequisite failed` + `[WARNING]` +
+  a failing assertion + stack frames. Restructured: the shared
+  `handleSystemInfoStatus` (#353) runs FIRST — 501/Problem-says-unsupported
+  → one skip line; out-of-version 404 → skip; auth/4xx/5xx → decoded
+  failures without chai tails (replaces the per-file `expect(...).to.eql(200)`
+  chains — 10 fewer chai-tail variants from the #349 known-remaining list).
+  The prerequisite hard-fail becomes cascade-kill: when the id came from a
+  broken list call, ONE `[INFO] Context: …` line points at the root cause —
+  no extra failing assertion. On a 200 the body is validated regardless of
+  how the id was obtained.
 
 ---
 
