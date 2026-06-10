@@ -62,7 +62,7 @@ function resetScenarioEnvVars() {
   const deleteList = [
     // Scenario / trip
     "scenario_override",
-    "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
+    "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
     "expiredBookingTest", "__expiredBookingArmed", "expiredBookingMaxWaitMinutes",
@@ -531,6 +531,9 @@ function parseScenarioData(jsonData) {
       // Set environment variables for the scenario
       bru.setEnvVar("osdmVersion", ["", "null"].includes(scenario.osdmVersion) ? null : scenario.osdmVersion);
       bru.setEnvVar("loggingType", ["", "null"].includes(scenario.loggingType) ? null : scenario.loggingType);
+      // #361: step-failure policy — HARD_STOP (default) vs CONTINUE; read by
+      // failStepOrContinue() in loopback.js at the non-critical call sites.
+      bru.setEnvVar("stepFailurePolicy", ["", "null", null, undefined].includes(scenario.stepFailurePolicy) ? "HARD_STOP" : String(scenario.stepFailurePolicy).toUpperCase());
       bru.setEnvVar("scenarioCode", scenario.code);
       bru.setEnvVar("scenarioType", ["", "null"].includes(scenario.scenarioType) ? null : scenario.scenarioType);
       bru.setEnvVar("scenarioAction", ["", "null"].includes(scenario.scenarioAction) ? null : scenario.scenarioAction);

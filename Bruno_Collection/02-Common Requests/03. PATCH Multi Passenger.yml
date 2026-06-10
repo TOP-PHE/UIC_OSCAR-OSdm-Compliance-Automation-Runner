@@ -171,19 +171,30 @@ runtime:
             if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
+        // #361: on failure, the step-failure policy decides — HARD_STOP
+        // (default) abandons the scenario; CONTINUE records the failure and
+        // proceeds to the GET Passenger step (still worth exercising — its
+        // own failure follows the same policy).
         if (res.getStatus() !== 200) {
           test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
-          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("PATCH Multi Passenger");
+          const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
+          failStepOrContinue("PATCH Multi Passenger", "06. GET Passenger");
           return;
         }
 
         const jsonData = res.getBody();
 
         if (!jsonData.passenger) {
-            throw new Error("⛔ Exiting script, no passenger available in the response");
+            // #361: registered failure + policy routing instead of a bare
+            // throw that killed the script before any setNextRequest.
+            test("PATCH Multi Passenger response carries a passenger object", () => {
+              throw new Error("No passenger in the 200 response body — see the HTTP-traffic viewer.");
+            });
+            const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
+            failStepOrContinue("PATCH Multi Passenger", "06. GET Passenger");
+            return;
         }
 
         const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber"));
