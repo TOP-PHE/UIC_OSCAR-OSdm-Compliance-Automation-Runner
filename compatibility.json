@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.150",
+  "current_release": "2026.151",
   "releases": [
+    {
+      "release": "2026.151",
+      "date": "2026-06-10",
+      "server": "1.11.123",
+      "collection": "OTST_V2.0.68",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Execution Log display fix (#355) — tester feedback on 2026.150: the per-area section headers (#351) used position:sticky, so the open section's header (📂 Runner) pinned to the top edge of the log box while its lines scrolled underneath — read as a stuck display, and the pinned row overlapped the first visible line. Sticky removed; headers scroll naturally with their content. Server display-only change (run-detail.html CSS); collection unchanged (OTST_V2.0.68)."
+      ]
+    },
     {
       "release": "2026.150",
       "date": "2026-06-10",

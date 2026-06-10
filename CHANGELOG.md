@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.123] — 2026-06-10
+
+### Fixed
+
+- **Execution Log: section headers no longer stick to the top of the log box
+  (#355).** The per-area headers (#351) used `position:sticky`, so the open
+  section's header (e.g. `📂 Runner`) pinned to the top edge while its lines
+  scrolled underneath — testers read it as a stuck display, and the pinned
+  row overlapped the first visible line. Headers now scroll naturally with
+  their content. Display-only.
+
+---
+
 ## [server-v1.11.122] — 2026-06-10
 
 **System-Info "not supported" = skip, not failure + LogParser section fix
