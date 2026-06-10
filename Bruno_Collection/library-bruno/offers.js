@@ -245,10 +245,36 @@ function postOfferResponse(jsonData) {
   if (typeof checkWarningsAndProblems === "function") {
     checkWarningsAndProblems(jsonData);
   }
-  // Stop flow if offers invalid
+  // Stop flow if offers invalid.
+  // Log-audit round 2: 'No offers found or offers is not an array' conflated
+  // two very different situations and said nothing about what the response
+  // DID contain. Split them and summarise the whole envelope in ONE line
+  // (the thrown message doubles as the test failure text):
+  //   - offers[] MISSING / not an array → malformed OfferCollectionResponse
+  //     envelope → provider bug, [ERROR];
+  //   - offers[] EMPTY in a 200 → structurally valid per OSDM (collections
+  //     may be empty), but when the response carries trips + passengers and
+  //     neither a warning nor a problem explains the empty result, that is
+  //     an interoperability gap worth raising with the provider — [WARNING]
+  //     with the full picture. The throw still drives the existing
+  //     retry-3-then-skip flow in 01. POST Get Offer.yml.
   if (!Array.isArray(jsonData.offers) || jsonData.offers.length === 0) {
-    validationLogger("[ERROR] No offers found or 'offers' is not an array.");
-    throw new Error("No offers found or 'offers' is not an array.");
+    const _trips = Array.isArray(jsonData.trips)      ? jsonData.trips.length      : 0;
+    const _pax   = Array.isArray(jsonData.passengers) ? jsonData.passengers.length : 0;
+    const _wrn   = Array.isArray(jsonData.warnings)   ? jsonData.warnings.length   : 0;
+    const _prb   = Array.isArray(jsonData.problems)   ? jsonData.problems.length   : 0;
+    if (!Array.isArray(jsonData.offers)) {
+      const msg = `POST /offers response has no offers[] array (got ${jsonData.offers === undefined ? "no 'offers' property" : typeof jsonData.offers}) — malformed OfferCollectionResponse envelope.`;
+      validationLogger("[ERROR] " + msg);
+      throw new Error(msg);
+    }
+    const msg = `POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_pax} passenger(s) but no offer, and ` +
+      ((_wrn + _prb) > 0
+        ? `${_wrn} warning(s) / ${_prb} problem(s) (see envelope lines above for why)`
+        : `NO warning or problem explaining why`) +
+      `. An empty offers[] is structurally valid per OSDM, but a provider that finds the journey and prices nothing should explain the empty result via warnings[]/problems[] (e.g. no fares available for this date/route). OSCAR retries in case of transient inventory.`;
+    validationLogger("[WARNING] " + msg);
+    throw new Error(msg);
   }
 
   // Check offers exist
