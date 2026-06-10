@@ -86,10 +86,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-level-btn.active{background:#0090D4;color:#fff}
 .log-line.hidden{display:none}
 .log-line .search-hl{background:#ffe082;color:#000;border-radius:2px;padding:0 1px}
-/* #351: per-area (suite) sections in the execution log, like the assertions panel. */
+/* #351: per-area (suite) sections in the execution log, like the assertions panel.
+   #355: headers scroll WITH their content — position:sticky pinned the open
+   section's header to the top of the box while its lines scrolled underneath,
+   which testers read as a stuck display, and the pinned row overlapped the
+   first visible line. */
 .log-group.hidden{display:none}
 .log-group{margin:2px 0}
-.log-group-head{cursor:pointer;position:sticky;top:0;z-index:1;background:#1e1e1e;color:#9fb3bd;font-weight:700;padding:3px 6px;user-select:none;border-top:1px solid #37474f;display:flex;align-items:center;gap:8px;list-style:none}
+.log-group-head{cursor:pointer;background:#1e1e1e;color:#9fb3bd;font-weight:700;padding:3px 6px;user-select:none;border-top:1px solid #37474f;display:flex;align-items:center;gap:8px;list-style:none}
 .log-group-head::-webkit-details-marker{display:none}
 .log-group-head:hover{color:#cfd8dc}
 .log-group-head .gchev{font-size:9px;transition:transform .15s}

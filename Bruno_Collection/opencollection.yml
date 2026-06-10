@@ -218,7 +218,14 @@ request:
             // skip reasons SHAPE the test flow (scope gates, place-map modes,
             // purchaser steps) and stay [INFO] so the report explains why a
             // step is absent.
-            console.log((_isToken ? '[DEBUG]' : '[INFO]') + ' ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            // #355: respect the dataset loggingType — this direct console.log
+            // bypassed the validationLogger pyramid, so the [DEBUG] token
+            // skips still appeared on INFO-typed runs.
+            const _lt = String(bru.getEnvVar('loggingType') || 'INFO').toUpperCase();
+            const _debugOn = _lt === 'DEBUG' || _lt === 'FULL';
+            if (!_isToken || _debugOn) {
+              console.log((_isToken ? '[DEBUG]' : '[INFO]') + ' ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            }
             // skipRequest() MUST be the last bru call — it clears the bru context.
             // break RUNSCRIPT immediately after so no further bru.* calls run.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
@@ -602,7 +609,12 @@ request:
           // Log-audit round 2: fires after EVERY request (incremental report
           // write) and shows a container-internal path — testers reach the
           // report via the run page's Artifacts section → [DEBUG].
-          if (_htmlPath) console.log(`[DEBUG] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
+          // #355: gate on the dataset loggingType — this direct console.log
+          // bypassed the validationLogger pyramid and appeared on INFO runs.
+          const _rptLt = String(bru.getEnvVar('loggingType') || 'INFO').toUpperCase();
+          if (_htmlPath && (_rptLt === 'DEBUG' || _rptLt === 'FULL')) {
+            console.log(`[DEBUG] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
+          }
         } catch (_re) {
           console.log(`[WARNING] Report generation error: ${_re && _re.message}`);
         }
