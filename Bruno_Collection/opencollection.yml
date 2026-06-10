@@ -270,7 +270,7 @@ request:
               console.log("🛠️  New Collection Execution — clearing env vars and loading scenario data...");
               const _deleteList = [
                 // Scenario / trip
-                "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
+                "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
                 "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
                 "overruleCode", "refundDate", "TripType",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",

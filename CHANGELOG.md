@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.126] — 2026-06-10
+
+**Step-failure policy (#361)** — tester finding on an OBB run: a failed
+GET /bookings/{id}/passengers abandoned the scenario before fulfillment
+was ever tested.
+
+### Added
+
+- **Scenario parameter `STEP FAILURE POLICY`** in the wizard (next to
+  Logging Level): **Hard stop** (default — exactly the historical
+  behaviour; existing datafiles unchanged) abandons the scenario via the
+  loopback on any step failure. **Continue** records the failure (red
+  assertions, scenario verdict stays FAILED), logs one
+  `[WARNING] <step> failed — step-failure policy CONTINUE: proceeding to
+  "<next step>"` line, and routes to the same successor the success path
+  uses — so fulfillment & co still get coverage.
+- One central helper `failStepOrContinue(label, nextStep, { critical })`
+  in loopback.js. Call-site policy (v1): offer / booking failures are
+  always `critical` (hard stop regardless of the parameter — nothing
+  downstream is meaningful without them); **03 PATCH Multi Passenger and
+  04 GET Passenger are policy-controlled** (the booking already exists;
+  fulfillment needs nothing from these responses); fulfillment itself
+  stays hard in v1. The malformed-body `⛔ Exiting script` throws in
+  03/04 — which killed the script before any routing — are now a
+  registered failing assertion + the same policy call, so CONTINUE
+  really continues.
+
+### Fixed
+
+- **04. GET Passenger routed to a request name that never existed** —
+  `"07. GET Booking before Fulfillments"`; the real request is
+  `"05. GET Booking before Fulfillments"`. The flow only worked because
+  Bruno falls through to natural file order on an unknown
+  `setNextRequest` target. Both the success path and the new CONTINUE
+  routing now use the real name.
+
+### Clarified
+
+- **Purchaser steps 12–14 already continue on failure by design**
+  (their `[ERROR]` branch registers the failing assertion and proceeds
+  to the pre-fulfillment GET — behaviour from #258). Phase 2 of #361 is
+  therefore already satisfied; their semantics are identical under both
+  policy values, and converting them to respect HARD_STOP would have
+  changed default behaviour, which this feature deliberately avoids.
+
+---
+
 ## [server-v1.11.125] — 2026-06-10
 
 **OSDM Trip Search Criteria, v1 (#359)** — requested by Marcel Koseler
