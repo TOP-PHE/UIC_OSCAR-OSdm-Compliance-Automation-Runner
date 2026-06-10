@@ -42,6 +42,9 @@ const ENUMS = {
   partialRefundLegSelection:      ['first', 'last', 'outbound', 'inbound'],
   partialRefundPaxSelection:      ['first', 'last'],
   loggingType:        ['INFO', 'DEBUG'],
+  // #361: what a failed NON-critical step does — abandon the scenario
+  // (historical) or record the failure and keep testing the remaining steps.
+  stepFailurePolicy:  ['HARD_STOP', 'CONTINUE'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
   tripType:           ['SEARCH', 'SPECIFICATION'],
@@ -1322,6 +1325,8 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
           'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
+        ${buildSelect(idx, 'stepFailurePolicy',  'Step Failure Policy',  ENUMS.stepFailurePolicy,
+          'What a failed non-critical step (passenger PATCH/GET) does. Hard stop (default): abandon the scenario, loop to the next one. Continue: record the failure, warn, and keep testing the remaining steps (fulfillment & co) — the scenario verdict stays FAILED. Offer/booking failures always hard-stop.')}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
@@ -5454,6 +5459,7 @@ async function wizGenerateScenario() {
     const scenario = {
       collection:          'OTST_V2.0.1_RFND_EXCH_ALL',
       loggingType:         'INFO',
+      stepFailurePolicy:   'HARD_STOP',
       code,
       scenarioType:        sc.type,
       scenarioAction:      sc.type !== 'SALE' ? (sc.action || 'PATCH') : null,

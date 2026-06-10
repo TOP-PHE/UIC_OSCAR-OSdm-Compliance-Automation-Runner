@@ -31,4 +31,24 @@ function loopbackOrStop(label) {
   }
 }
 
-module.exports = { loopbackOrStop };
+// #361: step-failure policy. HARD_STOP (default — historical behaviour)
+// abandons the scenario via loopbackOrStop; CONTINUE records the failure,
+// logs ONE warning and routes to the step the success path would have taken,
+// so the remaining endpoints still get coverage (the scenario verdict stays
+// FAILED). Critical steps (offer / booking — nothing downstream is
+// meaningful without them) always hard-stop regardless of the policy.
+function failStepOrContinue(label, nextStep, opts) {
+  const critical = !!(opts && opts.critical);
+  const policy = String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase();
+  if (!critical && policy === 'CONTINUE' && nextStep) {
+    console.log(
+      '[WARNING] ' + label + ' failed — step-failure policy CONTINUE: proceeding to "' +
+      nextStep + '" (failure stays recorded; booking state unchanged).'
+    );
+    bru.runner.setNextRequest(nextStep);
+    return;
+  }
+  loopbackOrStop(label);
+}
+
+module.exports = { loopbackOrStop, failStepOrContinue };

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.153",
+  "current_release": "2026.154",
   "releases": [
+    {
+      "release": "2026.154",
+      "date": "2026-06-10",
+      "server": "1.11.126",
+      "collection": "OTST_V2.0.72",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Step-failure policy (#361) — tester finding on an OBB run: a failed GET /bookings/{id}/passengers abandoned the scenario (loopbackOrStop's only branches are next-scenario or end-run), costing fulfillment/post-fulfillment coverage. New scenario parameter STEP FAILURE POLICY (wizard, next to Logging Level): HARD_STOP (default — historical behaviour, existing datafiles unchanged) vs CONTINUE (failure stays recorded with red assertions and a FAILED scenario verdict; one '[WARNING] <step> failed — step-failure policy CONTINUE: proceeding to \"<next step>\"' line; flow routes to the same successor as the success path, incl. the deferred-purchaser routing in 04). One central helper failStepOrContinue(label, nextStep, {critical}) in loopback.js; offer/booking failures always critical (hard regardless of policy); 03 PATCH Multi Passenger + 04 GET Passenger policy-controlled; fulfillment stays hard in v1; the malformed-body '⛔ Exiting script' throws in 03/04 (which killed the script before any routing) became a registered failing assertion + the same policy call. scenarioParser sets the stepFailurePolicy env at scenario start (default HARD_STOP, case-insensitive) and both env delete-lists (scenarioParser + opencollection) stay in sync. Purchaser steps 12–14: phase 2.",
+        "Verification: Node harness over the REAL failStepOrContinue — 6 cases (default hard-stops via loopback; CONTINUE routes onward with exactly one warning; critical ignores CONTINUE; missing nextStep falls back hard; last-scenario hard-stop calls stopExecution; lowercase policy value accepted). Both rewritten after-response scripts extracted from the ymls, syntax-checked, asserted policy-wired with the bare throws removed. node --check on loopback.js/scenarioParser.js/scenarios.js; eslint + inline-script lint green. Server 1.11.125 -> 1.11.126; Bruno_Collection/VERSION OTST_V2.0.71 -> OTST_V2.0.72. Wire format unchanged; behaviour unchanged unless a scenario opts into CONTINUE."
+      ]
+    },
     {
       "release": "2026.153",
       "date": "2026-06-10",
