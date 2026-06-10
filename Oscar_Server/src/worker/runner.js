@@ -814,6 +814,11 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'error';
       // 4) Known platform noise
       if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
+      // 4b) Bruno CLI's own skip echo (one per request the smart run filter
+      //     skips — e.g. the 6 vendor token requests at the top of every
+      //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
+      //     matching the [DEBUG] tag on the library's own skip line.
+      if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
       // 5/6) stream-based fallback
       return streamFallback;
     }

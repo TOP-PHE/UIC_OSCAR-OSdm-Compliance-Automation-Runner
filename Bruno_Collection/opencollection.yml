@@ -178,7 +178,18 @@ request:
 
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
-            _skipReason = 'not for "' + _sandbox + '" sandbox';
+            // Log-audit round 2: on OSCAR the env name is the company env
+            // ("bileto-sandbox_afc035bc"), which never contains a vendor word
+            // like "bileto access token" → ALL manual vendor token requests
+            // skip here, including the one matching the company's own vendor.
+            // That is CORRECT (the runner injects access_token fetched
+            // server-side from the API Config credentials) but the old
+            // wording — 'not for "bileto-sandbox_…" sandbox' — read as a
+            // sandbox-matching bug. Say what actually happened, and pick the
+            // standalone-Bruno wording only when no token was pre-provided.
+            _skipReason = bru.getEnvVar('access_token')
+              ? 'access token already provided by OSCAR (server-side OAuth from API Config) — manual vendor token requests never run on OSCAR'
+              : 'vendor token request for a different sandbox (env "' + _sandbox + '") — runs only in standalone Bruno with the matching vendor env';
           } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
             else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
             else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
@@ -202,7 +213,12 @@ request:
             else if (_st === 'EXCHANGE'      && _isRefund)                 { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
 
           if (_skipReason) {
-            console.log('[INFO] ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            // Token skips are routine plumbing (6 of them at the top of every
+            // OSCAR run) — the tester doesn't act on them → [DEBUG]. The other
+            // skip reasons SHAPE the test flow (scope gates, place-map modes,
+            // purchaser steps) and stay [INFO] so the report explains why a
+            // step is absent.
+            console.log((_isToken ? '[DEBUG]' : '[INFO]') + ' ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
             // skipRequest() MUST be the last bru call — it clears the bru context.
             // break RUNSCRIPT immediately after so no further bru.* calls run.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
