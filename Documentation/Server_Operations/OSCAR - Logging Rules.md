@@ -68,6 +68,7 @@ Bruno collection (`validationLogger` / `console.*` in `library-bruno/` and the
 | Round 1 — log pipeline | [#344](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/pull/344) (#343) | v1.11.117 / 2026.145 | ms timestamps stored, run-detail backlog drain |
 | Round 1 — validator false positives | [#346](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/pull/346) (#345) | v1.11.118 / OTST_V2.0.64 / 2026.146 | schema currency-required, null-whitelist, ⛔ header |
 | Round 2 — tester walkthrough | [#348](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/pull/348) (#347) | v1.11.119 / OTST_V2.0.65 / 2026.147 | 20 items: doctrine applied end-to-end (see PR for the list) + this full-review sweep |
+| Traces — endpoint filter & headers | [#348](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/pull/348) (#350) | v1.11.120 / OTST_V2.0.66 / 2026.148 | Log filterable per tested endpoint (request_name); request+response headers in dashboard & both reports; credential masking → graduated partial (head…tail) at the 3 capture sites |
 
 ## Known remaining (tracked, not yet applied)
 
