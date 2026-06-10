@@ -657,6 +657,12 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
 
   // Provider explicitly declares the operation unsupported — either via the
   // clean OSDM signal (HTTP 501) or via a Problem body whose code says so.
+  // #353: this is a SKIP, like out-of-version endpoints — not a failure.
+  // A clean 501 is exactly how OSDM says "optional endpoint not implemented";
+  // the provider did nothing wrong, so no assertion is registered. The 501
+  // response itself stays visible in the HTTP traffic and the report. Only
+  // a WRONG signal (e.g. 400 + OPERATION_NOT_PERMITTED) earns a [WARNING]
+  // with the conformance note; the right signal logs one [INFO] line.
   const _problem = extractOsdmProblem(body);
   const _problemCode = _problem && typeof _problem.code === 'string' ? _problem.code : '';
   const _saysUnsupported = /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
@@ -665,18 +671,12 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
     const _via = _saysUnsupported
       ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
       : 'HTTP 501 Not Implemented';
-    // Conformance nuance worth one clause: OSDM signals an unimplemented
-    // endpoint with 501 (or 404); other statuses are the wrong signal for
-    // "operation not supported".
-    const _note = (statusCode !== 501 && statusCode !== 404)
-      ? ` Note for the provider: OSDM expects HTTP 501 (or 404) for an unimplemented endpoint — ${statusCode} is the wrong status for "operation not supported".`
-      : '';
-    const _shortCode = _saysUnsupported ? ' + ' + _problemCode.split(':').pop() : '';
+    const _rightSignal = statusCode === 501 || statusCode === 404;
     return {
-      outcome: 'fail',
-      name: `GET ${endpoint} → not supported by this provider (HTTP ${statusCode}${_shortCode})`,
-      message: `The provider declares this operation unsupported: ${_via}. Endpoint counts as NOT implemented; remaining checks for this endpoint are skipped.${_note}`,
-      log: `[WARNING] GET ${endpoint} → not supported by this provider — ${_via}. Remaining checks for this endpoint skipped.${_note}`,
+      outcome: 'skip',
+      log: _rightSignal
+        ? `[INFO] GET ${endpoint} → not implemented by this provider (${_via}) — endpoint out of scope, skipped (OSDM allows 501/404 for unimplemented optional endpoints)`
+        : `[WARNING] GET ${endpoint} → not supported by this provider — ${_via}. Endpoint skipped. Note for the provider: OSDM expects HTTP 501 (or 404) for an unimplemented endpoint — ${statusCode} is the wrong status for "operation not supported".`,
     };
   }
 
