@@ -14,6 +14,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.121] — 2026-06-10
+
+**Execution Log follow-up (#351)** — tester feedback on the first 2026.148
+run: level filter semantics, per-area sections, DEBUG-dump leak.
+
+### Fixed
+
+- **Multi-line `[DEBUG]` dumps no longer leak into the INFO view.** The runner
+  stores each stdout line as its own event and only the FIRST line of a
+  multi-line message carried the level tag — the continuation lines
+  (`offerId: …`, `offerSummary: {`…) were level-guessed as *info*.
+  `validationLogger()` now propagates the message's tag to **every physical
+  line** (R1), and the Selected-Offer full-object dump is removed outright
+  (R6 — payload replay; the complete offer is one click away in the
+  HTTP-traffic viewer). The `[INFO]` id + per-part refundable/exchangeable
+  summary lines stay, now each carrying an explicit `[INFO]` tag.
+
+### Changed
+
+- **Dashboard level filter is a pyramid, matching `loggingType` semantics:**
+  *info+* shows INFO + WARNING + ERROR (DEBUG plumbing hidden), *warn+* shows
+  WARNING + ERROR, *error* shows errors only, *All* shows everything. The
+  buttons were exact-match before (selecting *info* hid warnings and errors).
+  Unknown levels stay visible (the #341 safety net). The dead **stdout /
+  stderr buttons are removed** — since round 1 the runner only ever stores
+  `debug/info/warn/error`, so they matched nothing; *debug* is gone too
+  (≡ *All* under pyramid semantics).
+- **The Execution Log is split per area, like the assertions panel:** one
+  collapsible sticky-header section per suite (`01-System Infos Requests`,
+  `02-Common Requests`, …) in chronological order, with a per-section line
+  count. Sections compose with all filters — a section whose lines are all
+  filtered out disappears; the count shows `visible/total` when filtered.
+  Lines stream into the current section live; a suite re-entered later (e.g.
+  loop-back) starts a new section so chronology is never reordered.
+
+### Verification
+
+- The page's real functions (extracted from run-detail.html, not copies) run
+  against a DOM shim in Node: 9 checks covering pyramid visibility per level,
+  group order/counts, empty-group hiding, endpoint-filter and search
+  composition, streaming continuation, and suite re-entry.
+- `validationLogger` multi-line propagation tested for DEBUG/WARNING tags,
+  single-line messages untouched.
+
+---
+
 ## [server-v1.11.120] — 2026-06-10
 
 **Request/response traces (#350)** — the dashboard becomes self-sufficient

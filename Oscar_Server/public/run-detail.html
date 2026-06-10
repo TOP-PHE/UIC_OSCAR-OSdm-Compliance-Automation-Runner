@@ -86,6 +86,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-level-btn.active{background:#0090D4;color:#fff}
 .log-line.hidden{display:none}
 .log-line .search-hl{background:#ffe082;color:#000;border-radius:2px;padding:0 1px}
+/* #351: per-area (suite) sections in the execution log, like the assertions panel. */
+.log-group.hidden{display:none}
+.log-group{margin:2px 0}
+.log-group-head{cursor:pointer;position:sticky;top:0;z-index:1;background:#1e1e1e;color:#9fb3bd;font-weight:700;padding:3px 6px;user-select:none;border-top:1px solid #37474f;display:flex;align-items:center;gap:8px;list-style:none}
+.log-group-head::-webkit-details-marker{display:none}
+.log-group-head:hover{color:#cfd8dc}
+.log-group-head .gchev{font-size:9px;transition:transform .15s}
+.log-group[open] > .log-group-head .gchev{transform:rotate(90deg)}
+.log-group-count{font-weight:400;font-size:11px;color:#607d8b;margin-left:auto}
+.log-group-body{padding-left:2px}
 .assertion-filter{transition:background .15s}
 .assertion-filter.active{background:#0090D4;color:#fff}
 .req-filter{transition:background .15s}
@@ -189,14 +199,16 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     <div class="card-header" style="flex-wrap:wrap;gap:8px">
       <span class="collapsible-head" id="log-toggle" title="Show / hide the execution log"><span class="chev">▶</span> 📋 Execution Log</span>
       <div class="log-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <!-- #351: hierarchical level filter — each button shows its level AND
+             everything more severe (the logging pyramid, same semantics as the
+             collection's loggingType). The old stdout/stderr buttons matched
+             nothing since round 1 (the runner only stores debug/info/warn/error)
+             and debug≡All under pyramid semantics — removed. -->
         <div style="display:flex;gap:4px;align-items:center">
-          <button class="btn btn-sm log-level-btn active" data-level="all">All</button>
-          <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
-          <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
-          <button class="btn btn-sm log-level-btn" data-level="info">info</button>
-          <button class="btn btn-sm log-level-btn" data-level="warn">warn</button>
-          <button class="btn btn-sm log-level-btn" data-level="error">error</button>
-          <button class="btn btn-sm log-level-btn" data-level="debug">debug</button>
+          <button class="btn btn-sm log-level-btn active" data-level="all" title="Every line, including DEBUG plumbing">All</button>
+          <button class="btn btn-sm log-level-btn" data-level="info" title="INFO + WARNING + ERROR — the flow story without DEBUG plumbing">info+</button>
+          <button class="btn btn-sm log-level-btn" data-level="warn" title="WARNING + ERROR only">warn+</button>
+          <button class="btn btn-sm log-level-btn" data-level="error" title="ERROR only">error</button>
         </div>
         <select id="log-req-filter" title="Show only the log lines of one tested endpoint" style="padding:4px 8px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;max-width:220px">
           <option value="all">All endpoints</option>
@@ -421,11 +433,63 @@ async function shareRunWithCertifier(share) {
 
 let activeLogLevel = 'all';
 let logSearchTerm = '';
+// #351: hierarchical level filter — a selected level shows that level AND
+// everything more severe (the standard logging pyramid, matching the Bruno
+// library's loggingType semantics). 'all' shows everything incl. DEBUG.
+// Unknown levels stay visible — same safety net as the #341 colors.
+const LOG_LEVEL_RANK = { debug: 0, info: 1, warn: 2, warning: 2, error: 3 };
+function levelVisible(level) {
+  if (activeLogLevel === 'all') return true;
+  const r = LOG_LEVEL_RANK[level];
+  return r === undefined ? true : r >= LOG_LEVEL_RANK[activeLogLevel];
+}
 // Endpoint filter (#350): the runner's LogParser attributes each line to the
 // request being executed (request_name); this lets the tester isolate one
 // endpoint's log, like the per-request grouping in the assertions panel.
 let activeLogRequest = 'all';
 const logRequestsSeen = new Set();
+
+// #351: the log is SPLIT per area (suite), like the assertions panel — one
+// collapsible section per suite, in chronological order. Lines stream into
+// the current section; a new section starts when suite_name changes.
+let currentLogSuite = null;
+let currentLogGroupBody = null;
+function logGroupBodyFor(suiteName, box) {
+  const suite = suiteName || 'Runner';
+  if (currentLogGroupBody && suite === currentLogSuite) return currentLogGroupBody;
+  currentLogSuite = suite;
+  const det = document.createElement('details');
+  det.className = 'log-group';
+  det.open = true;
+  const sum = document.createElement('summary');
+  sum.className = 'log-group-head';
+  const chev = document.createElement('span');
+  chev.className = 'gchev';
+  chev.textContent = '▶';
+  const lbl = document.createElement('span');
+  lbl.textContent = `📂 ${suite}`;
+  const cnt = document.createElement('span');
+  cnt.className = 'log-group-count';
+  sum.appendChild(chev); sum.appendChild(lbl); sum.appendChild(cnt);
+  det.appendChild(sum);
+  const body = document.createElement('div');
+  body.className = 'log-group-body';
+  det.appendChild(body);
+  box.appendChild(det);
+  currentLogGroupBody = body;
+  return body;
+}
+// Keep each section's count badge fresh and hide sections whose lines are all
+// filtered out (level / endpoint / search).
+function syncLogGroups() {
+  document.querySelectorAll('#log-box .log-group').forEach(g => {
+    const total = g.querySelectorAll('.log-line').length;
+    const visible = g.querySelectorAll('.log-line:not(.hidden)').length;
+    const cnt = g.querySelector('.log-group-count');
+    if (cnt) cnt.textContent = visible === total ? `${total} lines` : `${visible}/${total} lines`;
+    g.classList.toggle('hidden', visible === 0);
+  });
+}
 
 function registerLogRequest(name) {
   if (!name || logRequestsSeen.has(name)) return;
@@ -440,7 +504,12 @@ function registerLogRequest(name) {
 function appendLogs(events) {
   if (!events.length) return;
   const box = document.getElementById('log-box');
-  if (box.querySelector('span[style]')) box.innerHTML = '';
+  if (box.querySelector('span[style]')) {
+    box.innerHTML = '';
+    // #351: the placeholder wipe detaches any tracked group — start fresh.
+    currentLogSuite = null;
+    currentLogGroupBody = null;
+  }
   events.forEach(e => {
     const line = document.createElement('div');
     line.className = `log-line l-${e.level}`;
@@ -454,12 +523,13 @@ function appendLogs(events) {
     // at sub-second precision.
     line.textContent = `[${e.ts.slice(11,23)}] ${e.message}`;
     // Apply current filters to new lines
-    if (activeLogLevel !== 'all' && e.level !== activeLogLevel) line.classList.add('hidden');
+    if (!levelVisible(e.level)) line.classList.add('hidden');
     if (logSearchTerm && !e.message.toLowerCase().includes(logSearchTerm)) line.classList.add('hidden');
     if (activeLogRequest !== 'all' && (e.request_name || '') !== activeLogRequest) line.classList.add('hidden');
-    box.appendChild(line);
+    logGroupBodyFor(e.suite_name, box).appendChild(line);
     lastEventId = Math.max(lastEventId, e.id);
   });
+  syncLogGroups();
   if (document.getElementById('autoscroll').checked) {
     box.scrollTop = box.scrollHeight;
   }
@@ -472,11 +542,12 @@ function applyLogFilters() {
   lines.forEach(line => {
     const level = line.dataset.level;
     const text = line.textContent.toLowerCase();
-    const levelOk = activeLogLevel === 'all' || level === activeLogLevel;
+    const levelOk = levelVisible(level);
     const searchOk = !logSearchTerm || text.includes(logSearchTerm);
     const requestOk = activeLogRequest === 'all' || (line.dataset.request || '') === activeLogRequest;
     line.classList.toggle('hidden', !(levelOk && searchOk && requestOk));
   });
+  syncLogGroups();
   updateLogMatchCount();
 }
 
@@ -485,7 +556,7 @@ function updateLogMatchCount() {
   const visible = box.querySelectorAll('.log-line:not(.hidden)').length;
   const total = box.querySelectorAll('.log-line').length;
   const el = document.getElementById('log-match-count');
-  if (total > 0 && (activeLogLevel !== 'all' || logSearchTerm)) {
+  if (total > 0 && (activeLogLevel !== 'all' || logSearchTerm || activeLogRequest !== 'all')) {
     el.textContent = `${visible}/${total} shown`;
   } else {
     el.textContent = '';

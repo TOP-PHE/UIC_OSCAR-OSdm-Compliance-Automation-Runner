@@ -479,9 +479,11 @@ function selectAndSetOffer(jsonData) {
   // which part(s) carry which flags. An Offer has no top-level refundable /
   // exchangeable — only its parts do, and a "refundable: NO" on an ancillary
   // (e.g. luggage fee) is often misread as the whole offer being non-refundable.
+  // #351: every line carries its own [INFO] tag — the runner stores each
+  // stdout line separately, and untagged lines would be level-guessed.
   const _partSummary = (parts, label) =>
     (parts || []).map((p, i) =>
-      `  ${label}[${i}] type=${p.type || p.objectType || '?'} refundable=${p.refundable} exchangeable=${p.exchangeable}`
+      `[INFO]   ${label}[${i}] type=${p.type || p.objectType || '?'} refundable=${p.refundable} exchangeable=${p.exchangeable}`
     ).join('\n');
   const _admissionLines   = _partSummary(selectedOffer.admissionOfferParts,   'admission');
   const _reservationLines = _partSummary(selectedOffer.reservationOfferParts, 'reservation');
@@ -490,17 +492,12 @@ function selectAndSetOffer(jsonData) {
   if (_admissionLines)   console.log(_admissionLines);
   if (_reservationLines) console.log(_reservationLines);
   if (_ancillaryLines)   console.log(_ancillaryLines);
-  // Single-line JSON tagged with a marker the OSCAR Report Builder recognises —
-  // it renders the block as one collapsible pill instead of ~30 stdout rows.
-  // JSON.stringify also serialises at full depth (no [Array] / [Object] truncation
-  // from Node's util.inspect default depth=2).
-  //console.log(`[JSON:selectedOffer] ${JSON.stringify(selectedOffer)}`);
-  // Log-audit round 2: the full object dump (~280 log lines at Node's
-  // depth-2 inspect, full of [Array]/[Object] stubs) is payload replay —
-  // the complete response is one click away in the run page's HTTP-traffic
-  // viewer with the JSON editor. The compact id + per-part scope lines
-  // above remain the INFO-level summary.
-  console.log("[DEBUG] 🔍 Selected Offer:", selectedOffer);
+  // #351 (R6 — never replay the payload in the log): the full Selected Offer
+  // object dump is gone. Only its FIRST line carried [DEBUG]; the ~30
+  // continuation lines were level-guessed as info and polluted the tester's
+  // INFO view. The complete offer is one click away in the run page's
+  // HTTP-traffic viewer (and in the report); the [INFO] id + per-part scope
+  // lines above are the log-side summary.
 
   // Store selected offer and related info in environment
   bru.setEnvVar("offer", selectedOffer);
