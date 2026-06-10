@@ -14,6 +14,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.120] — 2026-06-10
+
+**Request/response traces (#350)** — the dashboard becomes self-sufficient
+for trace analysis; the HTML report gets the missing response headers.
+
+### Added
+
+- **Dashboard: per-endpoint log filter.** New "All endpoints" dropdown in the
+  Execution Log toolbar — pick one tested endpoint and see only its lines,
+  mirroring the assertions panel's per-request grouping. Uses the
+  `request_name` attribution the runner's LogParser already writes on every
+  `run_events` row; composes with the level buttons and the search box.
+- **Dashboard: request & response headers in the HTTP Traffic viewer.** Each
+  message now shows a collapsed "Request headers (N)" / "Response headers (N)"
+  table between the meta line and the body — real HTTP reading order. All
+  captured headers appear, including the non-mandatory debug ones
+  (`traceparent`, `tracestate`, correlation ids…). The data was already
+  stored and returned by the API; only the rendering was missing.
+- **HTML reports: response headers panel.** Both the per-scenario report
+  (reportGenerator.js) and the merged report (mergeReport.js) now render a
+  Headers table in the 📥 Response panel, mirroring the 📤 Request panel.
+  Capture confirmed complete on both directions: `req.headers` / `res.headers`
+  carry every header Bruno sends/receives (explicit + script-set). Transport
+  headers added below Bruno (Host, Content-Length) are not exposed by the
+  runtime — documented limitation.
+
+### Changed
+
+- **Credential masking: full redaction → graduated partial mask** at all three
+  capture sites (`structureResults.js` → run_requests, `reportGenerator.js`,
+  `mergeReport.js`). Sensitive header values keep their head and tail so a
+  tester can check the *right* token/identity was sent and correlate two
+  requests: ≥24 chars → first 10 + `…[masked N chars]…` + last 4 (Bearer
+  tokens show the scheme + JWT head); 8–23 chars → first 3 + last 2
+  (identity-style values); <8 chars → full `[REDACTED — credential]`.
+  Auth-endpoint request/response **bodies** stay fully redacted as before.
+- `Requestor` (the OSDM identity header, no `x-` prefix) added to the
+  sensitive-header sets — it was masked at render time in the reports but
+  reached `run_requests` unmasked; with headers now displayed in the
+  dashboard it gets the same partial mask everywhere.
+- Render-time maskers in both report generators pass already-masked values
+  through untouched (no double-masking that would destroy the tail); raw
+  values from legacy report data still get the old render-time mask.
+
+---
+
 ## [server-v1.11.119] — 2026-06-10
 
 **Log-audit round 2 — 17 decodability fixes from a line-by-line

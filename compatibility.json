@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.147",
+  "current_release": "2026.148",
   "releases": [
+    {
+      "release": "2026.148",
+      "date": "2026-06-10",
+      "server": "1.11.120",
+      "collection": "OTST_V2.0.66",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Request/response traces (#350) — dashboard self-sufficiency + report completeness. (1) Execution Log gains an 'All endpoints' dropdown: filter the log to one tested endpoint via the request_name attribution the LogParser already writes on run_events, composing with the level buttons and search (mirrors the assertions panel's per-request grouping). (2) HTTP Traffic viewer renders the captured request AND response headers as a collapsed 'Headers (N)' table between meta and body — all headers incl. non-mandatory debug ones (traceparent, tracestate, correlation ids); data was already stored/decrypted by the API, only rendering was missing. (3) Per-scenario AND merged HTML reports add the missing Response Headers panel (request-side existed); capture verified complete on both directions (req.headers / res.headers = every header Bruno sends/receives, explicit + script-set; transport-added Host/Content-Length not exposed by the runtime — documented limitation). (4) Credential masking switches from full '[REDACTED]' to a graduated PARTIAL mask at all three capture sites (structureResults → run_requests, reportGenerator, mergeReport): ≥24 chars keep first 10 + '…[masked N chars]…' + last 4 (Bearer shows scheme + JWT head, tail distinguishes tokens); 8–23 chars keep first 3 + last 2 (identity-style values); shorter stay fully redacted. 'Requestor' (no x- prefix) added to the sensitive sets — it previously reached run_requests unmasked and was only masked at report render time. Render-time maskers pass already-masked values through (no double-masking destroying the tail) while legacy raw data still gets the old render-time mask. Auth-endpoint BODIES stay fully redacted.",
+        "Verification: Node harness runs the real capture→render chain extracted from all three files (long bearer keeps head+tail, Requestor keeps 3+2, traceparent/Content-Type untouched, no double-mask, legacy '[REDACTED]' and raw-bearer paths preserved, <8-char secrets fully redacted); renderHeadersBlock tested for sort/escape/count and degenerate inputs (null, non-JSON, empty). eslint + inline-script lint green. Bruno_Collection/VERSION OTST_V2.0.65 -> OTST_V2.0.66; server 1.11.119 -> 1.11.120. No wire-format change; run_requests now stores partially-masked credential headers for NEW runs (old rows keep full redaction marker)."
+      ]
+    },
     {
       "release": "2026.147",
       "date": "2026-06-10",

@@ -42,16 +42,33 @@ const _SENSITIVE_HEADERS = new Set([
   'x-auth-token',
   'x-access-token',
   'x-requestor',
+  'requestor',
   'cookie',
   'set-cookie'
 ]);
 const _REDACTED_MARKER = '[REDACTED — credential]';
 
+// Partial masking: keep the head (scheme + token start) and the tail so a
+// tester can verify the right credential was sent and correlate two requests,
+// without exposing a usable secret. Graduated: long values (tokens) keep
+// head 10 / tail 4; short identity-style values (Requestor) keep head 3 /
+// tail 2; anything shorter is fully redacted.
+function _maskCredentialValue(v) {
+  const s = String(v == null ? '' : v);
+  if (s.length >= 24) {
+    return `${s.slice(0, 10)}…[masked ${s.length - 14} chars]…${s.slice(-4)}`;
+  }
+  if (s.length >= 8) {
+    return `${s.slice(0, 3)}…[masked ${s.length - 5} chars]…${s.slice(-2)}`;
+  }
+  return _REDACTED_MARKER;
+}
+
 function _redactHeaders(h) {
   if (!h || typeof h !== 'object') return h;
   const out = {};
   for (const [k, v] of Object.entries(h)) {
-    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _REDACTED_MARKER : v;
+    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _maskCredentialValue(v) : v;
   }
   return out;
 }
@@ -305,6 +322,10 @@ function _maskHeaderValue(name, value) {
   const raw = value == null ? '' : String(value);
   const maskTail = 'xxxxxxxxxxxxxxxxx';
 
+  // Already masked at capture by _redactHeaders (partial head…tail format or
+  // full redaction marker) — pass through, don't re-mask away the tail.
+  if (raw.includes('…[masked ') || raw.includes(_REDACTED_MARKER)) return raw;
+
   if (key === 'authorization' && /^bearer\s+/i.test(raw)) {
     const token = raw.replace(/^bearer\s+/i, '').trim();
     const first3 = token.slice(0, 3);
@@ -450,12 +471,15 @@ function _requestBlock(r, i) {
     </div>
   </details>`;
 
-  // Response panel
+  // Response panel — headers + body, mirroring the request panel
   const resPanelHtml = `<details>
-    <summary class="sub-summary">📥 Response Body</summary>
+    <summary class="sub-summary">📥 Response Headers &amp; Body</summary>
     <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      ${_headerTable(r.responseHeaders || {})}
       ${r.responseBody
-        ? `<pre class="code">${_esc(_prettyJson(r.responseBody))}</pre>`
+        ? `<div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">${_esc(_prettyJson(r.responseBody))}</pre>`
         : '<p class="muted">No response body captured</p>'}
     </div>
   </details>`;
