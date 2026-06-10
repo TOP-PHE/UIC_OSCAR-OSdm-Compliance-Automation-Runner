@@ -1166,13 +1166,24 @@ function parseScenarioData(jsonData) {
       }
 
       foundCorrectDataSet = true;
-      validationLogger("[INFO] ✅ Correct data set was found for this scenario : " + scenarioCode);
+      // Log-audit round 2: "Correct data set was found" never said WHICH
+      // data — testers read it as a mystery term. Say what actually
+      // happened: the scenario definition was matched by code in the data
+      // file and its linked Test Data sections were resolved into the
+      // run's variables.
+      validationLogger('[INFO] ✅ Scenario "' + scenarioCode + '" loaded from the data file — linked test data resolved' +
+        ' (tripRequirement #' + scenario.tripRequirementId +
+        ', passengersList #' + scenario.passengersListId +
+        ', fulfillmentOptions #' + scenario.requestedFulfillmentOptionsListId + ')');
     }
     dataFileIndex++;
   }
 
   if (foundCorrectDataSet === false) {
-    validationLogger(`[ERROR] ⛔ Scenario code with name :  "${scenarioCode}" not found, please check`);
+    const _availCodes = (jsonData.scenarios || []).map(function (s) { return s && s.code; }).filter(Boolean);
+    validationLogger('[ERROR] ⛔ Scenario "' + scenarioCode + '" not found in the data file\'s scenarios[]. ' +
+      'Available code(s): [' + _availCodes.slice(0, 20).join(', ') + (_availCodes.length > 20 ? ', …' : '') + ']. ' +
+      'Fix in the wizard: open Test Config and check the scenario list / scenariosToRun selection.');
     validationLogger(`[ERROR] ⛔ Stopping execution of further requests`);
     throw new Error(`Scenario code "${scenarioCode}" not found`);
   }
