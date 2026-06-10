@@ -106,6 +106,20 @@ function validationLogger(message) {
   }
   
   if (shouldLog) {
+    // R1 (#351): every PHYSICAL line carries the level tag. The OSCAR runner
+    // stores each stdout line as a separate event; untagged continuation
+    // lines of a multi-line message fall back to 'info' there, so a [DEBUG]
+    // multi-line dump leaked into the tester's INFO view line by line.
+    if (message.indexOf('\n') !== -1) {
+      var _tagMatch = message.match(/\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/);
+      if (_tagMatch) {
+        var _lineTag = '[' + _tagMatch[1] + '] ';
+        message = message.split('\n').map(function (l, i) {
+          if (i === 0 || !l.trim()) return l;
+          return /\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/.test(l) ? l : _lineTag + l;
+        }).join('\n');
+      }
+    }
     // Print to console
     console.log(message);
     
