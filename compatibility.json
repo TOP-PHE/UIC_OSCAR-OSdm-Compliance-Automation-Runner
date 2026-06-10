@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.149",
+  "current_release": "2026.150",
   "releases": [
+    {
+      "release": "2026.150",
+      "date": "2026-06-10",
+      "server": "1.11.122",
+      "collection": "OTST_V2.0.68",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "System-Info 'not supported' = SKIP + LogParser section fix (#353) — tester question on 2026.149: 'why for GET passenger-categories do we not skip like for the other ones?'. (1) classifySystemInfoStatus: the provider-declares-unsupported branch (HTTP 501, or Problem code OPERATION_NOT_PERMITTED/NOT_IMPLEMENTED/NOT_SUPPORTED) flips outcome 'fail' → 'skip', matching the out-of-version handling — a clean 501 is the OSDM-conformant signal for an unimplemented OPTIONAL endpoint, so no assertion is registered (the old code SAID 'remaining checks are skipped' but registered a failing test with red ✕ + [ERROR] + ~10 stack frames). Right signal (501/404) → one [INFO] 'not implemented by this provider — endpoint out of scope, skipped'; wrong signal (e.g. 400+OPERATION_NOT_PERMITTED) → one [WARNING] with the conformance note (OSDM expects 501/404). Genuine failures (401/403, plain in-version 404, 5xx) unchanged; all 8 .yml callers use the boolean return so behaviour composes. (2) runner LogParser: folder/request matcher accepted any 'text/text (parens)' line — '[DEBUG] 📊 Report updated → /app/…/report.html (39 assertions)' and '✕ GET /passenger-categories → … (HTTP 501 …)' became bogus per-area sections (📂 ✕ GET) stealing subsequent lines. Lines with an explicit [LEVEL] tag are exempt from suite/request detection; assertion markers checked FIRST and now include ✕ (U+2715 — what Bruno actually prints, distinct from ✗) and ✔/×.",
+        "Verification: Node harness over the real classify/handle functions (501+code → skip INFO; bare 501 → skip INFO; 400+code → skip WARNING incl. note; 404/401/500 still fail; 200 ok; handle skip path registers 0 assertions, 1 log line, returns false) and over the real LogParser class extracted from runner.js (CLI rows forward+backslash attribute, skip-echo attributes, the two screenshot garbage lines keep the current suite, ✓/✕ classified assertion, [INFO]/[ERROR] narration with slash+parens keeps suite). eslint + inline-script lint green. Bruno_Collection/VERSION OTST_V2.0.67 -> OTST_V2.0.68; server 1.11.121 -> 1.11.122. Assertion counts drop by 1 per unsupported System-Info endpoint (the contradictory failure disappears); no wire-format change."
+      ]
+    },
     {
       "release": "2026.149",
       "date": "2026-06-10",
