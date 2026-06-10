@@ -14,6 +14,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.119] — 2026-06-10
+
+**Log-audit round 2 — 17 decodability fixes from a line-by-line
+tester walkthrough.** A Test Manager read a full Bileto run log and
+challenged every message he couldn't act on. Governing principle that
+emerged: **the INFO log tells the flow story a tester can act on;
+plumbing goes to DEBUG; failures speak the provider's language.**
+
+### Fixed (real bugs found by the walkthrough)
+
+- **False "passengersList has only 0 passenger(s)" warning** — the
+  per-pax partial-refund check read `jsonData.passengersLists`
+  (plural, never exists) instead of `passengersList`; it fired on
+  every per-pax scenario regardless of the real count. Lookup fixed
+  (loose id compare, plural kept as fallback); the message now
+  distinguishes "list found but <2 passengers" from "list id not
+  found".
+- **expiredFlow queue require failed on EVERY run** — `library_base`
+  double-nested the path inside `library-bruno/`; the confusing
+  "Cannot find module" warning appeared even with 0 timers armed,
+  and the multi-timer auto-expansion was silently dead since it
+  shipped. Sibling require; a genuine failure now logs `[ERROR]`
+  with the consequence.
+- **OSDM version check** — mismatch narrative was `[INFO]`; the
+  assertion `expect(foundMatch).to.be.false` passed green on a
+  mismatch; the match confirmation was tagged `[✅ INFO]` (malformed
+  → dropped at default level); plus the `sytem` typo. Now: one
+  `[WARNING]` with the action path, an honest soft-check test title
+  carrying the verdict, a well-formed match line.
+- **Envelope warnings/problems present-path was broken** — warning
+  objects printed as `[object Object]`; an empty `warnings: []`
+  (truthy) hit the warning path; the problems header carried no
+  level tag.
+- **HTTP 501 was mislabelled "Server Error"** — it is OSDM's clean
+  not-implemented signal and now gets the decoded "not supported"
+  classification.
+- **OpenSSL `/etc/ssl/certs` stderr noise** — root-caused:
+  `node:22-slim` ships without `ca-certificates`; installed in the
+  runtime image, the line disappears entirely.
+
+### Changed (decodability)
+
+- **Provider-language failures**: `classifySystemInfoStatus` reads
+  the RFC-9457 Problem body — `GET /passenger-categories → not
+  supported by this provider (HTTP 400 + OPERATION_NOT_PERMITTED)`
+  in one line, including the conformance note that OSDM expects
+  501/404 for unimplemented endpoints. All 8 System-Info callsites
+  pass the parsed body.
+- **Compliance failures speak plainly**: index dumps
+  (`index 0, 1, … 207`) → *"required property "dimension" is
+  missing or not of type object on ALL 208 CoachDeckLayout
+  entries."* (count + 10-index sample for subsets); deep-schema
+  dumps grouped by distinct problem (*"416 schema issue(s) across
+  208 entries — 2 distinct problem(s): …"*); all 28
+  `expect(c.ok, c.message).to.be.true` callsites → plain `throw`
+  (kills chai's `: expected false to be true` tail everywhere).
+- **Assertion double-display killed**: the bruTest pass-echo is
+  `[DEBUG]`; Bruno's native `✓` row is the single INFO-level
+  confirmation. Failure echo stays `[WARNING]`, in-flow.
+- **Once-per-run instead of per-request**: env-sanity guards
+  (api_base/library_base/data_base) — one `[INFO] Environment OK`
+  line per run, a test only when something is missing (~120 lines
+  and 63 filler assertions removed per run); the auth preflight
+  (duplicate `POST /offers`) runs once per run and reports in one
+  line.
+- **Plumbing → DEBUG**: vendor token-skips (+ truthful wording),
+  14 full-JSON dumps, reportGenerator internals, per-request
+  "Report updated" lines, 33 `➤/►` function-name breadcrumbs,
+  Bruno's skip echoes, and `at …` stack frames after failed
+  assertions (runner-side; the `Error:` message line stays red).
+- **Self-explaining flow lines**: "Correct data set was found" →
+  names the scenario + its tripRequirement/passengersList/
+  fulfillmentOptions linkage ids; the not-found twin lists the
+  available codes and the wizard fix path.
+
+### Added
+
+- **OBB Access Token request** in `00-Access Token` for standalone
+  Bruno users (always skipped on OSCAR — server-side OAuth).
+- **Envelope shape-conformance assertion**: non-empty `warnings[]` /
+  `problems[]` entries must carry `code` + `title`/`detail` (same
+  bar as the NHF Problem probes); non-URN vendor codes get a
+  `[WARNING]` note; clean envelopes register no assertion.
+
+### Versions
+
+- `Bruno_Collection/VERSION` `OTST_V2.0.64` → `OTST_V2.0.65`
+- `Oscar_Server/package.json` `1.11.118` → `1.11.119`
+- `compatibility.json` `release-2026.147`
+
+### Notes
+
+- Report assertion counts **drop** by ~63 filler passes per run —
+  pass-rates become meaningful.
+- No payload / wire-format change.
+- Every behavioural item carries a Node-harness verification in its
+  commit (208-entry fixture, Bileto Problem classification, envelope
+  shapes ×4, expiredFlow require, inferLevel rule order, …).
+
+---
+
 ## [server-v1.11.118] — 2026-06-10
 
 **Datafile validator: two false positives in OUR bundled schema /
