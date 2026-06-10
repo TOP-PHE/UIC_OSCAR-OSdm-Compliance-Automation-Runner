@@ -808,10 +808,16 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
       if (/^\s*✕\s/.test(line))                                   return 'error';
       if (/^\s*✓\s/.test(line))                                   return 'info';
-      // 3) JS stack-trace shapes
+      // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
+      //    that's the content. The "at …" STACK FRAMES are demoted to debug
+      //    (log-audit round 2): Bruno prints ~10 frames after every failed
+      //    assertion (testCapture.js → @usebruno internals → node:vm), pure
+      //    developer detail that tripled the visual size of each failure in
+      //    the dashboard. They remain one debug-filter click away.
       if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
-      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'error';
-      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'error';
+      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'debug';
+      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
+      if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
       // 4) Known platform noise
       if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
       // 4b) Bruno CLI's own skip echo (one per request the smart run filter
