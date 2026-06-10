@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.148",
+  "current_release": "2026.149",
   "releases": [
+    {
+      "release": "2026.149",
+      "date": "2026-06-10",
+      "server": "1.11.121",
+      "collection": "OTST_V2.0.67",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Execution Log follow-up (#351) — tester feedback on the first 2026.148 run. (1) Dashboard level filter becomes a PYRAMID matching loggingType semantics: info+ = INFO+WARNING+ERROR (DEBUG hidden), warn+ = WARNING+ERROR, error = errors only, All = everything incl. DEBUG; the buttons were exact-match before (selecting info hid warnings/errors); dead stdout/stderr buttons removed (runner only stores debug/info/warn/error since round 1); unknown levels stay visible (safety net). (2) Log SPLIT per area like the assertions panel: one collapsible sticky-header section per suite in chronological order with line counts; sections compose with level/endpoint/search filters (fully-filtered sections hide, counts show visible/total); streaming lines join the current section; suite re-entry (loop-back) starts a new section preserving chronology. (3) FIX multi-line [DEBUG] dumps leaking into the INFO view: only the first physical line of a multi-line message carried the tag — continuation lines (offerId:…, offerSummary:{…) were level-guessed as info by the runner; validationLogger now propagates the tag to EVERY line (R1), and the Selected-Offer full-object console.log dump is removed outright (R6 — payload replay; the offer is in the HTTP-traffic viewer); the [INFO] id + per-part refundable/exchangeable summary stays, each line explicitly tagged.",
+        "Verification: the page's REAL functions (extracted from run-detail.html at test time) run against a DOM shim in Node — 9 checks: pyramid visibility per level incl. the reported case (info shows warn+error, hides debug), section order/counts, empty-section hiding at warn+, endpoint-filter and search composition, streaming continuation, suite re-entry chronology; validationLogger multi-line tag propagation tested for DEBUG/WARNING with single-line messages untouched; eslint + inline-script lint green. Bruno_Collection/VERSION OTST_V2.0.66 -> OTST_V2.0.67; server 1.11.120 -> 1.11.121. Display-only on the server side; Bruno-side log volume drops (~30 untagged dump lines per offer selection removed)."
+      ]
+    },
     {
       "release": "2026.148",
       "date": "2026-06-10",
