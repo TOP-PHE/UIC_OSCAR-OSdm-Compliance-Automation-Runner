@@ -432,20 +432,36 @@ request:
           console.log('[WARNING] Unitary run scenario load: ' + (_uErr && _uErr.message));
         }
 
-        test(`API base is available : ${bru.getEnvVar("api_base")}`, function () {
-            expect(bru.getEnvVar("api_base")).to.not.be.null;
-            console.log(`API base is available : ${bru.getEnvVar("api_base")}`);
-        });
-
-        test(`Library base is available : ${bru.getEnvVar("library_base")}`, function () {
-            expect(bru.getEnvVar("library_base")).not.null;
-            console.log(`Library base is available : ${bru.getEnvVar("library_base")}`);
-        });
-
-        test(`Data file is available : ${bru.getEnvVar("data_base")}`, function () {
-            expect(bru.getEnvVar("data_base")).not.null;
-            console.log(`Data file is available : ${bru.getEnvVar("data_base")}`);
-        });
+        // Env-sanity guards (api_base / library_base / data_base).
+        // Log-audit round 2: these used to register three PASSING tests on
+        // EVERY request — 3 "✓ … is available" rows under Pre-Request Tests
+        // PLUS 3 bare console echoes, ×~21 requests ≈ 120+ identical lines
+        // per run, and 3×21 filler assertions inflating every report count.
+        // Now: silent per-request check; the environment is announced ONCE
+        // per run at [INFO]; a test is registered ONLY when a variable is
+        // actually missing — failing exactly where it broke, with the fix
+        // path in the message.
+        {
+          const _envSanity = [
+            ['api_base',     'API base',     'check API Config → Company API Endpoint'],
+            ['library_base', 'Library base', 'collection environment issue — library_base should be ./library-bruno/'],
+            ['data_base',    'Data file',    'check the company data file (Test Config) / data_base env var'],
+          ];
+          const _missing = _envSanity.filter(([k]) => {
+            const v = bru.getEnvVar(k);
+            return v == null || v === '';
+          });
+          if (_missing.length > 0) {
+            _missing.forEach(([k, label, fix]) => {
+              test(`${label} env var "${k}" is set`, function () {
+                throw new Error(`${label} ("${k}") is not set — ${fix}.`);
+              });
+            });
+          } else if (bru.getEnvVar('__envSanityAnnounced') !== 'true') {
+            bru.setEnvVar('__envSanityAnnounced', 'true');
+            console.log(`[INFO] Environment OK — API: ${bru.getEnvVar("api_base")} | data file: ${bru.getEnvVar("data_base")} | library: ${bru.getEnvVar("library_base")}`);
+          }
+        }
 
         // Initialise scenario data only on the root collection offer search endpoint.
         // Using a broad "/offers" match also catches "/refund-offers" and

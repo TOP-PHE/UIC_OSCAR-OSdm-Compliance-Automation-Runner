@@ -103,7 +103,7 @@ runtime:
           bru.setEnvVar('coachListHasValidData', 'true');
           bru.setEnvVar('coachListCandidateIds', JSON.stringify(coachIds));
         }
-        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
 
         // ── OSDM compliance (Layer 1): Coach(Deck)LayoutCollectionResponse ──
         // Resource depends on the effective OSDM version: coach-deck-layouts

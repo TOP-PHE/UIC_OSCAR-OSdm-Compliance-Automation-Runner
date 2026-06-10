@@ -76,7 +76,7 @@ runtime:
           bru.setEnvVar('productListHasValidData', 'true');
           bru.setEnvVar('productListCandidateIds', JSON.stringify(productIds));
         }
-        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
 
         // ── OSDM compliance (Layer 1): ProductCollectionResponse ──
         // Envelope object → "products" array; every Product has required id,

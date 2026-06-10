@@ -37,7 +37,7 @@ runtime:
           expect(body, 'Response body should not be null/undefined').to.exist;
           expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
         });
-        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
 
         // ── OSDM compliance (Layer 1): array<PassengerCategory> ──
         // Bare array; every PassengerCategory has required title (Text object)
