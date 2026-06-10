@@ -79,7 +79,7 @@ runtime:
           bruTest(`GET ${endpoint} response body is present`, () => {
             expect(body, 'Response body should not be null/undefined').to.exist;
           });
-          validationLogger(`[INFO] GET ${endpoint} → 200 OK, ID=${layoutId}`);
+          validationLogger(`[DEBUG] GET ${endpoint} → 200 OK, ID=${layoutId}`);
 
           // ── OSDM compliance (Layer 1): Coach(Deck)LayoutResponse ──
           // coach-deck-layouts/{id} (>=3.8) wraps a CoachDeckLayout under
@@ -90,7 +90,7 @@ runtime:
             ? osdmCompliance.validateCoachDeckLayout(body, endpoint)
             : osdmCompliance.validateCoachLayout(body, endpoint);
           coachChecks.forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
           // ── OSDM compliance (Layer 2): deep, version-matched schema ──
@@ -98,7 +98,7 @@ runtime:
           const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
           const coachItem = (resource === 'coach-deck-layouts') ? body.coachDeckLayout : body.coachLayout;
           validateSchema(coachComponent, coachItem, { endpoint }).forEach((c) => {
-            bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+            bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
           });
 
         } else if (statusCode === 401) {

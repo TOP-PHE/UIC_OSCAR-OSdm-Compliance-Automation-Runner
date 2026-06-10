@@ -41,7 +41,7 @@ function returnInwardDateFromOutbound() {
 // / fulfillment are the same as the outbound. Returns true when a body was
 // built (i.e. this is a return scenario), false otherwise.
 function buildReturnOfferCollectionRequest() {
-  validationLogger("[INFO] ➤ buildReturnOfferCollectionRequest");
+  validationLogger("[DEBUG] ➤ buildReturnOfferCollectionRequest");
   const inwardReturnDate = returnInwardDateFromOutbound();
   const outboundOfferId  = bru.getEnvVar("outboundOfferId");
   if (!inwardReturnDate || !outboundOfferId) {
@@ -82,11 +82,11 @@ function buildReturnOfferCollectionRequest() {
 
 // Function to build the offer collection request
 function buildOfferCollectionRequest() {
-  validationLogger("[INFO] ➤ buildOfferCollectionRequest");
+  validationLogger("[DEBUG] ➤ buildOfferCollectionRequest");
   const tripType = bru.getEnvVar("TripType");
   const sandbox = bru.getEnvVar("api_base") || "";
   const isPaxone = sandbox.includes("paxone");
-  validationLogger("[INFO] Build using TripType: " + tripType);
+  validationLogger("[DEBUG] Build using TripType: " + tripType);
 
   const body = {};
 
@@ -115,7 +115,7 @@ function buildOfferCollectionRequest() {
 
 // Function to build the booking request
 function buildBookingRequest() {
-  validationLogger("[INFO] ➤ buildBookingRequest");
+  validationLogger("[DEBUG] ➤ buildBookingRequest");
   accommodationAndPlaceSelection();
 
   const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
@@ -170,7 +170,7 @@ function buildBookingRequest() {
   if (_purMode === "inline") {
     body.purchaser = parseEnvJson("bookingPurchaserSpecifications");
   } else {
-    validationLogger(`[INFO] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the Booking Purchaser step where applicable).`);
+    validationLogger(`[DEBUG] bookingPurchaserMode='${_purMode}' → purchaser omitted from the booking request (OSDM allows this; will be set/probed via the Booking Purchaser step where applicable).`);
   }
 
   const sandbox = bru.getEnvVar("api_base") || "";
@@ -190,7 +190,7 @@ function buildBookingRequest() {
 // "withhold") removes it. In 'invalid' mode, force a clearly-invalid email when
 // nothing else makes the body invalid, so the provider must reject.
 function buildBookingPurchaserBody() {
-  validationLogger("[INFO] ➤ buildBookingPurchaserBody");
+  validationLogger("[DEBUG] ➤ buildBookingPurchaserBody");
   const mode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
 
   let base = {};
@@ -352,7 +352,7 @@ function placesForPassengers(picked, passengerRefs) {
 
 // Function to handle place selections
 function accommodationAndPlaceSelection() {
-  validationLogger("[INFO] ➤ accommodationAndPlaceSelection");
+  validationLogger("[DEBUG] ➤ accommodationAndPlaceSelection");
 
   const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -432,7 +432,7 @@ function parseFulfillmentIds() {
 // unknown field on its current spec version, so the partial scope is then
 // silently lost — see #218 follow-up.
 function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecifications = null) {
-  validationLogger("[INFO] ➤ requestRefundOffersBody");
+  validationLogger("[DEBUG] ➤ requestRefundOffersBody");
 
   let fulfillmentIds = parseFulfillmentIds();
   // Side-channel: when partial scope is resolved but the OSDM version doesn't
@@ -473,7 +473,18 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
   if (refundDate != null)   body.refundDate   = refundDate;
   if (Array.isArray(refundSpecifications) && refundSpecifications.length > 0) {
     body.refundSpecifications = refundSpecifications;
-    validationLogger(`[INFO] Partial refund armed — fulfillmentIds scoped to [${fulfillmentIds.join(", ")}], refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
+    // Log-audit round 2: the "armed" signal is flow-shaping (the tester
+    // should see the request is a PARTIAL refund and what it scopes) →
+    // compact [INFO]; the raw refundSpecifications JSON is structure
+    // detail → [DEBUG]. The full body is also visible in the HTTP-traffic
+    // viewer on the run page.
+    const _scopeSummary = refundSpecifications.map(rs =>
+      `fulfillment ${rs.fulfillmentId}` +
+      (Array.isArray(rs.bookingPartIds) && rs.bookingPartIds.length ? `, ${rs.bookingPartIds.length} bookingPart(s)` : '') +
+      (Array.isArray(rs.passengerIds)   && rs.passengerIds.length   ? `, ${rs.passengerIds.length} passenger(s)`   : '')
+    ).join(' | ');
+    validationLogger(`[INFO] Partial refund armed — fulfillmentIds scoped to [${fulfillmentIds.join(", ")}]; scope: ${_scopeSummary}`);
+    validationLogger(`[DEBUG] refundSpecifications: ${JSON.stringify(refundSpecifications)}`);
   }
 
   bru.setEnvVar("requestRefundOffersBodyData", JSON.stringify(body));
@@ -481,7 +492,7 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
 
 // Function to create request body for exchange offers
 function requestExchangeOffersBody(overruleCode) {
-  validationLogger("[INFO] ➤ requestExchangeOffersBody");
+  validationLogger("[DEBUG] ➤ requestExchangeOffersBody");
 
   // Build anonymousPassengerSpecifications dynamically from offerPassengerSpecifications
   // so multi-passenger exchange scenarios send one entry per passenger.
@@ -503,7 +514,7 @@ function requestExchangeOffersBody(overruleCode) {
       if (updateGender != null) entry.gender = updateGender;
       return entry;
     });
-    validationLogger("[INFO] Built anonymousPassengerSpecifications for " + passengerSpecs.length + " passenger(s)");
+    validationLogger("[DEBUG] Built anonymousPassengerSpecifications for " + passengerSpecs.length + " passenger(s)");
   } catch (_e) {
     validationLogger('[WARNING] requestExchangeOffersBody: could not build passenger specs from offerPassengerSpecifications (' + _e.message + ') — falling back to single-passenger');
     const updateGender_0 = bru.getEnvVar('updateGender_0');
@@ -524,13 +535,13 @@ function requestExchangeOffersBody(overruleCode) {
     ...(overruleCode != null && { overruleCode })
   };
 
-  validationLogger("[INFO] Request Exchange Offers Body: " + JSON.stringify(body));
+  validationLogger("[DEBUG] Request Exchange Offers Body: " + JSON.stringify(body));
   bru.setEnvVar("requestExchangeOffersBodyData", JSON.stringify(body));
 }
 
 // Function to create request body for exchange operations
 function requestExchangeOperationsBody() {
-  validationLogger("[INFO] ➤ requestExchangeOperationsBody");
+  validationLogger("[DEBUG] ➤ requestExchangeOperationsBody");
 
   const body = {
     exchangeOffers: [{
@@ -539,7 +550,7 @@ function requestExchangeOperationsBody() {
     }]
   };
 
-  validationLogger("[INFO] Request Exchange Operations Body: " + JSON.stringify(body));
+  validationLogger("[DEBUG] Request Exchange Operations Body: " + JSON.stringify(body));
   bru.setEnvVar("requestExchangeOperationsBodyData", JSON.stringify(body));
 }
 

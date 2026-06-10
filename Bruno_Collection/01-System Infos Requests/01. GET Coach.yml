@@ -82,7 +82,7 @@ runtime:
         }
 
         // Shared, version-aware status handling (out-of-version 404 → skip, etc.).
-        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger })) return;
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
         let body;
         try { body = res.getBody(); } catch (_e) {}
@@ -103,7 +103,7 @@ runtime:
           bru.setEnvVar('coachListHasValidData', 'true');
           bru.setEnvVar('coachListCandidateIds', JSON.stringify(coachIds));
         }
-        validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
 
         // ── OSDM compliance (Layer 1): Coach(Deck)LayoutCollectionResponse ──
         // Resource depends on the effective OSDM version: coach-deck-layouts
@@ -113,7 +113,7 @@ runtime:
           ? validateCoachDeckLayouts(body, endpoint)
           : validateCoachLayouts(body, endpoint);
         coachChecks.forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // ── OSDM compliance (Layer 2): deep, version-matched schema ──
@@ -121,5 +121,5 @@ runtime:
         const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
         const coachItems = (resource === 'coach-deck-layouts') ? body.coachDeckLayouts : body.layouts;
         validateSchema(coachComponent, coachItems, { endpoint }).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });

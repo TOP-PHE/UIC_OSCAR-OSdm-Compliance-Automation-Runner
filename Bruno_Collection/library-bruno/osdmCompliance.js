@@ -21,7 +21,7 @@ http://www.apache.org/licenses/LICENSE-2.0
  *     const { validateApiVersions } =
  *       require(bru.getEnvVar("library_base") + "osdmCompliance.js");
  *     validateApiVersions(res.getBody()).forEach((c) =>
- *       bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; }));
+ *       bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); }));
  *
  * Keeping the logic here (rather than inline in the .bru script) makes it
  * unit-testable under Jest and reusable across every System-Information
@@ -180,22 +180,32 @@ function validateOsdmCollection(body, spec) {
   // reduction cards, zones, promotion codes, etc.), so there is deliberately NO
   // "at least one entry" compliance rule here. Data-presence/liveness remains a
   // separate scenario-level check.
-  const aggregate = (fields, predicate, label) => {
+  const aggregate = (fields, predicate, label, describe) => {
     Object.entries(fields || {}).forEach(([field, type]) => {
       const bad = [];
       items.forEach((it, i) => { if (predicate(it, field, type)) bad.push(i); });
-      checks.push({
-        name: label(field, type),
-        ok: bad.length === 0,
-        message: bad.length === 0 ? '' : `Entries with issue on "${field}": index ${bad.join(', ')}`,
-      });
+      // Log-audit round 2: plain-language failure summary instead of a raw
+      // dump of every failing index (the old message printed "index 0, 1,
+      // 2, … 207" — 208 numbers a tester can do nothing with). When every
+      // entry fails, say ALL; otherwise give the count and a 10-index
+      // sample so the tester can open a concrete example.
+      let message = '';
+      if (bad.length > 0) {
+        const where = bad.length === items.length
+          ? `ALL ${items.length} ${spec.itemLabel} entries`
+          : `${bad.length} of ${items.length} ${spec.itemLabel} entries (index ${bad.slice(0, 10).join(', ')}${bad.length > 10 ? `, … +${bad.length - 10} more` : ''})`;
+        message = `${describe(field, type)} on ${where}.`;
+      }
+      checks.push({ name: label(field, type), ok: bad.length === 0, message });
     });
   };
 
   aggregate(spec.required, (it, f, t) => !isType(it, 'object') || it[f] == null || !isType(it[f], t),
-    (f, t) => `GET ${ep} → every ${spec.itemLabel} has required "${f}" (${t})`);
+    (f, t) => `GET ${ep} → every ${spec.itemLabel} has required "${f}" (${t})`,
+    (f, t) => `required property "${f}" is missing or not of type ${t}`);
   aggregate(spec.optional, (it, f, t) => isType(it, 'object') && it[f] != null && !isType(it[f], t),
-    (f, t) => `GET ${ep} → "${f}" (when present) is ${t}`);
+    (f, t) => `GET ${ep} → "${f}" (when present) is ${t}`,
+    (f, t) => `optional property "${f}" is present but not of type ${t}`);
 
   Object.entries(spec.enums || {}).forEach(([field, allowed]) => {
     const bad = [];
@@ -606,7 +616,29 @@ function validateAncillaryOfferParts(offer, endpoint) {
 //                                              (INFO log only; not pass nor fail)
 //   { outcome: 'fail', name, message, log }  → auth / not-found(when expected) / server
 //   { outcome: 'ok',   name }                → name carries the "200 OK" assertion label
-function classifySystemInfoStatus(statusCode, endpoint) {
+//
+// Log-audit round 2: also PROBLEM-BODY-aware — when the provider answers a
+// non-2xx with an RFC-9457/OSDM Problem whose code says the operation is
+// unsupported (e.g. urn:uic:problem:OPERATION_NOT_PERMITTED), say exactly
+// that in ONE decoded line instead of the generic "unexpected status 400"
+// cascade. HTTP 501 (the clean OSDM not-implemented signal) gets the same
+// decoded treatment instead of being mislabelled "Server Error".
+
+// Best-effort extraction of the first OSDM Problem from a non-2xx body.
+// Accepts a bare Problem object ({ code, title, detail, … }) or the
+// envelope form ({ problems: [ … ] }). Returns null when the body doesn't
+// look like a Problem.
+function extractOsdmProblem(body) {
+  if (body == null || typeof body !== 'object') return null;
+  if (Array.isArray(body.problems) && body.problems.length > 0 &&
+      body.problems[0] != null && typeof body.problems[0] === 'object') {
+    return body.problems[0];
+  }
+  if (typeof body.code === 'string' || typeof body.title === 'string') return body;
+  return null;
+}
+
+function classifySystemInfoStatus(statusCode, endpoint, body) {
   if (statusCode === 200) {
     return { outcome: 'ok', name: `GET ${endpoint} → 200 OK` };
   }
@@ -622,6 +654,32 @@ function classifySystemInfoStatus(statusCode, endpoint) {
   if (statusCode === 403) {
     return { outcome: 'fail', name: `GET ${endpoint} → 403 Forbidden (FAIL)`, message: 'Expected 200, got 403 Forbidden — insufficient permissions', log: `[ERROR] GET ${endpoint} → 403 Forbidden — insufficient permissions` };
   }
+
+  // Provider explicitly declares the operation unsupported — either via the
+  // clean OSDM signal (HTTP 501) or via a Problem body whose code says so.
+  const _problem = extractOsdmProblem(body);
+  const _problemCode = _problem && typeof _problem.code === 'string' ? _problem.code : '';
+  const _saysUnsupported = /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
+  if (statusCode === 501 || _saysUnsupported) {
+    const _title = _problem && _problem.title ? ` ("${_problem.title}")` : '';
+    const _via = _saysUnsupported
+      ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
+      : 'HTTP 501 Not Implemented';
+    // Conformance nuance worth one clause: OSDM signals an unimplemented
+    // endpoint with 501 (or 404); other statuses are the wrong signal for
+    // "operation not supported".
+    const _note = (statusCode !== 501 && statusCode !== 404)
+      ? ` Note for the provider: OSDM expects HTTP 501 (or 404) for an unimplemented endpoint — ${statusCode} is the wrong status for "operation not supported".`
+      : '';
+    const _shortCode = _saysUnsupported ? ' + ' + _problemCode.split(':').pop() : '';
+    return {
+      outcome: 'fail',
+      name: `GET ${endpoint} → not supported by this provider (HTTP ${statusCode}${_shortCode})`,
+      message: `The provider declares this operation unsupported: ${_via}. Endpoint counts as NOT implemented; remaining checks for this endpoint are skipped.${_note}`,
+      log: `[WARNING] GET ${endpoint} → not supported by this provider — ${_via}. Remaining checks for this endpoint skipped.${_note}`,
+    };
+  }
+
   if (statusCode === 404) {
     return { outcome: 'fail', name: `GET ${endpoint} → 404 Not Found (FAIL)`, message: `Expected 200, got 404 — endpoint expected in OSDM ${getComplianceVersion()} but not implemented by this vendor`, log: `[ERROR] GET ${endpoint} → 404 Not Found — endpoint not implemented by this vendor` };
   }
@@ -632,20 +690,24 @@ function classifySystemInfoStatus(statusCode, endpoint) {
 }
 
 // Apply the status classification to the Bruno report. Pass the scenario's
-// { bruTest, validationLogger }. Returns true iff the status is 200 (caller
-// then runs its body + compliance checks); false otherwise (caller returns).
+// { bruTest, validationLogger, body } — body (the parsed response body) is
+// optional but enables the Problem-code-aware "not supported" decoding.
+// Returns true iff the status is 200 (caller then runs its body + compliance
+// checks); false otherwise (caller returns).
 // Out-of-version endpoints are logged as skipped — no pass/fail registered.
 function handleSystemInfoStatus(statusCode, endpoint, ctx) {
   const bruTest = ctx && ctx.bruTest;
   const validationLogger = ctx && ctx.validationLogger;
-  const cls = classifySystemInfoStatus(statusCode, endpoint);
+  const cls = classifySystemInfoStatus(statusCode, endpoint, ctx && ctx.body);
   if (cls.log && validationLogger) validationLogger(cls.log);
   if (cls.outcome === 'ok') {
     if (bruTest) bruTest(cls.name, () => { expect(statusCode).to.eql(200); });
     return true;
   }
   if (cls.outcome === 'fail' && bruTest) {
-    bruTest(cls.name, () => { expect(statusCode, cls.message).to.eql(200); });
+    // Plain throw (not expect) so the failure text is exactly cls.message —
+    // no chai ": expected 400 to deeply equal 200" tail (log-audit round 2).
+    bruTest(cls.name, () => { throw new Error(cls.message); });
   }
   // 'skip' → INFO log only, no bruTest (not counted as pass or fail)
   return false;

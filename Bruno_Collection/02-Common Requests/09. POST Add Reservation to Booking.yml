@@ -162,7 +162,7 @@ runtime:
         // ── Status ────────────────────────────────────────────────────────
         if (statusCode === 200) {
           bruTest(`POST ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
-          validationLogger(`[INFO] POST ${endpoint} → 200 OK`);
+          validationLogger(`[DEBUG] POST ${endpoint} → 200 OK`);
         } else {
           validationLogger(`[ERROR] POST ${endpoint} → ${statusCode} (expected 200 adding a reservation to the booking)`);
           bruTest(`POST ${endpoint} → ${statusCode} (FAIL)`, () => {
@@ -172,7 +172,7 @@ runtime:
 
         // ── OSDM compliance (Layer 1): BookedOfferPart/Reservation response ──
         validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
-          bruTest(c.name, () => { expect(c.ok, c.message).to.be.true; });
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // Mark done so the smart run filter does not re-run this post-booking
