@@ -899,7 +899,10 @@ function parseScenarioData(jsonData) {
                   tripRequirement.trip.vehicleNumber,
                   tripRequirement.trip.operatorCode
                 )
-              ], returnOptsFromScenario(scenario));
+              ], returnOptsFromScenario(scenario),
+                // #359: optional OSDM search options from the wizard's
+                // Trip Search Criteria sub-panel (flat fields).
+                tripRequirement.trip.searchCriteria || null);
               break;
           }
           } catch (_branchErr) {
@@ -1190,7 +1193,7 @@ function parseScenarioData(jsonData) {
 }
 
 // Function to set trip search criteria
-function osdmTripSearchCriteria(legDefinitions, returnOpts) {
+function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   test('Trip Search Criteria has at least one leg', function () {
     expect(legDefinitions).to.be.an("array");
     expect(legDefinitions.length).to.be.above(0);
@@ -1250,6 +1253,80 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts) {
   // Return trip (#176): derive inwardReturnDate from the outbound departure.
   const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, _startDateTime);
   if (rsp) tripSearchCriteria.returnSearchParameters = rsp;
+
+  // ── #359: optional OSDM TripSearchCriteria members from the wizard's
+  // Trip Search Criteria sub-panel. Only filled fields are sent; the wire
+  // shape is unchanged when nothing is configured.
+  if (searchCriteria && typeof searchCriteria === 'object') {
+    const _set = v => v != null && String(v).trim() !== '';
+    const _applied = [];
+
+    // Arrival-time basis (OSDM: exactly one of departureTime/arrivalTime).
+    // Uses the trip's Arrival field, same datetime convention as departure
+    // (LocalDateTime; OffsetDateTime for the Bileto exception).
+    if (searchCriteria.timeBasis === 'ARRIVAL') {
+      if (legDef.endDateTime) {
+        tripSearchCriteria.arrivalTime = _apiBase.includes("bileto")
+          ? toOffsetDateTime(legDef.endDateTime)
+          : toLocalDateTime(legDef.endDateTime);
+        delete tripSearchCriteria.departureTime;
+        _applied.push(`arrival-time basis (${tripSearchCriteria.arrivalTime})`);
+      } else {
+        validationLogger('[WARNING] Trip Search Criteria asks for ARRIVAL-time search but the trip has no Arrival time — falling back to departure-time search. Fill the Arrival field in the Trip requirement.');
+      }
+    }
+
+    // Vias (ordered; optional dwellTime per via).
+    const _vias = [];
+    [['via1Place', 'via1Dwell'], ['via2Place', 'via2Dwell']].forEach(([pf, df]) => {
+      if (_set(searchCriteria[pf])) {
+        const v = { viaPlace: new StopPlaceRef(String(searchCriteria[pf]).trim()) };
+        if (_set(searchCriteria[df])) v.dwellTime = String(searchCriteria[df]).trim();
+        _vias.push(v);
+      }
+    });
+    if (_vias.length) {
+      tripSearchCriteria.vias = _vias;
+      _applied.push(`${_vias.length} via(s): ${_vias.map(v => v.viaPlace.stopPlaceRef).join(', ')}`);
+    }
+
+    // Not-vias (comma-separated refs → one NotVia entry with the list).
+    if (_set(searchCriteria.notVias)) {
+      const _places = String(searchCriteria.notVias).split(',').map(s => s.trim()).filter(Boolean);
+      if (_places.length) {
+        tripSearchCriteria.notVias = [{ notViaPlace: _places.map(pl => new StopPlaceRef(pl)) }];
+        _applied.push(`notVia: ${_places.join(', ')}`);
+      }
+    }
+
+    // Simple TripParameters. Merged with the train-binding dataFilter; the
+    // paxone exception (no parameters member at all) is preserved.
+    const _params = {};
+    ['transferLimit', 'numberOfResults', 'numberOfResultsBefore', 'numberOfResultsAfter'].forEach(k => {
+      if (_set(searchCriteria[k])) {
+        const n = parseInt(searchCriteria[k], 10);
+        if (Number.isInteger(n) && n >= 0) { _params[k] = n; _applied.push(`${k} ${n}`); }
+        else validationLogger(`[WARNING] Trip Search Criteria ${k}="${searchCriteria[k]}" is not a non-negative integer — ignored.`);
+      }
+    });
+    if (_set(searchCriteria.ignoreRealtimeData)) {
+      _params.ignoreRealtimeData = String(searchCriteria.ignoreRealtimeData) === 'true';
+      _applied.push(`ignoreRealtimeData ${_params.ignoreRealtimeData}`);
+    }
+    if (Object.keys(_params).length > 0) {
+      if (sandbox.includes("paxone")) {
+        validationLogger('[INFO] paxone exception — TripParameters omitted from the request; the configured transfer/result/realtime options are not sent (vias/notVias/arrival basis still apply).');
+      } else {
+        const _merged = tripSearchCriteria.parameters || {};
+        Object.assign(_merged, _params);
+        tripSearchCriteria.parameters = _merged;
+      }
+    }
+
+    if (_applied.length) {
+      validationLogger(`[INFO] 🔎 Trip search criteria applied — ${_applied.join('; ')}`);
+    }
+  }
 
   bru.setEnvVar("offerTripSearchCriteria", JSON.stringify(tripSearchCriteria));
 }

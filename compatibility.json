@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.152",
+  "current_release": "2026.153",
   "releases": [
+    {
+      "release": "2026.153",
+      "date": "2026-06-10",
+      "server": "1.11.125",
+      "collection": "OTST_V2.0.71",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "OSDM Trip Search Criteria v1 (#359, requested by Marcel Koseler / ÖBB PV AG). Wizard: collapsed '🔎 Trip Search Criteria' sub-panel in the Trip requirement (SEARCH type) with an 'N set' badge — search time basis (Departure default / Arrival, which searches by the existing Arrival field via OSDM arrivalTime), Via 1/2 (UIC + optional ISO dwellTime), Not-via (comma-separated UICs), Transfer limit, Number of results/before/after, Ignore realtime data; stored flat under tripRequirement.trip.searchCriteria.*; setTripFieldByPath autovivifies missing sub-objects. scenarioParser builds the OSDM members: arrivalTime replaces departureTime on ARRIVAL basis (LocalDateTime convention + Bileto OffsetDateTime exception preserved; missing Arrival → WARNING + departure fallback); vias[] {viaPlace, dwellTime}; notVias[] {notViaPlace[]}; parameters gains transferLimit/numberOfResults(/Before/After)/ignoreRealtimeData merged with the train-binding dataFilter; paxone keeps its no-parameters exception (top-level members still sent, one INFO note); one '[INFO] 🔎 Trip search criteria applied — …' summary line. Wire shape byte-identical when nothing is configured. Out of v1 scope (in #359): per-via dataFilters, ptMode/serviceBrand filters, policy/mobility filters, embed.",
+        "Verification: Node harness drives the REAL osdmTripSearchCriteria extracted from scenarioParser with the REAL bundled OSDM 3.5 spec as key-allowlist — 6 cases: legacy shape unchanged when unset; full criteria (arrival basis drops departureTime, 2 vias incl. dwell, notVia comma-split, params merged with vehicleFilter, every object allowlisted against TripSearchCriteria/TripVia/NotVia/TripParameters spec properties); paxone parameter suppression with vias kept; ARRIVAL-without-Arrival fallback + WARNING; junk numeric ignored + WARNING; Bileto OffsetDateTime kept on arrivalTime. node --check on scenarios.js + scenarioParser.js; eslint + inline-script lint green. Server 1.11.124 -> 1.11.125; Bruno_Collection/VERSION OTST_V2.0.70 -> OTST_V2.0.71."
+      ]
+    },
     {
       "release": "2026.152",
       "date": "2026-06-10",
