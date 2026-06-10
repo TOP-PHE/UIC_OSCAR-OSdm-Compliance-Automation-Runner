@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.151",
+  "current_release": "2026.152",
   "releases": [
+    {
+      "release": "2026.152",
+      "date": "2026-06-10",
+      "server": "1.11.124",
+      "collection": "OTST_V2.0.70",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "reportGenerator [DEBUG] gate (#357) — tester on 2026.151 with a loggingType=INFO scenario still saw grey [DEBUG] lines: reportGenerator.js printed three ROUTINE lines per scenario via direct console.log ('↩ Same scenario detected…', '🗑 Previous run data cleared.', '✅ Report directory: …') plus three error-path diagnostics, all bypassing the validationLogger pyramid. The file is sandbox-self-contained (cannot require displays.js) → local _debugLog() gate, suppressed unless loggingType=DEBUG/FULL (no-bru context defaults to INFO/silent). offers.js's two error-path preflight diagnostics route through validationLogger. The ~15 'globalThis exposure skipped' catch-fallbacks fire only on exceptions and stay as-is. Documented boundary: Bruno-CLI-emitted lines ('(request skipped via pre-request script)' echoes, post-failure stack frames) are CLASSIFIED debug by the runner and cannot be un-emitted by loggingType — the dashboard info+ filter hides them; the DB keeps everything for forensics.",
+        "Verification: _debugLog extracted from the real file and exercised (INFO suppressed, DEBUG printed, no-bru silent); node --check on both files; eslint + inline-script lint green. Server 1.11.123 -> 1.11.124 (version pairing only, no server code change); Bruno_Collection/VERSION OTST_V2.0.69 -> OTST_V2.0.70."
+      ]
+    },
     {
       "release": "2026.151",
       "date": "2026-06-10",

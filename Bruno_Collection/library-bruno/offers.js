@@ -181,7 +181,8 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      console.log('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
+      // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
+      validationLogger('[DEBUG] [offers] preflight header extraction failed, continuing without headers: ' + (e && e.message));
     }
 
     // Best-effort body resolve (may be empty in pre-request)
@@ -198,7 +199,8 @@ function ensureAuthorizationOr403() {
         }
       }
     } catch (e) {
-      console.log('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
+      // #357: validationLogger so the [DEBUG] diagnostic obeys loggingType.
+      validationLogger('[DEBUG] [offers] preflight body resolution failed, continuing without body: ' + (e && e.message));
     }
 
     // Preflight call using bru.sendRequest

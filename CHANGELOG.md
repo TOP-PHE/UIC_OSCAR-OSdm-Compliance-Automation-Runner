@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.124] — 2026-06-10
+
+### Fixed
+
+- **reportGenerator `[DEBUG]` lines bypass loggingType (#357).** On a
+  loggingType=INFO scenario (2026.151), grey `[DEBUG]` lines still appeared:
+  reportGenerator.js printed three ROUTINE lines per scenario via direct
+  `console.log` (`↩ Same scenario detected…`, `🗑 Previous run data cleared.`,
+  `✅ Report directory: …`) plus three error-path diagnostics. The file is
+  sandbox-self-contained (can't require displays.js), so it gets a local
+  `_debugLog()` gate — suppressed unless loggingType is DEBUG/FULL. The two
+  error-path preflight diagnostics in offers.js now route through
+  `validationLogger` for the same reason.
+- **Documented boundary:** lines the Bruno CLI emits itself (the
+  `(request skipped via pre-request script)` echoes, post-failure stack
+  frames) are *classified* debug by the runner but cannot be un-emitted by
+  loggingType — the dashboard's **info+** filter is the way to hide them;
+  the database keeps everything for forensics.
+
+---
+
 ## [server-v1.11.123] — 2026-06-10
 
 **Execution Log & System-Info polish round (#355)** — four tester findings
