@@ -299,7 +299,7 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
 // ─── Public functions ────────────────────────────────────────────────────────
 
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
-  validationLogger("[INFO] ► postCreateBookingResponse");
+  validationLogger("[DEBUG] ► postCreateBookingResponse");
 
   const booking = jsonData.booking;
   if (typeof booking !== 'object' || booking === null) {
@@ -613,7 +613,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 }
 
 function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false, siblingDocs = undefined) {
-  validationLogger("[INFO] ► validateFulfillments");
+  validationLogger("[DEBUG] ► validateFulfillments");
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) {
     if (requireFulfillments) {
       // #250: after POST /fulfillments, GET /bookings/{id} MUST embed the

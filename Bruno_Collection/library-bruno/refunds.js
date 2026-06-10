@@ -20,7 +20,7 @@ module.exports = {
 
 // Function to validate refund offers response
 function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, expectedFulfillmentStatus) {
-  validationLogger("[INFO] ➤ postPatchRefundOfferResponse");
+  validationLogger("[DEBUG] ➤ postPatchRefundOfferResponse");
   if (typeof checkWarningsAndProblems === "function") {
     checkWarningsAndProblems(jsonData);
   }
@@ -75,7 +75,7 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
 
 // Function to validate a single refund offer
 function validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus) {
-  validationLogger("[INFO] ➤ validateRefundOfferResponse");
+  validationLogger("[DEBUG] ➤ validateRefundOfferResponse");
   validationLogger(`[INFO] Validating refund offer at index ${index}`);
 
   // Validate refund offer ID

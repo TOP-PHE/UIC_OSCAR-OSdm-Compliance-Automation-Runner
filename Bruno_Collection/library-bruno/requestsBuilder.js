@@ -41,7 +41,7 @@ function returnInwardDateFromOutbound() {
 // / fulfillment are the same as the outbound. Returns true when a body was
 // built (i.e. this is a return scenario), false otherwise.
 function buildReturnOfferCollectionRequest() {
-  validationLogger("[INFO] ➤ buildReturnOfferCollectionRequest");
+  validationLogger("[DEBUG] ➤ buildReturnOfferCollectionRequest");
   const inwardReturnDate = returnInwardDateFromOutbound();
   const outboundOfferId  = bru.getEnvVar("outboundOfferId");
   if (!inwardReturnDate || !outboundOfferId) {
@@ -82,7 +82,7 @@ function buildReturnOfferCollectionRequest() {
 
 // Function to build the offer collection request
 function buildOfferCollectionRequest() {
-  validationLogger("[INFO] ➤ buildOfferCollectionRequest");
+  validationLogger("[DEBUG] ➤ buildOfferCollectionRequest");
   const tripType = bru.getEnvVar("TripType");
   const sandbox = bru.getEnvVar("api_base") || "";
   const isPaxone = sandbox.includes("paxone");
@@ -115,7 +115,7 @@ function buildOfferCollectionRequest() {
 
 // Function to build the booking request
 function buildBookingRequest() {
-  validationLogger("[INFO] ➤ buildBookingRequest");
+  validationLogger("[DEBUG] ➤ buildBookingRequest");
   accommodationAndPlaceSelection();
 
   const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
@@ -190,7 +190,7 @@ function buildBookingRequest() {
 // "withhold") removes it. In 'invalid' mode, force a clearly-invalid email when
 // nothing else makes the body invalid, so the provider must reject.
 function buildBookingPurchaserBody() {
-  validationLogger("[INFO] ➤ buildBookingPurchaserBody");
+  validationLogger("[DEBUG] ➤ buildBookingPurchaserBody");
   const mode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
 
   let base = {};
@@ -352,7 +352,7 @@ function placesForPassengers(picked, passengerRefs) {
 
 // Function to handle place selections
 function accommodationAndPlaceSelection() {
-  validationLogger("[INFO] ➤ accommodationAndPlaceSelection");
+  validationLogger("[DEBUG] ➤ accommodationAndPlaceSelection");
 
   const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -432,7 +432,7 @@ function parseFulfillmentIds() {
 // unknown field on its current spec version, so the partial scope is then
 // silently lost — see #218 follow-up.
 function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecifications = null) {
-  validationLogger("[INFO] ➤ requestRefundOffersBody");
+  validationLogger("[DEBUG] ➤ requestRefundOffersBody");
 
   let fulfillmentIds = parseFulfillmentIds();
   // Side-channel: when partial scope is resolved but the OSDM version doesn't
@@ -492,7 +492,7 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
 
 // Function to create request body for exchange offers
 function requestExchangeOffersBody(overruleCode) {
-  validationLogger("[INFO] ➤ requestExchangeOffersBody");
+  validationLogger("[DEBUG] ➤ requestExchangeOffersBody");
 
   // Build anonymousPassengerSpecifications dynamically from offerPassengerSpecifications
   // so multi-passenger exchange scenarios send one entry per passenger.
@@ -541,7 +541,7 @@ function requestExchangeOffersBody(overruleCode) {
 
 // Function to create request body for exchange operations
 function requestExchangeOperationsBody() {
-  validationLogger("[INFO] ➤ requestExchangeOperationsBody");
+  validationLogger("[DEBUG] ➤ requestExchangeOperationsBody");
 
   const body = {
     exchangeOffers: [{

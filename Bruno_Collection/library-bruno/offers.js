@@ -72,7 +72,7 @@ function checkWarningsAndProblems(jsonData) {
 function postOfferResponsePreRequest() {
   const requestName = (typeof req !== 'undefined' && typeof req.getName === 'function') ? req.getName() : '';
   console.log("[INFO] ⏩ [STEP] Executing request : " + requestName);
-  validationLogger("[INFO] ➤ postOfferResponsePreRequest");
+  validationLogger("[DEBUG] ➤ postOfferResponsePreRequest");
 
   if (typeof buildOfferCollectionRequest === "function") {
     buildOfferCollectionRequest();
@@ -84,8 +84,24 @@ function postOfferResponsePreRequest() {
 }
 
 function ensureAuthorizationOr403() {
-  validationLogger("[INFO] ➤ ensureAuthorizationOr403");
-  validationLogger("[INFO] Run a preoffer authorization check to avoid 403 errors ...");
+  // Log-audit round 2: this helper PREFLIGHTS the offer request — it sends
+  // the same POST /offers once via bru.sendRequest purely to surface auth
+  // problems with a clear message BEFORE the real call. Running it on every
+  // offer was redundant and chatty (4 log lines to say "auth works"), and it
+  // doubled the provider's /offers load: by this point the system-info
+  // requests have already succeeded with the same token, the #204
+  // token-watchdog refreshes it at every scenario start, and
+  // checkAuthRejection decodes any real 401/403 downstream. Now:
+  //   - SKIPPED (one [DEBUG] line) when this run already proved the token:
+  //     a 200 on /versions (systemVersionCheckCompleted) or an earlier
+  //     successful preflight (__authPreflightOk);
+  //   - otherwise ONE [INFO] line carries the whole story on success.
+  if (bru.getEnvVar('systemVersionCheckCompleted') === 'true' ||
+      bru.getEnvVar('__authPreflightOk') === 'true') {
+    validationLogger("[DEBUG] Authorization preflight skipped — this token already returned 200 earlier in the run.");
+    return;
+  }
+  validationLogger("[DEBUG] ➤ ensureAuthorizationOr403 — preflighting POST /offers to surface auth problems early");
 
   function resolveVars(str) {
     if (!str) return str;
@@ -165,7 +181,8 @@ function ensureAuthorizationOr403() {
         console.log("[ERROR] ⛔ Stop: Bad Request (400). Check request parameters and body. Possibly due to authorization.");
         console.error("[ERROR] Authorization precheck failed with 400");
       } else {
-        validationLogger("[INFO] ✅ Authorization check passed.");
+        bru.setEnvVar('__authPreflightOk', 'true');
+        validationLogger("[INFO] ✅ Authorization OK — preflight POST /offers accepted (HTTP " + code + "); continuing with the real request. (Checked once per run.)");
       }
     });
   } catch (e) {
@@ -176,7 +193,7 @@ function ensureAuthorizationOr403() {
 
 // Function to validate offer response
 function postOfferResponse(jsonData) {
-  validationLogger("[INFO] ➤ postOfferResponse");
+  validationLogger("[DEBUG] ➤ postOfferResponse");
   if (typeof checkWarningsAndProblems === "function") {
     checkWarningsAndProblems(jsonData);
   }
@@ -333,7 +350,7 @@ function offerFlexibility(offer) {
 
 // select and set offer based on criteria
 function selectAndSetOffer(jsonData) {
-  validationLogger("[INFO] ➤ selectAndSetOffer");
+  validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
@@ -461,7 +478,7 @@ function selectAndSetOffer(jsonData) {
 
 // Offer summary validation
 function validateOfferSummary(selectedOffer) {
-  validationLogger("[INFO] ➤ validateOfferSummary");
+  validationLogger("[DEBUG] ➤ validateOfferSummary");
   const offerSummary = selectedOffer.offerSummary || {};
   const mini = offerSummary.minimalPrice;
   const minimalPrice = offerSummary.minimalPrice?.amount;
@@ -555,7 +572,7 @@ function validateOfferSummary(selectedOffer) {
 
 // Passengers validation
 function validatePassengers(jsonData) {
-  validationLogger("[INFO] ➤ validatePassengers");
+  validationLogger("[DEBUG] ➤ validatePassengers");
   const passengers = jsonData.anonymousPassengerSpecifications || [];
   bru.setEnvVar("passengerCount", passengers.length);
 
@@ -599,7 +616,7 @@ function validatePassengers(jsonData) {
 
 // Trips & Legs validation
 function validateTripsAndLegs(jsonData) {
-  validationLogger("[INFO] ➤ validateTripsAndLegs");
+  validationLogger("[DEBUG] ➤ validateTripsAndLegs");
   const trips = jsonData.trips || [];
 
   test(`Trips are defined - length: ${trips.length}`, function () {
@@ -668,7 +685,7 @@ function validateTripsAndLegs(jsonData) {
 
 // Offer Parts validation
 function validateOfferParts(selectedOffer) {
-  validationLogger("[INFO] ➤ validateOfferParts");
+  validationLogger("[DEBUG] ➤ validateOfferParts");
 
   const admissionParts = selectedOffer.admissionOfferParts || [];
   const reservationParts = selectedOffer.reservationOfferParts || [];
@@ -844,7 +861,7 @@ function validateOfferParts(selectedOffer) {
 
 // Admission validation
 function validateAdmissions(selectedOffer) {
-  validationLogger("[INFO] ➤ validateAdmissions");
+  validationLogger("[DEBUG] ➤ validateAdmissions");
 
   const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
   const admissionParts = selectedOffer.admissionOfferParts || [];
@@ -1047,7 +1064,7 @@ function validateAdmissions(selectedOffer) {
 
 // Reservation validation
 function validateReservations(selectedOffer) {
-  validationLogger("[INFO] ➤ validateReservations");
+  validationLogger("[DEBUG] ➤ validateReservations");
 
   const reservationParts = selectedOffer.reservationOfferParts || [];
   const ancillaryParts = selectedOffer.ancillaryOfferParts || [];
@@ -1228,7 +1245,7 @@ function validateReservations(selectedOffer) {
 }
 
 function validateAncillaries(selectedOffer) {
-  validationLogger("[INFO] ➤ validateAncillaries");
+  validationLogger("[DEBUG] ➤ validateAncillaries");
   const ancillaryParts = selectedOffer.ancillaryOfferParts || [];
   const _idsRaw3 = bru.getEnvVar("admissionReservationAncillaryOfferPartsIds");
   const admissionReservationAncillaryOfferPartsIds = Array.isArray(_idsRaw3) ? _idsRaw3 : JSON.parse(_idsRaw3 || "[]");
@@ -1339,7 +1356,7 @@ function getTripLegCoverage(selectedOffer, accommodationSelection) {
 
 // Helper function to handle place and accommodation selection
 function handleAccommodationAndPlaceSelection(selectedOffer) {
-  validationLogger("[INFO] ➤ handleAccommodationAndPlaceSelection");
+  validationLogger("[DEBUG] ➤ handleAccommodationAndPlaceSelection");
 
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
 
@@ -1411,7 +1428,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
-  validationLogger("[INFO] ➤ ensureYesWhenRefundOrExchangeSelected");
+  validationLogger("[DEBUG] ➤ ensureYesWhenRefundOrExchangeSelected");
 
   const admissionParts = selectedOffer.admissionOfferParts || [];
 

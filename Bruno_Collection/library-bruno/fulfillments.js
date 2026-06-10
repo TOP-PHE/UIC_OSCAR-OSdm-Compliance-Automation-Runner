@@ -48,7 +48,7 @@ function checkBookedOfferParts(bookedOffer, partType, bookingState) {
 
 // Function to validate passengers
 function validatePassengers(booking, offer) {
-  validationLogger("[INFO] ➤ validatePassengers");
+  validationLogger("[DEBUG] ➤ validatePassengers");
   offer.passengerRefs.forEach(passenger => {
     const found = booking.passengers.some(bookedPassenger => {
       return bookedPassenger.externalRef === passenger;
@@ -62,7 +62,7 @@ function validatePassengers(booking, offer) {
 
 // Function to validate purchaser details
 function validatePurchaserDetails(purchaserDetail) {
-  validationLogger("[INFO] ➤ validatePurchaserDetails");
+  validationLogger("[DEBUG] ➤ validatePurchaserDetails");
   if (purchaserDetail) {
     // Some sandboxes (e.g. Turnit OSDM < 3.4) use flat detail.email/phoneNumber;
     // others (Paxone, Bileto, Sqills OSDM >= 3.4) use detail.contact.email/phoneNumber
@@ -79,7 +79,7 @@ function validatePurchaserDetails(purchaserDetail) {
 
 // Function to validate fulfillment IDs
 function validateFulfillmentId(booking) {
-  validationLogger("[INFO] ➤ validateFulfillmentId");
+  validationLogger("[DEBUG] ➤ validateFulfillmentId");
   const fulfillmentsIdRaw = bru.getEnvVar("fulfillmentIds");
   if (fulfillmentsIdRaw) {
     const expectedIds = Array.isArray(fulfillmentsIdRaw) ? fulfillmentsIdRaw : JSON.parse(fulfillmentsIdRaw);
@@ -98,7 +98,7 @@ function validateFulfillmentId(booking) {
 
 // Function to validate prices
 function validatePrices(booking, fulfillmentState, totalPrice) {
-  validationLogger("[INFO] ➤ validatePrices");
+  validationLogger("[DEBUG] ➤ validatePrices");
   if (fulfillmentState != null) {
     bru.setEnvVar("bookingConfirmedPrice", booking.confirmedPrice.amount);
     const bookingConfirmedPrice = Number(bru.getEnvVar("bookingConfirmedPrice"));
@@ -122,7 +122,7 @@ function validatePrices(booking, fulfillmentState, totalPrice) {
 
 // Function to check fulfillment details
 function checkFulfillment(booking, fulfillment) {
-  validationLogger("[INFO] ➤ checkFulfillment");
+  validationLogger("[DEBUG] ➤ checkFulfillment");
   const currentDate = new Date();
   const createdOn = new Date(fulfillment.createdOn);
 

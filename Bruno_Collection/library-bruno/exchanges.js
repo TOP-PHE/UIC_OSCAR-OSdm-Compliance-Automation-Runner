@@ -19,7 +19,7 @@ module.exports = {
 
 // Function to validate exchange offers response
 function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
-  validationLogger("[INFO] ➤ postPatchExchangeOffersResponse");
+  validationLogger("[DEBUG] ➤ postPatchExchangeOffersResponse");
   // Stop flow if offers invalid
   if (!Array.isArray(jsonData.exchangeOffers) || jsonData.exchangeOffers.length === 0) {
     validationLogger("[ERROR] No exchangeOffers found or 'exchangeOffers' is not an array.");
@@ -59,7 +59,7 @@ function postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus) {
 
 // Function to validate exchange operations response (using 11_turnit_exchange.json structure)
 function postPatchExchangeOperationsResponse(jsonData, expectedExchangeOperationStatus, expectedFulfillmentStatus) {
-  validationLogger("[INFO] ➤ postPatchExchangeOperationsResponse");
+  validationLogger("[DEBUG] ➤ postPatchExchangeOperationsResponse");
   if (typeof checkWarningsAndProblems === "function") {
     checkWarningsAndProblems(jsonData);
   }
@@ -107,7 +107,7 @@ function postPatchExchangeOperationsResponse(jsonData, expectedExchangeOperation
 
 // Function to validate exchange offer
 function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillmentStatus) {
-  validationLogger("[INFO] ➤ validateExchangeOfferResponse");
+  validationLogger("[DEBUG] ➤ validateExchangeOfferResponse");
   validationLogger(`[INFO] Validating exchange offer at index ${index}`);
 
   // Validate exchange offer ID
@@ -228,7 +228,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
 
 // Function to validate exchange fees are consistent with after-sales conditions
 function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
-  validationLogger("[INFO] ➤ validateExchangeFeesConsistentWithAfterSalesConditions");
+  validationLogger("[DEBUG] ➤ validateExchangeFeesConsistentWithAfterSalesConditions");
   // Calculate total afterSalesConditions from all offer parts
   const exchangeFee = exchangeOffer.exchangeFee;
   const admissionOfferParts = exchangeOffer.admissionOfferParts || [];
