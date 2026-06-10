@@ -708,10 +708,23 @@ function parseScenarioData(jsonData) {
       // queue has length 1 and the existing after-response short-circuit
       // routes straight to the next scenario.
       try {
-        const { buildAndArmExpiredFlowQueue } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+        // Log-audit round 2: sibling-relative require. This file lives IN
+        // library-bruno/, so the YML-style library_base prefix
+        // ("./library-bruno/") double-nested to
+        // library-bruno/library-bruno/expiredFlow.js and FAILED ON EVERY RUN
+        // ("Cannot find module ..."), emitting a confusing [WARNING] even
+        // with zero timers armed — and silently disabling the multi-timer
+        // auto-expansion for scenarios that DID arm 2+ timers. Same sibling
+        // pattern as loopback.js → envUtils.js; reportGenerator.js documents
+        // the identical trap.
+        const { buildAndArmExpiredFlowQueue } = require("./expiredFlow.js");
         buildAndArmExpiredFlowQueue();
+        // With 0 timers armed the builder is silent (empty queue, no log) —
+        // so this block emits nothing on ordinary scenarios.
       } catch (_e) {
-        validationLogger(`[WARNING] expiredFlow queue build skipped: ${_e && _e.message}`);
+        // With the path fixed, a throw here is a genuine feature failure:
+        // armed expiry timers would not run their extra passes.
+        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e && _e.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
       }
 
       // Trip requirements — verify the scenario's reference resolves BEFORE
