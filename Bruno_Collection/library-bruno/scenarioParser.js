@@ -639,12 +639,22 @@ function parseScenarioData(jsonData) {
       if (_prByPax || _prByLeg) {
         // Per-pax requires >=2 passengers in the resolved passenger list.
         if (_prByPax) {
-          const _passengersList = jsonData.passengersLists?.find(
-            (pl) => pl && pl.id === scenario.passengersListId);
+          // Log-audit round 2: the root property in the data file is
+          // `passengersList` (an ARRAY of lists — the schema's required root
+          // field), not `passengersLists`. The old plural lookup was always
+          // undefined, so _paxCount was 0 for EVERY per-pax scenario and this
+          // warning fired even with 3 passengers correctly linked (list #62
+          // false-positive, 2026-06-10). Keep the plural as a fallback for
+          // hand-edited files, and compare ids loosely ("62" vs 62) since
+          // hand-edited files are exactly what this re-check exists for.
+          const _plRoot = jsonData.passengersList || jsonData.passengersLists;
+          const _passengersList = Array.isArray(_plRoot)
+            ? _plRoot.find((pl) => pl && String(pl.id) === String(scenario.passengersListId))
+            : undefined;
           const _paxCount = Array.isArray(_passengersList?.passengers)
             ? _passengersList.passengers.length : 0;
           if (_paxCount < 2) {
-            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} has only ${_paxCount} passenger(s) — per-pax partial refund cannot fire. Add a passenger or turn partialRefundByPax off.`);
+            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
           }
         }
         // Per-leg with SPECIFICATION trip can be statically validated.
