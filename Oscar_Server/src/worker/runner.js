@@ -225,6 +225,15 @@ class LogParser {
       //    /passenger-categories → … (HTTP 501 …)" also matches that shape.
       const hasLevelTag = /^\[(DEBUG|INFO|WARN(?:ING)?|ERROR)\]/i.test(trimmed);
       const isAssertionRow = /^\s*[✓✔✗✕×]/.test(trimmed) || /^\s*(pass|fail)\b/i.test(trimmed);
+      // #355: the library's token-skip line fires in the PRE-request script —
+      // BEFORE the Bruno CLI row that normally opens the 00-Access Token
+      // suite — so the FIRST one (benerail) landed in the Runner section.
+      // The line's home is known by construction (the token folder name is
+      // fixed in the collection).
+      if (/Skipping \[[^\]]*access token\]/i.test(trimmed)) {
+        this.currentSuite = '00-Access Token';
+        this.currentRequest = null;
+      }
       // Bruno CLI prints request execution lines like:
       //   "01-System Infos Requests\00. GET System Version Check (404 Not Found) - 302 ms"
       const folderReqMatch = !hasLevelTag && !isAssertionRow

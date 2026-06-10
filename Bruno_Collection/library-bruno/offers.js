@@ -259,22 +259,28 @@ function postOfferResponse(jsonData) {
   //     with the full picture. The throw still drives the existing
   //     retry-3-then-skip flow in 01. POST Get Offer.yml.
   if (!Array.isArray(jsonData.offers) || jsonData.offers.length === 0) {
-    const _trips = Array.isArray(jsonData.trips)      ? jsonData.trips.length      : 0;
-    const _pax   = Array.isArray(jsonData.passengers) ? jsonData.passengers.length : 0;
+    const _trips = Array.isArray(jsonData.trips) ? jsonData.trips.length : 0;
+    // #355: the passenger echo location varies by provider/version —
+    // 'passengers', 'anonymousPassengerSpecifications' (the field this very
+    // function uses below for the requested count) or 'passengersList'.
+    // Reading only jsonData.passengers showed a false "0 passenger(s)" on
+    // providers that echo elsewhere; when nothing is echoed, SAY so instead
+    // of claiming zero.
+    const _paxArr = [jsonData.passengers, jsonData.anonymousPassengerSpecifications, jsonData.passengersList].find(Array.isArray);
+    const _paxTxt = _paxArr ? `${_paxArr.length} passenger(s)` : 'no echoed passenger list';
     const _wrn   = Array.isArray(jsonData.warnings)   ? jsonData.warnings.length   : 0;
     const _prb   = Array.isArray(jsonData.problems)   ? jsonData.problems.length   : 0;
+    // #355: no standalone validationLogger before the throw — the caller
+    // re-throws inside bruTest("Offers found in response", …) whose failure
+    // echo prints this exact message, so logging here showed it TWICE.
     if (!Array.isArray(jsonData.offers)) {
-      const msg = `POST /offers response has no offers[] array (got ${jsonData.offers === undefined ? "no 'offers' property" : typeof jsonData.offers}) — malformed OfferCollectionResponse envelope.`;
-      validationLogger("[ERROR] " + msg);
-      throw new Error(msg);
+      throw new Error(`POST /offers response has no offers[] array (got ${jsonData.offers === undefined ? "no 'offers' property" : typeof jsonData.offers}) — malformed OfferCollectionResponse envelope.`);
     }
-    const msg = `POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_pax} passenger(s) but no offer, and ` +
+    throw new Error(`POST /offers returned 200 with 0 offers — the response carries ${_trips} trip(s) and ${_paxTxt}, but no offer, and ` +
       ((_wrn + _prb) > 0
         ? `${_wrn} warning(s) / ${_prb} problem(s) (see envelope lines above for why)`
         : `NO warning or problem explaining why`) +
-      `. An empty offers[] is structurally valid per OSDM, but a provider that finds the journey and prices nothing should explain the empty result via warnings[]/problems[] (e.g. no fares available for this date/route). OSCAR retries in case of transient inventory.`;
-    validationLogger("[WARNING] " + msg);
-    throw new Error(msg);
+      `. An empty offers[] is structurally valid per OSDM, but a provider that finds the journey and prices nothing should explain the empty result via warnings[]/problems[] (e.g. no fares available for this date/route). OSCAR retries in case of transient inventory.`);
   }
 
   // Check offers exist
