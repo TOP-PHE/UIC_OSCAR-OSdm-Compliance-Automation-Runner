@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.125] — 2026-06-10
+
+**OSDM Trip Search Criteria, v1 (#359)** — requested by Marcel Koseler
+(ÖBB PV AG): scenarios can now exercise the spec-defined search options
+beyond origin/destination/departure.
+
+### Added
+
+- **Wizard: "🔎 Trip Search Criteria" sub-panel** inside the Trip
+  requirement (SEARCH type), collapsed by default with an "N set" badge.
+  Fields (all optional — only filled ones are sent): search time basis
+  (**Departure**, default / **Arrival** — searches by the existing Arrival
+  time field, OSDM's `arrivalTime`), **Via 1/2** (UIC ref + optional ISO
+  dwell time), **Not via** (comma-separated UIC refs), **Transfer limit**,
+  **Number of results / before / after**, **Ignore realtime data**. Stored
+  flat under `tripRequirement.trip.searchCriteria.*`; `setTripFieldByPath`
+  now autovivifies missing sub-objects so older datafiles upgrade on first
+  edit.
+- **scenarioParser builds the OSDM members** from those fields:
+  `arrivalTime` replaces `departureTime` on ARRIVAL basis (same
+  LocalDateTime convention, Bileto OffsetDateTime exception preserved;
+  missing Arrival time → WARNING + departure fallback); `vias[]`
+  (`viaPlace` + `dwellTime`); `notVias[]`; `parameters` gains
+  `transferLimit` / `numberOfResults(/Before/After)` /
+  `ignoreRealtimeData`, merged with the existing train-binding
+  `dataFilter`. The paxone no-`parameters` exception is preserved (top-level
+  members still sent, one INFO note). One `[INFO] 🔎 Trip search criteria
+  applied — …` line summarises what was sent (R2). **Wire shape is
+  byte-identical to before when nothing is configured.**
+- Out of v1 scope (documented in #359): per-via dataFilters, ptMode /
+  serviceBrand filters, policy/mobility filters, `embed`.
+
+---
+
 ## [server-v1.11.124] — 2026-06-10
 
 ### Fixed

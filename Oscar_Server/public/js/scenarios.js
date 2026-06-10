@@ -1946,6 +1946,59 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
   </div>`;
 }
 
+// ── Trip Search Criteria sub-panel (#359, OSDM 3.4 set) ──────────────────────
+// Collapsed by default; only filled fields are sent in the request. Covers
+// the spec's TripSearchCriteria members beyond origin/destination/time:
+// arrival-time basis, vias (+dwell), notVias, and the simple TripParameters
+// (transferLimit, result counts, ignoreRealtimeData). Stored flat under
+// tripRequirement.trip.searchCriteria.* — scenarioParser builds the OSDM
+// objects from it.
+function buildTripSearchCriteriaPanel(tIdx, trip) {
+  const sc = (trip.trip && trip.trip.searchCriteria) || {};
+  const isSet = v => v != null && String(v).trim() !== '';
+  const setCount =
+    ['via1Place', 'via2Place', 'notVias', 'transferLimit', 'numberOfResults',
+     'numberOfResultsBefore', 'numberOfResultsAfter', 'ignoreRealtimeData']
+      .filter(k => isSet(sc[k])).length
+    + (sc.timeBasis === 'ARRIVAL' ? 1 : 0);
+  const p = f => `trip.searchCriteria.${f}`;
+
+  const selField = (f, label, hint, options) => `
+  <div class="param-field">
+    <span class="param-label">${label} <span class="param-hint">${hint}</span></span>
+    <select class="param-input param-select" data-action="set-trip-path" data-tidx="${esc(tIdx)}" data-path="${p(f)}">
+      ${options.map(o => `<option value="${esc(o.v)}" ${String(sc[f] || '') === o.v ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}
+    </select>
+  </div>`;
+
+  return `
+  <div class="param-section" style="margin-top:10px">
+    <div class="param-section-head" data-action="toggle-param-section">🔎 Trip Search Criteria
+      <span class="param-hint" style="margin-left:8px">optional OSDM search options — ${setCount} set; only filled fields are sent</span>
+      <span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+      <div style="padding:10px 14px 12px">
+        <div class="param-grid">
+          ${selField('timeBasis', 'Search time basis',
+            'ARRIVAL searches by the Arrival time above (OSDM: exactly one of departureTime/arrivalTime)',
+            [{ v: '', l: 'Departure (default)' }, { v: 'ARRIVAL', l: 'Arrival' }])}
+          ${buildTripTextField(tIdx, p('transferLimit'), 'Transfer limit <span class="param-hint">max interchanges accepted (0 = direct only)</span>', sc.transferLimit, 'e.g. 0')}
+          ${buildTripTextField(tIdx, p('via1Place'), 'Via 1 UIC <span class="param-hint">journey must pass through</span>', sc.via1Place, 'urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('via1Dwell'), 'Via 1 dwell <span class="param-hint">ISO-8601 duration, optional</span>', sc.via1Dwell, 'PT30M')}
+          ${buildTripTextField(tIdx, p('via2Place'), 'Via 2 UIC', sc.via2Place, 'urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('via2Dwell'), 'Via 2 dwell', sc.via2Dwell, 'PT30M')}
+          ${buildTripTextField(tIdx, p('notVias'), 'Not via <span class="param-hint">comma-separated UIC refs the trip must avoid</span>', sc.notVias, 'urn:uic:stn:..., urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('numberOfResults'), 'Number of results', sc.numberOfResults, 'e.g. 5')}
+          ${buildTripTextField(tIdx, p('numberOfResultsBefore'), 'Results before <span class="param-hint">around the requested time</span>', sc.numberOfResultsBefore, 'e.g. 0')}
+          ${buildTripTextField(tIdx, p('numberOfResultsAfter'), 'Results after', sc.numberOfResultsAfter, 'e.g. 5')}
+          ${selField('ignoreRealtimeData', 'Ignore realtime data', 'plan on timetable only',
+            [{ v: '', l: '— not set —' }, { v: 'true', l: 'true' }, { v: 'false', l: 'false' }])}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function buildTripSection(idx, sc, trip) {
   const tIdx = (state.tripRequirements || []).findIndex(t => t.id === sc.tripRequirementId);
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
@@ -1997,7 +2050,8 @@ function buildTripSection(idx, sc, trip) {
       ${buildTripTimeField(tIdx, 'trip.endDatetime',   'Arrival <span class="param-hint">HH:MM:SS±HH:MM</span>',   t.endDatetime,   '09:00:00+02:00')}
       ${buildTripTextField(tIdx, 'trip.vehicleNumber', 'Vehicle # <span class="param-hint">Train number</span>', t.vehicleNumber, '')}
       ${buildTripTextField(tIdx, 'trip.operatorCode',  'Operator Code <span class="param-hint">urn:uic:rics:NNNN</span>', t.operatorCode,  'urn:uic:rics:...')}
-    </div>`;
+    </div>
+    ${buildTripSearchCriteriaPanel(tIdx, trip)}`;
   }
 
   return `
@@ -2594,6 +2648,10 @@ function setTripFieldByPath(tIdx, path, value) {
   let obj = state.tripRequirements[tIdx];
   for (let i = 0; i < parts.length - 1; i++) {
     const key = isNaN(parts[i]) ? parts[i] : parseInt(parts[i]);
+    // #359: autovivify missing intermediates so new optional sub-objects
+    // (trip.searchCriteria.*) can be written into older datafiles that
+    // don't have them yet. Next segment numeric → array, else object.
+    if (obj[key] == null) obj[key] = isNaN(parts[i + 1]) ? {} : [];
     obj = obj[key];
   }
   const lastKey = isNaN(parts[parts.length-1]) ? parts[parts.length-1] : parseInt(parts[parts.length-1]);
@@ -6153,6 +6211,10 @@ document.body.addEventListener('change', function(e) {
       }
       break;
     }
+    // #359: selects in the Trip Search Criteria sub-panel write via dot-path
+    // like the text inputs do, but selects fire 'change', not 'input'.
+    case 'set-trip-path':
+      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-field': {
       const tIdxF = parseInt(el.dataset.tidx);
       setTripField(tIdxF, el.dataset.field, el.value);
