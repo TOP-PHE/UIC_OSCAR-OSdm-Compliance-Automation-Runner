@@ -48,8 +48,16 @@ WORKDIR /app
 # (e.g. CVE-2026-0861 glibc memalign, CVE-2026-4878 libcap TOCTOU,
 # CVE-2026-29111 systemd code exec — all fixed in deb12u14 / u3 / u2 point
 # releases that ship in newer base-image rebuilds).
+# ca-certificates: node:22-slim ships WITHOUT the system CA store, so
+# /etc/ssl/certs does not exist. Every Bruno child process then printed
+# "Cannot open directory /etc/ssl/certs to load OpenSSL certificates."
+# to stderr at startup — harmless (Node verifies TLS against its bundled
+# Mozilla CA store regardless) but it polluted every single run log.
+# Installing ca-certificates creates the directory and silences the
+# warning at the source.
 RUN apt-get update && \
     apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
