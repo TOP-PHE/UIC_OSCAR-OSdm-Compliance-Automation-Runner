@@ -27,7 +27,7 @@ runtime:
         // Shared, version-aware status handling. /versions is an OSDM 3.6+
         // endpoint — a 404 when the test-framework version is below 3.6 is
         // reported as out of scope (skipped), not a failure.
-        if (!handleSystemInfoStatus(res.getStatus(), '/versions', { bruTest, validationLogger })) return;
+        if (!handleSystemInfoStatus(res.getStatus(), '/versions', { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
         // Parse JSON response safely
         let versionsData;

@@ -26,7 +26,7 @@ runtime:
         const endpoint = '/passenger-categories';
         // Shared, version-aware status handling (passenger-categories is 3.6+ →
         // a 404 below 3.6 is reported as out of scope, not a failure).
-        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger })) return;
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
         let body;
         try { body = res.getBody(); } catch (_e) {}
