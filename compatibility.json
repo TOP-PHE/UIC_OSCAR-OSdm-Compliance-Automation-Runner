@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.157",
+  "current_release": "2026.158",
   "releases": [
+    {
+      "release": "2026.158",
+      "date": "2026-06-11",
+      "server": "1.11.130",
+      "collection": "OTST_V2.0.73",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Offer-probe follow-up (#369) — (1) NEW '🔄 Re-probe offers' button in the Test Data step: POST /v1/company/test-resources/reprobe-offers re-runs the anonymous-adult offer probe (3 dates via searchDates) for every distinct O&D across the TRAIN resources and refreshes data.offerProbe on the affected sets (no timetable harvest, no other train mutation); toast summarises routes/sets/findings; manual for now (automatic refresh later). (2) FIX (Test Manager's 'doubt without evidence' confirmed by audit): _collectAncillaries preferred AncillaryOfferPart.type — the offer-part DISCRIMINATOR ('AncillaryOfferPart') — over category (the actual ancillary kind), so the Service Configuration ancillary catalog could be seeded with a useless literal; now category-first and /offerpart$/i type values are never collected. travelClass/serviceClass collection audited clean. summarizeOfferProbe factored into the timetable-discovery service and shared by both routes.",
+        "Verification: summarizeOfferProbe harness (null at 0 probed days; no-offer finding keeps the provider echo; 2-of-3 days + only-SECOND + only-NON_FLEXIBLE produce 3 findings); node --check on service/route/wizard; eslint + inline-script lint green. Server 1.11.129 -> 1.11.130; collection unchanged (OTST_V2.0.73)."
+      ]
+    },
     {
       "release": "2026.157",
       "date": "2026-06-11",
