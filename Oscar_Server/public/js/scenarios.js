@@ -1872,6 +1872,26 @@ function buildSalesFlowActionsSection(idx, sc) {
     }
   }
 
+  // #373: accommodation family picker (Seat / Couchette / Berth). NOT gated
+  // behind the framework's place-selection authorisation — for IRT/NJ
+  // mandatory-reservation trains the accommodation drives OFFER selection and
+  // the booking request's placeSelections (#371) even without the graphical
+  // seat map. scenarioParser already maps scenario.accommodationSelection to
+  // the Bruno env; this is the missing wizard field.
+  const _accSel = sc.accommodationSelection || '';
+  const _accStyle = readOnly ? ' style="pointer-events:none;opacity:.6"' : '';
+  const accommodationPickerHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Accommodation type <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— filters the offers to this place family and states the booked compartment in the booking request (placeSelections); required by IRT/NJ mandatory-reservation trains</span></div>
+          <div class="pill-group">
+            ${[['', '— any —', 'No accommodation constraint (default — current behaviour)'],
+               ['SEAT', '🪑 Seat', 'Only offers where every available place is a SEAT'],
+               ['COUCHETTE', '🛏 Couchette', 'Offers with at least one COUCHETTE place — the selected compartment subtype (e.g. COUCHETTE_COMFORT_4) is sent in the booking'],
+               ['BERTH', '🛌 Berth', 'Offers with at least one BERTH place — the selected compartment subtype is sent in the booking']]
+              .map(([v, l, d]) => `<div class="pill${_accSel === v ? ' selected' : ''}" data-action="set-accommodation-selection" data-idx="${esc(idx)}" data-val="${esc(v)}" title="${esc(d)}"${_accStyle}>${l}</div>`).join('')}
+          </div>
+        </div>`;
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🛒 Booking Flow Actions <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">optional steps during the booking → fulfillment phase (applies to SALE, REFUND and EXCHANGE scenarios, which all start with a booking)</span><span class="ps-arrow">▶</span></div>
@@ -1879,6 +1899,7 @@ function buildSalesFlowActionsSection(idx, sc) {
       <div style="padding:12px 14px">
         <div class="pill-group">${pills}</div>
         ${modePickerHtml}
+        ${accommodationPickerHtml}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),
@@ -5962,6 +5983,19 @@ document.body.addEventListener('click', function(e) {
       // treated as false for the toggle purpose and becomes true.
       sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
       el.classList.toggle('selected', sc.salesFlowActions[key]);
+      markDirty();
+      break;
+    }
+    case 'set-accommodation-selection': {
+      // #373: single-select accommodation family (Seat/Couchette/Berth);
+      // '' (— any —) clears the field → current default behaviour.
+      e.stopPropagation();
+      const accIdx = parseInt(el.dataset.idx);
+      const accSc = state.scenarios[accIdx];
+      if (!accSc) break;
+      accSc.accommodationSelection = el.dataset.val || null;
+      const accGrp = el.parentElement;
+      if (accGrp) accGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
       markDirty();
       break;
     }
