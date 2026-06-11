@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.131] — 2026-06-11
+
+**Booking placeSelections for IRT/NJ mandatory-reservation offers (#371,
+OBB requirement).**
+
+### Added
+
+- The booking request now states **which compartment is booked**: at offer
+  selection, the chosen `reservationOfferPart`'s real accommodation
+  (`accommodationType`/`accommodationSubType` from `availablePlaces`, e.g.
+  COUCHETTE / COUCHETTE_COMFORT_4) is persisted and emitted in
+  `placeSelections[].accommodations` with the booking passenger refs — no
+  fabricated `placeProperties`. BERTH and seat scenarios are covered, not
+  just the legacy COUCHETTE path.
+- `tripLegCoverage` now prefers the **offer's `tripCoverage`** (object or
+  array, per the OBB spec) over the per-place `tripLegCoverage`, which
+  stays as the fallback.
+- Back-compat gates: the legacy hardcoded COUCHETTE shape (ANY_SEAT +
+  placeProperties) is kept when the offer carries no availablePlaces
+  detail; scenarios without accommodation/place selection are
+  wire-identical. `selectedAccommodation` added to both env delete-lists.
+
+---
+
 ## [server-v1.11.130] — 2026-06-11
 
 **Offer-probe follow-up (#369).**

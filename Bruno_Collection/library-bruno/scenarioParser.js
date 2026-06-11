@@ -63,6 +63,7 @@ function resetScenarioEnvVars() {
     // Scenario / trip
     "scenario_override",
     "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
+    "selectedAccommodation",
     "requestedInformationProbe", "requestedInfoAutoFed", "requestedInfoProbeTargets",
     "__passengerSweepIndex", "__passengerSweepTotal", "__passengerSweepTarget",
     "expiredBookingTest", "__expiredBookingArmed", "expiredBookingMaxWaitMinutes",

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.158",
+  "current_release": "2026.159",
   "releases": [
+    {
+      "release": "2026.159",
+      "date": "2026-06-11",
+      "server": "1.11.131",
+      "collection": "OTST_V2.0.74",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        ["Booking placeSelections for IRT/NJ mandatory-reservation offers (#371, OBB requirement relayed by the Test Manager). OBB returns one offer per bookable compartment (1 ReservationOfferPart each) and validates that the booking request states the compartment via placeSelections: reservationId = reservationOfferParts[].id; accommodations[].accommodationType/SubType from reservationOfferParts[].availablePlaces (e.g. COUCHETTE/COUCHETTE_COMFORT_4) with the booking passengerRefs; tripLegCoverage from offer.tripCoverage. Implementation reuses the existing place-selection pipeline: offers.js persists the selected part's real accommodation (selectedAccommodation env) on BOTH the seat and couchette/berth branches and getTripLegCoverage/the seat branch now prefer offer.tripCoverage (object or array) over per-place tripLegCoverage (kept as fallback); requestsBuilder.accommodationAndPlaceSelection emits the real accommodations when selectedAccommodation is present (gate extended so BERTH/IRT produce placeSelections), keeps the legacy hardcoded COUCHETTE shape (ANY_SEAT + placeProperties[MEN]) when the offer carries no availablePlaces detail, and stays wire-identical ([]) for scenarios without accommodation/place selection. selectedAccommodation added to both env delete-lists (scenarioParser + opencollection)."],
+        "Verification: harness drives the REAL extracted functions with OBB's example bookingRequest values — the built placeSelections deep-equals the example shape (reservationId Qtr7M_..., COUCHETTE/COUCHETTE_COMFORT_4 with passengerRefs ['0'], tripLegCoverage tripId/legId, no placeProperties); offer.tripCoverage preferred with per-place fallback intact (object + array forms, junk filtered); legacy COUCHETTE shape byte-identical without selectedAccommodation; BERTH now covered; no-selection scenarios emit []. node --check x3; eslint + inline-script lint green. Server 1.11.130 -> 1.11.131; Bruno_Collection/VERSION OTST_V2.0.73 -> OTST_V2.0.74."
+      ]
+    },
     {
       "release": "2026.158",
       "date": "2026-06-11",
