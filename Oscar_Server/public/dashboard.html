@@ -620,8 +620,8 @@ async function confirmDelete() {
     loadRuns();
   }
   if (data.skipped && data.skipped.length) {
-    alert(`${data.skipped.length} run(s) could not be flagged:\n` +
-      data.skipped.map(s => `- ${s.id.slice(0,8)}: ${s.reason}`).join('\n'));
+    oscarToast(`${data.skipped.length} run(s) could not be flagged:\n` +
+      data.skipped.map(s => `- ${s.id.slice(0,8)}: ${s.reason}`).join('\n'), 'warning');
   }
 }
 
@@ -689,7 +689,7 @@ async function toggleShare(runId, share) {
     if (res.status === 401) { logout(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
+      oscarToast(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
       return;
     }
     const data    = await res.json().catch(() => ({}));
@@ -710,7 +710,7 @@ async function toggleShare(runId, share) {
       await loadRuns();        // fallback: model out of sync
     }
   } catch (e) {
-    alert('Network error while updating sharing: ' + e.message);
+    oscarToast('Network error while updating sharing: ' + e.message, 'error');
   }
 }
 document.getElementById('runs-list').addEventListener('change', function(e) {
@@ -779,14 +779,14 @@ async function emergencyStopAll() {
     if (res.status === 401) { logout(); return; }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(`Emergency stop failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`);
+      oscarToast(`Emergency stop failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
       return;
     }
-    alert(`Emergency stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`);
+    oscarToast(`Emergency stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`, 'success');
     pollQueueInfo();
     loadRuns();
   } catch (e) {
-    alert('Network error during emergency stop: ' + e.message);
+    oscarToast('Network error during emergency stop: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = label;

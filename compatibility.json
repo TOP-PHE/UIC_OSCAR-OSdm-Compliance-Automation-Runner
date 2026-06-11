@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.154",
+  "current_release": "2026.155",
   "releases": [
+    {
+      "release": "2026.155",
+      "date": "2026-06-11",
+      "server": "1.11.127",
+      "collection": "OTST_V2.0.73",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Run-setup UX round (#363) — three Test Manager findings on 2026.154. (1) Departure day per trip: wizard select next to Trip Type — Auto (default, today + departureDateFromToday lead time, unchanged) or Monday…Sunday for trains that only run certain days; the parser keeps the lead time (aftersales buffer) and advances 0–6 days to the next matching weekday (resolveTripDateForWeekday, noon-anchored against DST), one '[INFO] 📅 Departure day …' line states the resolved date; applies to SEARCH trips and SPECIFICATION legs (one date per trip); weekday chosen over a hard-coded calendar date per the Test Manager's own rationale (a weekday stays valid forever, a date expires). (2) Placeholder-vs-value confusion: wizard-wide ::placeholder styling (lighter + italic, scenarios.css) + automatic 'e.g. ' prefix on trip-field proposals. (3) All 27 native alert() popups (run.html, dashboard.html, run-detail.html, scenarios.js) replaced by in-page toasts rendered inside the OSCAR UI (top-centre under the nav, auto-dismiss 7s / errors 12s, dismissable, info/success/warning/error styling; oscarToast/oscarToastAfterNav in nav.js; submit→redirect messages survive navigation via sessionStorage shown on the next page; confirm() decision dialogs stay native).",
+        "Verification: Node harness over the real resolveTripDateForWeekday (7 cases: Wed→Sat +3, same-day no shift, week wrap + case-insensitive, Auto/null/unknown → base unchanged, month rollover, INFO line content); zero bare alert( left in the four files; node --check on scenarioParser.js/scenarios.js/nav.js; eslint + inline-script lint green. Server 1.11.126 -> 1.11.127; Bruno_Collection/VERSION OTST_V2.0.72 -> OTST_V2.0.73. Wire format unchanged (departure date string only moves to a different valid day when a weekday is chosen)."
+      ]
+    },
     {
       "release": "2026.154",
       "date": "2026-06-10",

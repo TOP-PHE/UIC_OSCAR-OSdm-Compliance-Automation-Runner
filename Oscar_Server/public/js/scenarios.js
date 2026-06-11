@@ -616,12 +616,12 @@ async function saveFrameworkFromSection() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Failed to save framework: ${err.detail || err.title || res.status}`);
+      oscarToast(`Failed to save framework: ${err.detail || err.title || res.status}`, 'error');
       return;
     }
     showMsg('✅ Test Framework saved successfully.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Network error: ${e.message}`); }
+  } catch(e) { oscarToast(`Network error: ${e.message}`, 'error'); }
 }
 
 // ── Delete functions ─────────────────────────────────────────────────────────
@@ -651,7 +651,7 @@ async function deleteFramework() {
     state = null;
     showMsg('✅ Test Framework and all associated data deleted.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 2b) Delete ALL test data → deletes all resources + all scenarios/datafile
@@ -677,7 +677,7 @@ async function deleteAllTestData() {
     state = null;
     showMsg('✅ All test data and scenarios deleted.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 2a) Delete a single train resource → warn about impacted scenarios
@@ -747,7 +747,7 @@ async function deleteTrainResource(resourceId) {
     const bodyData = document.getElementById('body-data');
     const toggleData = document.getElementById('toggle-data');
     if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); renderWizardStep2InSection(); }
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 1) Delete a single scenario
@@ -786,7 +786,7 @@ async function deleteAllScenarios() {
     state = null;
     showMsg(`✅ All ${count} scenario(s) deleted.`, true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // ── Section 2: Test Data (Resources) ─────────────────────────────────────────
@@ -2015,7 +2015,21 @@ function buildTripSection(idx, sc, trip) {
       data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="tripType">
       ${ENUMS.tripType.map(t => `<option value="${t}" ${trip.tripType===t?'selected':''}>${lbl(t)}</option>`).join('')}
     </select>
+  </div>
+  ${(() => {
+    // #363: per-trip departure DAY for trains that only run on certain days.
+    // Auto (default) keeps today's rule (today + lead time); a weekday keeps
+    // the lead time and advances to the next matching date at run time.
+    const days = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    return `
+  <div class="param-field">
+    <span class="param-label">Departure day <span class="param-hint">Auto: today + lead time (departureDateFromToday). Pick a weekday for trains that only run some days — the lead time is kept and the date advances to the next matching day at run time</span></span>
+    <select class="param-input param-select"
+      data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="departureDay">
+      ${days.map(d => `<option value="${d}" ${String(trip.departureDay || '') === d ? 'selected' : ''}>${d ? d.charAt(0) + d.slice(1).toLowerCase() : 'Auto (default)'}</option>`).join('')}
+    </select>
   </div>`;
+  })()}`;
 
   // Apply-a-Journey picker (#137) — fills all legs from a saved journey.
   const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
@@ -2070,12 +2084,19 @@ function buildTripSection(idx, sc, trip) {
 }
 
 // Time field: strips %TRIP_DATE%T for display, re-adds on save
+// #363: placeholders are PROPOSALS — prefix them so they can never be read
+// as filled values (the CSS also renders them lighter + italic).
+function egPlaceholder(placeholder) {
+  const p = String(placeholder || '');
+  return p && !/^e\.g\. /.test(p) ? 'e.g. ' + p : p;
+}
+
 function buildTripTimeField(tIdx, path, label, val, placeholder) {
   const displayVal = (val || '').replace(/%TRIP_DATE%T/g, '');
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
-    <input class="param-input" type="text" value="${esc(displayVal)}" placeholder="${esc(placeholder||'')}"
+    <input class="param-input" type="text" value="${esc(displayVal)}" placeholder="${esc(egPlaceholder(placeholder))}"
       data-action="set-trip-time" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
@@ -2084,7 +2105,7 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
-    <input class="param-input" type="text" value="${esc(val||'')}" placeholder="${esc(placeholder||'')}"
+    <input class="param-input" type="text" value="${esc(val||'')}" placeholder="${esc(egPlaceholder(placeholder))}"
       data-action="set-trip-path" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
@@ -4002,7 +4023,7 @@ async function wizSaveTrain(tidx, opts = {}) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Failed to save train: ${err.detail || err.title || res.status}`);
+      oscarToast(`Failed to save train: ${err.detail || err.title || res.status}`, 'error');
       return;
     }
     const saved = await res.json();
@@ -4028,7 +4049,7 @@ async function wizSaveTrain(tidx, opts = {}) {
     renderWizardStep2InSection();
     reopenTrainById(saved.id);
     return saved;
-  } catch(e) { alert(`Network error: ${e.message}`); return null; }
+  } catch(e) { oscarToast(`Network error: ${e.message}`, 'error'); return null; }
 }
 
 // Re-open a train's detail panel by resource id after a list re-render.
@@ -4582,7 +4603,7 @@ async function wizSaveJourney(jidx) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Failed to save journey: ${err.detail || err.title || res.status}`);
+      oscarToast(`Failed to save journey: ${err.detail || err.title || res.status}`, 'error');
       return;
     }
     const saved = await res.json();
@@ -4593,7 +4614,7 @@ async function wizSaveJourney(jidx) {
     renderTestDataSection(wizData.framework, wizData.resources);
     renderWizardStep2InSection();
     reopenJourneyById(saved.id);
-  } catch (e) { alert(`Network error: ${e.message}`); }
+  } catch (e) { oscarToast(`Network error: ${e.message}`, 'error'); }
 }
 
 // Re-open a journey's detail panel by resource id after a list re-render.
@@ -4626,10 +4647,10 @@ async function wizDeleteJourney(id) {
   if (!confirm(`Delete journey "${j.label || id}"?`)) return;
   try {
     const res = await fetch(`/v1/company/test-resources/${id}`, { method: 'DELETE' });
-    if (!res.ok) { alert(`Failed to delete journey: ${res.status}`); return; }
+    if (!res.ok) { oscarToast(`Failed to delete journey: ${res.status}`, 'error'); return; }
     wizData.resources = wizData.resources.filter(r => r !== j);
     await refreshAllSections();
-  } catch (e) { alert(`Network error: ${e.message}`); }
+  } catch (e) { oscarToast(`Network error: ${e.message}`, 'error'); }
 }
 
 // ── Wizard navigation (now section-local) ─────────────────────────────────────
@@ -5327,9 +5348,9 @@ async function wizGenerateScenario() {
   const sc = wizScenario;
   const fw = wizData.framework || emptyFramework();
 
-  if (!sc.type) { alert('Please select a scenario type.'); return; }
+  if (!sc.type) { oscarToast('Please select a scenario type.', 'warning'); return; }
   const totalPax = Object.values(sc.passengers || {}).reduce((s, n) => s + n, 0);
-  if (totalPax === 0) { alert('Please add at least one passenger.'); return; }
+  if (totalPax === 0) { oscarToast('Please add at least one passenger.', 'warning'); return; }
 
   const btn      = document.getElementById('s3-gen-btn');
   const statusEl = document.getElementById('s3-gen-status');
@@ -6122,7 +6143,7 @@ document.body.addEventListener('change', function(e) {
       // in scenariosToRun and in the data file's code index.
       const dup = state.scenarios.some((x, i) => i !== sci && x.code === normalised);
       if (dup) {
-        alert('Another scenario already uses the code "' + normalised + '". Pick a different one.');
+        oscarToast('Another scenario already uses the code "' + normalised + '". Pick a different one.', 'warning');
         el.value = origCode;
         break;
       }
