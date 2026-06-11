@@ -3613,6 +3613,7 @@ function renderWizardStep2() {
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-train">➕ Add Train</button>
         ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
+        <button class="btn btn-secondary btn-sm" data-action="wiz-reprobe-offers" title="Re-run the anonymous-adult offer probe for every route of the train list and refresh the availability warnings (#369)">&#128260; Re-probe offers</button>
         <button class="btn btn-secondary btn-sm" data-action="wiz-discover-timetable" title="Scan the sandbox timetable for an origin/destination and auto-create the train sets it actually runs">🔍 Discover timetable</button>
       </div>
     </div>
@@ -6075,6 +6076,23 @@ document.body.addEventListener('click', function(e) {
       wizSaveAllTrains(); break;
     case 'wiz-discover-timetable':
       openTimetableDiscovery(); break;
+    case 'wiz-reprobe-offers': {
+      // #369: manual refresh of the per-route offer-availability findings.
+      el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
+      (async () => {
+        try {
+          const r = await fetch('/v1/company/test-resources/reprobe-offers', { method: 'POST' });
+          const b = await r.json().catch(() => ({}));
+          if (!r.ok) { oscarToast(`Re-probe failed: ${b.detail || b.title || ('HTTP ' + r.status)}`, 'error'); return; }
+          const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
+          oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
+          await refreshAllSections();
+        } catch (e2) {
+          oscarToast('Re-probe network error: ' + e2.message, 'error');
+        } finally { el.disabled = false; el.textContent = _oldTxt; }
+      })();
+      break;
+    }
     case 'tt-discover-run':
       runTimetableDiscovery(); break;
     case 'tt-discover-close':

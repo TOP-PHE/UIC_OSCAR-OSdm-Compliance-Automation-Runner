@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.130] — 2026-06-11
+
+**Offer-probe follow-up (#369).**
+
+### Added
+
+- **🔄 Re-probe offers** button in the Test Data step: re-runs the
+  anonymous-adult offer probe (3 dates) for every distinct O&D across the
+  TRAIN resources and refreshes `data.offerProbe` on the affected sets —
+  no timetable harvest, no other train changes. Toast summarises routes
+  probed / sets updated / findings. Manual for now; automation later.
+
+### Fixed
+
+- **Ancillary catalog could be seeded with the offer-part discriminator.**
+  `_collectAncillaries` preferred `AncillaryOfferPart.type` — which carries
+  the discriminator (providers send `AncillaryOfferPart`) — over `category`
+  (the actual kind, e.g. BICYCLE/MEAL). Now category-first, and
+  discriminator-shaped `type` values are never collected. travelClass /
+  serviceClass collection audited clean (ServiceClass objects correctly
+  yield their `type` enum). Findings builder factored into the service
+  (`summarizeOfferProbe`) and shared by discovery + re-probe.
+
+---
+
 ## [server-v1.11.129] — 2026-06-11
 
 ### Added
