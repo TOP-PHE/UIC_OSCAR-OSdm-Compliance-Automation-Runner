@@ -234,12 +234,13 @@ function _collectAncillaries(node, out, depth) {
   if (Array.isArray(node.ancillaryOfferParts)) {
     for (const a of node.ancillaryOfferParts) {
       if (a && typeof a === 'object') {
-        // #369: 'type' on an AncillaryOfferPart is the offer-part
-        // DISCRIMINATOR (providers send 'AncillaryOfferPart'); the ancillary
-        // KIND lives in 'category'. Prefer category; never seed the catalog
-        // with a discriminator literal.
-        const v = (typeof a.category === 'string' && a.category) ? a.category
-          : (typeof a.type === 'string' && a.type && !/offerpart$/i.test(a.type) ? a.type : '');
+        // #369: per spec, 'type' is the AncillaryType ENUM (FOOD_ON_BOARD,
+        // WIFI, ...) and 'category' a free-text label ('Meal'). Keep
+        // type-first, but never seed the catalog with a discriminator-shaped
+        // value (some providers echo the objectType there) - fall back to
+        // category in that case.
+        const tv = (typeof a.type === 'string' && a.type && !/offerpart$/i.test(a.type)) ? a.type : '';
+        const v = tv || (typeof a.category === 'string' ? a.category : '');
         if (v) out.add(v);
       }
     }
