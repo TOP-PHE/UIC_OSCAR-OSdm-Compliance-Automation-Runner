@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.156",
+  "current_release": "2026.157",
   "releases": [
+    {
+      "release": "2026.157",
+      "date": "2026-06-11",
+      "server": "1.11.129",
+      "collection": "OTST_V2.0.73",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Timetable Discovery offer probe (#365) — a discovered route does not guarantee offers. classifyOfferProbe (timetable-discovery service) classifies each offers response the discovery already receives (anonymous 1-adult): no offers (with the provider warnings/problems echo when present), travel classes seen, flexibilities seen. The discovery route aggregates across probed days and persists data.offerProbe {probedAt, daysProbed, daysWithOffers, classes, flexibilities, findings[]} on EVERY train set of the searched O&D (created and updated), and returns it in the response. Findings: 'No offer for an anonymous adult on any of the N probed day(s)' / 'Offers only in SECOND class (no FIRST)' / 'Offers only NON-FLEXIBLE (Desired Flexibility will not match)' / 'Offers on X of Y probed day(s)'. Wizard Test Data step: collapsible warnings panel above the train list (count + per-train findings + probe date) and a per-train warning chip with hover details, read from RAW resource data (normalizeTrainData strips unknown members). trips-collection responses (no offers[]) are not counted as probed days; findings refresh on the next Discover timetable of the route. Note: manually re-saving a train from the editor drops offerProbe until the next discovery — acceptable v1, findings are advisory.",
+        "Verification: classifyOfferProbe harness (trips-collection → null; empty offers without explanation; empty offers with problem echo; classes/flex dedup + uppercase across offerSummary and flat fields); node --check on service/route/scenarios.js; eslint + inline-script lint green. Server 1.11.128 -> 1.11.129; collection unchanged (OTST_V2.0.73). No change to the discovery wire calls — the probe reuses the responses already fetched."
+      ]
+    },
     {
       "release": "2026.156",
       "date": "2026-06-11",
