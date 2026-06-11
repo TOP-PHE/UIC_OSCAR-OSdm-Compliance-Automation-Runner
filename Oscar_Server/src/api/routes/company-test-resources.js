@@ -23,7 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -362,37 +362,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   };
   const { toCreate, toUpdate, summary } = groupAndMerge(harvested, existing, catalog);
 
-  // #365: route-level offer-availability findings - persisted on EVERY train
-  // set of this O&D so the wizard can warn before a run is launched.
-  const findings = [];
-  if (probe.daysProbed > 0) {
-    if (probe.daysWithOffers === 0) {
-      const echoed = probe.noOffer.find(x => /provider says/.test(x.finding));
-      findings.push('No offer for an anonymous adult on any of the ' + probe.daysProbed + ' probed day(s)' +
-        (echoed ? ' - ' + echoed.finding : ' - trip(s) found but offers[] stayed empty, no warning/problem explains why'));
-    } else {
-      const cls = [...probe.classes];
-      if (cls.length > 0 && cls.includes('SECOND') && !cls.includes('FIRST')) {
-        findings.push('Offers only in SECOND class (no FIRST offered to an anonymous adult)');
-      }
-      const fl = [...probe.flex];
-      if (fl.length > 0 && fl.every(f => /NON_?FLEX/i.test(f))) {
-        findings.push('Offers only NON-FLEXIBLE (no flexible tier - scenarios selecting by Desired Flexibility will not match)');
-      }
-      if (probe.daysWithOffers < probe.daysProbed) {
-        findings.push('Offers on ' + probe.daysWithOffers + ' of ' + probe.daysProbed + ' probed day(s) (none on: ' +
-          probe.noOffer.map(x => x.date).join(', ') + ')');
-      }
-    }
-  }
-  const offerProbe = probe.daysProbed > 0 ? {
-    probedAt: new Date().toISOString(),
-    daysProbed: probe.daysProbed,
-    daysWithOffers: probe.daysWithOffers,
-    classes: [...probe.classes],
-    flexibilities: [...probe.flex],
-    findings
-  } : null;
+  // #365/#369: route-level offer-availability findings (shared builder).
+  const offerProbe = summarizeOfferProbe(probe);
   if (offerProbe) {
     toCreate.forEach(c => { c.data.offerProbe = offerProbe; });
     toUpdate.forEach(u => { u.data.offerProbe = offerProbe; });
@@ -418,6 +389,89 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
   log.info({ companyId: targetCompanyId, origin, destination, days, ...summary }, 'Timetable discovery completed');
   return res.json({ summary, created, updated, dayResults, offerProbe });
+});
+
+// ── POST /v1/company/test-resources/reprobe-offers (#369) ────────────────────
+// Manual refresh of the offer-availability findings: for every DISTINCT O&D
+// across the existing TRAIN resources, re-run the anonymous-adult offer probe
+// (3 dates) and update data.offerProbe on the affected sets. No timetable
+// harvest, no train create/update besides the probe member.
+router.post('/test-resources/reprobe-offers', async (req, res) => {
+  if (!requireTestManager(req, res)) return;
+  const targetCompanyId = resolveCompanyScope(req, res);
+  if (targetCompanyId === null) return;
+
+  const company = get('SELECT id, slug, api_base FROM companies WHERE id = ?', [targetCompanyId]);
+  if (!company || !company.api_base) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
+  }
+  const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!userRow) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
+  let token;
+  try {
+    token = await resolveAccessToken(userRow, { info: (m) => log.debug(m), error: (m) => log.warn(m) });
+  } catch (err) {
+    return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
+  }
+  const extraHeaders = {};
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+
+  const rows = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']);
+  const trains = rows.map(r => {
+    let data = {};
+    try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
+    return { id: r.id, label: r.label, data };
+  }).filter(t => t.data && t.data.originURN && t.data.destinationURN);
+  if (!trains.length) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No TRAIN resources with an origin/destination to probe.' });
+  }
+
+  const byOd = new Map();
+  for (const t of trains) {
+    const key = t.data.originURN + '>' + t.data.destinationURN;
+    if (!byOd.has(key)) byOd.set(key, { origin: t.data.originURN, destination: t.data.destinationURN, trains: [] });
+    byOd.get(key).trains.push(t);
+  }
+
+  const routes = [];
+  let updatedCount = 0;
+  for (const od of byOd.values()) {
+    const probe = { daysProbed: 0, daysWithOffers: 0, classes: new Set(), flex: new Set(), noOffer: [] };
+    for (const date of searchDates(3, new Date())) {
+      let r2;
+      try {
+        r2 = await _postJson(company.api_base, 'offers', token, _discoveryBody('offers', date, od.origin, od.destination, company.api_base), extraHeaders);
+      } catch (_err) { continue; }
+      if (!r2.ok) continue;
+      const pc = classifyOfferProbe(r2.json);
+      if (!pc) continue;
+      probe.daysProbed++;
+      if (pc.offers > 0) {
+        probe.daysWithOffers++;
+        pc.classes.forEach(c => probe.classes.add(c));
+        pc.flexibilities.forEach(f => probe.flex.add(f));
+      } else {
+        probe.noOffer.push({ date, finding: pc.finding });
+      }
+    }
+    const offerProbe = summarizeOfferProbe(probe);
+    if (offerProbe) {
+      for (const t of od.trains) {
+        t.data.offerProbe = offerProbe;
+        run(`UPDATE test_resources SET data = ?, updated_at = datetime('now') WHERE id = ? AND company_id = ?`,
+          [colEncrypt(JSON.stringify(t.data)), t.id, targetCompanyId]);
+        updatedCount++;
+      }
+    }
+    routes.push({
+      origin: od.origin, destination: od.destination, trains: od.trains.length,
+      probed: !!offerProbe, findings: offerProbe ? offerProbe.findings : ['probe got no usable offers response']
+    });
+  }
+
+  log.info({ companyId: targetCompanyId, routes: routes.length, updatedCount }, 'Offer re-probe completed');
+  return res.json({ routes, updated: updatedCount });
 });
 
 module.exports = router;

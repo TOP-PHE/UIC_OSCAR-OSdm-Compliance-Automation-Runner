@@ -234,8 +234,13 @@ function _collectAncillaries(node, out, depth) {
   if (Array.isArray(node.ancillaryOfferParts)) {
     for (const a of node.ancillaryOfferParts) {
       if (a && typeof a === 'object') {
-        const v = (typeof a.type === 'string' && a.type) ? a.type
-          : (typeof a.category === 'string' ? a.category : '');
+        // #369: per spec, 'type' is the AncillaryType ENUM (FOOD_ON_BOARD,
+        // WIFI, ...) and 'category' a free-text label ('Meal'). Keep
+        // type-first, but never seed the catalog with a discriminator-shaped
+        // value (some providers echo the objectType there) - fall back to
+        // category in that case.
+        const tv = (typeof a.type === 'string' && a.type && !/offerpart$/i.test(a.type)) ? a.type : '';
+        const v = tv || (typeof a.category === 'string' ? a.category : '');
         if (v) out.add(v);
       }
     }
@@ -266,6 +271,40 @@ function harvestOfferCatalog(resp) {
     _collectAncillaries(o, anc, 0);
   }
   return { travelClasses: [...tc], serviceClasses: [...sc], ancillaries: [...anc] };
+}
+
+// #369: turn a probe accumulator { daysProbed, daysWithOffers, classes:Set,
+// flex:Set, noOffer:[{date,finding}] } into the persisted offerProbe object
+// (null when nothing was probed). Shared by discovery and re-probe.
+function summarizeOfferProbe(probe) {
+  if (!probe || probe.daysProbed <= 0) return null;
+  const findings = [];
+  if (probe.daysWithOffers === 0) {
+    const echoed = probe.noOffer.find(x => /provider says/.test(x.finding));
+    findings.push('No offer for an anonymous adult on any of the ' + probe.daysProbed + ' probed day(s)' +
+      (echoed ? ' - ' + echoed.finding : ' - trip(s) found but offers[] stayed empty, no warning/problem explains why'));
+  } else {
+    const cls = [...probe.classes];
+    if (cls.length > 0 && cls.includes('SECOND') && !cls.includes('FIRST')) {
+      findings.push('Offers only in SECOND class (no FIRST offered to an anonymous adult)');
+    }
+    const fl = [...probe.flex];
+    if (fl.length > 0 && fl.every(f => /NON_?FLEX/i.test(f))) {
+      findings.push('Offers only NON-FLEXIBLE (no flexible tier - scenarios selecting by Desired Flexibility will not match)');
+    }
+    if (probe.daysWithOffers < probe.daysProbed) {
+      findings.push('Offers on ' + probe.daysWithOffers + ' of ' + probe.daysProbed + ' probed day(s) (none on: ' +
+        probe.noOffer.map(x => x.date).join(', ') + ')');
+    }
+  }
+  return {
+    probedAt: new Date().toISOString(),
+    daysProbed: probe.daysProbed,
+    daysWithOffers: probe.daysWithOffers,
+    classes: [...probe.classes],
+    flexibilities: [...probe.flex],
+    findings
+  };
 }
 
 // #365: classify ONE offers response for route-level availability findings -
@@ -495,6 +534,7 @@ function groupAndMerge(harvested, existing, catalog) {
 
 module.exports = {
   classifyOfferProbe,
+  summarizeOfferProbe,
   dayOfWeekCode,
   timePartOf,
   searchDates,
