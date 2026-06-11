@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.129] — 2026-06-11
+
+### Added
+
+- **Timetable Discovery offer probe (#365).** A discovered route does not
+  guarantee offers — the discovery now classifies the offer responses it
+  already receives (anonymous 1-adult) and persists per-route
+  **offer-availability findings** on every train set of the searched O&D:
+  *no offer on any probed day* (with the provider's warning/problem echo
+  when given), *offers only in SECOND class*, *offers only NON-FLEXIBLE*,
+  *offers on X of Y probed days*. The wizard's Test Data step shows a
+  **⚠ warnings panel** above the train list (click to expand the per-train
+  findings) and a ⚠ chip on each affected train row (hover for details).
+  Findings refresh on the next discovery of the route; trips-collection
+  responses (no offers[]) are not counted as probed days.
 ## [server-v1.11.128] — 2026-06-11
 
 ### Fixed
