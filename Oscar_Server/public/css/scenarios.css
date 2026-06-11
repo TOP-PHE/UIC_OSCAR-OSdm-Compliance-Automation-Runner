@@ -115,6 +115,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .param-label .param-hint{font-weight:400;text-transform:none;font-size:10px;color:#b0bec5;margin-left:4px;letter-spacing:0}
 .param-input{padding:7px 9px;border:1px solid #cfd8dc;border-radius:5px;font-size:12px;background:#fff;color:#1a2e40;width:100%}
 .param-input:focus{outline:none;border-color:#0090D4}
+/* #363: proposals must not read as values — placeholders are clearly
+   lighter and italic (the builders also prefix them with "e.g. "). */
+.param-input::placeholder{color:#c5cfd8;font-style:italic;opacity:1}
 .param-select{appearance:auto}
 
 /* ── Multi-checkbox groups ──────────────────────────────────────────────── */

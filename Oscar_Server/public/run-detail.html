@@ -424,13 +424,13 @@ async function shareRunWithCertifier(share) {
     if (res.status === 401) { logout(); return; }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(`Action failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`);
+      oscarToast(`Action failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
       return;
     }
     // Reload the page to refresh the share button + the run banner.
     location.reload();
   } catch (err) {
-    alert(`Network error: ${err.message || err}`);
+    oscarToast(`Network error: ${err.message || err}`, 'error');
   }
 }
 
@@ -659,7 +659,7 @@ async function downloadArtifact(artifactId, filename) {
     if (res.status === 401) { logout(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
+      oscarToast(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
       return;
     }
     const blob = await res.blob();
@@ -672,7 +672,7 @@ async function downloadArtifact(artifactId, filename) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   } catch (e) {
-    alert('Network error during download: ' + e.message);
+    oscarToast('Network error during download: ' + e.message, 'error');
   }
 }
 
@@ -693,7 +693,7 @@ async function deleteRun() {
     window.location.href = '/dashboard.html';
   } else {
     const err = await res.json();
-    alert(err.detail || 'Could not delete run.');
+    oscarToast(err.detail || 'Could not delete run.', 'error');
   }
 }
 

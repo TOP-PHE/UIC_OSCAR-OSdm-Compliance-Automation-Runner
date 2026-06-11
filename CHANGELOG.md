@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.127] — 2026-06-11
+
+**Run-setup UX round (#363)** — three Test Manager findings while
+setting up OBB runs.
+
+### Added
+
+- **Departure day per trip** (wizard, next to Trip Type): **Auto**
+  (default — today + `departureDateFromToday` lead time, unchanged) or
+  **Monday…Sunday** for trains that only run on certain days. The
+  parser keeps the lead time (the aftersales buffer) and advances 0–6
+  days to the next date matching the chosen weekday — one
+  `[INFO] 📅 Departure day SATURDAY → 2026-06-27 (… lead time
+  preserved)` line states the resolved date. Applies to SEARCH trips
+  and SPECIFICATION legs alike (one date per trip, as before). Chosen
+  over a hard-coded calendar date per the Test Manager's own rationale:
+  a weekday stays valid forever, a date expires.
+
+### Changed
+
+- **Placeholders can no longer be mistaken for values**: wizard-wide
+  `::placeholder` styling (lighter + italic) and an automatic "e.g. "
+  prefix on the trip-field proposals.
+- **Native `alert()` popups replaced by in-page toasts** (27 call
+  sites: run.html, dashboard.html, run-detail.html, scenarios.js).
+  Toasts render inside the OSCAR UI — top-centre under the nav —
+  auto-dismiss (errors stay 12 s), can be closed, and are styled by
+  kind (info/success/warning/error). Messages followed by a navigation
+  (batch submitted → dashboard) survive via a sessionStorage hand-off
+  shown on the next page. `confirm()` decision dialogs stay native.
+
+---
+
 ## [server-v1.11.126] — 2026-06-10
 
 **Step-failure policy (#361)** — tester finding on an OBB run: a failed

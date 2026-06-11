@@ -223,6 +223,24 @@ function subTripDate(value, replacement, fieldLabel, ctx) {
   return value.replace("%TRIP_DATE%", replacement);
 }
 
+// #363: optional per-trip departure DAY (weekend-only trains). Keeps the
+// configured lead time (today + departureDateFromToday — the aftersales
+// buffer), then advances 0–6 days to the NEXT date matching the requested
+// weekday. Empty / unknown value → base date unchanged (Auto, the default).
+function resolveTripDateForWeekday(baseIso, departureDay) {
+  const _days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+  const want = _days.indexOf(String(departureDay || '').trim().toUpperCase());
+  if (want < 0) return baseIso;
+  const d = new Date(baseIso + 'T12:00:00'); // noon — immune to DST edges
+  const shift = (want - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + shift);
+  const pad = n => String(n).padStart(2, '0');
+  const out = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  validationLogger('[INFO] 📅 Departure day ' + _days[want] + ' → ' + out +
+    (shift > 0 ? ' (base ' + baseIso + ' advanced ' + shift + ' day(s), lead time preserved)' : ' (base date already matches)'));
+  return out;
+}
+
 // Helper: GET JSON via Bruno's sendRequest
 function getJson(url) {
   // Normalize double-slashes in path (e.g. http://host//path → http://host/path)
@@ -831,12 +849,14 @@ function parseScenarioData(jsonData) {
             case "SPECIFICATION":
               validationLogger('[INFO] ⏳ processing a specification');
               const legDefinitions = [];
+              // #363: per-trip departure day (Auto when unset).
+              const _specTripDate = resolveTripDateForWeekday(nextWeekdayString, tripRequirement.departureDay);
 
               tripRequirement.legs.forEach(function (leg, legIndex) {
                 const legPrefix = `leg${legIndex + 1}`;
                 const _legCtx = `tripRequirement (SPECIFICATION) leg ${legIndex + 1}`;
-                const startDatetime = subTripDate(leg.startDatetime, nextWeekdayString, 'startDatetime', _legCtx);
-                const endDatetime = subTripDate(leg.endDatetime, nextWeekdayString, 'endDatetime', _legCtx);
+                const startDatetime = subTripDate(leg.startDatetime, _specTripDate, 'startDatetime', _legCtx);
+                const endDatetime = subTripDate(leg.endDatetime, _specTripDate, 'endDatetime', _legCtx);
 
                 bru.setEnvVar(`${legPrefix}StartStopPlaceRef`, leg.origin);
                 bru.setEnvVar(`${legPrefix}EndStopPlaceRef`, leg.destination);
@@ -867,7 +887,9 @@ function parseScenarioData(jsonData) {
 
             case "SEARCH":
               validationLogger('[INFO] ⏳ processing a search');
-              const _searchStart = subTripDate(tripRequirement.trip.startDatetime, nextWeekdayString, 'startDatetime', 'tripRequirement (SEARCH)');
+              // #363: per-trip departure day (Auto when unset).
+              const _searchTripDate = resolveTripDateForWeekday(nextWeekdayString, tripRequirement.departureDay);
+              const _searchStart = subTripDate(tripRequirement.trip.startDatetime, _searchTripDate, 'startDatetime', 'tripRequirement (SEARCH)');
               // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
               // per OSDM spec — you specify a departure time, not a window. And
               // osdmTripSearchCriteria() below doesn't use the endDateTime
@@ -878,7 +900,7 @@ function parseScenarioData(jsonData) {
               // both-required check (legs[*].endDatetime IS required when
               // you're specifying exact trips).
               const _searchEnd = tripRequirement.trip.endDatetime
-                ? subTripDate(tripRequirement.trip.endDatetime, nextWeekdayString, 'endDatetime', 'tripRequirement (SEARCH)')
+                ? subTripDate(tripRequirement.trip.endDatetime, _searchTripDate, 'endDatetime', 'tripRequirement (SEARCH)')
                 : null;
               bru.setEnvVar("tripStartStopPlaceRef", tripRequirement.trip.origin);
               bru.setEnvVar("tripEndStopPlaceRef", tripRequirement.trip.destination);

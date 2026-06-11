@@ -348,3 +348,59 @@
       });
   };
 })(window);
+
+// ── #363: in-page toasts ──────────────────────────────────────────────────────
+// Native alert() renders in the browser chrome at the very top of the window
+// and testers miss it. oscarToast() renders INSIDE the OSCAR UI — top-centre,
+// just under the nav — auto-dismisses (errors stay longer) and can be closed.
+// oscarToastAfterNav() hands the message over a page navigation via
+// sessionStorage (submit → redirect flows); nav.js shows it on the next page.
+function oscarToast(message, kind) {
+  try {
+    kind = kind || 'info';
+    let host = document.getElementById('oscar-toasts');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'oscar-toasts';
+      host.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:90vw';
+      document.body.appendChild(host);
+    }
+    const colors = { info: '#0090D4', success: '#2e7d32', error: '#c62828', warning: '#ef6c00' };
+    const icons  = { info: 'ℹ️', success: '✅', error: '⛔', warning: '⚠️' };
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;max-width:560px;background:#fff;border-left:4px solid ' + (colors[kind] || colors.info) +
+      ';box-shadow:0 4px 18px rgba(0,0,0,.28);border-radius:6px;padding:10px 14px;font:13px/1.45 system-ui,sans-serif;color:#263238;display:flex;gap:10px;align-items:flex-start;white-space:pre-wrap';
+    const ic = document.createElement('span');
+    ic.textContent = icons[kind] || icons.info;
+    const span = document.createElement('span');
+    span.textContent = String(message);
+    span.style.cssText = 'flex:1;word-break:break-word';
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.title = 'Dismiss';
+    x.style.cssText = 'background:none;border:none;cursor:pointer;color:#90a4ae;font-size:13px;line-height:1;padding:0';
+    x.onclick = function () { t.remove(); };
+    t.appendChild(ic); t.appendChild(span); t.appendChild(x);
+    host.appendChild(t);
+    setTimeout(function () { t.remove(); }, kind === 'error' || kind === 'warning' ? 12000 : 7000);
+  } catch (_e) {
+    try { alert(message); } catch (_a) { /* headless context */ }
+  }
+}
+function oscarToastAfterNav(message, kind) {
+  try { sessionStorage.setItem('oscar_toast_pending', JSON.stringify({ m: String(message), k: kind || 'info' })); }
+  catch (_e) { oscarToast(message, kind); }
+}
+(function () {
+  function showPending() {
+    try {
+      const raw = sessionStorage.getItem('oscar_toast_pending');
+      if (!raw) return;
+      sessionStorage.removeItem('oscar_toast_pending');
+      const p = JSON.parse(raw);
+      oscarToast(p.m, p.k);
+    } catch (_e) { /* no pending toast */ }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showPending);
+  else showPending();
+})();
