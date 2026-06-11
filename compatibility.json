@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.159",
+  "current_release": "2026.160",
   "releases": [
+    {
+      "release": "2026.160",
+      "date": "2026-06-11",
+      "server": "1.11.132",
+      "collection": "OTST_V2.0.74",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Wizard Accommodation type picker (#373) — Test Manager configuring a night-train scenario could not find WHERE to choose the reservation type: scenarioParser has always mapped scenario.accommodationSelection to the Bruno env (offer filtering by place family + the #371 booking placeSelections key on it) but the wizard never rendered a field for it, so the IRT/NJ compartment choice was only reachable via hand-edited datafiles. New single-select pill row in Booking Flow Actions next to the Seat-selection mode block (exactly where the tester looked): '— any —' (default, wire-identical) / Seat / Couchette / Berth, with explanatory tooltips. Deliberately NOT gated behind the framework's place-selection authorisation — for IRT/NJ the accommodation drives offer selection and the booking placeSelections even without the graphical seat map. Server display-only (scenarios.js); collection unchanged (OTST_V2.0.74).",
+        "Verification: node --check + eslint + inline-script lint green; pill handler mirrors the existing set-place-mode single-select pattern ('' clears the field to null → default behaviour); scenario field round-trips through the datafile to the existing scenarioParser mapping (no Bruno change needed)."
+      ]
+    },
     {
       "release": "2026.159",
       "date": "2026-06-11",

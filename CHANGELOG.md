@@ -14,6 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.132] — 2026-06-11
+
+### Added
+
+- **Wizard: Accommodation type picker (#373).** The Bruno side has always
+  read `scenario.accommodationSelection` (offer filtering by place family +
+  the #371 booking `placeSelections`), but the wizard never exposed it —
+  the IRT/NJ compartment choice was unreachable from the UI. New
+  single-select pill row in **Booking Flow Actions** (next to the
+  Seat-selection mode, where the tester looked for it): *— any —*
+  (default, behaviour unchanged) / 🪑 Seat / 🛏 Couchette / 🛌 Berth.
+  Deliberately NOT gated behind the framework place-selection
+  authorisation — the accommodation drives offer selection and the
+  booking placeSelections even without the graphical seat map.
+
+---
+
 ## [server-v1.11.131] — 2026-06-11
 
 **Booking placeSelections for IRT/NJ mandatory-reservation offers (#371,
