@@ -279,7 +279,7 @@ async function startRun() {
     return;
   }
 
-  alert('Batch submitted: ' + data.runs.length + ' scenarios queued (batch: ' + data.batch_id.slice(0, 8) + ')');
+  oscarToastAfterNav('Batch submitted: ' + data.runs.length + ' scenarios queued (batch: ' + data.batch_id.slice(0, 8) + ')', 'success');
   window.location.href = '/dashboard.html';
 }
 
