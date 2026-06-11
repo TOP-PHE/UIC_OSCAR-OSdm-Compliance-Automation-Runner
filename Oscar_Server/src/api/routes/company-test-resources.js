@@ -23,7 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates } = require('../../services/timetable-discovery');
+const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
 // Cap each round-trip. Discovery loops several days, so a hung sandbox must
@@ -271,6 +271,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   // Accumulate the offer "catalog" (travel/service classes + ancillaries the
   // sandbox actually offered) across days, to prefill Service Configuration.
   const cat = { travelClasses: new Set(), serviceClasses: new Set(), ancillaries: new Set() };
+  // #365: offer-availability probe accumulator (offers-endpoint days only).
+  const probe = { daysProbed: 0, daysWithOffers: 0, classes: new Set(), flex: new Set(), noOffer: [] };
   let preferred = null;   // endpoint that worked on a previous day
 
   for (const date of dates) {
@@ -318,6 +320,18 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
       oc.travelClasses.forEach(x => cat.travelClasses.add(x));
       oc.serviceClasses.forEach(x => cat.serviceClasses.add(x));
       oc.ancillaries.forEach(x => cat.ancillaries.add(x));
+      // #365: classify this day's offer availability (null on trips-collection).
+      const pc = classifyOfferProbe(dayJson);
+      if (pc) {
+        probe.daysProbed++;
+        if (pc.offers > 0) {
+          probe.daysWithOffers++;
+          pc.classes.forEach(c => probe.classes.add(c));
+          pc.flexibilities.forEach(f => probe.flex.add(f));
+        } else {
+          probe.noOffer.push({ date, finding: pc.finding });
+        }
+      }
       dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length });
     } else {
       dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, error: lastError });
@@ -348,6 +362,42 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   };
   const { toCreate, toUpdate, summary } = groupAndMerge(harvested, existing, catalog);
 
+  // #365: route-level offer-availability findings - persisted on EVERY train
+  // set of this O&D so the wizard can warn before a run is launched.
+  const findings = [];
+  if (probe.daysProbed > 0) {
+    if (probe.daysWithOffers === 0) {
+      const echoed = probe.noOffer.find(x => /provider says/.test(x.finding));
+      findings.push('No offer for an anonymous adult on any of the ' + probe.daysProbed + ' probed day(s)' +
+        (echoed ? ' - ' + echoed.finding : ' - trip(s) found but offers[] stayed empty, no warning/problem explains why'));
+    } else {
+      const cls = [...probe.classes];
+      if (cls.length > 0 && cls.includes('SECOND') && !cls.includes('FIRST')) {
+        findings.push('Offers only in SECOND class (no FIRST offered to an anonymous adult)');
+      }
+      const fl = [...probe.flex];
+      if (fl.length > 0 && fl.every(f => /NON_?FLEX/i.test(f))) {
+        findings.push('Offers only NON-FLEXIBLE (no flexible tier - scenarios selecting by Desired Flexibility will not match)');
+      }
+      if (probe.daysWithOffers < probe.daysProbed) {
+        findings.push('Offers on ' + probe.daysWithOffers + ' of ' + probe.daysProbed + ' probed day(s) (none on: ' +
+          probe.noOffer.map(x => x.date).join(', ') + ')');
+      }
+    }
+  }
+  const offerProbe = probe.daysProbed > 0 ? {
+    probedAt: new Date().toISOString(),
+    daysProbed: probe.daysProbed,
+    daysWithOffers: probe.daysWithOffers,
+    classes: [...probe.classes],
+    flexibilities: [...probe.flex],
+    findings
+  } : null;
+  if (offerProbe) {
+    toCreate.forEach(c => { c.data.offerProbe = offerProbe; });
+    toUpdate.forEach(u => { u.data.offerProbe = offerProbe; });
+  }
+
   const created = [];
   for (const c of toCreate) {
     const id = uuidv4();
@@ -367,7 +417,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   }
 
   log.info({ companyId: targetCompanyId, origin, destination, days, ...summary }, 'Timetable discovery completed');
-  return res.json({ summary, created, updated, dayResults });
+  return res.json({ summary, created, updated, dayResults, offerProbe });
 });
 
 module.exports = router;

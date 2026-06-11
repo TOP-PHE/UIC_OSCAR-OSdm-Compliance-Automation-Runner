@@ -268,6 +268,33 @@ function harvestOfferCatalog(resp) {
   return { travelClasses: [...tc], serviceClasses: [...sc], ancillaries: [...anc] };
 }
 
+// #365: classify ONE offers response for route-level availability findings -
+// did an anonymous-adult search actually yield offers, and of what shape?
+// Returns null for a trips-collection response (no offers[] member at all).
+function classifyOfferProbe(resp) {
+  if (!resp || typeof resp !== 'object' || !Array.isArray(resp.offers)) return null;
+  const trips = Array.isArray(resp.trips) ? resp.trips.length : 0;
+  if (resp.offers.length === 0) {
+    const echo = []
+      .concat(Array.isArray(resp.warnings) ? resp.warnings : [], Array.isArray(resp.problems) ? resp.problems : [])
+      .map(w => w && (w.code || w.title)).filter(Boolean).slice(0, 3);
+    return {
+      offers: 0, trips, classes: [], flexibilities: [],
+      finding: trips > 0
+        ? ('trip(s) found but offers[] empty' + (echo.length ? ' (provider says: ' + echo.join('; ') + ')' : ', no warning/problem explains why'))
+        : 'no trip and no offer on this date'
+    };
+  }
+  const classes = new Set(); const flex = new Set();
+  for (const o of resp.offers) {
+    const tc = o.travelClass || (o.offerSummary && o.offerSummary.overallTravelClass);
+    if (typeof tc === 'string' && tc) classes.add(tc.toUpperCase());
+    const fl = (o.offerSummary && o.offerSummary.overallFlexibility) || o.flexibility;
+    if (typeof fl === 'string' && fl) flex.add(fl.toUpperCase());
+  }
+  return { offers: resp.offers.length, trips, classes: [...classes], flexibilities: [...flex], finding: null };
+}
+
 const _DAY_SHORT = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
 
 // Human label for an operating-days pattern, used to distinguish split sets.
@@ -467,6 +494,7 @@ function groupAndMerge(harvested, existing, catalog) {
 }
 
 module.exports = {
+  classifyOfferProbe,
   dayOfWeekCode,
   timePartOf,
   searchDates,

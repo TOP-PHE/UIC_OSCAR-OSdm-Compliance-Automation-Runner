@@ -3527,8 +3527,26 @@ function fwSetPaxAge(type, bound, value) {
 function renderWizardStep2() {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
 
+  // #365: per-route offer-availability findings persisted by the discovery
+  // probe (read from RAW data - normalizeTrainData strips unknown members).
+  const probeOf = (t) => {
+    try {
+      const raw = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+      return (raw.offerProbe && Array.isArray(raw.offerProbe.findings)) ? raw.offerProbe : null;
+    } catch (_e) { return null; }
+  };
+  const probeWarnings = [];
+  trains.forEach(t => {
+    const p = probeOf(t);
+    if (p && p.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
+  });
+
   const trainItems = trains.map((t, tidx) => {
     const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+    const probe = probeOf(t);
+    const probeChip = (probe && probe.findings.length)
+      ? `<span title="${esc(probe.findings.join('\n'))}" style="color:#ef6c00;font-size:12px;font-weight:700;flex-shrink:0;cursor:help">&#9888; ${probe.findings.length}</span>`
+      : '';
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
     const svc = d.services || [];
     const svcSummary = svc.length === 0 ? 'no services'
@@ -3540,7 +3558,7 @@ function renderWizardStep2() {
     <div class="train-item">
       <div class="train-row" data-action="toggle-train-detail" data-tidx="${esc(tidx)}">
         <div style="flex:1;min-width:0">
-          <div class="train-row-label">${esc(t.label || '—')}</div>
+          <div class="train-row-label">${esc(t.label || '—')} ${probeChip}</div>
           <div class="train-row-sub">${esc(sub)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
@@ -3577,6 +3595,14 @@ function renderWizardStep2() {
     These resources will be referenced when generating test scenarios.
   </p>
 
+  ${probeWarnings.length ? `
+  <details style="margin:0 0 10px;background:#fff8f0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px">
+    <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#ef6c00;user-select:none">&#9888; ${probeWarnings.reduce((n2, w) => n2 + w.findings.length, 0)} offer-availability warning(s) on discovered routes - a route in the timetable does not guarantee offers</summary>
+    <div style="margin-top:8px;font-size:12.5px;color:#5d4037;line-height:1.6">
+      ${probeWarnings.map(w => `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : ''}<br>${w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>')}</div>`).join('')}
+      <div style="color:#a1887f">Findings refresh on the next Discover timetable for the route (anonymous 1-adult offer request).</div>
+    </div>
+  </details>` : ''}
   <!-- Train Resources -->
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">🚆 Train Resources<span class="fw-toggle-icon">▶</span></div>
