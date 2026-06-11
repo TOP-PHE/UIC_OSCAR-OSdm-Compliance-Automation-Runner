@@ -2015,21 +2015,24 @@ function buildTripSection(idx, sc, trip) {
       data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="tripType">
       ${ENUMS.tripType.map(t => `<option value="${t}" ${trip.tripType===t?'selected':''}>${lbl(t)}</option>`).join('')}
     </select>
-  </div>
-  ${(() => {
-    // #363: per-trip departure DAY for trains that only run on certain days.
-    // Auto (default) keeps today's rule (today + lead time); a weekday keeps
-    // the lead time and advances to the next matching date at run time.
+  </div>`;
+
+  // #363/#366: per-trip departure DAY for trains that only run certain days.
+  // Auto (default) keeps today's rule (today + lead time); a weekday keeps
+  // the lead time and advances to the next matching date at run time.
+  // #366: rendered NEXT TO the Departure time field (where testers look for
+  // it) on SEARCH trips; trip-level above the legs on SPECIFICATION.
+  const depDayField = (() => {
     const days = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     return `
   <div class="param-field">
-    <span class="param-label">Departure day <span class="param-hint">Auto: today + lead time (departureDateFromToday). Pick a weekday for trains that only run some days — the lead time is kept and the date advances to the next matching day at run time</span></span>
+    <span class="param-label">Departure day <span class="param-hint">Auto: today + lead time. Pick a weekday for trains that only run some days — lead time kept, date advances to the next matching day</span></span>
     <select class="param-input param-select"
       data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="departureDay">
       ${days.map(d => `<option value="${d}" ${String(trip.departureDay || '') === d ? 'selected' : ''}>${d ? d.charAt(0) + d.slice(1).toLowerCase() : 'Auto (default)'}</option>`).join('')}
     </select>
   </div>`;
-  })()}`;
+  })();
 
   // Apply-a-Journey picker (#137) — fills all legs from a saved journey.
   const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
@@ -2046,7 +2049,9 @@ function buildTripSection(idx, sc, trip) {
 
   let inner = '';
   if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs)) {
-    inner = trip.legs.map((leg, li) => `
+    // #366: one departure date covers all legs → trip-level, above the legs.
+    inner = `<div class="param-grid" style="margin-bottom:8px">${depDayField}</div>`;
+    inner += trip.legs.map((leg, li) => `
     <div class="sub-card">
       <div class="sub-card-title">Leg ${li+1}</div>
       <div style="padding:0 14px 0">${buildTripTrainPicker(idx, tIdx, 'legs.' + li, trains)}</div>
@@ -2065,6 +2070,7 @@ function buildTripSection(idx, sc, trip) {
     <div class="param-grid">
       ${buildTripTextField(tIdx, 'trip.origin',      'Origin UIC <span class="param-hint">urn:uic:stn:NNNNNNN</span>',      t.origin,      'urn:uic:stn:...')}
       ${buildTripTextField(tIdx, 'trip.destination', 'Destination UIC <span class="param-hint">urn:uic:stn:NNNNNNN</span>', t.destination, 'urn:uic:stn:...')}
+      ${depDayField}
       ${buildTripTimeField(tIdx, 'trip.startDatetime', 'Departure <span class="param-hint">HH:MM:SS±HH:MM — date added automatically</span>', t.startDatetime, '07:00:00+02:00')}
       ${buildTripTimeField(tIdx, 'trip.endDatetime',   'Arrival <span class="param-hint">HH:MM:SS±HH:MM</span>',   t.endDatetime,   '09:00:00+02:00')}
       ${buildTripTextField(tIdx, 'trip.vehicleNumber', 'Vehicle # <span class="param-hint">Train number</span>', t.vehicleNumber, '')}
