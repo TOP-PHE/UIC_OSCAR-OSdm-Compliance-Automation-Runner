@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.128] — 2026-06-11
+
+### Fixed
+
+- **UX follow-up (#366)** on the 2026.155 round: the **Departure day**
+  select moved into the trip grid right next to the Departure time
+  (where testers look for it) on SEARCH trips, and sits trip-level
+  above the legs on SPECIFICATION (one date covers all legs). The
+  **toasts** moved to the upper third of the viewport, overlapping the
+  page content, with larger text/padding, a stronger shadow and an
+  entrance animation — under-the-nav placement was still missed.
+
+---
+
 ## [server-v1.11.127] — 2026-06-11
 
 **Run-setup UX round (#363)** — three Test Manager findings while

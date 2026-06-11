@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.155",
+  "current_release": "2026.156",
   "releases": [
+    {
+      "release": "2026.156",
+      "date": "2026-06-11",
+      "server": "1.11.128",
+      "collection": "OTST_V2.0.73",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "UX follow-up (#366) on the 2026.155 round — tester feedback: (1) the Departure day select was hard to find next to Trip Type; moved into the trip grid immediately before the Departure time field on SEARCH trips (trip-level above the legs on SPECIFICATION — one date covers all legs); (2) toasts were still missed at the top and read smaller than the old alert(); now positioned in the upper third of the viewport overlapping the page content, larger text (14.5px) and padding, min-width 340px, stronger shadow, 180ms entrance animation. Server display-only (scenarios.js + nav.js); collection unchanged (OTST_V2.0.73). Also filed #365: extend Timetable Discovery to probe offer availability per discovered route (anonymous 1-adult POST /offers) and surface per-route warnings (no offer / only Second class / only Non-flex …) behind a warning icon on the Test Data section title — tracked, not yet implemented."
+      ]
+    },
     {
       "release": "2026.155",
       "date": "2026-06-11",
