@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.133] — 2026-06-11
+
+### Fixed
+
+- **Booking price assertions are lifecycle-aware (#375).** OSDM scopes the
+  price members to the booking lifecycle: `provisionalPrice` before
+  confirmation, `confirmedPrice` once FULFILLED/CONFIRMED. OSCAR asserted
+  BOTH at every stage — 2 false ✕ per booking read on every conformant
+  provider, plus a raw TypeError when one member was absent. Now keyed on
+  the expected booking-part status: the stage member is required, the
+  other is logged as allowed-optional, failures are decoded, and the
+  price-amount env vars are set per-presence (previously only when both
+  existed — i.e. never on conformant data).
+- **afterSaleFee mismatches speak the provider's language** (#349
+  leftover): "Booking does not echo the offer's REFUND fee amount: the
+  offer said 60990, the booking says 0 — the booking must mirror the
+  offer's after-sales conditions." replaces the chai
+  "expected +0 to deeply equal 60990" tail. (That OBB mismatch itself is
+  a genuine provider finding and stays red.)
+
+---
+
 ## [server-v1.11.132] — 2026-06-11
 
 ### Added

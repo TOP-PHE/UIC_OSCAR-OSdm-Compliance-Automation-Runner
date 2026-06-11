@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.160",
+  "current_release": "2026.161",
   "releases": [
+    {
+      "release": "2026.161",
+      "date": "2026-06-11",
+      "server": "1.11.133",
+      "collection": "OTST_V2.0.75",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        ["Lifecycle-aware booking price assertions + decodable afterSaleFee mismatch (#375) — found on the first successful OBB NJ/BERTH end-to-end run. (1) postCreateBookingResponse asserted BOTH provisionalPrice AND confirmedPrice at every stage, but OSDM scopes them to the lifecycle (provisional pre-confirmation, confirmed once FULFILLED/CONFIRMED): every conformant provider got 2 false ✕ per booking read (PREBOOKED lacks confirmedPrice; post-fulfillment lacks provisionalPrice) and the combined field check crashed with a raw 'Cannot read properties of undefined' TypeError. Now keyed on the expectedBookedOffersStatus parameter the function already receives: the stage member is required with a decoded failure ('provisionalPrice missing — OSDM expects it at this booking stage (PREBOOKED)'), the other member's presence/absence is logged as allowed, no TypeError path remains, and provisionalPriceAmount/confirmedPriceAmount env vars (read by refund maths) are set per-presence — previously only when both existed, i.e. never on conformant data. (2) The afterSalesConditions fee comparison emits a provider-language message ('Booking does not echo the offer's REFUND fee amount: the offer said 60990, the booking says 0 — the booking must mirror the offer's after-sales conditions') instead of the chai 'expected +0 to deeply equal 60990' tail (a #349 leftover). The OBB fee mismatch itself is a genuine provider finding and stays red."],
+        "Verification: harness drives the REAL extracted price block — PREBOOKED with only provisionalPrice all-green (absence of confirmedPrice logged as allowed, env set per presence); FULFILLED with only confirmedPrice all-green; genuinely missing stage member → decoded failure with NO TypeError; missing currency field named decodably; both-present tolerated with both envs set. node --check; eslint + inline-script lint green. Server 1.11.132 -> 1.11.133; Bruno_Collection/VERSION OTST_V2.0.74 -> OTST_V2.0.75. Assertion counts: 2 false failures per booking read disappear on conformant providers."
+      ]
+    },
     {
       "release": "2026.160",
       "date": "2026-06-11",

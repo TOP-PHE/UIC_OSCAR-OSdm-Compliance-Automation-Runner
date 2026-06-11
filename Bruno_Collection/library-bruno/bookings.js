@@ -147,8 +147,13 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
       });
       ['currency', 'amount', 'scale'].forEach(field => {
         test(`${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field} matches`, () => {
-          expect(bookedCondition.afterSaleFee[field]).to.eql(condition.afterSaleFee[field]);
-          validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${condition.afterSaleFee[field]}' booking='${bookedCondition.afterSaleFee[field]}'`);
+          const _offerVal  = condition.afterSaleFee[field];
+          const _bookedVal = bookedCondition.afterSaleFee[field];
+          // #375: decodable provider-language failure (no chai tail).
+          if (_bookedVal !== _offerVal) {
+            throw new Error(`Booking does not echo the offer's ${condition.condition} fee ${field}: the offer said ${JSON.stringify(_offerVal)}, the booking says ${JSON.stringify(_bookedVal)} — the booking must mirror the offer's after-sales conditions.`);
+          }
+          validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${_offerVal}' booking='${_bookedVal}'`);
         });
       });
       const scenarioType = bru.getEnvVar("scenarioType");
@@ -523,25 +528,35 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   const mini      = selectedOffer.offerSummary.minimalPrice;
   const confirmed = booking.confirmedPrice;
 
-  test(`provisionalPrice structure exists`, () => {
-    expect(prov, `provisionalPrice missing`).to.exist;
-    validationLogger(`[DEBUG] provisionalPrice structure exists`);
+  // #375: price members are LIFECYCLE-scoped in OSDM — provisionalPrice
+  // before confirmation, confirmedPrice once confirmed/fulfilled. Asserting
+  // BOTH at every stage false-failed every conformant provider, and the
+  // combined field check crashed with a TypeError when one was absent.
+  // Key on the expected booking-part status this call already receives.
+  const _expectsConfirmed = /FULFILLED|CONFIRMED/i.test(String(expectedBookedOffersStatus || ''));
+  const _stagePrice = _expectsConfirmed ? confirmed : prov;
+  const _stageName  = _expectsConfirmed ? 'confirmedPrice' : 'provisionalPrice';
+  const _otherPrice = _expectsConfirmed ? prov : confirmed;
+  const _otherName  = _expectsConfirmed ? 'provisionalPrice' : 'confirmedPrice';
+
+  test(`${_stageName} structure exists (booking stage: ${expectedBookedOffersStatus || 'pre-confirmation'})`, () => {
+    if (!_stagePrice) throw new Error(`${_stageName} missing — OSDM expects it at this booking stage (${expectedBookedOffersStatus || 'pre-confirmation'}).`);
+    validationLogger(`[DEBUG] ${_stageName} structure exists`);
   });
-  test(`confirmedPrice structure exists`, () => {
-    expect(confirmed, `confirmedPrice missing`).to.exist;
-    validationLogger(`[DEBUG] confirmedPrice structure exists`);
-  });
-  test(`Price fields exist (currency, scale) in provisionalPrice and confirmedPrice`, () => {
+  validationLogger(_otherPrice
+    ? `[DEBUG] ${_otherName} also present at this stage — allowed (optional member).`
+    : `[DEBUG] ${_otherName} absent at this stage — allowed (lifecycle-scoped member).`);
+  test(`Price fields exist (currency, scale) in ${_stageName}`, () => {
+    if (!_stagePrice) throw new Error(`${_stageName} missing — its fields cannot be checked (see the assertion above).`);
     ['currency', 'scale'].forEach(field => {
-      expect(prov[field],
-        `provisionalPrice.${field} missing in booking (got: ${JSON.stringify(prov[field])})`).to.exist;
-      expect(confirmed[field],
-        `confirmedPrice.${field} missing in booking (got: ${JSON.stringify(confirmed[field])})`).to.exist;
+      if (_stagePrice[field] == null) throw new Error(`${_stageName}.${field} missing in booking (got: ${JSON.stringify(_stagePrice[field])})`);
     });
-    bru.setEnvVar("provisionalPriceAmount", prov.amount);
-    bru.setEnvVar("confirmedPriceAmount",   confirmed.amount);
-    validationLogger(`[DEBUG] provisionalPrice and confirmedPrice fields present`);
+    validationLogger(`[DEBUG] ${_stageName} fields present (currency, scale)`);
   });
+  // Downstream (refund maths) reads these — set whichever members exist
+  // (previously only set when BOTH existed, i.e. never on conformant data).
+  if (prov)      bru.setEnvVar("provisionalPriceAmount", prov.amount);
+  if (confirmed) bru.setEnvVar("confirmedPriceAmount",   confirmed.amount);
 
   // B4: Both prices must use the same currency (OSDM: currency must be consistent within a booking)
   if (prov?.currency && confirmed?.currency) {
