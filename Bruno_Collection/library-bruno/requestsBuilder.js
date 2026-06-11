@@ -363,9 +363,15 @@ function accommodationAndPlaceSelection() {
   // flag still carries its chosen seats into the booking.
   const preselectedPlaces = parseEnvJson("preselectedPlaces", []);
   const hasPicks = Array.isArray(preselectedPlaces) && preselectedPlaces.length > 0;
+  // #371: real accommodation captured from the selected offer's
+  // availablePlaces (offers.js) - enables placeSelections for IRT/NJ
+  // mandatory-reservation offers (BERTH included), not just the legacy
+  // COUCHETTE hardcode.
+  const selectedAccommodation = parseEnvJson("selectedAccommodation", null);
+  const hasSelAcc = !!(selectedAccommodation && selectedAccommodation.accommodationType);
 
   if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true"
-      && accommodationSelection !== "COUCHETTE" && !hasPicks) {
+      && accommodationSelection !== "COUCHETTE" && !hasPicks && !hasSelAcc) {
     bru.setEnvVar("placeSelections", JSON.stringify([]));
     return;
   }
@@ -381,7 +387,14 @@ function accommodationAndPlaceSelection() {
     tripLegCoverage: { tripId, legId }
   };
 
-  if (accommodationSelection === "COUCHETTE") {
+  if (hasSelAcc) {
+    // #371: the offer told us exactly which compartment is bookable - send
+    // its real type/subType (e.g. COUCHETTE / COUCHETTE_COMFORT_4); no
+    // fabricated placeProperties.
+    placeSelection.accommodations = [Object.assign({ passengerRefs }, selectedAccommodation)];
+  } else if (accommodationSelection === "COUCHETTE") {
+    // Legacy fallback for providers whose offers carry no availablePlaces
+    // accommodation detail (historical vendor-specific shape).
     placeSelection.accommodations = [{
       passengerRefs,
       accommodationType: accommodationSelection,

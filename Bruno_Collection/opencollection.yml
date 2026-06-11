@@ -271,6 +271,7 @@ request:
               const _deleteList = [
                 // Scenario / trip
                 "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
+                "selectedAccommodation",
                 "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
                 "overruleCode", "refundDate", "TripType",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",

@@ -1428,7 +1428,20 @@ function validateAncillaries(selectedOffer) {
 }
 
 // Function to extract all tripId and legId from tripLegCoverage for a given accommodationType
+// #371: coverage the OFFER declares (tripCoverage, object or array) -
+// normalized to [{tripId, legId}]. The authoritative source for booking
+// placeSelections per the OBB IRT/NJ requirement; per-place tripLegCoverage
+// stays the fallback for providers that only set it there.
+function offerTripCoverage(selectedOffer) {
+  const tc = selectedOffer && selectedOffer.tripCoverage;
+  return (Array.isArray(tc) ? tc : (tc ? [tc] : []))
+    .filter(c => c && c.tripId && c.legId)
+    .map(c => ({ tripId: c.tripId, legId: c.legId }));
+}
+
 function getTripLegCoverage(selectedOffer, accommodationSelection) {
+  const fromOffer = offerTripCoverage(selectedOffer);
+  if (fromOffer.length > 0) return fromOffer;
   const tripLegs = [];
 
   (selectedOffer.reservationOfferParts || []).forEach(part => {
@@ -1483,9 +1496,19 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     const _firstRes = _seatResParts[0];
     bru.setEnvVar("reservationId", _firstRes.id);
     bru.setEnvVar("reservationIds", JSON.stringify(_seatResParts.map((p) => p.id)));
+    const _offerCov = offerTripCoverage(selectedOffer);
     const _firstPlace = Array.isArray(_firstRes.availablePlaces) ? _firstRes.availablePlaces[0] : null;
-    if (_firstPlace && _firstPlace.tripLegCoverage) {
+    if (_offerCov.length > 0) {
+      bru.setEnvVar("tripLegCoverage", JSON.stringify(_offerCov));
+    } else if (_firstPlace && _firstPlace.tripLegCoverage) {
       bru.setEnvVar("tripLegCoverage", JSON.stringify([_firstPlace.tripLegCoverage]));
+    }
+    // #371: persist the real accommodation of the selected part when the
+    // offer declares it, so the booking placeSelections can carry it.
+    if (_firstPlace && typeof _firstPlace.accommodationType === 'string' && _firstPlace.accommodationType) {
+      const _acc = { accommodationType: _firstPlace.accommodationType };
+      if (typeof _firstPlace.accommodationSubType === 'string' && _firstPlace.accommodationSubType) _acc.accommodationSubType = _firstPlace.accommodationSubType;
+      bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
     }
     validationLogger(`[DEBUG] Seat place selection — reservationId set from first reservationOfferPart: ${_firstRes.id}`);
     return;
@@ -1510,6 +1533,19 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
   matchingParts.forEach(part => validationLogger(`[DEBUG] ${accommodationSelection} reservationOfferPart.id: ${part.id}`));
   bru.setEnvVar("reservationIds", JSON.stringify(matchingParts.map(part => part.id)));
   bru.setEnvVar("reservationId", matchingParts[0].id);
+
+  // #371 (OBB IRT/NJ): persist the SELECTED part's real accommodation so the
+  // booking request's placeSelections states which compartment is booked
+  // (accommodationType + accommodationSubType from availablePlaces - e.g.
+  // COUCHETTE / COUCHETTE_COMFORT_4) instead of a hardcoded placeholder.
+  const _selPlace = (matchingParts[0].availablePlaces || [])
+    .find(pl => pl && pl.accommodationType === accommodationSelection) || null;
+  if (_selPlace) {
+    const _acc = { accommodationType: _selPlace.accommodationType };
+    if (typeof _selPlace.accommodationSubType === 'string' && _selPlace.accommodationSubType) _acc.accommodationSubType = _selPlace.accommodationSubType;
+    bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
+    validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''} (reservation part ${matchingParts[0].id})`);
+  }
 
   test(`At least one reservationOfferPart has accommodationType: ${accommodationSelection}`, function () {
     expect(matchingParts.length, "No matching reservationOfferParts found").to.be.above(0);
