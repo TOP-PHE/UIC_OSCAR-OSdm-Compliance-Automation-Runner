@@ -362,14 +362,19 @@ function oscarToast(message, kind) {
     if (!host) {
       host = document.createElement('div');
       host.id = 'oscar-toasts';
-      host.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:90vw';
+      // #366: upper third of the viewport, overlapping the page content —
+      // tester feedback: under-the-nav toasts were still missed.
+      host.style.cssText = 'position:fixed;top:28vh;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none;max-width:90vw';
       document.body.appendChild(host);
     }
     const colors = { info: '#0090D4', success: '#2e7d32', error: '#c62828', warning: '#ef6c00' };
     const icons  = { info: 'ℹ️', success: '✅', error: '⛔', warning: '⚠️' };
     const t = document.createElement('div');
-    t.style.cssText = 'pointer-events:auto;max-width:560px;background:#fff;border-left:4px solid ' + (colors[kind] || colors.info) +
-      ';box-shadow:0 4px 18px rgba(0,0,0,.28);border-radius:6px;padding:10px 14px;font:13px/1.45 system-ui,sans-serif;color:#263238;display:flex;gap:10px;align-items:flex-start;white-space:pre-wrap';
+    t.style.cssText = 'pointer-events:auto;min-width:340px;max-width:640px;background:#fff;border-left:5px solid ' + (colors[kind] || colors.info) +
+      ';box-shadow:0 8px 32px rgba(0,0,0,.38);border-radius:8px;padding:14px 18px;font:14.5px/1.5 system-ui,sans-serif;color:#263238;display:flex;gap:12px;align-items:flex-start;white-space:pre-wrap';
+    if (t.animate) t.animate(
+      [{ opacity: 0, transform: 'translateY(-14px) scale(.96)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }],
+      { duration: 180, easing: 'ease-out' });
     const ic = document.createElement('span');
     ic.textContent = icons[kind] || icons.info;
     const span = document.createElement('span');
