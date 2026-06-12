@@ -117,6 +117,7 @@ function buildOfferCollectionRequest() {
 function buildBookingRequest() {
   validationLogger("[DEBUG] ➤ buildBookingRequest");
   accommodationAndPlaceSelection();
+  assertPlaceSelectionConsistency();
 
   const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
   const firstPassenger = bookingPassengerSpecifications[0];
@@ -348,6 +349,64 @@ function placesForPassengers(picked, passengerRefs) {
       passengerRef: ref
     };
   });
+}
+
+// #377: pre-flight self-check — the placeSelections WE built must be
+// consistent with the SELECTED offer before the booking request is sent.
+// Catches OSCAR regressions and incoherent offers at zero provider cost.
+// Registers an assertion ONLY on failure (logging rule R8); one DEBUG line
+// when clean.
+function assertPlaceSelectionConsistency() {
+  const ps = parseEnvJson("placeSelections", []);
+  if (!Array.isArray(ps) || ps.length === 0) return;
+  let offer = bru.getEnvVar("offer");
+  if (typeof offer === 'string') { try { offer = JSON.parse(offer); } catch (_e) { offer = null; } }
+  if (!offer || typeof offer !== 'object') return;
+
+  const parts = offer.reservationOfferParts || [];
+  const partIds = parts.map(pt => pt && pt.id).filter(Boolean);
+  const advertised = parts.flatMap(pt => (pt && pt.availablePlaces) || []).filter(Boolean);
+  // Offer coverage pairs — accepts both the flat {tripId, legId} form and the
+  // spec's TripCoverage {coveredTripId, coveredLegIds} form (mirror of
+  // offers.js offerTripCoverage, kept local to avoid a module dependency).
+  const covRaw = offer.tripCoverage;
+  const covArr = Array.isArray(covRaw) ? covRaw : (covRaw ? [covRaw] : []);
+  const coverage = [];
+  covArr.forEach(c => {
+    if (!c) return;
+    if (c.tripId && c.legId) coverage.push({ tripId: c.tripId, legId: c.legId });
+    else if (c.coveredTripId && Array.isArray(c.coveredLegIds)) c.coveredLegIds.filter(Boolean).forEach(l => coverage.push({ tripId: c.coveredTripId, legId: l }));
+  });
+
+  const issues = [];
+  ps.forEach((sel, i) => {
+    if (sel && sel.reservationId && partIds.length > 0 && !partIds.includes(sel.reservationId)) {
+      issues.push(`placeSelections[${i}].reservationId '${sel.reservationId}' is not a reservationOfferPart of the selected offer (parts: ${partIds.join(', ')})`);
+    }
+    ((sel && sel.accommodations) || []).forEach((acc, j) => {
+      if (acc && acc.accommodationType && advertised.length > 0
+          && !advertised.some(ap => ap.accommodationType === acc.accommodationType)) {
+        issues.push(`placeSelections[${i}].accommodations[${j}].accommodationType '${acc.accommodationType}' is not advertised in the offer's availablePlaces`);
+      }
+      if (acc && acc.accommodationSubType && advertised.length > 0
+          && advertised.some(ap => ap.accommodationSubType)
+          && !advertised.some(ap => ap.accommodationSubType === acc.accommodationSubType)) {
+        issues.push(`placeSelections[${i}].accommodations[${j}].accommodationSubType '${acc.accommodationSubType}' is not advertised in the offer's availablePlaces`);
+      }
+    });
+    if (sel && sel.tripLegCoverage && coverage.length > 0
+        && !coverage.some(c => c.tripId === sel.tripLegCoverage.tripId && c.legId === sel.tripLegCoverage.legId)) {
+      issues.push(`placeSelections[${i}].tripLegCoverage ${sel.tripLegCoverage.tripId}/${sel.tripLegCoverage.legId} is not within the offer's tripCoverage (${coverage.map(c => c.tripId + '/' + c.legId).join(', ')})`);
+    }
+  });
+
+  if (issues.length > 0 && typeof test === 'function') {
+    test(`Booking request placeSelections are consistent with the selected offer`, () => {
+      throw new Error(`Pre-flight inconsistency — the booking request would not match the selected offer: ${issues.join('; ')}`);
+    });
+  } else if (issues.length === 0) {
+    validationLogger(`[DEBUG] placeSelections pre-flight consistent with the selected offer (${ps.length} selection(s)).`);
+  }
 }
 
 // Function to handle place selections

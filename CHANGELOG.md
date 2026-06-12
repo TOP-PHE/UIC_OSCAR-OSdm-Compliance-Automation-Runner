@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.134] — 2026-06-12
+
+**NJ conformance PR1 (#377): the accommodation goal-closing chain.**
+Tester finding: nowhere did the run state that the BERTH requested by the
+scenario was actually what got booked.
+
+### Added
+
+- **🎯 Accommodation goal assertions** at the create-booking step: the
+  booking must carry the selected reservation part; when the provider
+  echoes `placeAllocation` (OSDM: accommodationType, accommodationSubType,
+  reservedPlaces, tripLegCoverage required when present), the allocation
+  must match the requested family and the offered compartment subtype,
+  with non-empty reservedPlaces and matching coverage. Absent
+  placeAllocation → one [WARNING] capability note, no failure. One
+  `🎯 Accommodation goal MET: requested BERTH → offer advertised
+  BERTH/SINGLE_SWC → booking allocated …` INFO line tells the story.
+- **Pre-flight self-check on the booking request** (R8 — registers only
+  on failure): reservationId must be a part of the selected offer, the
+  accommodations must be advertised in availablePlaces, tripLegCoverage
+  must lie within the offer coverage. Catches OSCAR regressions and
+  incoherent offers at zero provider cost.
+
+### Fixed
+
+- **`offerTripCoverage` now maps the spec's `TripCoverage` form**
+  (`coveredTripId` + `coveredLegIds`) — what providers actually send on
+  the offer (seen on OBB). The #371 offer-level preference only knew the
+  flat `{tripId, legId}` shape, so it silently never fired and always
+  fell back to per-place coverage.
+
+---
+
 ## [server-v1.11.133] — 2026-06-11
 
 ### Fixed

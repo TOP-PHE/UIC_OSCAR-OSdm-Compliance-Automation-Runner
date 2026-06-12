@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.161",
+  "current_release": "2026.162",
   "releases": [
+    {
+      "release": "2026.162",
+      "date": "2026-06-12",
+      "server": "1.11.134",
+      "collection": "OTST_V2.0.76",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        ["NJ conformance PR1 (#377) — accommodation goal-closing chain. Tester finding: nowhere did the run state that the BERTH requested by the scenario was what actually got booked. (1) 🎯 goal assertions at the create-booking step (gated to '02. POST Create Booking' so booking re-reads don't duplicate the rows): the booking must carry the selected reservation part; when the booked Reservation echoes placeAllocation (OSDM-required members when present: accommodationType, accommodationSubType, reservedPlaces, tripLegCoverage) the allocation must match the requested family + the offered compartment subtype, reservedPlaces non-empty, coverage matching the selection; absent placeAllocation → one [WARNING] capability note (no failure); one '🎯 Accommodation goal MET: requested BERTH → offer advertised BERTH/SINGLE_SWC (part …) → booking allocated …' INFO line. (2) Pre-flight self-check on OUR booking request (R8 — assertion registered ONLY on failure, one DEBUG when clean): reservationId ∈ selected offer parts, accommodations ⊆ availablePlaces (type and subtype), tripLegCoverage within the offer coverage. (3) FIX: offerTripCoverage now also maps the spec's TripCoverage form (coveredTripId + coveredLegIds) — what providers actually send (seen on OBB); the #371 flat-form-only mapping silently never fired and always fell back to per-place coverage. Part of the #377/#378/#379 NJ conformance programme (PR2: NHF place-selection probe sweep; PR3: reservation spec-coverage)."],
+        "Verification: harness over the REAL extracted functions — offerTripCoverage maps both coverage forms; validateAccommodationGoal 5 cases (full allocation → 5 green asserts + MET line; family mismatch decoded 'the provider changed the accommodation family'; no placeAllocation → WARNING + no failure; reservation dropped → decoded failure; no accommodationSelection → fully silent); assertPlaceSelectionConsistency 4 cases (consistent → R8-silent DEBUG; wrong reservationId / foreign coverage (against the covered* form) / unadvertised HAMMOCK type → one failing decoded assertion each). node --check x3; eslint + inline-script lint green. Server 1.11.133 -> 1.11.134; Bruno_Collection/VERSION OTST_V2.0.75 -> OTST_V2.0.76."
+      ]
+    },
     {
       "release": "2026.161",
       "date": "2026-06-11",

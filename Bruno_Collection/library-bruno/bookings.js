@@ -303,6 +303,66 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
 
 // ─── Public functions ────────────────────────────────────────────────────────
 
+// #377: 🎯 accommodation goal-closing — requested → offered → allocated.
+// The booked Reservation's placeAllocation (OSDM: accommodationType,
+// accommodationSubType, reservedPlaces, tripLegCoverage all required when
+// present) is the provider's own statement of what was allocated. Absent
+// placeAllocation is a capability note (WARNING), not a failure.
+function validateAccommodationGoal(selectedOffer, bookedOffers) {
+  const requested = bru.getEnvVar("accommodationSelection");
+  if (!requested || requested === "null") return;   // scenario asked for no accommodation family
+
+  let selAcc = null;
+  try { const raw = bru.getEnvVar("selectedAccommodation"); selAcc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_e) { selAcc = null; }
+  const reservationId = bru.getEnvVar("reservationId");
+  const offeredLabel = selAcc
+    ? `${selAcc.accommodationType}${selAcc.accommodationSubType ? '/' + selAcc.accommodationSubType : ''}`
+    : String(requested);
+
+  const bookedRes = (bookedOffers || []).flatMap(b => (b && b.reservations) || []).filter(Boolean);
+  const target = bookedRes.find(r => r.id === reservationId) || bookedRes[0] || null;
+
+  test(`🎯 Accommodation goal — booking carries the requested ${requested} reservation`, () => {
+    if (!target) throw new Error(`No reservation part in the booking (requested ${requested}, selected part ${reservationId || 'n/a'}) — the provider dropped the reservation from the booking.`);
+  });
+  if (!target) return;
+
+  const alloc = target.placeAllocation;
+  if (!alloc) {
+    validationLogger(`[WARNING] 🎯 Accommodation goal: requested ${requested} → offer advertised ${offeredLabel} (part ${reservationId}) → booked, but the reservation carries NO placeAllocation — the provider does not state which place(s) were allocated. Goal verified up to the reservation level only.`);
+    return;
+  }
+
+  test(`🎯 placeAllocation.accommodationType matches the requested ${requested}`, () => {
+    const got = String(alloc.accommodationType || '');
+    if (got.toUpperCase() !== String(requested).toUpperCase()) {
+      throw new Error(`Requested ${requested} but the booking allocated '${got || '(none)'}' — the provider changed the accommodation family.`);
+    }
+  });
+  if (selAcc && selAcc.accommodationSubType && alloc.accommodationSubType) {
+    test(`🎯 placeAllocation.accommodationSubType matches the offered compartment (${selAcc.accommodationSubType})`, () => {
+      if (String(alloc.accommodationSubType) !== String(selAcc.accommodationSubType)) {
+        throw new Error(`The offer advertised ${selAcc.accommodationSubType}, the booking allocated ${alloc.accommodationSubType} — the allocation does not match the selected compartment.`);
+      }
+    });
+  }
+  test(`🎯 placeAllocation.reservedPlaces is non-empty (OSDM: required member of PlaceAllocation)`, () => {
+    if (!Array.isArray(alloc.reservedPlaces) || alloc.reservedPlaces.length === 0) {
+      throw new Error(`placeAllocation.reservedPlaces is ${JSON.stringify(alloc.reservedPlaces)} — OSDM requires the reserved place(s) to be stated when placeAllocation is present.`);
+    }
+  });
+  let tlc = [];
+  try { const raw = bru.getEnvVar("tripLegCoverage"); tlc = typeof raw === 'string' ? JSON.parse(raw) : (raw || []); } catch (_e) { tlc = []; }
+  if (Array.isArray(tlc) && tlc.length > 0 && alloc.tripLegCoverage) {
+    test(`🎯 placeAllocation.tripLegCoverage matches the selected coverage`, () => {
+      const ok = tlc.some(c => c && c.tripId === alloc.tripLegCoverage.tripId && c.legId === alloc.tripLegCoverage.legId);
+      if (!ok) throw new Error(`The allocation covers trip/leg ${alloc.tripLegCoverage.tripId}/${alloc.tripLegCoverage.legId}, but the selection targeted ${tlc.map(c => c.tripId + '/' + c.legId).join(', ')}.`);
+    });
+  }
+  const places = Array.isArray(alloc.reservedPlaces) ? alloc.reservedPlaces.length : 0;
+  validationLogger(`[INFO] 🎯 Accommodation goal MET: requested ${requested} → offer advertised ${offeredLabel} (part ${reservationId}) → booking allocated ${alloc.accommodationType}${alloc.accommodationSubType ? '/' + alloc.accommodationSubType : ''} with ${places} reserved place(s).`);
+}
+
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
@@ -590,6 +650,12 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validateOfferParts(selectedOffer.admissionOfferParts   || [], bookedOffers.flatMap(b => b.admissions   || []), "admission",   expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
+
+  // #377: close the accommodation loop ONCE, on the create-booking step —
+  // re-reads (05/07) would only duplicate the goal rows in the report.
+  if ((req?.getName?.() ?? "") === "02. POST Create Booking") {
+    validateAccommodationGoal(selectedOffer, bookedOffers);
+  }
 
   // #253: pass the sibling Booking.fulfillmentDocuments[] (v3.8) so each
   // fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
