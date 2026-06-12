@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.167",
+  "current_release": "2026.168",
   "releases": [
+    {
+      "release": "2026.168",
+      "date": "2026-06-12",
+      "server": "1.11.140",
+      "collection": "OTST_V2.0.82",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Window-aware condition pairing & value-aware refund gate (#389), confirmed with OBB (Marcel Koseler) + tester review of 2026.167. (1) validateAfterSalesConditions paired offer->booking conditions with find()-by-condition-type — with TWO REFUND windows (free until the eve of travel / full fee after) every offer window was compared against the booking's FIRST window of that type, manufacturing 'the offer said 88950, the booking says 0' on perfectly mirrored payloads (booking echoes both windows, same instants in Z vs +02:00). Now: pair by type + identical validity INSTANTS (timezone-insensitive) -> consumption among same-type leftovers -> re-use with one WARNING; DEBUG names the pairing; new WARNING when the paired windows genuinely differ (schedules diverge between offer and booking). The 'systematic afterSaleFee zeroing' OBB finding (60990/87950/88950 -> 0) is formally RETRACTED — it was this matcher, the same first-match disease as the #383 appliedPassengerTypes fix. (2) Value-aware refund permissibility: the #387 gate failed only when EVERY part declared refundable=NO; the tester's mixed run (admission NO @ 88950 + reservation WITH_CONDITION @ 0, active fee-0 window) passed with an INFO while the refunded 88950 was exactly the NO-flagged admission's value. New gate (after all-NO, before the window checks; skipped under overrule; guarded to one currency+scale across compared amounts): refundableAmount + refundFee must not exceed the summed price of parts with refundable != NO — excess -> failing decoded row 'the refund returns 88950 EUR but the parts permitting a refund carry only 0 — the value comes from part(s) declaring refundable=NO... The provider pays out value its own flag declares locked.' Dossier impact: zeroing retracted; the refundable=NO contradiction SHARPENS (engine pays out flag-locked value).",
+        "Verification: harness over the REAL extracted functions with VERBATIM payloads — (a) Marcel's screenshot offer/booking (two REFUND windows, +02:00 vs Z, fees 0/88950 both sides): ZERO failing rows, both windows 'paired by validity window'; reversed booking order still green; GENUINE zeroing (booking window[1] really 0) -> exactly ONE row blaming the right window; fewer booking conditions -> one re-use WARNING; divergent windows -> 'schedules differ' nuance with fees still compared. (b) The tester's release-167 run (admission NO @ 88950 + reservation WITH_CONDITION @ 0, refund 88950 fee 0): ONE failing decoded row; YES-part covering the value -> green; refund within permitted siblings -> green + OK DEBUG; mixed currencies -> gate skipped with DEBUG; all-NO branch intact; overrule still silent. node --check x2; eslint + inline-script lint green. Server 1.11.139 -> 1.11.140; collection OTST_V2.0.81 -> OTST_V2.0.82."
+      ]
+    },
     {
       "release": "2026.167",
       "date": "2026-06-12",

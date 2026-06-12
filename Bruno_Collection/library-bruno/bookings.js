@@ -127,14 +127,48 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
     expect(bookedConditions).to.be.an('array');
     validationLogger(`[DEBUG] ${partType}[${index}] has ${offerConditions.length} afterSalesCondition(s) in offer and ${bookedConditions.length} in booking`);
   });
+  // #389: pair offer→booking conditions by type + IDENTICAL validity INSTANTS
+  // (timezone-insensitive — the offer speaks +02:00, the booking Z), then by
+  // consumption among same-type leftovers, then re-use with one WARNING. The
+  // old find()-by-type compared EVERY offer window of a type against the
+  // booking's FIRST window of that type — two REFUND windows (free until the
+  // eve of travel / full fee after) manufactured "the offer said 88950, the
+  // booking says 0" on perfectly mirrored payloads (tester + OBB finding;
+  // the same first-match disease as the #383 appliedPassengerTypes fix).
+  const _condInstant = (v) => {
+    if (!v) return null;
+    const t = new Date(v).getTime();
+    return isNaN(t) ? String(v) : t;
+  };
+  const _bookedCondPool = bookedConditions.slice();
+  let _condReuseWarned = false;
   offerConditions.forEach((condition, condIndex) => {
-    const condType        = condition.condition;
-    const bookedCondition = bookedConditions.find(c => c.condition === condType);
+    const condType = condition.condition;
+    let _pairKind = 'window';
+    let _poolIdx = _bookedCondPool.findIndex((c) => c && c.condition === condType
+      && _condInstant(c.validFrom) === _condInstant(condition.validFrom)
+      && _condInstant(c.validUntil) === _condInstant(condition.validUntil));
+    if (_poolIdx === -1) {
+      _pairKind = 'order';
+      _poolIdx = _bookedCondPool.findIndex((c) => c && c.condition === condType);
+    }
+    let bookedCondition = (_poolIdx !== -1) ? _bookedCondPool.splice(_poolIdx, 1)[0] : null;
+    if (!bookedCondition) {
+      bookedCondition = bookedConditions.find((c) => c && c.condition === condType) || null;
+      _pairKind = 'reused';
+      if (bookedCondition && !_condReuseWarned) {
+        _condReuseWarned = true;
+        validationLogger(`[WARNING] ${partType}[${index}] afterSalesConditions: the booking carries fewer ${condType} conditions than the offer — entries re-used for matching; per-window comparison is approximate.`);
+      }
+    }
     test(`${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} exists in booking`, () => {
       expect(bookedCondition, `Condition '${condType}' not found in booking`).to.exist;
-      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking`);
+      validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}] - ${condType} found in booking (paired by ${_pairKind === 'window' ? 'validity window' : _pairKind === 'order' ? 'type+order' : 'type re-use'})`);
     });
     if (!bookedCondition) return;
+    if (_pairKind === 'order' && (condition.validFrom || condition.validUntil || bookedCondition.validFrom || bookedCondition.validUntil)) {
+      validationLogger(`[WARNING] ${partType}[${index}] afterSalesConditions[${condIndex}] (${condType}): no booking condition shares this validity window (offer ${condition.validFrom || '-'} → ${condition.validUntil || 'open'}; paired with booking ${bookedCondition.validFrom || '-'} → ${bookedCondition.validUntil || 'open'}) — the schedules differ between offer and booking.`);
+    }
     test(`${partType}[${index}] afterSalesConditions[${condIndex}].condition matches`, () => {
       expect(bookedCondition.condition).to.eql(condition.condition);
       validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].condition: offer='${condition.condition}' booking='${bookedCondition.condition}'`);

@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.140] — 2026-06-12
+
+**Window-aware condition pairing & value-aware refund gate (#389)** —
+confirmed with OBB (Marcel) + tester review of release 2026.167.
+
+### Fixed
+
+- **False "the offer said 88950, the booking says 0" rows are gone.**
+  Offer↔booking afterSalesConditions now pair by condition type +
+  identical validity INSTANTS (timezone-insensitive; the offer speaks
+  +02:00, the booking Z), with consumption fallback and a re-use
+  WARNING. The old find()-by-type compared every offer window against
+  the booking's FIRST window of that type — two REFUND windows
+  manufactured the mismatch on perfectly mirrored payloads. The
+  "systematic afterSaleFee zeroing" OBB finding is formally RETRACTED.
+  New nuance when paired windows genuinely differ (schedules diverge).
+
+### Added
+
+- **Value-aware refund permissibility.** The #387 gate failed only when
+  EVERY part declared refundable=NO; a mixed offer (admission NO @ 88950
+  + reservation WITH_CONDITION @ 0) passed while the refunded 88950 was
+  exactly the NO-flagged admission's value. New gate: refunded value
+  (refundable + fee) must not exceed the total price of the parts that
+  permit a refund — excess fails decoded ("the provider pays out value
+  its own flag declares locked"). Guarded to single-currency/scale.
+
+---
+
 ## [server-v1.11.139] — 2026-06-12
 
 **Refundability verdict & report readability (#387)** — from the tester

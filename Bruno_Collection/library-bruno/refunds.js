@@ -127,6 +127,38 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
 
+  // #389: value-aware gate — the all-NO check above misses MIXED offers
+  // (tester finding: admission refundable=NO @ 88950 + reservation
+  // WITH_CONDITION @ 0 → the WITH_CONDITION branch passed with an INFO while
+  // the refunded 88950 was exactly the NO-flagged admission's value). The
+  // refunded value (refundableAmount + refundFee) must not exceed the total
+  // price of the parts that PERMIT a refund (refundable ≠ NO). Guarded:
+  // compared only when every involved amount shares one currency and scale.
+  const _noParts = parts.filter((p) => p.refundable === "NO" && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
+  if (_noParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
+    const _amounts = parts.filter((p) => p.price).map((p) => p.price)
+      .concat([refundOffer.refundableAmount])
+      .concat(refundOffer.refundFee ? [refundOffer.refundFee] : []);
+    const _currencies = [...new Set(_amounts.map((a) => a.currency).filter(Boolean))];
+    const _scales = [...new Set(_amounts.map((a) => a.scale).filter((v) => v != null))];
+    if (_currencies.length > 1 || _scales.length > 1) {
+      validationLogger(`[DEBUG] Refund permissibility value gate skipped — mixed currencies (${_currencies.join("/") || "?"}) or scales (${_scales.join("/") || "?"}); only the flag/window checks apply.`);
+    } else {
+      const _permitted = parts
+        .filter((p) => p.refundable !== "NO" && p.price && typeof p.price.amount === "number")
+        .reduce((sum, p) => sum + p.price.amount, 0);
+      const _refunded = refundOffer.refundableAmount.amount
+        + ((refundOffer.refundFee && typeof refundOffer.refundFee.amount === "number") ? refundOffer.refundFee.amount : 0);
+      if (_refunded > _permitted) {
+        test(`Refund offer[${index}] permissibility — refunded value stays within the parts that permit a refund`, () => {
+          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts permitting a refund (refundable ≠ NO) carry only ${_permitted} — the difference comes from part(s) declaring refundable=NO (${_noParts.map((p) => `${p.price.amount} ${p.price.currency || ""}`).join(", ")}) and no overrule was sent. The provider pays out value its own flag declares locked.`);
+        });
+        return;
+      }
+      validationLogger(`[DEBUG] Refund permissibility value gate OK — refunded ${_refunded} ≤ ${_permitted} carried by the parts permitting a refund (NO-flagged parts: ${_noParts.map((p) => p.price.amount).join(", ")}).`);
+    }
+  }
+
   const anyWithCondition = parts.some((p) => p.refundable === "WITH_CONDITION");
   if (anyWithCondition && hasRefundCondition && activeFees.length === 0) {
     validationLogger(`[WARNING] Refund offer[${index}] permissibility — refundable=WITH_CONDITION but NO declared REFUND condition window is active right now (flags: [${flags.join(", ")}]); the provider granted a refund outside its own declared windows.`);
