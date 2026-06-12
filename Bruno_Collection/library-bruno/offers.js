@@ -583,16 +583,13 @@ function selectAndSetOffer(jsonData) {
     }
 
     function validateField(field, type) {
+      // #387: context only — the scenario-vs-offer verdict row is OWNED by
+      // ensureYesWhenRefundOrExchangeSelected. This used to be the FIRST of
+      // THREE rows registered for the same root cause (a REFUND/EXCHANGE
+      // scenario on a part that does not permit it).
       const parts = selOffer.admissionOfferParts;
       const allYes = parts.every(p => p[field] === "YES");
-      test(`All admissionOfferParts of selected offer are ${type} - expected: YES, actual: ${parts.map(p => p[field]).join(", ")}`, () => {
-        validationLogger(`[DEBUG] All admissionOfferParts of selected offer are ${type} - expected: YES, actual: ${parts.map(p => p[field]).join(", ")}`);
-        expect(allYes, `Expected all admissionOfferParts to be ${type}`).to.be.true;
-        if (!allYes) {
-          validationLogger(`[ERROR] Some admissionOfferParts are not ${type}`);
-          throw new Error(`⛔ Stop: selected offer admissionOfferParts are not all ${type}`);
-        }
-      });
+      validationLogger(`[DEBUG] Selected offer admission ${type} flags (FULL/SEMI_FLEXIBLE context): [${parts.map(p => p[field]).join(", ")}]${allYes ? "" : " — not all YES; see the scenario-vs-offer verdict row."}`);
     }
 
     if (scenarioTypeStr?.includes("EXCHANGE")) validateField("exchangeable", "exchangeable");
@@ -1177,19 +1174,14 @@ function validateAdmissions(selectedOffer) {
         validationLogger(`[DEBUG] No afterSalesConditions found for admission id=${admission.id} → test skipped`);
       }
 
-      // If FULL FLEXIBLE ticket, refundable and/or exchangeable must be YES
+      // #387: context only — was the SECOND of three rows for one root cause;
+      // the verdict row is owned by ensureYesWhenRefundOrExchangeSelected.
       if (overallFlex === "FULL_FLEXIBLE" || overallFlex === "SEMI_FLEXIBLE") {
         const scenarioType = bru.getEnvVar("scenarioType") || "";
         if (scenarioType.includes("REFUND")) {
-          test(`Admission part ${i + 1} refundable : ${admission.refundable}`, function () {
-            validationLogger(`[DEBUG] Admission part ${i + 1} refundable : ${admission.refundable}`);
-            expect(admission.refundable, "Refundable should be YES").to.eql("YES");
-          });
+          validationLogger(`[DEBUG] Admission part ${i + 1} refundable : ${admission.refundable} (verdict: scenario-vs-offer row)`);
         } else if (scenarioType.includes("EXCHANGE")) {
-          test(`Admission part ${i + 1} exchangeable : ${admission.exchangeable}`, function () {
-            validationLogger(`[DEBUG] Admission part ${i + 1} exchangeable : ${admission.exchangeable}`);
-            expect(admission.exchangeable, "Exchangeable should be YES").to.eql("YES");
-          });
+          validationLogger(`[DEBUG] Admission part ${i + 1} exchangeable : ${admission.exchangeable} (verdict: scenario-vs-offer row)`);
         }
       }
     });
@@ -1726,24 +1718,38 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
   if (admissionParts.length > 0) {
     admissionParts.forEach((admission, i) => {
       const scenarioType = bru.getEnvVar("scenarioType") || "";
+      // #387: THE owner of the scenario-vs-offer verdict (one defect, one row
+      // — two former duplicates demoted to DEBUG context). Provider-fairness:
+      // WITH_CONDITION must PASS — a REFUND/EXCHANGE under conditions is
+      // legitimate; the after-sales step verifies the actual window. Only NO
+      // (or an absent flag) fails, decoded.
+      const _flagVerdict = (field, action) => {
+        const v = admission[field];
+        const hasSchedule = Array.isArray(admission.afterSalesConditions)
+          && admission.afterSalesConditions.some((c) => c && c.condition === action);
+        if (v === "YES") {
+          test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: YES`, () => {
+            validationLogger(`[DEBUG] Admission part ${i + 1} ${field}=YES — the ${action} scenario can proceed.`);
+          });
+          return;
+        }
+        if (v === "WITH_CONDITION") {
+          test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: WITH_CONDITION`, () => {
+            validationLogger(`[INFO] Admission part ${i + 1} ${field}=WITH_CONDITION — the ${action} is condition-bound; the ${action.toLowerCase()}-offer step verifies the declared window.`);
+          });
+          return;
+        }
+        test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: ${v}`, () => {
+          throw new Error(`The scenario plans a ${action} but the selected offer's admission part declares ${field}=${v == null ? "(absent)" : v} — OSCAR continues so the ${action.toLowerCase()} leg documents what the provider actually does with a product it declared non-${action.toLowerCase()}able.`);
+        });
+        if (hasSchedule) {
+          validationLogger(`[WARNING] Admission part ${i + 1} declares ${field}=${v} yet carries ${action} afterSalesConditions (a fee schedule is present) — the flag and the conditions contradict each other; the ${action.toLowerCase()}-offer step will reveal which one the provider's engine follows.`);
+        }
+      };
       if (scenarioType.includes("REFUND")) {
-        test(`Admission part ${i + 1} is refundable (scenarioType=REFUND) - refundable: ${admission.refundable}`, function () {
-          if (admission.refundable !== "YES") {
-            validationLogger(`[ERROR] ⛔ scenarioType is REFUND but Admission part ${i + 1} is not refundable`);
-          } else {
-            validationLogger(`[DEBUG] Admission part ${i + 1} is refundable as expected, continuing.`);
-          }
-          expect(admission.refundable, "Admission part should be refundable in REFUND scenario").to.eql("YES");
-        });
+        _flagVerdict("refundable", "REFUND");
       } else if (scenarioType.includes("EXCHANGE")) {
-        test(`Admission part ${i + 1} is exchangeable (scenarioType=EXCHANGE) - exchangeable: ${admission.exchangeable}`, function () {
-          if (admission.exchangeable !== "YES") {
-            validationLogger(`[ERROR] ⛔ scenarioType is EXCHANGE but Admission part ${i + 1} is not exchangeable`);
-          } else {
-            validationLogger(`[DEBUG] Admission part ${i + 1} is exchangeable as expected, continuing.`);
-          }
-          expect(admission.exchangeable, "Admission part should be exchangeable in EXCHANGE scenario").to.eql("YES");
-        });
+        _flagVerdict("exchangeable", "EXCHANGE");
       }
     });
   }
