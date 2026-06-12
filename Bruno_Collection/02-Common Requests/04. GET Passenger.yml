@@ -67,9 +67,8 @@ runtime:
         })();
 
         if (res.getStatus() !== 200) {
-          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
+          // #383: the status test above already recorded this failure once —
+          // a second identical registration only double-counted it.
           const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
           failStepOrContinue("GET Passenger", _policyNext);
           return;

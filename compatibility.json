@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.164",
+  "current_release": "2026.165",
   "releases": [
+    {
+      "release": "2026.165",
+      "date": "2026-06-12",
+      "server": "1.11.137",
+      "collection": "OTST_V2.0.79",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Booking validation accuracy round (#383), from Patrick's audit of the OBB SALE_WIEN_HAMBURG_1LEG_2ADT_3CHD_5BERTH run. (1) Option B re-read dedupe (approved): the offer<->booking afterSaleFee mismatch family registers ONE failing row per root cause, at create-booking; the 05/07 booking re-reads seeing the IDENTICAL part/condition/values log '[WARNING] defect already recorded at create-booking — still present at this read' instead of new rows; a CHANGED value at a re-read is a NEW finding and fails normally (state-transition coverage kept); passing confirmations stay. 6 rows -> 2 on the OBB zeroed-fee defect (offer 87950 -> booking 0; admission + reservation stay separate — two payload objects to fix). Keys in __bookingFindingKeys, reset per scenario (parser + opencollection delete-lists). (2) appliedPassengerTypes 1:1 consumption matcher: old find()-by-type compared the FIRST same-type booking entry N times (log showed PAX1, PAX1, 00003, 00003, 00003 — OSCAR's matcher, not OBB collapsing passengers). Order now: exact passengerRef match (providers keeping request refs) -> first UNCONSUMED same-type entry (UUID sandboxes) -> re-use with one R9 'fewer entries than the offer' note. New R9 nuance when booking entries share passengerRefs (per-passenger entitlements indistinguishable). Ref-matched entries now catch real type mismatches the old matcher could never see. (3) 🎯 goal MET line names the allocated places (coach X place Y; defensive over coachNumber/coach + placeNumber/number/place) and warns (R9) when reservedPlaces count < party size — legitimate for multi-passenger compartments (e.g. 3 DOUBLE_WC places for 5 pax), under-allocation otherwise; the list tells which. (4) FIX one-failure-one-row: 03/04/05/07 ymls registered the HTTP-status test TWICE on non-200 (normal + failure-branch duplicate before failStepOrContinue/loopbackOrStop). Follow-up probe noted in #383: REFUND with refund date after departure discriminates whether the refund engine reads the offer schedule (echo cosmetic) or the booking echo (money bug — free refund after travel).",
+        "Verification: harness over the REAL extracted functions — dedupe (02 mismatch -> 1 decoded row + key; 05 same values -> 0 rows + WARNING, passing confirmations kept; 07 changed value -> NEW failing row; create step never softens, e.g. return-inbound 02). Matcher (OBB-style same-namespace refs -> all 1:1, '00002 matched 1:1' not PAX1-collapse, zero warnings; UUID sandbox -> consumption fallback u1/u2 distinct; fewer-entries booking -> lenient + ONE reuse warning; collapsed refs -> 'only 1 distinct passengerRef(s) across 5' nuance). Goal (3 places/5 pax -> MET line lists coach/place + party WARNING; 5/5 -> silent). Yml sweep: exactly one status-test registration left in each of the 4 files. node --check x2; eslint + inline-script lint green. Server 1.11.136 -> 1.11.137; collection OTST_V2.0.78 -> OTST_V2.0.79."
+      ]
+    },
     {
       "release": "2026.164",
       "date": "2026-06-12",

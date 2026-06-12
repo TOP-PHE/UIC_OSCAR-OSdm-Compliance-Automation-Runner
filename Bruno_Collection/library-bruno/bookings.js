@@ -146,15 +146,26 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
         validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee exists in both offer and booking`);
       });
       ['currency', 'amount', 'scale'].forEach(field => {
-        test(`${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field} matches`, () => {
-          const _offerVal  = condition.afterSaleFee[field];
-          const _bookedVal = bookedCondition.afterSaleFee[field];
-          // #375: decodable provider-language failure (no chai tail).
-          if (_bookedVal !== _offerVal) {
-            throw new Error(`Booking does not echo the offer's ${condition.condition} fee ${field}: the offer said ${JSON.stringify(_offerVal)}, the booking says ${JSON.stringify(_bookedVal)} — the booking must mirror the offer's after-sales conditions.`);
-          }
-          validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${_offerVal}' booking='${_bookedVal}'`);
-        });
+        const _offerVal  = condition.afterSaleFee[field];
+        const _bookedVal = bookedCondition.afterSaleFee[field];
+        const _name = `${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field} matches`;
+        if (_bookedVal === _offerVal) {
+          test(_name, () => {
+            validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field}: offer='${_offerVal}' booking='${_bookedVal}'`);
+          });
+          return;
+        }
+        // #375: decodable provider-language failure (no chai tail).
+        // #383: ONE failing row per root cause across the booking re-reads.
+        recordFindingOnce(
+          `${partType}[${index}].asc[${condIndex}].afterSaleFee.${field}|${JSON.stringify(_offerVal)}|${JSON.stringify(_bookedVal)}`,
+          () => {
+            test(_name, () => {
+              throw new Error(`Booking does not echo the offer's ${condition.condition} fee ${field}: the offer said ${JSON.stringify(_offerVal)}, the booking says ${JSON.stringify(_bookedVal)} — the booking must mirror the offer's after-sales conditions.`);
+            });
+          },
+          `[WARNING] ${_name}: defect already recorded at create-booking — still present at this read (offer ${JSON.stringify(_offerVal)} vs booking ${JSON.stringify(_bookedVal)}).`,
+        );
       });
       const scenarioType = bru.getEnvVar("scenarioType");
       if (scenarioType && scenarioType.includes(condType)) {
@@ -169,6 +180,31 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
   });
 }
 
+// #383 (Option B, approved): offer↔booking mismatch findings register ONE
+// failing row per root cause. The booking is validated at THREE steps (02
+// create / 05 before fulfillment / 07 after) — re-reads seeing the IDENTICAL
+// finding (same part/condition/field/values) would only re-count it, so they
+// log a [WARNING] instead. A DIFFERENT value at a re-read is a state-transition
+// change → a NEW finding, registered normally. Keys live in
+// __bookingFindingKeys (reset per scenario via the parser delete-list).
+function isCreateBookingStep() {
+  try { return ((req && req.getName && req.getName()) || "") === "02. POST Create Booking"; } catch (_e) { return false; }
+}
+function recordFindingOnce(key, registerFailingTest, rereadNote) {
+  let seen = [];
+  try { seen = JSON.parse(bru.getEnvVar("__bookingFindingKeys") || "[]"); } catch (_e) { seen = []; }
+  if (!Array.isArray(seen)) seen = [];
+  if (seen.includes(key) && !isCreateBookingStep()) {
+    validationLogger(rereadNote);
+    return;
+  }
+  if (!seen.includes(key)) {
+    seen.push(key);
+    bru.setEnvVar("__bookingFindingKeys", JSON.stringify(seen));
+  }
+  registerFailingTest();
+}
+
 function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
   if (!Array.isArray(part.appliedPassengerTypes) || part.appliedPassengerTypes.length === 0) {
     if (Array.isArray(bookedPart.appliedPassengerTypes) && bookedPart.appliedPassengerTypes.length > 0) {
@@ -181,23 +217,53 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
     expect(bookedPart.appliedPassengerTypes).to.be.an('array');
     validationLogger(`[DEBUG] ${partType}[${index}] has ${part.appliedPassengerTypes.length} appliedPassengerType(s) in offer and ${bookedPart.appliedPassengerTypes.length} in booking`);
   });
+  // #383: 1:1 consumption matching. The old find()-by-type returned the FIRST
+  // booking entry of each type for EVERY offer passenger of that type — for a
+  // 2 ADT + 3 CHD party the log showed booking refs PAX1, PAX1, 00003, 00003,
+  // 00003 (OUR matcher, not the provider collapsing passengers), the same
+  // entry was compared N times, and per-passenger coverage was never checked.
+  // Order now: exact passengerRef match (providers that keep the request's
+  // refs — OBB does) → first UNCONSUMED entry of the same type (sandboxes that
+  // rewrite refs to internal UUIDs) → re-use any entry of the type, with one
+  // R9 note (booking carries fewer entries than the offer).
+  const _bookedPtPool = Array.isArray(bookedPart.appliedPassengerTypes) ? bookedPart.appliedPassengerTypes.slice() : [];
+  const _bookedPtAll  = Array.isArray(bookedPart.appliedPassengerTypes) ? bookedPart.appliedPassengerTypes : [];
+  let _ptReuseWarned = false;
+  const _distinctBookedRefs = new Set(_bookedPtAll.map(pt => pt && pt.passengerRef).filter(Boolean));
+  if (_bookedPtAll.length > 1 && _distinctBookedRefs.size < _bookedPtAll.length) {
+    validationLogger(`[WARNING] ${partType}[${index}] appliedPassengerTypes: only ${_distinctBookedRefs.size} distinct passengerRef(s) across ${_bookedPtAll.length} booking entries — passengers share references, so per-passenger entitlements cannot be told apart.`);
+  }
   part.appliedPassengerTypes.forEach((passengerType, ptIndex) => {
     validationLogger(`[DEBUG] Validating ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type}`);
-    // Note: passengerRef in the offer is the externalRef (e.g. "00001") while in the booking it is the
-    // sandbox internal UUID → match by type only to avoid false negatives across all sandboxes.
-    const bookedPassengerType = bookedPart.appliedPassengerTypes?.find(
-      pt => pt.type === passengerType.type
-    );
+    let _matchKind = 'ref';
+    let _poolIdx = _bookedPtPool.findIndex(pt => pt && pt.passengerRef != null && pt.passengerRef === passengerType.passengerRef);
+    if (_poolIdx === -1) {
+      _matchKind = 'type';
+      _poolIdx = _bookedPtPool.findIndex(pt => pt && pt.type === passengerType.type);
+    }
+    let bookedPassengerType = (_poolIdx !== -1) ? _bookedPtPool.splice(_poolIdx, 1)[0] : null;
+    if (!bookedPassengerType) {
+      // Pool exhausted — fewer booking entries than offer entries. Stay as
+      // lenient as the historic matcher (re-use an entry) but say so once.
+      bookedPassengerType = _bookedPtAll.find(pt => pt && pt.type === passengerType.type) || null;
+      _matchKind = 'reused';
+      if (bookedPassengerType && !_ptReuseWarned) {
+        _ptReuseWarned = true;
+        validationLogger(`[WARNING] ${partType}[${index}] appliedPassengerTypes: the booking carries fewer entries (${_bookedPtAll.length}) than the offer (${part.appliedPassengerTypes.length}) — entries re-used for matching; per-passenger linkage cannot be verified.`);
+      }
+    }
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type} exists in booking`, () => {
       expect(bookedPassengerType, `PassengerType type='${passengerType.type}' not found in booking`).to.exist;
       validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] - type=${passengerType.type} found in booking`);
     });
     if (!bookedPassengerType) return;
 
-    // passengerRef is intentionally not compared: offer contains externalRef, booking contains internal UUID
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef exists in booking`, () => {
       expect(bookedPassengerType.passengerRef, `passengerRef missing in booking appliedPassengerTypes`).to.be.a('string').and.not.be.empty;
-      validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef in booking: '${bookedPassengerType.passengerRef}' (offer externalRef was: '${passengerType.passengerRef}')`);
+      validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].passengerRef in booking: '${bookedPassengerType.passengerRef}'`
+        + (_matchKind === 'ref'
+          ? ` — matched 1:1 with the offer's '${passengerType.passengerRef}'`
+          : ` (offer externalRef was: '${passengerType.passengerRef}'; matched by type — the provider uses its own ids)`));
     });
     test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].type matches`, () => {
       expect(bookedPassengerType.type).to.eql(passengerType.type);
@@ -359,8 +425,26 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
       if (!ok) throw new Error(`The allocation covers trip/leg ${alloc.tripLegCoverage.tripId}/${alloc.tripLegCoverage.legId}, but the selection targeted ${tlc.map(c => c.tripId + '/' + c.legId).join(', ')}.`);
     });
   }
-  const places = Array.isArray(alloc.reservedPlaces) ? alloc.reservedPlaces.length : 0;
-  validationLogger(`[INFO] 🎯 Accommodation goal MET: requested ${requested} → offer advertised ${offeredLabel} (part ${reservationId}) → booking allocated ${alloc.accommodationType}${alloc.accommodationSubType ? '/' + alloc.accommodationSubType : ''} with ${places} reserved place(s).`);
+  // #383: name the actual places so a human can judge the allocation, and
+  // relate the count to the party (R9 nuance — a 'place' may be a compartment
+  // hosting several passengers, e.g. a DOUBLE berth, so fewer places than
+  // passengers can be legitimate; the list is what tells which case it is).
+  const _resPlaces = Array.isArray(alloc.reservedPlaces) ? alloc.reservedPlaces : [];
+  const _placeLabel = (p) => {
+    if (!p || typeof p !== 'object') return '?';
+    const _coach = p.coachNumber != null ? p.coachNumber : (p.coach != null ? p.coach : null);
+    const _num   = p.placeNumber != null ? p.placeNumber : (p.number != null ? p.number : (p.place != null ? p.place : null));
+    if (_coach != null && _num != null) return `coach ${_coach} place ${_num}`;
+    if (_num != null) return `place ${_num}`;
+    return JSON.stringify(p).slice(0, 40);
+  };
+  const _placesText = _resPlaces.length ? ` [${_resPlaces.map(_placeLabel).join('; ')}]` : '';
+  validationLogger(`[INFO] 🎯 Accommodation goal MET: requested ${requested} → offer advertised ${offeredLabel} (part ${reservationId}) → booking allocated ${alloc.accommodationType}${alloc.accommodationSubType ? '/' + alloc.accommodationSubType : ''} with ${_resPlaces.length} reserved place(s)${_placesText}.`);
+  let _party = 0;
+  try { _party = (JSON.parse(bru.getEnvVar("offerPassengerSpecifications") || "[]") || []).length; } catch (_e) { _party = 0; }
+  if (_party > 0 && _resPlaces.length > 0 && _resPlaces.length < _party) {
+    validationLogger(`[WARNING] 🎯 ${_resPlaces.length} reserved place(s) for a party of ${_party} — legitimate when a place is a multi-passenger compartment (${alloc.accommodationSubType || alloc.accommodationType}), under-allocation otherwise. Check the place list above.`);
+  }
 }
 
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
