@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.137] — 2026-06-12
+
+**Booking validation accuracy round (#383)** — from the tester audit of the
+OBB SALE_WIEN_HAMBURG_1LEG_2ADT_3CHD_5BERTH run.
+
+### Changed
+
+- **One failing row per root cause across booking re-reads (Option B).**
+  The offer↔booking afterSaleFee mismatch family registers its failing
+  assertion ONCE, at create-booking; the 05/07 re-reads seeing the same
+  part/condition/values log a [WARNING] "defect already recorded at
+  create-booking — still present at this read". A value that CHANGES
+  between reads is a NEW finding and fails normally (state-transition
+  coverage kept). 6 rows → 2 on the OBB zeroed-fee defect.
+- **appliedPassengerTypes now match 1:1 (consumption).** The old
+  find()-by-type compared the FIRST booking entry of each type N times
+  (log showed booking refs PAX1, PAX1, 00003, 00003, 00003 — our matcher,
+  not the provider). Order: exact passengerRef match → first unconsumed
+  same-type entry (UUID-rewriting sandboxes) → re-use with one R9 note.
+  New nuance when booking entries share passengerRefs.
+- **🎯 goal line names the allocated places** (coach/place) and adds an
+  R9 WARNING when reservedPlaces count < party size (legitimate for
+  multi-passenger compartments — the place list tells which case).
+
+### Fixed
+
+- **One HTTP failure, one row**: 03/04/05/07 registered the status test
+  twice on non-200 (once normally, once inside the failure branch).
+
+---
+
 ## [server-v1.11.136] — 2026-06-12
 
 **NJ conformance PR3 (#379): reservation spec-coverage depth.**

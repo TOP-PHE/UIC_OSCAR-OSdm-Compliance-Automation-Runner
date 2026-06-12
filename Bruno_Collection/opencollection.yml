@@ -308,6 +308,7 @@ request:
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
                 "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
+                "__bookingFindingKeys",
                 // Fulfillment
                 "fulfillmentIds",
                 // Exchange / Refund
