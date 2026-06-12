@@ -1434,9 +1434,21 @@ function validateAncillaries(selectedOffer) {
 // stays the fallback for providers that only set it there.
 function offerTripCoverage(selectedOffer) {
   const tc = selectedOffer && selectedOffer.tripCoverage;
-  return (Array.isArray(tc) ? tc : (tc ? [tc] : []))
-    .filter(c => c && c.tripId && c.legId)
-    .map(c => ({ tripId: c.tripId, legId: c.legId }));
+  const arr = Array.isArray(tc) ? tc : (tc ? [tc] : []);
+  const out = [];
+  arr.forEach(c => {
+    if (!c) return;
+    if (c.tripId && c.legId) {
+      out.push({ tripId: c.tripId, legId: c.legId });
+    } else if (c.coveredTripId && Array.isArray(c.coveredLegIds)) {
+      // #377: the spec's TripCoverage form ({coveredTripId, coveredLegIds})
+      // is what providers actually send on the offer (seen on OBB) — the
+      // flat {tripId, legId} mapping alone never fired, so #371's
+      // offer-level preference silently fell back to per-place coverage.
+      c.coveredLegIds.filter(Boolean).forEach(l => out.push({ tripId: c.coveredTripId, legId: l }));
+    }
+  });
+  return out;
 }
 
 function getTripLegCoverage(selectedOffer, accommodationSelection) {
