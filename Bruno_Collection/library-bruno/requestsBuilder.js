@@ -117,7 +117,17 @@ function buildOfferCollectionRequest() {
 function buildBookingRequest() {
   validationLogger("[DEBUG] ➤ buildBookingRequest");
   accommodationAndPlaceSelection();
-  assertPlaceSelectionConsistency();
+  // #378: during a place-selection probe pass the request is corrupted on
+  // purpose — the pre-flight self-check would (rightly) scream. Skip it for
+  // that pass; the 🧪 probe banner takes over the narration. The final CLEAN
+  // pass of the sweep runs the check as usual.
+  const { placeProbeCurrent, applyPlaceProbeCorruption } = require("./placeProbes.js");
+  const _placeProbe = placeProbeCurrent();
+  if (!_placeProbe) {
+    assertPlaceSelectionConsistency();
+  } else {
+    validationLogger(`[DEBUG] Pre-flight self-check skipped — place-selection probe pass ${_placeProbe.index + 1}/${_placeProbe.total} corrupts the request deliberately.`);
+  }
 
   const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
   const firstPassenger = bookingPassengerSpecifications[0];
@@ -178,6 +188,10 @@ function buildBookingRequest() {
   if (!sandbox.includes("paxone")) {
     body.externalRef = "00001";
   }
+
+  // #378: when a probe pass is armed, corrupt the otherwise-CLEAN body now
+  // (exactly one corruption per pass; 02's after-response grades and loops).
+  if (_placeProbe) applyPlaceProbeCorruption(body);
 
   bru.setEnvVar("BookingRequest", JSON.stringify(body));
 }

@@ -307,6 +307,7 @@ request:
                 "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone",
                 "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
+                "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
                 // Fulfillment
                 "fulfillmentIds",
                 // Exchange / Refund
