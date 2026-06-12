@@ -781,6 +781,10 @@ function validateProblemResponse(o) {
   // Optional label disambiguates assertion names when the grader runs repeatedly in
   // a per-field sweep (e.g. "[purchaser.email]") so each field shows on its own line.
   const lbl = o.label ? ` [${o.label}]` : '';
+  // #378: reusable outside the requestedInformation context (place-selection
+  // probes pass '🧪 Place probe'); the default keeps every existing call site
+  // byte-identical.
+  const pfx = o.prefix || 'Negative requestedInformation';
 
   // Rejection REQUIRED (hard) when: no targets given (caller asserts a hard expectation),
   // OR any target is an omit (missing demanded field), OR any invalid target is on an
@@ -803,14 +807,14 @@ function validateProblemResponse(o) {
   const isClientError = isError && status < 500;
 
   // N1 — provider rejects with a client error (never a silent accept).
-  grade(`Negative requestedInformation${lbl}: provider rejects with a client error (4xx)`,
+  grade(`${pfx}${lbl}: provider rejects with a client error (4xx)`,
     isClientError, `expected 4xx, got ${status}`);
 
   // N2/N3 only apply when the provider actually returned an error body to grade.
   if (isError) {
     const isObj = body !== null && typeof body === 'object';
     const hasMessage = isObj && (isSet(body.title) || isSet(body.detail) || isSet(body.code));
-    grade(`Negative requestedInformation${lbl}: error body is an RFC-9457 Problem (title/detail/code present)`,
+    grade(`${pfx}${lbl}: error body is an RFC-9457 Problem (title/detail/code present)`,
       !!hasMessage, 'response body did not contain title/detail/code');
     // N3 — should identify the offending field (always WARN; Problem.pointers optional @3.1).
     const fields = [...new Set(tgs.map((t) => t.scenarioField).filter(Boolean))];
@@ -818,13 +822,13 @@ function validateProblemResponse(o) {
     const hasPointers = isObj && Array.isArray(body.pointers) && body.pointers.length > 0;
     const namesField = fields.length > 0 && fields.some((f) => blob.includes(f.toLowerCase()));
     if (hasPointers || namesField) {
-      log('INFO', 'Negative requestedInformation: error identifies the offending field.');
+      log('INFO', `${pfx}: error identifies the offending field.`);
     } else {
-      log('WARNING', `Negative requestedInformation: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
+      log('WARNING', `${pfx}: error does not clearly identify the offending field${fields.length ? ` (${fields.join('/')})` : ''} via Problem.pointers — recommended per RFC 9457.`);
     }
   } else {
     log(soft ? 'INFO' : 'WARNING',
-      `Negative requestedInformation: provider returned ${status} with no error body to grade.`);
+      `${pfx}: provider returned ${status} with no error body to grade.`);
   }
 }
 

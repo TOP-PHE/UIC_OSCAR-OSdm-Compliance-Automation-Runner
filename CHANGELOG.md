@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.135] — 2026-06-12
+
+**NJ conformance PR2 (#378): the place-selection Non-Happy-Flow probe sweep.**
+One scenario, one sweep (the #258 purchaser-sweep design): the enabled
+probes run INSIDE the booking step — one deliberately-corrupted
+POST /bookings per probe, then the step re-runs CLEAN and the flow
+continues normally.
+
+### Added
+
+- **Three place-selection probes** (wizard: Non Happy Flow customisation →
+  🪑 Place-selection probes):
+  - *Omit placeSelections* — rejection expected on a reservation-mandatory
+    offer; acceptance WITH a provider-chosen `placeAllocation` is recorded
+    as a WARNING (auto-allocation is OSDM-tolerated since `placeSelections`
+    is optional); acceptance with NO allocation FAILS (ambiguous booking).
+  - *Unknown accommodation type* — asks for `HAMMOCK`
+    (AccommodationType is an x-extensible-enum). 400 + RFC-9457 Problem is
+    the recommended answer; acceptance → WARNING (tolerant reader); a 5xx
+    crash FAILS.
+  - *Wrong reservationId* — references a reservation part that exists in
+    no offer. Acceptance FAILS (referential integrity).
+- **Sweep mechanics**: 🧪 banner per pass, one outcome row per probe in the
+  report, RFC-9457 shape grading of every rejection (4xx not 5xx, Problem
+  body, field identification) via the shared grader; a rejected probe
+  consumes nothing; a wrongly-accepted probe stops the sweep and the run
+  continues with that booking. Auth failures (401/403) are flagged as OUR
+  problem and not graded. Probes auto-skip (one WARNING) when the scenario
+  sends no placeSelections, on two-step returns, and when the
+  expired-offer timer owns the booking step.
+- `validateProblemResponse` accepts an optional `prefix` so graders outside
+  the requestedInformation context keep their own report vocabulary
+  (existing call sites unchanged).
+
+---
+
 ## [server-v1.11.134] — 2026-06-12
 
 **NJ conformance PR1 (#377): the accommodation goal-closing chain.**

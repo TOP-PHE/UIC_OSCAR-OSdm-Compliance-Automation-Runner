@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.162",
+  "current_release": "2026.163",
   "releases": [
+    {
+      "release": "2026.163",
+      "date": "2026-06-12",
+      "server": "1.11.135",
+      "collection": "OTST_V2.0.77",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        ["NJ conformance PR2 (#378) — place-selection Non-Happy-Flow probe sweep. Patrick's principle: 'each time we implement a new feature we must think about the type of Non Happy Flow we can implement'; design per his preference (one scenario sweeping all probes, purchaser-sweep #258 precedent). Three probes, run INSIDE '02. POST Create Booking' via self-loop (one corrupted POST per probe, then a final CLEAN pass; a rejected probe consumes nothing provider-side): (1) omitPlaceSelections — rejection expected; 2xx WITH placeAllocation → WARNING (OSDM-tolerated auto-allocation, placeSelections is optional in BookingRequest); 2xx with NO allocation → FAIL (ambiguous booking). (2) unknownAccommodationType — requests 'HAMMOCK' (x-extensible-enum); 400+Problem recommended; 2xx → WARNING (tolerant reader; FAIL if HAMMOCK comes back allocated); 5xx → FAIL. (3) wrongReservationId — references a reservation part existing in no offer; 2xx → FAIL (referential integrity). Each pass: 🧪 [WARNING] banner + one outcome row; rejections graded for RFC-9457 shape (4xx not 5xx, Problem body, field identification) via validateProblemResponse with the new optional prefix param (existing call sites byte-identical). Wrongly-accepted probe → sweep stops, run continues WITH that booking (it flows into the normal post-booking steps incl. the #377 🎯 goal chain). Auth 401/403 → WARNING only, not graded (our problem, not a provider verdict). Auto-skips with one WARNING: no placeSelections to corrupt, two-step return scenarios, expiredOfferTest armed. Wizard: NHF customisation gains the '🪑 Place-selection probes' sub-group (3 pill toggles, dashed-border boxes, armed badges roll into the NHF badge). Pre-flight self-check (#377) is skipped on corrupted passes (deliberate corruption) and runs on the clean pass."],
+        "Verification: integration harness over the REAL modules (placeProbes.js + requestsBuilder.js + requestedInformation.js chain under a stubbed Bruno runtime) — gating (off/finished/expired-owned/return-owned/warn-once), corruption (omit/HAMMOCK/fake-id + no-selections auto-skip ends sweep), reject grading (400→next-probe with prefixed N1/N2 rows green, 422 last→clean-pass, 500→decoded FAIL, 401→advance with NO assertions), accept grading (omit+auto-allocation→WARN row only; omit w/o allocation→decoded FAIL; HAMMOCK ignored→tolerant WARN row; HAMMOCK echoed→FAIL; wrong-id→FAIL; sweep stop + index pinned), and a FULL 3-probe sweep through the real buildBookingRequest (pass1 omit + pre-flight skipped, pass2 HAMMOCK, pass3 fake id, clean pass body intact + pre-flight R8-silent green). node --check x4 + wizard Function-parse; eslint + inline-script lint green. Server 1.11.134 -> 1.11.135; collection OTST_V2.0.76 -> OTST_V2.0.77. NOTE: stacked on release 2026.162 (#377/PR #380) — merge that PR first."
+      ]
+    },
     {
       "release": "2026.162",
       "date": "2026-06-12",
