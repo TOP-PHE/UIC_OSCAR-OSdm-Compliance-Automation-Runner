@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.168",
+  "current_release": "2026.169",
   "releases": [
+    {
+      "release": "2026.169",
+      "date": "2026-06-12",
+      "server": "1.11.141",
+      "collection": "OTST_V2.0.83",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Schedule-aware effective refundability (#391), from the OBB exchange on the 18-offer NJ catalog (admissions pinned to refundable=NO while the schedules said three different things). Rule: a part is effectively refundable iff SOME declared REFUND window charges a fee BELOW the part's price — mere presence of conditions proves nothing (Sparschiene: one window fee=100% -> the schedule CONFIRMS NO). (1) NEW pure module afterSalesRules.js: effectiveRefundability(part, at, action) — fee-vs-price per window, active-window fee at an instant, contradiction classification (FLAG_NO_SCHEDULE_REFUNDABLE / FLAG_WC_NO_SCHEDULE / FLAG_YES_ZERO_WINDOW); expectedRefundForParts = sum(price − active fee), no-active-window contributes 0. (2) Offer verdict (ensureYesWhenRefundOrExchangeSelected) is schedule-first: Komfort/Normalpreis (flag NO, 50%/free window) PASS with the precise R9 WARNING ('the flag does not summarize the rules; per the spec enum, WITH_CONDITION is the value for exactly this schedule — distributors filtering on the flag would hide a refundable product'); Sparschiene FAILS decoded ('every declared REFUND window charges the full price — a refund would return 0; the schedule CONFIRMS the flag') with NO false contradiction warning; WITH_CONDITION without any declared condition -> WARNING (the flag promises conditions a client cannot read); flag-only parts keep the pre-#391 behaviour. (3) Refund permissibility (refunds.js) re-keyed on EFFECTIVE refundability: gate 1 every-part-effectively-non-refundable (schedule-confirmed wording), gate 2 value gate on effectively-permitting parts (the schedule-legal Normalpreis full refund no longer raises the false 'locked value' row), gate 3 NEW schedule-decode assertion: refundableAmount must equal sum(price − active-window fee) right now — a Sparschiene payout or a post-departure full refund fails 'the engine and its own declared schedule disagree' (the refund-after-departure discriminator, machine-checked). Overrule still bypasses; currency/scale guarded.",
+        "Verification: harness with the VERBATIM catalog families — rules 8 (Sparschiene schedule-confirms-NO no contradiction; Komfort 50% + Normalpreis free -> WITH_CONDITION + FLAG_NO_SCHEDULE_REFUNDABLE; after-travel active fee = full price; 0-price part -> flag rules; WC-without-schedule + YES-with-full-fee flagged); verdict 6 (Normalpreis/Komfort PASS + Marcel-sentence WARNING; Sparschiene FAIL decoded with ZERO warnings; flag-only NO fail; EXCHANGE mirror); permissibility 8 (Normalpreis pre-travel full refund GREEN + 'schedule decode OK 88950' — yesterday's false positive gone; Sparschiene payout fails gate 1 schedule-decoded; Komfort 50% match green / over-payout fails 'says 12225'; AFTER-DEPARTURE full payout fails 'says 0'; gate-1 flag-only wording; flag-only YES -> decode skipped, green; overrule silent). node --check x3; eslint + inline-script lint green. Server 1.11.140 -> 1.11.141; collection OTST_V2.0.82 -> OTST_V2.0.83."
+      ]
+    },
     {
       "release": "2026.168",
       "date": "2026-06-12",
