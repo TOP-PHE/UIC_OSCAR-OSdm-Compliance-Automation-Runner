@@ -84,6 +84,7 @@ function resetScenarioEnvVars() {
     "__expiredFlowQueue", "__expiredFlowQueueIndex", "__expiredFlowSubRunPending",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
+    "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
     "overruleCode", "refundDate", "TripType",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
@@ -630,6 +631,20 @@ function parseScenarioData(jsonData) {
       validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${bru.getEnvVar("osdmVersion")}"`);
       bru.setEnvVar("desiredFlexibility", ["", "null"].includes(scenario.desiredFlexibility) ? null : scenario.desiredFlexibility);
       bru.setEnvVar("accommodationSelection", ["", "null"].includes(scenario.accommodationSelection) ? null : scenario.accommodationSelection);
+      // #378: place-selection NHF probe sweep. The wizard stores an object of
+      // booleans; the env carries an ORDERED array of the enabled probe keys
+      // (omit → unknown type → wrong id). Default: no probes. The booking step
+      // self-loops once per key (corrupted passes), then books clean.
+      const _ppSel = scenario.placeSelectionProbes;
+      const _ppOrder = ["omitPlaceSelections", "unknownAccommodationType", "wrongReservationId"];
+      let _ppKeys = [];
+      if (Array.isArray(_ppSel)) _ppKeys = _ppOrder.filter((k) => _ppSel.includes(k));
+      else if (_ppSel && typeof _ppSel === "object") _ppKeys = _ppOrder.filter((k) => _ppSel[k] === true);
+      bru.setEnvVar("placeSelectionProbes", JSON.stringify(_ppKeys));
+      bru.setEnvVar("__placeProbeIndex", "0");
+      if (_ppKeys.length > 0) {
+        validationLogger(`[INFO] 🧪 Place-selection probe sweep ARMED (${_ppKeys.length} probe(s): ${_ppKeys.join(", ")}) — the booking step will first fire ${_ppKeys.length} corrupted request(s), then book clean.`);
+      }
       bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);

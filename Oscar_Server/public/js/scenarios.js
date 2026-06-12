@@ -1651,7 +1651,21 @@ function buildNonHappyFlowSection(idx, sc) {
   if (sc0.requestedInformationProbe != null && sc0.requestedInformationProbe !== 'off') armedShapes++;
   if (sc0.passengerExternalRefFormat && /%0?\d*d/.test(sc0.passengerExternalRefFormat)) armedShapes++;
 
-  const totalArmed = armedTimers + armedShapes;
+  // ── Place-selection probes (#378) — corrupt the booking's placeSelections,
+  // one probe per pass, inside the booking step (one-scenario sweep).
+  const PLACE_PROBE_ITEMS = [
+    { key: 'omitPlaceSelections', label: 'Omit placeSelections', icon: '🚫',
+      desc: 'Send the booking WITHOUT placeSelections although the offer demands a compartment choice (IRT/NJ). Expected: 4xx + RFC-9457 Problem. Accepted with a provider-chosen placeAllocation → WARNING (auto-allocation is OSDM-tolerated). Accepted with no allocation → FAIL (nobody knows which compartment was sold).' },
+    { key: 'unknownAccommodationType', label: 'Unknown accommodation type', icon: '👻',
+      desc: 'Ask for accommodationType HAMMOCK — a value unknown to the AccommodationType code list (x-extensible-enum). Expected: 400 + Problem (recommended). Accepted → WARNING (tolerant reader). 5xx crash → FAIL.' },
+    { key: 'wrongReservationId', label: 'Wrong reservationId', icon: '🎭',
+      desc: 'Reference a reservationId that exists in NO reservation offer part of the selected offer. Expected: 4xx Problem. Accepted → FAIL (referential-integrity violation).' },
+  ];
+  const PLACE_PROBES_TOTAL = PLACE_PROBE_ITEMS.length;
+  const ppSel = (sc0.placeSelectionProbes && typeof sc0.placeSelectionProbes === 'object') ? sc0.placeSelectionProbes : {};
+  const armedPlaceProbes = PLACE_PROBE_ITEMS.filter(p => ppSel[p.key] === true).length;
+
+  const totalArmed = armedTimers + armedShapes + armedPlaceProbes;
 
   // ── Badge renderer ────────────────────────────────────────────────────────
   // One small inline-block pill; amber when anything is armed, neutral grey
@@ -1670,6 +1684,7 @@ function buildNonHappyFlowSection(idx, sc) {
   // matching on header text (see reRenderScenarioDetail).
   const timersOpenClass = armedTimers > 0 ? ' open' : '';
   const shapesOpenClass = armedShapes > 0 ? ' open' : '';
+  const placeProbesOpenClass = armedPlaceProbes > 0 ? ' open' : '';
   const topOpenClass    = totalArmed > 0 ? ' open' : '';
 
   // ── Field-shape probes sub-section (requestedInfoProbe + format probe) ────
@@ -1745,6 +1760,40 @@ function buildNonHappyFlowSection(idx, sc) {
           </div>
         </div>`;
 
+  // ── Place-selection probes sub-section (#378) ─────────────────────────────
+  // Same visual vocabulary as the field-shape probes: dashed-border box per
+  // probe, pill toggle + explanation. Probes run INSIDE the booking step as a
+  // one-scenario sweep (see the footer note); runtime auto-skips keep them
+  // harmless on scenarios without placeSelections.
+  const placeProbesSubsection = `
+        <div class="param-section" style="border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            🪑 Place-selection probes
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">corrupt the booking&#39;s placeSelections, document how the provider reacts</span>
+            ${badge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
+            <span class="ps-arrow${placeProbesOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${placeProbesOpenClass}" style="padding:10px 14px">
+            ${PLACE_PROBE_ITEMS.map((p, i) => {
+              const on = ppSel[p.key] === true;
+              const style = (isTester && sc0.shared) ? ' style="pointer-events:none;opacity:.6"' : '';
+              return `
+            <div style="${i === 0 ? '' : 'margin-top:10px;'}padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+              <div class="pill${on ? ' selected' : ''}" data-action="toggle-place-probe" data-idx="${esc(idx)}" data-key="${esc(p.key)}" title="${esc(p.label)}"${style}>${p.icon} ${esc(p.label)}</div>
+              <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">${p.desc}</div>
+            </div>`;
+            }).join('')}
+            <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
+              <strong>One scenario, one sweep:</strong> the enabled probes run <strong>inside the booking step</strong> —
+              one deliberately-corrupted <code>POST /bookings</code> per probe (each shows a 🧪 banner and a per-probe
+              verdict row in the report), then the step re-runs <strong>clean</strong> and the flow continues normally.
+              A rejected probe consumes nothing on the provider side; a wrongly-<em>accepted</em> probe stops the sweep
+              and the run continues with that booking. Probes auto-skip (with a <code>[WARNING]</code>) when the scenario
+              sends no <code>placeSelections</code>, on return trips, and when the Expired-offer timer owns the booking step.
+            </div>
+          </div>
+        </div>`;
+
   // ── Expiry timers sub-section ─────────────────────────────────────────────
   const expiryTimersSubsection = `
         <div class="param-section" style="border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
@@ -1812,10 +1861,11 @@ function buildNonHappyFlowSection(idx, sc) {
 
   return `
   <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
     <div class="param-section-body${topOpenClass}">
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
         ${expiryTimersSubsection}
+        ${placeProbesSubsection}
         ${shapeProbesSubsection}
       </div>
     </div>
@@ -5984,6 +6034,22 @@ document.body.addEventListener('click', function(e) {
       sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
       el.classList.toggle('selected', sc.salesFlowActions[key]);
       markDirty();
+      break;
+    }
+    case 'toggle-place-probe': {
+      e.stopPropagation();
+      const ppIdx = parseInt(el.dataset.idx);
+      const ppKey = el.dataset.key;
+      const ppSc = state.scenarios[ppIdx];
+      if (!ppSc || !ppKey) break;
+      if (!ppSc.placeSelectionProbes || typeof ppSc.placeSelectionProbes !== 'object') {
+        ppSc.placeSelectionProbes = {};
+      }
+      ppSc.placeSelectionProbes[ppKey] = ppSc.placeSelectionProbes[ppKey] !== true;
+      markDirty();
+      // Re-render so the sub-group + top NHF badges follow the toggle (the
+      // re-render preserves open/closed sub-sections by header text).
+      reRenderScenarioDetail(ppIdx);
       break;
     }
     case 'set-accommodation-selection': {

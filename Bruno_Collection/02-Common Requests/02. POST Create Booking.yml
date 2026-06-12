@@ -94,6 +94,19 @@ runtime:
             return;
         }
 
+        // #378: place-selection NHF probe sweep. When this response answers a
+        // PROBE pass (deliberately corrupted placeSelections), grade it and
+        // loop this very step — next probe, or one final CLEAN pass. A
+        // wrongly-ACCEPTED probe created a real booking: the grader registered
+        // the verdict and stopped the sweep; we FALL THROUGH so the response
+        // is processed as the run's booking (the flow continues with it).
+        const { gradePlaceProbeResponse } = require(bru.getEnvVar("library_base") + "placeProbes.js");
+        const _placeProbeOutcome = gradePlaceProbeResponse(res);
+        if (_placeProbeOutcome === "next-probe" || _placeProbeOutcome === "clean-pass") {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+        }
+
         const _status = res.getStatus();
         let _body = null;
         try { _body = res.getBody(); } catch (_e) { _body = null; }
