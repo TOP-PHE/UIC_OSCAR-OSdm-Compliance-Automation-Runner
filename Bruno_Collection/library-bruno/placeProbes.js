@@ -86,7 +86,10 @@ function placeProbeCurrent() {
 
   // Flows that own the booking step — probes stand down (warn once).
   const owned =
-    (String(bru.getEnvVar('expiredOfferTest')) === 'true' && 'the Expired-offer timer waits past validUntil and grades the rejection itself')
+    // #385: a SKIPPED expired-offer timer (__expiredOfferArmed === 'false',
+    // decided before the body is built) frees this step for the probes.
+    (String(bru.getEnvVar('expiredOfferTest')) === 'true' && bru.getEnvVar('__expiredOfferArmed') !== 'false'
+      && 'the Expired-offer timer waits past the offer deadline and grades the rejection itself')
     || ((bru.getEnvVar('inboundOfferId') && bru.getEnvVar('outboundOfferId')) && 'two-step return bookings re-run the step for the outbound/inbound legs');
   if (owned) {
     if (bru.getEnvVar('__placeProbeSkipWarned') !== 'true') {

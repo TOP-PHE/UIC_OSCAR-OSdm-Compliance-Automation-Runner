@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.165",
+  "current_release": "2026.166",
   "releases": [
+    {
+      "release": "2026.166",
+      "date": "2026-06-12",
+      "server": "1.11.138",
+      "collection": "OTST_V2.0.80",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Expired-flow queue resilience (#385). Tester finding: all NHF armed on an OBB REFUND scenario; queue declared '3 sub-runs (OTO, BTO, RTO)'; the run degenerated into a single happy pass. Root causes: (1) the skip path (expiredOfferTest over budget — OBB part validUntil = TRAVEL date, 11 days away) only disarmed the timer; advanceExpiredFlowQueueOrFinish runs only on a GRADED timer, so BTO/RTO (individually feasible, ~15-16 min deadlines) never got their pass; (2) wrong deadline clock; (3) probes stood down for a timer that never actually waited; (4) RI probe armed but silently inapplicable on OBB's unmapped vocabulary. Fixes: (1) advanceExpiredFlowQueueAfterSkip() — every scenario-complete tail (14 ymls) consults the queue BEFORE the next-scenario/stop logic; detection via the per-timer __<flag>Armed marker ('true' = graded → no-op; 'false' = skipped at step; unset = step never fired → both advance, arm next, route to 01); tally '[INFO] NHF expired-flow queue finished: G of N graded, S skipped' whenever skips occurred. (2) captureExpiredOfferDeadline(): earliest of part validUntil (spec: USE validity, 'Time until the offer can be used, e.g. travel') and Offer.preBookableUntil ('time until the offer can be pre-booked') — Bileto hold windows keep working, OBB gets the real purchasability gate. (3) 02 yml: expired-offer plan/skip decided BEFORE buildBookingRequest + placeProbeCurrent honours __expiredOfferArmed !== 'false' → a skipped OTO frees the step for the 🧪 sweep in the same pass; the guard also stops probe-pass self-loops from re-planning. (4) processRequestedInformation: WARNING when requestedInformationProbe is armed but the RI vocabulary is unmapped ('Probe inert for this scenario'). Operational note for OBB: set Max wait ~20 min on expired-booking / expired-refund-offer (deadlines ~15-16 min; empty Max wait = 10-min server budget → skip).",
+        "Verification: harness over the REAL extracted functions — queue machine 7 states incl. the exact OBB replay (OTO skipped → BTO armed + routed to 01 → BTO route-miss decoded 'never fired' → RTO graded → tally '1 of 3 graded, 2 skipped'; all-skip tally; exhausted-index silent; clean run silent); captureExpiredOfferDeadline 4 shapes (OBB → preBookableUntil wins; Bileto → part hold kept; part earlier than preBookableUntil → earliest wins; no clocks → empty + DEBUG); probe slot 3 cases (skipped timer → probes run; armed → stand down; undecided → conservative stand-down). node --check x5; eslint + inline-script lint green. Server 1.11.137 -> 1.11.138; collection OTST_V2.0.79 -> OTST_V2.0.80."
+      ]
+    },
     {
       "release": "2026.165",
       "date": "2026-06-12",

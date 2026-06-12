@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.138] — 2026-06-12
+
+**Expired-flow queue resilience (#385)** — tester finding: all NHF armed
+on an OBB REFUND scenario, queue declared 3 sub-runs, run degenerated
+into one happy pass.
+
+### Fixed
+
+- **A skipped timer no longer beheads the queue.** Every
+  scenario-complete tail now consults the queue first: a sub-run whose
+  timer skipped at its step (budget/deadline) — or whose gated step
+  never fired — hands the remaining timers their pass. Tally line when
+  the queue ends with skips (e.g. "1 of 3 sub-run(s) graded, 2 skipped").
+- **Expired-offer deadline now targets BOOKABILITY.** Earliest of part
+  validUntil (spec: USE validity — on OBB the trip arrival, days away)
+  and Offer.preBookableUntil (the purchasability gate — 2.5 h on OBB).
+  Bileto-style hold windows in part validUntil keep working; OBB stops
+  producing 11-day waits.
+- **A skipped expired-offer timer frees the booking step for the 🧪
+  place-selection probes** in the same pass: the skip decision moved
+  before the request body is built, and the probes' stand-down check
+  honours the effective armed state.
+- **Armed-but-inert requestedInformation probe now says so**: when the
+  provider's RI vocabulary is unmapped (e.g. OBB's passenger[0].details.*)
+  the probe has nothing to withhold — one WARNING instead of silence.
+
+---
+
 ## [server-v1.11.137] — 2026-06-12
 
 **Booking validation accuracy round (#383)** — from the tester audit of the

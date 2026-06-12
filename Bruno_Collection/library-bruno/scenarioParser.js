@@ -81,7 +81,7 @@ function resetScenarioEnvVars() {
     // a fresh queue is built per scenario. Sub-run continuations skip
     // resetScenarioEnvVars (early-return in getScenarioData) so these survive
     // within a multi-timer scenario.
-    "__expiredFlowQueue", "__expiredFlowQueueIndex", "__expiredFlowSubRunPending",
+    "__expiredFlowQueue", "__expiredFlowQueueIndex", "__expiredFlowSubRunPending", "__expiredFlowSkipCount",
     "bookingPurchaserMode", "purchaserAdditionalData", "requestedInfoPurchaserProbeTargets", "__purchaserStepDone", "__purchaserWriteMethod",
     "__purchaserSweepIndex", "__purchaserSweepTotal", "bookingPurchaserSweepTarget",
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",

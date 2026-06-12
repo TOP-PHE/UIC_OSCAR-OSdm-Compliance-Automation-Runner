@@ -153,6 +153,10 @@ runtime:
             // PR B: auto-expansion — advance the queue if more timers are armed.
             if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired add-ancillary offer" })) return;
             // Multi-scenario tail: loop to next scenario or stop.
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {

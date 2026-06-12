@@ -630,6 +630,12 @@ function processRequestedInformation(o) {
   }
   if (issues.unknownRoots.length) {
     log('WARNING', `${tag}.requestedInformation references unknown root object(s): ${[...new Set(issues.unknownRoots)].join(', ')} — OSCAR handles 'passengerSpecifications' and 'purchaser'.`);
+    // #385: an armed RI probe has nothing to withhold/corrupt when the
+    // provider's vocabulary is unmapped — say so instead of silently no-opping.
+    const _riProbeMode = String((typeof bru !== 'undefined' && bru.getEnvVar ? bru.getEnvVar('requestedInformationProbe') : 'off') || 'off').toLowerCase();
+    if (_riProbeMode !== 'off' && _riProbeMode !== 'null') {
+      log('WARNING', `requestedInformationProbe '${_riProbeMode}' is armed but cannot engage on this offer — the requestedInformation vocabulary above is unmapped, so there is no demanded field to withhold or corrupt. Probe inert for this scenario.`);
+    }
   }
 
   s.leaves.forEach((l) => {
