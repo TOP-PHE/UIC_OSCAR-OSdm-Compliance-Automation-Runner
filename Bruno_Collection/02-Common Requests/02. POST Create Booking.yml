@@ -27,13 +27,17 @@ runtime:
       code: |-
         const { buildBookingRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
         require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
-        buildBookingRequest();
 
-        // #expired-offer test: when armed, wait until just past the EARLIEST
-        // offer-part validUntil (stashed by offers.js / postOfferResponse),
-        // then let the booking POST fire — the after-response asserts the
-        // provider correctly rejects the booking of a stale offer.
-        if (String(bru.getEnvVar("expiredOfferTest")) === "true") {
+        // #expired-offer test: when armed, wait until just past the offer
+        // deadline (earliest of part validUntil and offer.preBookableUntil —
+        // #385), then let the booking POST fire — the after-response asserts
+        // the provider correctly rejects the booking of a stale offer.
+        // #385: decided BEFORE the body is built, so a SKIP frees this step
+        // for the 🧪 place-selection probes in the same pass (their stand-down
+        // check honours __expiredOfferArmed). The guard also keeps probe-pass
+        // self-loops from re-planning and re-warning.
+        if (String(bru.getEnvVar("expiredOfferTest")) === "true"
+            && bru.getEnvVar("__expiredOfferArmed") !== "false") {
           const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
           const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
           const limitRaw   = bru.getEnvVar("offerValidUntil");
@@ -53,6 +57,8 @@ runtime:
             validationLogger(`[INFO] expiredOfferTest: attempting POST /bookings, expecting the provider to reject it (offer expired).`);
           }
         }
+
+        buildBookingRequest();
     - type: after-response
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
@@ -83,6 +89,10 @@ runtime:
             // Multi-scenario tail: loop to next scenario or stop. We do NOT
             // continue the happy-path booking flow because the booking was
             // (correctly) never created.
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {
