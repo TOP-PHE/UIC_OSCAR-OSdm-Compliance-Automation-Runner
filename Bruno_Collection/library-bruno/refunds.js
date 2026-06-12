@@ -74,6 +74,74 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
 }
 
 // Function to validate a single refund offer
+// #387: was this refund even PERMISSIBLE per the offer's own declarations?
+// Tester finding (OBB): a FULL refund (fee 0) was PROPOSED although the
+// admission declared refundable=NO — the part's own conditions said "fee 0
+// until the day before travel" and the engine followed the conditions; the
+// flag was decorative. OSCAR validated structure and bounds but never asked
+// the permissibility question. Skipped when an overruleCode was sent (an
+// overrule explicitly bypasses policy).
+function validateRefundPermissibility(refundOffer, index) {
+  const overruleCode = bru.getEnvVar("overruleCode");
+  if (overruleCode && overruleCode !== "null") {
+    validationLogger(`[DEBUG] Refund permissibility check skipped — overruleCode '${overruleCode}' explicitly bypasses the declared policy.`);
+    return;
+  }
+  let offer = null;
+  try { const raw = bru.getEnvVar("offer"); offer = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_e) { offer = null; }
+  if (!offer || typeof offer !== "object") {
+    validationLogger("[DEBUG] Refund permissibility check skipped — no selected offer in the environment.");
+    return;
+  }
+  const parts = []
+    .concat(Array.isArray(offer.admissionOfferParts) ? offer.admissionOfferParts : [])
+    .concat(Array.isArray(offer.reservationOfferParts) ? offer.reservationOfferParts : [])
+    .concat(Array.isArray(offer.ancillaryOfferParts) ? offer.ancillaryOfferParts : [])
+    .filter(Boolean);
+  if (parts.length === 0) {
+    validationLogger("[DEBUG] Refund permissibility check skipped — the selected offer carries no parts.");
+    return;
+  }
+
+  const flags = parts.map((p) => String(p.refundable || "(absent)"));
+  const allNo = parts.every((p) => p.refundable === "NO");
+  const now = Date.now();
+  let hasRefundCondition = false;
+  const activeFees = [];
+  parts.forEach((p) => {
+    (Array.isArray(p.afterSalesConditions) ? p.afterSalesConditions : []).forEach((c) => {
+      if (!c || c.condition !== "REFUND") return;
+      hasRefundCondition = true;
+      const fromOk  = !c.validFrom  || new Date(c.validFrom).getTime() <= now;
+      const untilOk = !c.validUntil || now <= new Date(c.validUntil).getTime();
+      if (fromOk && untilOk && c.afterSaleFee && typeof c.afterSaleFee.amount === "number") {
+        activeFees.push(c.afterSaleFee.amount);
+      }
+    });
+  });
+
+  if (allNo) {
+    test(`Refund offer[${index}] permissibility — every selected-offer part declares refundable=NO`, () => {
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer && refundOffer.refundFee ? refundOffer.refundFee.amount : "?"}) although every part of the selected offer declares refundable=NO and no overrule was sent — the refund contradicts the offer's own declaration${hasRefundCondition ? " (note: the parts DO carry REFUND afterSalesConditions, contradicting their own flag)" : ""}.`);
+    });
+    return;
+  }
+
+  const anyWithCondition = parts.some((p) => p.refundable === "WITH_CONDITION");
+  if (anyWithCondition && hasRefundCondition && activeFees.length === 0) {
+    validationLogger(`[WARNING] Refund offer[${index}] permissibility — refundable=WITH_CONDITION but NO declared REFUND condition window is active right now (flags: [${flags.join(", ")}]); the provider granted a refund outside its own declared windows.`);
+    return;
+  }
+  const distinctFees = [...new Set(activeFees)];
+  if (distinctFees.length === 1 && refundOffer && refundOffer.refundFee
+      && typeof refundOffer.refundFee.amount === "number"
+      && refundOffer.refundFee.amount !== distinctFees[0]) {
+    validationLogger(`[WARNING] Refund offer[${index}] fee ${refundOffer.refundFee.amount} does not match the single ACTIVE declared REFUND window fee ${distinctFees[0]} — the engine and the declared schedule disagree.`);
+    return;
+  }
+  validationLogger(`[INFO] Refund offer[${index}] permissibility OK — declared refundability [${flags.join(", ")}]${distinctFees.length === 1 ? `; the active REFUND window fee (${distinctFees[0]}) matches the refund fee` : (activeFees.length ? `; active window fee(s): ${distinctFees.join("/")}` : "")}.`);
+}
+
 function validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus) {
   validationLogger("[DEBUG] ➤ validateRefundOfferResponse");
   validationLogger(`[DEBUG] Validating refund offer at index ${index}`);
@@ -95,6 +163,12 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(expectedStatuses).to.include(refundOffer.status);
     validationLogger(`[DEBUG] Refund offer[${index}] has valid status, expected: ${expectedRefundOperationStatus}, actual: ${refundOffer.status}`);
   });
+
+  // #387: permissibility verdict — once, at the refund-offers step (the
+  // GET/PATCH re-reads would only duplicate it).
+  if (((typeof req !== "undefined" && req && req.getName && req.getName()) || "") === "10. POST Refund Offers") {
+    validateRefundPermissibility(refundOffer, index);
+  }
 
   // Validate dates.
   // #337: `new Date(null)` returns epoch 0 (1970-01-01) instead of Invalid

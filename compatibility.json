@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.166",
+  "current_release": "2026.167",
   "releases": [
+    {
+      "release": "2026.167",
+      "date": "2026-06-12",
+      "server": "1.11.139",
+      "collection": "OTST_V2.0.81",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Refundability verdict & report readability (#387), from Patrick's review of the NHF_RFND assertions. (1) ONE defect = ONE row: the refundable/exchangeable scenario-vs-offer verdict had THREE overlapping validators (validateSelectedOfferAdmission 'All admissionOfferParts ... are refundable', validateAdmissions per-part 'Refundable should be YES', ensureYesWhenRefundOrExchangeSelected) — the last now OWNS the row; the other two demote to DEBUG context. Provider-fairness: WITH_CONDITION now PASSES with an INFO (refund/exchange under conditions is legitimate; the after-sales step verifies the window); only NO/absent fails, decoded ('OSCAR continues so the refund leg documents what the provider actually does'). R9 WARNING when the flag contradicts the part's own conditions (refundable=NO yet a REFUND fee schedule present — observed on OBB). (2) NEW refund permissibility cross-check (refunds.js validateRefundPermissibility, called once at '10. POST Refund Offers'; skipped when an overruleCode bypasses policy): all touched parts refundable=NO → failing decoded row (the OBB case: full refund fee 0 PROPOSED on refundable=NO); WITH_CONDITION → an ACTIVE declared REFUND window must exist (none → WARNING 'granted outside its own declared windows'); when exactly one distinct active-window fee exists, compare with the refund offer's fee (mismatch → WARNING 'the engine and the declared schedule disagree'). (3) Report UI (run-detail assertions): the decoded failure message used to be clipped to 60 chars in a 180px right-hand column — now a full-width wrapped line under the failing row (.assertion-msg, pre-wrap, nothing hidden).",
+        "Verification: harness over the REAL extracted functions — ensureYesWhenRefundOrExchangeSelected on Patrick's exact OBB shape (refundable=NO + REFUND schedule → ONE decoded row + contradiction WARNING; WITH_CONDITION → pass + INFO; YES → pass; EXCHANGE mirror; duplicates textually gone from offers.js); validateRefundPermissibility 6 cases (all-NO + schedule → decoded fail incl. 'contradicting their own flag'; WITH_CONDITION active window fee-match → INFO only; no active window → WARNING; fee 500 vs 0 → schedule-vs-engine WARNING; overrule → silent skip; YES → OK line). Report UI structural (truncation gone, .assertion-msg full-width pre-wrap present). node --check x2; eslint + inline-script lint green. Server 1.11.138 -> 1.11.139; collection OTST_V2.0.80 -> OTST_V2.0.81."
+      ]
+    },
     {
       "release": "2026.166",
       "date": "2026-06-12",

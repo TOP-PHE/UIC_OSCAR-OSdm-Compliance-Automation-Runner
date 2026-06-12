@@ -106,6 +106,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .req-filter.active{background:#0090D4;color:#fff}
 .assertion-row{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid #f5f5f5;font-size:12px}
 .assertion-row:hover{background:#fafbfc}
+.assertion-row.has-msg{border-bottom:none}
+.assertion-msg{padding:0 16px 8px 40px;color:#c62828;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-bottom:1px solid #f5f5f5;background:#fffafa}
 .a-pass{color:#2e7d32}
 .a-fail{color:#c62828;font-weight:700}
 .a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
@@ -775,13 +777,20 @@ function renderAssertions() {
       for (const a of assertions) {
         const icon = a.passed ? '<span class="a-pass">✓</span>' : '<span class="a-fail">✗</span>';
         const sev = !a.passed && a.severity ? `<span class="a-badge a-sev-${a.severity}">${escHtml(a.severity)}</span>` : '';
-        rowsHtml += `<div class="assertion-row">${icon}
+        // #387: the decoded failure message is the payload of a failed row —
+        // it used to be clipped to 60 chars in a 180px column ("half hidden",
+        // tester finding). It now gets a full-width wrapped line of its own
+        // under the row; nothing truncates.
+        const hasMsg = !a.passed && a.error_msg;
+        rowsHtml += `<div class="assertion-row${hasMsg ? ' has-msg' : ''}">${icon}
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.assertion_name)}">${escHtml(a.assertion_name)}</span>
           ${a.category ? `<span class="a-badge a-cat">${escHtml(a.category)}</span>` : ''}
           ${a.domain ? `<span class="a-badge a-dom">${escHtml(a.domain)}</span>` : ''}
           ${sev}
-          ${a.error_msg ? `<span style="color:#c62828;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.error_msg)}">⚠ ${escHtml(a.error_msg.slice(0,60))}</span>` : ''}
         </div>`;
+        if (hasMsg) {
+          rowsHtml += `<div class="assertion-msg">⚠ ${escHtml(a.error_msg)}</div>`;
+        }
       }
 
       reqsHtml += `<div class="areq">
