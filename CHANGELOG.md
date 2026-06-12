@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.136] — 2026-06-12
+
+**NJ conformance PR3 (#379): reservation spec-coverage depth.**
+
+### Added
+
+- **🧭 Offer-set orientation line** before any filtering: one INFO line
+  telling the certifier what the provider returned — accommodation
+  families, their subtypes, how many offers carry each, and how many
+  offers have no reservation parts.
+- **Coverage referential integrity** (R8 — registers only on failure):
+  the selected offer's tripCoverage must reference trips/legs that exist
+  in the same OfferCollectionResponse; one decoded failure when broken,
+  a DEBUG line when OK.
+- **Place-selection capability notes** (R9 nuance, never a failure) on the
+  chosen reservation part: declared supportedPlaceSelectionFlows +
+  graphicalReservation related to the scenario's seat-selection mode
+  (seat-map mode vs automatic-only flows; manual-only flows without a
+  seat-map scenario; graphicalReservation 'NO'; unknown flow values
+  noted as x-extensible-enum extensions).
+- **Capacity vs party nuance**: numericAvailability (part- and place-level)
+  below the requested party size → one WARNING before booking.
+
+### Fixed
+
+- **Provider-fairness: unknown accommodationType no longer FAILS.** The
+  former hard oneOf [SEAT, COUCHETTE, BERTH, VEHICLE, STORAGE] assert
+  contradicted the spec — AccommodationType is an x-extensible-enum, so a
+  custom code is legal. Structural checks stay hard; list membership is
+  now an R9 WARNING. accommodationSubType (open code list) gets no
+  membership check at all.
+
+---
+
 ## [server-v1.11.135] — 2026-06-12
 
 **NJ conformance PR2 (#378): the place-selection Non-Happy-Flow probe sweep.**
