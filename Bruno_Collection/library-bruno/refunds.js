@@ -82,6 +82,13 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
 // the permissibility question. Skipped when an overruleCode was sent (an
 // overrule explicitly bypasses policy).
 function validateRefundPermissibility(refundOffer, index) {
+  // #391: read every flag THROUGH its schedule (fee vs price per window) and
+  // verify the ENGINE against the declared schedule. OBB exchange: the former
+  // flag-keyed gate flagged a schedule-legal payout (Normalpreis: flag NO,
+  // schedule fee 0 → full refund is what the rules say) while a Sparschiene
+  // payout (schedule fee = 100% → 0 back) would have slipped through as long
+  // as one sibling part carried a permitting flag.
+  const { effectiveRefundability, expectedRefundForParts } = require("./afterSalesRules.js");
   const overruleCode = bru.getEnvVar("overruleCode");
   if (overruleCode && overruleCode !== "null") {
     validationLogger(`[DEBUG] Refund permissibility check skipped — overruleCode '${overruleCode}' explicitly bypasses the declared policy.`);
@@ -103,75 +110,63 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
 
-  const flags = parts.map((p) => String(p.refundable || "(absent)"));
-  const allNo = parts.every((p) => p.refundable === "NO");
   const now = Date.now();
-  let hasRefundCondition = false;
-  const activeFees = [];
-  parts.forEach((p) => {
-    (Array.isArray(p.afterSalesConditions) ? p.afterSalesConditions : []).forEach((c) => {
-      if (!c || c.condition !== "REFUND") return;
-      hasRefundCondition = true;
-      const fromOk  = !c.validFrom  || new Date(c.validFrom).getTime() <= now;
-      const untilOk = !c.validUntil || now <= new Date(c.validUntil).getTime();
-      if (fromOk && untilOk && c.afterSaleFee && typeof c.afterSaleFee.amount === "number") {
-        activeFees.push(c.afterSaleFee.amount);
-      }
-    });
-  });
+  const analyses = parts.map((p) => effectiveRefundability(p, now, "REFUND"));
+  const effLabels = analyses.map((a) => (a.effective === "FLAG" ? `flag:${a.flagLabel}` : `schedule:${a.effective}`));
+  const permits = (a) => a.effective === "WITH_CONDITION"
+    || (a.effective === "FLAG" && (a.flag === "YES" || a.flag === "WITH_CONDITION"));
 
-  if (allNo) {
-    test(`Refund offer[${index}] permissibility — every selected-offer part declares refundable=NO`, () => {
-      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer && refundOffer.refundFee ? refundOffer.refundFee.amount : "?"}) although every part of the selected offer declares refundable=NO and no overrule was sent — the refund contradicts the offer's own declaration${hasRefundCondition ? " (note: the parts DO carry REFUND afterSalesConditions, contradicting their own flag)" : ""}.`);
+  // Gate 1 — nothing permits a refund, yet one was PROPOSED.
+  if (analyses.every((a) => !permits(a))) {
+    test(`Refund offer[${index}] permissibility — every selected-offer part is effectively non-refundable`, () => {
+      throw new Error(`The provider PROPOSED a refund (refundable ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.amount : "?"} ${refundOffer && refundOffer.refundableAmount ? refundOffer.refundableAmount.currency || "" : ""}, fee ${refundOffer && refundOffer.refundFee ? refundOffer.refundFee.amount : "?"}) although every part is effectively non-refundable — ${analyses.map((a, k) => `part ${k + 1}: ${a.schedule ? `the declared schedule charges the full price (fee ≥ ${a.priceAmount})` : `flag ${a.flagLabel} with no schedule granting a refund`}`).join("; ")} — and no overrule was sent.`);
     });
     return;
   }
 
-  // #389: value-aware gate — the all-NO check above misses MIXED offers
-  // (tester finding: admission refundable=NO @ 88950 + reservation
-  // WITH_CONDITION @ 0 → the WITH_CONDITION branch passed with an INFO while
-  // the refunded 88950 was exactly the NO-flagged admission's value). The
-  // refunded value (refundableAmount + refundFee) must not exceed the total
-  // price of the parts that PERMIT a refund (refundable ≠ NO). Guarded:
-  // compared only when every involved amount shares one currency and scale.
-  const _noParts = parts.filter((p) => p.refundable === "NO" && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
-  if (_noParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
+  // Gate 2 (#389, now effective-keyed) — refunded value must stay within the
+  // parts that effectively PERMIT a refund.
+  const lockedParts = parts.filter((p, k) => !permits(analyses[k]) && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
+  if (lockedParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
     const _amounts = parts.filter((p) => p.price).map((p) => p.price)
       .concat([refundOffer.refundableAmount])
       .concat(refundOffer.refundFee ? [refundOffer.refundFee] : []);
     const _currencies = [...new Set(_amounts.map((a) => a.currency).filter(Boolean))];
     const _scales = [...new Set(_amounts.map((a) => a.scale).filter((v) => v != null))];
     if (_currencies.length > 1 || _scales.length > 1) {
-      validationLogger(`[DEBUG] Refund permissibility value gate skipped — mixed currencies (${_currencies.join("/") || "?"}) or scales (${_scales.join("/") || "?"}); only the flag/window checks apply.`);
+      validationLogger(`[DEBUG] Refund permissibility value gate skipped — mixed currencies (${_currencies.join("/") || "?"}) or scales (${_scales.join("/") || "?"}).`);
     } else {
       const _permitted = parts
-        .filter((p) => p.refundable !== "NO" && p.price && typeof p.price.amount === "number")
+        .filter((p, k) => permits(analyses[k]) && p.price && typeof p.price.amount === "number")
         .reduce((sum, p) => sum + p.price.amount, 0);
       const _refunded = refundOffer.refundableAmount.amount
         + ((refundOffer.refundFee && typeof refundOffer.refundFee.amount === "number") ? refundOffer.refundFee.amount : 0);
       if (_refunded > _permitted) {
-        test(`Refund offer[${index}] permissibility — refunded value stays within the parts that permit a refund`, () => {
-          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts permitting a refund (refundable ≠ NO) carry only ${_permitted} — the difference comes from part(s) declaring refundable=NO (${_noParts.map((p) => `${p.price.amount} ${p.price.currency || ""}`).join(", ")}) and no overrule was sent. The provider pays out value its own flag declares locked.`);
+        test(`Refund offer[${index}] permissibility — refunded value stays within the parts that effectively permit a refund`, () => {
+          throw new Error(`The refund returns ${_refunded} ${_currencies[0] || ""} (refundable + fee) but the parts effectively permitting a refund carry only ${_permitted} — the difference comes from part(s) whose own declarations lock the value (${lockedParts.map((p) => `${p.price.amount} ${p.price.currency || ""}`).join(", ")}) and no overrule was sent.`);
         });
         return;
       }
-      validationLogger(`[DEBUG] Refund permissibility value gate OK — refunded ${_refunded} ≤ ${_permitted} carried by the parts permitting a refund (NO-flagged parts: ${_noParts.map((p) => p.price.amount).join(", ")}).`);
+      validationLogger(`[DEBUG] Refund permissibility value gate OK — refunded ${_refunded} ≤ ${_permitted} carried by the effectively-permitting parts.`);
     }
   }
 
-  const anyWithCondition = parts.some((p) => p.refundable === "WITH_CONDITION");
-  if (anyWithCondition && hasRefundCondition && activeFees.length === 0) {
-    validationLogger(`[WARNING] Refund offer[${index}] permissibility — refundable=WITH_CONDITION but NO declared REFUND condition window is active right now (flags: [${flags.join(", ")}]); the provider granted a refund outside its own declared windows.`);
+  // Gate 3 (#391) — THE schedule-decode assertion: what the declared schedule
+  // says a full refund right now must return, vs what the engine offers.
+  const r = expectedRefundForParts(parts, now, "REFUND");
+  if (r.ok && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number"
+      && (!r.currency || !refundOffer.refundableAmount.currency || r.currency === refundOffer.refundableAmount.currency)) {
+    if (refundOffer.refundableAmount.amount !== r.expectedRefundable) {
+      test(`Refund offer[${index}] schedule decode — refundableAmount matches the declared after-sales schedule (Σ price − active fee)`, () => {
+        throw new Error(`The declared REFUND schedule says ${r.expectedRefundable} ${r.currency || ""} back right now (${r.detail.join("; ")}), the engine offers ${refundOffer.refundableAmount.amount} — the engine and its own declared schedule disagree.`);
+      });
+      return;
+    }
+    validationLogger(`[INFO] Refund offer[${index}] schedule decode OK — refundableAmount ${refundOffer.refundableAmount.amount} matches the declared schedule (${r.detail.join("; ")}). Effective refundability: [${effLabels.join(", ")}].`);
     return;
   }
-  const distinctFees = [...new Set(activeFees)];
-  if (distinctFees.length === 1 && refundOffer && refundOffer.refundFee
-      && typeof refundOffer.refundFee.amount === "number"
-      && refundOffer.refundFee.amount !== distinctFees[0]) {
-    validationLogger(`[WARNING] Refund offer[${index}] fee ${refundOffer.refundFee.amount} does not match the single ACTIVE declared REFUND window fee ${distinctFees[0]} — the engine and the declared schedule disagree.`);
-    return;
-  }
-  validationLogger(`[INFO] Refund offer[${index}] permissibility OK — declared refundability [${flags.join(", ")}]${distinctFees.length === 1 ? `; the active REFUND window fee (${distinctFees[0]}) matches the refund fee` : (activeFees.length ? `; active window fee(s): ${distinctFees.join("/")}` : "")}.`);
+  validationLogger(`[DEBUG] Refund schedule-decode assertion skipped — ${r.ok ? "currency differs from the refund offer" : r.reason}.`);
+  validationLogger(`[INFO] Refund offer[${index}] permissibility OK — effective refundability: [${effLabels.join(", ")}].`);
 }
 
 function validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus) {

@@ -1724,9 +1724,31 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
       // legitimate; the after-sales step verifies the actual window. Only NO
       // (or an absent flag) fails, decoded.
       const _flagVerdict = (field, action) => {
+        // #391: read the flag THROUGH the schedule (fee vs price per window).
+        // OBB exchange: admissions pinned to NO while the schedules said three
+        // different things — Sparschiene fee=100% of price (flag CONSISTENT:
+        // a refund returns 0), Komfort fee=50%, Normalpreis fee=0 (both
+        // effectively refundable → the flag should be WITH_CONDITION). Mere
+        // PRESENCE of conditions proves nothing; their CONTENT decides.
+        const { effectiveRefundability } = require("./afterSalesRules.js");
         const v = admission[field];
-        const hasSchedule = Array.isArray(admission.afterSalesConditions)
-          && admission.afterSalesConditions.some((c) => c && c.condition === action);
+        const a = effectiveRefundability(admission, Date.now(), action);
+        if (a.schedule && a.effective === "WITH_CONDITION") {
+          test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - schedule: ${a.refundableWindows}/${a.windows} window(s) below full price (flag: ${a.flagLabel})`, () => {
+            validationLogger(`[INFO] Admission part ${i + 1}: the declared ${action} schedule grants a ${action.toLowerCase()} — ${a.refundableWindows} of ${a.windows} window(s) charge less than the price (${a.priceAmount})${a.freeWindow ? ", one window is even FREE" : ""}; the ${action.toLowerCase()} leg verifies the engine against it.`);
+          });
+          if (a.contradiction === "FLAG_NO_SCHEDULE_REFUNDABLE") {
+            validationLogger(`[WARNING] Admission part ${i + 1} declares ${field}=NO while its own ${action} schedule charges less than the price${a.freeWindow ? " (a window is even FREE)" : ""} — the flag does not summarize the rules; per the spec enum, WITH_CONDITION is the value for exactly this schedule. Distributors filtering on the flag would hide a ${action.toLowerCase()}able product.`);
+          }
+          return;
+        }
+        if (a.schedule && a.effective === "NO") {
+          test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - schedule: every window charges the full price (flag: ${a.flagLabel})`, () => {
+            throw new Error(`The scenario plans a ${action} but every declared ${action} window charges the full price (fee ≥ ${a.priceAmount}) — a ${action.toLowerCase()} would return 0; the schedule CONFIRMS the flag (${a.flagLabel}). OSCAR continues so the ${action.toLowerCase()} leg documents what the provider actually does.`);
+          });
+          return;
+        }
+        // No decodable schedule → the flag rules.
         if (v === "YES") {
           test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: YES`, () => {
             validationLogger(`[DEBUG] Admission part ${i + 1} ${field}=YES — the ${action} scenario can proceed.`);
@@ -1737,14 +1759,14 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
           test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: WITH_CONDITION`, () => {
             validationLogger(`[INFO] Admission part ${i + 1} ${field}=WITH_CONDITION — the ${action} is condition-bound; the ${action.toLowerCase()}-offer step verifies the declared window.`);
           });
+          if (a.contradiction === "FLAG_WC_NO_SCHEDULE") {
+            validationLogger(`[WARNING] Admission part ${i + 1} declares ${field}=WITH_CONDITION but carries no ${action} afterSalesConditions — the conditions the flag promises are not declared; a client cannot evaluate them.`);
+          }
           return;
         }
         test(`Admission part ${i + 1} permits ${action} (scenarioType=${action}) - ${field}: ${v}`, () => {
-          throw new Error(`The scenario plans a ${action} but the selected offer's admission part declares ${field}=${v == null ? "(absent)" : v} — OSCAR continues so the ${action.toLowerCase()} leg documents what the provider actually does with a product it declared non-${action.toLowerCase()}able.`);
+          throw new Error(`The scenario plans a ${action} but the selected offer's admission part declares ${field}=${v == null ? "(absent)" : v} (and no decodable ${action} schedule is present) — OSCAR continues so the ${action.toLowerCase()} leg documents what the provider actually does with a product it declared non-${action.toLowerCase()}able.`);
         });
-        if (hasSchedule) {
-          validationLogger(`[WARNING] Admission part ${i + 1} declares ${field}=${v} yet carries ${action} afterSalesConditions (a fee schedule is present) — the flag and the conditions contradict each other; the ${action.toLowerCase()}-offer step will reveal which one the provider's engine follows.`);
-        }
       };
       if (scenarioType.includes("REFUND")) {
         _flagVerdict("refundable", "REFUND");
