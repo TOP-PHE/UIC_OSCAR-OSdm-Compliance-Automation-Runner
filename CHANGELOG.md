@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.139] — 2026-06-12
+
+**Refundability verdict & report readability (#387)** — from the tester
+review of the REFUND-scenario assertions.
+
+### Changed
+
+- **One defect, one row**: the scenario-vs-offer refundable/exchangeable
+  verdict is now OWNED by a single check (the two historical duplicates
+  demote to DEBUG context). Provider-fairness: `WITH_CONDITION` now
+  PASSES (a REFUND/EXCHANGE under conditions is legitimate; only NO
+  fails, decoded). R9 WARNING when the flag contradicts the part's own
+  afterSalesConditions (refundable=NO yet a REFUND fee schedule present).
+
+### Added
+
+- **Refund permissibility cross-check** at the refund-offers step (once;
+  skipped under an overrule): every touched part refundable=NO → failing
+  decoded row ("refund proposed on a product whose every part declares
+  refundable=NO"); WITH_CONDITION → verify an ACTIVE declared REFUND
+  window exists (none → WARNING); unambiguous active-window fee vs the
+  refund offer's fee (mismatch → WARNING "engine and schedule disagree").
+
+### Fixed
+
+- **Report UI: failure messages no longer truncated** ("half hidden",
+  60-char clip in a 180px column). The decoded message gets a full-width
+  wrapped line under the failing assertion row.
+
+---
+
 ## [server-v1.11.138] — 2026-06-12
 
 **Expired-flow queue resilience (#385)** — tester finding: all NHF armed
