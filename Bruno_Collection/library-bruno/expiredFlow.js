@@ -383,12 +383,77 @@ function nhfTestPrefix() {
   return `[NHF_${cur.code}_${baseCode || 'SC'}] `;
 }
 
+/**
+ * #385 — called at every scenario-complete tail BEFORE the multi-scenario
+ * loop/stop logic. A sub-run whose timer SKIPPED at its step (budget /
+ * missing deadline) — or whose gated step never fired — used to end the whole
+ * queue, because advanceExpiredFlowQueueOrFinish only runs on a GRADED timer.
+ * This wrapper detects the un-graded current sub-run at tail time and hands
+ * the remaining timers their pass.
+ *
+ * Detection: the per-timer `__<flag minus Test>Armed` marker is 'true' only
+ * when the timer's step actually armed (and graded) this pass; 'false' means
+ * it skipped at the step; unset means the step never fired. Both of the
+ * latter mean "did not grade" → advance.
+ *
+ * @returns {boolean} true → routed back to 01 for the next sub-run (the
+ *   CALLER MUST RETURN IMMEDIATELY); false → nothing to do (no queue, the
+ *   current sub-run graded, or the queue is exhausted — a tally [INFO] is
+ *   logged whenever sub-runs were skipped).
+ */
+function advanceExpiredFlowQueueAfterSkip() {
+  let queue = [];
+  try { queue = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
+  catch (_e) { queue = []; }
+  const idx = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
+  if (queue.length === 0 || idx >= queue.length) return false;
+
+  const cur = queue[idx];
+  const armedKey = '__' + String(cur.flag || '').replace(/Test$/, 'Armed');
+  const armedVal = String(bru.getEnvVar(armedKey));
+  const skips = parseInt(bru.getEnvVar('__expiredFlowSkipCount') || '0', 10) || 0;
+
+  if (armedVal === 'true') {
+    // The (last) sub-run armed and graded — its own expired branch already
+    // consulted advanceExpiredFlowQueueOrFinish. Only the tally is owed.
+    if (skips > 0) {
+      validationLogger(`[INFO] NHF expired-flow queue finished: ${queue.length - skips} of ${queue.length} sub-run(s) graded, ${skips} skipped — see the [WARNING]s above.`);
+      bru.setEnvVar('__expiredFlowSkipCount', '0');
+    }
+    return false;
+  }
+
+  // Current sub-run never graded.
+  const why = (armedVal === 'false')
+    ? 'its timer SKIPPED at the step (see the WARNING above)'
+    : 'its gated step never fired this pass';
+  bru.setEnvVar('__expiredFlowSkipCount', String(skips + 1));
+  validationLogger(`[WARNING] NHF sub-run ${idx + 1}/${queue.length} (${cur.code} — ${cur.label}) did not grade: ${why}. Advancing the queue instead of ending the scenario.`);
+  bru.setEnvVar(cur.flag, 'false');
+  bru.setEnvVar(armedKey, 'false');
+
+  if (idx + 1 >= queue.length) {
+    validationLogger(`[INFO] NHF expired-flow queue finished: ${queue.length - (skips + 1)} of ${queue.length} sub-run(s) graded, ${skips + 1} skipped — see the [WARNING]s above.`);
+    bru.setEnvVar('__expiredFlowSkipCount', '0');
+    return false;
+  }
+
+  const next = queue[idx + 1];
+  bru.setEnvVar(next.flag, 'true');
+  bru.setEnvVar('__expiredFlowQueueIndex', String(idx + 1));
+  bru.setEnvVar('__expiredFlowSubRunPending', 'true');
+  validationLogger(`[INFO] expired-flow queue advancing to sub-run ${idx + 2}/${queue.length} — ${next.code} (${next.label}). Routing back to 01. POST Get Offer.`);
+  bru.runner.setNextRequest('01. POST Get Offer');
+  return true;
+}
+
 module.exports = {
   planExpiredFlow, runExpiredFlowWait, gradeExpiredFlowResponse,
   BUFFER_MS, POST_MARGIN_MS,
   EXPIRED_FLOW_TIMERS_DEF,
   buildAndArmExpiredFlowQueue,
   advanceExpiredFlowQueueOrFinish,
+  advanceExpiredFlowQueueAfterSkip,
   nhfTestPrefix,
 };
 
