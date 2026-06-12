@@ -434,6 +434,30 @@ function offerFlexibility(offer) {
 function selectAndSetOffer(jsonData) {
   validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
+  // #379: 🧭 one orientation line over the WHOLE offer set BEFORE any filter —
+  // the certifier reading the log sees at a glance what the provider returned
+  // (accommodation families, their subtypes, how many offers carry each).
+  (function orientOfferSet(offers) {
+    if (!Array.isArray(offers) || offers.length === 0) return;
+    const fam = {};
+    let noRes = 0;
+    offers.forEach((o) => {
+      const parts = (o && o.reservationOfferParts) || [];
+      if (parts.length === 0) { noRes++; return; }
+      parts.forEach((p) => ((p && p.availablePlaces) || []).forEach((pl) => {
+        const t = pl && pl.accommodationType;
+        if (!t) return;
+        if (!fam[t]) fam[t] = { offers: new Set(), subs: new Set() };
+        fam[t].offers.add(o.offerId);
+        if (pl.accommodationSubType) fam[t].subs.add(pl.accommodationSubType);
+      }));
+    });
+    const famLine = Object.keys(fam)
+      .map((t) => `${t} ×${fam[t].offers.size} offer(s)${fam[t].subs.size ? ` (subtypes: ${[...fam[t].subs].join(", ")})` : ""}`)
+      .join("; ");
+    console.log(`[INFO] 🧭 Offer set: ${offers.length} offer(s)${famLine ? ` — reservation accommodations: ${famLine}` : ""}${noRes > 0 ? `; ${noRes} offer(s) without reservation parts` : ""}.`);
+  })(jsonData && jsonData.offers);
+
   const desiredFlexibility = bru.getEnvVar("desiredFlexibility");
   const accommodationSelection = bru.getEnvVar("accommodationSelection");
   const scenarioType = bru.getEnvVar("scenarioType");
@@ -511,6 +535,10 @@ function selectAndSetOffer(jsonData) {
   bru.setEnvVar("offer", selectedOffer);
   bru.setEnvVar("offerId", selectedOffer.offerId);
   bru.setEnvVar("offers", jsonData.offers);
+
+  // #379: the selected offer's coverage must reference this response's
+  // trips/legs (R8 — silent when OK, one decoded failure when broken).
+  assertOfferCoverageIntegrity(selectedOffer, jsonData);
 
   if (desiredFlexibility) {
     const _summaryFlex = selectedOffer.offerSummary?.overallFlexibility;
@@ -1205,7 +1233,12 @@ function validateReservations(selectedOffer) {
         expect(reservationPassengerRefs.length).to.be.above(0);
       });
 
-      // Available Places: accommodationType oneOf + tripLegCoverage structure
+      // Available Places: structure + tripLegCoverage shape. #379: the former
+      // hard `oneOf` on accommodationType was provider-UNFAIR — AccommodationType
+      // is an x-extensible-enum, so a value outside the base list is LEGAL
+      // (custom code) and must not fail the run. The membership check moved to
+      // an R9 conformance-nuance WARNING below; accommodationSubType is an OPEN
+      // code list (no base enum), so it gets no membership check at all.
       const availablePlaces = reservation.availablePlaces || [];
       if (availablePlaces.length > 0) {
         test(`Reservation part ${i + 1} availablePlaces is an array and contains accommodationType and numericAvailability`, () => {
@@ -1214,7 +1247,6 @@ function validateReservations(selectedOffer) {
           availablePlaces.forEach((place, pIndex) => {
             validationLogger(`[DEBUG] availablePlaces[${pIndex}] accommodationType : ${place.accommodationType}, numericAvailability : ${place.numericAvailability}`);
             expect(typeof place.accommodationType).to.eql("string");
-            expect(place.accommodationType, `availablePlaces[${pIndex}].accommodationType should be a known OSDM value`).to.be.oneOf(	["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"]);
             expect(typeof place.numericAvailability).to.eql("number");
             // tripLegCoverage structure (if present)
             if (place.tripLegCoverage) {
@@ -1222,6 +1254,13 @@ function validateReservations(selectedOffer) {
               expect(place.tripLegCoverage.legId, `availablePlaces[${pIndex}].tripLegCoverage.legId should be a string`).to.be.a("string");
             }
           });
+        });
+        const KNOWN_ACCOMMODATION_TYPES = ["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "STORAGE"];
+        availablePlaces.forEach((place, pIndex) => {
+          const _t = String((place && place.accommodationType) || "");
+          if (_t && !KNOWN_ACCOMMODATION_TYPES.includes(_t.toUpperCase())) {
+            validationLogger(`[WARNING] Reservation part ${i + 1} availablePlaces[${pIndex}].accommodationType '${_t}' is outside the OSDM base AccommodationType list [${KNOWN_ACCOMMODATION_TYPES.join(", ")}] — legal for an x-extensible-enum (custom code), but cross-vendor tooling may not understand it.`);
+          }
         });
       } else {
         validationLogger(`[DEBUG] No availablePlaces for reservation id=${reservation.id} → test skipped`);
@@ -1235,6 +1274,25 @@ function validateReservations(selectedOffer) {
         });
       } else {
         validationLogger(`[DEBUG] No numericAvailability for reservation id : ${reservation.id} → test skipped`);
+      }
+
+      // #379: capacity vs the requested party (R9 nuance — the spec does not
+      // mandate numericAvailability >= party size, but this offer was generated
+      // FOR this party; one that cannot host it is worth a flag before booking).
+      const _paxCount = (parseEnvJson("offerPassengerSpecifications", []) || []).length;
+      if (_paxCount > 0) {
+        const _short = [];
+        if (typeof reservation.numericAvailability === "number" && reservation.numericAvailability < _paxCount) {
+          _short.push(`part-level numericAvailability ${reservation.numericAvailability}`);
+        }
+        availablePlaces.forEach((place, pIndex) => {
+          if (place && typeof place.numericAvailability === "number" && place.numericAvailability < _paxCount) {
+            _short.push(`availablePlaces[${pIndex}] (${place.accommodationType || "?"}${place.accommodationSubType ? "/" + place.accommodationSubType : ""}) ${place.numericAvailability}`);
+          }
+        });
+        if (_short.length > 0) {
+          validationLogger(`[WARNING] Reservation part ${i + 1}: availability below the requested party of ${_paxCount} — ${_short.join("; ")}. Booking this part for the whole party may be refused.`);
+        }
       }
 
       // Number of Private Compartments
@@ -1451,6 +1509,80 @@ function offerTripCoverage(selectedOffer) {
   return out;
 }
 
+// #379 (R8 — registers only on failure): the offer's tripCoverage must
+// reference trips/legs that EXIST in the same OfferCollectionResponse. A
+// booking built on broken coverage would send tripLegCoverage pairs the
+// provider's own trips do not contain.
+function assertOfferCoverageIntegrity(selectedOffer, jsonData) {
+  const pairs = offerTripCoverage(selectedOffer);
+  const trips = (jsonData && Array.isArray(jsonData.trips)) ? jsonData.trips : [];
+  if (pairs.length === 0 || trips.length === 0) {
+    validationLogger(`[DEBUG] Offer coverage integrity: ${pairs.length === 0 ? "offer declares no tripCoverage" : "response carries no trips"} → check skipped.`);
+    return;
+  }
+  const tripIds = new Set(trips.map((t) => t && t.id).filter(Boolean));
+  const legsByTrip = {};
+  trips.forEach((t) => {
+    if (t && t.id) legsByTrip[t.id] = new Set((t.legs || []).map((l) => l && l.id).filter(Boolean));
+  });
+  const issues = [];
+  pairs.forEach((pr) => {
+    if (!tripIds.has(pr.tripId)) {
+      issues.push(`coverage references tripId '${pr.tripId}' but the response's trips are [${[...tripIds].join(", ")}]`);
+      return;
+    }
+    const legs = legsByTrip[pr.tripId];
+    if (legs && legs.size > 0 && pr.legId && !legs.has(pr.legId)) {
+      issues.push(`coverage references legId '${pr.legId}' which is not a leg of trip '${pr.tripId}' (legs: [${[...legs].join(", ")}])`);
+    }
+  });
+  if (issues.length > 0) {
+    test("Selected offer tripCoverage references the response's own trips/legs", () => {
+      throw new Error(`Referential integrity of the offer's tripCoverage is broken — ${[...new Set(issues)].join("; ")}.`);
+    });
+  } else {
+    validationLogger(`[DEBUG] Offer coverage integrity OK — ${pairs.length} coverage pair(s) all reference existing trips/legs.`);
+  }
+}
+
+// #379 (R9 nuance, never a failure): relate the CHOSEN reservation part's
+// declared place-selection capabilities to what the scenario is about to do,
+// so a later seat-map / booking misbehaviour reads back to a declared (or
+// undeclared) capability without cross-referencing the payloads.
+function notePlaceSelectionCapabilities(part) {
+  if (!part || typeof part !== "object") return;
+  const KNOWN_FLOWS = [
+    "MANUAL_PLACE_SELECTION_WITH_FEE", "MANUAL_PLACE_SELECTION_WITHOUT_FEE",
+    "AUTOMATIC_PLACE_SELECTION", "AUTOMATIC_PLACE_SELECTION_NEARBY", "AUTOMATIC_PLACE_SELECTION_PREFERENCES",
+  ];
+  const flows = Array.isArray(part.supportedPlaceSelectionFlows) ? part.supportedPlaceSelectionFlows.filter(Boolean).map(String) : [];
+  const mode = bru.getEnvVar("placeSelectionMode") || "";
+  const wantsMap = mode === "SEATMAP_AT_OFFER" || mode === "ADD_TO_BOOKING";
+  const graphical = (Array.isArray(part.availablePlacePreferences) ? part.availablePlacePreferences : [])
+    .map((p) => p && p.graphicalReservation).filter(Boolean).map(String);
+
+  if (flows.length === 0) {
+    validationLogger(`[INFO] Reservation part ${part.id}: no supportedPlaceSelectionFlows declared (optional in OSDM)${wantsMap ? ` — the scenario's ${mode} seat-map flow proceeds without a declared capability` : ""}.`);
+  } else {
+    validationLogger(`[INFO] Reservation part ${part.id} declares place-selection flows: ${flows.join(", ")}${graphical.length ? `; graphicalReservation: ${[...new Set(graphical)].join(", ")}` : ""}.`);
+    const unknown = flows.filter((f) => !KNOWN_FLOWS.includes(f.toUpperCase()));
+    if (unknown.length > 0) {
+      validationLogger(`[WARNING] Reservation part ${part.id}: place-selection flow value(s) [${unknown.join(", ")}] are outside the OSDM base PlaceSelectionFlow list — legal (x-extensible-enum), noted for cross-vendor readers.`);
+    }
+    const hasManual = flows.some((f) => f.toUpperCase().indexOf("MANUAL_PLACE_SELECTION") === 0);
+    const hasAutomatic = flows.some((f) => f.toUpperCase().indexOf("AUTOMATIC_PLACE_SELECTION") === 0);
+    if (wantsMap && !hasManual) {
+      validationLogger(`[WARNING] Scenario seat-selection mode is ${mode} (graphical pick) but the selected reservation part only declares [${flows.join(", ")}] — the provider does not advertise a manual/graphical flow; expect the place map or the place-carrying booking to be refused. Conformance nuance, not a failure.`);
+    }
+    if (!wantsMap && hasManual && !hasAutomatic) {
+      validationLogger(`[INFO] Selected reservation part declares ONLY manual/graphical flows (${flows.join(", ")}) while the scenario books without a seat map — per OSDM the place map (/availabilities/vehicle-place-map) is expected before /bookings in these flows; watch the booking answer.`);
+    }
+  }
+  if (wantsMap && graphical.length > 0 && graphical.every((g) => g.toUpperCase() === "NO")) {
+    validationLogger(`[WARNING] Scenario seat-selection mode is ${mode} but availablePlacePreferences.graphicalReservation is 'NO' on the selected part — the provider states graphical reservation is NOT supported here. Conformance nuance, not a failure.`);
+  }
+}
+
 function getTripLegCoverage(selectedOffer, accommodationSelection) {
   const fromOffer = offerTripCoverage(selectedOffer);
   if (fromOffer.length > 0) return fromOffer;
@@ -1522,6 +1654,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
       if (typeof _firstPlace.accommodationSubType === 'string' && _firstPlace.accommodationSubType) _acc.accommodationSubType = _firstPlace.accommodationSubType;
       bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
     }
+    notePlaceSelectionCapabilities(_firstRes);
     validationLogger(`[DEBUG] Seat place selection — reservationId set from first reservationOfferPart: ${_firstRes.id}`);
     return;
   }
@@ -1558,6 +1691,8 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
     validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''} (reservation part ${matchingParts[0].id})`);
   }
+
+  notePlaceSelectionCapabilities(matchingParts[0]);
 
   test(`At least one reservationOfferPart has accommodationType: ${accommodationSelection}`, function () {
     expect(matchingParts.length, "No matching reservationOfferParts found").to.be.above(0);

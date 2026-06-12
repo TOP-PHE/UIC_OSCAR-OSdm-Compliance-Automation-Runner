@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.163",
+  "current_release": "2026.164",
   "releases": [
+    {
+      "release": "2026.164",
+      "date": "2026-06-12",
+      "server": "1.11.136",
+      "collection": "OTST_V2.0.78",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "NJ conformance PR3 (#379) — reservation spec-coverage depth, closing the 3-PR programme (#377 goal chain, #378 NHF sweep). (1) 🧭 offer-set orientation: one INFO line before any filter (families x offers, subtypes, no-reservation count) so the certifier reads the provider's hand at a glance. (2) Coverage referential integrity (R8): selected offer's tripCoverage (both forms, via offerTripCoverage) must reference trips/legs existing in the SAME OfferCollectionResponse — decoded failure when broken ('coverage references legId L9 which is not a leg of trip T1'), DEBUG when OK or not applicable. (3) Place-selection capability notes (R9, never fail) on the CHOSEN part: supportedPlaceSelectionFlows + availablePlacePreferences.graphicalReservation related to the scenario's seat-selection mode — seat-map mode vs automatic-only flows → WARNING; manual-only flows on a no-map scenario → INFO (spec expects /availabilities/vehicle-place-map before /bookings); graphicalReservation 'NO' under a map mode → WARNING; unknown flow values → x-extensible-enum note. (4) Capacity nuance: part-/place-level numericAvailability below the requested party → one WARNING. (5) FAIRNESS FIX: the hard oneOf [SEAT, COUCHETTE, BERTH, VEHICLE, STORAGE] on availablePlaces.accommodationType contradicted the spec (x-extensible-enum — custom codes are legal) and would have FAILED any provider extension; membership is now an R9 WARNING, structural checks stay hard; accommodationSubType (open code list) has no membership check.",
+        "Verification: harness over the REAL extracted functions — validateReservations (HAMMOCK place: zero failing assertions + enum WARNING + capacity WARNING listing part- and place-level; clean BERTH part: zero warnings), assertOfferCoverageIntegrity (OK→R8-silent DEBUG; bad leg / missing trip → one decoded failure each; no coverage → skip), notePlaceSelectionCapabilities (6 cases incl. TELEPATHY x-ext note and graphicalReservation NO), 🧭 orientation line content over a 3-offer set, and the BERTH selection path regression (reservationId/selectedAccommodation/tripLegCoverage persisted + flows INFO, all green). node --check; eslint + inline-script lint green. Server 1.11.135 -> 1.11.136; collection OTST_V2.0.77 -> OTST_V2.0.78. NOTE: stacked on 2026.163 (#378/PR #381) which stacks on 2026.162 (#377/PR #380) — merge in order #380 -> #381 -> this."
+      ]
+    },
     {
       "release": "2026.163",
       "date": "2026-06-12",
