@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.141] — 2026-06-12
+
+**Schedule-aware effective refundability (#391)** — from the OBB
+exchange: the refundable/exchangeable FLAG must be read THROUGH the
+afterSalesConditions (fee vs price per window); presence of conditions
+proves nothing, their content decides.
+
+### Added
+
+- **afterSalesRules.js** (pure): effectiveRefundability(part, at, action)
+  — a part is effectively refundable iff SOME declared window charges a
+  fee BELOW the price; active-window fee lookup; contradiction
+  classification (NO-but-refundable-window, WITH_CONDITION-without-
+  schedule, YES-with-full-fee-window). expectedRefundForParts =
+  Σ(price − active fee).
+- **Schedule-decode assertion at the refund step**: refundableAmount
+  must equal what the declared schedule says right now — a Sparschiene
+  payout (fee=100%) or a post-departure full refund fails with "the
+  engine and its own declared schedule disagree".
+
+### Changed
+
+- **Offer verdict is schedule-first**: Normalpreis/Komfort (flag NO,
+  window below price) now PASS with the precise R9 WARNING ("the flag
+  does not summarize the rules; WITH_CONDITION is the value for exactly
+  this schedule"); Sparschiene FAILS decoded ("every declared window
+  charges the full price — a refund would return 0; the schedule
+  CONFIRMS the flag") with NO false contradiction.
+- **Refund permissibility keys on EFFECTIVE refundability** — the
+  schedule-legal Normalpreis full refund no longer raises the false
+  "locked value" row; genuinely locked value still fails.
+
+---
+
 ## [server-v1.11.140] — 2026-06-12
 
 **Window-aware condition pairing & value-aware refund gate (#389)** —
