@@ -521,7 +521,12 @@ router.delete('/companies/:id', (req, res) => {
 const CONFIG_SCHEMA = {
   MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide)', type: 'number', min: 1, max: 20 },
   PARALLEL_STAGGER_MS: { description: 'Delay between batch launches (ms)', type: 'number', min: 0, max: 30000 },
-  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms)',         type: 'number', min: 60000, max: 3600000 },
+  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms) — the effective budget is additionally clamped at the Run Budget Ceiling below', type: 'number', min: 60000, max: 3600000 },
+  // #394: the runner's hard ceiling was env-only and invisible here, so the
+  // panel accepted RUN_TIMEOUT_MS up to 3.6M while everything above 1.8M
+  // silently did nothing (min(max(base, scenario waits), ceiling)). Exposing
+  // it makes the clamp visible and editable; the DB value overrides the env.
+  RUN_HARD_MAX_TIMEOUT_MS: { description: 'Server-wide ceiling (ms) on the per-run budget, including expired-flow Max-wait extensions — the runner clamps anything above it (default 1800000 = 30 min). E.g. an expired-offer test against a provider whose offers stay bookable for 30 min needs ≥ 1920000.', type: 'number', min: 60000, max: 7200000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',

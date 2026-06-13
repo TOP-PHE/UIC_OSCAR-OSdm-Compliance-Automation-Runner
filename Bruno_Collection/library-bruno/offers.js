@@ -360,6 +360,10 @@ function postOfferResponse(jsonData) {
 
   ensureYesWhenRefundOrExchangeSelected(selectedOffer);
 
+  // #393: the verdict above covers only the SELECTED offer — sweep the whole
+  // response for flag-vs-schedule contradictions (one summary line, R9).
+  sweepCatalogFlagVsSchedule(jsonData.offers);
+
   // Mirror original no-op env set (kept for compatibility)
   bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", bru.getEnvVar("admissionReservationAncillaryOfferPartsIds"));
 }
@@ -1775,6 +1779,55 @@ function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
       }
     });
   }
+}
+
+// #393: catalog-wide flag-vs-schedule sweep (R9). The per-scenario verdict
+// above analyses only the SELECTED offer, but the conformance pattern it
+// caught on OBB — value-bearing parts pinned to refundable=NO while their own
+// schedules grant below-price refunds — is a property of the whole catalog
+// (16 of 24 offers in one NJ response). One summary WARNING per offers
+// response gives catalog-scale evidence without per-offer noise; silent when
+// no offer contradicts (R8). Zero-price parts carry no value to compare fees
+// against and are skipped (the flag legitimately rules there, see #391).
+function sweepCatalogFlagVsSchedule(offers) {
+  const { effectiveRefundability } = require("./afterSalesRules.js");
+  const list = Array.isArray(offers) ? offers : [];
+  if (list.length === 0) return;
+  ["REFUND", "EXCHANGE"].forEach((action) => {
+    const field = action === "REFUND" ? "refundable" : "exchangeable";
+    let contradicting = 0;
+    let freeWindowed = 0;
+    let consistent = 0;
+    list.forEach((offer) => {
+      const parts = []
+        .concat((offer && offer.admissionOfferParts) || [])
+        .concat((offer && offer.reservationOfferParts) || [])
+        .concat((offer && offer.ancillaryOfferParts) || [])
+        .filter((p) => p && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
+      let hasContradiction = false;
+      let hasFree = false;
+      let hasConsistentNo = false;
+      parts.forEach((p) => {
+        const a = effectiveRefundability(p, Date.now(), action);
+        if (!a.schedule) return;
+        if (a.contradiction === "FLAG_NO_SCHEDULE_REFUNDABLE") {
+          hasContradiction = true;
+          if (a.freeWindow) hasFree = true;
+        } else if (a.flag === "NO" && a.effective === "NO") {
+          hasConsistentNo = true;
+        }
+      });
+      if (hasContradiction) {
+        contradicting++;
+        if (hasFree) freeWindowed++;
+      } else if (hasConsistentNo) {
+        consistent++;
+      }
+    });
+    if (contradicting > 0) {
+      validationLogger(`[WARNING] Catalog sweep (${action}): ${contradicting} of ${list.length} offers declare ${field}=NO on a value-bearing part while their own ${action} schedule charges less than the price${freeWindowed > 0 ? ` (${freeWindowed} even with a FREE window)` : ""} — per the spec enum these are WITH_CONDITION; ${consistent} offer(s) are consistent (every ${action} window charges the full price). Distributors filtering on the flag would hide ${action.toLowerCase()}able products.`);
+    }
+  });
 }
 
 // Expose globally for convenience in eval/require flows

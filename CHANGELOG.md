@@ -14,6 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.142] — 2026-06-12
+
+**Bundle: catalog-wide refundability sweep (#393) + run-budget ceiling
+in the admin panel (#394).**
+
+### Added
+
+- **Catalog flag-vs-schedule sweep (#393)**: the #391 verdict analyses
+  only the SELECTED offer; the OBB pattern is catalog-wide (16 of 24 NJ
+  offers pin `refundable=NO` over below-price REFUND schedules).
+  offers.js now sweeps ALL offers' value-bearing parts with
+  `effectiveRefundability` after the per-offer validations and emits ONE
+  summary WARNING per action (REFUND / EXCHANGE) when contradictions
+  exist — *"16 of 24 offers declare refundable=NO on a value-bearing
+  part while their own REFUND schedule charges less than the price (8
+  even with a FREE window) — per the spec enum these are WITH_CONDITION;
+  8 offer(s) are consistent"*. Silent when nothing contradicts (R8);
+  0-price parts skipped (no value to compare fees against, #391).
+- **Run Budget Ceiling in the admin panel (#394)**:
+  `RUN_HARD_MAX_TIMEOUT_MS` joins `CONFIG_SCHEMA` (60000..7200000) — the
+  generic GET/PUT handlers make it visible, validated and persisted to
+  `server_config`, which overrides the env var on the next run (no
+  restart). The panel previously accepted `RUN_TIMEOUT_MS` up to 3.6M
+  while the runner silently clamped every budget at the env-only 30-min
+  ceiling — the OBB expired-offer test (`preBookableUntil` = offer
+  +30 min) missed its window by one minute on every run, unfixable from
+  the UI. `RUN_TIMEOUT_MS` description now names the clamp; panel label
+  "Run Budget Ceiling (ms)"; Server Admin Guide row updated.
+
+---
+
 ## [server-v1.11.141] — 2026-06-12
 
 **Schedule-aware effective refundability (#391)** — from the OBB
