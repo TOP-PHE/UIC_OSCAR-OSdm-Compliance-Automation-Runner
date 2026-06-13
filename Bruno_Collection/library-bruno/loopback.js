@@ -51,4 +51,42 @@ function failStepOrContinue(label, nextStep, opts) {
   loopbackOrStop(label);
 }
 
-module.exports = { loopbackOrStop, failStepOrContinue };
+// #398: known-deviation baseline. A provider's documented gaps (declared in the
+// UI, persisted to the datafile as top-level `knownDeviations` and exposed by
+// scenarioParser as the `__knownDeviations` env) should not drag every run to
+// FAILED. knownDeviationFor() returns the matching record when a step's HTTP
+// status equals a documented deviation, so the call site can emit a PASSING
+// "known deviation" row instead of throwing. Matching is tolerant of the
+// "NN. " request-name prefix, so the tester can declare "GET Passenger" and it
+// still matches the "04. GET Passenger" request.
+function _normStep(s) {
+  return String(s == null ? '' : s).trim().toLowerCase().replace(/^\d+\.\s*/, '');
+}
+function knownDeviationFor(stepLabel, status) {
+  const list = parseEnvJson('__knownDeviations', []);
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const target = _normStep(stepLabel);
+  return list.find(function (d) {
+    // `active === false` = checklist item un-ticked (kept on record, not enforced).
+    return d && d.active !== false && _normStep(d.step) === target && Number(d.expectedStatus) === Number(status);
+  }) || null;
+}
+
+// Log the documented deviation as a WARNING (visibility — NOT a failure) and
+// bump the per-run tally so a future end-of-run summary can report it. Records
+// which deviations were actually seen, so the baseline can later flag any that
+// no longer reproduce.
+function noteKnownDeviation(stepLabel, status, dev) {
+  console.log(
+    '[WARNING] Known deviation (documented): ' + stepLabel + ' returned HTTP ' + status +
+    ' — ' + (dev && dev.note ? dev.note : 'declared in the provider baseline') +
+    '. Not counted as a failure; surfaced for visibility.'
+  );
+  const n = parseInt(bru.getEnvVar('__knownDeviationHits') || '0', 10) + 1;
+  bru.setEnvVar('__knownDeviationHits', String(n));
+  const seen = parseEnvJson('__knownDeviationsSeen', []);
+  const key = _normStep(stepLabel) + '#' + String(status);
+  if (seen.indexOf(key) === -1) { seen.push(key); bru.setEnvVar('__knownDeviationsSeen', JSON.stringify(seen)); }
+}
+
+module.exports = { loopbackOrStop, failStepOrContinue, knownDeviationFor, noteKnownDeviation };

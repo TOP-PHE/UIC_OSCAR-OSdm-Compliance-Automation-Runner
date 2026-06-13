@@ -14,6 +14,20 @@
       "type": "object",
       "description": "Root-level system info parameters set as env vars"
     },
+    "knownDeviations": {
+      "description": "#398: provider-level documented non-conformances declared in the wizard. A step whose HTTP status matches a documented deviation is reported as a passing 'known deviation' (WARNING) instead of a failure, so a clean run is not dragged to FAILED by an already-reported provider gap.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step", "expectedStatus"],
+        "properties": {
+          "step": { "type": "string", "description": "Request/step name, e.g. 'GET Passenger' or '04. GET Passenger' (the 'NN. ' prefix is optional)." },
+          "expectedStatus": { "type": "integer", "description": "The documented HTTP status for this gap, e.g. 501." },
+          "note": { "type": "string", "description": "Why it is accepted, e.g. 'GET /passengers not implemented (reported to ÖBB)'." },
+          "active": { "type": "boolean", "description": "Checklist toggle — untick (false) to keep the deviation on record without enforcing it (e.g. after the provider fixes it). Defaults to true." }
+        }
+      }
+    },
     "scenarios": {
       "type": "array",
       "items": {
