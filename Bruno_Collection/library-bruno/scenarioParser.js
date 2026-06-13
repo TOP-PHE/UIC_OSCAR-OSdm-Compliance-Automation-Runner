@@ -283,6 +283,25 @@ function setSystemInfoParameters(jsonData) {
   });
 }
 
+// #398: known-deviation baseline. The provider's documented gaps are declared
+// in the UI and persisted at the datafile root as `knownDeviations` (sibling of
+// systemInfoParameters). Stow the list as a JSON env var so loopback.js can
+// consult it at the call sites; a matched response becomes a passing "known
+// deviation" row instead of a FAILED assertion. Datafile-derived, so it lives
+// outside resetScenarioEnvVars — re-set fresh here on every parse.
+function setKnownDeviations(jsonData) {
+  const list = Array.isArray(jsonData.knownDeviations) ? jsonData.knownDeviations : [];
+  bru.setEnvVar('__knownDeviations', JSON.stringify(list));
+  bru.setEnvVar('__knownDeviationHits', '0');
+  bru.setEnvVar('__knownDeviationsSeen', '[]');
+  if (list.length > 0) {
+    validationLogger('[INFO] Known-deviation baseline: ' + list.length +
+      ' documented provider deviation(s) loaded — ' +
+      list.map(function (d) { return (d && d.step) + '→' + (d && d.expectedStatus); }).join(', ') +
+      '. A matching response is reported as a documented deviation, not a failure.');
+  }
+}
+
 // Wrapper to validate data file JSON (uses global or validators module)
 async function validateDataFileJsonWithTemplateSafe(json) {
   if (typeof validateDataFileJsonWithTemplate === "function") {
@@ -363,6 +382,8 @@ async function getScenarioData() {
 function parseScenarioData(jsonData) {
   // Apply root-level systemInfoParameters as env vars (e.g. masterDataLayoutId)
   setSystemInfoParameters(jsonData);
+  // #398: load the provider's known-deviation baseline (root-level).
+  setKnownDeviations(jsonData);
 
   const plusDays = parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
   const today = new Date();

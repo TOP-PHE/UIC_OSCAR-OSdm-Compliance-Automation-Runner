@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.171",
+  "current_release": "2026.172",
   "releases": [
+    {
+      "release": "2026.172",
+      "date": "2026-06-13",
+      "server": "1.11.144",
+      "collection": "OTST_V2.0.86",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Known-deviation baseline (#398). A provider's documented non-conformances stop dragging every run to FAILED. Declared in the UI per test-system (Test-Manager-gated), persisted as a top-level knownDeviations[] in that sandbox's datafile (sibling of systemInfoParameters; schema-validated), each entry {step, expectedStatus, note, active}. Engine: scenarioParser.setKnownDeviations loads it into __knownDeviations; loopback.knownDeviationFor matches a step's HTTP status against the ticked deviations (tolerant of the 'NN. ' request-name prefix; active:false = kept on record, not enforced); 04. GET Passenger.yml emits a PASSING 'known deviation (documented)' row + WARNING instead of throwing when 501 matches, so a clean OBB run is no longer FAILED by the already-reported GET /passengers gap. Any OTHER status still fails for real (the baseline can't hide a regression); noteKnownDeviation bumps a per-run tally. UI: a dedicated 'Known deviations' card in the scenarios section (renderScenariosSection) with add/remove/tick rows; saveDatafile normalises (integer status, drops incomplete rows) so the persisted datafile stays schema-clean. Safe no-op until a deviation is ticked (defaults to []). No change to the server's pass/fail computation — entirely Bruno-side + datafile/UI.",
+        "Verification: harness over the REAL extracted functions (knownDeviationFor / noteKnownDeviation / setKnownDeviations) — 22 checks: prefix-tolerant + status-coerced matching, active:false skip, success/undocumented-status no-match, WARNING+tally+dedup, parser load/reset/malformed-guard. The wizard panel renders from the real deviationChecklistHtml (toggles + rows + empty state). node --check on scenarios.js + loopback.js + scenarioParser.js; schema JSON valid; eslint clean. Cut 1 = status-level deviations (covers GET Passenger 501, every run); assertion-level deviations (the step-14 trio) are a documented fast-follow on the same framework. Server 1.11.143 -> 1.11.144; collection OTST_V2.0.85 -> OTST_V2.0.86. Operator: register each sandbox's accepted gaps in Wizard -> Scenarios -> Known deviations; runs then read PASS with documented deviations instead of FAILED."
+      ]
+    },
     {
       "release": "2026.171",
       "date": "2026-06-13",

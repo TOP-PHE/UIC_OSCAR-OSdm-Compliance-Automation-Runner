@@ -14,6 +14,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.144] — 2026-06-13
+
+**Known-deviation baseline (#398)** — a provider's documented gaps stop
+dragging every run to FAILED, declared in the UI per test-system.
+
+### Added
+
+- **Per-test-system known-deviation checklist.** The test team registers a
+  provider's accepted non-conformances (e.g. `GET Passenger → 501` on ÖBB)
+  in the wizard's datafile panel; they persist as a top-level
+  `knownDeviations[]` ({step, expectedStatus, note, active}) in that
+  sandbox's datafile (sibling of `systemInfoParameters`). A **dedicated
+  "Known deviations" card** in the scenarios section (Test-Manager-gated,
+  saved by the existing Save & Apply) — add / remove / tick rows; un-ticking
+  keeps a deviation on record without enforcing it.
+- **Engine** (`loopback.js` + `scenarioParser.js` + `04. GET Passenger.yml`):
+  when a step's HTTP status matches a ticked deviation, OSCAR emits a
+  **passing** "known deviation (documented)" row + a WARNING instead of
+  throwing — so a clean run is no longer FAILED by an already-reported gap.
+  Any *other* status still fails for real (the baseline can't hide a
+  regression), and a per-run tally records what was seen. Matching is
+  tolerant of the `"NN. "` request-name prefix; `active:false` items are
+  kept but not enforced. Safe no-op until a deviation is ticked
+  (`knownDeviations` defaults to `[]`).
+
+---
+
 ## [server-v1.11.143] — 2026-06-13
 
 **Matcher-credibility audit, round 1 (#396)** — sweep of every offer↔booking
