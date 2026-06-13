@@ -48,9 +48,22 @@ runtime:
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");
 
-        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
-        });
+        // #398: known-deviation baseline. If the provider returns a status
+        // documented in the datafile's knownDeviations (e.g. GET Passenger →
+        // 501 on ÖBB), report it as a PASSING "known deviation" row + WARNING
+        // instead of a failure, so a clean run is not dragged to FAILED by an
+        // already-reported provider gap. Any other non-200 is a real failure.
+        const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar("library_base") + "loopback.js");
+        const _kdStatus = res.getStatus();
+        const _kdMatch  = _kdStatus !== 200 ? knownDeviationFor("04. GET Passenger", _kdStatus) : null;
+        if (_kdMatch) {
+            test(`HTTP response status — known deviation (documented): 04. GET Passenger returns ${_kdStatus}`, () => {});
+            noteKnownDeviation("04. GET Passenger", _kdStatus, _kdMatch);
+        } else {
+            test(`HTTP response status — expected 200, actual: ${_kdStatus}`, () => {
+                if (_kdStatus !== 200) throw new Error("HTTP " + _kdStatus + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
+            });
+        }
 
         // #361: on failure, the step-failure policy decides — HARD_STOP
         // (default) abandons the scenario; CONTINUE records the failure and
@@ -66,7 +79,14 @@ runtime:
           return _due ? "12. GET Booking Purchaser" : "05. GET Booking before Fulfillments";
         })();
 
-        if (res.getStatus() !== 200) {
+        if (_kdStatus !== 200) {
+          // #398: a documented known deviation is NOT a failure — route on
+          // (GET Passenger yields no usable body either way) WITHOUT recording
+          // a step failure. A real (undocumented) non-200 keeps the #361 path.
+          if (_kdMatch) {
+            bru.runner.setNextRequest(_policyNext);
+            return;
+          }
           // #383: the status test above already recorded this failure once —
           // a second identical registration only double-counted it.
           const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
