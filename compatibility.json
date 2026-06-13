@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.170",
+  "current_release": "2026.171",
   "releases": [
+    {
+      "release": "2026.171",
+      "date": "2026-06-13",
+      "server": "1.11.143",
+      "collection": "OTST_V2.0.85",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Matcher-credibility audit round 1 (#396). The audit (the direction chosen after #395) swept every offer<->booking pairing function for the first-match-by-type disease that produced false findings this week; the historically-diseased matchers (afterSalesConditions #390, appliedPassengerTypes #384) are confirmed fixed, and this PR fixes the one the audit found in an un-audited flow. (1) Exchange-fee validation carried the pre-#391 disease: validateExchangeFeesConsistentWithAfterSalesConditions summed afterSaleFee across ALL EXCHANGE windows of ALL parts and hard-asserted equality to exchangeFee (and to a second naive sum in the admissionReservationAncillaryOfferPartsAftersalesConditions env var) — a part with a two-window schedule (50% before travel / 100% after) contributed 150%, manufacturing a false 'exchange fee mismatch' on any multi-window/multi-part offer (the same class as the OBB afterSaleFee retraction). Now schedule-aware on effectiveRefundability: expected fee = sum of the ACTIVE window's fee per value-bearing part, decode-safe (hard-asserts only when every value-bearing part has a decodable active EXCHANGE schedule and one currency; otherwise INFO + skip). It also moved OUT of the inverted `if (appliedOverruleCode)` gating into the normal flow and skips under overrule (an overrule overrides the schedule) — previously the normal exchange was never checked and the overrule case compared against the wrong baseline. (2) 🎯 accommodation goal: bookedRes.find(id) || bookedRes[0] silently validated the goal against the FIRST reservation when the id was not echoed — in a multi-reservation booking that can green-light the wrong compartment. Now id -> requested accommodation type -> first, with a WARNING when the last fallback is ambiguous (>1 reservation).",
+        "Verification: harness over the REAL extracted functions with stubbed bru/test/validationLogger and the REAL afterSalesRules.js — exchange decode 7 (single active window match/mismatch; TWO-WINDOW fee=active-window PASSES while fee=old-naive-sum now FAILS 'engine and its own declared schedule disagree'; OBB reality exchangeable=NO/no-EXCHANGE-windows -> INFO skip with zero assertions; overruleCode sent -> skip; no numeric exchangeFee -> early return); 🎯 target 5 (single id match no warning; multi id match; multi no-id type-fallback finds the COUCHETTE not the first SEAT; multi no-id no-type -> first + WARNING; single never warns). node --check x2; eslint clean. Deferred (tracked, not guessed): offers.js place-selection first-subtype pick feeds the live booking placeSelections — needs a real multi-subtype scenario. Server 1.11.142 -> 1.11.143; collection OTST_V2.0.84 -> OTST_V2.0.85."
+      ]
+    },
     {
       "release": "2026.170",
       "date": "2026-06-12",

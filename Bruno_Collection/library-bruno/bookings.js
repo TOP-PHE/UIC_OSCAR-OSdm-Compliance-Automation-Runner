@@ -420,7 +420,24 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
     : String(requested);
 
   const bookedRes = (bookedOffers || []).flatMap(b => (b && b.reservations) || []).filter(Boolean);
-  const target = bookedRes.find(r => r.id === reservationId) || bookedRes[0] || null;
+  // #396: locate the booked reservation by id; if the provider didn't echo it,
+  // fall back to the requested accommodation type, and only then to the first
+  // reservation — warning when that last fallback is ambiguous (>1 reservation).
+  // The old `|| bookedRes[0]` silently validated the 🎯 goal against the FIRST
+  // reservation, which can green-light the wrong compartment in a multi-
+  // reservation booking.
+  let target = bookedRes.find(r => r.id === reservationId) || null;
+  if (!target && selAcc && selAcc.accommodationType) {
+    const _want = String(selAcc.accommodationType).toUpperCase();
+    target = bookedRes.find(r => r.placeAllocation
+      && String(r.placeAllocation.accommodationType || '').toUpperCase() === _want) || null;
+  }
+  if (!target) {
+    target = bookedRes[0] || null;
+    if (target && bookedRes.length > 1) {
+      validationLogger(`[WARNING] 🎯 Accommodation goal: the booked reservation could not be located by id (${reservationId || 'n/a'}) or by accommodation type (${selAcc && selAcc.accommodationType ? selAcc.accommodationType : 'n/a'}) among ${bookedRes.length} reservations — validating against the first; the 🎯 verdict may target the wrong reservation part.`);
+    }
+  }
 
   test(`🎯 Accommodation goal — booking carries the requested ${requested} reservation`, () => {
     if (!target) throw new Error(`No reservation part in the booking (requested ${requested}, selected part ${reservationId || 'n/a'}) — the provider dropped the reservation from the booking.`);
