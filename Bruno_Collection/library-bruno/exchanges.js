@@ -185,10 +185,14 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
   // Validate applied overrule code if present
   if (exchangeOffer.appliedOverruleCode) {
     validateExchangeAppliedOverruleCode(exchangeOffer.appliedOverruleCode, expectedOverruleCode);
-
-    // Validate exchange price and fees
-    validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer);
   }
+
+  // #396: exchange-fee schedule consistency runs in the NORMAL flow now. The old
+  // code ran it ONLY inside `if (appliedOverruleCode)` — but an overrule
+  // overrides the declared schedule, so the comparison was against the wrong
+  // baseline exactly there, while the normal (non-overrule) exchange was never
+  // checked. The function itself skips when an overruleCode was sent.
+  validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer);
 
   // Validate refundableAmount if present
   if (exchangeOffer.refundableAmount !== undefined && exchangeOffer.refundableAmount !== null && exchangeOffer.refundableAmount.amount !== null) {
@@ -228,77 +232,58 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
 
 // Function to validate exchange fees are consistent with after-sales conditions
 function validateExchangeFeesConsistentWithAfterSalesConditions(exchangeOffer) {
-  validationLogger("[DEBUG] ➤ validateExchangeFeesConsistentWithAfterSalesConditions");
-  // Calculate total afterSalesConditions from all offer parts
-  const exchangeFee = exchangeOffer.exchangeFee;
-  const admissionOfferParts = exchangeOffer.admissionOfferParts || [];
-  const reservationOfferParts = exchangeOffer.reservationOfferParts || [];
-  const ancillaryOfferParts = exchangeOffer.ancillaryOfferParts || [];
-  let totalAfterSalesFee = 0;
-  let admissionReservationAncillaryOfferPartsAftersalesConditions = Number(bru.getEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions") || 0);
-
-  // Sum afterSalesConditions from admissionOfferParts
-  admissionOfferParts.forEach((admission, admIndex) => {
-    if (Array.isArray(admission.afterSalesConditions) && admission.afterSalesConditions.length > 0) {
-      admission.afterSalesConditions.forEach((condition, condIndex) => {
-        if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[DEBUG] AdmissionOfferPart[${admIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
-          const scenarioType = bru.getEnvVar("scenarioType") || "";
-          if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          }
-        }
-      });
-    }
-  });
-
-  // Sum afterSalesConditions from reservationOfferParts
-  reservationOfferParts.forEach((reservation, resIndex) => {
-    if (Array.isArray(reservation.afterSalesConditions) && reservation.afterSalesConditions.length > 0) {
-      reservation.afterSalesConditions.forEach((condition, condIndex) => {
-        if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[DEBUG] ReservationOfferPart[${resIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
-          const scenarioType = bru.getEnvVar("scenarioType") || "";
-          if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          }
-        }
-      });
-    }
-  });
-
-  // Sum afterSalesConditions from ancillaryOfferParts
-  ancillaryOfferParts.forEach((ancillary, ancIndex) => {
-    if (Array.isArray(ancillary.afterSalesConditions) && ancillary.afterSalesConditions.length > 0) {
-      ancillary.afterSalesConditions.forEach((condition, condIndex) => {
-        if (condition.afterSaleFee && condition.afterSaleFee.amount !== undefined) {
-          validationLogger(`[DEBUG] AncillaryOfferPart[${ancIndex}].afterSalesConditions[${condIndex}].afterSaleFee.amount: ${condition.afterSaleFee.amount}`);
-          const scenarioType = bru.getEnvVar("scenarioType") || "";
-          if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
-            totalAfterSalesFee += condition.afterSaleFee.amount;
-          }
-        }
-      });
-    }
-  });
-
-  validationLogger(`[DEBUG] Total afterSalesConditions fee from all offer parts: ${totalAfterSalesFee}`);
-
-  // Validate exchange fee if exchange fee and afterSalesConditions exist and consistent
-  if (exchangeFee && typeof exchangeFee.amount === 'number') {
-    test(`Exchange fee = ${exchangeFee.amount} matches total afterSalesConditions = ${totalAfterSalesFee} from all offer parts and admissionReservationAncillaryOfferPartsAftersalesConditions from offer = ${admissionReservationAncillaryOfferPartsAftersalesConditions}`, () => {
-      validationLogger(`[DEBUG] Exchange fee = ${exchangeFee.amount} matches total afterSalesConditions = ${totalAfterSalesFee} from all offer parts and admissionReservationAncillaryOfferPartsAftersalesConditions from offer = ${admissionReservationAncillaryOfferPartsAftersalesConditions}`);
-      expect(exchangeFee.amount).to.be.at.least(0, "Exchange fee should be non-negative");
-      expect(exchangeFee.amount).to.eql(totalAfterSalesFee);
-      expect(exchangeFee.amount).to.eql(admissionReservationAncillaryOfferPartsAftersalesConditions);
-    });
+  validationLogger("[DEBUG] \u27a4 validateExchangeFeesConsistentWithAfterSalesConditions");
+  // #396: schedule-aware exchange-fee consistency (mirrors the refund #391 model).
+  // The old version summed afterSaleFee across ALL EXCHANGE windows of ALL parts
+  // and hard-asserted equality to exchangeFee (and to a second naive sum carried
+  // in an env var) — a part with a two-window schedule (e.g. 50% before travel,
+  // 100% after) contributed 150%, manufacturing a false 'exchange fee mismatch'
+  // on any multi-window / multi-part offer. Now: the expected fee is the sum of
+  // the ACTIVE window's fee per value-bearing part, and the check is DECODE-SAFE
+  // (hard-asserts only when every value-bearing part has a decodable active
+  // EXCHANGE schedule and one currency; otherwise INFO + skip, no false fail).
+  const exchangeFee = exchangeOffer && exchangeOffer.exchangeFee;
+  if (!exchangeFee || typeof exchangeFee.amount !== 'number') {
+    validationLogger("[DEBUG] Exchange offer carries no numeric exchangeFee \u2014 nothing to verify against the schedule.");
+    return;
   }
+
+  // An overrule explicitly overrides the declared schedule (overrule contract:
+  // the fee is the overridden value, not the afterSalesConditions). Skip the
+  // schedule comparison, exactly as the refund permissibility gate does.
+  const overruleCode = bru.getEnvVar("overruleCode");
+  if (overruleCode && overruleCode !== "null") {
+    validationLogger(`[INFO] Exchange fee schedule-consistency skipped \u2014 an overruleCode (${overruleCode}) was sent; the overrule overrides the declared EXCHANGE schedule.`);
+    return;
+  }
+
+  const { expectedRefundForParts } = require("./afterSalesRules.js");
+  const parts = []
+    .concat(exchangeOffer.admissionOfferParts || [])
+    .concat(exchangeOffer.reservationOfferParts || [])
+    .concat(exchangeOffer.ancillaryOfferParts || []);
+
+  // expectedRefundForParts threads the action through effectiveRefundability;
+  // its .expectedFee is the sum of the active-window fee over value-bearing parts
+  // (price > 0) \u2014 exactly what the declared EXCHANGE schedule charges right now.
+  const r = expectedRefundForParts(parts, Date.now(), "EXCHANGE");
+
+  if (!r.ok) {
+    validationLogger(`[INFO] Exchange fee not schedule-decodable (${r.reason}) \u2014 OSCAR does not assert exchangeFee against the conditions here; the provider's exchangeFee (${exchangeFee.amount}${exchangeFee.currency ? ' ' + exchangeFee.currency : ''}) stands on its own.`);
+    return;
+  }
+  if (exchangeFee.currency && r.currency && exchangeFee.currency !== r.currency) {
+    validationLogger(`[INFO] Exchange fee currency (${exchangeFee.currency}) differs from the schedule currency (${r.currency}) \u2014 schedule decode skipped.`);
+    return;
+  }
+
+  test(`Exchange fee matches the active EXCHANGE schedule \u2014 exchangeFee ${exchangeFee.amount} = active-window fee ${r.expectedFee}`, () => {
+    validationLogger(`[DEBUG] Exchange fee schedule decode: per part [${r.detail.join('; ')}] \u2192 expected active-window fee ${r.expectedFee}; provider exchangeFee ${exchangeFee.amount}.`);
+    if (exchangeFee.amount !== r.expectedFee) {
+      throw new Error(`The declared EXCHANGE schedule charges ${r.expectedFee} right now (${r.detail.join('; ')}), but the exchange offer's exchangeFee is ${exchangeFee.amount} \u2014 the engine and its own declared schedule disagree.`);
+    }
+  });
+  validationLogger(`[INFO] Exchange fee schedule decode OK \u2014 exchangeFee ${exchangeFee.amount} matches the active EXCHANGE schedule (active-window fee ${r.expectedFee}).`);
 }
 
 // Function to validate applied overrule code
