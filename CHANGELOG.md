@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.143] — 2026-06-13
+
+**Matcher-credibility audit, round 1 (#396)** — sweep of every offer↔booking
+pairing function for the first-match-by-type disease that caused false
+findings this week. The historically-diseased matchers (afterSalesConditions
+#390, appliedPassengerTypes #384) are confirmed fixed; this fixes the one the
+audit found in an un-audited flow.
+
+### Changed
+
+- **Exchange-fee validation is now schedule-aware (the refund #391 model
+  applied to exchange).** `validateExchangeFeesConsistentWithAfterSalesConditions`
+  summed `afterSaleFee` across ALL EXCHANGE windows of ALL parts and
+  hard-asserted equality to `exchangeFee` (and to a second naive sum carried
+  in an env var) — a part with a two-window schedule (50% before travel /
+  100% after) contributed 150%, manufacturing a false "exchange fee mismatch"
+  on any multi-window / multi-part offer. Now the expected fee is the sum of
+  the **active** window's fee per value-bearing part, **decode-safe**
+  (hard-asserts only when every value-bearing part has a decodable active
+  EXCHANGE schedule and one currency; otherwise INFO + skip). The check also
+  moves out of the `if (appliedOverruleCode)` branch into the normal flow and
+  **skips under overrule** (an overrule overrides the schedule) — the old
+  gating was inverted, so the normal exchange was never checked.
+- **🎯 accommodation goal targets the right reservation.** The booked
+  reservation was located by id with `|| bookedRes[0]` — in a multi-reservation
+  booking where the id wasn't echoed, the 🎯 goal was silently validated
+  against the FIRST reservation. Now: id → requested accommodation type →
+  first, with a WARNING when the last fallback is ambiguous (>1 reservation).
+
+### Deferred
+
+- Place-selection `availablePlaces.find(type)[first-subtype]` (offers.js) feeds
+  the live booking `placeSelections` — high blast radius; a fix needs a real
+  multi-subtype reservation scenario to verify against. Tracked, not guessed.
+
+---
+
 ## [server-v1.11.142] — 2026-06-12
 
 **Bundle: catalog-wide refundability sweep (#393) + run-budget ceiling
