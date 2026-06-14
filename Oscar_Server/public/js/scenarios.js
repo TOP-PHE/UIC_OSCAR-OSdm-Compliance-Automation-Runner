@@ -925,8 +925,6 @@ function renderScenariosSection(framework, resources, datafile) {
         <div id="scenario-list"></div>
       </div>
 
-      <div class="card" id="deviation-card" style="margin-bottom:14px">${deviationChecklistHtml(datafile)}</div>
-
       <div style="text-align:center;padding:8px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap">
         <button class="btn btn-primary" data-action="open-scenario-creator">
           ⚡ Create Scenario
@@ -940,49 +938,6 @@ function renderScenariosSection(framework, resources, datafile) {
 
     renderAll();
   }
-}
-
-// #398: Known-deviation checklist (datafile-level, per test-system). Documented
-// provider gaps that the test team accepts; a ticked deviation whose response
-// matches is reported as a documented deviation instead of a run failure. Lives
-// on state.knownDeviations and persists with the datafile (saveDatafile).
-function deviationChecklistHtml(datafile) {
-  const list = (datafile && Array.isArray(datafile.knownDeviations)) ? datafile.knownDeviations : [];
-  const rows = list.map(function(d, i) {
-    const active = d.active !== false;
-    return `
-      <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #eceff1">
-        <div class="pill${active ? ' selected' : ''}" data-action="toggle-deviation-active" data-idx="${i}"
-             title="${active ? 'Enforced — click to keep on record without enforcing' : 'Not enforced (kept on record)'}"
-             style="min-width:84px;text-align:center;cursor:pointer">${active ? '✓ Active' : '✗ Off'}</div>
-        <input class="param-input" data-action="set-deviation-field" data-idx="${i}" data-field="step"
-               value="${esc(d.step || '')}" placeholder="Step, e.g. GET Passenger" style="flex:1.2;min-width:0">
-        <input class="param-input" data-action="set-deviation-field" data-idx="${i}" data-field="expectedStatus"
-               value="${esc(d.expectedStatus != null ? d.expectedStatus : '')}" placeholder="HTTP, e.g. 501"
-               inputmode="numeric" style="width:96px">
-        <input class="param-input" data-action="set-deviation-field" data-idx="${i}" data-field="note"
-               value="${esc(d.note || '')}" placeholder="Why accepted (e.g. not implemented — reported to provider)" style="flex:2;min-width:0">
-        <button class="row-delete-btn" data-action="delete-deviation" data-idx="${i}" title="Remove this deviation">🗑</button>
-      </div>`;
-  }).join('');
-  const empty = `<div style="color:#90a4ae;font-size:12px;padding:8px 0">No documented deviations for this test-system yet — add one when the team accepts a provider gap (e.g. GET Passenger → 501).</div>`;
-  return `
-    <div class="card-head">
-      <span class="card-head-title">🩹 Known deviations
-        <span style="font-size:11px;font-weight:400;text-transform:none;color:#90a4ae;letter-spacing:0">
-          — documented provider gaps for THIS test-system, maintained by the test team. A ticked deviation whose response matches is reported as documented, not counted as a run failure; any other response still fails.
-        </span>
-      </span>
-    </div>
-    ${list.length ? rows : empty}
-    <div style="padding:8px 0 2px">
-      <button class="btn btn-sm btn-secondary" data-action="add-deviation">➕ Add deviation</button>
-    </div>`;
-}
-
-function rerenderDeviationCard() {
-  const card = document.getElementById('deviation-card');
-  if (card) card.innerHTML = deviationChecklistHtml(state);
 }
 
 function openScenarioCreator() {
@@ -2928,20 +2883,6 @@ async function saveDatafile() {
   setSaveBtnState(true, '💾 Saving…');
   hidePanels();
   try {
-    // #398: normalise the known-deviation checklist before persisting — coerce
-    // expectedStatus to an integer and drop incomplete rows, so the datafile
-    // stays schema-clean even if a row was left half-filled mid-edit.
-    if (Array.isArray(state.knownDeviations)) {
-      state.knownDeviations = state.knownDeviations
-        .map(d => ({
-          step: String((d && d.step) || '').trim(),
-          expectedStatus: parseInt(d && d.expectedStatus, 10),
-          note: String((d && d.note) || '').trim(),
-          active: !(d && d.active === false),
-        }))
-        .filter(d => d.step && Number.isFinite(d.expectedStatus));
-    }
-
     // Auto-increment version on shared scenarios when test_manager saves
     if (isTestManager && state && state.scenarios) {
       state.scenarios.forEach(sc => {
@@ -5872,25 +5813,6 @@ document.body.addEventListener('click', function(e) {
     case 'delete-datafile':
       deleteDatafile(); break;
 
-    // ── #398 Known-deviation checklist (datafile-level) ───────────────────────
-    case 'add-deviation':
-      if (!Array.isArray(state.knownDeviations)) state.knownDeviations = [];
-      state.knownDeviations.push({ step: '', expectedStatus: '', note: '', active: true });
-      markDirty(); rerenderDeviationCard(); break;
-    case 'delete-deviation': {
-      const _di = parseInt(el.dataset.idx, 10);
-      if (Array.isArray(state.knownDeviations) && _di >= 0) {
-        state.knownDeviations.splice(_di, 1); markDirty(); rerenderDeviationCard();
-      }
-      break;
-    }
-    case 'toggle-deviation-active': {
-      const _di = parseInt(el.dataset.idx, 10);
-      const _d = Array.isArray(state.knownDeviations) ? state.knownDeviations[_di] : null;
-      if (_d) { _d.active = (_d.active === false); markDirty(); rerenderDeviationCard(); }
-      break;
-    }
-
     // ── Scenario list actions ─────────────────────────────────────────────────
     case 'toggle-detail':
       toggleDetail(parseInt(el.dataset.idx)); break;
@@ -6787,15 +6709,6 @@ document.body.addEventListener('input', function(e) {
   switch (action) {
     case 'set-scenario-text':
       setScenarioField(parseInt(el.dataset.idx), el.dataset.field, el.value); break;
-    case 'set-deviation-field': {
-      // #398: edit a known-deviation field in place (no re-render — keeps focus).
-      // expectedStatus is stored as typed; saveDatafile() coerces to integer and
-      // drops incomplete rows so the persisted datafile stays schema-clean.
-      const _di = parseInt(el.dataset.idx, 10);
-      const _d = Array.isArray(state.knownDeviations) ? state.knownDeviations[_di] : null;
-      if (_d) { _d[el.dataset.field] = el.value; markDirty(); }
-      break;
-    }
     case 'set-scenario-max-wait-minutes': {
       // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
       // Empty input clears (null = use server default RUN_TIMEOUT_MS).

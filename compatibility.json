@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.172",
+  "current_release": "2026.173",
   "releases": [
+    {
+      "release": "2026.173",
+      "date": "2026-06-14",
+      "server": "1.11.145",
+      "collection": "OTST_V2.0.86",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Findings & Open Points (#400). The #398 known-deviation checklist is reframed from a Test-Config wizard panel into a threaded, per-test-system conformance dialogue on its own main-menu page (/findings.html, nav item for testers + test managers). Server store: finding + finding_comment tables (schema.sql, idempotent — picked up on next boot). REST: GET/POST/PATCH/DELETE /v1/company/findings + POST /v1/company/findings/:id/comments; reads = the vendor's own test_manager + testers, writes = test_manager only (administrators + certifiers have no access, mirroring GET /v1/company/datafile). Each finding carries an observation + OSCAR's spec reading, a SOFT category (open | provider_deviation | oscar_issue | not_supported | spec_question), a SOFT severity (major | minor | not_supported), a status (open -> discussing -> resolved, auto-advanced on first reply), a baseline_in_run switch and a raise_to_osdm flag. Soft wording is deliberate: a finding may be the provider's deviation OR OSCAR's own bug — the thread decides, so OSCAR never pre-labels a provider. Runtime link: a finding baselined with a step + numeric expected_status is projected server-side (utils/knownDeviationProjection) into the datafile's top-level knownDeviations[] in the exact {step, expectedStatus, note, active} shape the #398 engine consumes — regenerated on every finding change AND on every datafile save (PUT /v1/company/datafile/json overwrites the array from the register), so a wizard save can't wipe or hand-edit it; the datafile is decrypted/re-encrypted at rest. The unchanged #398 Bruno engine (loopback.knownDeviationFor / scenarioParser.setKnownDeviations / 04. GET Passenger.yml) consumes it as before. The #398 wizard panel (1.11.144) is fully excised from scenarios.js. Ships an importable OEBB/Nightjet starter set = OSCAR's 2026-06-14 analysis (GET-passenger 501 [baselined — the run-failing core gap] + System-Info 501s [not-supported] + RI vocabulary passenger[0].details.* + refundable=NO over a below-price schedule + exchangeable=NO on FULL_FLEXIBLE + expiry-error vagueness + step-14 provisionalPrice/reservation-status).",
+        "Verification: integration test tests/integration/findings-routes.test.js + a standalone supertest harness over the REAL route + db + at-rest (temp DB) — 23 checks: auth/role gating (401 no token, 403 certifier read, 200 tester read, 403 tester write), create + defaults, 400 no-title, list with comment counts, threaded comment with open->discussing auto-advance, PATCH classify, baseline guard (refuses baseline_in_run without a step + numeric status), 404s, buildProjection mapping (only baselined rows with step + numeric status, mapped to {step,expectedStatus,note,active:true}; empty for unknown company), and an END-TO-END loop (PUT datafile -> POST baselined finding -> GET datafile shows the projected knownDeviations entry). eslint clean on the new/edited src; node --check on findings.js + scenarios.js; #398 panel grep-confirmed gone (no dangling deviationChecklistHtml / knownDeviations references in scenarios.js). Server 1.11.144 -> 1.11.145; collection unchanged at OTST_V2.0.86 (no Bruno change this cut). Operator: declare a sandbox's findings in Test Findings & Open Points and baseline the ones the team accepts (step + HTTP status) — runs then read PASS-with-documented instead of FAILED on those."
+      ]
+    },
     {
       "release": "2026.172",
       "date": "2026-06-13",
