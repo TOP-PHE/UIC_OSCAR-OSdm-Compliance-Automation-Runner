@@ -713,6 +713,74 @@ router.get('/batch/:batchId', (req, res) => {
   });
 });
 
+// ── GET /v1/runs/batch/:batchId/reports.zip (#405) ───────────────────────────
+// One-click bulk download: every run's artifacts in a batch, bundled into one
+// ZIP named {sandbox}_{date}_batch-{shortid}.zip. Strictly company-scoped; each
+// artifact is decrypted at-rest and added under a scenario-named entry.
+const bulkDownloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many bulk downloads in a short window — please wait a moment.' }
+});
+router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
+  const companyId = req.companyId || req.user.companyId;
+  if (!companyId) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'A company context is required to download batch reports.' });
+  }
+
+  const runs = all(
+    `SELECT id, scenario_code, env_name_used, queued_at, started_at
+       FROM runs WHERE batch_id = ? AND company_id = ? ORDER BY queued_at ASC`,
+    [req.params.batchId, companyId]
+  );
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+
+  const { decryptFromFile } = require('../../utils/at-rest');
+  const { buildZip }        = require('../../utils/zip');
+  const SAFE_ARTIFACTS_DIR  = path.resolve(__dirname, '../../../data/artifacts');
+  const sanitize = s => String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+
+  const entries = [];
+  const used = new Set();
+  for (const r of runs) {
+    const arts = all(`SELECT id, type, filename, path FROM run_artifacts WHERE run_id = ?`, [r.id]);
+    for (const a of arts) {
+      const safePath = path.resolve(a.path || '');
+      if (!safePath.startsWith(SAFE_ARTIFACTS_DIR + path.sep) || !fs.existsSync(safePath)) continue;
+      let plaintext;
+      try { plaintext = decryptFromFile(safePath); } catch (_e) { continue; }   // skip an unreadable artifact, keep the rest
+      const scenario = sanitize(r.scenario_code) || ('run-' + String(r.id).slice(0, 8));
+      const ext = ((a.filename && a.filename.match(/\.([A-Za-z0-9]+)$/)) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
+      let name = `${scenario}.${ext}`;
+      if (used.has(name)) {
+        const short = String(r.id).slice(0, 8);
+        let n = 1;
+        do { name = `${scenario}_${short}${n > 1 ? '_' + n : ''}.${ext}`; n++; } while (used.has(name));
+      }
+      used.add(name);
+      entries.push({ name, data: plaintext });
+    }
+  }
+  if (!entries.length) {
+    return res.status(404).json({ status: 404, title: 'No reports', detail: 'No downloadable artifacts found for this batch yet.' });
+  }
+
+  const sandbox = sanitize((runs[0].env_name_used || 'sandbox').replace(/^OTST[_-]?/i, '').replace(/[_-]?Env$/i, '')) || 'sandbox';
+  const date    = String(runs[0].started_at || runs[0].queued_at || '').slice(0, 10) || 'run';
+  const zipName = `${sandbox}_${date}_batch-${String(req.params.batchId).slice(0, 8)}.zip`;
+
+  let zip;
+  try { zip = buildZip(entries); }
+  catch (_e) { return res.status(500).json({ status: 500, title: 'Zip failed', detail: 'Could not build the report archive.' }); }
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+  res.setHeader('Content-Length', String(zip.length));
+  return res.end(zip);
+});
+
 // ── GET /v1/runs/:id ──────────────────────────────────────────────────────────
 router.get('/:id', (req, res) => {
   const runRow = validateRunOwnership(req.params.id, req.companyId, req);

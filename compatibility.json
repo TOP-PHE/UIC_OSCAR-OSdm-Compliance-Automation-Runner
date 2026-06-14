@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.174",
+  "current_release": "2026.175",
   "releases": [
+    {
+      "release": "2026.175",
+      "date": "2026-06-14",
+      "server": "1.11.147",
+      "collection": "OTST_V2.0.86",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "One-click bulk report download (#405). A '+ Reports' button on each Dashboard batch header streams a single ZIP of every run's artifacts in that batch — each run's HTML report + raw JSON results, entry-named by scenario — as {sandbox}_{date}_batch-{shortid}.zip. New endpoint GET /v1/runs/batch/:batchId/reports.zip: strictly company-scoped (WHERE batch_id AND company_id; a foreign company gets 404), each run_artifacts file path-checked under data/artifacts and decrypted at-rest (decryptFromFile) before being added to the archive, rate-limited (30/min). The download name comes from the server Content-Disposition (run.env_name_used -> sandbox, started_at -> date). Kills the cumbersome one-by-one report download and lets a whole sandbox batch be handed to OSCAR for finding-analysis as one file. The ZIP is produced by a new dependency-free store-mode writer utils/zip.js (self-contained CRC-32), in keeping with the codebase's hand-rolled-over-dependency convention (cf. utils/at-rest.js, the cookie parser in auth.js). The dashboard button lives inside the batch-header toggle row, so its click stops propagation to avoid collapsing the batch. UI + one read-only endpoint + a util; no schema or data-model change.",
+        "Verification: tests/unit/zip.test.js (archive structure — local/central/EOCD signatures, entry counts, central-dir offset, CRC-32 cross-checked vs zlib.crc32, UTF-8 names/data, empty-list) + tests/integration/batch-reports-zip.test.js (seeds a 2-run batch with REAL encrypted artifacts; asserts 401 no-token, 404 unknown-batch, 404 cross-company scoping, and a 200 valid ZIP with 3 scenario-named entries + the friendly Content-Disposition). The hand-rolled zip was independently validated by .NET's System.IO.Compression reader (opened, enumerated, content + UTF-8 + CRC round-tripped). node --check + eslint + inline-script lint clean. Server 1.11.146 -> 1.11.147; collection unchanged OTST_V2.0.86."
+      ]
+    },
     {
       "release": "2026.174",
       "date": "2026-06-14",
