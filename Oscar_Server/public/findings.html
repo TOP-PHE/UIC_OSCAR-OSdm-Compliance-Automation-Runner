@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!--
+Copyright [2026] [International Union of Railways (UIC)]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSCAR — Test Findings &amp; Open Points</title>
+<link rel="stylesheet" href="/css/scenarios.css">
+</head>
+<body>
+
+<header class="uic-banner">
+  <div class="uic-banner-top">
+    <div class="uic-banner-left">
+      <a href="https://uis.org" aria-label="UIC website">
+        <img src="https://uic.org/plugins/uictemplates/img/logos/uic_logo.svg" alt="UIC" class="uic-banner-logo">
+      </a>
+    </div>
+    <div class="uic-banner-right">
+      <a href="https://osdm.io" aria-label="OSDM website">
+        <img src="https://uic.org/com/IMG/png/logo_osdm.png" alt="OSDM" class="osdm-banner-logo">
+      </a>
+    </div>
+  </div>
+  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/nav.js"></script>
+  <script>renderOscarNav('oscar-nav', 'findings');</script>
+</header>
+
+<div class="container">
+  <div class="page-header">
+    <div>
+      <h2>🔎 Test Findings &amp; Open Points</h2>
+      <div style="font-size:12px;color:#90a4ae;margin-top:4px">
+        Conformance dialogue for this test-system — documented gaps, open questions, and how OSCAR reads the spec.
+        A finding may be the provider's deviation <em>or</em> OSCAR's own issue; the thread decides.
+      </div>
+    </div>
+    <div class="header-actions" id="header-actions"></div>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <div id="loading" class="placeholder">⏳ Loading…</div>
+
+  <div id="findings-root" style="display:none"></div>
+</div>
+
+<footer class="site-footer">
+  <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
+    <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">
+    <span>Powered by <strong style="color:#cfd8dc">TrackOnPath SAS</strong> &nbsp;&middot;&nbsp;
+    <a href="mailto:patrick.heuguet@trackonpath.com" style="color:#90a4ae;text-decoration:none">patrick.heuguet@trackonpath.com</a></span>
+  </div>
+  &copy; UIC - International union of railways. 2026. All rights reserved.
+</footer>
+
+<script src="/js/findings.js"></script>
+</body>
+</html>

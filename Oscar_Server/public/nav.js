@@ -236,6 +236,7 @@
         { href: '/compare.html',        label: 'Compare',        page: 'compare'        },
         { href: '/profile.html',        label: 'API Config',     page: 'profile'        },
         { href: '/scenarios.html',      label: 'Test Config',    page: 'scenarios'      },
+        { href: '/findings.html',       label: 'Test Findings',  page: 'findings'       },
       ];
       if (role === 'test_manager') {
         items.push({ href: '/admin.html?tab=users', label: 'Manage Users', page: 'admin-users' });
