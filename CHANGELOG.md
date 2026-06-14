@@ -14,6 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.145] — 2026-06-14
+
+**Test Findings & Open Points (#400)** — the per-test-system known-deviation
+checklist becomes a threaded conformance dialogue, on its own main-menu page.
+
+### Added
+
+- **"Test Findings & Open Points" page** (`/findings.html`, new nav item for
+  testers + test managers). A per-test-system, threaded record of conformance
+  findings: OSCAR's analysis opens a point (observation + its reading of the
+  spec); the test team replies, classifies (category / severity / status) and
+  resolves on the thread. Soft-worded on purpose — a finding may be the
+  provider's deviation **or** OSCAR's own issue; the dialogue decides. A
+  "raise to OSDM" flag earmarks items as working-group feedback. Ships a
+  one-click ÖBB / Nightjet starter set (OSCAR's analysis — 7 open points).
+- **Server store + API** — `finding` + `finding_comment` tables (schema.sql);
+  `GET/POST/PATCH/DELETE /v1/company/findings` and
+  `POST /v1/company/findings/:id/comments`. Reads = the vendor's own users;
+  writes = `test_manager` only (admins + certifiers excluded, mirroring the
+  datafile). Integration-tested (`tests/integration/findings-routes.test.js`).
+- **Run-time projection** — a finding the team baselines (a step + a documented
+  HTTP status) is projected server-side into the datafile's `knownDeviations[]`
+  (`utils/knownDeviationProjection.js`), so the #398 Bruno engine reports it as
+  documented instead of FAILED. The array is server-managed: regenerated on any
+  finding change and on every datafile save, so a wizard save can never wipe or
+  hand-edit it.
+
+### Changed
+
+- **Known-deviation declaration moved out of Test Config.** The #398 wizard
+  panel (v1.11.144) is replaced by the dedicated Findings page — it isn't run
+  configuration, it's a standing conformance record. The #398 Bruno engine
+  (`loopback.js` / `scenarioParser.js` / `04. GET Passenger.yml`) is unchanged
+  and now consumes the server-projected `knownDeviations[]`.
+
+---
+
 ## [server-v1.11.144] — 2026-06-13
 
 **Known-deviation baseline (#398)** — a provider's documented gaps stop

@@ -317,6 +317,19 @@ router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const filePath = path.join(dir, `${company.slug}-datafile.json`);
+
+  // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
+  // is server-managed — derived from the findings the test team has baselined
+  // for runs — never hand-authored in the wizard. Overwrite whatever the client
+  // sent so a datafile save can't wipe or tamper with it. Soft: a failure here
+  // leaves the rest of the save intact.
+  try {
+    const { buildProjection } = require('../../utils/knownDeviationProjection');
+    body.knownDeviations = buildProjection(targetCompanyId);
+  } catch (err) {
+    log.warn({ err: err.message, companyId: targetCompanyId }, 'datafile save: knownDeviations projection failed');
+  }
+
   const content  = JSON.stringify(body, null, 4);
   // Hash the plaintext (so the hash matches the user-visible file content),
   // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
