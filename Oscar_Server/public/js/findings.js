@@ -123,12 +123,10 @@
     if (!state.findings.length) {
       return '<div class="card"><div class="card-body" style="padding:24px;text-align:center;color:#78909c">'
         + '<div style="font-size:15px;font-weight:700;color:#455a64;margin-bottom:6px">No findings recorded yet</div>'
-        + '<div style="font-size:13px;margin-bottom:16px;max-width:560px;margin-left:auto;margin-right:auto">'
-        + 'Open points raised here become the conformance record for this test-system — searchable, threaded, and a feed for OSDM working-group feedback.</div>'
-        + (state.isTM
-            ? '<button class="btn btn-secondary" data-action="import-seed">⬇ Import the ÖBB / Nightjet starter set — OSCAR\'s analysis (7 open points)</button>'
-            : '')
-        + '</div></div>';
+        + '<div style="font-size:13px;max-width:560px;margin-left:auto;margin-right:auto">'
+        + 'Open points raised here become the conformance record for this test-system — searchable, threaded, and a feed for OSDM working-group feedback.'
+        + (state.isTM ? ' Use <strong>＋ Open a finding</strong> to add one.' : '')
+        + '</div></div></div>';
     }
     return '<div style="margin-bottom:12px;font-size:12px;color:#78909c">' + summarise(state.findings) + '</div>'
       + state.findings.map(renderCard).join('');
@@ -372,14 +370,6 @@
       await refresh();
     } catch (e) { toast(e.message, 'error'); }
   }
-  async function importSeed() {
-    if (!confirm('Import the ÖBB / Nightjet starter set — ' + OBB_SEED.length + ' open points from OSCAR\'s analysis? You can edit or delete any afterwards.')) return;
-    try {
-      for (var i = 0; i < OBB_SEED.length; i++) await api('POST', '/v1/company/findings', OBB_SEED[i]);
-      await refresh();
-      toast('Imported ' + OBB_SEED.length + ' findings.', 'success');
-    } catch (e) { toast('Import stopped: ' + e.message, 'error'); await refresh(); }
-  }
 
   // ── Event delegation ─────────────────────────────────────────────────────────
   document.body.addEventListener('click', function (e) {
@@ -399,7 +389,6 @@
       case 'toggle-osdm':   toggleOsdm(id); break;
       case 'post-reply':    postReply(id); break;
       case 'delete-finding': delFinding(id); break;
-      case 'import-seed':   importSeed(); break;
       case 'form-pill': {
         if (!state.form) break;
         var fld = el.dataset.field, val = el.dataset.value, cur = state.form.fields[fld];
@@ -417,57 +406,6 @@
     var el = closestAction(e.target); if (!el) return;
     if (el.dataset.action === 'form-toggle' && state.form) state.form.fields[el.dataset.field] = el.checked;
   });
-
-  // ── ÖBB / Nightjet starter set — OSCAR's analysis (2026-06-14) ────────────────
-  // Soft-worded open points, not verdicts. Only the core passenger-read gap is
-  // pre-baselined (it carries a step + HTTP status the #398 engine consults and
-  // is the one currently dragging clean runs to FAILED). Authorship shows as
-  // "OSCAR analysis" so the thread opens as OSCAR's voice.
-  var OBB_SEED = [
-    {
-      title: 'GET booking passenger(s) returns 501',
-      step: 'GET Passenger', expectedStatus: 501,
-      observed: 'GET /bookings/{id}/passengers and …/passengers/{passengerId} both return HTTP 501.',
-      interpretation: 'These are core booking passenger-read endpoints (getBookingPassengers / getBookingPassengersId), not the optional System-Info family. ÖBB does not implement them. Handled as not-supported so a clean run is not FAILED — but it is a core-endpoint gap worth raising upstream, not a spec-permitted omission.',
-      category: 'not_supported', severity: 'not_supported', baselineInRun: true, raiseToOsdm: true, createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'System-Info endpoints not implemented (501)',
-      observed: 'versions, coach-layouts, passenger-categories, promotion-codes, reduction-cards, zones, products, product-tags all return 501.',
-      interpretation: 'Optional / auxiliary System-Info endpoints. OSDM permits a provider not to implement them; OSCAR already treats these as out-of-scope (INFO skip). No runtime effect — recorded for completeness.',
-      category: 'not_supported', severity: 'not_supported', createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'requestedInformation uses non-standard pointer vocabulary',
-      observed: 'requestedInformation references passenger[0].details.* tokens.',
-      interpretation: 'The OSDM pointer model is passengerSpecifications[n].detail.* — the [0] list index was never the objection; passenger≠passengerSpecifications and details≠detail. OSCAR\'s RI probe can\'t map the tokens (inert) and warns. Either a provider mapping deviation or a spec-clarity gap — worth confirming with ÖBB / OSDM.',
-      category: 'spec_question', severity: 'minor', raiseToOsdm: true, createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'refundable=NO over a below-price REFUND schedule',
-      observed: '16 of 24 NJ offers pin refundable=NO on a value-bearing part while their own REFUND schedule charges below the price (Komfort 50%, Normalpreis free).',
-      interpretation: 'Per the OSDM enum a part refundable below its price is WITH_CONDITION, not NO. OSCAR emits a catalog-wide R9 warning. (Sparschiene with a 100% fee → NO is consistent and not flagged.)',
-      category: 'provider_deviation', severity: 'minor', createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'exchangeable=NO on FULL_FLEXIBLE fares',
-      observed: 'exchangeable=NO catalog-wide, including FULL_FLEXIBLE products that declare no EXCHANGE conditions.',
-      interpretation: 'A fully-flexible fare that cannot be exchanged is internally inconsistent. Raises whether the flag reflects the product or the spec needs to tie flexibility to exchangeability. Open question.',
-      category: 'spec_question', severity: 'minor', createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'Expired-error vocabulary is inconsistent across after-sales',
-      observed: 'Expired POST /bookings and POST /fulfillments return a bare 404 with no expiry vocabulary; PATCH /refund-offers names the expiry clearly.',
-      interpretation: 'Inconsistent diagnosability across the after-sales surface — the booking/fulfillment path can\'t be told apart from a generic not-found. Not blocking, but worth aligning so testers (and OSCAR) can attribute expiry correctly.',
-      category: 'provider_deviation', severity: 'minor', createdBy: 'OSCAR analysis'
-    },
-    {
-      title: 'After refund: missing provisionalPrice + reservation stuck FULFILLED',
-      observed: 'After a refund, provisionalPrice is absent at the REFUNDED stage and the reservation part stays FULFILLED (the step-14 trio).',
-      interpretation: 'OSDM expects price/status coherence after a refund. OSCAR currently asserts these as failures; candidates either to baseline once confirmed accepted on ÖBB, or to raise as genuine provider deviations.',
-      category: 'provider_deviation', severity: 'minor', createdBy: 'OSCAR analysis'
-    }
-  ];
 
   // ── Init ─────────────────────────────────────────────────────────────────────
   boot();
