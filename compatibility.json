@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.173",
+  "current_release": "2026.174",
   "releases": [
+    {
+      "release": "2026.174",
+      "date": "2026-06-14",
+      "server": "1.11.146",
+      "collection": "OTST_V2.0.86",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Findings UX + report naming (#403). Two quality-of-life fixes after Test Findings & Open Points (#400) went live on real sandboxes. (1) Run-artifact downloads are self-describing: the JSON results file from a run page now downloads as {sandbox}_{date}_{scenario}.json (derived client-side in run-detail.html from run.env_name_used -> sandbox, run.started_at/queued_at -> date, run.scenario_code; sanitised to [A-Za-z0-9._-], length-capped at 120) instead of the anonymous bru_results.json, so a folder of downloaded reports is no longer indistinguishable. The displayed artifact name shows the friendly name (raw stored name on hover); HTML 'Open Report' is unchanged (it already carries the scenario). (2) Dropped the hardcoded OEBB/Nightjet seed import from the Findings page: the button rendered on EVERY sandbox (Bileto included), not just OEBB — removed (OBB_SEED const + importSeed() + the import-seed action + the empty-state button); the empty state now points to '+ Open a finding'. It was a Phase-1 convenience; the generic per-sandbox analyzer (Phase 2A, AI-assisted) is its proper replacement and OEBB's findings are already imported. UI-only; no engine, schema, route, or data-model change. eslint + node --check + inline-script lint clean. Server 1.11.145 -> 1.11.146; collection unchanged OTST_V2.0.86."
+      ]
+    },
     {
       "release": "2026.173",
       "date": "2026-06-14",

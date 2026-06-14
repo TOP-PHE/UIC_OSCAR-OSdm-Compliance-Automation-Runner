@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.146] — 2026-06-14
+
+**Findings UX + report naming (#403)** — quality-of-life fixes after the Test
+Findings feature went live on real sandboxes.
+
+### Fixed
+
+- **Run-artifact downloads are now self-describing.** The JSON results file
+  downloaded from a run page is named `{sandbox}_{date}_{scenario}.json`
+  (length-capped, filesystem-safe) instead of the anonymous `bru_results.json`,
+  so a folder of downloaded reports is no longer indistinguishable
+  (`run-detail.html`, derived client-side from the run metadata).
+
+### Changed
+
+- **Dropped the hardcoded ÖBB seed from the Findings page.** The "Import the
+  ÖBB / Nightjet starter set" button was rendering on *every* sandbox (Bileto
+  included), not just ÖBB. Removed — it was a Phase-1 convenience; the generic
+  per-sandbox analyzer (Phase 2A) is its proper replacement, and ÖBB's findings
+  are already imported. The empty state now points to **＋ Open a finding**.
+
+---
+
 ## [server-v1.11.145] — 2026-06-14
 
 **Test Findings & Open Points (#400)** — the per-test-system known-deviation

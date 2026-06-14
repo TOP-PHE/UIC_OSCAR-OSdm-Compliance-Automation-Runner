@@ -298,6 +298,23 @@ let polling     = true;
 // backlog, so updateStatus() can be called with a terminal run several times.
 let terminalHandled = false;
 
+// Friendly, self-describing download name for run artifacts —
+// {sandbox}_{date}_{scenario}.{ext} — so a downloaded results file is no longer
+// an anonymous bru_results.json. Built from the run object (set in updateStatus).
+let currentRun = null;
+function friendlyArtifactBase() {
+  const r = currentRun || {};
+  const sandbox = String(r.env_name_used || 'sandbox')
+    .replace(/^OTST[_-]?/i, '').replace(/[_-]?Env$/i, '').trim() || 'sandbox';
+  let date = '';
+  try { date = parseServerTs(r.started_at || r.queued_at).toISOString().slice(0, 10); } catch (_e) { /* missing/invalid date → omit */ }
+  const scenario = r.scenario_code || 'run';
+  let base = [sandbox, date, scenario].filter(Boolean).join('_')
+    .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-');
+  if (base.length > 120) base = base.slice(0, 120).replace(/[-_.]+$/, '');   // mind the filename length
+  return base || 'run';
+}
+
 // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
 function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
 function duration(a, b) {
@@ -307,6 +324,7 @@ function duration(a, b) {
 }
 
 function updateStatus(run) {
+  currentRun = run;
   const badge = document.getElementById('status-badge');
   badge.className = `status s-${run.status}`;
   const spin = (run.status === 'RUNNING' || run.status === 'QUEUED') ? '<span class="spin">⟳</span> ' : '';
@@ -643,11 +661,13 @@ async function loadArtifacts() {
         <a href="${href}" target="_blank" class="btn btn-dl">🔍 Open Report</a>
       </div>`;
     }
+    const _ext    = (a.filename.match(/\.([A-Za-z0-9]+)$/) || [])[1] || 'json';
+    const _dlName = `${friendlyArtifactBase()}.${_ext}`;
     return `
     <div class="artifact-row">
       <span style="flex:1;font-weight:600">${label}</span>
-      <span style="color:#90a4ae;font-size:12px">${a.filename}</span>
-      <button class="btn btn-dl" data-action="download-artifact" data-artifact-id="${a.id}" data-filename="${a.filename}">⬇ Download</button>
+      <span style="color:#90a4ae;font-size:12px" title="stored as ${a.filename}">${_dlName}</span>
+      <button class="btn btn-dl" data-action="download-artifact" data-artifact-id="${a.id}" data-filename="${_dlName}">⬇ Download</button>
     </div>`;
   }).join('');
 }
