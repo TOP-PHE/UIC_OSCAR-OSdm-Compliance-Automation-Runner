@@ -432,7 +432,7 @@ function renderRuns(runs) {
       <div class="url">${batchRuns[0].api_base_used || '-'}</div>
       <div style="color:#546e7a;font-size:12px">${fmtDate(batchRuns[0].queued_at)}</div>
       <div style="color:#546e7a;font-size:12px">${batchDuration}</div>
-      <div></div>
+      <div><button class="btn" data-action="download-batch" data-batch-id="${batchId}" title="Download all ${batchRuns.length} reports in this batch as a ZIP" style="padding:4px 10px;font-size:11px;background:#eceff1;color:#455a64;font-weight:700">⬇ Reports</button></div>
       <div></div>
     </div>`;
 
@@ -662,6 +662,16 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
     return;
   }
 
+  // Bulk download — all reports in a batch as a ZIP (#405). Must run BEFORE the
+  // batch-header toggle below, since the button lives inside the toggle row.
+  const dlEl = e.target.closest('[data-action="download-batch"]');
+  if (dlEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    downloadBatch(dlEl.dataset.batchId, dlEl);
+    return;
+  }
+
   // Batch header toggle
   const el = e.target.closest('[data-action="toggle-batch"]');
   if (el) {
@@ -677,6 +687,37 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
   const row = e.target.closest('.run-row');
   if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
 });
+
+// Bulk download (#405): fetch the batch's reports.zip (authenticated) and save
+// it under the server-provided {sandbox}_{date}_batch.zip filename.
+async function downloadBatch(batchId, btn) {
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ Zipping…'; btn.style.pointerEvents = 'none'; }
+  try {
+    const res = await fetch(`/v1/runs/batch/${encodeURIComponent(batchId)}/reports.zip`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      oscarToast(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    const cd = res.headers.get('content-disposition') || '';
+    const m  = /filename="?([^"]+)"?/.exec(cd);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = m ? m[1] : `batch-${String(batchId).slice(0, 8)}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (e) {
+    oscarToast('Network error during download: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = orig; btn.style.pointerEvents = ''; }
+  }
+}
 
 // Share / unshare a single run with certifiers (test_manager only).
 // Wired to POST/DELETE /v1/runs/:id/share. Reloads the list on success so
