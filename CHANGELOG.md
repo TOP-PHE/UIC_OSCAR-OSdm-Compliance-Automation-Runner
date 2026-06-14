@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.147] — 2026-06-14
+
+**One-click bulk report download (#405)** — download every run's reports in a
+batch as a single ZIP, from the Dashboard.
+
+### Added
+
+- **"⬇ Reports" button on each Dashboard batch header.** One click streams a
+  single ZIP of every run's artifacts in that batch — each run's HTML report +
+  raw JSON results, named by scenario — as `{sandbox}_{date}_batch-{id}.zip`.
+  Endpoint `GET /v1/runs/batch/:batchId/reports.zip` (strictly company-scoped;
+  artifacts decrypted at-rest on the way out; rate-limited). No more downloading
+  reports one-by-one — and a whole sandbox batch can be handed to OSCAR for
+  analysis as a single file.
+- **`utils/zip.js`** — a small, dependency-free store-mode ZIP writer (with a
+  self-contained CRC-32), in keeping with the codebase's hand-rolled-over-
+  dependency convention (cf. `utils/at-rest.js`). Unit-tested, and the endpoint
+  integration-tested.
+
+---
+
 ## [server-v1.11.146] — 2026-06-14
 
 **Findings UX + report naming (#403)** — quality-of-life fixes after the Test
