@@ -30,7 +30,9 @@
     openId: null,     // id of the expanded finding (thread view), or null
     thread: null,     // { finding, comments } for the open finding
     form: null,       // { mode:'create'|'edit', id, fields:{...} } when composing
-    replyText: ''     // draft reply for the open thread
+    replyText: '',    // draft reply for the open thread
+    importing: false, // JSON-import view open
+    importText: ''    // pasted import JSON
   };
 
   // ── Soft-label vocabularies ──────────────────────────────────────────────────
@@ -109,10 +111,12 @@
   // ── Render dispatch ──────────────────────────────────────────────────────────
   function render() {
     var ha = document.getElementById('header-actions');
-    ha.innerHTML = (state.isTM && !state.form)
+    ha.innerHTML = (state.isTM && !state.form && !state.importing)
       ? '<button class="btn btn-success" data-action="compose-new">＋ Open a finding</button>'
+        + ' <button class="btn btn-secondary" data-action="import-open" title="Import findings from a JSON array (e.g. OSCAR\'s analysis for this test-system)">⬆ Import</button>'
       : '';
     var root = document.getElementById('findings-root');
+    if (state.importing) { root.innerHTML = renderImport(); return; }
     if (state.form) { root.innerHTML = renderForm(state.form); return; }
     if (state.openId && state.thread) { root.innerHTML = renderThread(state.thread); return; }
     root.innerHTML = renderList();
@@ -312,6 +316,20 @@
     }).join('') + '</div>';
   }
 
+  // ── Import view ──────────────────────────────────────────────────────────────
+  function renderImport() {
+    var h = '<div class="card" style="margin-bottom:14px;border:1px solid #b3e5fc">';
+    h += '<div class="card-head"><div class="card-head-title">⬆ Import findings</div></div>';
+    h += '<div class="card-body" style="padding:16px 18px">';
+    h += '<div style="font-size:12px;color:#78909c;margin-bottom:8px">Paste a JSON array of findings — e.g. OSCAR\'s analysis for this test-system. Each needs a <code>title</code>; optional: <code>step, expectedStatus, observed, interpretation, category, severity, baselineInRun, raiseToOsdm</code>. They\'re created as open points (authored “OSCAR analysis” unless the item sets <code>createdBy</code>) for you to review and reply to.</div>';
+    h += '<textarea class="param-input" data-action="import-text" spellcheck="false" placeholder=\'[ {"title":"...","category":"provider_deviation","severity":"minor","observed":"...","interpretation":"..."} ]\' style="min-height:240px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5">' + esc(state.importText || '') + '</textarea>';
+    h += '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">'
+       + '<button class="btn btn-secondary btn-sm" data-action="import-cancel">Cancel</button>'
+       + '<button class="btn btn-success btn-sm" data-action="import-run">Import</button></div>';
+    h += '</div></div>';
+    return h;
+  }
+
   // ── Actions ──────────────────────────────────────────────────────────────────
   async function openFinding(id) {
     try {
@@ -371,6 +389,41 @@
     } catch (e) { toast(e.message, 'error'); }
   }
 
+  async function importFindings() {
+    var raw = (state.importText || '').trim();
+    if (!raw) { toast('Paste a JSON array of findings first.', 'warning'); return; }
+    var arr;
+    try { arr = JSON.parse(raw); }
+    catch (e) { toast('Invalid JSON: ' + e.message, 'error'); return; }
+    if (!Array.isArray(arr)) { toast('Expected a JSON array of findings.', 'error'); return; }
+    var items = arr.filter(function (o) { return o && typeof o === 'object' && String(o.title || '').trim(); });
+    if (!items.length) { toast('No findings with a title found in the JSON.', 'warning'); return; }
+    if (!confirm('Import ' + items.length + ' finding(s) into this test-system?')) return;
+    var ok = 0, failed = 0;
+    for (var i = 0; i < items.length; i++) {
+      var o = items[i];
+      try {
+        await api('POST', '/v1/company/findings', {
+          title:          String(o.title).trim(),
+          step:           (o.step != null && String(o.step).trim()) ? String(o.step).trim() : null,
+          expectedStatus: o.expectedStatus,
+          observed:       o.observed || '',
+          interpretation: o.interpretation || '',
+          evidence:       o.evidence || '',
+          category:       o.category || 'open',
+          severity:       o.severity || null,
+          baselineInRun:  !!o.baselineInRun,
+          raiseToOsdm:    !!o.raiseToOsdm,
+          createdBy:      (typeof o.createdBy === 'string' && o.createdBy.trim()) ? o.createdBy.trim() : 'OSCAR analysis'
+        });
+        ok++;
+      } catch (_e) { failed++; }
+    }
+    state.importing = false; state.importText = '';
+    await refresh();
+    toast('Imported ' + ok + ' finding(s)' + (failed ? (' — ' + failed + ' failed') : '') + '.', failed ? 'warning' : 'success');
+  }
+
   // ── Event delegation ─────────────────────────────────────────────────────────
   document.body.addEventListener('click', function (e) {
     var el = closestAction(e.target); if (!el) return;
@@ -378,7 +431,10 @@
     switch (a) {
       case 'open-finding':  openFinding(id); break;
       case 'close-thread':  state.openId = null; state.thread = null; render(); break;
-      case 'compose-new':   state.form = blankForm('create'); render(); window.scrollTo(0, 0); break;
+      case 'compose-new':   state.form = blankForm('create'); state.importing = false; render(); window.scrollTo(0, 0); break;
+      case 'import-open':   state.importing = true; state.form = null; state.openId = null; state.thread = null; render(); window.scrollTo(0, 0); break;
+      case 'import-cancel': state.importing = false; render(); break;
+      case 'import-run':    importFindings(); break;
       case 'edit-finding':  startEdit(id); break;
       case 'cancel-form':   state.form = null; render(); break;
       case 'submit-form':   submitForm(); break;
@@ -400,6 +456,7 @@
   document.body.addEventListener('input', function (e) {
     var el = closestAction(e.target); if (!el) return;
     if (el.dataset.action === 'set-reply-text') state.replyText = el.value;
+    else if (el.dataset.action === 'import-text') state.importText = el.value;
     else if (el.dataset.action === 'form-field' && state.form) state.form.fields[el.dataset.field] = el.value;
   });
   document.body.addEventListener('change', function (e) {

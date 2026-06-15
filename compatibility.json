@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.175",
+  "current_release": "2026.176",
   "releases": [
+    {
+      "release": "2026.176",
+      "date": "2026-06-14",
+      "server": "1.11.148",
+      "collection": "OTST_V2.0.86",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Findings generic Import (#408). A '+ Import' button on the Test Findings page (test_manager) accepts a pasted JSON array of findings and creates each via the existing POST /v1/company/findings (loop; the create endpoint validates/whitelists per item). Each imported finding is authored 'OSCAR analysis' unless the item supplies createdBy. Replaces the hardcoded OBB seed (removed in #403) with a GENERIC, per-sandbox path — usable for Bileto / SNCF / any provider — and is the intended front door for the Phase 2A auto-analyzer (OSCAR proposes findings, Import ingests them). Frontend-only change to public/js/findings.js (new import view + import-open/cancel/run actions + import-text input); no server or schema change. Used to file the Bileto findings set from the 2026-06-14 report analysis.",
+        "Verification: node --check on findings.js; npm run lint clean (eslint src + inline-script lint over 15 HTML files). The import reuses the #400-verified findings POST endpoint (integration-tested in findings-routes.test.js). Server 1.11.147 -> 1.11.148; collection unchanged OTST_V2.0.86."
+      ]
+    },
     {
       "release": "2026.175",
       "date": "2026-06-14",
