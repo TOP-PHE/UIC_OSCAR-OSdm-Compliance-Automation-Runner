@@ -18,8 +18,28 @@ module.exports = {
   placesForPassengers,
   requestRefundOffersBody,
   requestExchangeOffersBody,
-  requestExchangeOperationsBody
+  requestExchangeOperationsBody,
+  withPaxoneOfferSearchCriteriaDefaults
 };
+
+// PAXONE mandates offerSearchCriteria.currency + .offerMode on the offer request:
+// both are OPTIONAL in OSDM, but PAXONE rejects their absence with a 422
+// VALIDATION_ERROR ("Field body.offerSearchCriteria.offerMode/currency is
+// missing"), which blocks the whole discovery flow. When the scenario doesn't
+// declare them, default them so the offer requests go through — currency from
+// the scenario's offerSearchCriteriaCurrency (else EUR), offerMode INDIVIDUAL.
+// Returns a NEW object and never mutates the input; only the two PAXONE-required
+// keys are filled — any criteria the scenario DID set are preserved untouched.
+function withPaxoneOfferSearchCriteriaDefaults(osc) {
+  const out = (osc && typeof osc === 'object' && !Array.isArray(osc)) ? Object.assign({}, osc) : {};
+  if (out.currency == null || out.currency === '') {
+    out.currency = bru.getEnvVar('offerSearchCriteriaCurrency') || 'EUR';
+  }
+  if (out.offerMode == null || out.offerMode === '') {
+    out.offerMode = 'INDIVIDUAL';
+  }
+  return out;
+}
 
 // Two-step return (#178): does this scenario's outbound search request a return?
 // We detect it from the outbound tripSearchCriteria the scenarioParser built —
@@ -68,6 +88,10 @@ function buildReturnOfferCollectionRequest() {
     anonymousPassengerSpecifications: parseEnvJson("offerPassengerSpecifications"),
     offerSearchCriteria: parseEnvJson("offerSearchCriteria")
   };
+  // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).
+  if (isPaxone) {
+    body.offerSearchCriteria = withPaxoneOfferSearchCriteriaDefaults(body.offerSearchCriteria);
+  }
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
   const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
     ? JSON.parse(fulfillmentOptions) : [];
@@ -101,6 +125,10 @@ function buildOfferCollectionRequest() {
 
   body.anonymousPassengerSpecifications = parseEnvJson("offerPassengerSpecifications");
   body.offerSearchCriteria = parseEnvJson("offerSearchCriteria");
+  // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).
+  if (isPaxone) {
+    body.offerSearchCriteria = withPaxoneOfferSearchCriteriaDefaults(body.offerSearchCriteria);
+  }
 
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
   const parsedFulfillmentOptions = (fulfillmentOptions != null && fulfillmentOptions !== '')
