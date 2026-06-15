@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.149] — 2026-06-14
+
+**Fix (#410): placeSelection `reservationId` stale across offers (#14/#15)** —
+surfaced by the Bileto report analysis.
+
+### Fixed
+
+- **`requestsBuilder.js` now derives the booking `placeSelections.reservationId`
+  from the SELECTED offer at build time** instead of trusting a `reservationId`
+  env var that `offers.js` sets by first-match and keeps across offers
+  (`offers.js:1642`). In multi-offer flows (`…_RETURN`, `ADD_TO_BOOKING`) that
+  value could point to a `reservationOfferPart` of a *different* offer than the
+  one being booked — which the `#377` pre-flight rejected (Bileto #14) and which
+  drove the Bileto add-reservation 400 (#15). The env value is honoured only
+  when it IS a part of the selected offer; otherwise the part matching the
+  chosen accommodation (else the first reservation part) is used; `#377` stays as
+  the guard. Resolves the deferred place-selection audit item. Collection
+  OTST_V2.0.86 → OTST_V2.0.87.
+
+### Verified
+
+- Harness over the real `resolvePlaceSelectionReservationId` — 8 checks
+  (env-id-valid keep; stale-id re-derive [the Bileto #14 repro]; accommodation
+  match; no-offer keep; unset→first; offer-as-JSON-string; valid-non-first keep;
+  empty-parts keep). `node --check` clean.
+
+---
+
 ## [server-v1.11.148] — 2026-06-14
 
 **Findings: generic Import (#408)** — file a whole set of findings (e.g. OSCAR's
