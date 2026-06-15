@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.176",
+  "current_release": "2026.177",
   "releases": [
+    {
+      "release": "2026.177",
+      "date": "2026-06-14",
+      "server": "1.11.149",
+      "collection": "OTST_V2.0.87",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #410 (#14/#15): placeSelection reservationId stale across offers. requestsBuilder.js now derives the booking placeSelections.reservationId from the SELECTED offer (bru env 'offer') at build time, instead of the reservationId env var that offers.js sets by first-match and keeps across offers (offers.js:1642 'already set -> keep it'). In multi-offer flows (..._RETURN, ADD_TO_BOOKING) that value could point to a reservationOfferPart of a DIFFERENT offer than the one booked -> the #377 pre-flight rejected it (Bileto #14: 'placeSelections[0].reservationId is not a reservationOfferPart of the selected offer'), and the same stale/unresolved id drove the Bileto add-reservation 400 (#15; cf. the offers.js:1630 comment documenting a prior Bileto 400 here). New resolvePlaceSelectionReservationId(): honour the env id only when it is a part of the selected offer; else pick the reservationOfferPart matching the chosen accommodation (selectedAccommodation), else the first reservation part; the #377 pre-flight stays as the guard; no offer context -> keep the env var (legacy). Resolves the deferred place-selection audit item. Library-side only (Bruno_Collection/library-bruno/requestsBuilder.js).",
+        "Verification: harness over the REAL extracted resolvePlaceSelectionReservationId with stubbed bru/parseEnvJson/validationLogger — 8 checks (env-id-valid keep; stale-id re-derive = the Bileto #14 repro; accommodation-type match; no-offer keep; unset -> first part; offer-as-JSON-string parsed; valid-non-first keep; empty-parts keep). node --check clean. Server 1.11.148 -> 1.11.149; collection OTST_V2.0.86 -> OTST_V2.0.87."
+      ]
+    },
     {
       "release": "2026.176",
       "date": "2026-06-14",

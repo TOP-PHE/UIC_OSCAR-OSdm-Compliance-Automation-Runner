@@ -423,6 +423,37 @@ function assertPlaceSelectionConsistency() {
   }
 }
 
+// #14/#15 fix — the `reservationId` env var (set by first-match in offers.js and
+// KEPT across offers via its "already set → keep it" guard, offers.js:1642) goes
+// stale in multi-offer flows (…_RETURN, ADD_TO_BOOKING): it can point to a
+// reservationOfferPart of a DIFFERENT offer than the one being booked, which the
+// #377 pre-flight then (correctly) rejects — and which drove the Bileto
+// add-reservation 400 (cf. offers.js:1630). Re-derive it from the SELECTED offer
+// at build time: honour the env var only when it IS a part of the selected
+// offer; otherwise pick the part matching the chosen accommodation, else the
+// first reservation part. No offer context → keep the env var (legacy behaviour).
+function resolvePlaceSelectionReservationId(selectedAccommodation) {
+  const envId = bru.getEnvVar("reservationId");
+  const offer = parseEnvJson("offer", null);
+  const parts = (offer && Array.isArray(offer.reservationOfferParts)) ? offer.reservationOfferParts : [];
+  const partIds = parts.map(p => p && p.id).filter(Boolean);
+  if (partIds.length === 0) return envId;                  // no selected-offer context — leave as-is
+  if (envId && partIds.includes(envId)) return envId;       // already a part of the booked offer — trust it
+
+  const accType = selectedAccommodation && selectedAccommodation.accommodationType;
+  let pick = null;
+  if (accType) {
+    pick = parts.find(p => Array.isArray(p.availablePlaces)
+      && p.availablePlaces.some(pl => pl && pl.accommodationType === accType)) || null;
+  }
+  if (!pick) pick = parts.find(p => p && p.id) || null;
+  const newId = pick && pick.id;
+  if (newId && newId !== envId) {
+    validationLogger(`[DEBUG] placeSelection reservationId re-derived from the selected offer: '${envId || "(unset)"}' → '${newId}' (the env value was not a reservationOfferPart of the booked offer).`);
+  }
+  return newId || envId;
+}
+
 // Function to handle place selections
 function accommodationAndPlaceSelection() {
   validationLogger("[DEBUG] ➤ accommodationAndPlaceSelection");
@@ -456,7 +487,7 @@ function accommodationAndPlaceSelection() {
   const passengerRefs = Array.isArray(passengerRefsRaw) ? passengerRefsRaw : [];
 
   const placeSelection = {
-    reservationId: bru.getEnvVar("reservationId"),
+    reservationId: resolvePlaceSelectionReservationId(selectedAccommodation),
     tripLegCoverage: { tripId, legId }
   };
 
