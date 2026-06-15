@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.155] — 2026-06-15
+
+**Fix (#422): baseline the documented Turnit refund/exchange `GET → 405` so it
+stops hard-failing the run (extends the #398 known-deviation hook).**
+
+### Fixed
+
+- **`loopback.js _normStep` now tolerates a `Folder/` path prefix** as well as
+  the `"NN. "` request-number prefix, so a deviation declared from a
+  report-derived step name (`03-Refund/11. GET Refund Offer`) matches the
+  request's own label (`11. GET Refund Offer`) — both normalise to
+  `get refund offer`. (Previously a baselined finding's folder-prefixed step
+  silently never matched.)
+- **The #398 known-deviation hook is now wired into `03-Refund/11. GET Refund
+  Offer.yml` and `04-Exchange/12. GET Exchange Offer.yml`** (previously only on
+  `04. GET Passenger.yml`). Turnit creates refund/exchange offers (`POST` → 200,
+  full body) but returns **405** on `GET /refund-offers/{id}` /
+  `GET /exchange-operations/{id}`; those steps used to hard-stop the scenario, so
+  the rest of the refund/exchange flow never ran. A documented 405 (the
+  `baselineInRun` finding on the Turnit board) is now reported as a PASSING
+  "known deviation" + `[WARNING]` and the flow proceeds — the offer id came from
+  step 10/11, so steps 12-16 (incl. `13. PATCH Refund Offer`) don't need this
+  body. Any **undocumented** non-200 still hard-stops; the 200 happy path is
+  untouched. Collection OTST_V2.0.89 → OTST_V2.0.90.
+
+### Verified
+
+- Harness over the real extracted `_normStep` + `knownDeviationFor` — **11/11**:
+  folder-prefixed ↔ short labels collapse equal; refund/exchange 405 match the
+  documented deviation; legacy `GET Passenger` 501 still matches; 200 and
+  undocumented (404) → no match; `active:false` not enforced; empty list → null.
+  `node --check` on `loopback.js` clean; both edited yml after-response scripts
+  parse as valid JS. Server 1.11.154 → 1.11.155.
+
+  **Note:** baselining steps 11/12 lets the refund/exchange flow continue past
+  the 405 — a fresh Turnit run will reveal whether 12-16 (esp. `13. PATCH Refund
+  Offer`) complete or surface a new finding.
+
+---
+
 ## [server-v1.11.154] — 2026-06-15
 
 **Fix (#420): "Discover timetable" finds 0 trips on PAXONE — it queried at
