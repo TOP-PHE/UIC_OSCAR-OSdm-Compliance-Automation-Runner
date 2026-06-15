@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.177",
+  "current_release": "2026.178",
   "releases": [
+    {
+      "release": "2026.178",
+      "date": "2026-06-15",
+      "server": "1.11.150",
+      "collection": "OTST_V2.0.87",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Findings & Open Points list reorganised into a category accordion (#412). The flat card stack is now a two-level accordion grouped by category (provider_deviation/oscar_issue/not_supported/spec_question/open), collapsed by default. Each category header shows the lifecycle breakdown as counts — New (not yet reviewed) / WIP (discussion ongoing) / Closed (settled), zeros muted. Expanding a category reveals the three lifecycle sub-groups themselves collapsed; expanding one lists its findings. Both levels persist their open/closed state across re-renders, with an Expand-all/Collapse-all toggle. Finding rows are leaner now the headers carry category + lifecycle (severity dot, title, in-runs/OSDM badges, reply count, step/HTTP line); clicking a row opens the existing thread. New/WIP/Closed is a display-only relabel of the stored open/discussing/resolved status (the thread-view status pills + badge adopt the same labels) — no API, schema, or data-model change. Front-end only: public/js/findings.js.",
+        "Access verified unchanged (the Test Manager asked to confirm all company Test Managers see the same findings): GET /v1/company/findings resolves companyId = req.user.companyId and queries WHERE company_id = ? with no created_by filter, so every test_manager AND tester of a company shares one board; writes stay test_manager-only. Confirmed empirically on Bileto (2 Test Managers + 1 tester, same company).",
+        "Verification: node --check on findings.js clean; public/js is outside the eslint scope (CI lints src/). Grouping + lifecycle-count logic previewed live against the 12-finding Bileto board (Provider deviation 9 / OSCAR issue 1 / Not supported 2) in both collapsed and expanded states. Findings API unchanged (findings-routes.test.js still applies). Server 1.11.149 -> 1.11.150; collection unchanged OTST_V2.0.87."
+      ]
+    },
     {
       "release": "2026.177",
       "date": "2026-06-14",
