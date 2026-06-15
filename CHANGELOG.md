@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.153] — 2026-06-15
+
+**Fix (#418): "Discover timetable" fails on PAXONE (422) — the server-side
+companion to #416.**
+
+### Fixed
+
+- **The "Discover timetable" feature now sends `offerSearchCriteria.{currency,
+  offerMode}` for PAXONE** (`company-test-resources.js` `_discoveryBody`). The
+  train-set discovery that scans `POST /offers` across N days was sending
+  `offerSearchCriteria: {}`, so on PAXONE every searched day returned a 422
+  VALIDATION_ERROR and discovery reported *"No usable offer response across the
+  searched days"* — blocking timetable discovery entirely. #416/#417 fixed the
+  Bruno **request builder** (`requestsBuilder.js`) but missed this **server** path,
+  which is the one behind the Discover-timetable button. `_discoveryBody` now
+  sends `{ currency: 'EUR', offerMode: 'INDIVIDUAL' }` for PAXONE (neither filters
+  the harvested timetable); every other sandbox keeps the empty criteria,
+  unchanged. Same `/paxone/i` api_base gate. Server-only — collection unchanged.
+
+### Verified
+
+- Harness over the **real extracted** `_discoveryBody` (source-extracted + eval'd
+  — the route module opens the DB on require) — **6/6**: PAXONE → currency +
+  offerMode with trip/passenger preserved; non-PAXONE → empty `{}`; case-
+  insensitive; non-offers endpoint → bare trip; `undefined` apiBase safe.
+  `node --check` clean. Server 1.11.152 → 1.11.153; collection unchanged
+  (OTST_V2.0.89).
+
+---
+
 ## [server-v1.11.152] — 2026-06-15
 
 **Fix (#416): PAXONE offer requests fail (422) without

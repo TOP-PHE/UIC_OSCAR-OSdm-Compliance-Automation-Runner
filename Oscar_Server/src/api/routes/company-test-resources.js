@@ -65,15 +65,23 @@ function _tripSearch(date, origin, destination, apiBase) {
 //   offers           → an OfferCollectionRequest (trip search + one anonymous
 //                      passenger; offerSearchCriteria left empty so nothing is
 //                      filtered out — we only want the trips, not the pricing).
+//
+// offerSearchCriteria.currency + .offerMode are OPTIONAL in OSDM, but PAXONE
+// rejects an offers request that omits them with a 422 VALIDATION_ERROR
+// ("Field body.offerSearchCriteria.offerMode/currency is missing"), which makes
+// timetable discovery fail on every searched day. For PAXONE we send the minimal
+// required pair (EUR / INDIVIDUAL — neither filters the timetable we harvest);
+// every other sandbox keeps the empty criteria, unchanged.
 function _discoveryBody(endpoint, date, origin, destination, apiBase) {
   const trip = _tripSearch(date, origin, destination, apiBase);
   if (endpoint === 'offers') {
+    const isPaxone = /paxone/i.test(String(apiBase || ''));
     return {
       tripSearchCriteria: trip,
       anonymousPassengerSpecifications: [
         { externalRef: '1', type: 'PERSON', dateOfBirth: '1990-01-01', gender: 'X' }
       ],
-      offerSearchCriteria: {}
+      offerSearchCriteria: isPaxone ? { currency: 'EUR', offerMode: 'INDIVIDUAL' } : {}
     };
   }
   return trip;
