@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.154] — 2026-06-15
+
+**Fix (#420): "Discover timetable" finds 0 trips on PAXONE — it queried at
+midnight; PAXONE returns offers only around the requested time.**
+
+### Fixed
+
+- **Discovery now queries PAXONE at a daytime hour** (`company-test-resources.js`
+  `_tripSearch`). After #418/#419 cleared the 422, PAXONE discovery returned 200
+  but **0 trips every day**, even on a route the SALE scenario proves runs.
+  Confirmed from the PAXONE SALE report: the working request searches
+  `departureTime: …T06:00:00` and gets `trips[].legs[].timedLeg` (exactly what
+  `harvestTrips` reads — the harvester is fine); discovery searched
+  `…T00:00:00` (**midnight**). PAXONE returns offers only *around* the requested
+  time, so a midnight query finds nothing (its sandbox trains run daytime). Fix:
+  query PAXONE at `T08:00:00`, gated on `/paxone/i`; Bileto (offset) and every
+  other sandbox keep midnight (whole-day), unchanged. Server-only — collection
+  unchanged.
+
+### Changed
+
+- **Each discovery day now reports its `offers` count** alongside `trips`/`legs`
+  in `dayResults`, so a future "0 trips" is self-diagnosing: a 2xx day with
+  `offers > 0` but `trips == 0` is a harvest/shape issue, whereas `offers == 0`
+  means no service for that day/time.
+
+### Verified
+
+- Harness over the **real extracted** `_tripSearch` — **6/6**: PAXONE →
+  `T08:00:00` (no offset); Bileto → `T00:00:00+00:00` unchanged; other sandboxes
+  → `T00:00:00` unchanged; `undefined` apiBase safe; case-insensitive.
+  `node --check` clean. Server 1.11.153 → 1.11.154; collection unchanged
+  (OTST_V2.0.89).
+
+---
+
 ## [server-v1.11.153] — 2026-06-15
 
 **Fix (#418): "Discover timetable" fails on PAXONE (422) — the server-side
