@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.150] — 2026-06-15
+
+**Feature (#412): Test Findings list — category accordion with New/WIP/Closed
+lifecycle groups.**
+
+### Changed
+
+- **The Test Findings & Open Points list now groups by category as a collapsed
+  accordion** (`public/js/findings.js`). Each category (`provider_deviation`,
+  `oscar_issue`, `not_supported`, `spec_question`, `open`) is a collapsed card
+  whose header shows the lifecycle breakdown — **New** (not yet reviewed) ·
+  **WIP** (discussion ongoing) · **Closed** (settled) — as counts, with zero
+  buckets muted. Expanding a category reveals the three lifecycle sub-groups,
+  themselves collapsed; expanding one lists its findings. Both accordion levels
+  remember their open/closed state across re-renders, plus a `⊞ Expand all /
+  ⊟ Collapse all` toggle. Finding rows are leaner now that the headers carry
+  category + lifecycle: severity dot · title · ⚙ in-runs · 📣 OSDM · 💬 replies ·
+  step/HTTP line; clicking a row opens the existing thread unchanged.
+- New/WIP/Closed is a **display-only relabel** of the stored
+  `open`/`discussing`/`resolved` status (the thread-view status pills + badge
+  adopt the same words). No API, schema, or data-model change — front-end only.
+
+### Verified
+
+- `node --check` on `findings.js` clean; `public/js` is outside the eslint scope
+  (CI lints `src/`). The grouping + lifecycle-count logic was previewed against
+  the live 12-finding Bileto board (Provider deviation 9 / OSCAR issue 1 / Not
+  supported 2, all New) — collapsed and expanded states render as specified.
+  The findings API is unchanged (still covered by `findings-routes.test.js`).
+  **Access confirmed unchanged**: findings are company-scoped
+  (`GET /v1/company/findings` → `WHERE company_id = req.user.companyId`), so
+  every Test Manager + tester of a company shares one board. Server
+  1.11.149 → 1.11.150; collection unchanged OTST_V2.0.87.
+
+---
+
 ## [server-v1.11.149] — 2026-06-14
 
 **Fix (#410): placeSelection `reservationId` stale across offers (#14/#15)** —
