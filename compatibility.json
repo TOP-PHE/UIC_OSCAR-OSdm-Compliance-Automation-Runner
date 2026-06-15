@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.179",
+  "current_release": "2026.180",
   "releases": [
+    {
+      "release": "2026.180",
+      "date": "2026-06-15",
+      "server": "1.11.152",
+      "collection": "OTST_V2.0.89",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #416: PAXONE offer requests fail (422 VALIDATION_ERROR) when offerSearchCriteria.currency + offerMode are absent — both optional in OSDM but mandatory for PAXONE, blocking offer/discovery for any scenario that doesn't declare them (not tracked as a finding; PAXONE is simply stricter than the spec). New helper withPaxoneOfferSearchCriteriaDefaults() in requestsBuilder.js defaults currency (from the scenario's offerSearchCriteriaCurrency env, else EUR) + offerMode (INDIVIDUAL) on both the outbound (buildOfferCollectionRequest) and return (buildReturnOfferCollectionRequest) offer requests. Gated behind the existing isPaxone (api_base.includes('paxone')) check, so NO other sandbox's offer request changes; only the two missing keys are filled (any criteria the scenario already set pass through untouched), input never mutated. Library-side only (Bruno_Collection/library-bruno/requestsBuilder.js).",
+        "Verification: harness over the REAL extracted withPaxoneOfferSearchCriteriaDefaults — 10/10 (absent/null -> EUR+INDIVIDUAL; absent + scenario currency CZK -> CZK+INDIVIDUAL; partial fills only the missing key; fully-specified unchanged with extra criteria preserved; empty-string treated as missing; non-object -> fresh defaults; input not mutated). node --check clean. Server 1.11.151 -> 1.11.152; collection OTST_V2.0.88 -> OTST_V2.0.89."
+      ]
+    },
     {
       "release": "2026.179",
       "date": "2026-06-15",

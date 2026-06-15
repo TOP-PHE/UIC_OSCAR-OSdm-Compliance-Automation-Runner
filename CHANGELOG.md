@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.152] — 2026-06-15
+
+**Fix (#416): PAXONE offer requests fail (422) without
+`offerSearchCriteria.{currency,offerMode}`.**
+
+### Fixed
+
+- **For PAXONE, default `offerSearchCriteria.currency` + `.offerMode` on the offer
+  requests** (`requestsBuilder.js`). Both are optional in OSDM but PAXONE rejects
+  their absence with a 422 VALIDATION_ERROR, blocking offer/discovery for any
+  scenario that doesn't declare them. New helper
+  `withPaxoneOfferSearchCriteriaDefaults()` fills `currency` (from the scenario's
+  `offerSearchCriteriaCurrency`, else `EUR`) and `offerMode` (`INDIVIDUAL`) on both
+  the outbound (`buildOfferCollectionRequest`) and return
+  (`buildReturnOfferCollectionRequest`) requests. Gated behind the existing
+  `isPaxone` check — no other sandbox's offer request changes; only the two missing
+  keys are filled (criteria the scenario already set pass through untouched), and
+  the input is never mutated. Not tracked as a finding (PAXONE is simply stricter
+  than these optional-by-spec fields). Collection OTST_V2.0.88 → OTST_V2.0.89.
+
+### Verified
+
+- Harness over the real extracted `withPaxoneOfferSearchCriteriaDefaults` — 10/10
+  (absent/null → EUR+INDIVIDUAL; scenario currency respected; partial fills only
+  the missing key; fully-specified unchanged; empty-string treated as missing;
+  non-object → fresh defaults; input not mutated). `node --check` clean. Server
+  1.11.151 → 1.11.152.
+
+---
+
 ## [server-v1.11.151] — 2026-06-15
 
 **Fix (#414): `GET Passenger` false-fails when a provider returns passengers out
