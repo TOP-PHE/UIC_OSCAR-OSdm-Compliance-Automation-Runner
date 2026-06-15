@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.178",
+  "current_release": "2026.179",
   "releases": [
+    {
+      "release": "2026.179",
+      "date": "2026-06-15",
+      "server": "1.11.151",
+      "collection": "OTST_V2.0.88",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #414: GET Passenger false-fails when a provider returns passengers out of submitted order (Turnit). 03. PATCH Multi Passenger / 04. GET Passenger pair passengerIdList[i] with passengerAdditionalData[i] BY INDEX; passengerIdList was built in booking-return order (bookings.js) while the expected data is submitted order (scenarioParser.js), so a provider that reorders passengers made every per-passenger field (name/DOB/phone/email) compare against the wrong row — ~25 false-fails on a 5-pax run, all data correct. Proven on Turnit: submitted [PAX01..PAX05] returned [PAX05,PAX04,PAX02,PAX03,PAX01]. New testable helper alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) orders passengerIdList back to submitted order keyed on externalRef (the retailer ref OSCAR sends and the provider echoes on the booking + GET /passengers/{id}). Safe fallback to booking order when refs are absent / counts mismatch / any ref unmappable, so providers that don't echo externalRef and in-order providers (identity no-op) are unaffected; a [WARNING] documents any realignment. Library-side only (Bruno_Collection/library-bruno/bookings.js).",
+        "Verification: harness over the REAL extracted alignPassengerIdsToSubmittedOrder driven by the actual Turnit booking JSON + synthetic cases — 17/17 (real reorder aligns by externalRef, ids a permutation of booking ids; downstream comparison OLD 5/5 mismatches -> NEW 0/5; in-order identity no-op; no-ref/count-mismatch/unknown-ref/empty/null fall back to booking order). node --check clean. Server 1.11.150 -> 1.11.151; collection OTST_V2.0.87 -> OTST_V2.0.88."
+      ]
+    },
     {
       "release": "2026.178",
       "date": "2026-06-15",

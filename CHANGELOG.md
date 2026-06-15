@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.151] — 2026-06-15
+
+**Fix (#414): `GET Passenger` false-fails when a provider returns passengers out
+of submitted order (Turnit).** Surfaced by the Turnit report analysis.
+
+### Fixed
+
+- **`passengerIdList` is now ordered to the SUBMITTED passenger order, keyed on
+  `externalRef`** (`bookings.js`). The per-passenger steps (`03. PATCH Multi
+  Passenger`, `04. GET Passenger`) pair `passengerIdList[i]` with
+  `passengerAdditionalData[i]` BY INDEX. Because `passengerIdList` was built in
+  booking-return order while the expected data is in submitted order, a provider
+  that reorders passengers (Turnit: submitted `[PAX01…PAX05]` → returned
+  `[PAX05,PAX04,PAX02,PAX03,PAX01]`) made every per-passenger field compare
+  against the wrong row — ~25 false failures on a 5-pax run, all data otherwise
+  correct. New helper `alignPassengerIdsToSubmittedOrder()` maps the booking's
+  passenger ids back to submitted order via the `externalRef` OSCAR sends and the
+  provider echoes (on the booking + on `GET /passengers/{id}`). Falls back to
+  booking order when refs are absent / counts mismatch / any ref is unmappable,
+  so providers that don't echo `externalRef` and providers that already return in
+  order (identity no-op) are unaffected; a `[WARNING]` documents any realignment.
+  Collection OTST_V2.0.87 → OTST_V2.0.88.
+
+### Verified
+
+- Harness over the **real extracted** `alignPassengerIdsToSubmittedOrder`, driven
+  by the actual Turnit booking JSON + synthetic cases — **17/17**: real reorder
+  aligns (`passengerIdList[i] ↔ submittedRefs[i]`, ids a permutation of booking
+  ids); downstream comparison OLD 5/5 mismatches → NEW 0/5; in-order provider
+  identity no-op; no-externalRef / count-mismatch / unknown-ref / empty / null all
+  fall back to booking order. `node --check` clean. Server 1.11.150 → 1.11.151.
+
+---
+
 ## [server-v1.11.150] — 2026-06-15
 
 **Feature (#412): Test Findings list — category accordion with New/WIP/Closed

@@ -12,8 +12,54 @@ const { processRequestedInformation, summariseRequestedInformation } = require('
 
 module.exports = {
   postCreateBookingResponse,
-  validateFulfillments
+  validateFulfillments,
+  alignPassengerIdsToSubmittedOrder
 };
+
+// ─── Passenger id ordering ───────────────────────────────────────────────────
+/**
+ * Order the booking's passenger ids to match the SUBMITTED order, keyed on each
+ * passenger's `externalRef` (the retailer reference OSCAR sends and the provider
+ * echoes back on the booking + on GET /passengers/{id}).
+ *
+ * Why: OSDM does not guarantee a booking returns passengers in the order they
+ * were submitted — some providers (e.g. Turnit) reorder them. The downstream
+ * per-passenger steps (`03. PATCH Multi Passenger`, `04. GET Passenger`) pair
+ * `passengerIdList[i]` with `passengerAdditionalData[i]` / `bookingPassengerReferences[i]`
+ * BY INDEX, so a reordered booking made every per-passenger field compare against
+ * the wrong expected row (~25 false-fails on a 5-pax run, all data otherwise
+ * correct).
+ *
+ * Returns `{ ids, aligned, reordered }`. Falls back to booking order
+ * (`aligned:false`) when external refs are absent, counts mismatch, or any
+ * submitted ref can't be mapped — so providers that don't echo `externalRef`,
+ * and providers that already return in order, are unaffected (for the latter the
+ * realignment is an identity no-op, `reordered:false`).
+ *
+ * @param {Array}  bookingPassengers  booking.passengers[] (each may have id, externalRef)
+ * @param {Array}  submittedRefs      bookingPassengerReferences (submitted order)
+ * @returns {{ids:string[], aligned:boolean, reordered:boolean}}
+ */
+function alignPassengerIdsToSubmittedOrder(bookingPassengers, submittedRefs) {
+  const bookingOrderIds = [];
+  const refToId = Object.create(null);
+  (Array.isArray(bookingPassengers) ? bookingPassengers : []).forEach((p) => {
+    if (p && p.id) {
+      bookingOrderIds.push(p.id);
+      if (p.externalRef != null && p.externalRef !== '') {
+        refToId[String(p.externalRef)] = p.id;
+      }
+    }
+  });
+  const refs = Array.isArray(submittedRefs) ? submittedRefs : [];
+  const canAlign = refs.length > 0
+    && refs.length === bookingOrderIds.length
+    && refs.every((r) => refToId[String(r)] !== undefined);
+  if (!canAlign) return { ids: bookingOrderIds, aligned: false, reordered: false };
+  const ids = refs.map((r) => refToId[String(r)]);
+  const reordered = ids.some((id, i) => id !== bookingOrderIds[i]);
+  return { ids, aligned: true, reordered };
+}
 
 // ─── Field-level helpers ─────────────────────────────────────────────────────
 
@@ -526,15 +572,28 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     validationLogger(`[DEBUG] booking.bookingCode is absent (optional per OSDM spec)`);
   }
 
-  // Collect passenger IDs
-  const passengerIdList = [];
+  // Collect passenger IDs, ALIGNED to the submitted order by externalRef. OSDM
+  // does not guarantee the booking returns passengers in submitted order (Turnit
+  // reorders them); the per-passenger steps (03 PATCH / 04 GET Passenger) pair
+  // passengerIdList[i] with passengerAdditionalData[i] BY INDEX, so a reordered
+  // booking made every field compare against the wrong passenger. Align by the
+  // externalRef OSCAR sent (and the provider echoes back); fall back to booking
+  // order when refs are unavailable so unaffected providers behave exactly as before.
   (booking.passengers || []).forEach((passenger, i) => {
-    if (passenger.id) {
-      passengerIdList.push(passenger.id);
-    } else {
-      validationLogger(`[WARNING] Passenger at index ${i} has no ID.`);
-    }
+    if (!passenger || !passenger.id) validationLogger(`[WARNING] Passenger at index ${i} has no ID.`);
   });
+  let _submittedRefs = [];
+  try {
+    const _raw = bru.getEnvVar("bookingPassengerReferences");
+    _submittedRefs = _raw ? (Array.isArray(_raw) ? _raw : JSON.parse(_raw)) : [];
+  } catch (_e) { _submittedRefs = []; }
+  const _align = alignPassengerIdsToSubmittedOrder(booking.passengers, _submittedRefs);
+  const passengerIdList = _align.ids;
+  if (_align.aligned && _align.reordered) {
+    validationLogger(`[WARNING] Provider returned booking passengers in a different order than submitted. Re-aligned passengerIdList to the submitted order by externalRef (${_submittedRefs.join(', ')}) so the per-passenger checks (03 PATCH / 04 GET Passenger) compare like-for-like rather than position-by-position. A strict OSDM consumer should not rely on passenger order either.`);
+  } else if (!_align.aligned && (booking.passengers || []).length) {
+    validationLogger(`[DEBUG] passengerIdList kept in booking order — externalRef alignment unavailable (refs/count mismatch or provider does not echo externalRef). submittedRefs=[${_submittedRefs.join(', ')}].`);
+  }
   if (passengerIdList.length === 0) validationLogger("[ERROR] Passengers structure is invalid or empty.");
   validationLogger(`[FULL] Passenger IDs: [${passengerIdList}]`);
   bru.setEnvVar("passengerIdList", passengerIdList);
