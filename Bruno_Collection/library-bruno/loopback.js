@@ -60,7 +60,14 @@ function failStepOrContinue(label, nextStep, opts) {
 // "NN. " request-name prefix, so the tester can declare "GET Passenger" and it
 // still matches the "04. GET Passenger" request.
 function _normStep(s) {
-  return String(s == null ? '' : s).trim().toLowerCase().replace(/^\d+\.\s*/, '');
+  // Tolerant of BOTH the "NN. " request-number prefix AND a "Folder/" path
+  // prefix, so a deviation declared from a report-derived step name
+  // ("03-Refund/11. GET Refund Offer") matches the request's own label
+  // ("11. GET Refund Offer") — both normalise to "get refund offer".
+  return String(s == null ? '' : s).trim().toLowerCase()
+    .replace(/^.*\//, '')      // drop a leading "folder/" path segment
+    .replace(/^\d+\.\s*/, '')  // drop the "NN. " request-number prefix
+    .trim();
 }
 function knownDeviationFor(stepLabel, status) {
   const list = parseEnvJson('__knownDeviations', []);

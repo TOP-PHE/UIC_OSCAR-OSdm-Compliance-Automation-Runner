@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.182",
+  "current_release": "2026.183",
   "releases": [
+    {
+      "release": "2026.183",
+      "date": "2026-06-15",
+      "server": "1.11.155",
+      "collection": "OTST_V2.0.90",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #422: baseline the documented Turnit refund/exchange GET -> 405 (extends the #398 known-deviation hook). Turnit creates refund/exchange offers (POST /refund-offers, /exchange-offers -> 200 with the full body) but returns 405 on GET /refund-offers/{id} and GET /exchange-operations/{id} (no GET retrieval); steps 11. GET Refund Offer / 12. GET Exchange Offer used to hard-stop the scenario so the rest of the flow never ran. Two changes: (1) loopback.js _normStep now strips a Folder/ path prefix as well as the 'NN. ' prefix, so a baselined finding's report-derived step name (03-Refund/11. GET Refund Offer) matches the request label (11. GET Refund Offer) -> both normalise to 'get refund offer' (previously never matched). (2) The known-deviation hook (previously only in 04. GET Passenger.yml) is added to 03-Refund/11. GET Refund Offer.yml and 04-Exchange/12. GET Exchange Offer.yml: a documented 405 (the baselineInRun finding on the Turnit board) -> PASSING 'known deviation' + [WARNING] + proceed (the offer id came from step 10/11), instead of a hard stop. Undocumented non-200s still fail; the 200 happy path is untouched. Library-side (Bruno_Collection: library-bruno/loopback.js + the two yml steps). Note: this lets steps 12-16 (incl. 13. PATCH Refund Offer) run on a fresh Turnit run, which will show whether they complete.",
+        "Verification: harness over the REAL extracted _normStep + knownDeviationFor -- 11/11 (folder-prefixed <-> short labels collapse equal; refund/exchange 405 match; legacy GET Passenger 501 still matches; 200 and undocumented 404 -> no match; active:false not enforced; empty -> null). node --check on loopback.js clean; both edited yml after-response scripts parse as valid JS via new Function(). Server 1.11.154 -> 1.11.155; collection OTST_V2.0.89 -> OTST_V2.0.90."
+      ]
+    },
     {
       "release": "2026.182",
       "date": "2026-06-15",
