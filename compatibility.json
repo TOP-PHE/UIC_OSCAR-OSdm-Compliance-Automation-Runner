@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.180",
+  "current_release": "2026.181",
   "releases": [
+    {
+      "release": "2026.181",
+      "date": "2026-06-15",
+      "server": "1.11.153",
+      "collection": "OTST_V2.0.89",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #418 (server-side companion to #416): the 'Discover timetable' feature (company-test-resources.js _discoveryBody) scans POST /offers across N days and was sending offerSearchCriteria:{}, so on PAXONE every searched day returned 422 VALIDATION_ERROR ('offerMode/currency is missing') and discovery reported 'No usable offer response across the searched days' — blocking PAXONE timetable discovery entirely. #416/#417 fixed the Bruno request builder (requestsBuilder.js) but missed this server path (the one behind the Discover-timetable button). _discoveryBody now sends {currency:'EUR', offerMode:'INDIVIDUAL'} for PAXONE (neither filters the harvested timetable), empty {} for every other sandbox (unchanged). Same /paxone/i api_base gate. Server-only (Oscar_Server/src/api/routes/company-test-resources.js); collection unchanged.",
+        "Verification: harness over the REAL extracted _discoveryBody (source-extracted + eval'd, since the route module opens the DB on require) — 6/6 (PAXONE -> EUR+INDIVIDUAL with trip/passenger preserved; non-PAXONE -> empty; case-insensitive; non-offers endpoint -> bare trip; undefined apiBase safe). node --check clean. Server 1.11.152 -> 1.11.153; collection unchanged OTST_V2.0.89."
+      ]
+    },
     {
       "release": "2026.180",
       "date": "2026-06-15",
