@@ -53,8 +53,16 @@ function _stnUrn(s) {
 // mirrors the Bileto exception in the Bruno run flow (scenarioParser.js).
 function _tripSearch(date, origin, destination, apiBase) {
   const isBileto = /bileto/i.test(String(apiBase || ''));
+  const isPaxone = /paxone/i.test(String(apiBase || ''));
+  // Most sandboxes return the whole day's offers for a midnight departureTime,
+  // but PAXONE returns offers only AROUND the requested time — a T00:00:00 query
+  // finds nothing (its sandbox trains run during the day), so discovery reported
+  // "0 trips" even on routes that clearly run (the SALE scenario gets offers at
+  // T06:00). Query PAXONE at a daytime hour so the running service is in range;
+  // every other sandbox keeps midnight (whole-day), unchanged.
+  const time = isPaxone ? '08:00:00' : '00:00:00';
   return {
-    departureTime: isBileto ? `${date}T00:00:00+00:00` : `${date}T00:00:00`,
+    departureTime: isBileto ? `${date}T${time}+00:00` : `${date}T${time}`,
     origin: { objectType: 'StopPlaceRef', stopPlaceRef: origin },
     destination: { objectType: 'StopPlaceRef', stopPlaceRef: destination }
   };
@@ -340,9 +348,14 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
           probe.noOffer.push({ date, finding: pc.finding });
         }
       }
-      dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length });
+      // Surface the offer count alongside the trip count: a 2xx day with
+      // offers>0 but trips==0 means the provider returned offers we couldn't
+      // harvest as a timetable (parse/shape issue), vs offers==0 meaning no
+      // service for that day/time — so a future "0 trips" is self-diagnosing.
+      const dayOffers = pc ? pc.offers : (dayJson && Array.isArray(dayJson.offers) ? dayJson.offers.length : 0);
+      dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length, offers: dayOffers });
     } else {
-      dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, error: lastError });
+      dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, offers: 0, error: lastError });
     }
   }
 

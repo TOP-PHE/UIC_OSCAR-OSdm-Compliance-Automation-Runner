@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.181",
+  "current_release": "2026.182",
   "releases": [
+    {
+      "release": "2026.182",
+      "date": "2026-06-15",
+      "server": "1.11.154",
+      "collection": "OTST_V2.0.89",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #420: 'Discover timetable' finds 0 trips on PAXONE — it queried at midnight. After #418/#419 cleared the 422, PAXONE discovery returned 200 but 0 trips every day, even on a route the SALE scenario proves runs. Confirmed from the PAXONE SALE report: the working request searches departureTime …T06:00:00 and returns trips[].legs[].timedLeg (exactly what harvestTrips reads — harvester is fine); discovery searched …T00:00:00 (midnight). PAXONE returns offers only AROUND the requested time, so a midnight query finds nothing (its sandbox trains run daytime). Fix in company-test-resources.js _tripSearch: query PAXONE at T08:00:00, gated on /paxone/i; Bileto (offset) and every other sandbox keep midnight (whole-day), unchanged. Also: each discovery day now reports its offers count in dayResults so a future 0-trips is self-diagnosing (offers>0 but trips==0 = harvest/shape issue; offers==0 = no service). Server-only; collection unchanged.",
+        "Verification: harness over the REAL extracted _tripSearch — 6/6 (PAXONE -> T08:00:00 no offset; Bileto -> T00:00:00+00:00 unchanged; other -> T00:00:00 unchanged; undefined apiBase safe; case-insensitive). node --check clean. Server 1.11.153 -> 1.11.154; collection unchanged OTST_V2.0.89."
+      ]
+    },
     {
       "release": "2026.181",
       "date": "2026-06-15",
