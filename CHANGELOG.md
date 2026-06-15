@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.148] — 2026-06-14
+
+**Findings: generic Import (#408)** — file a whole set of findings (e.g. OSCAR's
+per-sandbox analysis) into the register in one click.
+
+### Added
+
+- **"⬆ Import" button on the Test Findings page** (test_manager). Paste a JSON
+  array of findings and they're created via the existing
+  `POST /v1/company/findings` — each authored "OSCAR analysis" unless the item
+  sets `createdBy`. Replaces the removed hardcoded ÖBB seed with a generic,
+  per-sandbox path, and is the front door for the Phase 2A auto-analyzer.
+  Frontend-only (`public/js/findings.js`); no server change.
+
+---
+
 ## [server-v1.11.147] — 2026-06-14
 
 **One-click bulk report download (#405)** — download every run's reports in a
