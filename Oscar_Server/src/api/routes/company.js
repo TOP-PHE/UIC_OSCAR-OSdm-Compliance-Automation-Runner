@@ -102,9 +102,62 @@ function safeCompany(c) {
     // retired. Certifier visibility is now per-report (the test_manager
     // shares individual runs from the dashboard). The DB column is kept for
     // backward compatibility but is no longer surfaced or writable here.
+    extra_headers:                parseExtraHeaders(c.extra_headers),
     created_at:                   c.created_at,
     updated_at:                   c.updated_at
   };
+}
+
+// ── Dedicated headers (issue #426) ────────────────────────────────────────────
+// Company-wide custom request headers — a JSON array of { name, value } stored
+// on companies.extra_headers and injected on every OSDM request by the Bruno
+// collection's before-request hook. value may be a literal or carry {{var}}
+// templates resolved against the env at send time (e.g. {{requestor}},
+// {{Ocp-Apim-Subscription-Key}}, {{access_token}}).
+const MAX_EXTRA_HEADERS    = 25;
+const MAX_HEADER_NAME_LEN  = 128;
+const MAX_HEADER_VALUE_LEN = 4096;
+// RFC 7230 field-name: a non-empty sequence of token characters.
+const HEADER_NAME_RE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
+
+function parseExtraHeaders(raw) {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+// Validate + normalise an incoming extra_headers array. Drops rows whose name
+// is blank (the UI may submit empty trailing rows). Returns either
+// { ok: true, value: [{name,value}, ...] } or { ok: false, detail }.
+function normalizeExtraHeaders(input) {
+  if (!Array.isArray(input)) {
+    return { ok: false, detail: 'extra_headers must be an array of { name, value } objects.' };
+  }
+  const rows = input.filter(h =>
+    h && typeof h === 'object' && String(h.name == null ? '' : h.name).trim() !== '');
+  if (rows.length > MAX_EXTRA_HEADERS) {
+    return { ok: false, detail: `Too many dedicated headers (max ${MAX_EXTRA_HEADERS}).` };
+  }
+  const out = [];
+  for (const h of rows) {
+    const name  = String(h.name).trim();
+    const value = h.value == null ? '' : String(h.value);
+    if (name.length > MAX_HEADER_NAME_LEN || !HEADER_NAME_RE.test(name)) {
+      return { ok: false, detail: `Invalid header name "${name}". Use a valid HTTP header token (letters, digits and !#$%&'*+-.^_\`|~).` };
+    }
+    if (/[\r\n]/.test(value)) {
+      return { ok: false, detail: `Header "${name}" value must not contain CR or LF characters.` };
+    }
+    if (value.length > MAX_HEADER_VALUE_LEN) {
+      return { ok: false, detail: `Header "${name}" value is too long (max ${MAX_HEADER_VALUE_LEN} characters).` };
+    }
+    out.push({ name, value });
+  }
+  return { ok: true, value: out };
 }
 
 // At-rest encryption for company datafiles (Phase 2 of issue #60, v1.11.0).
@@ -138,7 +191,7 @@ router.patch('/', (req, res) => {
 
   // PATCH /v1/company now only handles company-shared fields. Per-tester
   // credentials moved to /v1/me/credentials in v12 — see me-credentials.js.
-  const { api_base } = req.body || {};
+  const { api_base, extra_headers } = req.body || {};
 
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
@@ -166,9 +219,31 @@ router.patch('/', (req, res) => {
     });
   }
 
+  // Dedicated headers (issue #426) — company-wide config, Test-Manager-only.
+  // Validate before touching the row so a bad payload changes nothing.
+  let normalizedExtra = null;
+  if (extra_headers !== undefined) {
+    if (req.user.role !== 'test_manager' && !isPlatformRole(req.user.role)) {
+      return res.status(403).json({
+        status: 403, title: 'Forbidden',
+        detail: 'Only Test Managers can edit dedicated headers.'
+      });
+    }
+    const norm = normalizeExtraHeaders(extra_headers);
+    if (!norm.ok) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: norm.detail });
+    }
+    normalizedExtra = norm.value;
+  }
+
   const updates = [];
   const values  = [];
   if (api_base) { updates.push('api_base = ?'); values.push(api_base.trim()); }
+  if (extra_headers !== undefined) {
+    // Store null (not "[]") when the list is emptied so the column reads clean.
+    updates.push('extra_headers = ?');
+    values.push(normalizedExtra.length ? JSON.stringify(normalizedExtra) : null);
+  }
 
   if (updates.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No fields to update.' });
