@@ -1,0 +1,203 @@
+info:
+  name: 09. POST Add Reservation to Booking
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{api_base}}/bookings/{{bookingId}}/booked-offers/{{bookedOfferId}}/{{addOfferPartResource}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: |
+      {{addReservationBody}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Post-booking add-reservation step (ADD_TO_BOOKING, issue #104 Stage B).
+        // OSDM has no post-booking "seat map" — this ADDS a reservation offer
+        // part to an existing booking. Endpoint is version-aware: the unified
+        // /offer-parts is OSDM >= 3.7; older versions use the deprecated
+        // /reservations. Reached only when 02. POST Create Booking routed here
+        // (place selection enabled in ADD_TO_BOOKING mode); otherwise skipped.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+
+        const useOfferParts = atLeast(resolveEffectiveVersion(), '3.7.0');
+        bru.setVar('addOfferPartResource', useOfferParts ? 'offer-parts' : 'reservations');
+
+        // ── Best-effort request body ───────────────────────────────────────
+        // No ADD_TO_BOOKING scenario / supporting vendor exists yet to validate
+        // the exact shape; this assembles the schema-required fields from env
+        // set by offers.js (reservationId / tripLegCoverage) and scenarioParser
+        // (bookingPassengerReferences). Refine against a live system when one is
+        // available. Schemas:
+        //   >=3.7 BookedOfferPartRequest: offerId*, passengerRefs* (+ optional
+        //         placeSelections / ancillaryOfferIds)
+        //   <3.7  BookedOfferReservationRequest: offerId*, reservationOfferId*,
+        //         passengerRefs*, placeSelections*
+        const offerId = bru.getEnvVar('offerId');
+        let passengerRefs = [];
+        try { passengerRefs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch (_e) {}
+        const reservationOfferId = bru.getEnvVar('reservationId');
+        let tripLegCoverage = null;
+        try { tripLegCoverage = JSON.parse(bru.getEnvVar('tripLegCoverage') || 'null'); } catch (_e) {}
+
+        // Availability-aware place picks (#184): when 08b. GET Place Map
+        // Post-Booking served a BOOKING-context seat map, preselectedPlaces holds
+        // one AVAILABLE place per passenger. Carry them as placeSelections.places
+        // (one entry per passenger). When absent (vendor serves no post-booking
+        // map), placeSelections has no places and the system assigns the seat.
+        const { placesForPassengers } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        let _picked = [];
+        try { _picked = JSON.parse(bru.getEnvVar("preselectedPlaces") || "[]") || []; } catch (_e) {}
+        const _places = placesForPassengers(_picked, passengerRefs);
+
+        const placeSelections = [];
+        if (reservationOfferId && tripLegCoverage) {
+          const _sel = { reservationId: reservationOfferId, tripLegCoverage: tripLegCoverage };
+          if (_places.length > 0) _sel.places = _places;
+          placeSelections.push(_sel);
+        }
+
+        const body = { offerId: offerId, passengerRefs: passengerRefs };
+        if (!useOfferParts) {
+          // Deprecated /reservations: reservationOfferId + placeSelections required.
+          body.reservationOfferId = reservationOfferId;
+          body.placeSelections = placeSelections;
+        } else if (placeSelections.length > 0) {
+          // Unified /offer-parts: placeSelections optional.
+          body.placeSelections = placeSelections;
+        }
+        bru.setVar('addReservationBody', JSON.stringify(body));
+
+        // #expired-add-reservation-offer test (Phase 5a): when armed, wait
+        // until just past the validUntil of the reservationOfferPart that
+        // 09 is about to send (stashed by offers.js postOfferResponse via the
+        // reservationId lookup). Fires AFTER the body is built so the request
+        // we send is correct; the after-response asserts the provider rejects
+        // the add-reservation of a stale offer-part.
+        if (String(bru.getEnvVar("expiredAddReservationOfferTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("addReservationOfferValidUntil");
+          const limitSrc   = bru.getEnvVar("addReservationOfferValidUntilSource") || "reservation offer-part validUntil";
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredAddReservationOfferMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "add-reservation offer-part (" + limitSrc + ")",
+          });
+          if (!plan.armed) {
+            validationLogger(`[WARNING] expiredAddReservationOfferTest SKIPPED: ${plan.reason}`);
+            bru.setEnvVar("__expiredAddReservationOfferArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredAddReservationOfferTest (POST /bookings/{id}/.../offer-parts)" });
+            bru.setEnvVar("__expiredAddReservationOfferArmed", "true");
+            validationLogger(`[INFO] expiredAddReservationOfferTest: attempting POST add-reservation, expecting the provider to reject it (offer-part validUntil passed).`);
+          }
+        }
+
+    - type: after-response
+      code: |-
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validateBookedOfferPartResponse } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        // #expired-add-reservation-offer: when armed, the POST MUST be rejected
+        // — adding an expired offer-part to the booking must not succeed. Grade
+        // here and short-circuit (skip the compliance validator + the routing
+        // tail to Add Ancillary / PATCH / GET Passenger) so the next scenario
+        // fires cleanly. The booking continues to exist in its pre-add state;
+        // we do NOT continue the post-booking happy path because part of it
+        // would now be against a half-populated booking.
+        if (String(bru.getEnvVar("__expiredAddReservationOfferArmed")) === "true") {
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired add-reservation offer" });
+            const _tag = nhfTestPrefix();
+            const _resource = bru.getVar('addOfferPartResource') || 'offer-parts';
+            test(`${_tag}Expired add-reservation offer: POST /.../${_resource} is rejected with a client error (4xx) — an expired offer-part must not be addable to the booking (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test(`${_tag}Expired add-reservation offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // PR B: auto-expansion — advance the queue if more timers are armed.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired add-reservation offer" })) return;
+            // Multi-scenario tail: loop to next scenario or stop. We deliberately
+            // skip the routing to "11. Add Ancillary" / "03. PATCH" / "04. GET
+            // Passenger" — the booking did not gain the reservation, so the
+            // downstream happy-path steps would be operating against an
+            // inconsistent state.
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
+
+        const resource = bru.getVar('addOfferPartResource') || 'offer-parts';
+        const endpoint = `/bookings/{id}/booked-offers/{id}/${resource}`;
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status ────────────────────────────────────────────────────────
+        if (statusCode === 200) {
+          bruTest(`POST ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[DEBUG] POST ${endpoint} → 200 OK`);
+        } else {
+          validationLogger(`[ERROR] POST ${endpoint} → ${statusCode} (expected 200 adding a reservation to the booking)`);
+          bruTest(`POST ${endpoint} → ${statusCode} (FAIL)`, () => {
+            expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
+          });
+        }
+
+        // ── OSDM compliance (Layer 1): BookedOfferPart/Reservation response ──
+        validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
+
+        // Mark done so the smart run filter does not re-run this post-booking
+        // step if the flow falls through to it again at the end of the scenario.
+        bru.setEnvVar('__addReservationDone', 'true');
+
+        // Continue the sale flow: chain to Add Ancillary if that step is also
+        // enabled, otherwise the same PATCH-vs-GET decision as Create Booking.
+        const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
+            && bru.getEnvVar("__addAncillaryDone") !== "true";
+        if (_addAnc) {
+          bru.runner.setNextRequest("11. Add Ancillary - Get Additional Offers");
+        } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+            || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
+          bru.runner.setNextRequest("04. GET Passenger");
+        } else {
+          bru.runner.setNextRequest("03. PATCH Multi Passenger");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

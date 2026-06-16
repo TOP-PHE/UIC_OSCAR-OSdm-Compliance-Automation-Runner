@@ -1,5 +1,12 @@
+/**
+ * validators.js — Swagger/OpenAPI schema-validation helpers + auth-token capture.
+ *
+ * Loads the OSDM OpenAPI schema and validates request/response payloads and the
+ * scenario data file against it; also captures the bearer/access token for the
+ * run. Used by scenarioParser (data-file validation) and the response steps.
+ */
 // Import needed library files
-const display = require('./displays.js');
+require('./displays.js');
 
 
 module.exports = {
@@ -51,7 +58,7 @@ function setAuthToken(responseBody) {
       validationLogger("[WARNING] PHE access_token not found in response");
     }
   } catch (e) {
-    console.error("setAuthToken error:", e && e.stack ? e.stack : e);
+    console.error("[ERROR] setAuthToken error: " + (e.stack || e));
   }
 }
 
@@ -60,7 +67,7 @@ function captureSwaggerSchemaValidator() {
 
   const url = bru.getEnvVar("swaggerSchema");
   if (!url) {
-    console.error("❌ Missing env var swaggerSchema");
+    console.error("[ERROR] ❌ Missing env var swaggerSchema");
     return;
   }
 
@@ -68,7 +75,9 @@ function captureSwaggerSchemaValidator() {
     { url, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("❌ Error during Swagger request:", err);
+        // Inside `if (err)` so err is truthy — drop the `err && ` guard
+        // to keep CodeQL happy about js/useless-conditional.
+        console.log("[ERROR] ❌ Error during Swagger request: " + (err.message || err));
         return;
       }
       try {
@@ -78,12 +87,12 @@ function captureSwaggerSchemaValidator() {
           const swaggerJson = typeof body === 'string' ? JSON.parse(body) : body;
           const swaggerJsonString = JSON.stringify(swaggerJson);
           bru.setEnvVar("swaggerJson", swaggerJsonString);
-          console.log("✅ Swagger JSON captured");
+          console.log("[INFO] ✅ Swagger JSON captured");
         } else {
-          console.error(`❌ Swagger load failed: HTTP ${status}`);
+          console.error(`[ERROR] ❌ Swagger load failed: HTTP ${status}`);
         }
       } catch (e) {
-        console.error("❌ Failed to parse Swagger JSON:", e);
+        console.error("[ERROR] ❌ Failed to parse Swagger JSON: " + (e.message || e));
       }
     }
   );
@@ -92,7 +101,7 @@ function captureSwaggerSchemaValidator() {
 function swaggerSchemaValidatorContent() {
   const ajvUrl = bru.getEnvVar("ajvMinified");
   if (!ajvUrl) {
-    console.error("❌ Missing env var ajvMinified");
+    console.error("[ERROR] ❌ Missing env var ajvMinified");
     return;
   }
 
@@ -100,7 +109,8 @@ function swaggerSchemaValidatorContent() {
     { url: ajvUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.log("❌ Error while loading AJV:", err);
+        // Same as above — inside `if (err)` so err is truthy.
+        console.log("[ERROR] ❌ Error while loading AJV: " + (err.message || err));
         return;
       }
 
@@ -108,13 +118,13 @@ function swaggerSchemaValidatorContent() {
         const status = res.status || res.statusCode || 200;
         const text = res.data || "";
         if (status >= 200 && status < 300 && String(text).length > 0) {
-          console.log("✅ AJV script successfully loaded");
+          console.log("[INFO] ✅ AJV script successfully loaded");
           const scriptContent = String(text);
           bru.setEnvVar("scriptContent", scriptContent);
 
           const swaggerJsonString = bru.getEnvVar("swaggerJson");
           if (!swaggerJsonString) {
-            console.error("❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
+            console.error("[ERROR] ❌ swaggerJson env var is missing; run captureSwaggerSchemaValidator first");
             return;
           }
           const swaggerSchema = JSON.parse(swaggerJsonString);
@@ -129,10 +139,10 @@ function swaggerSchemaValidatorContent() {
             url: bru.getEnvVar("url")
           });
         } else {
-          console.error(`❌ Failed to load AJV script. HTTP ${status}`);
+          console.error(`[ERROR] ❌ Failed to load AJV script. HTTP ${status}`);
         }
       } catch (e) {
-        console.error("❌ Error during AJV script evaluation/usage:", e);
+        console.error("[ERROR] ❌ Error during AJV script evaluation/usage: " + (e.message || e));
       }
     }
   );
@@ -161,14 +171,14 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     }
 
     if (!matchedPath) {
-      console.error(`❌ No matching path found in Swagger for URL: ${url}`);
+      console.error(`[ERROR] ❌ No matching path found in Swagger for URL: ${url}`);
       return;
     }
 
     const m = String(method || "").toLowerCase();
     const pathSchema = schema.paths[matchedPath]?.[m];
     if (!pathSchema) {
-      console.error(`❌ No matching method '${method}' for path '${matchedPath}'`);
+      console.error(`[ERROR] ❌ No matching method '${method}' for path '${matchedPath}'`);
       return;
     }
 
@@ -176,7 +186,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
     try {
       Ajv = resolveAjvConstructor();
     } catch (e) {
-      console.error("❌ Failed to initialize AJV:", e && e.message ? e.message : e);
+      console.error("[ERROR] ❌ Failed to initialize AJV: " + (e.message || e));
       return;
     }
 
@@ -196,12 +206,12 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
         }
         const valid = validateBody(bodyToValidate);
         if (!valid) {
-          console.error(`❌ Invalid request body for ${method} ${matchedPath}:`, validateBody.errors);
+          console.error(`[ERROR] ❌ Invalid request body for ${method} ${matchedPath}: ` + JSON.stringify(validateBody.errors));
         } else {
-          console.log(`✅ Request body is valid for ${method} ${matchedPath}`);
+          console.log(`[INFO] ✅ Request body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("❌ Failed to validate request body:", e);
+        console.error("[ERROR] ❌ Failed to validate request body: " + (e.message || e));
       }
     }
 
@@ -221,16 +231,16 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
         }
         const valid = validateResponse(bodyToValidate);
         if (!valid) {
-          console.error(`❌ Invalid response body for ${method} ${matchedPath}:`, validateResponse.errors);
+          console.error(`[ERROR] ❌ Invalid response body for ${method} ${matchedPath}: ` + JSON.stringify(validateResponse.errors));
         } else {
-          console.log(`✅ Response body is valid for ${method} ${matchedPath}`);
+          console.log(`[INFO] ✅ Response body is valid for ${method} ${matchedPath}`);
         }
       } catch (e) {
-        console.error("❌ Failed to validate response body:", e);
+        console.error("[ERROR] ❌ Failed to validate response body: " + (e.message || e));
       }
     }
   } catch (e) {
-    console.error("swaggerSchemaValidator error:", e && e.stack ? e.stack : e);
+    console.error("[ERROR] swaggerSchemaValidator error: " + (e.stack || e));
   }
 }
 
@@ -238,18 +248,81 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
 function validateDataFileJsonWithTemplate(jsonData) {
   const schemaUrl = bru.getEnvVar("json_schema");
   if (!schemaUrl) {
-    console.error("❌ Missing env var json_schema");
+    console.error("[ERROR] ❌ Missing env var json_schema");
     test("Schema load failed", function () {
       throw new Error("Schema load failed: json_schema env var missing");
     });
     return;
   }
 
+  // #328 (v1.11.109): warn about stale schema URLs. Several pre-existing
+  // env files point at the external GitHub repo OSDM-testing/refs/heads/
+  // exch_dev/json_validator/datafile.schema.json — that branch has been
+  // deprecated and its schema is OUT OF SYNC with what the wizard
+  // produces (it still requires the legacy offerSearchCriteriaList +
+  // offerSearchCriteriaListId linkage, but OSCAR's modern datafiles
+  // use the inline scenario.offerSearchCriteria model). Validating
+  // against the stale schema produces false-positive failures that
+  // mislead new users.
+  //
+  // The canonical local schema is bundled with OSCAR at
+  //   http://localhost:8080/json_validator/datafile.schema.json
+  // and that's what every fresh env file should reference. When we
+  // detect the GitHub URL we emit a [WARNING] naming both the issue
+  // and the fix, so the new user has a clear next step instead of
+  // chasing "Required property 'offerSearchCriteriaList' is missing"
+  // through the codebase.
+  // Use URL.hostname so we match the host CORRECTLY (CodeQL
+  // js/regex/missing-regexp-anchor — a bare /github\.com/ would also
+  // match strings like `https://evilgithub.com.attacker.example/`).
+  try {
+    if (typeof schemaUrl === "string") {
+      let _hostname = "";
+      try { _hostname = new URL(schemaUrl).hostname || ""; } catch (_urlErr) { _hostname = ""; }
+      // Match the GitHub hosts we know to warn about, anchored to the
+      // full hostname extracted from the URL. Covers:
+      //   - github.com
+      //   - raw.githubusercontent.com  (the actual host for refs/heads/... paths)
+      //   - any other *.github.com / *.githubusercontent.com subdomain
+      const _isGitHubHost = /^(?:[^.]+\.)?github(?:usercontent)?\.com$/i.test(_hostname);
+      if (_isGitHubHost) {
+        // #333 (v1.11.112): json_schema is a SERVER-wide setting, not a
+        // per-company env file. The previous WARNING text said "update the
+        // company's environment file" which is misleading — there is no
+        // such file. The value comes from JSON_SCHEMA_URL set on the OSCAR
+        // server's .env (OSCAR_Deploy/.env). v1.11.112 also serves the
+        // schema bundled with the Bruno collection at
+        // http://127.0.0.1:3001/json_validator/datafile.schema.json, so
+        // operators no longer need a public schema URL at all.
+        const _isExchDev = /exch_dev/i.test(schemaUrl) || /OSDM-testing/i.test(schemaUrl);
+        const _staleNote = _isExchDev
+          ? 'The UnionInternationalCheminsdeFer/OSDM-testing repo (exch_dev branch and others) is deprecated as a schema reference — its schema is out of sync with the modern OSCAR datafile shape and produces false-positive validation failures (typically "Required property \'offerSearchCriteriaList\' is missing"). '
+          : 'A GitHub-hosted schema URL is fragile (depends on the repo staying public and the branch / file path not moving). ';
+        // v1.11.115: the previous text said `docker compose restart oscar` —
+        // WRONG: `restart` keeps the existing container, and env_file values
+        // are baked in at container CREATE time, so an edited .env is never
+        // picked up. Only `docker compose up -d oscar` (recreate on config
+        // change) applies a new JSON_SCHEMA_URL. (Watchtower image updates
+        // clone the old container's env, so they don't pick it up either.)
+        validationLogger(
+          '[WARNING] json_schema env var points at a GitHub-hosted schema (' + schemaUrl + '). ' +
+          _staleNote +
+          'OSCAR_Server now bundles the schema and serves it locally — preferred value: ' +
+          'http://127.0.0.1:3001/json_validator/datafile.schema.json. ' +
+          'Operator action on the VPS: edit OSCAR_Deploy/.env, set JSON_SCHEMA_URL to that URL, then apply with ' +
+          '"docker compose up -d oscar" — NOT "docker compose restart" (restart does not re-read .env; ' +
+          'env values are fixed when the container is created).'
+        );
+      }
+    }
+  } catch (_logErr) { /* logging is best-effort */ }
+
   bru.sendRequest(
     { url: schemaUrl, method: 'GET', proxy: false },
     function (err, res) {
       if (err) {
-        console.error("Error loading the schema: ", err);
+        // Same as above — inside `if (err)` so err is truthy.
+        console.error("[ERROR] Error loading the schema: " + (err.message || err));
         test("Schema load failed", function () {
           throw new Error("Schema load failed: " + err);
         });
@@ -282,20 +355,40 @@ function validateDataFileJsonWithTemplate(jsonData) {
         function validateValueAgainstSchema(key, value, propertySchema, path = "") {
           const fullPath = path ? (key ? `${path}.${key}` : path) : key;
 
-          // Check required
+          // Null handling.
+          // #345 (v1.11.118): this branch fires for a property that is PRESENT
+          // with a null value (the callers only recurse on hasOwnProperty).
+          // It used to accept null only for a hardcoded list of field names —
+          // a maintenance trap: placeSelectionMode (added later with schema
+          // type ["string","null"] and null in its enum) wasn't on the list,
+          // so every scenario carrying the perfectly legal
+          // `"placeSelectionMode": null` was flagged "Required property
+          // missing". Derive nullability from the SCHEMA itself first
+          // (type includes "null", or the enum lists null); keep the legacy
+          // name list as a fallback for older fields whose schema entries
+          // never declared nullability.
           if (value == null) {
-            if (
+            const _types = Array.isArray(propertySchema.type)
+              ? propertySchema.type
+              : [propertySchema.type];
+            const _schemaAllowsNull =
+              _types.includes("null") ||
+              (Array.isArray(propertySchema.enum) && propertySchema.enum.includes(null));
+            const _legacyNullableNames = (
               key === "gender" || key === "updateGender" || key === "requiresPlaceSelection" || key === "offerMode" ||
               key === "updateFirstName" || key === "updateLastName" || key === "updateDateOfBirth" ||
               key === "updatePhoneNumber" || key === "updateEmail" || key === "requestedOfferParts" ||
               key === "serviceClass" || key === "travelClass" || key === "refundDate" || key === "flexibilities" ||
               key === "desiredFlexibility" || key === "overruleCode" || key === "scenarioAction" ||
               key === "accommodationSelection" || key === "loggingType"
-            ) {
+            );
+            if (_schemaAllowsNull || _legacyNullableNames) {
               validationLogger(`[FULL] ⚠️ Optional field '${fullPath}' is null/missing — this is allowed.`);
               return;
             }
-            validationErrors.push(`❌ Required property '${fullPath}' is missing.`);
+            // Present-but-null on a non-nullable schema type: say THAT,
+            // not "required property missing" (the property exists).
+            validationErrors.push(`❌ '${fullPath}' is null but the schema type (${_types.join(", ")}) does not allow null.`);
             return;
           }
 
@@ -386,14 +479,20 @@ function validateDataFileJsonWithTemplate(jsonData) {
             expect(true).to.eql(true);
           });
         } else {
-          validationLogger(`[INFO] ⛔ Invalid JSON Data file structure with schema from : ${schemaUrl}`);
-          validationErrors.forEach(err => console.error(err));
+          // #345 (v1.11.118): the header used to be tagged [INFO] with no
+          // error count — easy to misread as a schema-ACCESS problem. It is
+          // not: this branch only runs after the schema was fetched (2xx)
+          // and parsed; the failures below are CONTENT mismatches between
+          // the data file and the schema. Tag it [ERROR] and announce how
+          // many detail lines follow.
+          validationLogger(`[ERROR] ⛔ Invalid JSON Data file structure (${validationErrors.length} error(s) — details below). Schema was fetched OK from: ${schemaUrl}`);
+          validationErrors.forEach(err => console.error("[ERROR] " + err));
           test("⛔ Invalid JSON Data file structure", function () {
             throw new Error("Validation errors:\n" + validationErrors.join("\n"));
           });
         }
       } catch (e) {
-        console.error("Schema parsing/validation error:", e);
+        console.error("[ERROR] Schema parsing/validation error: " + (e.message || e));
         test("Schema parse/validate failure", function () {
           throw new Error("Schema parse/validate failure: " + (e.message || e));
         });

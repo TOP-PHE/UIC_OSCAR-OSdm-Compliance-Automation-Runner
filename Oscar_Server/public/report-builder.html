@@ -138,6 +138,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-level.l-warn,.log-level.l-warning{background:#fff3e0;color:#e65100}
 .log-level.l-info{background:#e8f5e9;color:#2e7d32}
 .log-level.l-stdout,.log-level.l-stderr{background:#eceff1;color:#546e7a}
+/* v1.11.115: 'debug' level chips (emitted since the v1.11.113 runner-side
+   level inference) had no rule — readable here on the light page, but the
+   chip rendered without its badge colors. */
+.log-level.l-debug{background:#eceff1;color:#78909c}
 .log-cat{font-size:10px;color:#1565c0;background:#e3f2fd;border-radius:3px;padding:1px 6px;text-align:center;align-self:center}
 .log-msg{color:#37474f;white-space:pre-wrap;word-break:break-word}
 .log-empty{padding:20px;text-align:center;color:#90a4ae;font-size:13px}
@@ -506,7 +510,8 @@ function escHtml(s) {
 }
 function fmtDate(d) {
   if (!d) return '-';
-  return new Date(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
+  // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
 }
 function runScenarioLabel(r) {
   // What identifies this run for a human? Prefer the actual scenario(s) executed:
@@ -875,7 +880,7 @@ function renderMilestone(e) {
   var attempt = (e.attempt_index && e.attempt_total)
     ? 'attempt ' + e.attempt_index + '/' + e.attempt_total
     : '';
-  var ts = e.ts ? new Date(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+  var ts = e.ts ? parseServerTs(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
   return '<div class="log-milestone ' + def.cls + '">'
     + '<span class="mile-label">' + escHtml(def.text) + '</span>'
     + '<span class="mile-scenario">' + escHtml(e.scenario_name || '(unknown scenario)') + '</span>'
@@ -965,7 +970,7 @@ function renderLogs() {
         if (item.__jsonBlock) {
           var o = item.event;
           var lvl = (o.level || 'stdout').toLowerCase();
-          var ts  = o.ts ? new Date(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var ts  = o.ts ? parseServerTs(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
           var label = jsonBlockLabel(o);
           var lineCount = item.body.split('\n').length;
           var bodyId = 'json-body-' + (o.id || Math.random().toString(36).slice(2));
@@ -985,7 +990,7 @@ function renderLogs() {
         } else {
           var e2 = item;
           var lvl2 = (e2.level || 'stdout').toLowerCase();
-          var ts2  = e2.ts ? new Date(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var ts2  = e2.ts ? parseServerTs(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
           html += '<div class="log-row">'
             + '<span class="log-ts">' + escHtml(ts2) + '</span>'
             + '<span class="log-level l-' + escHtml(lvl2) + '">' + escHtml(lvl2) + '</span>'
@@ -1480,7 +1485,10 @@ document.getElementById('http-content').addEventListener('click', function(e) {
     if (tab) switchHttpTab(tab);
     // or copy
     var cpy = e.target.closest('[data-copy-target]');
-    if (cpy) copyJsonContent(cpy);
+    if (cpy) { copyJsonContent(cpy); return; }
+    // #325: or download
+    var dnl = e.target.closest('[data-download-target]');
+    if (dnl) { downloadJsonContent(dnl); return; }
     return;
   }
   toggleHttpRow(row);
@@ -1566,13 +1574,23 @@ function renderHttpTabBody(r, kind) {
   try { parsed = JSON.parse(raw); } catch (_e) { isJson = false; }
 
   var copyId = 'http-raw-' + r.id + '-' + kind;
+  // #325: tester-ergonomics — Download button next to Copy. Filename built
+  // from the same context used in the run-detail dashboard so files moved
+  // between the two views match.
+  var scenarioForName = r.scenario_code || r.scenario_name || r.suite_name || '';
+  var stepForName     = r.request_name || '';
   var copyBtn = '<button class="copy-btn" data-copy-target="' + copyId + '">Copy</button>';
+  var downloadBtn = '<button class="copy-btn" data-download-target="' + copyId + '"'
+    + ' data-download-scenario="' + escAttr(scenarioForName) + '"'
+    + ' data-download-step="' + escAttr(stepForName) + '"'
+    + ' data-download-kind="' + escAttr(kind) + '">Download</button>';
+  var actionsBtn = copyBtn + downloadBtn;
 
   if (isJson) {
-    return copyBtn
+    return actionsBtn
       + '<div class="json-tree" id="' + copyId + '" data-raw="' + escAttr(raw) + '">' + renderJsonNode(parsed, '', true) + '</div>';
   }
-  return copyBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
+  return actionsBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
 }
 
 function renderHeaders(jsonStr) {
@@ -1664,6 +1682,41 @@ function copyJsonContent(btn) {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
   });
+}
+
+// #325: tester-ergonomics — Download a request/response body as a JSON file.
+// Filename pattern: ${scenario}_${step}_${kind}.json with non-FS-safe chars
+// collapsed to underscores so the file moves cleanly between Windows, macOS,
+// and Linux. Matches the pattern used by the run-detail dashboard so a
+// downloaded file from either view has the same name.
+function _rbSanitiseFilename(s) {
+  return String(s == null ? '' : s)
+    .replace(/[\\\/:*?"<>|\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+function downloadJsonContent(btn) {
+  var targetId = btn.getAttribute('data-download-target');
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  var text = el.getAttribute('data-raw') || el.textContent || '';
+  if (!text) return;
+  var scenario = btn.getAttribute('data-download-scenario') || '';
+  var step     = btn.getAttribute('data-download-step')     || '';
+  var kind     = btn.getAttribute('data-download-kind')     || 'response';
+  var filename = [
+    _rbSanitiseFilename(scenario) || 'oscar',
+    _rbSanitiseFilename(step)     || 'request',
+    kind
+  ].join('_') + '.json';
+  var blob = new Blob([text], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+  btn.textContent = '✓ Downloaded';
+  setTimeout(function() { btn.textContent = 'Download'; }, 1400);
 }
 
 function escAttr(s) { return escHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }

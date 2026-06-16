@@ -18,6 +18,13 @@ unless otherwise agreed by UIC."
 
 'use strict';
 
+/**
+ * reportGenerator.js — build the HTML validation report's per-request entries.
+ *
+ * `initReport()` resets the report at scenario start; `appendRequest()` adds an
+ * entry per HTTP call (request/response bodies + captured assertions/logs) that
+ * the collection-level after-response renders into the final HTML report.
+ */
 module.exports = { initReport, appendRequest };
 
 // ─── Credential redaction (issue #17) ────────────────────────────────────────
@@ -35,22 +42,50 @@ const _SENSITIVE_HEADERS = new Set([
   'x-auth-token',
   'x-access-token',
   'x-requestor',
+  'requestor',
   'cookie',
   'set-cookie'
 ]);
 const _REDACTED_MARKER = '[REDACTED — credential]';
 
+// Partial masking: keep the head (scheme + token start) and the tail so a
+// tester can verify the right credential was sent and correlate two requests,
+// without exposing a usable secret. Graduated: long values (tokens) keep
+// head 10 / tail 4; short identity-style values (Requestor) keep head 3 /
+// tail 2; anything shorter is fully redacted.
+function _maskCredentialValue(v) {
+  const s = String(v == null ? '' : v);
+  if (s.length >= 24) {
+    return `${s.slice(0, 10)}…[masked ${s.length - 14} chars]…${s.slice(-4)}`;
+  }
+  if (s.length >= 8) {
+    return `${s.slice(0, 3)}…[masked ${s.length - 5} chars]…${s.slice(-2)}`;
+  }
+  return _REDACTED_MARKER;
+}
+
 function _redactHeaders(h) {
   if (!h || typeof h !== 'object') return h;
   const out = {};
   for (const [k, v] of Object.entries(h)) {
-    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _REDACTED_MARKER : v;
+    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _maskCredentialValue(v) : v;
   }
   return out;
 }
 
 function _isAuthRequestUrl(url) {
   return /\/(token|login|auth|logon|oauth)/i.test(String(url || ''));
+}
+
+// #357: [DEBUG] prints obey the dataset loggingType. reportGenerator is
+// sandbox-self-contained (can't require displays.js), so a local gate:
+// suppressed unless loggingType is DEBUG/FULL; when bru is unavailable the
+// default (INFO) applies.
+function _debugLog(msg) {
+  try {
+    const lt = String((typeof bru !== 'undefined' && bru.getEnvVar && bru.getEnvVar('loggingType')) || 'INFO').toUpperCase();
+    if (lt === 'DEBUG' || lt === 'FULL') console.log(msg);
+  } catch (_e) { /* no logging context — stay silent like INFO */ }
 }
 
 // ─── Lazy native-module accessors ────────────────────────────────────────────
@@ -111,6 +146,16 @@ function _ensureDir(dir) {
  * Resets accumulated report data so the HTML file starts fresh.
  * libraryBase parameter kept for backward compatibility but no longer used
  * (path is derived from __dirname instead).
+ *
+ * Loop-back-aware (v1.11.9): when an existing tmp file is for the SAME
+ * scenarioCode that is about to start, we KEEP it. Rationale: a single
+ * scenario run that fails partway (e.g. /offers returns 5xx) triggers a
+ * loop-back retry of the SAME scenarioCode in the .bru chain. Before this
+ * guard, the loop-back wiped the System Information requests + the first
+ * attempt of /offers — the final HTML only contained the retry attempt,
+ * giving the (incorrect) impression that "system endpoints were never run".
+ * For a genuinely new scenario starting in a multi-scenario sequential run,
+ * the codes differ and we still clear, preserving the original behaviour.
  */
 function initReport(libraryBase) {
   try {
@@ -119,12 +164,36 @@ function initReport(libraryBase) {
     _ensureDir(dir);
     const tmp = _tmpFile();
     if (fs.existsSync(tmp)) {
-      fs.unlinkSync(tmp);
-      console.log('[reportGenerator] 🗑️  Previous run data cleared.');
+      // Read the existing tmp's scenarioCode and compare with the one the
+      // caller is about to start (sourced from the bru env var, which the
+      // .bru scenario-start script has already set to the new scenario).
+      let prevScenarioCode = null;
+      try {
+        const data = JSON.parse(fs.readFileSync(tmp, 'utf8'));
+        prevScenarioCode = (data && data.meta && data.meta.scenarioCode) || null;
+      } catch (re) { _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (re && re.message) + ') — treating as a different scenario.'); }
+      let currentScenarioCode = null;
+      try {
+        if (typeof bru !== 'undefined' && bru && typeof bru.getEnvVar === 'function') {
+          currentScenarioCode = bru.getEnvVar('scenarioCode') || null;
+        }
+      } catch (be) { _debugLog('[DEBUG] [reportGenerator] no bru context (' + (be && be.message) + ') — falling through to clear previous run data.'); }
+
+      if (prevScenarioCode && currentScenarioCode && prevScenarioCode === currentScenarioCode) {
+        // Log-audit round 2: report-accumulator bookkeeping → DEBUG (the
+        // retry itself is already announced by the loop-back [INFO] line).
+        _debugLog('[DEBUG] [reportGenerator] ↩ Same scenario detected (' + prevScenarioCode + ') — preserving accumulated report data (loop-back retry).');
+      } else {
+        fs.unlinkSync(tmp);
+        _debugLog('[DEBUG] [reportGenerator] 🗑️  Previous run data cleared.');
+      }
     }
-    console.log('[reportGenerator] ✅ Report directory: ' + dir);
+    // Log-audit round 2: container-internal path (/app/data/workspaces/…) —
+    // testers reach reports via the run page's Artifacts section, never via
+    // this filesystem → DEBUG.
+    _debugLog('[DEBUG] [reportGenerator] ✅ Report directory: ' + dir);
   } catch (e) {
-    console.log('[reportGenerator] initReport error: ' + e.message);
+    console.log('[ERROR] [reportGenerator] initReport error: ' + e.message);
   }
 }
 
@@ -157,11 +226,20 @@ function appendRequest(data) {
     const tmpFile = _tmpFile();
 
     // ── Load existing accumulated data ────────────────────────────────────
+    // No fs.existsSync() gate here (CodeQL js/file-system-race / TOCTOU): the
+    // check-then-read/write on tmpFile was a time-of-check-to-time-of-use race.
+    // Instead just attempt the read and treat a missing file (ENOENT) or
+    // corrupt JSON as "start fresh" — behaviour is identical, no pre-check.
     let reportData = { meta: null, requests: [] };
-    if (fs.existsSync(tmpFile)) {
-      try {
-        reportData = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
-      } catch (_e) { /* corrupt tmp → start fresh */ }
+    try {
+      reportData = JSON.parse(fs.readFileSync(tmpFile, 'utf8'));
+    } catch (e) {
+      // A caught value is always defined, so no redundant `e &&` guard
+      // (CodeQL js/useless-conditional). ENOENT ("no tmp yet") is normal →
+      // stay silent; anything else (corrupt JSON, perms) is logged.
+      if (e.code !== 'ENOENT') {
+        _debugLog('[DEBUG] [reportGenerator] previous tmp unreadable (' + (e.message || e) + ') — starting fresh.');
+      }
     }
 
     // ── Initialize or update metadata ────────────────────────────────────
@@ -227,7 +305,7 @@ function appendRequest(data) {
 
     return htmlPath;
   } catch (e) {
-    console.log('[reportGenerator] appendRequest error: ' + e.message);
+    console.log('[ERROR] [reportGenerator] appendRequest error: ' + e.message);
     return null;
   }
 }
@@ -254,6 +332,10 @@ function _maskHeaderValue(name, value) {
   const key = String(name || '').toLowerCase();
   const raw = value == null ? '' : String(value);
   const maskTail = 'xxxxxxxxxxxxxxxxx';
+
+  // Already masked at capture by _redactHeaders (partial head…tail format or
+  // full redaction marker) — pass through, don't re-mask away the tail.
+  if (raw.includes('…[masked ') || raw.includes(_REDACTED_MARKER)) return raw;
 
   if (key === 'authorization' && /^bearer\s+/i.test(raw)) {
     const token = raw.replace(/^bearer\s+/i, '').trim();
@@ -400,12 +482,15 @@ function _requestBlock(r, i) {
     </div>
   </details>`;
 
-  // Response panel
+  // Response panel — headers + body, mirroring the request panel
   const resPanelHtml = `<details>
-    <summary class="sub-summary">📥 Response Body</summary>
+    <summary class="sub-summary">📥 Response Headers &amp; Body</summary>
     <div class="panel">
+      <div class="panel-lbl">Headers</div>
+      ${_headerTable(r.responseHeaders || {})}
       ${r.responseBody
-        ? `<pre class="code">${_esc(_prettyJson(r.responseBody))}</pre>`
+        ? `<div class="panel-lbl" style="margin-top:10px">Body</div>
+           <pre class="code">${_esc(_prettyJson(r.responseBody))}</pre>`
         : '<p class="muted">No response body captured</p>'}
     </div>
   </details>`;
@@ -728,7 +813,7 @@ h1{color:#1a3a6b;margin:0 0 6px;font-size:22px}
 <div class="legend">
   <b>ℹ️ About these assertions:</b> Each request shows the full set of business assertions (offer found, booking created, refund valid…)
   plus two global OSDM compliance checks on every response:
-  <b>[OSDM] Content-Type is application/json</b> — every non-empty response must be JSON &nbsp;|&nbsp;
+  <b>[OSDM] Content-Type is JSON</b> — every non-empty response must be JSON (application/json or a +json media type, e.g. application/vnd.uic.osdm+json) &nbsp;|&nbsp;
   <b>[OSDM] Error body is a valid RFC 9457 Problem object</b> — error responses (4xx/5xx) must include a structured Problem object.
   <div class="color-legend">
     <div class="cl-item"><div class="cl-dot cl-green"></div> All assertions passed (0% failures)</div>

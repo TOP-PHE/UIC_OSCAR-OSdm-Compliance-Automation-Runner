@@ -19,44 +19,21 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        const DEFAULT_LATEST_VERSION = '3.9.0';
-
-        function parseVersion(v) {
-          if (v == null) return null;
-          const m = String(v).trim().match(/(\d+)\.(\d+)(?:\.(\d+))?/);
-          if (!m) return null;
-          return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3] || 0) };
-        }
-
-        function score(v) {
-          return (v.major * 1000000) + (v.minor * 1000) + v.patch;
-        }
-
-        function pickLatestFromList(raw) {
-          if (!raw) return null;
-          return String(raw)
-            .split(',')
-            .map(s => parseVersion(s))
-            .filter(Boolean)
-            .sort((a, b) => score(b) - score(a))[0] || null;
-        }
-
-        const apiVersion = parseVersion(bru.getEnvVar('apiVersion'));
-        const apiVersionFromVersions = pickLatestFromList(bru.getEnvVar('apiVersionsAvailable'));
-        const scenarioVersion = parseVersion(bru.getEnvVar('osdmVersion'));
-        const effective = apiVersion || apiVersionFromVersions || scenarioVersion || parseVersion(DEFAULT_LATEST_VERSION);
-
-        const isCoachDeck = score(effective) >= score({ major: 3, minor: 8, patch: 0 });
-        bru.setVar('coachLayoutsResource', isCoachDeck ? 'coach-deck-layouts' : 'coach-layouts');
+        // Endpoint selection by the NEGOTIATED OSDM version (>= 3.8 → the
+        // coach-deck-layouts resource, else legacy coach-layouts). Version
+        // resolution is centralised in osdmVersion.js (issue #105). NB this is
+        // the negotiated/effective version, NOT the compliance version.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        bru.setVar('coachLayoutsResource', atLeast(resolveEffectiveVersion(), '3.8.0') ? 'coach-deck-layouts' : 'coach-layouts');
 
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { handleSystemInfoStatus, validateCoachLayouts, validateCoachDeckLayouts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
         const resource = bru.getVar('coachLayoutsResource') || 'coach-layouts';
         const endpoint = `/${resource}`;
-        const statusCode = res.getStatus();
 
         // Reset coach list markers for this request execution
         bru.setEnvVar('coachListHasValidData', 'false');
@@ -104,59 +81,45 @@ runtime:
           return ids;
         }
 
-        // ── Status code classification ────────────────────────────────────
-        if (statusCode === 200) {
-          bruTest(`GET ${endpoint} → 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-          let body;
-          try { body = res.getBody(); } catch (_e) {}
-          const bodyNotEmpty = Array.isArray(body)
-            ? body.length > 0
-            : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
-          bruTest(`GET ${endpoint} response body is present and not empty`, () => {
-            expect(body, 'Response body should not be null/undefined').to.exist;
-            expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
-          });
+        // Shared, version-aware status handling (out-of-version 404 → skip, etc.).
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
-          const coachIds = pickCoachIds(body);
-          bruTest(`GET ${endpoint} response contains at least one coach/layout id`, () => {
-            expect(coachIds.length, 'No coach/layout id found in list response').to.be.greaterThan(0);
-          });
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+        const bodyNotEmpty = Array.isArray(body)
+          ? body.length > 0
+          : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
+        bruTest(`GET ${endpoint} response body is present and not empty`, () => {
+          expect(body, 'Response body should not be null/undefined').to.exist;
+          expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
+        });
 
-          if (coachIds.length > 0) {
-            bru.setEnvVar('coachListHasValidData', 'true');
-            bru.setEnvVar('coachListCandidateIds', JSON.stringify(coachIds));
-          }
-          validationLogger(`[INFO] GET ${endpoint} → 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        const coachIds = pickCoachIds(body);
+        bruTest(`GET ${endpoint} response contains at least one coach/layout id`, () => {
+          expect(coachIds.length, 'No coach/layout id found in list response').to.be.greaterThan(0);
+        });
 
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
-          bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET ${endpoint} → 403 Forbidden — insufficient permissions`);
-          bruTest(`GET ${endpoint} → 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET ${endpoint} → 404 Not Found — endpoint not implemented by this vendor`);
-          bruTest(`GET ${endpoint} → 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404 — endpoint not supported').to.eql(200);
-          });
-
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET ${endpoint} → ${statusCode} Server Error`);
-          bruTest(`GET ${endpoint} → ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-
-        } else {
-          validationLogger(`[WARNING] GET ${endpoint} → unexpected status ${statusCode}`);
-          bruTest(`GET ${endpoint} → unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
+        if (coachIds.length > 0) {
+          bru.setEnvVar('coachListHasValidData', 'true');
+          bru.setEnvVar('coachListCandidateIds', JSON.stringify(coachIds));
         }
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
+
+        // ── OSDM compliance (Layer 1): Coach(Deck)LayoutCollectionResponse ──
+        // Resource depends on the effective OSDM version: coach-deck-layouts
+        // (>=3.8) → CoachDeckLayout items under "coachDeckLayouts"; otherwise
+        // coach-layouts → CoachLayout items under "layouts".
+        const coachChecks = (resource === 'coach-deck-layouts')
+          ? validateCoachDeckLayouts(body, endpoint)
+          : validateCoachLayouts(body, endpoint);
+        coachChecks.forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
+
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
+        const coachItems = (resource === 'coach-deck-layouts') ? body.coachDeckLayouts : body.layouts;
+        validateSchema(coachComponent, coachItems, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });

@@ -114,20 +114,118 @@ request:
 
           var _isToken    = _rn.includes('token') || _rn.includes('access');
           var _isPlaceMap = _ru.includes('place-map') || _rn.includes('place map');
+          // Two seat-map variants share the /availabilities/place-map endpoint
+          // (#184): the OFFER-context map (08, pre-booking) and the
+          // BOOKING-context map (08b, post-booking). Detect the post-booking one
+          // by its contextType=BOOKING query (or its name) so the two are gated
+          // independently below.
+          var _isPostBookingPlaceMap = _isPlaceMap && (_ru.includes('contexttype=booking') || _rn.includes('post-booking'));
+          var _isOfferPlaceMap = _isPlaceMap && !_isPostBookingPlaceMap;
+          var _isAddReservation = _rn.includes('add reservation');
+          var _isAddAncillary   = _rn.includes('add ancillary');
+          var _isPurchaserGet   = _rn.includes('get booking purchaser');
+          var _isPurchaserPatch = _rn.includes('patch booking purchaser');
+          var _isPurchaserPost  = _rn.includes('post booking purchaser');
+          var _isPurchaserStep  = _isPurchaserGet || _isPurchaserPatch || _isPurchaserPost;
+          var _isReturnOffer    = _rn.includes('return offer');
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
 
+          // Two-step return (#178): the inward "01b. POST Get Return Offer" step
+          // runs only for return scenarios — detected from the outbound
+          // tripSearchCriteria the scenarioParser built (returnSearchParameters
+          // .inwardReturnDate). For one-way scenarios it is skipped wherever it
+          // sits in the flow.
+          var _isReturnScenario = (function () {
+            try {
+              var _t = JSON.parse(bru.getEnvVar('offerTripSearchCriteria') || '{}');
+              return !!(_t.returnSearchParameters && _t.returnSearchParameters.inwardReturnDate);
+            } catch (_e) { return false; }
+          })();
+
+          // Place maps run only when the scenario enabled Place selection in the
+          // SEATMAP_AT_OFFER mode (issues #104/#107); legacy requiresPlaceSelection
+          // and the SALE+PLACEMAP scenario type are kept as OR-fallbacks. When the
+          // gate is off (every current scenario) the place-map request is skipped
+          // wherever it sits in the flow.
+          var _runPlaceMap = (bru.getEnvVar('placeSelectionMode') === 'SEATMAP_AT_OFFER'
+                               && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true')
+                          || (bru.getEnvVar('requiresPlaceSelection') === true || bru.getEnvVar('requiresPlaceSelection') === 'true')
+                          || _st === 'SALE+PLACEMAP';
+
+          // Post-booking add-reservation runs only in ADD_TO_BOOKING mode
+          // (issues #104 Stage B / #107), and only once per scenario.
+          // Adaptive fallback (#182): also runs when the pre-booking seat map
+          // failed at offer time (08. GET Place Maps set __placeMapAtOfferFailed)
+          // — the seat is then selected AFTER pre-booking via add-reservation.
+          var _runAddReservation = ((bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
+                                    || bru.getEnvVar('__placeMapAtOfferFailed') === 'true')
+                                 && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true';
+
+          // Post-booking add-ancillary runs only when the scenario enabled it
+          // (salesFlow_addAncillary, authorised by the framework #107), once.
+          var _runAddAncillary = String(bru.getEnvVar('salesFlow_addAncillary')) === 'true';
+
+          // Post-booking purchaser step (#258 / #203) runs only when the scenario
+          // deferred the purchaser ('deferred' supplies it, 'invalid' probes it).
+          // 'inline' (default) and 'omit' never run the dedicated step.
+          var _purMode = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
+          var _runPurchaserStep = (_purMode === 'deferred' || _purMode === 'invalid');
+          // The GET probe (12) decides create-vs-update and sets the method; the
+          // two write steps run only for the method the probe selected.
+          var _purWriteMethod = String(bru.getEnvVar('__purchaserWriteMethod') || '');
+
           var _skipReason = null;
           if (_isToken && _sandbox && _rn && !_rn.includes(_sandbox)) {
-            _skipReason = 'not for "' + _sandbox + '" sandbox';
-          } else if (_st === 'SALE'         && (_isPlaceMap || _isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
-            else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange))               { _skipReason = 'not in SALE+PLACEMAP scope'; }
-            else if (_st === 'REFUND'        && _isExchange)                              { _skipReason = 'Exchange excluded for REFUND scenario'; }
-            else if (_st === 'EXCHANGE'      && _isRefund)                                { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
+            // Log-audit round 2: on OSCAR the env name is the company env
+            // ("bileto-sandbox_afc035bc"), which never contains a vendor word
+            // like "bileto access token" → ALL manual vendor token requests
+            // skip here, including the one matching the company's own vendor.
+            // That is CORRECT (the runner injects access_token fetched
+            // server-side from the API Config credentials) but the old
+            // wording — 'not for "bileto-sandbox_…" sandbox' — read as a
+            // sandbox-matching bug. Say what actually happened, and pick the
+            // standalone-Bruno wording only when no token was pre-provided.
+            _skipReason = bru.getEnvVar('access_token')
+              ? 'access token already provided by OSCAR (server-side OAuth from API Config) — manual vendor token requests never run on OSCAR'
+              : 'vendor token request for a different sandbox (env "' + _sandbox + '") — runs only in standalone Bruno with the matching vendor env';
+          } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
+            else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
+            else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
+            else if (_isPostBookingPlaceMap && !bru.getEnvVar('bookingId')) { _skipReason = 'post-booking place map needs a booking first'; }
+            else if (_isPostBookingPlaceMap && bru.getEnvVar('__postBookingPlaceMapDone') === 'true') { _skipReason = 'post-booking place map already done this scenario'; }
+            else if (_isPlaceMap && !bru.getEnvVar('reservationId')) { _skipReason = 'no reservation offer-part in this offer — seat map not applicable (resourceId would be unresolved)'; }
+            else if (_isAddReservation && !_runAddReservation)            { _skipReason = 'add-reservation not enabled (ADD_TO_BOOKING)'; }
+            else if (_isAddReservation && bru.getEnvVar('__addReservationDone') === 'true') { _skipReason = 'add-reservation already done this scenario'; }
+            else if (_isAddAncillary && !_runAddAncillary)                { _skipReason = 'add-ancillary not enabled (salesFlow_addAncillary)'; }
+            else if (_isAddAncillary && bru.getEnvVar('__addAncillaryDone') === 'true') { _skipReason = 'add-ancillary already done this scenario'; }
+            else if (_isPurchaserStep && !_runPurchaserStep)              { _skipReason = 'purchaser step not enabled (bookingPurchaserMode is inline/omit)'; }
+            else if (_isPurchaserStep && !bru.getEnvVar('bookingId'))     { _skipReason = 'purchaser step needs a booking first'; }
+            else if (_isPurchaserStep && bru.getEnvVar('__purchaserStepDone') === 'true') { _skipReason = 'purchaser step already done this scenario'; }
+            else if (_isPurchaserPatch && _purWriteMethod !== 'PATCH')    { _skipReason = 'purchaser exists-check selected POST (or has not run yet)'; }
+            else if (_isPurchaserPost && _purWriteMethod !== 'POST')      { _skipReason = 'purchaser exists-check selected PATCH (or has not run yet)'; }
+            else if (_isReturnOffer && !_isReturnScenario)                { _skipReason = 'not a return-trip scenario'; }
+            else if (_isReturnOffer && bru.getEnvVar('__returnInboundDone') === 'true') { _skipReason = 'inward (return) offer already fetched this scenario'; }
+            else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
+            else if (_st === 'SALE+PLACEMAP' && (_isRefund || _isExchange)) { _skipReason = 'not in SALE+PLACEMAP scope'; }
+            else if (_st === 'REFUND'        && _isExchange)               { _skipReason = 'Exchange excluded for REFUND scenario'; }
+            else if (_st === 'EXCHANGE'      && _isRefund)                 { _skipReason = 'Refund excluded for EXCHANGE scenario'; }
 
           if (_skipReason) {
-            console.log('[INFO] ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            // Token skips are routine plumbing (6 of them at the top of every
+            // OSCAR run) — the tester doesn't act on them → [DEBUG]. The other
+            // skip reasons SHAPE the test flow (scope gates, place-map modes,
+            // purchaser steps) and stay [INFO] so the report explains why a
+            // step is absent.
+            // #355: respect the dataset loggingType — this direct console.log
+            // bypassed the validationLogger pyramid, so the [DEBUG] token
+            // skips still appeared on INFO-typed runs.
+            const _lt = String(bru.getEnvVar('loggingType') || 'INFO').toUpperCase();
+            const _debugOn = _lt === 'DEBUG' || _lt === 'FULL';
+            if (!_isToken || _debugOn) {
+              console.log((_isToken ? '[DEBUG]' : '[INFO]') + ' ⏭️  Skipping [' + (_rn || _ru) + '] — ' + _skipReason);
+            }
             // skipRequest() MUST be the last bru call — it clears the bru context.
             // break RUNSCRIPT immediately after so no further bru.* calls run.
             if (bru.runner && typeof bru.runner.skipRequest === 'function') bru.runner.skipRequest();
@@ -172,7 +270,8 @@ request:
               console.log("🛠️  New Collection Execution — clearing env vars and loading scenario data...");
               const _deleteList = [
                 // Scenario / trip
-                "loggingType", "scenarioType", "scenarioAction", "osdmVersion",
+                "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
+                "selectedAccommodation",
                 "desiredFlexibility", "accommodationSelection", "requiresPlaceSelection",
                 "overruleCode", "refundDate", "TripType",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
@@ -182,13 +281,18 @@ request:
                 "offer", "offerId", "offers", "OfferCollectionRequest",
                 "offerSearchCriteria", "offerTripSearchCriteria", "offerTripSpecifications",
                 "offerFulfillmentOptions", "offerPassengerSpecifications",
+                // Two-step return (#178/#180)
+                "outboundOfferId", "inboundOfferId", "outboundOfferTag",
+                "ReturnOfferCollectionRequest", "__returnInboundDone",
+                "outboundBookingId", "__returnBookMode",
                 "admissionReservationAncillaryOfferPartsIds",
                 "admissionReservationAncillaryOfferPartsAftersalesConditions",
                 "overallFlexibility", "coveredTripId", "minimalPrice",
                 "admissionPartsPrice", "reservationPartsPrice", "ancillaryPartsPrice",
                 "referencedAncillaryIds", "passengerCount",
                 // Booking
-                "BookingRequest", "bookingId",
+                "BookingRequest", "bookingId", "bookedOfferId", "__addReservationDone", "__addAncillaryDone",
+                "addAncillaryParentOfferId", "addAncillaryOfferIds",
                 "admissionReservationAncillaryBookingPartsIds",
                 "provisionalPrice", "provisionalPriceAmount",
                 "confirmedPriceAmount", "bookingConfirmedPrice",
@@ -200,8 +304,11 @@ request:
                 "patchDateOfBirth", "patchFirstName", "patchLastName",
                 "patchEmail", "patchPhoneNumber", "patchGender",
                 // Place selection
-                "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace",
+                "placeSelectionMode", "__placeMapAtOfferFailed", "__postBookingPlaceMapDone",
+                "placeSelections", "layoutId", "preselectedCoach", "preselectedPlace", "preselectedPlaces",
                 "reservationId", "reservationIds", "tripLegCoverage",
+                "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
+                "__bookingFindingKeys",
                 // Fulfillment
                 "fulfillmentIds",
                 // Exchange / Refund
@@ -209,6 +316,12 @@ request:
                 "requestExchangeOffersBodyData", "requestExchangeOperationsBodyData",
                 "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed",
                 "requestRefundOffersBodyData",
+                // Partial refund (#218) — runtime-only side channels
+                "__bookingForRefund",
+                "__partialRefundDegradedToFull", "__partialRefundResolvedSpec",
+                "__partialRefundExpectedAmount", "__partialRefundExpectedPartIds",
+                "__partialRefundScopeFulfillmentId",
+                "__refundOfferRetryCount",
                 "afterSaleCondition_EXCHANGE_amount", "afterSaleCondition_EXCHANGE_currency", "afterSaleCondition_EXCHANGE_scale",
                 "afterSaleCondition_REFUND_amount",   "afterSaleCondition_REFUND_currency",   "afterSaleCondition_REFUND_scale",
                 // Misc
@@ -259,7 +372,7 @@ request:
           const _isAuthReq = /\/(token|login|auth|logon|oauth)/.test(_rqUrlForScenario)
             || _rqNameForScenario.includes('token') || _rqNameForScenario.includes('access');
 
-          const _idxNow = bru.getEnvVar('scenariosToRunIndex') || '0';
+          let   _idxNow = bru.getEnvVar('scenariosToRunIndex') || '0';
           const _targetNow = (bru.getEnvVar('scenarioTarget') || '').trim();
           const _lastUnitaryIdx = bru.getEnvVar('__unitaryLoadedIdx');
           const _lastUnitaryTarget = bru.getEnvVar('__unitaryLoadedTarget') || '';
@@ -275,6 +388,27 @@ request:
             || (_targetNow === '' && _lastUnitaryIdx !== _idxNow);
 
           if (!_isAuthReq && !_isScenarioStartLocal && _needsLoad) {
+            // Defensive clamp: if scenariosToRunIndex is at or past the end of
+            // __scenariosList (typically because /versions just advanced it on
+            // a 1-scenario list), reset it to 0 BEFORE calling getScenarioData.
+            // Without this, getScenarioData() detects idx >= length and calls
+            // bru.runner.stopExecution(), which halts every subsequent request
+            // in the run — observed on Bileto/Sqills where the run silently
+            // truncated after /coach-deck-layouts. Only applies in sequential
+            // mode; scenarioTarget mode looks up by name/explicit index and
+            // does not depend on scenariosToRunIndex being in-range.
+            if (_targetNow === '') {
+              try {
+                const _scList0 = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+                const _idxInt = parseInt(_idxNow, 10) || 0;
+                if (_scList0.length > 0 && _idxInt >= _scList0.length) {
+                  bru.setEnvVar('scenariosToRunIndex', '0');
+                  _idxNow = '0';
+                  console.log('[INFO] ↩ scenariosToRunIndex was at/past end of __scenariosList — clamped to 0 before unitary load');
+                }
+              } catch (_ce) { /* ignore — fallthrough lets getScenarioData handle malformed list */ }
+            }
+
             const _loadDesc = _targetNow !== '' ? ('target="' + _targetNow + '"') : ('index ' + _idxNow);
             console.log('[INFO] 🔄 Loading scenario for unitary run (' + _loadDesc + ')...');
             await getScenarioData();
@@ -282,19 +416,22 @@ request:
               // scenarioTarget mode: never advance the index — same scenario re-runs
               // until the user changes scenarioTarget.
               bru.setEnvVar('scenariosToRunIndex', _idxNow);
-            } else {
-              // Sequential mode: getScenarioData() advanced index to idx+1.
-              // If we've reached the end of the list, wrap back to 0 so the
-              // next Send starts from the first scenario again.
-              try {
-                const _scList = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
-                const _nextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
-                if (_scList.length > 0 && _nextIdx >= _scList.length) {
-                  bru.setEnvVar('scenariosToRunIndex', '0');
-                  console.log('[INFO] 🔁 Last scenario reached — scenariosToRunIndex reset to 0 for next Send');
-                }
-              } catch (_we) { /* ignore */ }
             }
+            // v1.11.10: the previous wrap-to-0 branch was REMOVED here. In an
+            // OSCAR collection run, the terminal .bru steps (e.g. "14. GET
+            // Booking after Patch Refund") and the multi-scenario loop-back in
+            // loopback.js / "01. POST Get Offer" decide between looping back
+            // and stopping by comparing `scenariosToRunIndex < __scenariosList.length`.
+            // Wrapping the index back to 0 here defeated that check: the
+            // condition was always true and the run looped forever, only
+            // ending via SIGTERM from RUN_TIMEOUT_MS (which also prevented
+            // Bruno from flushing its --reporter-json file, breaking the
+            // JSON download). For unitary Bruno-UI use it is acceptable for
+            // the index to grow past the list length: the parseScenarioData()
+            // branch in scenarioParser.js handles "idx >= length" by either
+            // calling stopExecution() (multi-scenario completed) or wrapping
+            // to 0 (fresh / unitary). Letting that branch own the decision
+            // keeps the OSCAR runner's terminal-stop machinery working.
             // Store _idxNow (the index that was CONSUMED), NOT the post-load value.
             // This way the next Send sees _idxNow !== _lastUnitaryIdx and reloads.
             bru.setEnvVar('__unitaryLoadedIdx', _idxNow);
@@ -305,20 +442,36 @@ request:
           console.log('[WARNING] Unitary run scenario load: ' + (_uErr && _uErr.message));
         }
 
-        test(`API base is available : ${bru.getEnvVar("api_base")}`, function () {
-            expect(bru.getEnvVar("api_base")).to.not.be.null;
-            console.log(`API base is available : ${bru.getEnvVar("api_base")}`);
-        });
-
-        test(`Library base is available : ${bru.getEnvVar("library_base")}`, function () {
-            expect(bru.getEnvVar("library_base")).not.null;
-            console.log(`Library base is available : ${bru.getEnvVar("library_base")}`);
-        });
-
-        test(`Data file is available : ${bru.getEnvVar("data_base")}`, function () {
-            expect(bru.getEnvVar("data_base")).not.null;
-            console.log(`Data file is available : ${bru.getEnvVar("data_base")}`);
-        });
+        // Env-sanity guards (api_base / library_base / data_base).
+        // Log-audit round 2: these used to register three PASSING tests on
+        // EVERY request — 3 "✓ … is available" rows under Pre-Request Tests
+        // PLUS 3 bare console echoes, ×~21 requests ≈ 120+ identical lines
+        // per run, and 3×21 filler assertions inflating every report count.
+        // Now: silent per-request check; the environment is announced ONCE
+        // per run at [INFO]; a test is registered ONLY when a variable is
+        // actually missing — failing exactly where it broke, with the fix
+        // path in the message.
+        {
+          const _envSanity = [
+            ['api_base',     'API base',     'check API Config → Company API Endpoint'],
+            ['library_base', 'Library base', 'collection environment issue — library_base should be ./library-bruno/'],
+            ['data_base',    'Data file',    'check the company data file (Test Config) / data_base env var'],
+          ];
+          const _missing = _envSanity.filter(([k]) => {
+            const v = bru.getEnvVar(k);
+            return v == null || v === '';
+          });
+          if (_missing.length > 0) {
+            _missing.forEach(([k, label, fix]) => {
+              test(`${label} env var "${k}" is set`, function () {
+                throw new Error(`${label} ("${k}") is not set — ${fix}.`);
+              });
+            });
+          } else if (bru.getEnvVar('__envSanityAnnounced') !== 'true') {
+            bru.setEnvVar('__envSanityAnnounced', 'true');
+            console.log(`[INFO] Environment OK — API: ${bru.getEnvVar("api_base")} | data file: ${bru.getEnvVar("data_base")} | library: ${bru.getEnvVar("library_base")}`);
+          }
+        }
 
         // Initialise scenario data only on the root collection offer search endpoint.
         // Using a broad "/offers" match also catches "/refund-offers" and
@@ -354,15 +507,32 @@ request:
         // ── Shared response status ────────────────────────────────────────────
         const _rptStatus = res && (typeof res.getStatus === 'function' ? res.getStatus() : res.status);
 
+        // ── #208: auth-rejection fail-fast ────────────────────────────────────
+        // A 401/403 on any (non-token) request means the access/bearer token was
+        // rejected — typically a stale/expired token pasted in the API config, or
+        // rotated OAuth credentials. Stop the run with a clear message rather than
+        // cascading the same failure across every following request. We do NOT
+        // return early: the report still records THIS request + the failing auth
+        // assertion; stopExecution() just prevents the next request from running.
+        try {
+          const { checkAuthRejection } = require(bru.getEnvVar("library_base") + "auth.js");
+          checkAuthRejection(res, (req && typeof req.getName === 'function') ? req.getName() : '');
+        } catch (_authGuardErr) { console.log(`[WARNING] auth guard: ${_authGuardErr && _authGuardErr.message}`); }
+
         // ── H1/H2: run via bruTest so results accumulate in __rptTests ────────
         try {
           const { bruTest: _bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
 
-          // H1: Content-Type check (OSDM spec)
+          // H1: Content-Type is JSON (OSDM). Accept application/json AND any
+          // media type using the +json structured-syntax suffix — the OSDM
+          // vendor type application/vnd.uic.osdm+json (with any ;version) and
+          // RFC 9457 application/problem+json (error bodies) are all JSON.
           if (_rptStatus && _rptStatus !== 204 && _rptStatus !== 304) {
             const _ct = (res.headers || {})['content-type'] || (res.headers || {})['Content-Type'] || '';
-            _bruTest(`[OSDM] Content-Type is application/json`, () => {
-              expect(_ct, `Expected application/json, got: '${_ct}'`).to.include('application/json');
+            const _mediaType = String(_ct).split(';')[0].trim().toLowerCase();
+            const _isJson = /^application\/(.*\+)?json$/.test(_mediaType);
+            _bruTest(`[OSDM] Content-Type is JSON`, () => {
+              expect(_isJson, `Expected a JSON media type (application/json or application/...+json), got: '${_ct}'`).to.be.true;
             });
           }
 
@@ -439,7 +609,15 @@ request:
             consoleLogs:    _consoleLogs
           });
 
-          if (_htmlPath) console.log(`[INFO] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
+          // Log-audit round 2: fires after EVERY request (incremental report
+          // write) and shows a container-internal path — testers reach the
+          // report via the run page's Artifacts section → [DEBUG].
+          // #355: gate on the dataset loggingType — this direct console.log
+          // bypassed the validationLogger pyramid and appeared on INFO runs.
+          const _rptLt = String(bru.getEnvVar('loggingType') || 'INFO').toUpperCase();
+          if (_htmlPath && (_rptLt === 'DEBUG' || _rptLt === 'FULL')) {
+            console.log(`[DEBUG] 📊 Report updated → ${_htmlPath} (${_testResults.length} assertions)`);
+          }
         } catch (_re) {
           console.log(`[WARNING] Report generation error: ${_re && _re.message}`);
         }

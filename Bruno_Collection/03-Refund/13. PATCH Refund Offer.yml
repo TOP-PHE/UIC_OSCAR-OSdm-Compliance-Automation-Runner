@@ -24,19 +24,83 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: |-
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+
+        // #expired-refund-offer test (Phase 3): when armed, wait until just past
+        // the refundOffers[0].validUntil (stashed by refunds.js
+        // postPatchRefundOfferResponse on the prior POST /refund-offers), then
+        // let the PATCH fire — the after-response asserts the provider correctly
+        // rejects the confirmation of a stale refund offer.
+        if (String(bru.getEnvVar("expiredRefundOfferTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("refundOfferValidUntil");
+          const limitSrc   = bru.getEnvVar("refundOfferValidUntilSource") || "refund offer validUntil";
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredRefundOfferMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "refund offer (" + limitSrc + ")",
+          });
+          if (!plan.armed) {
+            validationLogger(`[WARNING] expiredRefundOfferTest SKIPPED: ${plan.reason}`);
+            bru.setEnvVar("__expiredRefundOfferArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredRefundOfferTest (PATCH /refund-offers/{id})" });
+            bru.setEnvVar("__expiredRefundOfferArmed", "true");
+            validationLogger(`[INFO] expiredRefundOfferTest: attempting PATCH /refund-offers/{id}, expecting the provider to reject it (refund offer expired).`);
+          }
+        }
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postPatchRefundOfferResponse } = require(bru.getEnvVar("library_base")+"refunds.js");
 
+        // #expired-refund-offer: when armed, the PATCH MUST be rejected — an
+        // expired refund offer must not be confirmable. Grade the rejection
+        // here and short-circuit (skip postPatchRefundOfferResponse + downstream
+        // GET booking after refund / DEL refund offer) so the next scenario in
+        // the loop fires cleanly.
+        if (String(bru.getEnvVar("__expiredRefundOfferArmed")) === "true") {
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired refund offer" });
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired refund offer: PATCH /refund-offers/{id} is rejected with a client error (4xx) — an expired refund offer must not be confirmable (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test(`${_tag}Expired refund offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // PR B: auto-expansion — advance the queue if more timers are armed.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired refund offer" })) return;
+            // Multi-scenario tail: loop to next scenario or stop. We do NOT
+            // continue the refund-flow validation because the refund was
+            // (correctly) never confirmed.
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
+
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");

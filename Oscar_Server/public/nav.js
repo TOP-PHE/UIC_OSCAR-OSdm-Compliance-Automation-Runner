@@ -236,6 +236,7 @@
         { href: '/compare.html',        label: 'Compare',        page: 'compare'        },
         { href: '/profile.html',        label: 'API Config',     page: 'profile'        },
         { href: '/scenarios.html',      label: 'Test Config',    page: 'scenarios'      },
+        { href: '/findings.html',       label: 'Test Findings',  page: 'findings'       },
       ];
       if (role === 'test_manager') {
         items.push({ href: '/admin.html?tab=users', label: 'Manage Users', page: 'admin-users' });
@@ -255,6 +256,14 @@
       '<span style="font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Company</span>'
       + '&nbsp;<strong style="color:#37474f;font-size:12px">' + esc(company.name || 'N/A') + '</strong>';
 
+    // Local timezone reference chip — every page renders timestamps in the
+    // viewer's local time (parseServerTs + toLocaleString), so show the zone once
+    // here as the reference for all time columns.
+    var tzRef = (typeof global.localTzRef === 'function') ? global.localTzRef() : '';
+    var tzChip = tzRef
+      ? '<span class="nav-user" title="All times on OSCAR pages are shown in this local timezone" style="font-size:11px;color:#78909c">🕒 ' + esc(tzRef) + '</span>' + sep
+      : '';
+
     container.innerHTML =
       '<a href="/welcome.html" class="brand">'
         + '<img src="/oscar-icon.svg" alt="OSCAR"> OSCAR'
@@ -266,6 +275,7 @@
       + sep
       + linkParts.join(sep)
       + '<span class="spacer"></span>'
+      + tzChip
       + '<span class="nav-user">' + companyLabel + '</span>'
       + sep
       + '<span class="nav-user">' + esc(user.email || '') + inlineBadge(meta) + '</span>'
@@ -279,6 +289,50 @@
   }
 
   global.renderOscarNav = renderOscarNav;
+
+  // ── Server-timestamp parser (v1.11.7) ────────────────────────────────────────
+  // SQLite's `datetime('now')` returns UTC timestamps WITHOUT a TZ marker
+  // (e.g. "2026-05-16 08:44:24"). The OSCAR server passes these through to
+  // the browser unchanged. `new Date("2026-05-16 08:44:24")` in JavaScript
+  // then interprets the string as LOCAL time (not UTC), which causes the
+  // dashboard to display the UTC value as if it were local — i.e. a 10:44
+  // Paris event shows as "08:44" because the browser thinks 08:44 is local.
+  //
+  // This helper detects the missing TZ marker and normalises to ISO with 'Z'
+  // so the browser correctly converts UTC → viewer's local timezone. Storage
+  // stays UTC (correct); display localises to whoever is viewing the page.
+  //
+  // Use everywhere a server-side timestamp is rendered:
+  //   parseServerTs(run.queued_at).toLocaleString()
+  //
+  // Already-marked ISO strings (ending in Z or with ±HH:MM offset) pass
+  // through unchanged.
+  global.parseServerTs = function parseServerTs(s) {
+    if (s instanceof Date) return s;
+    if (typeof s !== 'string' || !s) return new Date(s);
+    if (/Z$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s);
+    return new Date(s.replace(' ', 'T') + 'Z');
+  };
+
+  // ── Local timezone reference (v1.11.56) ───────────────────────────────────────
+  // All timestamps are stored UTC and rendered with parseServerTs(...).
+  // toLocaleString() (i.e. the viewer's local zone) — but that prints no zone, so
+  // it's unclear *which* local time. This returns a human label for the viewer's
+  // zone, e.g. "Europe/Paris (UTC+02:00)" (auto-reflects DST), shown once in the
+  // nav bar so every page's time columns have an explicit reference.
+  global.localTzRef = function localTzRef() {
+    var zone = '';
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_e) {}
+    var off = -new Date().getTimezoneOffset();   // minutes east of UTC
+    var sign = off >= 0 ? '+' : '-';
+    var abs = Math.abs(off);
+    var hh = String(Math.floor(abs / 60));
+    var mm = String(abs % 60);
+    if (hh.length < 2) hh = '0' + hh;
+    if (mm.length < 2) mm = '0' + mm;
+    var utc = 'UTC' + sign + hh + ':' + mm;
+    return zone ? (zone + ' (' + utc + ')') : utc;
+  };
 
   // ── Global logout helper ─────────────────────────────────────────────────────
   // Revokes the session token on the server (clears httpOnly cookie), then clears
@@ -295,3 +349,64 @@
       });
   };
 })(window);
+
+// ── #363: in-page toasts ──────────────────────────────────────────────────────
+// Native alert() renders in the browser chrome at the very top of the window
+// and testers miss it. oscarToast() renders INSIDE the OSCAR UI — top-centre,
+// just under the nav — auto-dismisses (errors stay longer) and can be closed.
+// oscarToastAfterNav() hands the message over a page navigation via
+// sessionStorage (submit → redirect flows); nav.js shows it on the next page.
+function oscarToast(message, kind) {
+  try {
+    kind = kind || 'info';
+    let host = document.getElementById('oscar-toasts');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'oscar-toasts';
+      // #366: upper third of the viewport, overlapping the page content —
+      // tester feedback: under-the-nav toasts were still missed.
+      host.style.cssText = 'position:fixed;top:28vh;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none;max-width:90vw';
+      document.body.appendChild(host);
+    }
+    const colors = { info: '#0090D4', success: '#2e7d32', error: '#c62828', warning: '#ef6c00' };
+    const icons  = { info: 'ℹ️', success: '✅', error: '⛔', warning: '⚠️' };
+    const t = document.createElement('div');
+    t.style.cssText = 'pointer-events:auto;min-width:340px;max-width:640px;background:#fff;border-left:5px solid ' + (colors[kind] || colors.info) +
+      ';box-shadow:0 8px 32px rgba(0,0,0,.38);border-radius:8px;padding:14px 18px;font:14.5px/1.5 system-ui,sans-serif;color:#263238;display:flex;gap:12px;align-items:flex-start;white-space:pre-wrap';
+    if (t.animate) t.animate(
+      [{ opacity: 0, transform: 'translateY(-14px) scale(.96)' }, { opacity: 1, transform: 'translateY(0) scale(1)' }],
+      { duration: 180, easing: 'ease-out' });
+    const ic = document.createElement('span');
+    ic.textContent = icons[kind] || icons.info;
+    const span = document.createElement('span');
+    span.textContent = String(message);
+    span.style.cssText = 'flex:1;word-break:break-word';
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.title = 'Dismiss';
+    x.style.cssText = 'background:none;border:none;cursor:pointer;color:#90a4ae;font-size:13px;line-height:1;padding:0';
+    x.onclick = function () { t.remove(); };
+    t.appendChild(ic); t.appendChild(span); t.appendChild(x);
+    host.appendChild(t);
+    setTimeout(function () { t.remove(); }, kind === 'error' || kind === 'warning' ? 12000 : 7000);
+  } catch (_e) {
+    try { alert(message); } catch (_a) { /* headless context */ }
+  }
+}
+function oscarToastAfterNav(message, kind) {
+  try { sessionStorage.setItem('oscar_toast_pending', JSON.stringify({ m: String(message), k: kind || 'info' })); }
+  catch (_e) { oscarToast(message, kind); }
+}
+(function () {
+  function showPending() {
+    try {
+      const raw = sessionStorage.getItem('oscar_toast_pending');
+      if (!raw) return;
+      sessionStorage.removeItem('oscar_toast_pending');
+      const p = JSON.parse(raw);
+      oscarToast(p.m, p.k);
+    } catch (_e) { /* no pending toast */ }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showPending);
+  else showPending();
+})();

@@ -1,0 +1,92 @@
+info:
+  name: 01b. POST Get Return Offer
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{api_base}}/offers"
+  headers:
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: "{{ReturnOfferCollectionRequest}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // ── Two-step return (#178), leg 2 — the INWARD (return) offer ──────────
+        // Reached only when "01. POST Get Offer" detected a return scenario and
+        // routed here (after capturing the outbound offer). Build the inward
+        // request: O&D swapped, departureTime = inwardReturnDate, related to the
+        // outbound via returnSearchParameters.outwardOfferIds.
+        const { buildReturnOfferCollectionRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+        buildReturnOfferCollectionRequest();
+    - type: after-response
+      code: |-
+        const { postOfferResponse } = require(bru.getEnvVar("library_base")+"offers.js");
+        const { displayOfferResponse } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base")+"testCapture.js");
+
+        // Mark the inbound step done up-front so a failure here never loops back
+        // into another return fetch.
+        bru.setEnvVar('__returnInboundDone', 'true');
+
+        bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
+        });
+
+        if (res.getStatus() !== 200) {
+          bruTest("Return offer — status 200 (STOP on failure)", () => {
+            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
+          });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Return Offer");
+          return;
+        }
+
+        let jsonData;
+        try {
+            jsonData = res.getBody();
+        } catch (e) {
+            bruTest("Return offer — JSON parsing should succeed", () => { throw e; });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("POST Get Return Offer (JSON parse)");
+            return;
+        }
+
+        // Capture + validate the inward offer. postOfferResponse sets offer /
+        // offerId to the inbound; we copy offerId into inboundOfferId so the
+        // booking can reference BOTH legs. On "no offers" it throws → skip.
+        try {
+          postOfferResponse(jsonData);
+          bru.setEnvVar("inboundOfferId", bru.getEnvVar("offerId"));
+          console.log("[INFO] 🔁 Inbound (return) offer captured: " + bru.getEnvVar("offerId"));
+        } catch (noOffersErr) {
+          bruTest("Return offers found in response", () => { throw noOffersErr; });
+          console.log("[INFO] No inbound (return) offers returned — skipping this scenario");
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Return Offer (no offers)");
+          return;
+        }
+        displayOfferResponse(jsonData);
+
+        // Return trips book outbound + inbound together; no pre-booking place map.
+        bru.setGlobalEnvVar("skipPlaceMaps", true);
+        bru.runner.setNextRequest("02. POST Create Booking");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

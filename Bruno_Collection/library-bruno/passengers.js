@@ -1,3 +1,10 @@
+/**
+ * passengers.js — validate the per-passenger PATCH/GET responses (`03`/`04`).
+ *
+ * After OSCAR PATCHes each passenger's details (name, DOB, gender, contact),
+ * this checks the response echoed the sent data back correctly and that the
+ * passenger object is OSDM-conformant (e.g. type in the PassengerType enum).
+ */
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
@@ -12,10 +19,15 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   const dateOfBirth = response.passenger?.dateOfBirth;
   const gender      = response.passenger?.gender;
 
-  const isV34Plus = parseFloat(bru.getEnvVar("osdmVersion")) >= 3.4;
-  const contact   = response.passenger?.detail;
-  const phoneNumber = isV34Plus ? (contact?.contact?.phoneNumber || "") : (contact?.phoneNumber || "");
-  const email       = isV34Plus ? (contact?.contact?.email       || "") : (contact?.email       || "");
+  // Email/phone moved from detail.{email,phoneNumber} (now deprecated) into
+  // detail.contact.{email,phoneNumber} (ContactDetail) at OSDM 3.1. Read
+  // contact-first, then fall back to the deprecated flat fields — robust across
+  // 3.0.x and 3.1+ with no version guessing. (Replaces an earlier `>= 3.4`
+  // boundary that false-failed on 3.1–3.3 servers returning contact-only, and
+  // mis-parsed a bare "3" osdmVersion.)
+  const detail = response.passenger?.detail || {};
+  const phoneNumber = detail.contact?.phoneNumber ?? detail.phoneNumber ?? "";
+  const email       = detail.contact?.email       ?? detail.email       ?? "";
 
   const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber"));
   const passengerDataRaw = bru.getEnvVar("passengerAdditionalData") || "[]";
@@ -39,7 +51,7 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   const _passengerId = response.passenger?.id;
   test(`Passenger ${passengerIndex} - id is a non-empty string after PATCH (OSDM: Passenger.id immutable)`, () => {
     expect(_passengerId).to.be.a('string').and.not.be.empty;
-    validationLogger(`[INFO] Passenger ${passengerIndex} id after PATCH: ${_passengerId}`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} id after PATCH: ${_passengerId}`);
   });
   // G1: id must still be in the list from the original booking
   const _passengerIdListRaw = bru.getEnvVar("passengerIdList");
@@ -53,36 +65,36 @@ function patchMultiPassengerResponse(response, passengerIndex) {
     });
   }
 
-  validationLogger(`[INFO] Comparing passenger ${passengerIndex} values with expected values from data file.`);
+  validationLogger(`[DEBUG] Comparing passenger ${passengerIndex} values with expected values from data file.`);
 
   test(`Passenger ${passengerIndex} - First name is correct (expected: ${passenger.updateFirstName}, actual: ${firstName})`, () => {
-    validationLogger(`[INFO] Passenger ${passengerIndex} - First name is correct (expected: ${passenger.updateFirstName}, actual: ${firstName})`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} - First name is correct (expected: ${passenger.updateFirstName}, actual: ${firstName})`);
     expect(firstName).to.equal(passenger.updateFirstName);
   });
 
   test(`Passenger ${passengerIndex} - Last name is correct (expected: ${passenger.updateLastName}, actual: ${lastName})`, () => {
-    validationLogger(`[INFO] Passenger ${passengerIndex} - Last name is correct (expected: ${passenger.updateLastName}, actual: ${lastName})`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Last name is correct (expected: ${passenger.updateLastName}, actual: ${lastName})`);
     expect(lastName).to.equal(passenger.updateLastName);
   });
 
   test(`Passenger ${passengerIndex} - Date of birth is correct (expected: ${passenger.updateDateOfBirth}, actual: ${dateOfBirth})`, () => {
-    validationLogger(`[INFO] Passenger ${passengerIndex} - Date of birth is correct (expected: ${passenger.updateDateOfBirth}, actual: ${dateOfBirth})`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Date of birth is correct (expected: ${passenger.updateDateOfBirth}, actual: ${dateOfBirth})`);
     expect(dateOfBirth).to.equal(passenger.updateDateOfBirth);
   });
 
   test(`Passenger ${passengerIndex} - Phone number is correct (expected: ${passenger.updatePhoneNumber}, actual: ${phoneNumber})`, () => {
-    validationLogger(`[INFO] Passenger ${passengerIndex} - Phone number is correct (expected: ${passenger.updatePhoneNumber}, actual: ${phoneNumber})`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Phone number is correct (expected: ${passenger.updatePhoneNumber}, actual: ${phoneNumber})`);
     expect(phoneNumber).to.equal(passenger.updatePhoneNumber);
   });
 
   test(`Passenger ${passengerIndex} - Email is correct (expected: ${passenger.updateEmail}, actual: ${email})`, () => {
-    validationLogger(`[INFO] Passenger ${passengerIndex} - Email is correct (expected: ${passenger.updateEmail}, actual: ${email})`);
+    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Email is correct (expected: ${passenger.updateEmail}, actual: ${email})`);
     expect(email).to.equal(passenger.updateEmail);
   });
 
   if (gender != null) {
     test(`Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`, () => {
-      validationLogger(`[INFO] Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`);
+      validationLogger(`[DEBUG] Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`);
       expect(gender).to.equal(passenger.updateGender);
     });
   }
@@ -92,5 +104,5 @@ function patchMultiPassengerResponse(response, passengerIndex) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

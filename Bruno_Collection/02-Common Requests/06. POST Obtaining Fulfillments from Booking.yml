@@ -21,11 +21,72 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: |-
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+
+        // #204 EXPIRED-BOOKING TEST: when armed, wait until just past the booking's
+        // confirmation deadline, THEN let the fulfillment fire — the after-response
+        // asserts the provider rejects it. The deadline is read from a single env
+        // var (bookingConfirmationTimeLimit) populated by bookings.js from one of:
+        //   1. booking.confirmationTimeLimit (OSDM-standard at booking level)
+        //   2. booking.confirmableUntil (Bileto-style at booking level)
+        //   3. earliest bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil
+        //      (Paxone-style — the OSDM schema's actual placement for the field)
+        // Skips (with a WARNING) when the wait would overrun the run budget, or
+        // when the provider exposes no deadline anywhere.
+        if (String(bru.getEnvVar("expiredBookingTest")) === "true") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("bookingConfirmationTimeLimit");
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredBookingMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "booking confirmation",
+          });
+          if (!plan.armed) {
+            // Augment the helper's reason with the booking-specific deadline-source detail.
+            const detail = limitRaw
+              ? plan.reason
+              : "provider returned no booking-level confirmation deadline (neither booking.confirmationTimeLimit nor booking.confirmableUntil) — cannot deterministically test expiry. Proceeding without the expiry assertion.";
+            validationLogger(`[WARNING] expiredBookingTest SKIPPED: ${detail}`);
+            bru.setEnvVar("__expiredBookingArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredBookingTest (POST /fulfillments)" });
+            bru.setEnvVar("__expiredBookingArmed", "true");
+            validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);
+          }
+        }
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
         const { validateFulfillments } = require(bru.getEnvVar("library_base")+"bookings.js");
+
+        // #204 EXPIRED-BOOKING: if the wait armed the test, the fulfillment MUST be
+        // rejected — an expired booking must not be fulfillable. Grade the rejection
+        // and fall through to 07. GET Booking after Fulfillments to verify the
+        // admissions/reservations are EXPIRED/RELEASED/CANCELLED.
+        if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
+            // Shared helper graded the response, emitted the WARNING/INFO/ERROR
+            // log lines (auth-failure distinguishing, expiry-keyword check, etc.).
+            // The Bruno-level test() assertions stay here so they appear in the
+            // run report's Assertions tab.
+            const { gradeExpiredFlowResponse, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired booking" });
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired booking: fulfillment is rejected with a client error (4xx) — an expired booking must not be fulfillable (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test(`${_tag}Expired booking: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // Continue to 07 (GET booking) to assert the parts are expired/released.
+            // The PR B queue-advancement happens in 07.yml's tail, not here, so
+            // the EXPIRED/RELEASED/CANCELLED assertions land before we loop.
+            return;
+        }
 
         // Validate HTTP response status
         test('Status code is 200 or 202', () => {
@@ -52,7 +113,9 @@ runtime:
             return;
         }
 
-        validateFulfillments(jsonData.fulfillments, 0, expectedFulfillmentStatus=["FULFILLED", "CONFIRMED"])
+        // #253: pass the sibling FulfillmentResponse.fulfillmentDocuments[] (v3.8)
+        // so each fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
+        validateFulfillments(jsonData.fulfillments, 0, expectedFulfillmentStatus=["FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments)
 
 settings:
   encodeUrl: true

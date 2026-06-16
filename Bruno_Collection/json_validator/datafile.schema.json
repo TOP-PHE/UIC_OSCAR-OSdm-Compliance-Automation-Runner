@@ -14,6 +14,20 @@
       "type": "object",
       "description": "Root-level system info parameters set as env vars"
     },
+    "knownDeviations": {
+      "description": "#398: provider-level documented non-conformances declared in the wizard. A step whose HTTP status matches a documented deviation is reported as a passing 'known deviation' (WARNING) instead of a failure, so a clean run is not dragged to FAILED by an already-reported provider gap.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step", "expectedStatus"],
+        "properties": {
+          "step": { "type": "string", "description": "Request/step name, e.g. 'GET Passenger' or '04. GET Passenger' (the 'NN. ' prefix is optional)." },
+          "expectedStatus": { "type": "integer", "description": "The documented HTTP status for this gap, e.g. 501." },
+          "note": { "type": "string", "description": "Why it is accepted, e.g. 'GET /passengers not implemented (reported to ÖBB)'." },
+          "active": { "type": "boolean", "description": "Checklist toggle — untick (false) to keep the deviation on record without enforcing it (e.g. after the provider fixes it). Defaults to true." }
+        }
+      }
+    },
     "scenarios": {
       "type": "array",
       "items": {
@@ -46,6 +60,137 @@
               null
             ]
           },
+          "requestedInformationProbe": {
+            "description": "Negative-test probe for OSDM requestedInformation (#258 Phase 3c). 'off' (default): auto-provide demanded fields so the happy flow completes. 'omit': withhold required fields. 'invalid': send invalid values. With omit/invalid OSCAR asserts the provider rejects with a conformant RFC-9457 Problem.",
+            "type": ["string", "null"],
+            "enum": [
+              "off",
+              "omit",
+              "invalid",
+              "",
+              null
+            ]
+          },
+          "bookingPurchaserMode": {
+            "description": "Where the purchaser is supplied for a booking (#258 / #203). 'inline' (default): the purchaser is sent in the POST /bookings request (historic behaviour). 'deferred': omit it at booking, then POST it to /bookings/{id}/purchaser afterwards (happy path — also exercises any purchaser requestedInformation the booking raised). 'omit': never supply the purchaser. 'invalid': omit at booking, then POST an invalid purchaser and assert an RFC-9457 Problem.",
+            "type": ["string", "null"],
+            "enum": [
+              "inline",
+              "deferred",
+              "omit",
+              "invalid",
+              "",
+              null
+            ]
+          },
+          "expiredBookingTest": {
+            "description": "Negative test for an EXPIRED booking (#204). When on, OSCAR waits until just past booking.confirmationTimeLimit, then attempts POST /fulfillments and asserts the provider REJECTS it (4xx + RFC-9457 Problem) and that the booking's admissions/reservations are EXPIRED/RELEASED/CANCELLED. If waiting until the deadline would exceed the run budget (RUN_TIMEOUT_MS), the test is skipped with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredBookingMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for #204 expiredBookingTest, in MINUTES (1-60). When set AND expiredBookingTest is on, OSCAR uses this as the per-scenario wait budget instead of the server-wide RUN_TIMEOUT_MS, and the runner auto-extends the worker SIGTERM to cover it (clamped to the server-side RUN_HARD_MAX_TIMEOUT_MS cap, default 30 min). Leave null/empty to use the server default. Lets a tester opt into a longer wait (e.g. Bileto/Paxone deadlines ~15 min) without needing to also change the server env.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredOfferTest": {
+            "description": "Negative test for an EXPIRED offer (Phase 2 of the expired-flow generalization). When on, OSCAR waits until just past the earliest OfferPart.validUntil from the selected offer, then attempts POST /bookings and asserts the provider REJECTS it (4xx + RFC-9457 Problem) — an expired offer must not be bookable. If waiting until the deadline would exceed the run budget (RUN_TIMEOUT_MS / per-scenario expiredOfferMaxWaitMinutes), the test is skipped with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredOfferTest, in MINUTES (1-60). When set AND expiredOfferTest is on, OSCAR uses this as the per-scenario wait budget instead of the server-wide RUN_TIMEOUT_MS, and the runner auto-extends the worker SIGTERM to cover it (clamped to the server-side RUN_HARD_MAX_TIMEOUT_MS cap, default 30 min). Leave null/empty to use the server default. Lets a tester opt into a longer wait when a provider's OfferPart.validUntil is far in the future.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredAddReservationOfferTest": {
+            "description": "Negative test for an EXPIRED post-booking add-reservation offer-part (Phase 5a of the expired-flow generalization). When on, OSCAR waits until just past the validUntil of the reservationOfferPart that 09. POST Add Reservation to Booking is about to send, then attempts the add and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful when salesFlow_placeSelection is on AND placeSelectionMode is ADD_TO_BOOKING (otherwise step 09 doesn't run). Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredAddReservationOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredAddReservationOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredAddAncillaryOfferTest": {
+            "description": "Negative test for an EXPIRED post-booking add-ancillary offer-part (Phase 5b of the expired-flow generalization). When on, OSCAR waits until just past the EARLIEST validUntil across the ancillary offer-parts that 10. POST Add Ancillary to Booking is about to send (sourced primarily from 11. additional-offers, falling back to the selected offer's own ancillaryOfferParts), then attempts the add and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful when salesFlow_addAncillary is on. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredAddAncillaryOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredAddAncillaryOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredRefundOfferTest": {
+            "description": "Negative test for an EXPIRED refund offer (Phase 3 of the expired-flow generalization). When on, OSCAR waits until just past the RefundOffer.validUntil of the first refund offer returned by 10. POST Refund Offers, then attempts 13. PATCH Refund Offer (CONFIRMED) and asserts the provider REJECTS it (4xx + RFC-9457 Problem). Skips with a WARNING if the wait would exceed the run budget. Only meaningful in REFUND-type scenarios. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredRefundOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredRefundOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
+          "expiredExchangeOfferTest": {
+            "description": "Negative test for an EXPIRED exchange offer (Phase 4 of the expired-flow generalization). When on, OSCAR waits until just past the ExchangeOffer.preBookableUntil of the first exchange offer returned by 10. POST Exchange Offers, then attempts 11. POST Exchange Operations and asserts the provider REJECTS it (4xx + RFC-9457 Problem). NOTE: the spec field on ExchangeOffer is `preBookableUntil`, NOT `validUntil` — see OSDM_Spec_Deviations #25 for the per-resource-type naming inconsistency. Skips with a WARNING if the wait would exceed the run budget. Only meaningful in EXCHANGE-type scenarios. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": [
+              "on",
+              "off",
+              true,
+              false,
+              "",
+              null
+            ]
+          },
+          "expiredExchangeOfferMaxWaitMinutes": {
+            "description": "Per-scenario max wait budget for the expiredExchangeOfferTest, in MINUTES (1-60). Same auto-extend semantics as expiredOfferMaxWaitMinutes.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
           "osdmVersion": {
             "type": "string"
           },
@@ -62,6 +207,30 @@
               "string",
               "null"
             ]
+          },
+          "partialRefundByLeg": {
+            "description": "Per-leg partial refund scope (issue #218). When on, OSCAR scopes the refund to one leg of a multi-leg trip via OSDM's RefundSpecification.bookingPartIds. Requires a multi-leg trip — wizard blocks save when SPECIFICATION trip is single-leg; SEARCH-mode trips are checked at offer-runtime and the test degrades to full-refund with a [WARNING] when only one leg comes back. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "partialRefundLegSelection": {
+            "description": "Which leg to refund when partialRefundByLeg is on. 'first' / 'last' are valid for any multi-leg trip; 'outbound' / 'inbound' are only valid when the trip is a return-trip. Default 'first'.",
+            "type": ["string", "null"],
+            "enum": ["first", "last", "outbound", "inbound", "", null]
+          },
+          "partialRefundByPax": {
+            "description": "Per-passenger partial refund scope (issue #218). When on, OSCAR scopes the refund to one passenger of a multi-passenger booking via OSDM's RefundSpecification.passengerIds. Requires ≥2 passengers — wizard blocks save when the passengersList has only 1 entry. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "partialRefundPaxSelection": {
+            "description": "Which passenger to refund when partialRefundByPax is on. 'first' refunds passenger #1, 'last' refunds the last passenger. Default 'first'.",
+            "type": ["string", "null"],
+            "enum": ["first", "last", "", null]
+          },
+          "passengerExternalRefFormat": {
+            "description": "Non-happy-flow probe. When set to a printf-style pattern, OSCAR rewrites every passenger reference at scenario-parse time to use that pattern. The new ref propagates through every downstream call (offer, booking, refund, exchange). Empty / missing = no rewrite, wizard-default '00001', '00002', ... is used (every production provider accepts this). Examples: 'PAX%04d' -> 'PAX0001', 'ABC-%03d' -> 'ABC-001', '%d' -> '1' (no padding). The pattern must contain a %d or %0Nd placeholder; without one, the probe is ignored at runtime and a [WARNING] is logged. Designed to document provider variance — e.g. Paxone rejects 'PAX1'-style refs with a catch-all Schema validation error, while Bileto / Sqills / Turnit / Benerail accept any non-empty string per OSDM v3.8 spec.",
+            "type": ["string", "null"]
           },
           "overruleCode": {
             "type": "string"
@@ -156,16 +325,34 @@
               "inboundDate": {
                 "type": "string"
               }
-            },
-            "required": [
-              "currency"
-            ]
+            }
           },
           "requestedFulfillmentOptionsListId": {
             "type": "integer"
           },
           "offerSearchCriteriaListId": {
             "type": "integer"
+          },
+          "salesFlowActions": {
+            "type": "object",
+            "description": "Optional intermediate booking-flow actions to exercise (issue #107). Optional features default off in the runner.",
+            "properties": {
+              "patchPassengers": { "type": "boolean" },
+              "placeSelection":  { "type": "boolean" },
+              "addAncillary":    { "type": "boolean" },
+              "getBooking":      { "type": "boolean" },
+              "deleteAncillary": { "type": "boolean" }
+            }
+          },
+          "placeSelectionMode": {
+            "type": ["string", "null"],
+            "description": "How place selection is exercised (issue #107). SEATMAP_AT_OFFER = seat map before booking; ADD_TO_BOOKING = reservation added to an existing booking.",
+            "enum": [
+              "SEATMAP_AT_OFFER",
+              "ADD_TO_BOOKING",
+              "",
+              null
+            ]
           }
         },
         "required": [

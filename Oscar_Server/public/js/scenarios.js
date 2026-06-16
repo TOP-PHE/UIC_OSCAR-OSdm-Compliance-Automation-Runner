@@ -26,7 +26,25 @@ function incrementVersion(v) { const [major, minor] = v.split('.').map(Number); 
 const ENUMS = {
   scenarioType:       [null, 'SALE', 'REFUND', 'EXCHANGE'],
   scenarioAction:     [null, 'PATCH', 'DELETE'],
+  requestedInformationProbe: [null, 'omit', 'invalid'],
+  bookingPurchaserMode: ['inline', 'deferred', 'omit', 'invalid'],
+  expiredBookingTest:             ['off', 'on'],
+  expiredOfferTest:               ['off', 'on'],
+  expiredAddReservationOfferTest: ['off', 'on'],
+  expiredAddAncillaryOfferTest:   ['off', 'on'],
+  expiredRefundOfferTest:         ['off', 'on'],
+  expiredExchangeOfferTest:       ['off', 'on'],
+  // Partial refund (#218) — two orthogonal axes (legs / passengers) each with
+  // its own scope picker. Outbound / inbound on the leg axis are only valid
+  // for return-trips; the wizard hides them when the trip isn't a return.
+  partialRefundByLeg:             ['off', 'on'],
+  partialRefundByPax:             ['off', 'on'],
+  partialRefundLegSelection:      ['first', 'last', 'outbound', 'inbound'],
+  partialRefundPaxSelection:      ['first', 'last'],
   loggingType:        ['INFO', 'DEBUG'],
+  // #361: what a failed NON-critical step does — abandon the scenario
+  // (historical) or record the failure and keep testing the remaining steps.
+  stepFailurePolicy:  ['HARD_STOP', 'CONTINUE'],
   desiredFlexibility: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   overruleCode:       [null, 'PAYMENT_FAILURE', 'DISRUPTION'],
   tripType:           ['SEARCH', 'SPECIFICATION'],
@@ -87,8 +105,14 @@ const LABELS = {
 
 function lbl(val) { return val == null ? '— none —' : (LABELS[val] || val); }
 function esc(s) {
+  // HTML-context entity encoder for every value interpolated into innerHTML.
+  // Escapes the full set incl. single quote (&#39;) so values are safe in BOTH
+  // double- and single-quoted attributes and in text content. (Sonar S5696 may
+  // still flag innerHTML sinks here — it doesn't recognise this custom encoder
+  // as a sanitiser; those alerts are false positives, see issue #82.)
   return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -150,6 +174,37 @@ function fwSupportsIrops(scenarioType) {
   return flows.includes(String(scenarioType).toUpperCase() + '_IROPS');
 }
 
+// Does the framework declare partial refund/exchange support? (#218 v1.11.105)
+// The "golden rule" check: a scenario must not arm partialRefundBy{Leg,Pax}
+// or partialExchangeBy{Leg,Pax} unless the framework declares the matching
+// flow in salesFlows[] (REFUND_PARTIAL / EXCHANGE_PARTIAL).
+function fwDeclaresPartialRefund(scenarioType) {
+  if (!scenarioType || scenarioType === 'SALE') return false;
+  const fw = (wizData && wizData.framework) || {};
+  const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
+  return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
+}
+
+// Count of scenarios in the current datafile whose armed feature is not
+// declared in the framework — used by the top-of-scenarios banner.
+// Kept in sync with Oscar_Server/src/utils/frameworkGating.js scenarioWarnings()
+// (the server-side authority). Add new field/flow pairs as features land.
+function fwUndeclaredArmedCount() {
+  const scenarios = (state && state.scenarios) || [];
+  const fw = (wizData && wizData.framework) || {};
+  const flows = new Set(Array.isArray(fw.salesFlows) ? fw.salesFlows : []);
+  function armed(v) { return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1; }
+  let n = 0;
+  for (const sc of scenarios) {
+    const t = String((sc && sc.scenarioType) || 'SALE').toUpperCase();
+    if (t === 'REFUND' && (armed(sc.partialRefundByLeg) || armed(sc.partialRefundByPax))
+        && !flows.has('REFUND_PARTIAL')) {
+      n++;
+    }
+  }
+  return n;
+}
+
 // ── Decode scenario code → human description ──────────────────────────────────
 function decodeCode(code) {
   // Only decode codes that follow the OSDM test-suite naming convention
@@ -166,6 +221,7 @@ function decodeCode(code) {
   }
   let i = 0;
   let type = '', action = '', tripMode = '', paxParts = [], legs = '', special = [];
+  let unrecognized = 0;
 
   // Type
   if      (parts[i] === 'RFND') { type = 'Refund';   i++; }
@@ -188,13 +244,34 @@ function decodeCode(code) {
     else if (!isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
     else if (!isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
     else if (p === 'SEAT')   { special.push('Seat selection'); }
-    else if (p === 'CCHTTE') { special.push('Couchette'); }
+    else if (p === 'CCHTTE' || p === 'COUCHETTE') { special.push('Couchette'); }
+    else { unrecognized++; }
     i++;
   }
+
+  // If nothing beyond the bare type marker was recognised yet some tokens
+  // were unrecognised, the code does not follow the OSDM naming convention
+  // (e.g. a custom rename like `SALE_SEARCH_IC_BAS_AMS_1PAX`). Return it
+  // verbatim rather than collapsing it to a misleading bare "Sale" /
+  // "Refund" / "Exchange" — same intent as the first-token guard above.
+  const decodedSomething = action || tripMode || paxParts.length || legs || special.length;
+  if (!decodedSomething && unrecognized > 0) return code;
 
   let desc = [type, action, tripMode, paxParts.join(' + '), legs].filter(Boolean).join(' — ');
   if (special.length) desc += ' — ' + special.join(', ');
   return desc;
+}
+
+// Display name for a scenario row. Show the scenario CODE exactly as the user
+// entered it — NEVER rewrite a user-provided code into a decoded "friendly"
+// name. (decodeCode used to partial-decode e.g. SALE_SEARCH_BAS_PAR_2ADT_2LEG
+// into "Sale — 2 Adults — 2 Legs", silently dropping the origin/destination and
+// making it look like the system had renamed the scenario.) A generated/decoded
+// default applies ONLY when there is no code at all.
+function scenarioTitle(sc) {
+  const code = (sc && sc.code != null) ? String(sc.code).trim() : '';
+  if (code) return code;
+  return decodeCode((sc && sc.code) || '') || 'Untitled scenario';
 }
 
 function scenarioTypeBadge(sc) {
@@ -483,6 +560,9 @@ function renderWizardStep1InSection() {
   if (!fw.offerCriteria.offerMode)   fw.offerCriteria.offerMode  = def.offerCriteria.offerMode;
   if (!fw.offerCriteria.currency)    fw.offerCriteria.currency   = def.offerCriteria.currency;
   if (fw.offerCriteria.requiresPlaceSelection == null) fw.offerCriteria.requiresPlaceSelection = false;
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  if (typeof fw.placeSelection.seatMap !== 'boolean') fw.placeSelection.seatMap = false;
+  if (!Array.isArray(fw.placeSelection.supportedModes)) fw.placeSelection.supportedModes = [];
   if (!fw.fulfillment || typeof fw.fulfillment !== 'object') fw.fulfillment = def.fulfillment;
   if (!Array.isArray(fw.fulfillment.media)) fw.fulfillment.media = def.fulfillment.media;
   if (!Array.isArray(fw.fulfillment.types)) fw.fulfillment.types = def.fulfillment.types;
@@ -536,12 +616,12 @@ async function saveFrameworkFromSection() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Failed to save framework: ${err.detail || err.title || res.status}`);
+      oscarToast(`Failed to save framework: ${err.detail || err.title || res.status}`, 'error');
       return;
     }
     showMsg('✅ Test Framework saved successfully.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Network error: ${e.message}`); }
+  } catch(e) { oscarToast(`Network error: ${e.message}`, 'error'); }
 }
 
 // ── Delete functions ─────────────────────────────────────────────────────────
@@ -571,7 +651,7 @@ async function deleteFramework() {
     state = null;
     showMsg('✅ Test Framework and all associated data deleted.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 2b) Delete ALL test data → deletes all resources + all scenarios/datafile
@@ -597,7 +677,7 @@ async function deleteAllTestData() {
     state = null;
     showMsg('✅ All test data and scenarios deleted.', true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 2a) Delete a single train resource → warn about impacted scenarios
@@ -606,20 +686,22 @@ async function deleteTrainResource(resourceId) {
   const targetTrain = trains.find(t => t.id === resourceId);
   if (!targetTrain) return;
 
-  const td = typeof targetTrain.data === 'string' ? JSON.parse(targetTrain.data) : (targetTrain.data || {});
-  const trainLabel = targetTrain.label || td.vehicleNumber || resourceId;
+  const td = normalizeTrainData(typeof targetTrain.data === 'string' ? JSON.parse(targetTrain.data) : (targetTrain.data || {}));
+  const vehicleNumbers = td.services.map(s => s.vehicleNumber).filter(Boolean);
+  const trainLabel = targetTrain.label || vehicleNumbers[0] || resourceId;
 
-  // Find scenarios that reference this train (by matching vehicle number / origin / destination)
+  // Find scenarios that reference this train (by matching any of its services'
+  // vehicle numbers against a trip/leg).
   let impacted = [];
   if (state && state.scenarios && state.tripRequirements) {
     // Find tripRequirement IDs that match this train's data
     const matchingTripIds = (state.tripRequirements || [])
       .filter(tr => {
         if (tr.tripType === 'SEARCH' && tr.trip) {
-          return tr.trip.vehicleNumber === td.vehicleNumber;
+          return vehicleNumbers.includes(tr.trip.vehicleNumber);
         }
         if (tr.tripType === 'SPECIFICATION' && tr.legs) {
-          return tr.legs.some(l => l.vehicleNumber === td.vehicleNumber);
+          return tr.legs.some(l => vehicleNumbers.includes(l.vehicleNumber));
         }
         return false;
       })
@@ -665,7 +747,7 @@ async function deleteTrainResource(resourceId) {
     const bodyData = document.getElementById('body-data');
     const toggleData = document.getElementById('toggle-data');
     if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); renderWizardStep2InSection(); }
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // 1) Delete a single scenario
@@ -704,7 +786,7 @@ async function deleteAllScenarios() {
     state = null;
     showMsg(`✅ All ${count} scenario(s) deleted.`, true);
     await refreshAllSections();
-  } catch(e) { alert(`Error: ${e.message}`); }
+  } catch(e) { oscarToast(`Error: ${e.message}`, 'error'); }
 }
 
 // ── Section 2: Test Data (Resources) ─────────────────────────────────────────
@@ -768,7 +850,7 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
 }
 
@@ -810,8 +892,24 @@ function renderScenariosSection(framework, resources, datafile) {
     badge.textContent = `✅ ${scenarios.length} scenario(s) · ${toRun.length} in run`;
     summary.innerHTML = `${esc(scenarios.length)} scenario(s) defined, ${esc(toRun.length)} selected for next run`;
 
+    // Framework-gating soft-validation banner (#218 follow-up — golden rule).
+    // Surfaces the count of scenarios in this datafile whose armed feature
+    // isn't declared in the Test Framework. The banner only renders when
+    // there's at least one such scenario; otherwise it stays out of the way.
+    const _undeclaredCount = fwUndeclaredArmedCount();
+    const _gatingBanner = _undeclaredCount > 0 ? `
+      <div style="margin:0 0 12px;padding:10px 14px;border:1px solid #ffb74d;border-radius:6px;background:#fff8e1;color:#bf6f00;font-size:13px;line-height:1.5">
+        ⚠ ${_undeclaredCount} scenario(s) arm a feature the Test Framework does not declare
+        (currently <strong>REFUND_PARTIAL</strong> on REFUND scenarios with partial-refund flags armed).
+        The run is not blocked — the runtime will emit a <code>[WARNING]</code> and degrade
+        where the wire can't carry the requested scope. Tick the matching Partial card in
+        Test Framework → ✂️ Refund/Exchange row to silence both this banner and the
+        runtime warning.
+      </div>` : '';
+
     // Build merged scenario list with checkbox + expandable details
     body.innerHTML = `
+      ${_gatingBanner}
       <div class="card" style="margin-bottom:14px">
         <div class="card-head">
           <span class="card-head-title">📋 Scenarios
@@ -951,33 +1049,36 @@ async function extractFromDatafile(datafile) {
     const trips = datafile.tripRequirements || [];
     const trainResources = trips.map((trip, idx) => {
       let origin = '', destination = '', departureTime = '', arrivalTime = '', vehicleNumber = '', operatorCode = '';
-      if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0) {
-        const leg = trip.legs[0];
-        origin = leg.origin || '';
-        destination = leg.destination || '';
-        departureTime = (leg.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (leg.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = leg.vehicleNumber || '';
-        operatorCode = leg.operatorCode || '';
-      } else if (trip.trip) {
-        origin = trip.trip.origin || '';
-        destination = trip.trip.destination || '';
-        departureTime = (trip.trip.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (trip.trip.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = trip.trip.vehicleNumber || '';
-        operatorCode = trip.trip.operatorCode || '';
+      let pcRef = '', pcName = '', pcShortName = '';
+      const src = (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0)
+        ? trip.legs[0]
+        : (trip.trip || null);
+      if (src) {
+        origin = src.origin || '';
+        destination = src.destination || '';
+        departureTime = (src.startDatetime || '').replace(/%TRIP_DATE%T/, '');
+        arrivalTime = (src.endDatetime || '').replace(/%TRIP_DATE%T/, '');
+        vehicleNumber = src.vehicleNumber || '';
+        operatorCode = src.operatorCode || '';
+        pcRef = src.productCategoryRef || '';
+        pcName = src.productCategoryName || '';
+        pcShortName = src.productCategoryShortName || '';
       }
 
       return {
         label: `Train ${vehicleNumber || ('Trip-' + (idx+1))}`,
         resource_type: 'TRAIN',
         data: {
-          vehicleNumber,
           originURN: origin,
           destinationURN: destination,
-          departureTime,
-          arrivalTime,
           operatorCode,
+          productCategoryRef: pcRef,
+          productCategoryName: pcName,
+          productCategoryShortName: pcShortName,
+          daysOfWeek: [],
+          services: (vehicleNumber || departureTime || arrivalTime)
+            ? [{ vehicleNumber, departureTime, arrivalTime }]
+            : [],
           ticketTypes: [],
           travelClasses: [],
           serviceClasses: [],
@@ -987,11 +1088,21 @@ async function extractFromDatafile(datafile) {
       };
     });
 
+    // Dedup key from a train resource's route + its first service (#136).
+    const trainDedupKey = (data) => {
+      const d = data || {};
+      const s = (Array.isArray(d.services) && d.services[0]) || {};
+      const veh = s.vehicleNumber || d.vehicleNumber || '';      // legacy fallback
+      const dep = s.departureTime || d.departureTime || '';
+      const arr = s.arrivalTime || d.arrivalTime || '';
+      return `${veh}|${d.originURN||''}|${d.destinationURN||''}|${dep}|${arr}`;
+    };
+
     // Deduplicate trainResources from the datafile itself (same vehicle + route + times)
     const seenTrainKeys = new Set();
     const uniqueTrainResources = [];
     for (const train of trainResources) {
-      const key = `${train.data.vehicleNumber||''}|${train.data.originURN||''}|${train.data.destinationURN||''}|${train.data.departureTime||''}|${train.data.arrivalTime||''}`;
+      const key = trainDedupKey(train.data);
       if (!seenTrainKeys.has(key)) {
         seenTrainKeys.add(key);
         uniqueTrainResources.push(train);
@@ -1015,12 +1126,12 @@ async function extractFromDatafile(datafile) {
 
     const existingTrains = existingResources.filter(r => r.resource_type === 'TRAIN').map(r => {
       const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
-      return `${d.vehicleNumber||''}|${d.originURN||''}|${d.destinationURN||''}|${d.departureTime||''}|${d.arrivalTime||''}`;
+      return trainDedupKey(d);
     });
 
     let created = 0, skipped = 0;
     for (const train of uniqueTrainResources) {
-      const key = `${train.data.vehicleNumber||''}|${train.data.originURN||''}|${train.data.destinationURN||''}|${train.data.departureTime||''}|${train.data.arrivalTime||''}`;
+      const key = trainDedupKey(train.data);
       if (existingTrains.includes(key)) {
         skipped++;
         continue; // duplicate — skip
@@ -1100,7 +1211,7 @@ function renderAll() {
           title="${inRun ? 'Remove from run' : 'Add to run'}"
           style="accent-color:#0090D4;width:18px;height:18px;flex-shrink:0;cursor:pointer">
         <div style="flex:1;min-width:0;cursor:pointer" data-action="toggle-detail" data-idx="${esc(idx)}">
-          <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(decodeCode(sc.code))} ${ownerBadge} ${versionBadge}</div>
+          <div style="font-weight:700;color:#1a2e40;font-size:13px">${esc(scenarioTitle(sc))} ${ownerBadge} ${versionBadge}</div>
           <div style="font-size:11px;color:#90a4ae;font-family:'Courier New',monospace">${esc(sc.code)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
@@ -1207,7 +1318,15 @@ function buildDetailHTML(idx) {
           if (scType !== 'REFUND' && scType !== 'EXCHANGE') return '';
           return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction);
         })()}
+        ${/* requestedInformationProbe moved to the Non Happy Flow customisation
+            section in v1.11.100 — sits alongside passengerExternalRefFormat in
+            the new "Field-shape & payload probes" sub-group. The Tester Guide
+            §4.8 always classified it as NHF; the wizard now matches. */ ''}
+        ${buildSelect(idx, 'bookingPurchaserMode', 'Purchaser at Booking', ENUMS.bookingPurchaserMode,
+          'Where the purchaser is supplied. Inline (default): sent in the booking request. Deferred: omitted at booking, then POSTed to /bookings/{id}/purchaser (happy — also triggers any purchaser requestedInformation). Omit: never supplied. Invalid: POST a bad purchaser, expect an RFC-9457 Problem.')}
         ${buildSelect(idx, 'loggingType',        'Logging Level',        ENUMS.loggingType)}
+        ${buildSelect(idx, 'stepFailurePolicy',  'Step Failure Policy',  ENUMS.stepFailurePolicy,
+          'What a failed non-critical step (passenger PATCH/GET) does. Hard stop (default): abandon the scenario, loop to the next one. Continue: record the failure, warn, and keep testing the remaining steps (fulfillment & co) — the scenario verdict stays FAILED. Offer/booking failures always hard-stop.')}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
@@ -1222,10 +1341,14 @@ function buildDetailHTML(idx) {
           return buildSelect(idx, 'overruleCode', 'Overrule Code', codes,
             'Reason code used when overruling the refund/exchange policy');
         })()}
+        ${buildPartialRefundFields(idx, sc)}
         ${buildText(idx,   'osdmVersion',        'OSDM Version',         'e.g. 3.4')}
       </div>
     </div>
   </div>
+
+  <!-- Non Happy Flow customisation — all expired-X negative tests grouped -->
+  ${buildNonHappyFlowSection(idx, sc)}
 
   <!-- Sales flow actions (SALE scenarios only) -->
   ${buildSalesFlowActionsSection(idx, sc)}
@@ -1265,6 +1388,17 @@ const SALES_FLOW_ACTIONS = [
     description: 'Read the booking back after creation for consistency checks' },
   { key: 'deleteAncillary', label: 'Delete ancillary', icon: '✕',
     description: 'Remove a previously added ancillary (tests the reverse path)' },
+];
+
+// Place-selection modes (issue #107). Two genuinely different OSDM mechanisms,
+// not "the same call at two times" — so the labels avoid the misleading
+// pre/post-booking framing. The Test Framework declares which it supports
+// (placeSelection.supportedModes); each scenario picks one from that menu.
+const PLACE_SELECTION_MODES = [
+  { key: 'SEATMAP_AT_OFFER', label: 'Seat map at offer', icon: '🪑',
+    description: 'Traveller picks a seat before the booking is created (the seat may affect the price). Seat map → BookingRequest.placeSelections.' },
+  { key: 'ADD_TO_BOOKING',   label: 'Add reservation to a booking', icon: '➕',
+    description: 'A seat reservation is added after the booking already exists (e.g. SNCF first-class TGV). Adds an offer part to the booking.' },
 ];
 
 // Defaults for newly-created scenarios: all actions OFF. The user opts in
@@ -1324,29 +1458,505 @@ function migrateMissingOfferSearchCriteria() {
 // REFUND and EXCHANGE run the same booking → fulfilment prelude before
 // their dedicated aftersales steps. Hidden only when the scenario type is
 // unset (null).
+// ── Tiny printf-style preview helper for the externalRef format probe ─────
+// Same parser as library-bruno/scenarioParser.js applyExternalRefFormat() —
+// duplicated here only because the wizard renders a live preview and we
+// don't want a server round-trip per keystroke. Keep the two in sync (a
+// unit test in bruno-externalrefformat.test.js anchors the canonical
+// behaviour; if the regex changes there, change it here too).
+function previewExternalRef(pattern, n) {
+  if (!pattern) return '';
+  return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
+    const w = parseInt(width || '0', 10);
+    return String(n).padStart(w, '0');
+  });
+}
+
+// ── Non Happy Flow customisation section ─────────────────────────────────
+//
+// All "expired-X" negative tests live here, grouped by the OSDM resource that
+// expires (Offer / Booking / AddReservation / AddAncillary / RefundOffer /
+// ExchangeOffer). Each row is one timer pair: an on/off dropdown + an
+// optional per-scenario Max wait (min) input. The runner auto-extends the
+// worker SIGTERM to cover the largest Max wait among the enabled timers
+// (see EXPIRED_FLOW_TIMERS in src/worker/runner.js); clamped at
+// RUN_HARD_MAX_TIMEOUT_MS.
+//
+// In addition to the expired-X timers, this section hosts the
+// `passengerExternalRefFormat` probe — a text input that overrides the
+// default 00001-style passenger reference used everywhere in the offer and
+// booking requests. Lets the tester probe how providers handle non-standard
+// shapes (e.g. Paxone rejects "PAX1" with a catch-all Schema validation
+// error; v1.11.98 made the wizard default to "00001" — this probe lets you
+// deliberately go back to the rejected shape, or try ABC-001, etc., and
+// document what each provider accepts).
+//
+// Refund/Exchange rows are conditionally shown — they only make sense for
+// REFUND / EXCHANGE scenarios respectively (the underlying request flows
+// don't even fire on a SALE scenario). When hidden, the underlying enum
+// stays 'off' so an existing tester-saved value doesn't accidentally arm
+// a test that can never reach its request.
+// ── Partial refund fields (#218) ────────────────────────────────────────────
+// Inline block inside the SCENARIO PARAMETERS section, only shown when the
+// scenario type is REFUND. Two orthogonal axes (legs / passengers) each with
+// their own scope picker. Inline validation hints when the configured scope
+// can't be satisfied:
+//   - per-pax requires ≥2 passengers in the resolved passengersList
+//   - per-leg with a SPECIFICATION trip requires the trip to have ≥2 legs
+//     (a multi-leg one-way OR a return-trip)
+//   - outbound / inbound scope require a return-trip; hidden otherwise
+// SEARCH-mode trips can't be statically checked for leg-count — the runtime
+// degradation in 10.yml handles that case with a WARNING.
+function buildPartialRefundFields(idx, sc) {
+  if (!sc || sc.scenarioType !== 'REFUND') return '';
+
+  // Resolve passengersList + tripRequirement via the canonical state.* helpers
+  // already defined at the top of this file (getPassengers / getTrip). The
+  // earlier wizData.* lookups never matched anything because wizData is the
+  // collection-export shape and uses singular `passengersList` / plural
+  // `tripRequirements` under `state`, not `wizData`. Reported via screenshot:
+  // the per-pax warning fired even on a 5-passenger scenario.
+  const paxGroup = getPassengers(sc.passengersListId);
+  const resolvedPassengerCount = Array.isArray(paxGroup.passengers) ? paxGroup.passengers.length : 0;
+  const tripRequirement = getTrip(sc.tripRequirementId);
+  const isSpec  = tripRequirement && tripRequirement.tripType === 'SPECIFICATION';
+  const specLegCount = isSpec && Array.isArray(tripRequirement.legs) ? tripRequirement.legs.length : 0;
+  const isReturn = !!(tripRequirement && (tripRequirement.returnSearchParameters || tripRequirement.tripType === 'RETURN'));
+
+  // Build leg-selection options: drop outbound/inbound when not a return-trip.
+  const legOptions = isReturn
+    ? ENUMS.partialRefundLegSelection
+    : ENUMS.partialRefundLegSelection.filter(v => v !== 'outbound' && v !== 'inbound');
+
+  const byLegOn = sc.partialRefundByLeg === 'on' || sc.partialRefundByLeg === true;
+  const byPaxOn = sc.partialRefundByPax === 'on' || sc.partialRefundByPax === true;
+
+  // Inline warnings — emit only when the user has TURNED THE OPTION ON and it
+  // can't be satisfied, so the editor isn't noisy.
+  let warnings = '';
+  if (byPaxOn && resolvedPassengerCount < 2) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ Per-passenger partial refund requires ≥2 passengers. The selected passengersList has ${resolvedPassengerCount}.</div>`;
+  }
+  if (byLegOn && isSpec && specLegCount < 2) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ Per-leg partial refund requires a multi-leg trip. The SPECIFICATION trip has ${specLegCount} leg(s).</div>`;
+  }
+  if (byLegOn && isSpec && !isReturn &&
+      (sc.partialRefundLegSelection === 'outbound' || sc.partialRefundLegSelection === 'inbound')) {
+    warnings += `<div style="color:#c81010;font-size:12px;margin-top:4px">⚠ 'outbound' / 'inbound' selection requires a return-trip; this scenario's trip is one-way. OSCAR will fall back to 'first'.</div>`;
+  }
+  if (byLegOn && !isSpec) {
+    warnings += `<div style="color:#90a4ae;font-size:11px;margin-top:4px">ℹ SEARCH-mode trip: leg count is unknown at authoring time. If the returned offer has only one leg, the test degrades to full refund with a [WARNING].</div>`;
+  }
+  // Framework-gating soft validation (#218 follow-up — "golden rule" v1.11.105).
+  // The Test Framework wizard's REFUND_PARTIAL after-sales card declares
+  // whether the provider supports partial-refund scope. When the scenario
+  // arms partial without the framework declaring it, surface an amber
+  // banner with a deep-link to Step 1 so the Test Manager can either
+  // tick the declaration or unset the scenario flag. Soft: save is not
+  // blocked; the runtime emits an equivalent [WARNING].
+  if ((byLegOn || byPaxOn) && !fwDeclaresPartialRefund(sc.scenarioType)) {
+    warnings += `<div style="color:#e65100;font-size:12px;margin-top:4px;padding:6px 8px;border:1px solid #ffb74d;border-radius:4px;background:#fff8e1">
+      ⚠ Test Framework does not declare <strong>REFUND_PARTIAL</strong> for ${esc(sc.scenarioType || 'REFUND')} scenarios.
+      The scenario will still run; runtime will degrade where the wire can't carry the scope.
+      <span style="display:block;margin-top:3px;font-size:11px;color:#bf6f00">
+        Fix: tick the Partial card in Test Framework → ✂️ Refund row, or unset the per-leg/per-pax flags here.
+      </span>
+    </div>`;
+  }
+
+  return `
+    <div class="param-field" style="grid-column: span 2; padding:8px;border:1px dashed #b0bec5;border-radius:6px;margin-top:6px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">Partial refund (#218)</div>
+      ${buildSelect(idx, 'partialRefundByLeg', 'Per-leg', ENUMS.partialRefundByLeg,
+        'When on, scope the refund to one leg of a multi-leg trip via OSDM RefundSpecification.bookingPartIds. Requires the booking to have ≥2 admissions (= legs).')}
+      ${byLegOn ? buildSelect(idx, 'partialRefundLegSelection', 'Leg target', legOptions,
+        'Which leg to refund. outbound / inbound require a return-trip.') : ''}
+      ${buildSelect(idx, 'partialRefundByPax', 'Per-passenger', ENUMS.partialRefundByPax,
+        'When on, scope the refund to one passenger via OSDM RefundSpecification.passengerIds. Requires ≥2 passengers in the booking.')}
+      ${byPaxOn ? buildSelect(idx, 'partialRefundPaxSelection', 'Passenger target', ENUMS.partialRefundPaxSelection,
+        'Which passenger to refund (first or last in the booking order).') : ''}
+      ${warnings}
+      <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
+        Both axes can be combined (per-leg AND per-pax) → refund one passenger on one leg.
+        When the booking can't satisfy the requested scope at runtime (single-leg trip / single passenger),
+        OSCAR logs a <code>[WARNING]</code> and degrades to full refund.
+      </div>
+    </div>`;
+}
+
+function buildNonHappyFlowSection(idx, sc) {
+  const scType = (sc && sc.scenarioType) || '';
+  const showRefund   = (scType === 'REFUND');
+  const showExchange = (scType === 'EXCHANGE');
+
+  // One timer row = the test-on/off select + the Max wait number input.
+  // `action` is the dataset.action of the Max-wait input (must be registered
+  // in the input event-delegation switch below).
+  function timerRow(testField, testLabel, testHint, waitField, waitHint, action) {
+    const val = (state.scenarios[idx] || {})[waitField];
+    return `
+      ${buildSelect(idx, testField, testLabel, ENUMS[testField], testHint)}
+      <div class="param-field">
+        <span class="param-label">Max wait (min) <span class="param-hint">${esc(waitHint)}</span></span>
+        <input class="param-input" type="number" min="1" max="60"
+          value="${esc(val != null ? val : '')}"
+          placeholder="leave empty = server default"
+          data-action="${esc(action)}" data-idx="${esc(idx)}">
+      </div>`;
+  }
+
+  // Refund / Exchange rows hidden when the scenarioType doesn't enable that
+  // flow at all — keeps the section honest.
+  const refundRow = showRefund ? timerRow(
+    'expiredRefundOfferTest',         'Expired refund-offer test',
+    'Negative test. On: after refund offers are returned (10. POST Refund Offers), OSCAR waits until just past refundOffers[0].validUntil, then attempts 13. PATCH Refund Offer (CONFIRMED) and asserts the provider rejects it. Skips with a WARNING if the wait would exceed the run budget. REFUND scenarios only.',
+    'expiredRefundOfferMaxWaitMinutes',
+    'Optional. Per-scenario wait budget for the expired-refund-offer test. Same auto-extend semantics as the other expired-X tests.',
+    'set-scenario-max-wait-refund-offer-minutes',
+  ) : '';
+
+  const exchangeRow = showExchange ? timerRow(
+    'expiredExchangeOfferTest',       'Expired exchange-offer test',
+    'Negative test. On: after exchange offers are returned (10. POST Exchange Offers), OSCAR waits until just past exchangeOffers[0].preBookableUntil (note the spec uses preBookableUntil here, NOT validUntil — see OSDM Spec Deviations #25), then attempts 11. POST Exchange Operations and asserts the provider rejects it. EXCHANGE scenarios only.',
+    'expiredExchangeOfferMaxWaitMinutes',
+    'Optional. Per-scenario wait budget for the expired-exchange-offer test.',
+    'set-scenario-max-wait-exchange-offer-minutes',
+  ) : '';
+
+  // ── Counters for the badge UI ─────────────────────────────────────────────
+  // Counted on the wizard side rather than computed in a derived state — kept
+  // tiny so the badge updates correctly on every keystroke / dropdown change.
+  const TIMER_FIELDS = [
+    'expiredOfferTest',
+    'expiredBookingTest',
+    'expiredAddReservationOfferTest',
+    'expiredAddAncillaryOfferTest',
+    'expiredRefundOfferTest',
+    'expiredExchangeOfferTest',
+  ];
+  const sc0 = state.scenarios[idx] || {};
+  const totalTimers = (showRefund && showExchange) ? 6
+                    : (showRefund || showExchange) ? 5 : 4;
+  const armedTimers = TIMER_FIELDS.filter(f => sc0[f] === 'on').length;
+
+  // Shape-probe armed when:
+  //   - requestedInformationProbe is set to a non-null value other than 'off'
+  //     (the null sentinel renders as "— none —" in the wizard);
+  //   - passengerExternalRefFormat contains a %d / %0Nd placeholder.
+  // Both armed conditions match what the runtime actually does — a malformed
+  // ref-format value still arms the probe in spirit, but the runtime logs a
+  // [WARNING] and degrades to default; counting it as armed would mislead.
+  const SHAPE_PROBES_TOTAL = 2;
+  let armedShapes = 0;
+  if (sc0.requestedInformationProbe != null && sc0.requestedInformationProbe !== 'off') armedShapes++;
+  if (sc0.passengerExternalRefFormat && /%0?\d*d/.test(sc0.passengerExternalRefFormat)) armedShapes++;
+
+  // ── Place-selection probes (#378) — corrupt the booking's placeSelections,
+  // one probe per pass, inside the booking step (one-scenario sweep).
+  const PLACE_PROBE_ITEMS = [
+    { key: 'omitPlaceSelections', label: 'Omit placeSelections', icon: '🚫',
+      desc: 'Send the booking WITHOUT placeSelections although the offer demands a compartment choice (IRT/NJ). Expected: 4xx + RFC-9457 Problem. Accepted with a provider-chosen placeAllocation → WARNING (auto-allocation is OSDM-tolerated). Accepted with no allocation → FAIL (nobody knows which compartment was sold).' },
+    { key: 'unknownAccommodationType', label: 'Unknown accommodation type', icon: '👻',
+      desc: 'Ask for accommodationType HAMMOCK — a value unknown to the AccommodationType code list (x-extensible-enum). Expected: 400 + Problem (recommended). Accepted → WARNING (tolerant reader). 5xx crash → FAIL.' },
+    { key: 'wrongReservationId', label: 'Wrong reservationId', icon: '🎭',
+      desc: 'Reference a reservationId that exists in NO reservation offer part of the selected offer. Expected: 4xx Problem. Accepted → FAIL (referential-integrity violation).' },
+  ];
+  const PLACE_PROBES_TOTAL = PLACE_PROBE_ITEMS.length;
+  const ppSel = (sc0.placeSelectionProbes && typeof sc0.placeSelectionProbes === 'object') ? sc0.placeSelectionProbes : {};
+  const armedPlaceProbes = PLACE_PROBE_ITEMS.filter(p => ppSel[p.key] === true).length;
+
+  const totalArmed = armedTimers + armedShapes + armedPlaceProbes;
+
+  // ── Badge renderer ────────────────────────────────────────────────────────
+  // One small inline-block pill; amber when anything is armed, neutral grey
+  // when not. Same shape as the rest of the wizard's count badges so we don't
+  // introduce a new visual vocabulary.
+  function badge(n, total, suffix) {
+    const armed = n > 0;
+    const bg    = armed ? '#FCC44D' : '#eceff1';
+    const fg    = armed ? '#005A8A' : '#90a4ae';
+    return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
+  }
+
+  // Auto-expand a sub-group when anything inside it is armed; otherwise stay
+  // collapsed. The user can still toggle manually via the standard
+  // toggle-param-section handler — re-renders preserve the manual state by
+  // matching on header text (see reRenderScenarioDetail).
+  const timersOpenClass = armedTimers > 0 ? ' open' : '';
+  const shapesOpenClass = armedShapes > 0 ? ' open' : '';
+  const placeProbesOpenClass = armedPlaceProbes > 0 ? ' open' : '';
+  const topOpenClass    = totalArmed > 0 ? ' open' : '';
+
+  // ── Field-shape probes sub-section (requestedInfoProbe + format probe) ────
+  // requestedInformationProbe MOVED here from SCENARIO PARAMETERS in v1.11.100.
+  // The Tester Guide §4.8 always classified it as NHF; the wizard now matches.
+  const shapeProbesSubsection = `
+        <div class="param-section" style="margin-top:14px;border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            🪪 Field-shape &amp; payload probes
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">alter the request, document provider strictness</span>
+            ${badge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
+            <span class="ps-arrow${shapesOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${shapesOpenClass}" style="padding:10px 14px">
+            <!-- RequestedInfo probe — matched to the format-probe presentation:
+                 dashed-border box with an uppercase mini-header, the dropdown
+                 sized to its longest enum value, and the explanation as a
+                 full-width hint underneath. Drops the cramped param-grid
+                 label-column buildSelect produces so the long hint stops
+                 squeezing into a narrow vertical strip. Same data-action
+                 ('set-scenario') and data-field ('requestedInformationProbe')
+                 as before — runtime / save semantics unchanged. -->
+            ${(function buildRequestedInfoProbe() {
+              const sc = state.scenarios[idx] || {};
+              const current = sc.requestedInformationProbe;
+              const opts = ENUMS.requestedInformationProbe.map(o =>
+                `<option value="${esc(o == null ? '' : o)}" ${(current == null ? '' : current) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+              ).join('');
+              return `
+              <div style="padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">RequestedInfo probe</div>
+                <select class="param-input param-select" style="max-width:340px"
+                  data-action="set-scenario" data-idx="${esc(idx)}" data-field="requestedInformationProbe" data-nullable="true">
+                  ${opts}
+                </select>
+                <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">
+                  Negative test for OSDM <code>requestedInformation</code>.
+                  <strong>Off</strong>: auto-provide demanded fields (happy path).
+                  <strong>Omit</strong> / <strong>Invalid</strong>: deliberately withhold or send bad values,
+                  then assert the provider rejects with a conformant RFC-9457 <code>Problem</code>.
+                </div>
+              </div>`;
+            })()}
+            <!-- Passenger external-ref format probe — non-timer NHF parameter.
+                 Runtime applies the printf-style pattern to every passenger
+                 reference sent to the provider; empty = default 00001-style. -->
+            ${(function buildExternalRefFormatProbe() {
+              const sc = state.scenarios[idx] || {};
+              const current = sc.passengerExternalRefFormat || '';
+              const hasPlaceholder = /%0?\d*d/.test(current);
+              const isError = current && !hasPlaceholder;
+              const previewLine = (current && hasPlaceholder)
+                ? `<div style="font-size:11px;color:#37474f;margin-top:6px">Preview · ${esc(previewExternalRef(current, 1))}, ${esc(previewExternalRef(current, 2))}, ${esc(previewExternalRef(current, 3))}, …</div>`
+                : '';
+              const errorLine = isError
+                ? `<div style="color:#c81010;font-size:12px;margin-top:6px">⚠ Pattern must contain <code>%d</code> or <code>%0Nd</code> (e.g. <code>%04d</code>). Without a placeholder, the runtime can't substitute the passenger index.</div>`
+                : '';
+              const hintLine = !current
+                ? `<div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">Empty (default): wizard generates <code>00001</code>, <code>00002</code>, … — accepted by every production provider. Set to e.g. <code>PAX%04d</code> to probe how a provider handles a non-standard shape. The same pattern is applied across the entire run (offer → booking → refund/exchange).</div>`
+                : '';
+              return `
+              <div style="margin-top:10px;padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:#90a4ae;margin-bottom:6px">Passenger external-ref format probe</div>
+                <input class="param-input" type="text" style="font-family:Consolas,monospace;font-size:13px;width:100%;max-width:340px"
+                  value="${esc(current)}"
+                  placeholder="off — leave empty for default 00001-style"
+                  data-action="set-scenario-text" data-field="passengerExternalRefFormat" data-idx="${esc(idx)}">
+                ${previewLine}
+                ${errorLine}
+                ${hintLine}
+              </div>`;
+            })()}
+          </div>
+        </div>`;
+
+  // ── Place-selection probes sub-section (#378) ─────────────────────────────
+  // Same visual vocabulary as the field-shape probes: dashed-border box per
+  // probe, pill toggle + explanation. Probes run INSIDE the booking step as a
+  // one-scenario sweep (see the footer note); runtime auto-skips keep them
+  // harmless on scenarios without placeSelections.
+  const placeProbesSubsection = `
+        <div class="param-section" style="border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            🪑 Place-selection probes
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">corrupt the booking&#39;s placeSelections, document how the provider reacts</span>
+            ${badge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
+            <span class="ps-arrow${placeProbesOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${placeProbesOpenClass}" style="padding:10px 14px">
+            ${PLACE_PROBE_ITEMS.map((p, i) => {
+              const on = ppSel[p.key] === true;
+              const style = (isTester && sc0.shared) ? ' style="pointer-events:none;opacity:.6"' : '';
+              return `
+            <div style="${i === 0 ? '' : 'margin-top:10px;'}padding:10px;border:1px dashed #b0bec5;border-radius:6px">
+              <div class="pill${on ? ' selected' : ''}" data-action="toggle-place-probe" data-idx="${esc(idx)}" data-key="${esc(p.key)}" title="${esc(p.label)}"${style}>${p.icon} ${esc(p.label)}</div>
+              <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">${p.desc}</div>
+            </div>`;
+            }).join('')}
+            <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
+              <strong>One scenario, one sweep:</strong> the enabled probes run <strong>inside the booking step</strong> —
+              one deliberately-corrupted <code>POST /bookings</code> per probe (each shows a 🧪 banner and a per-probe
+              verdict row in the report), then the step re-runs <strong>clean</strong> and the flow continues normally.
+              A rejected probe consumes nothing on the provider side; a wrongly-<em>accepted</em> probe stops the sweep
+              and the run continues with that booking. Probes auto-skip (with a <code>[WARNING]</code>) when the scenario
+              sends no <code>placeSelections</code>, on return trips, and when the Expired-offer timer owns the booking step.
+            </div>
+          </div>
+        </div>`;
+
+  // ── Expiry timers sub-section ─────────────────────────────────────────────
+  const expiryTimersSubsection = `
+        <div class="param-section" style="border:1px solid #cfd8dc;border-radius:6px;background:#f7f9fa">
+          <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
+            ⏰ Expiry timers
+            <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">wait past a deadline, assert next request is rejected</span>
+            ${badge(armedTimers, totalTimers, 'armed')}
+            <span class="ps-arrow${timersOpenClass}" style="float:right">▶</span>
+          </div>
+          <div class="param-section-body${timersOpenClass}" style="padding:10px 14px">
+            <div class="param-row">
+              ${timerRow(
+                'expiredOfferTest', 'Expired-offer test',
+                'Negative test. On: after the offer is selected (01. POST Get Offer), OSCAR waits until just past the earliest OfferPart.validUntil, then attempts POST /bookings and asserts the provider rejects it (4xx + Problem). Pairs naturally with the expired-booking test only on long happy-path scenarios — when on, the booking step is what fails by design.',
+                'expiredOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget for the expired-offer test. Typical: 15 (covers most provider offer validity windows).',
+                'set-scenario-max-wait-offer-minutes',
+              )}
+              ${timerRow(
+                'expiredBookingTest', 'Expired-booking test',
+                'Negative test (#204). On: after the booking is created (02. POST Create Booking), OSCAR waits until just past booking.confirmationTimeLimit, then attempts fulfillment (06) and asserts the provider rejects it and the booking parts are EXPIRED/RELEASED/CANCELLED.',
+                'expiredBookingMaxWaitMinutes',
+                'Optional. Per-scenario wait budget for the expired-booking test. Typical: 20 (covers Bileto/Paxone ~15 min deadlines).',
+                'set-scenario-max-wait-minutes',
+              )}
+              ${timerRow(
+                'expiredAddReservationOfferTest', 'Expired add-reservation-offer test',
+                'Negative test. On: just before 09. POST Add Reservation to Booking fires, OSCAR waits until just past the validUntil of the reservationOfferPart that 09 will send, then attempts the add and asserts the provider rejects it. Only meaningful when the scenario uses Place selection in ADD_TO_BOOKING mode (Booking Flow Actions below).',
+                'expiredAddReservationOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget.',
+                'set-scenario-max-wait-addres-minutes',
+              )}
+              ${timerRow(
+                'expiredAddAncillaryOfferTest', 'Expired add-ancillary-offer test',
+                'Negative test. On: just before 10. POST Add Ancillary to Booking fires, OSCAR waits until just past the earliest validUntil of the ancillary offer-parts that 10 will send (sourced from 11. additional-offers or the original offer), then attempts the add and asserts the provider rejects it. Only meaningful when "Add ancillary" is enabled in Booking Flow Actions below.',
+                'expiredAddAncillaryOfferMaxWaitMinutes',
+                'Optional. Per-scenario wait budget.',
+                'set-scenario-max-wait-addanc-minutes',
+              )}
+              ${refundRow}
+              ${exchangeRow}
+            </div>
+            <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
+              Each enabled test waits past its resource's deadline, then asserts the next request is rejected
+              with a <strong>4xx + RFC-9457 Problem</strong> body. If the wait would exceed the run budget
+              (server's <code>RUN_TIMEOUT_MS</code> or the per-scenario Max wait above), the test
+              <strong>skips with a <code>[WARNING]</code></strong> instead of being killed mid-wait.
+              OAuth tokens are refreshed automatically across the wait — a 401/403 is flagged as an auth
+              failure (not a test pass) so you can tell the two apart.
+              <br><br>
+              <strong>Multi-timer scenarios auto-expand into sub-runs.</strong> Enabling N timers on the
+              same scenario makes OSCAR run that scenario <strong>N times</strong>, one pass per timer
+              (in flow order: Offer → Booking → AddReservation → AddAncillary → RefundOffer →
+              ExchangeOffer). Each sub-run's assertions are tagged
+              <code>[NHF_<em>XXX</em>_<em>scenario_code</em>]</code> in the report
+              (<code>OTO</code>/<code>BTO</code>/<code>ARO</code>/<code>ATO</code>/<code>RTO</code>/<code>ETO</code>);
+              a leading <code>NHF_</code> on the scenario code is stripped so you don't get double prefixes.
+              The total wait budget is the <strong>sum</strong> of the enabled Max waits — when ticking
+              multiple timers, raise the per-timer Max wait values so their sum stays under
+              <code>RUN_HARD_MAX_TIMEOUT_MS</code> (30 min by default; the runner auto-extends and
+              clamps with a clear warning).
+            </div>
+          </div>
+        </div>`;
+
+  return `
+  <div class="param-section">
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
+    <div class="param-section-body${topOpenClass}">
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        ${expiryTimersSubsection}
+        ${placeProbesSubsection}
+        ${shapeProbesSubsection}
+      </div>
+    </div>
+  </div>`;
+}
+
 function buildSalesFlowActionsSection(idx, sc) {
   if (!sc.scenarioType) return '';
   const readOnly = isTester && sc.shared;
   const current = (sc && typeof sc.salesFlowActions === 'object' && sc.salesFlowActions)
     ? sc.salesFlowActions : defaultSalesFlowActions();
+
+  // Gate 0 — the Test Framework authorises which optional actions a scenario may
+  // select (issue #107). An unsupported action is shown disabled with the reason;
+  // it cannot be turned on here.
+  const fw = (wizData && wizData.framework) || {};
+  const ticketTypes  = (fw.rail && Array.isArray(fw.rail.ticketTypes)) ? fw.rail.ticketTypes : [];
+  const hasReservations = ticketTypes.includes('IRT') || ticketTypes.includes('NRT_OPTIONAL_RESERVATION');
+  const hasSeatMap      = !!(fw.placeSelection && fw.placeSelection.seatMap);
+  const hasAncillaries  = Array.isArray(fw.ancillaries) && fw.ancillaries.length > 0;
+  const blockedReasonFor = {
+    placeSelection: (hasReservations && hasSeatMap) ? null
+      : 'Enable a reservation ticket type + "seat map" in your Test Framework first',
+    addAncillary:    hasAncillaries ? null : 'Declare at least one ancillary in your Test Framework first',
+    deleteAncillary: hasAncillaries ? null : 'Declare at least one ancillary in your Test Framework first',
+  };
+
   const pills = SALES_FLOW_ACTIONS.map(a => {
-    const on = current[a.key] === true; // explicit opt-in only
-    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${esc(idx)}" data-key="${esc(a.key)}" title="${esc(a.description)}"${readOnly?' style="pointer-events:none;opacity:.6"':''}>${a.icon} ${esc(a.label)}</div>`;
+    const blocked = blockedReasonFor[a.key] || null;     // null → authorised
+    const on = current[a.key] === true && !blocked;       // a disabled action never shows selected
+    const disabled = readOnly || !!blocked;
+    const style = disabled ? ' style="pointer-events:none;opacity:.45"' : '';
+    const title = blocked || a.description;
+    return `<div class="pill${on?' selected':''}" data-action="toggle-sales-action" data-idx="${esc(idx)}" data-key="${esc(a.key)}" title="${esc(title)}"${style}>${a.icon} ${esc(a.label)}</div>`;
   }).join('');
+
+  // Seat-selection mode picker — shown when the framework authorises place
+  // selection. Limited to the framework's supported modes; single-select.
+  let modePickerHtml = '';
+  if (!blockedReasonFor.placeSelection) {
+    const supported = (fw.placeSelection && Array.isArray(fw.placeSelection.supportedModes)) ? fw.placeSelection.supportedModes : [];
+    const offered = PLACE_SELECTION_MODES.filter(m => supported.includes(m.key));
+    if (offered.length > 0) {
+      const sel = sc.placeSelectionMode || (offered.length === 1 ? offered[0].key : null);
+      const modePills = offered.map(m => {
+        const style = readOnly ? ' style="pointer-events:none;opacity:.6"' : '';
+        return `<div class="pill${sel === m.key ? ' selected' : ''}" data-action="set-place-mode" data-idx="${esc(idx)}" data-val="${esc(m.key)}" title="${esc(m.description)}"${style}>${m.icon} ${esc(m.label)}</div>`;
+      }).join('');
+      modePickerHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Seat-selection mode <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— applies when "Place selection" is enabled above</span></div>
+          <div class="pill-group">${modePills}</div>
+        </div>`;
+    }
+  }
+
+  // #373: accommodation family picker (Seat / Couchette / Berth). NOT gated
+  // behind the framework's place-selection authorisation — for IRT/NJ
+  // mandatory-reservation trains the accommodation drives OFFER selection and
+  // the booking request's placeSelections (#371) even without the graphical
+  // seat map. scenarioParser already maps scenario.accommodationSelection to
+  // the Bruno env; this is the missing wizard field.
+  const _accSel = sc.accommodationSelection || '';
+  const _accStyle = readOnly ? ' style="pointer-events:none;opacity:.6"' : '';
+  const accommodationPickerHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Accommodation type <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— filters the offers to this place family and states the booked compartment in the booking request (placeSelections); required by IRT/NJ mandatory-reservation trains</span></div>
+          <div class="pill-group">
+            ${[['', '— any —', 'No accommodation constraint (default — current behaviour)'],
+               ['SEAT', '🪑 Seat', 'Only offers where every available place is a SEAT'],
+               ['COUCHETTE', '🛏 Couchette', 'Offers with at least one COUCHETTE place — the selected compartment subtype (e.g. COUCHETTE_COMFORT_4) is sent in the booking'],
+               ['BERTH', '🛌 Berth', 'Offers with at least one BERTH place — the selected compartment subtype is sent in the booking']]
+              .map(([v, l, d]) => `<div class="pill${_accSel === v ? ' selected' : ''}" data-action="set-accommodation-selection" data-idx="${esc(idx)}" data-val="${esc(v)}" title="${esc(d)}"${_accStyle}>${l}</div>`).join('')}
+          </div>
+        </div>`;
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🛒 Booking Flow Actions <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">optional steps during the booking → fulfillment phase (applies to SALE, REFUND and EXCHANGE scenarios, which all start with a booking)</span><span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
       <div style="padding:12px 14px">
         <div class="pill-group">${pills}</div>
+        ${modePickerHtml}
+        ${accommodationPickerHtml}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),
           the test runner logs it as <strong>NOT_APPLICABLE</strong> and continues —
           each attempted action becomes one row in the Vendor Capability Matrix of the
           generated report, so a certifier can see at a glance which sub-flows the vendor
-          implements. Matching library-bruno support is required for each action;
-          <em>PATCH passengers</em> is already wired.
+          implements. Greyed-out actions are not enabled in your Test Framework.
         </div>
       </div>
     </div>
@@ -1396,14 +2006,72 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
     <span style="font-weight:600">🚄 ${label}:</span>
     <select class="param-input param-select" style="max-width:280px;font-size:12px"
       data-action="apply-trip-train" data-idx="${esc(idx)}" data-tidx="${esc(tIdx)}" data-target="${esc(target)}">
-      <option value="">— pick a train to copy its parameters —</option>
-      ${trains.map(t => {
-        const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
-        const hint = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || t.label;
-        return '<option value="' + esc(t.id) + '">' + esc(t.label || '?') + (hint ? ' — ' + esc(hint) : '') + '</option>';
+      <option value="">— pick a service to copy its parameters —</option>
+      ${trains.flatMap(t => {
+        const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+        const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ');
+        const svcs = d.services.length ? d.services : [{}];
+        return svcs.map((s, si) => {
+          const svcLabel = [s.vehicleNumber, s.departureTime].filter(Boolean).join(' ');
+          const bits = [t.label || '?', route, svcLabel].filter(Boolean).join(' — ');
+          return '<option value="' + esc(t.id) + '::' + si + '">' + esc(bits) + '</option>';
+        });
       }).join('')}
     </select>
     <span style="color:#90a4ae;font-size:11px">values fill the fields below; edit any of them afterwards</span>
+  </div>`;
+}
+
+// ── Trip Search Criteria sub-panel (#359, OSDM 3.4 set) ──────────────────────
+// Collapsed by default; only filled fields are sent in the request. Covers
+// the spec's TripSearchCriteria members beyond origin/destination/time:
+// arrival-time basis, vias (+dwell), notVias, and the simple TripParameters
+// (transferLimit, result counts, ignoreRealtimeData). Stored flat under
+// tripRequirement.trip.searchCriteria.* — scenarioParser builds the OSDM
+// objects from it.
+function buildTripSearchCriteriaPanel(tIdx, trip) {
+  const sc = (trip.trip && trip.trip.searchCriteria) || {};
+  const isSet = v => v != null && String(v).trim() !== '';
+  const setCount =
+    ['via1Place', 'via2Place', 'notVias', 'transferLimit', 'numberOfResults',
+     'numberOfResultsBefore', 'numberOfResultsAfter', 'ignoreRealtimeData']
+      .filter(k => isSet(sc[k])).length
+    + (sc.timeBasis === 'ARRIVAL' ? 1 : 0);
+  const p = f => `trip.searchCriteria.${f}`;
+
+  const selField = (f, label, hint, options) => `
+  <div class="param-field">
+    <span class="param-label">${label} <span class="param-hint">${hint}</span></span>
+    <select class="param-input param-select" data-action="set-trip-path" data-tidx="${esc(tIdx)}" data-path="${p(f)}">
+      ${options.map(o => `<option value="${esc(o.v)}" ${String(sc[f] || '') === o.v ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}
+    </select>
+  </div>`;
+
+  return `
+  <div class="param-section" style="margin-top:10px">
+    <div class="param-section-head" data-action="toggle-param-section">🔎 Trip Search Criteria
+      <span class="param-hint" style="margin-left:8px">optional OSDM search options — ${setCount} set; only filled fields are sent</span>
+      <span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+      <div style="padding:10px 14px 12px">
+        <div class="param-grid">
+          ${selField('timeBasis', 'Search time basis',
+            'ARRIVAL searches by the Arrival time above (OSDM: exactly one of departureTime/arrivalTime)',
+            [{ v: '', l: 'Departure (default)' }, { v: 'ARRIVAL', l: 'Arrival' }])}
+          ${buildTripTextField(tIdx, p('transferLimit'), 'Transfer limit <span class="param-hint">max interchanges accepted (0 = direct only)</span>', sc.transferLimit, 'e.g. 0')}
+          ${buildTripTextField(tIdx, p('via1Place'), 'Via 1 UIC <span class="param-hint">journey must pass through</span>', sc.via1Place, 'urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('via1Dwell'), 'Via 1 dwell <span class="param-hint">ISO-8601 duration, optional</span>', sc.via1Dwell, 'PT30M')}
+          ${buildTripTextField(tIdx, p('via2Place'), 'Via 2 UIC', sc.via2Place, 'urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('via2Dwell'), 'Via 2 dwell', sc.via2Dwell, 'PT30M')}
+          ${buildTripTextField(tIdx, p('notVias'), 'Not via <span class="param-hint">comma-separated UIC refs the trip must avoid</span>', sc.notVias, 'urn:uic:stn:..., urn:uic:stn:...')}
+          ${buildTripTextField(tIdx, p('numberOfResults'), 'Number of results', sc.numberOfResults, 'e.g. 5')}
+          ${buildTripTextField(tIdx, p('numberOfResultsBefore'), 'Results before <span class="param-hint">around the requested time</span>', sc.numberOfResultsBefore, 'e.g. 0')}
+          ${buildTripTextField(tIdx, p('numberOfResultsAfter'), 'Results after', sc.numberOfResultsAfter, 'e.g. 5')}
+          ${selField('ignoreRealtimeData', 'Ignore realtime data', 'plan on timetable only',
+            [{ v: '', l: '— not set —' }, { v: 'true', l: 'true' }, { v: 'false', l: 'false' }])}
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1420,9 +2088,41 @@ function buildTripSection(idx, sc, trip) {
     </select>
   </div>`;
 
+  // #363/#366: per-trip departure DAY for trains that only run certain days.
+  // Auto (default) keeps today's rule (today + lead time); a weekday keeps
+  // the lead time and advances to the next matching date at run time.
+  // #366: rendered NEXT TO the Departure time field (where testers look for
+  // it) on SEARCH trips; trip-level above the legs on SPECIFICATION.
+  const depDayField = (() => {
+    const days = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    return `
+  <div class="param-field">
+    <span class="param-label">Departure day <span class="param-hint">Auto: today + lead time. Pick a weekday for trains that only run some days — lead time kept, date advances to the next matching day</span></span>
+    <select class="param-input param-select"
+      data-action="set-trip-field" data-tidx="${esc(tIdx)}" data-field="departureDay">
+      ${days.map(d => `<option value="${d}" ${String(trip.departureDay || '') === d ? 'selected' : ''}>${d ? d.charAt(0) + d.slice(1).toLowerCase() : 'Auto (default)'}</option>`).join('')}
+    </select>
+  </div>`;
+  })();
+
+  // Apply-a-Journey picker (#137) — fills all legs from a saved journey.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyPicker = journeys.length ? `
+  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#546e7a;margin:8px 0 4px">
+    <span style="font-weight:600">🧭 Apply a Journey:</span>
+    <select class="param-input param-select" style="max-width:340px;font-size:12px"
+      data-action="apply-trip-journey" data-idx="${esc(idx)}" data-tidx="${esc(tIdx)}">
+      <option value="">— pick a saved journey to fill all legs —</option>
+      ${journeys.map(j => `<option value="${esc(j.id)}">${esc(j.label || j.id)} — ${esc(journeySummary(j))}</option>`).join('')}
+    </select>
+    <span style="color:#90a4ae;font-size:11px">sets SPECIFICATION + fills the legs below</span>
+  </div>` : '';
+
   let inner = '';
   if (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs)) {
-    inner = trip.legs.map((leg, li) => `
+    // #366: one departure date covers all legs → trip-level, above the legs.
+    inner = `<div class="param-grid" style="margin-bottom:8px">${depDayField}</div>`;
+    inner += trip.legs.map((leg, li) => `
     <div class="sub-card">
       <div class="sub-card-title">Leg ${li+1}</div>
       <div style="padding:0 14px 0">${buildTripTrainPicker(idx, tIdx, 'legs.' + li, trains)}</div>
@@ -1441,30 +2141,39 @@ function buildTripSection(idx, sc, trip) {
     <div class="param-grid">
       ${buildTripTextField(tIdx, 'trip.origin',      'Origin UIC <span class="param-hint">urn:uic:stn:NNNNNNN</span>',      t.origin,      'urn:uic:stn:...')}
       ${buildTripTextField(tIdx, 'trip.destination', 'Destination UIC <span class="param-hint">urn:uic:stn:NNNNNNN</span>', t.destination, 'urn:uic:stn:...')}
+      ${depDayField}
       ${buildTripTimeField(tIdx, 'trip.startDatetime', 'Departure <span class="param-hint">HH:MM:SS±HH:MM — date added automatically</span>', t.startDatetime, '07:00:00+02:00')}
       ${buildTripTimeField(tIdx, 'trip.endDatetime',   'Arrival <span class="param-hint">HH:MM:SS±HH:MM</span>',   t.endDatetime,   '09:00:00+02:00')}
       ${buildTripTextField(tIdx, 'trip.vehicleNumber', 'Vehicle # <span class="param-hint">Train number</span>', t.vehicleNumber, '')}
       ${buildTripTextField(tIdx, 'trip.operatorCode',  'Operator Code <span class="param-hint">urn:uic:rics:NNNN</span>', t.operatorCode,  'urn:uic:rics:...')}
-    </div>`;
+    </div>
+    ${buildTripSearchCriteriaPanel(tIdx, trip)}`;
   }
 
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🚂 Trip (requirement #${sc.tripRequirementId})<span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
-      <div style="padding:12px 14px 4px">${tripTypeSelect}</div>
+      <div style="padding:12px 14px 4px">${tripTypeSelect}${journeyPicker}</div>
       <div style="padding:0 14px 12px">${inner}</div>
     </div>
   </div>`;
 }
 
 // Time field: strips %TRIP_DATE%T for display, re-adds on save
+// #363: placeholders are PROPOSALS — prefix them so they can never be read
+// as filled values (the CSS also renders them lighter + italic).
+function egPlaceholder(placeholder) {
+  const p = String(placeholder || '');
+  return p && !/^e\.g\. /.test(p) ? 'e.g. ' + p : p;
+}
+
 function buildTripTimeField(tIdx, path, label, val, placeholder) {
   const displayVal = (val || '').replace(/%TRIP_DATE%T/g, '');
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
-    <input class="param-input" type="text" value="${esc(displayVal)}" placeholder="${esc(placeholder||'')}"
+    <input class="param-input" type="text" value="${esc(displayVal)}" placeholder="${esc(egPlaceholder(placeholder))}"
       data-action="set-trip-time" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
@@ -1473,15 +2182,25 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
-    <input class="param-input" type="text" value="${esc(val||'')}" placeholder="${esc(placeholder||'')}"
+    <input class="param-input" type="text" value="${esc(val||'')}" placeholder="${esc(egPlaceholder(placeholder))}"
       data-action="set-trip-path" data-tidx="${esc(tIdx)}" data-path="${path}">
   </div>`;
 }
 
 // Re-render one scenario detail panel in place, preserving which
-// param-sections were expanded. Used by handlers that change fields whose
-// edits reshape the markup (scenarioType, tripType, purchaser link toggle,
-// passenger category, …). Quietly returns if the detail isn't rendered.
+// param-sections were expanded AND the window scroll position. Used by
+// handlers that change fields whose edits reshape the markup (scenarioType,
+// tripType, purchaser link toggle, passenger category, …). Quietly returns
+// if the detail isn't rendered.
+//
+// Scroll preservation (v1.11.102) was added after a tester reported that
+// changing a passenger's type (e.g. ADULT → CHILD) snapped the viewport
+// back to the top of the panel, forcing them to scroll all the way down
+// to the Passengers section again just to keep editing. We capture
+// window.scrollY at function entry, do the re-render, then restore. The
+// browser preserves scroll across innerHTML replacement only when the
+// document height doesn't change between the two snapshots — for safety
+// we restore explicitly so it's not subject to that condition.
 function reRenderScenarioDetail(scIdx) {
   const detail = document.getElementById('detail-' + scIdx);
   if (!detail || !detail.dataset.rendered) return;
@@ -1491,6 +2210,7 @@ function reRenderScenarioDetail(scIdx) {
       openSections.add((h.textContent || '').trim());
     }
   });
+  const _savedScrollY = window.scrollY;
   detail.innerHTML = buildDetailHTML(scIdx);
   detail.querySelectorAll('.param-section-head').forEach(h => {
     const label = (h.textContent || '').trim();
@@ -1499,6 +2219,10 @@ function reRenderScenarioDetail(scIdx) {
     const arrow = h.querySelector('.ps-arrow');
     if (arrow) arrow.classList.toggle('open', isOpen);
   });
+  // Restore in the same microtask so the viewport doesn't visibly flicker.
+  // (Using requestAnimationFrame would defer to the next paint and the user
+  // would see a brief jump to the top.)
+  if (window.scrollY !== _savedScrollY) window.scrollTo(0, _savedScrollY);
 }
 
 // ── Passengers section ────────────────────────────────────────────────────────
@@ -1842,19 +2566,21 @@ function syncPurchaserFromPassenger(paxList, pax) {
 // ── Offer search criteria section (inline on scenario) ───────────────────────
 function buildOfferSection(idx, sc) {
   const criteria = sc.offerSearchCriteria || {};
-  const fwOc = ((wizData && wizData.framework) || {}).offerCriteria || {};
-  const fwSc = ((wizData && wizData.framework) || {}).serviceClasses;
 
-  // Filter each list by the framework's offerCriteria constraints, falling
-  // back to the full OSDM enum when the framework leaves a field empty.
-  // The framework's offerMode is a single string (not array), so we build
-  // a one-item array to pass through fwFilter uniformly.
-  const offerModeAllowed = fwOc.offerMode ? [fwOc.offerMode] : null;
-  const modeList         = fwFilter(ENUMS.offerMode,           offerModeAllowed);
-  const offerPartsList   = fwFilter(ENUMS.requestedOfferParts, fwOc.requestedOfferParts);
-  const serviceClassList = fwFilter(ENUMS.serviceClass,        fwSc);
-  const travelClassList  = fwFilter(ENUMS.travelClass,         fwOc.travelClasses);
-  const flexibilityList  = fwFilter(ENUMS.flexibilities,       fwOc.flexibilities);
+  // Offer search criteria are free request filters: a scenario must be able to
+  // request ANY value from the OSDM master list — including travel/service
+  // classes or offer parts the train or system-under-test doesn't support — so
+  // that non-happy-flow scenarios can be authored (#155). Travel class is test
+  // data (per train), not a framework setting; the framework must NOT restrict
+  // these options. So each list is the full OSDM enum, unioned with whatever is
+  // already selected (a safety net for any custom/out-of-enum value).
+  const withSelected = (allowed, selected) =>
+    [...new Set([...(allowed || []), ...(Array.isArray(selected) ? selected : [])])];
+  const modeList         = withSelected(ENUMS.offerMode,           criteria.offerMode ? [criteria.offerMode] : []);
+  const offerPartsList   = withSelected(ENUMS.requestedOfferParts, criteria.requestedOfferParts);
+  const serviceClassList = withSelected(ENUMS.serviceClass,        criteria.serviceClass);
+  const travelClassList  = withSelected(ENUMS.travelClass,         criteria.travelClass);
+  const flexibilityList  = withSelected(ENUMS.flexibilities,       criteria.flexibilities);
 
   const modeOpts = `<option value="" ${!criteria.offerMode?'selected':''} style="color:#90a4ae">— none —</option>`
     + modeList.map(m =>
@@ -1866,7 +2592,7 @@ function buildOfferSection(idx, sc) {
     <div class="param-section-body">
     <div class="param-grid" style="padding:12px 14px 4px">
       <div class="param-field">
-        <span class="param-label">Offer Mode <span class="param-hint">(optional) — how offers are grouped</span></span>
+        <span class="param-label">Offer Mode <span class="param-hint">(optional) — INDIVIDUAL gives per-passenger admissions (refundable individually); COLLECTIVE shares one admission across the group (atomic, can't refund per pax). With only one passenger, COLLECTIVE is degenerate — the provider may accept, fall back to INDIVIDUAL with a warning, or reject. See Tester Guide §4.3.</span></span>
         <select class="param-input param-select"
           data-action="set-offer" data-idx="${esc(idx)}" data-field="offerMode">
           ${modeOpts}
@@ -1938,9 +2664,14 @@ function buildOfferSection(idx, sc) {
           data-action="set-offer-tags" data-idx="${esc(idx)}">
       </div>
       <div class="param-field">
-        <span class="param-label">Inbound Date <span class="param-hint">(optional) — return trip date</span></span>
-        <input class="param-input" type="datetime-local" value="${esc(criteria.inboundDate||'')}"
-          data-action="set-offer-inbound" data-idx="${esc(idx)}">
+        <span class="param-label">Return trip <span class="param-hint">(optional) — days after the outbound. Empty = one-way · 0 = same day · e.g. 2</span></span>
+        <input class="param-input" type="number" min="0" max="30" value="${esc(criteria.returnOffsetDays != null ? criteria.returnOffsetDays : '')}" placeholder="e.g. 2 (leave empty for one-way)"
+          data-action="set-offer-return-offset" data-idx="${esc(idx)}">
+      </div>
+      <div class="param-field">
+        <span class="param-label">Return time <span class="param-hint">(optional) — HH:MM; defaults to the outbound departure time</span></span>
+        <input class="param-input" type="time" value="${esc(criteria.returnTime||'')}"
+          data-action="set-offer-return-time" data-idx="${esc(idx)}">
       </div>
     </div>
 
@@ -2020,6 +2751,10 @@ function setTripFieldByPath(tIdx, path, value) {
   let obj = state.tripRequirements[tIdx];
   for (let i = 0; i < parts.length - 1; i++) {
     const key = isNaN(parts[i]) ? parts[i] : parseInt(parts[i]);
+    // #359: autovivify missing intermediates so new optional sub-objects
+    // (trip.searchCriteria.*) can be written into older datafiles that
+    // don't have them yet. Next segment numeric → array, else object.
+    if (obj[key] == null) obj[key] = isNaN(parts[i + 1]) ? {} : [];
     obj = obj[key];
   }
   const lastKey = isNaN(parts[parts.length-1]) ? parts[parts.length-1] : parseInt(parts[parts.length-1]);
@@ -2137,7 +2872,8 @@ function showSaveConfirm(data) {
   document.getElementById('sc-torun-count').textContent = data.to_run_count;
   document.getElementById('sc-torun-list').innerHTML = (data.to_run || [])
     .map(code => `<li>${esc(code)}</li>`).join('');
-  document.getElementById('sc-saved-at').textContent = new Date(data.saved_at).toLocaleString();
+  // v1.11.7 — parseServerTs (nav.js) normalises SQLite's TZ-less UTC strings.
+  document.getElementById('sc-saved-at').textContent = parseServerTs(data.saved_at).toLocaleString();
   document.getElementById('sc-hash').textContent = (data.hash || '').slice(0, 16) + '…';
   document.getElementById('save-confirm').style.display = 'block';
   document.getElementById('save-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2285,7 +3021,12 @@ const WIZ_TICKET_TYPES    = [
 ];
 const WIZ_SERVICE_CLASSES = ['BEST','HIGH','STANDARD','BASIC','ANY_CLASS'];
 const WIZ_ACCOMMODATIONS  = ['SEAT','COUCHETTE','BERTH','VEHICLE'];
-const WIZ_ANCILLARIES     = ['WIFI','FOOD_ON_BOARD','DRINKS_ON_BOARD','LUGGAGE','PARKING','PETS','ASSISTANT','ON_BOARD_SERVICE','ENTERTAINMENT'];
+// OSDM AncillaryType example values. AncillaryType is an x-extensible-enum —
+// the spec states the listed values are examples, so custom values (e.g. BIKE)
+// are valid. These seed the editable ancillary catalog at the Test Framework
+// level (issue #130); train resources then pick from framework.ancillaries
+// (standard + custom), not from a fixed constant.
+const OSDM_ANCILLARY_TYPES = ['PAYMENT_VOUCHER','PRODUCT_ACCESS','MERCHANDISE_PRODUCT','LUGGAGE','LUGGAGE_TRANSFER','ON_BOARD_SERVICE','STATION_SERVICE','FOOD_ON_BOARD','DRINKS_ON_BOARD','WIFI','PARKING'];
 const WIZ_PAX_TYPES       = [
   'ADULT','CHILD','YOUTH','SENIOR','YOUNG_CHILD','FAMILY_CHILD',
   'PRM','ACCOMP_PRM','WHEELCHAIR','DOG','PET','BICYCLE',
@@ -2311,6 +3052,14 @@ const WIZ_OFFER_MODES    = ['INDIVIDUAL','COMBINATION'];
 // Fulfillment
 const WIZ_FULFIL_MEDIA   = ['PDF_A4','PKPASS','AZTEC_CODE','QR_CODE','NFC'];
 const WIZ_FULFIL_TYPES   = ['ETICKET','PAPER_TICKET'];
+// Days of week for a train set's timetable services (#136). Stored per service;
+// empty = runs every day. Informational today (the offer request still targets a
+// specific %TRIP_DATE%), but documents the route's weekly pattern.
+const WIZ_DAYS = [
+  { value: 'MON', label: 'Mon' }, { value: 'TUE', label: 'Tue' }, { value: 'WED', label: 'Wed' },
+  { value: 'THU', label: 'Thu' }, { value: 'FRI', label: 'Fri' }, { value: 'SAT', label: 'Sat' },
+  { value: 'SUN', label: 'Sun' }
+];
 const WIZ_PAX_ABBREV = {
   ADULT:'ADT', CHILD:'CHD', YOUTH:'YTH', SENIOR:'SEN',
   YOUNG_CHILD:'YCH', FAMILY_CHILD:'FCH', PRM:'PRM',
@@ -2381,10 +3130,14 @@ function emptyFramework() {
       currency:            'EUR',
       requiresPlaceSelection: false
     },
+    // Optional-feature capability (issue #107): does the system offer a graphical
+    // seat map, and via which mode(s)? seatMap=false / supportedModes=[] means
+    // place selection is not exercised. Authorises the per-scenario opt-in.
+    placeSelection: { seatMap: false, supportedModes: [] },
     fulfillment:    { media: ['PDF_A4'], types: ['ETICKET'] },
     serviceClasses:['STANDARD','HIGH'],
     accommodations:['SEAT'],
-    ancillaries:   ['WIFI'],
+    ancillaries:   [...OSDM_ANCILLARY_TYPES],
     passengerTypes:['ADULT','CHILD'],
     passengerAgeRanges: {
       ADULT: { min: 26, max: 99 },
@@ -2441,6 +3194,10 @@ function renderWizardStep1() {
   if (!fw.offerCriteria.offerMode)   fw.offerCriteria.offerMode  = def.offerCriteria.offerMode;
   if (!fw.offerCriteria.currency)    fw.offerCriteria.currency   = def.offerCriteria.currency;
   if (fw.offerCriteria.requiresPlaceSelection == null) fw.offerCriteria.requiresPlaceSelection = false;
+  // Place-selection capability (issue #107)
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  if (typeof fw.placeSelection.seatMap !== 'boolean') fw.placeSelection.seatMap = false;
+  if (!Array.isArray(fw.placeSelection.supportedModes)) fw.placeSelection.supportedModes = [];
   // Fulfillment
   if (!fw.fulfillment || typeof fw.fulfillment !== 'object') fw.fulfillment = def.fulfillment;
   if (!Array.isArray(fw.fulfillment.media)) fw.fulfillment.media = def.fulfillment.media;
@@ -2598,6 +3355,34 @@ function renderWizardStep1() {
     </div>
   </div>
 
+  <!-- ②-bis Seat selection capability (issue #107) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🪑 Seat Selection<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:6px">
+          <input type="checkbox" id="ps-seatmap" ${fw.placeSelection.seatMap?'checked':''} data-action="fw-toggle-seatmap" style="accent-color:#0090D4;width:16px;height:16px">
+          Does the system offer a graphical seat map?
+        </label>
+        <div style="font-size:11px;color:#90a4ae;margin-bottom:10px;line-height:1.5">
+          Tick this if travellers can pick a specific seat. Then choose <strong>when</strong> it happens — a scenario can only use a mode you enable here.
+        </div>
+        <div id="place-selection-detail" style="${fw.placeSelection.seatMap?'':'display:none'}">
+          <div class="fw-subsection">
+            <div class="fw-subsection-label">Supported seat-selection modes</div>
+            <div class="pill-group">
+              ${PLACE_SELECTION_MODES.map(m=>`<div class="pill${(fw.placeSelection.supportedModes||[]).includes(m.key)?' selected':''}" data-action="fw-pill" data-mode="placeSelection" data-group="supportedModes" data-val="${esc(m.key)}" title="${esc(m.description)}">${m.icon} ${esc(m.label)}</div>`).join('')}
+            </div>
+            <div style="font-size:11px;color:#90a4ae;margin-top:8px;line-height:1.5">
+              🪑 <strong>Seat map at offer</strong> — traveller picks a seat before booking (e.g. a seat that affects the price).<br>
+              ➕ <strong>Add reservation to a booking</strong> — seat reservation added after the booking exists (e.g. SNCF first-class TGV).
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ③ Passenger Types + age limits -->
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">👥 Passenger Types<span class="fw-toggle-icon">▶</span></div>
@@ -2609,7 +3394,7 @@ function renderWizardStep1() {
       <div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">
           Age limits per passenger type
-          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — used to generate valid birth dates in test data; first name prefixed with type (e.g. ADULT_Marie)</span>
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — used to generate valid birth dates in test data for each passenger type</span>
         </div>
         <div class="pax-age-table">
           ${WIZ_HUMAN_PAX_TYPES.map(p => {
@@ -2630,6 +3415,27 @@ function renderWizardStep1() {
         ${WIZ_HUMAN_PAX_TYPES.every(p=>!(fw.passengerTypes||[]).includes(p))
           ? '<div style="color:#90a4ae;font-size:12px;padding:6px 0">Select a human passenger type above to configure its age range.</div>'
           : ''}
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ Ancillaries catalog (issue #130) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🧳 Ancillaries<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">Ancillaries the platform supports — standard (OSDM) plus any custom ones. Train resources pick from this catalog.</div>
+        <div class="pill-group">
+          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replace(/_/g,' '))}</div>`).join('')}
+        </div>
+        ${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).length
+          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).map(a=>`<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('')}</div></div>`
+          : ''}
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <input class="param-input" id="fw-custom-ancillary" placeholder="Add custom — e.g. BIKE" style="max-width:240px" maxlength="40">
+          <button class="btn btn-small btn-secondary" data-action="fw-add-ancillary">+ Add</button>
+        </div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.5">OSDM <code>AncillaryType</code> is an extensible code list — custom values are spec-valid.</div>
       </div>
     </div>
   </div>
@@ -2687,6 +3493,18 @@ function fwToggleMode(mode, enabled) {
   if (d) d.style.display = enabled ? '' : 'none';
 }
 
+// Seat-selection capability toggle (issue #107). seatMap=true reveals the
+// supported-modes picker; the modes themselves use the generic fw-pill handler
+// (placeSelection.supportedModes). When off, the modes are kept but hidden —
+// consumers always check seatMap first.
+function fwToggleSeatMap(enabled) {
+  const fw = wizData.framework;
+  if (!fw.placeSelection || typeof fw.placeSelection !== 'object') fw.placeSelection = { seatMap: false, supportedModes: [] };
+  fw.placeSelection.seatMap = enabled;
+  const d = document.getElementById('place-selection-detail');
+  if (d) d.style.display = enabled ? '' : 'none';
+}
+
 function fwTogglePill(el, modeKey, subKey, value) {
   const arr = wizData.framework[modeKey][subKey] || [];
   const idx = arr.indexOf(value);
@@ -2728,6 +3546,31 @@ function fwToggleFulfilPill(el, subKey, value) {
   else            { arr.splice(idx,1); el.classList.remove('selected'); }
 }
 
+// ── Ancillary catalog helpers (issue #130) ───────────────────────────────────
+// framework.ancillaries is the editable catalog the platform supports (OSDM
+// standard + custom). Train resources pick from it. Custom add/remove re-render
+// the framework section so the new/removed pill shows immediately.
+function fwAddCustomAncillary() {
+  const input = document.getElementById('fw-custom-ancillary');
+  if (!input) return;
+  // Normalise to an UPPER_SNAKE code (OSDM AncillaryType is a string code list).
+  const code = (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!code) return;
+  const fw = wizData.framework;
+  if (!Array.isArray(fw.ancillaries)) fw.ancillaries = [];
+  if (!fw.ancillaries.includes(code)) fw.ancillaries.push(code);
+  input.value = '';
+  saveFrameworkDebounced();
+  renderWizardStep1InSection();
+}
+function fwRemoveAncillary(value) {
+  const fw = wizData.framework;
+  if (!Array.isArray(fw.ancillaries)) return;
+  fw.ancillaries = fw.ancillaries.filter(a => a !== value);
+  saveFrameworkDebounced();
+  renderWizardStep1InSection();
+}
+
 // ── Passenger type + age-range helpers ───────────────────────────────────────
 function fwTogglePaxType(el, value) {
   fwToggleSimplePill(el, 'passengerTypes', value);
@@ -2755,21 +3598,43 @@ function fwSetPaxAge(type, bound, value) {
 function renderWizardStep2() {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
 
+  // #365: per-route offer-availability findings persisted by the discovery
+  // probe (read from RAW data - normalizeTrainData strips unknown members).
+  const probeOf = (t) => {
+    try {
+      const raw = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+      return (raw.offerProbe && Array.isArray(raw.offerProbe.findings)) ? raw.offerProbe : null;
+    } catch (_e) { return null; }
+  };
+  const probeWarnings = [];
+  trains.forEach(t => {
+    const p = probeOf(t);
+    if (p && p.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
+  });
+
   const trainItems = trains.map((t, tidx) => {
-    const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+    const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+    const probe = probeOf(t);
+    const probeChip = (probe && probe.findings.length)
+      ? `<span title="${esc(probe.findings.join('\n'))}" style="color:#ef6c00;font-size:12px;font-weight:700;flex-shrink:0;cursor:help">&#9888; ${probe.findings.length}</span>`
+      : '';
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
-    const times = [d.departureTime, d.arrivalTime].filter(Boolean).join(' — ') || '';
+    const svc = d.services || [];
+    const svcSummary = svc.length === 0 ? 'no services'
+      : svc.length === 1 ? (svc[0].vehicleNumber || '1 service')
+      : `${svc.length} services`;
     const classes = (d.travelClasses || []).join(', ') || '';
-    const sub = [d.vehicleNumber || d.trainId || '', route, times, classes].filter(Boolean).join('  ·  ');
+    const sub = [route, svcSummary, classes].filter(Boolean).join('  ·  ');
     return `
     <div class="train-item">
       <div class="train-row" data-action="toggle-train-detail" data-tidx="${esc(tidx)}">
         <div style="flex:1;min-width:0">
-          <div class="train-row-label">${esc(t.label || '—')}</div>
+          <div class="train-row-label">${esc(t.label || '—')} ${probeChip}</div>
           <div class="train-row-sub">${esc(sub)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
           <span class="toggle-arrow" id="train-arrow-${esc(tidx)}">▶</span>
+          <button class="btn btn-sm btn-secondary" data-action="wiz-duplicate-train" data-tidx="${esc(tidx)}" title="Duplicate this train (copy then edit the vehicle # / times)" style="font-size:11px;padding:3px 8px">🗐 Duplicate</button>
           <button class="row-delete-btn" data-action="wiz-delete-resource" data-id="${esc(t.id)}" title="Delete this train">🗑</button>
         </div>
       </div>
@@ -2777,12 +3642,38 @@ function renderWizardStep2() {
     </div>`;
   }).join('');
 
+  // Journeys (#137) — reusable multi-leg itineraries chaining train sets.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyItems = journeys.map((j, jidx) => `
+    <div class="train-item">
+      <div class="train-row" data-action="toggle-journey-detail" data-jidx="${esc(jidx)}">
+        <div style="flex:1;min-width:0">
+          <div class="train-row-label">${esc(j.label || '—')}</div>
+          <div class="train-row-sub">${esc(journeySummary(j))}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;align-items:center">
+          <span class="toggle-arrow" id="journey-arrow-${esc(jidx)}">▶</span>
+          <button class="btn btn-sm btn-secondary" data-action="wiz-duplicate-journey" data-jidx="${esc(jidx)}" title="Duplicate this journey" style="font-size:11px;padding:3px 8px">🗐 Duplicate</button>
+          <button class="row-delete-btn" data-action="wiz-delete-journey" data-id="${esc(j.id)}" title="Delete this journey">🗑</button>
+        </div>
+      </div>
+      <div class="train-detail" id="journey-detail-${esc(jidx)}"></div>
+    </div>`).join('');
+
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
     Register the test trains available in your system under test.
     These resources will be referenced when generating test scenarios.
   </p>
 
+  ${probeWarnings.length ? `
+  <details style="margin:0 0 10px;background:#fff8f0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px">
+    <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#ef6c00;user-select:none">&#9888; ${probeWarnings.reduce((n2, w) => n2 + w.findings.length, 0)} offer-availability warning(s) on discovered routes - a route in the timetable does not guarantee offers</summary>
+    <div style="margin-top:8px;font-size:12.5px;color:#5d4037;line-height:1.6">
+      ${probeWarnings.map(w => `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : ''}<br>${w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>')}</div>`).join('')}
+      <div style="color:#a1887f">Findings refresh on the next Discover timetable for the route (anonymous 1-adult offer request).</div>
+    </div>
+  </details>` : ''}
   <!-- Train Resources -->
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">🚆 Train Resources<span class="fw-toggle-icon">▶</span></div>
@@ -2790,24 +3681,156 @@ function renderWizardStep2() {
       ${trains.length === 0
         ? '<div style="color:#90a4ae;font-size:13px;padding:8px 0 12px">No trains configured yet — click Add Train to get started.</div>'
         : `<div id="train-list">${trainItems}</div>`}
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" data-action="wiz-add-train">➕ Add Train</button>
+        ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
+        <button class="btn btn-secondary btn-sm" data-action="wiz-reprobe-offers" title="Re-run the anonymous-adult offer probe for every route of the train list and refresh the availability warnings (#369)">&#128260; Re-probe offers</button>
+        <button class="btn btn-secondary btn-sm" data-action="wiz-discover-timetable" title="Scan the sandbox timetable for an origin/destination and auto-create the train sets it actually runs">🔍 Discover timetable</button>
       </div>
     </div>
   </div>
 
-  <!-- Multimodal placeholder -->
+  <!-- Journeys (multi-leg) -->
   <div class="fw-section">
-    <div class="fw-section-head" data-action="fw-toggle">
-      🗺️ Multimodal Trips
-      <span style="font-size:10px;font-weight:400;color:#90a4ae;margin-left:8px">— coming soon</span>
-      <span class="fw-toggle-icon">▶</span>
-    </div>
+    <div class="fw-section-head" data-action="fw-toggle">🧭 Journeys <span style="font-size:10px;font-weight:400;color:#90a4ae;margin-left:8px">— reusable multi-leg itineraries</span><span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body">
-      <div class="placeholder" style="padding:24px">🚧 Multimodal trip configuration will be available in a future release.</div>
+      <p style="color:#90a4ae;font-size:12px;margin:0 0 8px">Chain train sets into a multi-leg journey (e.g. Basel → Amsterdam → Paris). A scenario can then apply the whole journey at once instead of typing each leg.</p>
+      ${journeys.length === 0
+        ? '<div style="color:#90a4ae;font-size:13px;padding:4px 0 12px">No journeys yet — click Add Journey to chain train sets together.</div>'
+        : `<div id="journey-list">${journeyItems}</div>`}
+      <div style="margin-top:12px">
+        <button class="btn btn-secondary btn-sm" data-action="wiz-add-journey">➕ Add Journey</button>
+      </div>
     </div>
   </div>
   `;
+}
+
+// ── Train timetable (#136) ────────────────────────────────────────────────
+// A train set is a route (origin/destination/operator/product/classes/...)
+// plus a list of *services* — the individual trains that run that route at
+// different hours/days (e.g. Sqills IC BAS→AMS = OSDM_200/202/204/206). Legacy
+// train sets stored a single service as top-level vehicleNumber/departureTime/
+// arrivalTime; normalizeTrainData() migrates those into services[0] on read so
+// the rest of the UI can assume the array. Idempotent.
+function normalizeTrainData(d) {
+  d = d || {};
+  if (!Array.isArray(d.services)) {
+    d.services = (d.vehicleNumber || d.departureTime || d.arrivalTime)
+      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '' }]
+      : [];
+  }
+  // Operating days live at the set level (#141) — all services share one
+  // calendar. Migrate from a per-service daysOfWeek (the Phase 2 shape).
+  if (!Array.isArray(d.daysOfWeek)) {
+    const fromSvc = d.services.find(s => s && Array.isArray(s.daysOfWeek) && s.daysOfWeek.length);
+    d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
+  }
+  d.services = d.services.map(s => ({
+    vehicleNumber: (s && s.vehicleNumber) || '',
+    departureTime: (s && s.departureTime) || '',
+    arrivalTime:   (s && s.arrivalTime) || ''
+  }));
+  // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
+  // single `productCategory` text field into the ref so saved sets keep working.
+  if (d.productCategoryRef == null)       d.productCategoryRef = d.productCategory || '';
+  if (d.productCategoryName == null)      d.productCategoryName = '';
+  if (d.productCategoryShortName == null) d.productCategoryShortName = '';
+  return d;
+}
+
+// Parse a vendor service token, e.g. the Sqills form
+// "OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058".
+// Returns a service (+ route hints) or null if it doesn't have enough parts.
+function parseServiceToken(tok) {
+  const p = String(tok || '').trim().split('|');
+  if (p.length < 4 || !p[0].trim()) return null;
+  const timeOf = (iso) => { const i = String(iso).indexOf('T'); return (i >= 0 ? iso.slice(i + 1) : iso).trim(); };
+  const stnUrn = (s) => { s = String(s || '').trim(); return s ? (/^urn:/i.test(s) ? s : `urn:uic:stn:${s}`) : ''; };
+  return {
+    vehicleNumber: p[0].trim(),
+    productCategory: (p[1] || '').trim(),
+    departureTime: timeOf(p[2]),
+    arrivalTime: timeOf(p[3]),
+    originURN: stnUrn(p[4]),
+    destinationURN: stnUrn(p[5])
+  };
+}
+
+// One <tr> for a service row in the timetable table. Operating days are set
+// once for the whole set (#141), so a service row is just vehicle + times.
+function trainServiceRowHtml(s) {
+  s = s || {};
+  return `<tr class="svc-row">
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="vehicleNumber" value="${esc(s.vehicleNumber || '')}" placeholder="OSDM_202" style="min-width:90px"></td>
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="departureTime" value="${esc(s.departureTime || '')}" placeholder="09:10:00+02:00" style="min-width:130px"></td>
+    <td style="padding:3px 6px"><input class="param-input" data-svc-field="arrivalTime" value="${esc(s.arrivalTime || '')}" placeholder="16:35:00+02:00" style="min-width:130px"></td>
+    <td style="padding:3px 6px"><button class="row-delete-btn" data-action="train-remove-service" title="Remove this service">🗑</button></td>
+  </tr>`;
+}
+
+// Read the current service rows out of an expanded train detail panel's
+// timetable table (DOM is the source of truth until Save, like the other
+// train fields). Returns [] when the panel/table isn't present.
+function readTrainServiceRows(tidx) {
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (!tbody) return [];
+  return [...tbody.querySelectorAll('tr.svc-row')].map(row => {
+    const val = (f) => { const el = row.querySelector(`[data-svc-field="${f}"]`); return el ? el.value.trim() : ''; };
+    return {
+      vehicleNumber: val('vehicleNumber'),
+      departureTime: val('departureTime'),
+      arrivalTime:   val('arrivalTime')
+    };
+  });
+}
+
+// Re-render only the timetable <tbody> from a services array — preserves the
+// route fields above (which are untouched DOM-only inputs).
+function reRenderTrainServices(tidx, services) {
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (tbody) tbody.innerHTML = (services || []).map(trainServiceRowHtml).join('');
+}
+
+function trainAddService(tidx) {
+  const rows = readTrainServiceRows(tidx);
+  rows.push({ vehicleNumber: '', departureTime: '', arrivalTime: '' });
+  reRenderTrainServices(tidx, rows);
+}
+
+function trainRemoveService(tidx, rowEl) {
+  const rows = readTrainServiceRows(tidx);
+  const tr = rowEl && rowEl.closest('tr.svc-row');
+  const tbody = document.getElementById(`tf-${tidx}-services`);
+  if (tr && tbody) {
+    const i = [...tbody.querySelectorAll('tr.svc-row')].indexOf(tr);
+    if (i >= 0) rows.splice(i, 1);
+  }
+  reRenderTrainServices(tidx, rows);
+}
+
+// Parse the paste box (one token per line or comma-separated) and append the
+// resulting services; fill empty route fields (origin/destination) from the
+// first token as a convenience.
+function trainPasteServices(tidx) {
+  const box = document.getElementById(`tf-${tidx}-paste`);
+  if (!box) return;
+  const tokens = String(box.value || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  const parsed = tokens.map(parseServiceToken).filter(Boolean);
+  if (parsed.length === 0) return;
+  const rows = readTrainServiceRows(tidx);
+  parsed.forEach(p => rows.push({ vehicleNumber: p.vehicleNumber, departureTime: p.departureTime, arrivalTime: p.arrivalTime }));
+  reRenderTrainServices(tidx, rows);
+  // Fill empty route inputs from the first token.
+  const first = parsed[0];
+  const setIfEmpty = (field, v) => {
+    if (!v) return;
+    const el = document.querySelector(`#train-detail-${tidx} [data-tfield="${field}"]`);
+    if (el && !el.value.trim()) el.value = v;
+  };
+  setIfEmpty('originURN', first.originURN);
+  setIfEmpty('destinationURN', first.destinationURN);
+  box.value = '';
 }
 
 // ── Build the detail HTML for one train resource ─────────────────────────────
@@ -2815,7 +3838,7 @@ function buildTrainDetailHTML(tidx) {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const t = trains[tidx];
   if (!t) return '';
-  const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
+  const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
   const fw = wizData.framework;
 
   // Build pill HTML with pre-selected state
@@ -2839,47 +3862,73 @@ function buildTrainDetailHTML(tidx) {
     <div class="param-section-head" data-action="toggle-param-section">⚙️ Train Details<span class="ps-arrow open">▶</span></div>
     <div class="param-section-body open">
     <div style="padding:12px 14px">
+      <p style="color:#90a4ae;font-size:11px;margin:0 0 10px">A train set is a <b>route</b> (below) plus a <b>timetable</b> of services (the trains that run it at different hours). Add the individual departures in the Services section.</p>
       <div class="train-form-grid">
-        <!-- Row 1: Label | Vehicle Number -->
+        <!-- Row 1: Label | Operator Code -->
         <div class="param-field">
           <label class="param-label">Label <span class="param-hint">(short display name)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. ICE 123 Berlin→Paris">
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="label" value="${esc(t.label || '')}" placeholder="e.g. Sqills IC BAS/AMS">
           <span class="field-error" id="tf-${esc(tidx)}-label-err"></span>
         </div>
         <div class="param-field">
-          <label class="param-label">Vehicle Number</label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="vehicleNumber" value="${esc(d.vehicleNumber || d.trainId || '')}" placeholder="e.g. ICE123">
-          <span class="field-error" id="tf-${esc(tidx)}-vehicleNumber-err"></span>
+          <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184">
+          <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
         </div>
-        <!-- Row 2: Origin URN | Departure time -->
+        <!-- Row 2: Origin URN | Destination URN -->
         <div class="param-field">
           <label class="param-label">Origin station URN</label>
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010">
           <span class="field-error" id="tf-${esc(tidx)}-originURN-err"></span>
         </div>
         <div class="param-field">
-          <label class="param-label">Departure time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="departureTime" value="${esc(d.departureTime || '')}" placeholder="07:00:00+02:00">
-          <span class="field-error" id="tf-${esc(tidx)}-departureTime-err"></span>
-        </div>
-        <!-- Row 3: Destination URN | Arrival time -->
-        <div class="param-field">
           <label class="param-label">Destination station URN</label>
           <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
           <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
+        <!-- Row 3: Product category ref | short name -->
         <div class="param-field">
-          <label class="param-label">Arrival time <span class="param-hint">(HH:MM:SS±HH:MM)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="arrivalTime" value="${esc(d.arrivalTime || '')}" placeholder="10:20:00+02:00">
-          <span class="field-error" id="tf-${esc(tidx)}-arrivalTime-err"></span>
+          <label class="param-label">Product category ref <span class="param-hint">(urn:uic:sbc:… — sent in the request)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryRef" value="${esc(d.productCategoryRef || '')}" placeholder="urn:uic:sbc:SQILLS_HS">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryRef-err"></span>
         </div>
-        <!-- Row 4: Operator Code (full width) -->
+        <div class="param-field">
+          <label class="param-label">Product category short name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryShortName" value="${esc(d.productCategoryShortName || '')}" placeholder="Sqills High Speed train">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryShortName-err"></span>
+        </div>
+        <!-- Row 4: Product category name (full width, optional) -->
         <div class="param-field" style="grid-column:1/-1">
-          <label class="param-label">Operator Code <span class="param-hint">(urn:uic:rics:NNNN — operator's UIC RICS code)</span></label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="operatorCode" value="${esc(d.operatorCode || '')}" placeholder="urn:uic:rics:1184" style="max-width:280px">
-          <span class="field-error" id="tf-${esc(tidx)}-operatorCode-err"></span>
+          <label class="param-label">Product category name <span class="param-hint">(optional)</span></label>
+          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="productCategoryName" value="${esc(d.productCategoryName || '')}" placeholder="Sqills High Speed train" style="max-width:360px">
+          <span class="field-error" id="tf-${esc(tidx)}-productCategoryName-err"></span>
         </div>
       </div>
+    </div>
+    </div>
+  </div>
+  <div class="param-section" style="margin-top:8px">
+    <div class="param-section-head" data-action="toggle-param-section">🕑 Services (timetable)<span class="ps-arrow open">▶</span></div>
+    <div class="param-section-body open">
+    <div style="padding:12px 14px">
+      <div class="fw-subsection" style="margin-bottom:12px">
+        <div class="fw-subsection-label">Operating days <span class="param-hint">(empty = daily — applies to every service in this set)</span></div>
+        <div class="pill-group" id="tf-${esc(tidx)}-days">${WIZ_DAYS.map(dy => `<div class="pill${(d.daysOfWeek || []).includes(dy.value) ? ' selected' : ''}" data-action="pill-toggle" data-val="${esc(dy.value)}">${esc(dy.label)}</div>`).join('')}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">
+        <input class="param-input" id="tf-${esc(tidx)}-paste" placeholder="Paste service tokens, one per line — OSDM_202|OSDM_IC|2026-06-01T09:10:00+02:00|2026-06-01T16:35:00+02:00|8500010|8400058" style="flex:1;min-width:260px;font-size:11px;font-family:'Consolas','Monaco','Courier New',monospace">
+        <button class="btn btn-secondary btn-sm" data-action="train-paste-service" data-tidx="${esc(tidx)}" title="Parse the pasted tokens into service rows">📥 Add from tokens</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="text-align:left;color:#90a4ae;font-size:11px">
+          <th style="padding:3px 6px">Vehicle #</th><th style="padding:3px 6px">Departure (HH:MM:SS±HH:MM)</th><th style="padding:3px 6px">Arrival</th><th></th>
+        </tr></thead>
+        <tbody id="tf-${esc(tidx)}-services">${(d.services.length ? d.services : [{}]).map(trainServiceRowHtml).join('')}</tbody>
+      </table>
+      <div style="margin-top:10px">
+        <button class="btn btn-secondary btn-sm" data-action="train-add-service" data-tidx="${esc(tidx)}">➕ Add service</button>
+      </div>
+      <span class="field-error" id="tf-${esc(tidx)}-services-err"></span>
     </div>
     </div>
   </div>
@@ -2905,7 +3954,7 @@ function buildTrainDetailHTML(tidx) {
       </div>
       <div class="fw-subsection" style="margin-top:10px">
         <div class="fw-subsection-label">Ancillaries available</div>
-        <div class="pill-group" id="tf-${esc(tidx)}-ancillaries">${pills(WIZ_ANCILLARIES, 'ancillaries')}</div>
+        <div class="pill-group" id="tf-${esc(tidx)}-ancillaries">${pills([...new Set([...(fw.ancillaries || []), ...(d.ancillaries || [])])], 'ancillaries')}</div>
       </div>
     </div>
     </div>
@@ -2966,12 +4015,14 @@ function readTrainDetailFields(tidx) {
   };
   return {
     label:         field('label'),
-    vehicleNumber: field('vehicleNumber'),
     originURN:     field('originURN'),
     destinationURN:field('destinationURN'),
-    departureTime: field('departureTime'),
-    arrivalTime:   field('arrivalTime'),
     operatorCode:  field('operatorCode'),
+    productCategoryRef:       field('productCategoryRef'),
+    productCategoryName:      field('productCategoryName'),
+    productCategoryShortName: field('productCategoryShortName'),
+    daysOfWeek:    getSelectedPills(`tf-${esc(tidx)}-days`),
+    services:      readTrainServiceRows(tidx),
     ticketTypes:       getSelectedPills(`tf-${esc(tidx)}-ticketTypes`),
     travelClasses:     getSelectedPills(`tf-${esc(tidx)}-travelClasses`),
     serviceClasses:    getSelectedPills(`tf-${esc(tidx)}-serviceClasses`),
@@ -2983,27 +4034,30 @@ function readTrainDetailFields(tidx) {
 }
 
 function wizValidateTrain(tidx) {
-  const URN_RE  = /^urn:uic:stn:\d+$/i;
+  // Station refs are not always UIC codes: some sandboxes use vendor-specific
+  // schemes (e.g. Bileto returns urn:x_bileto:stn:<uuid>). Accept any
+  // urn:<scheme>:stn:<id> so discovered/real refs validate (#161 follow-up).
+  const URN_RE  = /^urn:[a-z0-9_]+:stn:[a-z0-9_.-]+$/i;
   const RICS_RE = /^urn:uic:rics:\d+$/i;
   const TIME_RE = /^\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/;
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return false;
+  const urnMsg = 'Must be a station URN, e.g. urn:uic:stn:8400058 (or a vendor ref like urn:x_bileto:stn:…).';
   const checks = [
     { tfield: 'label',          test: v => v.length > 0,            msg: 'Label is required.' },
-    { tfield: 'vehicleNumber',  test: v => v.length > 0,            msg: 'Vehicle Number is required.' },
-    { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
-    { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: 'Must be urn:uic:stn:XXXXXXX (digits only after last colon).' },
-    { tfield: 'departureTime',  test: v => !v || TIME_RE.test(v),  msg: 'Must be HH:MM:SS+HH:MM or HH:MM:SS-HH:MM (e.g. 07:00:00+02:00).' },
-    { tfield: 'arrivalTime',    test: v => !v || TIME_RE.test(v),  msg: 'Must be HH:MM:SS+HH:MM or HH:MM:SS-HH:MM (e.g. 10:20:00+02:00).' },
+    { tfield: 'originURN',      test: v => !v || URN_RE.test(v),   msg: urnMsg },
+    { tfield: 'destinationURN', test: v => !v || URN_RE.test(v),   msg: urnMsg },
     { tfield: 'operatorCode',   test: v => !v || RICS_RE.test(v),  msg: 'Must be urn:uic:rics:NNNN (e.g. urn:uic:rics:1184) or leave empty.' }
   ];
-  // Clear previous state
+  // Clear previous state (route fields + services)
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
     const err = document.getElementById(`tf-${esc(tidx)}-${c.tfield}-err`);
     if (el)  el.classList.remove('invalid');
     if (err) { err.textContent = ''; err.classList.remove('show'); }
   });
+  const svcErr = document.getElementById(`tf-${esc(tidx)}-services-err`);
+  if (svcErr) { svcErr.textContent = ''; svcErr.classList.remove('show'); }
   let ok = true;
   checks.forEach(c => {
     const el  = detail.querySelector(`[data-tfield="${c.tfield}"]`);
@@ -3016,11 +4070,29 @@ function wizValidateTrain(tidx) {
       ok = false;
     }
   });
+
+  // Services (timetable): at least one, each with a vehicle # and valid times.
+  const services = readTrainServiceRows(tidx);
+  let svcMsg = '';
+  if (services.length === 0) {
+    svcMsg = 'Add at least one service (the train that runs this route).';
+  } else {
+    for (let i = 0; i < services.length; i++) {
+      const s = services[i];
+      if (!s.vehicleNumber) { svcMsg = `Service ${i + 1}: vehicle number is required.`; break; }
+      if (s.departureTime && !TIME_RE.test(s.departureTime)) { svcMsg = `Service ${i + 1}: departure must be HH:MM:SS±HH:MM (e.g. 09:10:00+02:00).`; break; }
+      if (s.arrivalTime && !TIME_RE.test(s.arrivalTime)) { svcMsg = `Service ${i + 1}: arrival must be HH:MM:SS±HH:MM (e.g. 16:35:00+02:00).`; break; }
+    }
+  }
+  if (svcMsg) {
+    if (svcErr) { svcErr.textContent = svcMsg; svcErr.classList.add('show'); }
+    ok = false;
+  }
   return ok;
 }
 
-async function wizSaveTrain(tidx) {
-  if (!wizValidateTrain(tidx)) return;
+async function wizSaveTrain(tidx, opts = {}) {
+  if (!wizValidateTrain(tidx)) return null;
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const t = trains[tidx];
   if (!t) return;
@@ -3028,12 +4100,14 @@ async function wizSaveTrain(tidx) {
   if (!fields) return;
   const label = fields.label;
   const data = {
-    vehicleNumber:    fields.vehicleNumber,
     originURN:        fields.originURN,
     destinationURN:   fields.destinationURN,
-    departureTime:    fields.departureTime,
-    arrivalTime:      fields.arrivalTime,
     operatorCode:     fields.operatorCode,
+    productCategoryRef:       fields.productCategoryRef,
+    productCategoryName:      fields.productCategoryName,
+    productCategoryShortName: fields.productCategoryShortName,
+    daysOfWeek:       fields.daysOfWeek,
+    services:         fields.services,
     ticketTypes:      fields.ticketTypes,
     travelClasses:    fields.travelClasses,
     serviceClasses:   fields.serviceClasses,
@@ -3053,7 +4127,7 @@ async function wizSaveTrain(tidx) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Failed to save train: ${err.detail || err.title || res.status}`);
+      oscarToast(`Failed to save train: ${err.detail || err.title || res.status}`, 'error');
       return;
     }
     const saved = await res.json();
@@ -3068,9 +4142,199 @@ async function wizSaveTrain(tidx) {
     const targetIdx = wizData.resources.findIndex(r => r === t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
+    // Save-all reads + persists several panels, then re-renders once itself.
+    if (opts.rerender === false) return saved;
     showMsg(`✅ Train "${label}" saved.`, true);
+    // Re-render the Test Data section locally (no server round-trip) and re-open
+    // the saved panel — so saving a train no longer collapses it / wipes the
+    // list (#141). refreshAllSections() is unnecessary here: a resource save
+    // doesn't touch the framework, scenarios or datafile.
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenTrainById(saved.id);
+    return saved;
+  } catch(e) { oscarToast(`Network error: ${e.message}`, 'error'); return null; }
+}
+
+// Re-open a train's detail panel by resource id after a list re-render.
+function reopenTrainById(id) {
+  if (id == null) return;
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const tidx = trains.findIndex(r => String(r.id) === String(id));
+  if (tidx < 0) return;
+  const detail = document.getElementById('train-detail-' + tidx);
+  if (detail && !detail.classList.contains('open')) toggleTrainDetail(tidx);
+}
+
+// Save every train whose detail panel is open/edited (rendered), in one go.
+// Validates all first so a bad field blocks the batch before anything is sent.
+async function wizSaveAllTrains() {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const targets = [];
+  trains.forEach((t, tidx) => {
+    const detail = document.getElementById('train-detail-' + tidx);
+    if (detail && detail.dataset.rendered) targets.push(tidx);
+  });
+  if (targets.length === 0) { showMsg('Open the train(s) you want to save first (click a row to expand).', false); return; }
+  for (const tidx of targets) {
+    if (!wizValidateTrain(tidx)) { showMsg('Fix the highlighted train fields, then Save all.', false); return; }
+  }
+  const savedIds = [];
+  for (const tidx of targets) {
+    const r = await wizSaveTrain(tidx, { rerender: false });
+    if (r) savedIds.push(r.id);
+  }
+  renderTestDataSection(wizData.framework, wizData.resources);
+  renderWizardStep2InSection();
+  savedIds.forEach(reopenTrainById);
+  showMsg(`✅ Saved ${savedIds.length} train${savedIds.length !== 1 ? 's' : ''}.`, true);
+}
+
+// ── Timetable Discovery (#157) ───────────────────────────────────────────────
+// Reverse-engineer the train sets a sandbox actually runs: enter an O&D, OSCAR
+// fires POST /trips-collection across the next N days server-side, harvests
+// every leg as a service, and merges the result into the Train Resources list
+// (creating new sets, appending services to existing ones — never clobbering
+// manual edits). All the network + merge work happens on the server; the
+// client just collects the O&D, shows a spinner, then renders the summary.
+
+// Seed the O&D from the first existing train set, as a convenience.
+function _ttSeedOD() {
+  const t = (wizData.resources || []).find(r => r.resource_type === 'TRAIN');
+  const d = t ? normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {})) : {};
+  return { origin: d.originURN || '', destination: d.destinationURN || '' };
+}
+
+function openTimetableDiscovery() {
+  if (isTester) return;
+  closeTimetableDiscovery();
+  const seed = _ttSeedOD();
+  const overlay = document.createElement('div');
+  overlay.id = 'tt-discover-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:560px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:22px 24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <h3 style="margin:0;font-size:17px;color:#263238">🔍 Discover timetable</h3>
+        <button class="row-delete-btn" data-action="tt-discover-close" title="Close">✕</button>
+      </div>
+      <p style="color:#607d8b;font-size:12.5px;line-height:1.6;margin:0 0 16px">
+        Enter an origin and destination. OSCAR queries the sandbox
+        (<code>POST /offers</code>) across the next few days and creates/updates
+        the train sets it actually runs — including the offered travel/service
+        classes and ancillaries. Existing manual edits are preserved.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:12px;color:#455a64;font-weight:600">Origin
+          <input id="tt-origin" class="param-input" value="${esc(seed.origin)}" placeholder="urn:uic:stn:8500010 (or just 8500010)" style="margin-top:3px">
+        </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Destination
+          <input id="tt-dest" class="param-input" value="${esc(seed.destination)}" placeholder="urn:uic:stn:8400058 (or just 8400058)" style="margin-top:3px">
+        </label>
+        <label style="font-size:12px;color:#455a64;font-weight:600">Days to scan (1–14)
+          <input id="tt-days" class="param-input" type="number" min="1" max="14" value="7" style="margin-top:3px;width:90px">
+        </label>
+      </div>
+      <div id="tt-discover-status" style="margin-top:14px;font-size:12.5px;color:#546e7a"></div>
+      <div id="tt-discover-result" style="margin-top:12px"></div>
+      <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" data-action="tt-discover-close">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="tt-discover-run-btn" data-action="tt-discover-run">Discover</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  // Click outside the dialog closes it.
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeTimetableDiscovery(); });
+  const o = document.getElementById('tt-origin');
+  if (o) o.focus();
+}
+
+function closeTimetableDiscovery() {
+  const el = document.getElementById('tt-discover-overlay');
+  if (el) el.remove();
+}
+
+async function runTimetableDiscovery() {
+  const originEl = document.getElementById('tt-origin');
+  const destEl   = document.getElementById('tt-dest');
+  const daysEl   = document.getElementById('tt-days');
+  const statusEl = document.getElementById('tt-discover-status');
+  const resultEl = document.getElementById('tt-discover-result');
+  const runBtn   = document.getElementById('tt-discover-run-btn');
+  if (!originEl || !destEl) return;
+
+  const originURN = originEl.value.trim();
+  const destinationURN = destEl.value.trim();
+  let days = parseInt(daysEl && daysEl.value, 10);
+  if (!Number.isInteger(days) || days < 1) days = 7;
+  if (days > 14) days = 14;
+
+  if (!originURN || !destinationURN) {
+    statusEl.textContent = '⚠️ Enter both an origin and a destination.';
+    statusEl.style.color = '#c62828';
+    return;
+  }
+
+  if (resultEl) resultEl.innerHTML = '';
+  statusEl.style.color = '#546e7a';
+  statusEl.textContent = `⏳ Scanning the next ${days} day(s) of timetable… this can take up to ~${Math.min(days * 20, 60)}s.`;
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Scanning…'; }
+
+  try {
+    const res = await fetch('/v1/company/test-resources/discover-timetable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originURN, destinationURN, days })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      statusEl.style.color = '#c62828';
+      statusEl.textContent = `❌ ${body.detail || body.title || ('HTTP ' + res.status)}`;
+      if (Array.isArray(body.dayResults)) renderDiscoveryDays(resultEl, body.dayResults);
+      return;
+    }
+    const s = body.summary || {};
+    statusEl.style.color = '#2e7d32';
+    statusEl.textContent = `✅ Found ${s.routesDiscovered || 0} route(s), ${s.servicesDiscovered || 0} service(s). Created ${s.created || 0}, updated ${s.updated || 0} train set(s).`;
+    renderDiscoveryResult(resultEl, body);
+
+    // Reload + re-render ALL sections from the server so the new/updated train
+    // sets appear AND the Scenarios section unlocks (it gates on train count;
+    // a partial Test-Data-only refresh left it stale → "configure Test Data
+    // first" even though a train now exists). #165 follow-up.
     await refreshAllSections();
-  } catch(e) { alert(`Network error: ${e.message}`); }
+  } catch (e) {
+    statusEl.style.color = '#c62828';
+    statusEl.textContent = `❌ Network error: ${e.message}`;
+  } finally {
+    if (runBtn) { runBtn.disabled = false; runBtn.textContent = 'Discover again'; }
+  }
+}
+
+// Render the created/updated lists + per-day breakdown into the modal.
+function renderDiscoveryResult(el, body) {
+  if (!el) return;
+  const created = body.created || [];
+  const updated = body.updated || [];
+  const list = (title, arr) => arr.length
+    ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
+        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('')}</ul></div>`
+    : '';
+  el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated);
+  renderDiscoveryDays(el, body.dayResults || []);
+}
+
+function renderDiscoveryDays(el, dayResults) {
+  if (!el || !Array.isArray(dayResults) || dayResults.length === 0) return;
+  const rows = dayResults.map(d => {
+    const ok = d.status >= 200 && d.status < 300;
+    const icon = ok ? '✅' : '⚠️';
+    const via = d.via ? ` via ${esc(d.via)}` : '';
+    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : ''}`;
+    return `<tr><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${icon} ${esc(d.date)}</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${detail}</td></tr>`;
+  }).join('');
+  el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
+    <table style="margin-top:6px;border-collapse:collapse">${rows}</table></details>`;
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
@@ -3085,6 +4349,44 @@ function wizAddTrain() {
   if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
   const newIdx = trains.length - 1;
+  toggleTrainDetail(newIdx);
+  const detail = document.getElementById('train-detail-' + newIdx);
+  if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Duplicate an existing train into a new unsaved copy and expand it ─────────
+// Deep-clones the source train's data + label into a fresh unsaved placeholder
+// (mirrors wizAddTrain) so the user can tweak the vehicle # / times before
+// saving — the common "same route, different hour" case. The copy gets a
+// unique "(copy)" label and is persisted as a brand-new resource on Save Train.
+function wizDuplicateTrain(tidx) {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const src = trains[tidx];
+  if (!src) return;
+  const srcData = typeof src.data === 'string' ? JSON.parse(src.data) : (src.data || {});
+
+  // Unique "(copy)" label so the list stays readable and Save doesn't collide.
+  const existing = new Set(trains.map(t => t.label).filter(Boolean));
+  const base = `${src.label || 'Train'} (copy)`;
+  let newLabel = base;
+  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+
+  const copy = {
+    id: null,
+    _unsaved: true,
+    label: newLabel,
+    resource_type: 'TRAIN',
+    data: JSON.parse(JSON.stringify(srcData))
+  };
+  wizData.resources.push(copy);
+
+  // Re-render and expand the new (last) train — same flow as wizAddTrain.
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const newTrains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const newIdx = newTrains.length - 1;
   toggleTrainDetail(newIdx);
   const detail = document.getElementById('train-detail-' + newIdx);
   if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -3105,6 +4407,354 @@ async function wizDeleteResource(id) {
   }
   // Delegate to deleteTrainResource which checks for impacted scenarios
   await deleteTrainResource(id);
+}
+
+// ── Journeys (#137) ───────────────────────────────────────────────────────
+// A Journey is a reusable multi-leg itinerary: an ordered list of legs, each
+// referencing a train set (#136) + a chosen service from its timetable. A
+// scenario can apply a journey to fill its trip legs once, instead of typing
+// every leg by hand. Stored as a JOURNEY test-resource: data = { legs: [
+// { trainResourceId, serviceIndex } ] }.
+function stnShort(urn) { return String(urn || '').split(':').pop() || ''; }
+
+// Resolve one journey leg → { train, d (normalized data), svc (chosen service) }.
+function journeyResolveLeg(leg) {
+  if (!leg) return null;
+  const train = (wizData.resources || []).find(r => String(r.id) === String(leg.trainResourceId) && r.resource_type === 'TRAIN');
+  if (!train) return null;
+  const d = normalizeTrainData(typeof train.data === 'string' ? JSON.parse(train.data) : (train.data || {}));
+  const svc = d.services[leg.serviceIndex] || d.services[0] || {};
+  return { train, d, svc };
+}
+
+function journeyData(j) {
+  if (!j) return { legs: [] };
+  const data = typeof j.data === 'string' ? (() => { try { return JSON.parse(j.data || '{}'); } catch (_) { return {}; } })() : (j.data || {});
+  if (!Array.isArray(data.legs)) data.legs = [];
+  return data;
+}
+
+// Human summary of a journey: "BAS → AMS → PAR · 2 legs · 1 transfer".
+function journeySummary(j) {
+  const legs = journeyData(j).legs;
+  if (!legs.length) return 'no legs yet';
+  const stops = [];
+  legs.forEach((leg, i) => {
+    const r = journeyResolveLeg(leg);
+    const o = r ? stnShort(r.d.originURN) : '?';
+    const dst = r ? stnShort(r.d.destinationURN) : '?';
+    if (i === 0) stops.push(o || '?');
+    stops.push(dst || '?');
+  });
+  const transfers = Math.max(0, legs.length - 1);
+  return `${stops.join(' → ')}  ·  ${legs.length} leg${legs.length > 1 ? 's' : ''}  ·  ${transfers} transfer${transfers !== 1 ? 's' : ''}`;
+}
+
+// Resolve a journey into scenario trip legs (origin/destination/times/vehicle).
+function journeyToTripLegs(j) {
+  return journeyData(j).legs.map(leg => {
+    const r = journeyResolveLeg(leg);
+    if (!r) return null;
+    const { d, svc } = r;
+    const out = {};
+    if (d.originURN)      out.origin        = d.originURN;
+    if (d.destinationURN) out.destination   = d.destinationURN;
+    if (svc.departureTime) out.startDatetime = '%TRIP_DATE%T' + svc.departureTime;
+    if (svc.arrivalTime)   out.endDatetime   = '%TRIP_DATE%T' + svc.arrivalTime;
+    if (svc.vehicleNumber) out.vehicleNumber = svc.vehicleNumber;
+    if (d.operatorCode)    out.operatorCode  = d.operatorCode;
+    if (d.productCategoryRef)       out.productCategoryRef       = d.productCategoryRef;
+    if (d.productCategoryName)      out.productCategoryName      = d.productCategoryName;
+    if (d.productCategoryShortName) out.productCategoryShortName = d.productCategoryShortName;
+    return out;
+  }).filter(Boolean);
+}
+
+// Continuity check (#145): a journey's legs must chain — each leg should start
+// where the previous ended, and depart after the previous arrives. Returns a
+// list of human warnings (soft — overnight connections are legitimately
+// possible, so this guides rather than blocks). Times are "HH:MM:SS±HH:MM" on a
+// shared trip date, so a fixed-date parse compares them correctly.
+function journeyContinuityWarnings(j) {
+  const legs = journeyData(j).legs;
+  const ms = (t) => { if (!t) return NaN; const d = new Date('2000-01-01T' + t); return d.getTime(); };
+  const warns = [];
+  for (let i = 1; i < legs.length; i++) {
+    const prev = journeyResolveLeg(legs[i - 1]);
+    const cur  = journeyResolveLeg(legs[i]);
+    if (!prev || !cur) continue;
+    if (prev.d.destinationURN && cur.d.originURN && prev.d.destinationURN !== cur.d.originURN) {
+      warns.push(`Leg ${i + 1} starts at ${stnShort(cur.d.originURN)} but leg ${i} ends at ${stnShort(prev.d.destinationURN)} — the legs don't connect.`);
+    }
+    const arr = ms(prev.svc.arrivalTime), dep = ms(cur.svc.departureTime);
+    if (!isNaN(arr) && !isNaN(dep) && dep < arr) {
+      warns.push(`Leg ${i + 1} departs ${cur.svc.departureTime} before leg ${i} arrives ${prev.svc.arrivalTime} — pick a later service (or ignore if it's an overnight connection).`);
+    }
+  }
+  return warns;
+}
+
+// <select> of every train set × service for one journey leg.
+function journeyLegPickerHtml(jidx, li, leg) {
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const sel = leg && leg.trainResourceId !== '' && leg.trainResourceId != null
+    ? `${leg.trainResourceId}::${leg.serviceIndex || 0}` : '';
+  const opts = ['<option value="">— pick a service for this leg —</option>'];
+  trains.forEach(t => {
+    const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+    const route = [d.originURN, d.destinationURN].filter(Boolean).map(stnShort).join('→');
+    (d.services.length ? d.services : [{}]).forEach((s, si) => {
+      const v = `${t.id}::${si}`;
+      // Identify the leg by its *service* (route · vehicle · departure→arrival),
+      // not the train-set label — a set holds several services, so leading with
+      // the set name was misleading (#141). The set name trails as context.
+      const times = [s.departureTime, s.arrivalTime].filter(Boolean).join('→');
+      const svc = [route, s.vehicleNumber, times].filter(Boolean).join(' · ');
+      const lbl = svc ? `${svc}  ·  ${t.label || '?'}` : (t.label || '?');
+      opts.push(`<option value="${esc(v)}" ${sel === v ? 'selected' : ''}>${esc(lbl)}</option>`);
+    });
+  });
+  return `<select class="param-input param-select" data-action="journey-leg-pick" data-jidx="${esc(jidx)}" data-li="${esc(li)}" style="min-width:300px;font-size:12px">${opts.join('')}</select>`;
+}
+
+// The legs + summary body of a journey detail (re-rendered on leg edits; the
+// label input lives outside this container so unsaved edits survive).
+function journeyBodyHtml(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return '';
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  const legs = journeyData(j).legs;
+  const legsHtml = legs.length ? legs.map((leg, li) => `
+    <div class="sub-card" style="display:flex;gap:8px;align-items:center;padding:8px 12px;margin-bottom:6px">
+      <span style="font-weight:700;color:#455a64;min-width:46px">Leg ${li + 1}</span>
+      ${journeyLegPickerHtml(jidx, li, leg)}
+      <div style="display:flex;gap:3px;margin-left:auto">
+        <button class="btn btn-sm btn-secondary" data-action="journey-move-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" data-dir="-1" title="Move up"${li === 0 ? ' disabled' : ''}>▲</button>
+        <button class="btn btn-sm btn-secondary" data-action="journey-move-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" data-dir="1" title="Move down"${li === legs.length - 1 ? ' disabled' : ''}>▼</button>
+        <button class="row-delete-btn" data-action="journey-remove-leg" data-jidx="${esc(jidx)}" data-li="${esc(li)}" title="Remove this leg">🗑</button>
+      </div>
+    </div>`).join('') : '<div style="color:#90a4ae;font-size:12px;padding:6px 0">No legs yet — chain the train sets this journey runs over.</div>';
+  const warns = journeyContinuityWarnings(j);
+  const warnHtml = warns.length
+    ? `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#e65100">⚠ ${warns.map(esc).join('<br>')}</div>`
+    : '';
+  return `
+    <div style="font-size:11px;color:#78909c;margin-bottom:8px">🧭 ${esc(journeySummary(j))}</div>
+    ${warnHtml}
+    ${trains.length === 0
+      ? '<div style="color:#e65100;font-size:12px">⚠️ Define train sets first — a journey chains existing train sets.</div>'
+      : legsHtml}
+    <div style="margin-top:10px">
+      <button class="btn btn-secondary btn-sm" data-action="journey-add-leg" data-jidx="${esc(jidx)}"${trains.length === 0 ? ' disabled' : ''}>➕ Add leg</button>
+    </div>
+    <span class="field-error" id="jf-${esc(jidx)}-legs-err"></span>`;
+}
+
+function buildJourneyDetailHTML(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return '';
+  return `
+  <div class="param-section" style="margin-top:8px">
+    <div class="param-section-head" data-action="toggle-param-section">🧭 Journey<span class="ps-arrow open">▶</span></div>
+    <div class="param-section-body open">
+    <div style="padding:12px 14px">
+      <div class="param-field" style="margin-bottom:12px">
+        <label class="param-label">Label <span class="param-hint">(short display name)</span></label>
+        <input class="param-input" data-action="journey-label" data-jidx="${esc(jidx)}" value="${esc(j.label || '')}" placeholder="e.g. Basel → Paris via Amsterdam">
+        <span class="field-error" id="jf-${esc(jidx)}-label-err"></span>
+      </div>
+      <div id="journey-body-${esc(jidx)}">${journeyBodyHtml(jidx)}</div>
+      <div style="margin-top:14px">
+        <button class="btn btn-primary btn-sm" data-action="wiz-save-journey" data-jidx="${esc(jidx)}">💾 Save Journey</button>
+      </div>
+    </div>
+    </div>
+  </div>`;
+}
+
+function reRenderJourneyBody(jidx) {
+  const body = document.getElementById('journey-body-' + jidx);
+  if (body) body.innerHTML = journeyBodyHtml(jidx);
+}
+
+function toggleJourneyDetail(jidx) {
+  const detail = document.getElementById('journey-detail-' + jidx);
+  const arrow  = document.getElementById('journey-arrow-' + jidx);
+  if (!detail) return;
+  if (!detail.classList.contains('open')) {
+    if (!detail.dataset.rendered) {
+      detail.innerHTML = buildJourneyDetailHTML(jidx);
+      detail.dataset.rendered = '1';
+    }
+    detail.classList.add('open');
+    if (arrow) arrow.classList.add('open');
+  } else {
+    detail.classList.remove('open');
+    if (arrow) arrow.classList.remove('open');
+  }
+}
+
+function wizAddJourney() {
+  wizData.resources.push({ id: null, _unsaved: true, label: '', resource_type: 'JOURNEY', data: { legs: [] } });
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const newIdx = journeys.length - 1;
+  toggleJourneyDetail(newIdx);
+  const detail = document.getElementById('journey-detail-' + newIdx);
+  if (detail) detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function wizDuplicateJourney(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const src = journeys[jidx];
+  if (!src) return;
+  const existing = new Set(journeys.map(x => x.label).filter(Boolean));
+  const base = `${src.label || 'Journey'} (copy)`;
+  let newLabel = base;
+  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  wizData.resources.push({
+    id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
+    data: JSON.parse(JSON.stringify(journeyData(src)))
+  });
+  renderWizardStep2InSection();
+  const bodyData = document.getElementById('body-data');
+  const toggleData = document.getElementById('toggle-data');
+  if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+  const after = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  toggleJourneyDetail(after.length - 1);
+}
+
+function journeyAddLeg(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
+  if (trains.length === 0) return;
+  // Default the new leg to the first train's first service so it is valid.
+  j.data.legs.push({ trainResourceId: trains[0].id, serviceIndex: 0 });
+  reRenderJourneyBody(jidx);
+}
+
+function journeyRemoveLeg(jidx, li) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  if (li >= 0 && li < j.data.legs.length) j.data.legs.splice(li, 1);
+  reRenderJourneyBody(jidx);
+}
+
+function journeyMoveLeg(jidx, li, dir) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const to = li + dir;
+  if (to < 0 || to >= j.data.legs.length) return;
+  const tmp = j.data.legs[li];
+  j.data.legs[li] = j.data.legs[to];
+  j.data.legs[to] = tmp;
+  reRenderJourneyBody(jidx);
+}
+
+function journeySetLeg(jidx, li, value) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  j.data = journeyData(j);
+  const [trainResourceId, svcIdxStr] = String(value || '').split('::');
+  if (!trainResourceId) { j.data.legs[li] = { trainResourceId: '', serviceIndex: 0 }; }
+  else {
+    const parsedId = /^\d+$/.test(trainResourceId) ? parseInt(trainResourceId, 10) : trainResourceId;
+    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: parseInt(svcIdxStr, 10) || 0 };
+  }
+  reRenderJourneyBody(jidx);
+}
+
+async function wizSaveJourney(jidx) {
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const j = journeys[jidx];
+  if (!j) return;
+  const detail = document.getElementById('journey-detail-' + jidx);
+  const labelEl = detail && detail.querySelector('[data-action="journey-label"]');
+  const label = labelEl ? labelEl.value.trim() : (j.label || '');
+  const legs = journeyData(j).legs.filter(l => l && l.trainResourceId !== '' && l.trainResourceId != null);
+
+  const labelErr = document.getElementById(`jf-${jidx}-label-err`);
+  const legsErr  = document.getElementById(`jf-${jidx}-legs-err`);
+  if (labelErr) { labelErr.textContent = ''; labelErr.classList.remove('show'); }
+  if (legsErr)  { legsErr.textContent = '';  legsErr.classList.remove('show'); }
+  let ok = true;
+  if (!label) { if (labelErr) { labelErr.textContent = 'Label is required.'; labelErr.classList.add('show'); } ok = false; }
+  if (legs.length === 0) { if (legsErr) { legsErr.textContent = 'Add at least one leg (a train set + service).'; legsErr.classList.add('show'); } ok = false; }
+  if (!ok) return;
+
+  const data = { legs };
+  const isNew = !j.id || j._unsaved;
+  try {
+    const url    = isNew ? '/v1/company/test-resources' : `/v1/company/test-resources/${j.id}`;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, resource_type: 'JOURNEY', data })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      oscarToast(`Failed to save journey: ${err.detail || err.title || res.status}`, 'error');
+      return;
+    }
+    const saved = await res.json();
+    const idx = wizData.resources.findIndex(r => r === j);
+    if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
+    showMsg(`✅ Journey "${label}" saved.`, true);
+    // Local re-render + re-open (keep the panel expanded after save, #141).
+    renderTestDataSection(wizData.framework, wizData.resources);
+    renderWizardStep2InSection();
+    reopenJourneyById(saved.id);
+  } catch (e) { oscarToast(`Network error: ${e.message}`, 'error'); }
+}
+
+// Re-open a journey's detail panel by resource id after a list re-render.
+function reopenJourneyById(id) {
+  if (id == null) return;
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const jidx = journeys.findIndex(r => String(r.id) === String(id));
+  if (jidx < 0) return;
+  const detail = document.getElementById('journey-detail-' + jidx);
+  if (detail && !detail.classList.contains('open')) toggleJourneyDetail(jidx);
+}
+
+async function wizDeleteJourney(id) {
+  // Unsaved journey (no id) — drop locally.
+  if (!id || id === 'null') {
+    const unsaved = wizData.resources.find(r => r._unsaved && !r.id && r.resource_type === 'JOURNEY');
+    if (unsaved) {
+      wizData.resources = wizData.resources.filter(r => r !== unsaved);
+      renderWizardStep2InSection();
+      const bodyData = document.getElementById('body-data');
+      const toggleData = document.getElementById('toggle-data');
+      if (bodyData) { bodyData.style.display = 'block'; toggleData.classList.add('open'); }
+    }
+    return;
+  }
+  const j = (wizData.resources || []).find(r => String(r.id) === String(id) && r.resource_type === 'JOURNEY');
+  if (!j) return;
+  // Journeys are copied into a scenario's legs at apply-time (not referenced),
+  // so deleting one cannot orphan a scenario — a plain confirm is enough.
+  if (!confirm(`Delete journey "${j.label || id}"?`)) return;
+  try {
+    const res = await fetch(`/v1/company/test-resources/${id}`, { method: 'DELETE' });
+    if (!res.ok) { oscarToast(`Failed to delete journey: ${res.status}`, 'error'); return; }
+    wizData.resources = wizData.resources.filter(r => r !== j);
+    await refreshAllSections();
+  } catch (e) { oscarToast(`Network error: ${e.message}`, 'error'); }
 }
 
 // ── Wizard navigation (now section-local) ─────────────────────────────────────
@@ -3153,22 +4803,23 @@ function wizInitScenario() {
     passengerGender:    {},    // per-type default gender applied at generation: { ADULT: 'X'|'MALE'|'FEMALE', ... }
     overruleCode:       null,
     trainResourceId:    null,
+    journeyResourceId:  null,   // #143 — when set, the scenario is a multi-leg journey
     tripType:           'SPECIFICATION',
     originURN:          '',
     destinationURN:     '',
     passengers,
-    // Per OSDM spec, every offer-search criterion is OPTIONAL. The wizard
-    // pre-fills only from the company's Test Framework defaults — if the
-    // framework leaves a field empty, we leave it empty here too, so the
-    // generated scenario sends nothing for it (and the vendor applies its
-    // own server-side default). Users can still type/tick values in the
-    // wizard to override.
-    requestedOfferParts: (fw.offerCriteria && fw.offerCriteria.requestedOfferParts) ? [...fw.offerCriteria.requestedOfferParts] : [],
-    serviceClasses:      (fw.offerCriteria && fw.offerCriteria.serviceClasses)      ? [...fw.offerCriteria.serviceClasses]      : [],
-    travelClasses:       (fw.offerCriteria && fw.offerCriteria.travelClasses)       ? [...fw.offerCriteria.travelClasses]       : [],
-    flexibilities:       (fw.offerCriteria && fw.offerCriteria.flexibilities)       ? [...fw.offerCriteria.flexibilities]       : [],
-    offerMode:           (fw.offerCriteria && fw.offerCriteria.offerMode)           || '',
-    currency:            (fw.offerCriteria && fw.offerCriteria.currency)            || '',
+    // Per OSDM spec, every offer-search criterion is OPTIONAL. By default a new
+    // scenario sends ONLY the trip (origin + destination + departure date) and
+    // NO offer criteria — an empty offerSearchCriteria, so the vendor returns
+    // its full default offer. The tester ticks any criterion in the wizard to
+    // constrain the search. (#172 — framework offer-criteria defaults are no
+    // longer auto-applied; they remain selectable in the wizard.)
+    requestedOfferParts: [],
+    serviceClasses:      [],
+    travelClasses:       [],
+    flexibilities:       [],
+    offerMode:           '',
+    currency:            '',
     fulfillmentTypes:    (fw.fulfillment && fw.fulfillment.types) ? [...fw.fulfillment.types] : ['ETICKET'],
     fulfillmentMedia:    (fw.fulfillment && fw.fulfillment.media) ? [...fw.fulfillment.media] : ['PDF_A4']
   };
@@ -3216,8 +4867,10 @@ function renderWizardStep3() {
     ? '<option value="">— No trains defined — go to Step 2 first —</option>'
     : ['<option value="">— Select a train —</option>',
         ...trains.map(t => {
-          const d = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
-          return `<option value="${esc(t.id)}" ${sc.trainResourceId===t.id?'selected':''}>${esc(t.label||t.id)} (${esc(d.vehicleNumber||d.trainId||'?')})</option>`;
+          const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
+          const route = [d.originURN, d.destinationURN].filter(Boolean).join('→');
+          const hint = route || `${d.services.length} svc`;
+          return `<option value="${esc(t.id)}" ${sc.trainResourceId===t.id?'selected':''}>${esc(t.label||t.id)}${hint?' ('+esc(hint)+')':''}</option>`;
         })].join('');
 
   // Selected train detail card
@@ -3225,13 +4878,14 @@ function renderWizardStep3() {
   if (sc.trainResourceId) {
     const tr = trains.find(t => t.id === sc.trainResourceId);
     if (tr) {
-      const d = typeof tr.data === 'string' ? JSON.parse(tr.data) : (tr.data || {});
+      const d = normalizeTrainData(typeof tr.data === 'string' ? JSON.parse(tr.data) : (tr.data || {}));
+      const svcList = d.services.length
+        ? d.services.map(s => `${esc(s.vehicleNumber||'?')} ${esc(s.departureTime||'')}→${esc(s.arrivalTime||'')}`).join('<br>')
+        : '—';
       trainDetail = `<div class="train-sel-detail open" style="margin-top:10px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
-          <div><span class="param-label">Vehicle Number</span><br><code style="font-size:11px">${esc(d.vehicleNumber||d.trainId||'—')}</code></div>
           <div><span class="param-label">Route</span><br><code style="font-size:11px">${esc(d.originURN||'?')} → ${esc(d.destinationURN||'?')}</code></div>
-          <div><span class="param-label">Departure</span><br><code style="font-size:11px">${esc(d.departureTime||'—')}</code></div>
-          <div><span class="param-label">Arrival</span><br><code style="font-size:11px">${esc(d.arrivalTime||'—')}</code></div>
+          <div><span class="param-label">Services (${d.services.length})</span><br><code style="font-size:11px">${svcList}</code></div>
         </div>
         <div style="margin-top:8px;font-size:11px;color:#78909c">
           Travel classes: ${(d.travelClasses||[]).join(', ')||'—'} &nbsp;·&nbsp;
@@ -3240,6 +4894,23 @@ function renderWizardStep3() {
       </div>`;
     }
   }
+
+  // Journey selector (#143) — pick a saved multi-leg journey instead of a single
+  // train. When set, the scenario is generated as a SPECIFICATION from the
+  // journey's legs, and the single-train controls below are hidden.
+  const journeys = (wizData.resources || []).filter(r => r.resource_type === 'JOURNEY');
+  const journeyOpts = ['<option value="">— none (use a single train below) —</option>',
+    ...journeys.map(j => `<option value="${esc(j.id)}" ${String(sc.journeyResourceId) === String(j.id) ? 'selected' : ''}>${esc(j.label || j.id)} — ${esc(journeySummary(j))}</option>`)
+  ].join('');
+  const selJourney = sc.journeyResourceId ? journeys.find(j => String(j.id) === String(sc.journeyResourceId)) : null;
+  const journeyLegList = selJourney ? journeyData(selJourney).legs.map((leg, i) => {
+    const r = journeyResolveLeg(leg);
+    return r ? `${i + 1}. ${esc(stnShort(r.d.originURN))}→${esc(stnShort(r.d.destinationURN))} ${esc(r.svc.vehicleNumber || '')}` : `${i + 1}. ?`;
+  }).join(' &nbsp; ') : '';
+  const journeyDetail = selJourney ? `<div class="train-sel-detail open" style="margin-top:10px">
+      <div style="font-size:12px"><span class="param-label">Journey (multi-leg → SPECIFICATION)</span><br><code style="font-size:11px">🧭 ${esc(journeySummary(selJourney))}</code></div>
+      <div style="margin-top:6px;font-size:11px;color:#78909c">Legs: ${journeyLegList}</div>
+    </div>` : '';
 
   // Passenger counters — each human type also gets a default-gender picker.
   // The chosen gender is applied to every passenger of that type when the
@@ -3277,11 +4948,14 @@ function renderWizardStep3() {
     </div>`;
   }).join('');
 
-  // Offer criteria — prefer train-specific values if a train is selected
-  const activeTrain = sc.trainResourceId ? trains.find(t => t.id === sc.trainResourceId) : null;
-  const atd = activeTrain ? (typeof activeTrain.data==='string'?JSON.parse(activeTrain.data):activeTrain.data||{}) : null;
-  const availSC = atd && atd.serviceClasses && atd.serviceClasses.length ? atd.serviceClasses : (fw.serviceClasses||[]);
-  const availTC = atd && atd.travelClasses  && atd.travelClasses.length  ? atd.travelClasses  : (fw.offerCriteria&&fw.offerCriteria.travelClasses||WIZ_TRAVEL_CLASSES);
+  // Offer search criteria are free request filters — a scenario must be able to
+  // request ANY OSDM master-list value (incl. travel/service classes the train
+  // or system-under-test doesn't support), so non-happy-flow scenarios can be
+  // authored (#155). Options are the full enum; the train/framework values are
+  // only defaults (seeded into sc.* elsewhere), never a restriction. Union with
+  // whatever's already selected as a safety net.
+  const availSC = [...new Set([...WIZ_SERVICE_CLASSES, ...(sc.serviceClasses || [])])];
+  const availTC = [...new Set([...WIZ_TRAVEL_CLASSES,  ...(sc.travelClasses  || [])])];
 
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
@@ -3360,6 +5034,13 @@ function renderWizardStep3() {
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">🚆 Train / Trip Selection<span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body open">
+      ${journeys.length ? `
+      <div class="param-field" style="margin-bottom:12px">
+        <label class="param-label">Select a Journey <span class="param-hint">(multi-leg — overrides the single train below)</span></label>
+        <select class="param-input param-select" data-action="wiz-select-journey">${journeyOpts}</select>
+        ${journeyDetail}
+      </div>` : ''}
+      ${sc.journeyResourceId ? '' : `
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap">
         <div>
           <div class="param-label" style="margin-bottom:4px">Trip search mode</div>
@@ -3425,6 +5106,7 @@ function renderWizardStep3() {
           </div>
         </div>`;
       })()}
+      `}
     </div>
   </div>
 
@@ -3433,8 +5115,8 @@ function renderWizardStep3() {
     <div class="fw-section-head open" data-action="fw-toggle">👥 Passengers<span class="fw-toggle-icon">▶</span></div>
     <div class="fw-section-body open">
       <div style="font-size:12px;color:#78909c;margin-bottom:10px">
-        First names are prefixed with the passenger type (e.g. <code>ADULT_Marie</code>).
-        Date of birth is generated from configured age ranges.
+        Each passenger keeps its type (Adult, Child, …) and gets a realistic name;
+        the date of birth is generated from the configured age ranges for that type.
       </div>
       <div class="pax-counter-rows">
         ${paxRows || '<div style="color:#90a4ae;font-size:13px">No passenger types configured in the Test Framework.</div>'}
@@ -3461,15 +5143,16 @@ function renderWizardStep3() {
             data-action="wiz-currency">
         </div>
         <div class="param-field" style="min-width:160px">
-          <label class="param-label">Offer mode</label>
+          <label class="param-label">Offer mode <span class="param-hint">(optional)</span></label>
           <select class="param-input param-select" data-action="wiz-offer-mode">
-            ${fwFilter(WIZ_OFFER_MODES, fw.offerCriteria && fw.offerCriteria.offerMode ? [fw.offerCriteria.offerMode] : null).map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
+            <option value="" ${!sc.offerMode?'selected':''} style="color:#90a4ae">— none —</option>
+            ${WIZ_OFFER_MODES.map(m=>`<option value="${m}" ${sc.offerMode===m?'selected':''}>${m}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Requested offer parts</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_OFFER_PARTS, fw.offerCriteria && fw.offerCriteria.requestedOfferParts).map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${esc(p)}">${esc(p)}</div>`).join('')}
+        ${[...new Set([...WIZ_OFFER_PARTS, ...(sc.requestedOfferParts||[])])].map(p=>`<div class="pill${(sc.requestedOfferParts||[]).includes(p)?' selected':''}" data-action="wiz-scen-array" data-field="requestedOfferParts" data-val="${esc(p)}">${esc(p)}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Service class</div>
       <div class="pill-group" style="margin-bottom:14px">
@@ -3483,7 +5166,7 @@ function renderWizardStep3() {
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
+        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -3594,6 +5277,18 @@ function wizSelectTrain(id) {
   reRenderStep3InSection();
 }
 
+// #143 — pick a saved multi-leg Journey for a new scenario. A journey is always
+// a SPECIFICATION; selecting one supersedes the single-train selection.
+function wizSelectJourney(id) {
+  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  wizScenario.journeyResourceId = parsed;
+  if (parsed) {
+    wizScenario.tripType = 'SPECIFICATION';
+    wizScenario.trainResourceId = null;
+  }
+  reRenderStep3InSection();
+}
+
 function wizAdjustPax(type, delta) {
   const cur = wizScenario.passengers[type] || 0;
   wizScenario.passengers[type] = Math.max(0, cur + delta);
@@ -3675,7 +5370,6 @@ function genDateOfBirth(minAge, maxAge) {
 function wizGenPassengers() {
   const fw    = wizData.framework || emptyFramework();
   const sc    = wizScenario;
-  const email = wizProfile.email || (user && user.email) || 'tester@example.com';
   const passengers = [];
   let refNum = 1;
 
@@ -3691,8 +5385,22 @@ function wizGenPassengers() {
       const paxPhone   = genPhone();
 
       const pax = {
-        reference:   `PAX${refNum++}`,       // required by schema
+        // Reference is sent verbatim as externalRef on the OSDM
+        // anonymousPassengerSpecifications[] entry. OSDM v3.8 itself accepts any
+        // non-null string, but at least one provider (Paxone) enforces a stricter
+        // numeric / zero-padded shape and rejects "PAX1", "PAX2", … with a
+        // catch-all 422 "Schema validation error" per non-conformant passenger.
+        // Use the 5-digit zero-padded shape already used by requestsBuilder.js
+        // (lines 178 / 455 / 468) so wizard-generated scenarios run on every
+        // production provider.
+        reference:   String(refNum++).padStart(5, '0'),
         type:        osdmType,
+        // OSCAR-side passenger category (ADULT / CHILD / YOUTH / SENIOR / …).
+        // The OSDM `type` is PERSON for all humans (age differentiated by
+        // dateOfBirth), so without this the scenario view could not tell an
+        // ADULT from a CHILD and defaulted everything to ADULT — a 3-adult /
+        // 2-child request rendered as 5 adults. inferCategory() reads this first.
+        category:    category,
         phoneNumber: paxPhone,
         email:       paxEmail
       };
@@ -3744,9 +5452,9 @@ async function wizGenerateScenario() {
   const sc = wizScenario;
   const fw = wizData.framework || emptyFramework();
 
-  if (!sc.type) { alert('Please select a scenario type.'); return; }
+  if (!sc.type) { oscarToast('Please select a scenario type.', 'warning'); return; }
   const totalPax = Object.values(sc.passengers || {}).reduce((s, n) => s + n, 0);
-  if (totalPax === 0) { alert('Please add at least one passenger.'); return; }
+  if (totalPax === 0) { oscarToast('Please add at least one passenger.', 'warning'); return; }
 
   const btn      = document.getElementById('s3-gen-btn');
   const statusEl = document.getElementById('s3-gen-status');
@@ -3804,33 +5512,52 @@ async function wizGenerateScenario() {
     const trainRes = sc.trainResourceId
       ? (wizData.resources||[]).find(r => r.id === sc.trainResourceId)
       : null;
-    const d = trainRes ? (typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    const d = trainRes ? normalizeTrainData(typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    // A train set may carry several services (timetable, #136); the wizard uses
+    // the first one. Per-service selection is available in the trip editor's
+    // "Apply test data" picker.
+    const svc0 = (d.services && d.services[0]) || {};
+
+    // #143 — a selected Journey supersedes the single train: build a multi-leg
+    // SPECIFICATION from its legs (origin/dest/times/vehicle/operator + product
+    // category resolved per leg from each train set).
+    const journey = sc.journeyResourceId
+      ? (wizData.resources||[]).find(r => String(r.id) === String(sc.journeyResourceId) && r.resource_type === 'JOURNEY')
+      : null;
 
     // Resolve origin/destination: wizard override → train resource → framework → empty
     const resolvedOrigin      = sc.originURN      || d.originURN      || fw.originURN      || '';
     const resolvedDestination = sc.destinationURN || d.destinationURN || fw.destinationURN || '';
 
-    // Validate: SEARCH requires non-empty origin and destination
-    if (sc.tripType === 'SEARCH' && (!resolvedOrigin || !resolvedDestination)) {
+    // Validate: SEARCH requires non-empty origin and destination (a journey carries its own legs)
+    if (!journey && sc.tripType === 'SEARCH' && (!resolvedOrigin || !resolvedDestination)) {
       const missing = [!resolvedOrigin && 'Origin', !resolvedDestination && 'Destination'].filter(Boolean).join(' and ');
       if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ SEARCH mode requires ${esc(missing)} station URN(s). Please fill them in the Train/Trip section above.</span>`;
       if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate & Add Scenario'; }
       return;
     }
 
-    if (sc.tripType === 'SPECIFICATION') {
+    if (journey) {
+      const journeyLegs = journeyToTripLegs(journey);
+      if (journeyLegs.length === 0) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#c62828">⚠ The selected journey has no legs. Add legs to it under Test Data → Journeys.</span>`;
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate & Add Scenario'; }
+        return;
+      }
+      tripReq = { id: tripId, tripType: 'SPECIFICATION', legs: journeyLegs };
+    } else if (sc.tripType === 'SPECIFICATION') {
       tripReq = {
         id: tripId,
         tripType: 'SPECIFICATION',
         legs: [{
           origin:                   resolvedOrigin,
           destination:              resolvedDestination,
-          startDatetime:            `%TRIP_DATE%T${d.departureTime || '07:00:00+01:00'}`,
-          endDatetime:              `%TRIP_DATE%T${d.arrivalTime   || '09:00:00+01:00'}`,
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
-          vehicleNumber:            d.vehicleNumber || d.trainId || '',
+          startDatetime:            `%TRIP_DATE%T${svc0.departureTime || '07:00:00+01:00'}`,
+          endDatetime:              `%TRIP_DATE%T${svc0.arrivalTime   || '09:00:00+01:00'}`,
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
+          vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }]
       };
@@ -3842,12 +5569,12 @@ async function wizGenerateScenario() {
         trip: {
           origin:                   resolvedOrigin,
           destination:              resolvedDestination,
-          startDatetime:            d.departureTime  ? `%TRIP_DATE%T${d.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
-          endDatetime:              d.arrivalTime    ? `%TRIP_DATE%T${d.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
-          productCategoryRef:       '',
-          productCategoryName:      '',
-          productCategoryShortName: '',
-          vehicleNumber:            d.vehicleNumber || d.trainId || '',
+          startDatetime:            svc0.departureTime  ? `%TRIP_DATE%T${svc0.departureTime}` : '%TRIP_DATE%T07:00:00+01:00',
+          endDatetime:              svc0.arrivalTime    ? `%TRIP_DATE%T${svc0.arrivalTime}`   : '%TRIP_DATE%T09:00:00+01:00',
+          productCategoryRef:       d.productCategoryRef       || '',
+          productCategoryName:      d.productCategoryName      || '',
+          productCategoryShortName: d.productCategoryShortName || '',
+          vehicleNumber:            svc0.vehicleNumber || '',
           operatorCode:             d.operatorCode  || ''
         }
       };
@@ -3857,6 +5584,7 @@ async function wizGenerateScenario() {
     const scenario = {
       collection:          'OTST_V2.0.1_RFND_EXCH_ALL',
       loggingType:         'INFO',
+      stepFailurePolicy:   'HARD_STOP',
       code,
       scenarioType:        sc.type,
       scenarioAction:      sc.type !== 'SALE' ? (sc.action || 'PATCH') : null,
@@ -3870,6 +5598,73 @@ async function wizGenerateScenario() {
       // /bookings and POST /fulfillments. All-enabled by default; users
       // narrow via the pills in the detail panel.
       salesFlowActions: defaultSalesFlowActions(),
+      // Seat-selection mode (issue #107) — null until the author enables Place
+      // selection and picks a framework-supported mode in the detail panel.
+      placeSelectionMode: null,
+      // RequestedInformation negative probe (issue #258 Phase 3c) — null/off by
+      // default (auto-provide demanded fields); set to omit/invalid in the detail
+      // panel to negative-test the provider's error handling.
+      requestedInformationProbe: null,
+      // Purchaser at booking (issue #258 / #203) — 'inline' by default (purchaser
+      // sent in the booking request); deferred/omit/invalid in the detail panel
+      // to omit it at booking and set/probe it via POST /bookings/{id}/purchaser.
+      bookingPurchaserMode: 'inline',
+      // Expired-booking negative test (issue #204) — 'off' by default; 'on' makes
+      // OSCAR wait past confirmationTimeLimit then assert fulfillment is rejected.
+      expiredBookingTest: 'off',
+      // Per-scenario max wait budget for the expired-booking test (#204), in
+      // minutes. null = use server's RUN_TIMEOUT_MS (default 10 min). When set
+      // and expiredBookingTest is 'on', the runner auto-extends the worker
+      // SIGTERM to cover this wait (clamped to RUN_HARD_MAX_TIMEOUT_MS).
+      expiredBookingMaxWaitMinutes: null,
+      // Expired-offer negative test (Phase 2 of the expired-flow generalization)
+      // — 'off' by default; 'on' makes OSCAR wait past the earliest
+      // OfferPart.validUntil then assert POST /bookings is rejected.
+      expiredOfferTest: 'off',
+      // Per-scenario max wait budget for the expired-offer test, in minutes.
+      // null = use server's RUN_TIMEOUT_MS. Same auto-extend semantics as
+      // expiredBookingMaxWaitMinutes (clamped to RUN_HARD_MAX_TIMEOUT_MS).
+      expiredOfferMaxWaitMinutes: null,
+      // Phase 5a — expired post-booking add-reservation offer-part test.
+      // 'off' by default; 'on' makes OSCAR wait past the validUntil of the
+      // reservationOfferPart 09 will send, then assert the POST is rejected.
+      expiredAddReservationOfferTest: 'off',
+      expiredAddReservationOfferMaxWaitMinutes: null,
+      // Phase 5b — expired post-booking add-ancillary offer-part test.
+      // 'off' by default; 'on' makes OSCAR wait past the earliest validUntil
+      // across the ancillary parts 10 will send, then assert rejection.
+      expiredAddAncillaryOfferTest: 'off',
+      expiredAddAncillaryOfferMaxWaitMinutes: null,
+      // Phase 3 — expired refund-offer test. REFUND scenarios only.
+      // 'on' → wait past refundOffers[0].validUntil, assert PATCH rejection.
+      expiredRefundOfferTest: 'off',
+      expiredRefundOfferMaxWaitMinutes: null,
+      // Phase 4 — expired exchange-offer test. EXCHANGE scenarios only.
+      // 'on' → wait past exchangeOffers[0].preBookableUntil, assert POST
+      // /exchange-operations rejection. NOTE: the spec field is
+      // `preBookableUntil`, NOT `validUntil` (Deviations doc #25).
+      expiredExchangeOfferTest: 'off',
+      expiredExchangeOfferMaxWaitMinutes: null,
+      // Passenger external-ref format probe. Default empty → wizard generates
+      // 5-digit zero-padded refs ("00001", "00002", …) which every production
+      // provider accepts. When set to a printf-style pattern, the runtime
+      // overrides those refs at scenario-parse time, propagating the new
+      // values through the offer + booking + refund/exchange flows
+      // consistently. Lets the tester probe how providers handle non-standard
+      // externalRef shapes (e.g. "PAX%04d" → "PAX0001", "ABC-%03d" → "ABC-001",
+      // "%d" → "1" no-padding). The pattern is parsed by a small helper in
+      // library-bruno/scenarioParser.js — see applyExternalRefFormat().
+      passengerExternalRefFormat: '',
+      // Partial refund (#218) — both axes off by default for backwards-compat.
+      // When turned on, OSCAR scopes the refund-offer request via OSDM's
+      // RefundSpecification[].bookingPartIds / passengerIds. Wizard validates
+      // consistency (≥2 pax, ≥2 legs for SPECIFICATION trips); SEARCH-mode
+      // leg checks happen at offer-runtime and degrade to full refund with
+      // a [WARNING] when the offer returns only one leg.
+      partialRefundByLeg: 'off',
+      partialRefundLegSelection: 'first',
+      partialRefundByPax: 'off',
+      partialRefundPaxSelection: 'first',
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,
@@ -4042,7 +5837,8 @@ document.body.addEventListener('click', function(e) {
       // set-pax sets the field. Omitting from the initial object means the
       // data file JSON does not carry `gender: "X"` until the user asks for it.
       const newPax = {
-        reference: `PAX${paxList.passengers.length + 1}`,
+        // 5-digit zero-padded — see comment at wizGenPassengers() for rationale.
+        reference: String(paxList.passengers.length + 1).padStart(5, '0'),
         type: osdmType,
         category: category,
         firstName: fn,
@@ -4188,8 +5984,8 @@ document.body.addEventListener('click', function(e) {
       // When a passenger is removed, drop its stale Edit-open entry so the
       // remaining passengers don't inherit an expanded state at their index.
       _paxEditOpen.delete(rpIdx + ':' + rpPi);
-      // Re-number references
-      rpList.passengers.forEach((p, i) => p.reference = `PAX${i + 1}`);
+      // Re-number references — 5-digit zero-padded; see comment at wizGenPassengers().
+      rpList.passengers.forEach((p, i) => p.reference = String(i + 1).padStart(5, '0'));
       markDirty();
       // Find which scenario detail is open and re-render
       document.querySelectorAll('.scenario-detail').forEach(det => {
@@ -4237,6 +6033,48 @@ document.body.addEventListener('click', function(e) {
       // treated as false for the toggle purpose and becomes true.
       sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
       el.classList.toggle('selected', sc.salesFlowActions[key]);
+      markDirty();
+      break;
+    }
+    case 'toggle-place-probe': {
+      e.stopPropagation();
+      const ppIdx = parseInt(el.dataset.idx);
+      const ppKey = el.dataset.key;
+      const ppSc = state.scenarios[ppIdx];
+      if (!ppSc || !ppKey) break;
+      if (!ppSc.placeSelectionProbes || typeof ppSc.placeSelectionProbes !== 'object') {
+        ppSc.placeSelectionProbes = {};
+      }
+      ppSc.placeSelectionProbes[ppKey] = ppSc.placeSelectionProbes[ppKey] !== true;
+      markDirty();
+      // Re-render so the sub-group + top NHF badges follow the toggle (the
+      // re-render preserves open/closed sub-sections by header text).
+      reRenderScenarioDetail(ppIdx);
+      break;
+    }
+    case 'set-accommodation-selection': {
+      // #373: single-select accommodation family (Seat/Couchette/Berth);
+      // '' (— any —) clears the field → current default behaviour.
+      e.stopPropagation();
+      const accIdx = parseInt(el.dataset.idx);
+      const accSc = state.scenarios[accIdx];
+      if (!accSc) break;
+      accSc.accommodationSelection = el.dataset.val || null;
+      const accGrp = el.parentElement;
+      if (accGrp) accGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+      markDirty();
+      break;
+    }
+    case 'set-place-mode': {
+      // Single-select seat-selection mode (issue #107). Constrained at render
+      // time to the framework's supported modes.
+      e.stopPropagation();
+      const spmIdx = parseInt(el.dataset.idx);
+      const spmSc = state.scenarios[spmIdx];
+      if (!spmSc) break;
+      spmSc.placeSelectionMode = el.dataset.val;
+      const grp = el.parentElement;
+      if (grp) grp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
       markDirty();
       break;
     }
@@ -4312,6 +6150,12 @@ document.body.addEventListener('click', function(e) {
       fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-pax-type':
       fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-ancillary':
+      fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-remove-ancillary':
+      fwRemoveAncillary(el.dataset.val); break;
+    case 'fw-add-ancillary':
+      fwAddCustomAncillary(); break;
 
     // ── Pill toggle (simple self-toggle) ──────────────────────────────────────
     case 'pill-toggle':
@@ -4324,8 +6168,63 @@ document.body.addEventListener('click', function(e) {
       e.stopPropagation(); wizDeleteResource(el.dataset.id); break;
     case 'wiz-add-train':
       wizAddTrain(); break;
+    case 'wiz-duplicate-train':
+      e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
       wizSaveTrain(parseInt(el.dataset.tidx)); break;
+    case 'wiz-save-all-trains':
+      wizSaveAllTrains(); break;
+    case 'wiz-discover-timetable':
+      openTimetableDiscovery(); break;
+    case 'wiz-reprobe-offers': {
+      // #369: manual refresh of the per-route offer-availability findings.
+      el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
+      (async () => {
+        try {
+          const r = await fetch('/v1/company/test-resources/reprobe-offers', { method: 'POST' });
+          const b = await r.json().catch(() => ({}));
+          if (!r.ok) { oscarToast(`Re-probe failed: ${b.detail || b.title || ('HTTP ' + r.status)}`, 'error'); return; }
+          const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
+          oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
+          await refreshAllSections();
+        } catch (e2) {
+          oscarToast('Re-probe network error: ' + e2.message, 'error');
+        } finally { el.disabled = false; el.textContent = _oldTxt; }
+      })();
+      break;
+    }
+    case 'tt-discover-run':
+      runTimetableDiscovery(); break;
+    case 'tt-discover-close':
+      closeTimetableDiscovery(); break;
+    case 'train-add-service':
+      trainAddService(parseInt(el.dataset.tidx)); break;
+    case 'train-remove-service': {
+      const _tb = el.closest('tbody');
+      const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
+      if (_m) trainRemoveService(parseInt(_m[1], 10), el);
+      break;
+    }
+    case 'train-paste-service':
+      trainPasteServices(parseInt(el.dataset.tidx)); break;
+
+    // ── Journey actions (Step 2, #137) ────────────────────────────────────────
+    case 'toggle-journey-detail':
+      toggleJourneyDetail(parseInt(el.dataset.jidx)); break;
+    case 'wiz-add-journey':
+      wizAddJourney(); break;
+    case 'wiz-duplicate-journey':
+      e.stopPropagation(); wizDuplicateJourney(parseInt(el.dataset.jidx)); break;
+    case 'wiz-delete-journey':
+      e.stopPropagation(); wizDeleteJourney(el.dataset.id); break;
+    case 'wiz-save-journey':
+      wizSaveJourney(parseInt(el.dataset.jidx)); break;
+    case 'journey-add-leg':
+      journeyAddLeg(parseInt(el.dataset.jidx)); break;
+    case 'journey-remove-leg':
+      journeyRemoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li)); break;
+    case 'journey-move-leg':
+      journeyMoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), parseInt(el.dataset.dir)); break;
 
     // ── Scenario creation (Step 3) ────────────────────────────────────────────
     case 'wiz-scen-type':
@@ -4394,7 +6293,7 @@ document.body.addEventListener('change', function(e) {
       // in scenariosToRun and in the data file's code index.
       const dup = state.scenarios.some((x, i) => i !== sci && x.code === normalised);
       if (dup) {
-        alert('Another scenario already uses the code "' + normalised + '". Pick a different one.');
+        oscarToast('Another scenario already uses the code "' + normalised + '". Pick a different one.', 'warning');
         el.value = origCode;
         break;
       }
@@ -4418,9 +6317,10 @@ document.body.addEventListener('change', function(e) {
         if (raw)   raw.textContent   = normalised;
         if (human) {
           // Preserve trailing ownership/version badges by only rewriting the
-          // leading text node. Simpler: rebuild with decodeCode + existing badges.
+          // leading text node. Show the (normalised) code verbatim — never the
+          // decoded "friendly" rename.
           const badgeHtml = human.innerHTML.replace(/^[^<]*/, '');
-          human.innerHTML = esc(decodeCode(normalised)) + ' ' + badgeHtml;
+          human.innerHTML = esc(scenarioTitle({ code: normalised })) + ' ' + badgeHtml;
         }
       }
       // Toggle-scenario checkbox uses the code as identifier — refresh its
@@ -4488,6 +6388,10 @@ document.body.addEventListener('change', function(e) {
       }
       break;
     }
+    // #359: selects in the Trip Search Criteria sub-panel write via dot-path
+    // like the text inputs do, but selects fire 'change', not 'input'.
+    case 'set-trip-path':
+      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-field': {
       const tIdxF = parseInt(el.dataset.tidx);
       setTripField(tIdxF, el.dataset.field, el.value);
@@ -4565,21 +6469,26 @@ document.body.addEventListener('change', function(e) {
       });
       break;
     }
+    case 'journey-leg-pick':
+      journeySetLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), el.value); break;
     case 'apply-trip-train': {
       const atScIdx = parseInt(el.dataset.idx);
       const atTIdx  = parseInt(el.dataset.tidx);
       const target  = el.dataset.target; // "trip" or "legs.<n>"
-      const trainId = el.value;
-      if (!trainId) break;
+      const raw = el.value; // "<trainId>::<serviceIndex>"
+      if (!raw) break;
+      const [trainId, svcIdxStr] = String(raw).split('::');
+      const svcIdx = parseInt(svcIdxStr, 10) || 0;
       const train = (wizData.resources || []).find(r => String(r.id) === String(trainId));
       if (!train) break;
-      const data = typeof train.data === 'string'
-        ? JSON.parse(train.data) : (train.data || {});
+      const data = normalizeTrainData(typeof train.data === 'string'
+        ? JSON.parse(train.data) : (train.data || {}));
+      const svc = data.services[svcIdx] || data.services[0] || {};
       const tripReq = state.tripRequirements[atTIdx];
       if (!tripReq) break;
       // Resolve the target sub-object (trip block or leg N) and populate its
-      // scalar fields from the train resource. Preserve any field the train
-      // does not define — the user may have already typed into it.
+      // scalar fields from the train set's route + the chosen service.
+      // Preserve any field neither defines — the user may have typed into it.
       let t;
       if (target === 'trip') {
         tripReq.trip = tripReq.trip || {};
@@ -4592,16 +6501,39 @@ document.body.addEventListener('change', function(e) {
       }
       if (data.originURN)      t.origin         = data.originURN;
       if (data.destinationURN) t.destination    = data.destinationURN;
-      if (data.departureTime)  t.startDatetime  = '%TRIP_DATE%T' + data.departureTime;
-      if (data.arrivalTime)    t.endDatetime    = '%TRIP_DATE%T' + data.arrivalTime;
-      if (data.vehicleNumber)  t.vehicleNumber  = data.vehicleNumber;
+      if (svc.departureTime)   t.startDatetime  = '%TRIP_DATE%T' + svc.departureTime;
+      if (svc.arrivalTime)     t.endDatetime    = '%TRIP_DATE%T' + svc.arrivalTime;
+      if (svc.vehicleNumber)   t.vehicleNumber  = svc.vehicleNumber;
       if (data.operatorCode)   t.operatorCode   = data.operatorCode;
+      // Product category (#141) — carried into the request's service.productCategory.
+      if (data.productCategoryRef)       t.productCategoryRef       = data.productCategoryRef;
+      if (data.productCategoryName)      t.productCategoryName      = data.productCategoryName;
+      if (data.productCategoryShortName) t.productCategoryShortName = data.productCategoryShortName;
       markDirty();
       // Reset the dropdown to its placeholder so it reads as "apply again"
       // next time (avoids users wondering whether the select remembered
       // their last pick).
       el.value = '';
       reRenderScenarioDetail(atScIdx);
+      break;
+    }
+    case 'apply-trip-journey': {
+      const ajScIdx = parseInt(el.dataset.idx);
+      const ajTIdx  = parseInt(el.dataset.tidx);
+      const jid = el.value;
+      if (!jid) break;
+      const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
+      if (!journey) break;
+      const tripReq = state.tripRequirements[ajTIdx];
+      if (!tripReq) break;
+      const legs = journeyToTripLegs(journey);
+      if (legs.length === 0) break;
+      // A journey is an explicit multi-leg itinerary → SPECIFICATION.
+      tripReq.tripType = 'SPECIFICATION';
+      tripReq.legs = legs;
+      markDirty();
+      el.value = '';
+      reRenderScenarioDetail(ajScIdx);
       break;
     }
     case 'toggle-purchaser-is-pax': {
@@ -4698,17 +6630,20 @@ document.body.addEventListener('change', function(e) {
         if (pax.updateDateOfBirth) pax.updateDateOfBirth = genDateOfBirth(ar.min, ar.max);
       }
       markDirty();
-      // Re-render the detail
-      const det = document.getElementById(`detail-${esc(cpScIdx)}`);
-      if (det && det.innerHTML) {
-        det.innerHTML = buildDetailHTML(cpScIdx);
-        det.querySelectorAll('.param-section-head').forEach(h => {
-          if (h.textContent.includes('Passengers')) {
-            h.nextElementSibling?.classList.add('open');
-            h.querySelector('.ps-arrow')?.classList.add('open');
-          }
-        });
-      }
+      // Re-render through the canonical reRenderScenarioDetail helper —
+      // this preserves every param-section's open/closed state AND the
+      // window scroll position. The previous inline `det.innerHTML = …`
+      // collapsed every section except Passengers and snapped the viewport
+      // back to the top, forcing the tester to scroll all the way down and
+      // re-open whatever they had open just to keep editing. (v1.11.102)
+      reRenderScenarioDetail(cpScIdx);
+      // Re-focus the category dropdown so the keyboard / pointer can
+      // continue editing without an extra click. The DOM nodes are fresh
+      // after the re-render, so we re-query by the same data-attrs.
+      const _restored = document.querySelector(
+        `select[data-action="change-pax-category"][data-pidx="${cpIdx}"][data-pi="${cpPi}"]`
+      );
+      if (_restored) _restored.focus();
       break;
     }
     case 'set-offer':
@@ -4727,6 +6662,8 @@ document.body.addEventListener('change', function(e) {
       fwToggleFlow(el.dataset.key, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-mode':
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
+    case 'fw-toggle-seatmap':
+      fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
     case 'fw-pax-age': {
       const raw = (el.value || '').trim();
       const n = parseInt(raw, 10);
@@ -4744,6 +6681,8 @@ document.body.addEventListener('change', function(e) {
     // ── Step 3 change handlers ────────────────────────────────────────────────
     case 'wiz-select-train':
       wizSelectTrain(el.value); break;
+    case 'wiz-select-journey':
+      wizSelectJourney(el.value); break;
     case 'wiz-flexibility':
       wizScenario.desiredFlexibility = el.value; wizUpdateCodePreview(); break;
     case 'wiz-overrule':
@@ -4770,6 +6709,64 @@ document.body.addEventListener('input', function(e) {
   switch (action) {
     case 'set-scenario-text':
       setScenarioField(parseInt(el.dataset.idx), el.dataset.field, el.value); break;
+    case 'set-scenario-max-wait-minutes': {
+      // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
+      // Empty input clears (null = use server default RUN_TIMEOUT_MS).
+      // Non-empty must be an integer in [1, 60] — anything else is ignored
+      // until the user types a valid value (no spurious saves mid-edit).
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+        }
+      }
+      break;
+    }
+    case 'set-scenario-max-wait-offer-minutes': {
+      // Per-scenario max wait budget for the expiredOfferTest, in minutes.
+      // Same semantics as set-scenario-max-wait-minutes above: empty = null
+      // (use server default RUN_TIMEOUT_MS); non-empty must be an integer in
+      // [1, 60] — anything else is ignored mid-edit.
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
+        }
+      }
+      break;
+    }
+    case 'set-scenario-max-wait-addres-minutes':
+    case 'set-scenario-max-wait-addanc-minutes':
+    case 'set-scenario-max-wait-refund-offer-minutes':
+    case 'set-scenario-max-wait-exchange-offer-minutes': {
+      // Per-scenario Max wait inputs for Phase 3/4/5 expired-X tests. All
+      // share the empty=null / [1,60] integer semantics of the booking/offer
+      // timers above. Action → field-name map kept local so renaming a field
+      // is a one-place edit.
+      const _maxWaitFieldByAction = {
+        'set-scenario-max-wait-addres-minutes':         'expiredAddReservationOfferMaxWaitMinutes',
+        'set-scenario-max-wait-addanc-minutes':         'expiredAddAncillaryOfferMaxWaitMinutes',
+        'set-scenario-max-wait-refund-offer-minutes':   'expiredRefundOfferMaxWaitMinutes',
+        'set-scenario-max-wait-exchange-offer-minutes': 'expiredExchangeOfferMaxWaitMinutes',
+      };
+      const _field = _maxWaitFieldByAction[action];
+      const v = el.value.trim();
+      if (v === '') {
+        setScenarioField(parseInt(el.dataset.idx), _field, null);
+      } else {
+        const n = parseInt(v, 10);
+        if (Number.isInteger(n) && n >= 1 && n <= 60) {
+          setScenarioField(parseInt(el.dataset.idx), _field, n);
+        }
+      }
+      break;
+    }
     case 'set-trip-time':
       setTripTimeFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-path':
@@ -4831,8 +6828,15 @@ document.body.addEventListener('input', function(e) {
       setOfferField(parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
       break;
     }
-    case 'set-offer-inbound':
-      setOfferField(parseInt(el.dataset.idx), 'inboundDate', el.value || null); break;
+    case 'set-offer-return-offset': {
+      const v = el.value.trim();
+      const n = parseInt(v, 10);
+      // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
+      setOfferField(parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
+      break;
+    }
+    case 'set-offer-return-time':
+      setOfferField(parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
     case 'set-offer-selections': {
       try {
         const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;

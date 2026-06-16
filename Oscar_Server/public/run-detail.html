@@ -48,11 +48,21 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:16px;overflow:hidden}
 .card-header{padding:10px 16px;background:#eceff1;font-size:12px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;justify-content:space-between}
 .log-box{background:#1e1e1e;padding:14px 16px;max-height:450px;overflow-y:auto;font-family:'Courier New',monospace;font-size:12px;line-height:1.6}
-.log-line{white-space:pre-wrap;word-break:break-all}
+/* color:#d4d4d4 doubles as the safety net — any level without an explicit
+   .l-* rule below stays readable on the dark box instead of inheriting the
+   page's dark text color (must stay BEFORE the .l-* rules: equal
+   specificity, so source order decides). */
+.log-line{white-space:pre-wrap;word-break:break-all;color:#d4d4d4}
 .l-stdout{color:#d4d4d4}
 .l-stderr{color:#ff9800}
 .l-info  {color:#81c784}
 .l-error {color:#ef5350}
+/* v1.11.115: the v1.11.113 runner-side level inference started emitting
+   'warn' and 'debug' levels in volume, but these two classes had no color
+   rule — the lines inherited the page's dark text color on the dark
+   #1e1e1e log box and rendered near-invisible. */
+.l-warn  {color:#ffb74d}
+.l-debug {color:#9e9e9e}
 .btn{padding:8px 16px;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
 .btn-dl{background:#0090D4;color:#fff}
 .btn-dl:hover{background:#005A8A}
@@ -76,10 +86,28 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-level-btn.active{background:#0090D4;color:#fff}
 .log-line.hidden{display:none}
 .log-line .search-hl{background:#ffe082;color:#000;border-radius:2px;padding:0 1px}
+/* #351: per-area (suite) sections in the execution log, like the assertions panel.
+   #355: headers scroll WITH their content — position:sticky pinned the open
+   section's header to the top of the box while its lines scrolled underneath,
+   which testers read as a stuck display, and the pinned row overlapped the
+   first visible line. */
+.log-group.hidden{display:none}
+.log-group{margin:2px 0}
+.log-group-head{cursor:pointer;background:#1e1e1e;color:#9fb3bd;font-weight:700;padding:3px 6px;user-select:none;border-top:1px solid #37474f;display:flex;align-items:center;gap:8px;list-style:none}
+.log-group-head::-webkit-details-marker{display:none}
+.log-group-head:hover{color:#cfd8dc}
+.log-group-head .gchev{font-size:9px;transition:transform .15s}
+.log-group[open] > .log-group-head .gchev{transform:rotate(90deg)}
+.log-group-count{font-weight:400;font-size:11px;color:#607d8b;margin-left:auto}
+.log-group-body{padding-left:2px}
 .assertion-filter{transition:background .15s}
 .assertion-filter.active{background:#0090D4;color:#fff}
+.req-filter{transition:background .15s}
+.req-filter.active{background:#0090D4;color:#fff}
 .assertion-row{display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid #f5f5f5;font-size:12px}
 .assertion-row:hover{background:#fafbfc}
+.assertion-row.has-msg{border-bottom:none}
+.assertion-msg{padding:0 16px 8px 40px;color:#c62828;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-bottom:1px solid #f5f5f5;background:#fffafa}
 .a-pass{color:#2e7d32}
 .a-fail{color:#c62828;font-weight:700}
 .a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
@@ -92,6 +120,55 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .suite-header{padding:8px 16px;background:#eceff1;font-size:11px;font-weight:700;color:#546e7a;text-transform:uppercase;letter-spacing:.4px;cursor:pointer}
 .suite-header:hover{background:#e3e8ec}
 .req-header{padding:6px 16px 6px 32px;background:#f5f5f5;font-size:12px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+/* ── Collapse / expand (logs, assertions, HTTP traffic) ──────────────── */
+.chev{display:inline-block;width:12px;text-align:center;font-size:10px;color:#90a4ae;transition:transform .12s;flex-shrink:0}
+.collapsible-head{cursor:pointer;user-select:none}
+.collapsible-head:hover .chev{color:#0090D4}
+/* Card-level collapse (logs): hide body when the card has .collapsed */
+.card.collapsed .card-body{display:none}
+.card.collapsed .log-controls{display:none}
+.card-header .chev{margin-right:2px}
+.card:not(.collapsed)>.card-header .collapsible-head .chev{transform:rotate(90deg)}
+/* Two-level collapse for assertions + HTTP traffic */
+.asuite-body,.areq-body{display:none}
+.asuite.open>.asuite-body{display:block}
+.areq.open>.areq-body{display:block}
+.asuite.open>.suite-header .chev,.areq.open>.req-header .chev{transform:rotate(90deg)}
+.areq{border-bottom:1px solid #f0f0f0}
+.areq-count{margin-left:auto;color:#90a4ae;font-size:11px;font-weight:400}
+.msg-block{padding:8px 16px 12px 32px;border-bottom:1px solid #f5f5f5}
+.msg-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#90a4ae;margin:8px 0 4px}
+.msg-meta{font-size:11px;color:#607d8b;margin-bottom:6px;word-break:break-all}
+.msg-pre{background:#1e1e1e;color:#d4d4d4;border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;margin:0}
+.msg-loading{padding:10px 32px;color:#90a4ae;font-size:12px;font-style:italic}
+/* #287: HTTP-Traffic body Tree/Raw toggle (opt-in structured viewer). */
+.msg-header{display:flex;align-items:center;gap:10px;margin:8px 0 4px}
+.msg-header .msg-label{margin:0}
+.msg-toggle-group{display:inline-flex;border:1px solid #cfd8dc;border-radius:4px;overflow:hidden;height:20px;align-items:stretch}
+.msg-toggle-group.disabled{opacity:.5;cursor:not-allowed}
+.msg-toggle{background:#fff;border:0;padding:0 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#607d8b;cursor:pointer}
+.msg-toggle:not(:last-child){border-right:1px solid #cfd8dc}
+.msg-toggle:hover:not(:disabled){background:#eceff1}
+.msg-toggle.active{background:#0090D4;color:#fff}
+.msg-toggle:disabled{cursor:not-allowed;color:#90a4ae}
+.msg-tree{background:#fff;border:1px solid #eceff1;border-radius:6px;min-height:200px;max-height:480px;overflow:auto}
+/* #325: per-message Copy / Download / Expand buttons in the msg-header. */
+.msg-actions{display:inline-flex;gap:4px;margin-left:auto;align-items:stretch;height:20px}
+.msg-act{background:#fff;border:1px solid #cfd8dc;border-radius:4px;padding:0 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a;cursor:pointer;line-height:18px;font-family:inherit}
+.msg-act:hover{background:#eceff1;border-color:#90a4ae}
+.msg-act:active{transform:translateY(1px)}
+/* Expand toggle removes the 360px scrollable-box cap so the user can read
+   the full body in place without opening the report or copying it out. */
+.msg-pre.msg-pre--expanded{max-height:none}
+/* #350: collapsible request/response header table (between meta and body). */
+.hdr-details{margin:2px 0 8px}
+.hdr-summary{cursor:pointer;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#546e7a;user-select:none}
+.hdr-summary:hover{color:#0090D4}
+.hdr-table{width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:11px;margin:6px 0 2px;background:#fafbfc;border:1px solid #eceff1;border-radius:6px}
+.hdr-table td{border-bottom:1px solid #eceff1;padding:3px 10px;vertical-align:top}
+.hdr-table tr:last-child td{border-bottom:0}
+.hdr-table .hdr-k{color:#1565c0;white-space:nowrap;width:230px;font-weight:700}
+.hdr-table .hdr-v{color:#37474f;word-break:break-all}
 </style>
 </head>
 <body>
@@ -123,28 +200,39 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 
   <div id="meta" class="meta"></div>
 
-  <!-- Live Log -->
-  <div class="card">
+  <!-- Live Log (collapsed by default) -->
+  <div class="card collapsed" id="log-card">
     <div class="card-header" style="flex-wrap:wrap;gap:8px">
-      <span>📋 Execution Log</span>
-      <div style="display:flex;gap:4px;align-items:center">
-        <button class="btn btn-sm log-level-btn active" data-level="all">All</button>
-        <button class="btn btn-sm log-level-btn" data-level="stdout">stdout</button>
-        <button class="btn btn-sm log-level-btn" data-level="stderr">stderr</button>
-        <button class="btn btn-sm log-level-btn" data-level="info">info</button>
-        <button class="btn btn-sm log-level-btn" data-level="error">error</button>
+      <span class="collapsible-head" id="log-toggle" title="Show / hide the execution log"><span class="chev">▶</span> 📋 Execution Log</span>
+      <div class="log-controls" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <!-- #351: hierarchical level filter — each button shows its level AND
+             everything more severe (the logging pyramid, same semantics as the
+             collection's loggingType). The old stdout/stderr buttons matched
+             nothing since round 1 (the runner only stores debug/info/warn/error)
+             and debug≡All under pyramid semantics — removed. -->
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-sm log-level-btn active" data-level="all" title="Every line, including DEBUG plumbing">All</button>
+          <button class="btn btn-sm log-level-btn" data-level="info" title="INFO + WARNING + ERROR — the flow story without DEBUG plumbing">info+</button>
+          <button class="btn btn-sm log-level-btn" data-level="warn" title="WARNING + ERROR only">warn+</button>
+          <button class="btn btn-sm log-level-btn" data-level="error" title="ERROR only">error</button>
+        </div>
+        <select id="log-req-filter" title="Show only the log lines of one tested endpoint" style="padding:4px 8px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;max-width:220px">
+          <option value="all">All endpoints</option>
+        </select>
+        <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
+        <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm" id="log-copy-btn">Copy</button>
+          <button class="btn btn-sm" id="log-download-btn">Download</button>
+        </div>
+        <label style="font-size:12px;font-weight:400;color:#546e7a">
+          <input type="checkbox" id="autoscroll" checked> Auto-scroll
+        </label>
       </div>
-      <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
-      <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-sm" id="log-copy-btn">Copy</button>
-        <button class="btn btn-sm" id="log-download-btn">Download</button>
-      </div>
-      <label style="font-size:12px;font-weight:400;color:#546e7a">
-        <input type="checkbox" id="autoscroll" checked> Auto-scroll
-      </label>
     </div>
-    <div id="log-box" class="log-box"><span style="color:#546e7a;font-style:italic">Waiting for logs...</span></div>
+    <div class="card-body">
+      <div id="log-box" class="log-box"><span style="color:#546e7a;font-style:italic">Waiting for logs...</span></div>
+    </div>
   </div>
 
   <!-- Assertions -->
@@ -161,6 +249,20 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     </div>
     <div id="assertion-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>
     <div id="assertion-content" style="max-height:600px;overflow-y:auto"></div>
+  </div>
+
+  <!-- HTTP Traffic — request & response messages, grouped like the assertions -->
+  <div class="card" id="requests-card" style="display:none">
+    <div class="card-header">
+      <span>🌐 HTTP Traffic — Request &amp; Response</span>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm req-filter active" data-filter="all">All</button>
+        <button class="btn btn-sm req-filter" data-filter="non2xx">Non-2xx</button>
+        <button class="btn btn-sm req-filter" data-filter="failed">Failed</button>
+      </div>
+    </div>
+    <div id="requests-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>
+    <div id="requests-content" style="max-height:600px;overflow-y:auto"></div>
   </div>
 
   <!-- Artifacts -->
@@ -190,8 +292,31 @@ const runId = _rawRunId;
 
 let lastEventId = 0;
 let polling     = true;
+// #343 followup (v1.11.117): run the terminal-status side-effects (artifacts /
+// assertions / requests loads, delete + share buttons) exactly once — the
+// poll loop now keeps spinning after a terminal status to drain the log
+// backlog, so updateStatus() can be called with a terminal run several times.
+let terminalHandled = false;
 
-function fmtDate(d) { return d ? new Date(d).toLocaleString() : '-'; }
+// Friendly, self-describing download name for run artifacts —
+// {sandbox}_{date}_{scenario}.{ext} — so a downloaded results file is no longer
+// an anonymous bru_results.json. Built from the run object (set in updateStatus).
+let currentRun = null;
+function friendlyArtifactBase() {
+  const r = currentRun || {};
+  const sandbox = String(r.env_name_used || 'sandbox')
+    .replace(/^OTST[_-]?/i, '').replace(/[_-]?Env$/i, '').trim() || 'sandbox';
+  let date = '';
+  try { date = parseServerTs(r.started_at || r.queued_at).toISOString().slice(0, 10); } catch (_e) { /* missing/invalid date → omit */ }
+  const scenario = r.scenario_code || 'run';
+  let base = [sandbox, date, scenario].filter(Boolean).join('_')
+    .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-');
+  if (base.length > 120) base = base.slice(0, 120).replace(/[-_.]+$/, '');   // mind the filename length
+  return base || 'run';
+}
+
+// v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
 function duration(a, b) {
   if (!a || !b) return '-';
   const s = Math.round((new Date(b) - new Date(a)) / 1000);
@@ -199,6 +324,7 @@ function duration(a, b) {
 }
 
 function updateStatus(run) {
+  currentRun = run;
   const badge = document.getElementById('status-badge');
   badge.className = `status s-${run.status}`;
   const spin = (run.status === 'RUNNING' || run.status === 'QUEUED') ? '<span class="spin">⟳</span> ' : '';
@@ -267,8 +393,11 @@ function updateStatus(run) {
 
   if (run.status === 'COMPLETED' || run.status === 'FAILED' || run.status === 'CANCELLED') {
     polling = false;
+    if (terminalHandled) return;
+    terminalHandled = true;
     loadArtifacts();
     loadAssertions();
+    loadRequests();
 
     // Show delete button if user has permission
     const canDelete = user.role === 'administrator' ||
@@ -289,7 +418,7 @@ function updateStatus(run) {
       if (shareWrap) {
         const isShared = !!run.shared_with_certifier_at;
         const sharedAt = isShared
-          ? new Date(run.shared_with_certifier_at + 'Z').toLocaleString()
+          ? parseServerTs(run.shared_with_certifier_at).toLocaleString()
           : '';
         const sharedBy = run.shared_with_certifier_by || '';
         shareWrap.innerHTML = isShared
@@ -315,35 +444,116 @@ async function shareRunWithCertifier(share) {
     if (res.status === 401) { logout(); return; }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert(`Action failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`);
+      oscarToast(`Action failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
       return;
     }
     // Reload the page to refresh the share button + the run banner.
     location.reload();
   } catch (err) {
-    alert(`Network error: ${err.message || err}`);
+    oscarToast(`Network error: ${err.message || err}`, 'error');
   }
 }
 
 
 let activeLogLevel = 'all';
 let logSearchTerm = '';
+// #351: hierarchical level filter — a selected level shows that level AND
+// everything more severe (the standard logging pyramid, matching the Bruno
+// library's loggingType semantics). 'all' shows everything incl. DEBUG.
+// Unknown levels stay visible — same safety net as the #341 colors.
+const LOG_LEVEL_RANK = { debug: 0, info: 1, warn: 2, warning: 2, error: 3 };
+function levelVisible(level) {
+  if (activeLogLevel === 'all') return true;
+  const r = LOG_LEVEL_RANK[level];
+  return r === undefined ? true : r >= LOG_LEVEL_RANK[activeLogLevel];
+}
+// Endpoint filter (#350): the runner's LogParser attributes each line to the
+// request being executed (request_name); this lets the tester isolate one
+// endpoint's log, like the per-request grouping in the assertions panel.
+let activeLogRequest = 'all';
+const logRequestsSeen = new Set();
+
+// #351: the log is SPLIT per area (suite), like the assertions panel — one
+// collapsible section per suite, in chronological order. Lines stream into
+// the current section; a new section starts when suite_name changes.
+let currentLogSuite = null;
+let currentLogGroupBody = null;
+function logGroupBodyFor(suiteName, box) {
+  const suite = suiteName || 'Runner';
+  if (currentLogGroupBody && suite === currentLogSuite) return currentLogGroupBody;
+  currentLogSuite = suite;
+  const det = document.createElement('details');
+  det.className = 'log-group';
+  det.open = true;
+  const sum = document.createElement('summary');
+  sum.className = 'log-group-head';
+  const chev = document.createElement('span');
+  chev.className = 'gchev';
+  chev.textContent = '▶';
+  const lbl = document.createElement('span');
+  lbl.textContent = `📂 ${suite}`;
+  const cnt = document.createElement('span');
+  cnt.className = 'log-group-count';
+  sum.appendChild(chev); sum.appendChild(lbl); sum.appendChild(cnt);
+  det.appendChild(sum);
+  const body = document.createElement('div');
+  body.className = 'log-group-body';
+  det.appendChild(body);
+  box.appendChild(det);
+  currentLogGroupBody = body;
+  return body;
+}
+// Keep each section's count badge fresh and hide sections whose lines are all
+// filtered out (level / endpoint / search).
+function syncLogGroups() {
+  document.querySelectorAll('#log-box .log-group').forEach(g => {
+    const total = g.querySelectorAll('.log-line').length;
+    const visible = g.querySelectorAll('.log-line:not(.hidden)').length;
+    const cnt = g.querySelector('.log-group-count');
+    if (cnt) cnt.textContent = visible === total ? `${total} lines` : `${visible}/${total} lines`;
+    g.classList.toggle('hidden', visible === 0);
+  });
+}
+
+function registerLogRequest(name) {
+  if (!name || logRequestsSeen.has(name)) return;
+  logRequestsSeen.add(name);
+  const sel = document.getElementById('log-req-filter');
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  sel.appendChild(opt);
+}
 
 function appendLogs(events) {
   if (!events.length) return;
   const box = document.getElementById('log-box');
-  if (box.querySelector('span[style]')) box.innerHTML = '';
+  if (box.querySelector('span[style]')) {
+    box.innerHTML = '';
+    // #351: the placeholder wipe detaches any tracked group — start fresh.
+    currentLogSuite = null;
+    currentLogGroupBody = null;
+  }
   events.forEach(e => {
     const line = document.createElement('div');
     line.className = `log-line l-${e.level}`;
     line.dataset.level = e.level;
-    line.textContent = `[${e.ts.slice(11,19)}] ${e.message}`;
+    line.dataset.request = e.request_name || '';
+    registerLogRequest(e.request_name);
+    // #336 (v1.11.113): show milliseconds in the timestamp prefix. ts is
+    // an ISO string like "2026-06-09T19:12:42.123Z" — slice(11,23) gives
+    // "19:12:42.123". Previously slice(11,19) dropped the ms portion,
+    // making it hard to correlate OSCAR log lines with provider-side logs
+    // at sub-second precision.
+    line.textContent = `[${e.ts.slice(11,23)}] ${e.message}`;
     // Apply current filters to new lines
-    if (activeLogLevel !== 'all' && e.level !== activeLogLevel) line.classList.add('hidden');
+    if (!levelVisible(e.level)) line.classList.add('hidden');
     if (logSearchTerm && !e.message.toLowerCase().includes(logSearchTerm)) line.classList.add('hidden');
-    box.appendChild(line);
+    if (activeLogRequest !== 'all' && (e.request_name || '') !== activeLogRequest) line.classList.add('hidden');
+    logGroupBodyFor(e.suite_name, box).appendChild(line);
     lastEventId = Math.max(lastEventId, e.id);
   });
+  syncLogGroups();
   if (document.getElementById('autoscroll').checked) {
     box.scrollTop = box.scrollHeight;
   }
@@ -356,10 +566,12 @@ function applyLogFilters() {
   lines.forEach(line => {
     const level = line.dataset.level;
     const text = line.textContent.toLowerCase();
-    const levelOk = activeLogLevel === 'all' || level === activeLogLevel;
+    const levelOk = levelVisible(level);
     const searchOk = !logSearchTerm || text.includes(logSearchTerm);
-    line.classList.toggle('hidden', !(levelOk && searchOk));
+    const requestOk = activeLogRequest === 'all' || (line.dataset.request || '') === activeLogRequest;
+    line.classList.toggle('hidden', !(levelOk && searchOk && requestOk));
   });
+  syncLogGroups();
   updateLogMatchCount();
 }
 
@@ -368,7 +580,7 @@ function updateLogMatchCount() {
   const visible = box.querySelectorAll('.log-line:not(.hidden)').length;
   const total = box.querySelectorAll('.log-line').length;
   const el = document.getElementById('log-match-count');
-  if (total > 0 && (activeLogLevel !== 'all' || logSearchTerm)) {
+  if (total > 0 && (activeLogLevel !== 'all' || logSearchTerm || activeLogRequest !== 'all')) {
     el.textContent = `${visible}/${total} shown`;
   } else {
     el.textContent = '';
@@ -395,6 +607,14 @@ function downloadLogs() {
 }
 
 async function poll() {
+  // #343 followup (v1.11.117): the /logs endpoint caps each fetch at 500
+  // rows. The old loop stopped polling the moment the run reached a terminal
+  // status — stranding everything past the first page when a finished run
+  // was opened after the fact ("log stops before the offer request"). Now a
+  // full page (has_more from the server, with a length fallback) forces an
+  // immediate follow-up fetch to drain the backlog, and only then does the
+  // terminal status end the loop.
+  let drainBacklog = false;
   try {
     const [runRes, logRes] = await Promise.all([
       fetch(`/v1/runs/${encodeURIComponent(runId)}`,       {}),
@@ -404,10 +624,13 @@ async function poll() {
     const run  = await runRes.json();
     const logs = await logRes.json();
     updateStatus(run);
-    appendLogs(logs.events || []);
+    const events = logs.events || [];
+    appendLogs(events);
+    drainBacklog = logs.has_more === true || events.length >= 500;
   } catch(e) { /* network hiccup - keep polling */ }
 
-  if (polling) setTimeout(poll, 1500);
+  if (drainBacklog)  setTimeout(poll, 50);
+  else if (polling)  setTimeout(poll, 1500);
 }
 
 async function loadArtifacts() {
@@ -438,11 +661,13 @@ async function loadArtifacts() {
         <a href="${href}" target="_blank" class="btn btn-dl">🔍 Open Report</a>
       </div>`;
     }
+    const _ext    = (a.filename.match(/\.([A-Za-z0-9]+)$/) || [])[1] || 'json';
+    const _dlName = `${friendlyArtifactBase()}.${_ext}`;
     return `
     <div class="artifact-row">
       <span style="flex:1;font-weight:600">${label}</span>
-      <span style="color:#90a4ae;font-size:12px">${a.filename}</span>
-      <button class="btn btn-dl" data-action="download-artifact" data-artifact-id="${a.id}" data-filename="${a.filename}">⬇ Download</button>
+      <span style="color:#90a4ae;font-size:12px" title="stored as ${a.filename}">${_dlName}</span>
+      <button class="btn btn-dl" data-action="download-artifact" data-artifact-id="${a.id}" data-filename="${_dlName}">⬇ Download</button>
     </div>`;
   }).join('');
 }
@@ -456,7 +681,7 @@ async function downloadArtifact(artifactId, filename) {
     if (res.status === 401) { logout(); return; }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      alert(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`);
+      oscarToast(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
       return;
     }
     const blob = await res.blob();
@@ -469,7 +694,7 @@ async function downloadArtifact(artifactId, filename) {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   } catch (e) {
-    alert('Network error during download: ' + e.message);
+    oscarToast('Network error during download: ' + e.message, 'error');
   }
 }
 
@@ -490,7 +715,7 @@ async function deleteRun() {
     window.location.href = '/dashboard.html';
   } else {
     const err = await res.json();
-    alert(err.detail || 'Could not delete run.');
+    oscarToast(err.detail || 'Could not delete run.', 'error');
   }
 }
 
@@ -533,20 +758,25 @@ async function loadAssertions() {
   } catch(_) {}
 }
 
+// Two-level collapse: suite (main area) → request (endpoint) → assertions.
+// Everything starts collapsed; clicking a suite reveals its endpoints (still
+// collapsed), clicking an endpoint reveals its assertions.
 function renderAssertions() {
   if (!assertionsData) return;
   const s = assertionsData.summary;
   const passRate = s.total > 0 ? Math.round(s.passed / s.total * 1000) / 10 : 0;
   document.getElementById('assertion-summary').innerHTML =
-    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate`;
+    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate
+     <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an area to expand)</span>`;
 
   const catFilter = document.getElementById('assertion-category-filter').value;
   const domFilter = document.getElementById('assertion-domain-filter').value;
   let html = '';
 
   for (const suite of assertionsData.suites || []) {
-    let suiteHtml = '';
+    let reqsHtml = '';
     let suiteFiltered = 0;
+    let suiteFailed = 0;
 
     for (const req of suite.requests || []) {
       let assertions = req.assertions || [];
@@ -556,33 +786,60 @@ function renderAssertions() {
       if (domFilter) assertions = assertions.filter(a => a.domain === domFilter);
       if (assertions.length === 0) continue;
       suiteFiltered += assertions.length;
+      const reqFailed = assertions.filter(a => !a.passed).length;
+      suiteFailed += reqFailed;
 
       const statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
         : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
         : '<span style="color:#90a4ae">SKIP</span>';
-      suiteHtml += `<div class="req-header">${statusBadge} <span>${escHtml(req.request_name)}</span>
-        <span style="color:#90a4ae;font-size:11px;margin-left:auto">${req.http_method||''} ${req.http_status||''} · ${req.duration_ms||0}ms</span></div>`;
 
+      let rowsHtml = '';
       for (const a of assertions) {
         const icon = a.passed ? '<span class="a-pass">✓</span>' : '<span class="a-fail">✗</span>';
         const sev = !a.passed && a.severity ? `<span class="a-badge a-sev-${a.severity}">${escHtml(a.severity)}</span>` : '';
-        suiteHtml += `<div class="assertion-row">${icon}
+        // #387: the decoded failure message is the payload of a failed row —
+        // it used to be clipped to 60 chars in a 180px column ("half hidden",
+        // tester finding). It now gets a full-width wrapped line of its own
+        // under the row; nothing truncates.
+        const hasMsg = !a.passed && a.error_msg;
+        rowsHtml += `<div class="assertion-row${hasMsg ? ' has-msg' : ''}">${icon}
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.assertion_name)}">${escHtml(a.assertion_name)}</span>
           ${a.category ? `<span class="a-badge a-cat">${escHtml(a.category)}</span>` : ''}
           ${a.domain ? `<span class="a-badge a-dom">${escHtml(a.domain)}</span>` : ''}
           ${sev}
-          ${a.error_msg ? `<span style="color:#c62828;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(a.error_msg)}">⚠ ${escHtml(a.error_msg.slice(0,60))}</span>` : ''}
         </div>`;
+        if (hasMsg) {
+          rowsHtml += `<div class="assertion-msg">⚠ ${escHtml(a.error_msg)}</div>`;
+        }
       }
+
+      reqsHtml += `<div class="areq">
+        <div class="req-header collapsible-head" data-action="toggle-areq"><span class="chev">▶</span>
+          ${statusBadge} <span>${escHtml(req.request_name)}</span>
+          <span class="areq-count">${escHtml(req.http_method||'')} ${escHtml(req.http_status||'')} · ${req.duration_ms||0}ms · ${assertions.length} assertion${assertions.length!==1?'s':''}${reqFailed>0?` · <span class="a-fail">${reqFailed} failed</span>`:''}</span>
+        </div>
+        <div class="areq-body">${rowsHtml}</div>
+      </div>`;
     }
 
     if (suiteFiltered === 0) continue;
-    const sfailed = suite.failed || 0;
-    html += `<div class="suite-header">${escHtml(suite.suite_name)} — ${suiteFiltered} assertions${sfailed > 0 ? ` · <span style="color:#c62828">${sfailed} failed</span>` : ''} · ${suite.pass_rate}%</div>${suiteHtml}`;
+    html += `<div class="asuite">
+      <div class="suite-header collapsible-head" data-action="toggle-asuite"><span class="chev">▶</span>
+        ${escHtml(suite.suite_name)} — ${suiteFiltered} assertion${suiteFiltered!==1?'s':''}${suiteFailed>0?` · <span style="color:#c62828">${suiteFailed} failed</span>`:''} · ${suite.pass_rate}%</div>
+      <div class="asuite-body">${reqsHtml}</div>
+    </div>`;
   }
 
   document.getElementById('assertion-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No assertions match the selected filters.</div>';
 }
+
+// Collapse/expand toggles for the two assertion levels.
+document.getElementById('assertion-content').addEventListener('click', function(e) {
+  const sh = e.target.closest('[data-action="toggle-asuite"]');
+  if (sh) { sh.parentElement.classList.toggle('open'); return; }
+  const rh = e.target.closest('[data-action="toggle-areq"]');
+  if (rh) { rh.parentElement.classList.toggle('open'); }
+});
 
 // Assertion filter event listeners
 document.getElementById('assertions-card').addEventListener('click', function(e) {
@@ -609,8 +866,373 @@ document.getElementById('log-search').addEventListener('input', function() {
   logSearchTerm = this.value.toLowerCase().trim();
   applyLogFilters();
 });
+document.getElementById('log-req-filter').addEventListener('change', function() {
+  activeLogRequest = this.value;
+  applyLogFilters();
+});
 document.getElementById('log-copy-btn').addEventListener('click', copyLogs);
 document.getElementById('log-download-btn').addEventListener('click', downloadLogs);
+
+// Collapse / expand the whole Execution Log card.
+document.getElementById('log-toggle').addEventListener('click', function() {
+  document.getElementById('log-card').classList.toggle('collapsed');
+});
+
+// ── HTTP Traffic (request / response messages) ───────────────────────────────
+// Same suite → endpoint structure as the assertions, collapsed by default.
+// Bodies are fetched lazily the first time an endpoint is expanded (the list
+// endpoint returns metadata only, so we avoid pulling every body up-front).
+let requestsData = null;
+let activeReqFilter = 'all';
+
+async function loadRequests() {
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/requests?status_filter=${encodeURIComponent(activeReqFilter)}`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) return;
+    requestsData = await res.json();
+    if (!requestsData.requests || requestsData.requests.length === 0) {
+      // Only hide on the unfiltered (all) view — keep the card visible so the
+      // user can switch filters back.
+      if (activeReqFilter === 'all') return;
+    }
+    document.getElementById('requests-card').style.display = 'block';
+    renderRequests();
+  } catch (_) {}
+}
+
+function renderRequests() {
+  if (!requestsData) return;
+  const reqs = requestsData.requests || [];
+  document.getElementById('requests-summary').innerHTML =
+    `<strong>${reqs.length}</strong> request${reqs.length!==1?'s':''} <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an endpoint to load its request &amp; response)</span>`;
+
+  // Group by suite, preserving first-seen order.
+  const order = [];
+  const bySuite = new Map();
+  for (const r of reqs) {
+    const key = r.suite_name || r.scenario_name || '—';
+    if (!bySuite.has(key)) { bySuite.set(key, []); order.push(key); }
+    bySuite.get(key).push(r);
+  }
+
+  let html = '';
+  for (const suiteName of order) {
+    const group = bySuite.get(suiteName);
+    let rowsHtml = '';
+    for (const r of group) {
+      const st = r.http_status;
+      const ok = typeof st === 'number' && st >= 200 && st < 300;
+      const badge = st == null ? '<span style="color:#90a4ae">—</span>'
+        : `<span class="${ok ? 'a-pass' : 'a-fail'}">${escHtml(st)}</span>`;
+      rowsHtml += `<div class="areq" data-req-id="${escHtml(r.id)}">
+        <div class="req-header collapsible-head" data-action="toggle-rreq"><span class="chev">▶</span>
+          ${badge} <span>${escHtml(r.request_name)}</span>
+          <span class="areq-count">${escHtml(r.http_method||'')} · ${r.duration_ms||0}ms${r.failed>0?` · <span class="a-fail">${r.failed} failed</span>`:''}</span>
+        </div>
+        <div class="areq-body"><div class="msg-loading">Click to load…</div></div>
+      </div>`;
+    }
+    html += `<div class="asuite">
+      <div class="suite-header collapsible-head" data-action="toggle-rsuite"><span class="chev">▶</span>
+        ${escHtml(suiteName)} — ${group.length} request${group.length!==1?'s':''}</div>
+      <div class="asuite-body">${rowsHtml}</div>
+    </div>`;
+  }
+  document.getElementById('requests-content').innerHTML = html || '<div style="padding:16px;color:#90a4ae">No requests match the selected filter.</div>';
+}
+
+// #287: HTTP-Traffic body viewer — opt-in structured Tree view.
+//   - Raw view is the DEFAULT (no behaviour change for users who don't toggle).
+//   - Tree view lazy-loads vanilla-jsoneditor only on first click.
+//   - Guards: non-JSON bodies and bodies > MSG_TREE_MAX_BYTES leave the toggle disabled.
+const MSG_TREE_MAX_BYTES = 2 * 1024 * 1024;   // 2 MB cap for tree view
+let __msgIdCounter = 0;
+let __jsoneditorModulePromise = null;          // cached module loader
+function loadJsonEditorModule() {
+  if (!__jsoneditorModulePromise) {
+    __jsoneditorModulePromise = import('/vendor/vanilla-jsoneditor/standalone.js')
+      .catch(err => { __jsoneditorModulePromise = null; throw err; });
+  }
+  return __jsoneditorModulePromise;
+}
+// Escape "<\/script" inside the inline JSON payload so it cannot terminate
+// its inline <script type="application/json"> envelope (the JSON is data,
+// not executed). Anywhere in this source where the literal sequence
+// "<\/script" would otherwise appear is written as "<\/script" — the JS
+// engine collapses "\/" to "/", so the EMITTED HTML is correct, while the
+// HTML parser scanning this <script> block does NOT see "</" and therefore
+// does NOT terminate this outer <script> while reading the source.
+function safeJsonForInlineScript(s) {
+  return String(s).replace(/<\/(?=script)/gi, '<\\/');
+}
+
+function renderMessage(label, meta, body, opts) {
+  // opts: { kind: 'request'|'response', stepName: string, scenarioName: string }
+  // — used to build the Copy/Download buttons' filename. All optional;
+  // sensible fallbacks keep the function callable from existing sites that
+  // didn't pass opts.
+  opts = opts || {};
+  const kind         = opts.kind || (String(label).toLowerCase().includes('request') ? 'request' : 'response');
+  const stepName     = opts.stepName || '';
+  const scenarioName = opts.scenarioName || '';
+  const id = `m${++__msgIdCounter}`;
+  let pretty = body;
+  let parsedOk = false;
+  let payloadSize = 0;
+  if (body) {
+    payloadSize = (typeof body === 'string') ? body.length : 0;
+    try {
+      const parsed = JSON.parse(body);
+      pretty = JSON.stringify(parsed, null, 2);
+      parsedOk = true;
+    } catch (_) {
+      pretty = body;
+    }
+  }
+  const canTree = parsedOk && payloadSize > 0 && payloadSize <= MSG_TREE_MAX_BYTES;
+  let toggleHtml = '';
+  let payloadScript = '';
+  let treeDiv = '';
+  if (canTree) {
+    toggleHtml =
+      `<div class="msg-toggle-group" data-msg-id="${id}">`
+        + `<button class="msg-toggle active" data-mode="raw" type="button">Raw</button>`
+        + `<button class="msg-toggle" data-mode="tree" type="button" title="Structured tree view with key/value search (lazy-loaded)">Tree</button>`
+      + `</div>`;
+    // IMPORTANT: write "<\/script>" (not the literal closing tag) so the HTML
+    // parser does NOT terminate this outer <script> block while reading the
+    // source. JS interprets "\/" as "/", so the EMITTED HTML is correct.
+    payloadScript = `<script type="application/json" id="${id}-payload">${safeJsonForInlineScript(pretty)}<\/script>`;
+    treeDiv = `<div class="msg-tree" id="${id}-tree" style="display:none"></div>`;
+  } else if (body) {
+    const reason = !parsedOk
+      ? 'Body is not JSON — tree view unavailable'
+      : payloadSize > MSG_TREE_MAX_BYTES
+        ? `Body > ${Math.round(MSG_TREE_MAX_BYTES/1024/1024)} MB — too large for tree view`
+        : '';
+    if (reason) {
+      toggleHtml =
+        `<div class="msg-toggle-group disabled" title="${escHtml(reason)}">`
+          + `<button class="msg-toggle active" disabled type="button">Raw</button>`
+          + `<button class="msg-toggle" disabled type="button">Tree</button>`
+        + `</div>`;
+    }
+  }
+  // Tester-ergonomics buttons (#325): Copy + Download + Expand/Collapse for
+  // the raw payload. Hidden when there is no body. Filename built from the
+  // scenario + step + direction so downloaded files are self-identifying.
+  let actionsHtml = '';
+  if (body) {
+    actionsHtml =
+      `<div class="msg-actions" data-msg-id="${id}" data-msg-kind="${escHtml(kind)}" `
+        + `data-msg-step="${escHtml(stepName)}" data-msg-scenario="${escHtml(scenarioName)}">`
+        + `<button class="msg-act" data-act="copy" type="button" title="Copy body to clipboard">Copy</button>`
+        + `<button class="msg-act" data-act="download" type="button" title="Download body as JSON">Download</button>`
+        + `<button class="msg-act" data-act="expand" type="button" title="Expand / collapse the body box">⌄ Expand</button>`
+      + `</div>`;
+  }
+  // #350: headers ride between meta and body — real HTTP message order
+  // (status line → headers → body). Collapsed by default.
+  const headersHtml = opts.headersHtml || '';
+  return `<div class="msg-header"><div class="msg-label">${escHtml(label)}</div>${toggleHtml}${actionsHtml}</div>`
+    + (meta ? `<div class="msg-meta">${meta}</div>` : '')
+    + headersHtml
+    + payloadScript
+    + `<pre class="msg-pre" id="${id}-raw">${escHtml(pretty || '(empty)')}</pre>`
+    + treeDiv;
+}
+
+// Mount the tree view on demand. Idempotent — no-ops if already mounted or if
+// the payload script went missing.
+async function mountJsonTree(msgId) {
+  const target = document.getElementById(`${msgId}-tree`);
+  if (!target || target.dataset.mounted === '1') return;
+  const payloadEl = document.getElementById(`${msgId}-payload`);
+  if (!payloadEl) return;
+  let parsed;
+  try { parsed = JSON.parse(payloadEl.textContent); }
+  catch (_) { return; }
+  let mod;
+  try { mod = await loadJsonEditorModule(); }
+  catch (err) {
+    console.warn('[run-detail] vanilla-jsoneditor failed to load — Tree view unavailable, Raw view still works', err);
+    target.textContent = 'Tree view unavailable (failed to load editor).';
+    return;
+  }
+  try {
+    mod.createJSONEditor({
+      target,
+      props: {
+        content: { json: parsed },
+        readOnly: true,
+        mode: 'tree',
+        mainMenuBar: true,
+        navigationBar: true,
+        statusBar: false
+      }
+    });
+    target.dataset.mounted = '1';
+  } catch (err) {
+    console.warn('[run-detail] vanilla-jsoneditor mount failed — Raw view still works', err);
+    target.textContent = 'Tree view failed to mount.';
+  }
+}
+
+// #350: collapsible header table for one direction (request or response).
+// Headers are stored alongside the bodies (credential values already masked
+// at capture by the server — head + last 4 chars kept so the tester can
+// check the right token was used). Includes every captured header, also the
+// non-mandatory ones (traceId, correlation ids…) useful for provider debug.
+function renderHeadersBlock(label, headersJson) {
+  let h = headersJson;
+  if (typeof h === 'string') { try { h = JSON.parse(h); } catch (_) { h = null; } }
+  if (!h || typeof h !== 'object') return '';
+  const keys = Object.keys(h).sort((a, b) => a.localeCompare(b));
+  if (!keys.length) return '';
+  const rows = keys.map(k => {
+    const v = typeof h[k] === 'string' ? h[k] : JSON.stringify(h[k]);
+    return `<tr><td class="hdr-k">${escHtml(k)}</td><td class="hdr-v">${escHtml(v)}</td></tr>`;
+  }).join('');
+  return `<details class="hdr-details"><summary class="hdr-summary">${escHtml(label)} (${keys.length})</summary>`
+    + `<table class="hdr-table"><tbody>${rows}</tbody></table></details>`;
+}
+
+async function loadRequestBodies(reqId, bodyEl) {
+  bodyEl.innerHTML = '<div class="msg-loading">Loading…</div>';
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/requests/${encodeURIComponent(reqId)}`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) { bodyEl.innerHTML = '<div class="msg-loading">Could not load this message.</div>'; return; }
+    const d = await res.json();
+    const r = d.request || {};
+    const reqMeta = `${escHtml(r.http_method||'')} ${escHtml(r.http_url||'')}`.trim();
+    const resMeta = r.http_status != null ? `HTTP ${escHtml(r.http_status)}` : '';
+    // #325: pass step + scenario into renderMessage so the Download button can
+    // produce a self-identifying filename like
+    //   `${scenario}_${step}_response.json`.
+    const msgOpts = { stepName: r.request_name || '', scenarioName: r.scenario_name || r.suite_name || '' };
+    bodyEl.innerHTML = '<div class="msg-block">'
+      + renderMessage('Request', reqMeta, r.request_body,
+          Object.assign({ kind: 'request',
+            headersHtml: renderHeadersBlock('Request headers', r.request_headers) }, msgOpts))
+      + renderMessage('Response', resMeta, r.response_body,
+          Object.assign({ kind: 'response',
+            headersHtml: renderHeadersBlock('Response headers', r.response_headers) }, msgOpts))
+      + '</div>';
+  } catch (_) {
+    bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';
+  }
+}
+
+// #325: tester ergonomics — Copy / Download / Expand handlers for the
+// per-message action buttons. Filename pattern:
+//   ${scenario}_${step}_${kind}.json
+// with non-filesystem-safe chars collapsed to underscores.
+function _msgSanitiseFilename(s) {
+  return String(s || '').replace(/[\\/:*?"<>|\s]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+}
+function _msgFlash(btn, text) {
+  const original = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1100);
+}
+function _msgGetBodyText(msgId) {
+  // The <pre> always carries the pretty-printed text (already escaped HTML
+  // entities → use textContent so the clipboard / download gets the original
+  // JSON, not the escaped HTML).
+  const rawEl = document.getElementById(`${msgId}-raw`);
+  return rawEl ? rawEl.textContent : '';
+}
+
+// Collapse/expand + lazy body load for the HTTP Traffic section.
+document.getElementById('requests-content').addEventListener('click', function(e) {
+  // #325: per-message action buttons (Copy / Download / Expand).
+  const actBtn = e.target.closest('.msg-actions .msg-act');
+  if (actBtn) {
+    const wrap     = actBtn.closest('.msg-actions');
+    const msgId    = wrap && wrap.dataset.msgId;
+    const kind     = (wrap && wrap.dataset.msgKind) || 'response';
+    const stepName = (wrap && wrap.dataset.msgStep) || '';
+    const scenario = (wrap && wrap.dataset.msgScenario) || '';
+    const act      = actBtn.dataset.act;
+    if (!msgId || !act) return;
+    const bodyText = _msgGetBodyText(msgId);
+    if (act === 'copy') {
+      if (!bodyText) return;
+      navigator.clipboard.writeText(bodyText)
+        .then(() => _msgFlash(actBtn, 'Copied!'))
+        .catch(() => _msgFlash(actBtn, 'Copy failed'));
+      return;
+    }
+    if (act === 'download') {
+      if (!bodyText) return;
+      const filename = [
+        _msgSanitiseFilename(scenario) || 'oscar',
+        _msgSanitiseFilename(stepName) || 'request',
+        kind
+      ].join('_') + '.json';
+      const blob = new Blob([bodyText], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      _msgFlash(actBtn, '✓ Downloaded');
+      return;
+    }
+    if (act === 'expand') {
+      const rawEl = document.getElementById(`${msgId}-raw`);
+      if (!rawEl) return;
+      const expanded = rawEl.classList.toggle('msg-pre--expanded');
+      actBtn.textContent = expanded ? '⌃ Collapse' : '⌄ Expand';
+      return;
+    }
+    return;
+  }
+  // #287: Tree/Raw toggle inside a body panel — handle first so the click
+  // never falls through to a collapsible.
+  const tgBtn = e.target.closest('.msg-toggle-group .msg-toggle');
+  if (tgBtn && !tgBtn.disabled) {
+    const group = tgBtn.closest('.msg-toggle-group');
+    const msgId = group && group.dataset.msgId;
+    const mode  = tgBtn.dataset.mode;
+    if (!msgId || !mode) return;
+    group.querySelectorAll('.msg-toggle').forEach(b => b.classList.toggle('active', b === tgBtn));
+    const rawEl  = document.getElementById(`${msgId}-raw`);
+    const treeEl = document.getElementById(`${msgId}-tree`);
+    if (mode === 'tree') {
+      if (rawEl)  rawEl.style.display  = 'none';
+      if (treeEl) treeEl.style.display = '';
+      mountJsonTree(msgId);
+    } else {
+      if (rawEl)  rawEl.style.display  = '';
+      if (treeEl) treeEl.style.display = 'none';
+    }
+    return;
+  }
+  const sh = e.target.closest('[data-action="toggle-rsuite"]');
+  if (sh) { sh.parentElement.classList.toggle('open'); return; }
+  const rh = e.target.closest('[data-action="toggle-rreq"]');
+  if (rh) {
+    const areq = rh.parentElement;
+    areq.classList.toggle('open');
+    if (areq.classList.contains('open') && !areq.dataset.loaded) {
+      areq.dataset.loaded = '1';
+      loadRequestBodies(areq.dataset.reqId, areq.querySelector('.areq-body'));
+    }
+  }
+});
+
+// HTTP Traffic filter buttons (re-fetch with the server-side status filter).
+document.getElementById('requests-card').addEventListener('click', function(e) {
+  const btn = e.target.closest('.req-filter');
+  if (!btn) return;
+  activeReqFilter = btn.dataset.filter;
+  document.querySelectorAll('.req-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadRequests();
+});
 
 poll();
 </script>

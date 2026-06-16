@@ -1,0 +1,20 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# CodeQL configuration — referenced from .github/workflows/codeql.yml via
+# init.config-file. Keeps the workflow declarative and centralises path
+# rules.
+name: "OSCAR CodeQL config"
+
+# Paths to EXCLUDE from analysis. Inclusions are still driven by the
+# workflow's path-filter (Oscar_Server/**); these are precise drops.
+paths-ignore:
+  # Vendored third-party front-end bundles (e.g. vanilla-jsoneditor v3.12.0).
+  # These are minified ES modules from upstream — not OSCAR code, not our
+  # responsibility to maintain, and CodeQL noise on minified code is
+  # actively misleading.
+  - "Oscar_Server/public/vendor/**"

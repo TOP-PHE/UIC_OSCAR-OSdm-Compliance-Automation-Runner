@@ -37,12 +37,13 @@ const fs      = require('fs');
 const path    = require('path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
+const runner = require('../../worker/runner');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -65,8 +66,19 @@ const runSubmitLimiter = rateLimit({
 const DELETION_STATUSES = ['DELETION_REQUESTED', 'DELETED_BY_ADMIN'];
 const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 
+// v1.11.13 — parse started_at as UTC. SQLite's datetime('now') returns a
+// TZ-less UTC string ("2026-05-16 08:44:24"). Since #67 the oscar container
+// runs TZ=Europe/Paris, so new Date("2026-05-16 08:44:24") was interpreted as
+// Paris-local — making a run that started minutes ago look 1–2h old and
+// wrongly flagging it stale (auto-cancelled on delete). Append 'Z' when the
+// string carries no TZ marker so it parses as UTC regardless of container TZ.
+function parseUtcTs(s) {
+  if (!s) return NaN;
+  if (/[Z]$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
+  return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
+}
 function isRunStale(runRow) {
-  const startedAt = runRow.started_at ? new Date(runRow.started_at).getTime() : 0;
+  const startedAt = runRow.started_at ? parseUtcTs(runRow.started_at) : 0;
   return !runRow.started_at || (Date.now() - startedAt > STALE_RUN_MS);
 }
 
@@ -158,9 +170,13 @@ router.post('/', runSubmitLimiter, (req, res) => {
     });
   }
 
-  // Read concurrent session limit from test framework config
+  // Read concurrent session limit from test framework config.
+  // The config column is encrypted at rest (Phase 2 of issue #60) — it MUST be
+  // colDecrypt()'d before JSON.parse, or parsing the ciphertext throws and the
+  // limit silently falls back to 1, serialising every company's runs (the
+  // concurrency bug). colDecrypt() passes legacy plaintext through unchanged.
   const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
-  let fwConfig = tfRow ? (() => { try { return JSON.parse(tfRow.config); } catch (_) { return {}; } })() : {};
+  let fwConfig = tfRow ? (() => { try { return JSON.parse(colDecrypt(tfRow.config)); } catch (_) { return {}; } })() : {};
   // Handle double-nested config (legacy: { config: { concurrentSessionLimit: N } })
   if (fwConfig.config && typeof fwConfig.config === 'object' && !Array.isArray(fwConfig.config)) {
     fwConfig = fwConfig.config;
@@ -291,11 +307,12 @@ router.get('/', (req, res) => {
 
   if (isPlatform && !req.companyId) {
     // Certifier list: per-run share gate (v1.10.0, issue #60). The
-    // certifier sees ONLY runs the test_manager has explicitly shared,
-    // gated additionally by the company-wide kill switch. Administrators
-    // are short-circuited above.
+    // certifier sees ONLY runs the test_manager has explicitly shared.
+    // v1.11.15: the company-wide kill-switch was removed — per-report
+    // sharing (shared_with_certifier_at) is now the sole gate.
+    // Administrators are short-circuited above.
     const certifierFilter = req.user.role === 'certification_user'
-      ? 'AND r.shared_with_certifier_at IS NOT NULL AND c.share_reports_with_certifier = 1'
+      ? 'AND r.shared_with_certifier_at IS NOT NULL'
       : '';
     rows = all(
       `SELECT r.id, r.company_id, c.name AS company_name, r.status,
@@ -319,6 +336,19 @@ router.get('/', (req, res) => {
        WHERE r.status != 'DELETED' ${certifierFilter}`
     );
   } else {
+    // Company-scoped list. Visibility within a company depends on role:
+    //   - test_manager → all runs in the company (they triage/own the
+    //     company's test data and can delete any run; see bulk-delete).
+    //   - plain tester (company_user) → ONLY their own runs (v1.11.13).
+    //     A tester previously saw teammates' runs (company-scoped) but
+    //     could only delete their own, which surfaced as a confusing
+    //     "Not the run owner" toast and leaked who-ran-what across the
+    //     team. Testers now see strictly what they submitted.
+    // (administrator is short-circuited above into the lifecycle queue;
+    //  certifier is handled in the platform-role branch.)
+    const isElevatedViewer = req.user.role === 'test_manager' || req.user.role === 'administrator';
+    const ownScope = isElevatedViewer ? '' : ' AND r.user_id = ?';
+    const ownScopeCount = isElevatedViewer ? '' : ' AND user_id = ?';
     // Tester: hide DELETION_REQUESTED (they already "deleted" it) and permanently DELETED,
     // but show DELETED_BY_ADMIN (flagged) so they know admin has marked it
     rows = all(
@@ -326,6 +356,7 @@ router.get('/', (req, res) => {
               r.auth_mode_used, r.api_base_used, r.env_name_used,
               r.queued_at, r.started_at, r.completed_at, r.exit_code,
               r.user_id, r.deleted_by, r.batch_id, r.scenario_code,
+              r.shared_with_certifier_at, r.shared_with_certifier_by,
               u.email AS submitted_by,
               COALESCE(ra.artifact_count, 0) AS artifact_count,
               COALESCE(rs.scenario_count,  0) AS scenario_count,
@@ -333,14 +364,14 @@ router.get('/', (req, res) => {
        FROM runs r
        JOIN users u ON u.id = r.user_id
        JOIN companies c ON c.id = r.company_id${agg}
-       WHERE r.company_id = ? AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
+       WHERE r.company_id = ?${ownScope} AND r.status NOT IN ('DELETION_REQUESTED', 'DELETED')
        ORDER BY r.queued_at DESC
        LIMIT ? OFFSET ?`,
-      [req.companyId, limit, offset]
+      isElevatedViewer ? [req.companyId, limit, offset] : [req.companyId, req.user.id, limit, offset]
     );
     total = get(
-      "SELECT COUNT(*) AS n FROM runs WHERE company_id = ? AND status NOT IN ('DELETION_REQUESTED', 'DELETED')",
-      [req.companyId]
+      `SELECT COUNT(*) AS n FROM runs WHERE company_id = ?${ownScopeCount} AND status NOT IN ('DELETION_REQUESTED', 'DELETED')`,
+      isElevatedViewer ? [req.companyId] : [req.companyId, req.user.id]
     );
   }
 
@@ -536,7 +567,8 @@ router.get('/queue-status', (req, res) => {
   const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
   let concurrentLimit = 1;
   if (tfRow) {
-    try { concurrentLimit = JSON.parse(tfRow.config).concurrentSessionLimit || 1; } catch (_) {}
+    // config is encrypted at rest — decrypt before parsing (see POST / above).
+    try { concurrentLimit = JSON.parse(colDecrypt(tfRow.config)).concurrentSessionLimit || 1; } catch (_) {}
   }
 
   // Get all QUEUED + RUNNING runs for this company
@@ -571,6 +603,85 @@ router.get('/queue-status', (req, res) => {
   });
 });
 
+// ── POST /v1/runs/stop-all ────────────────────────────────────────────────────
+// Emergency stop: forcibly terminate active runs "hard but sure".
+//   - QUEUED  → purged from the in-memory queue so they never start, then
+//               marked CANCELLED.
+//   - RUNNING → the Bruno child process is killed (SIGTERM → SIGKILL after a
+//               grace period via runner.killRun), then marked CANCELLED.
+// Scope (deliberately restrictive — only the platform admin can touch other
+// users' runs):
+//   - certification_user → 403 (cannot run or stop runs)
+//   - company_user (tester) AND test_manager → only the runs THEY launched
+//   - administrator → ALL active runs across EVERY company (platform-wide)
+// There is no per-company "stop everyone's runs": the only cross-user power is
+// the platform administrator's, and it spans the whole platform by design.
+// Registered BEFORE /:id so Express doesn't treat "stop-all" as a run id.
+router.post('/stop-all', (req, res) => {
+  if (req.user.role === 'certification_user') {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot stop runs.' });
+  }
+
+  const companyId = req.companyId || req.user.companyId;
+  const isAdmin   = req.user.role === 'administrator';
+  const scope     = isAdmin ? 'platform' : 'own';
+
+  // Active = QUEUED or RUNNING. Admin → platform-wide (no company/user filter);
+  // everyone else → only the runs they personally started. enforceTenant has
+  // already hard-locked a non-admin's company_id to their own; we also pin
+  // user_id, so a tester or test_manager can never reach a teammate's run.
+  const activeRuns = isAdmin
+    ? all(`SELECT id, status FROM runs WHERE status IN ('QUEUED','RUNNING')`)
+    : all(`SELECT id, status FROM runs WHERE company_id = ? AND user_id = ? AND status IN ('QUEUED','RUNNING')`,
+        [companyId, req.user.id]);
+
+  if (activeRuns.length === 0) {
+    return res.json({ stopped: 0, running_cancelled: 0, queued_cancelled: 0, processes_killed: 0, scope });
+  }
+
+  const ids = new Set(activeRuns.map(r => r.id));
+
+  // 1. Drop matching QUEUED jobs from the in-memory queue so the next drain
+  //    cannot launch a run we are about to cancel.
+  queue.purge(job => ids.has(job.runId));
+
+  // 2. Kill running processes + mark every targeted run CANCELLED. The DB write
+  //    is guarded so a run that finished between the SELECT and now is left as
+  //    its real terminal status.
+  let processesKilled = 0;
+  let queuedCancelled = 0;
+  let runningCancelled = 0;
+  transaction(() => {
+    for (const r of activeRuns) {
+      if (r.status === 'RUNNING') {
+        if (runner.killRun(r.id)) processesKilled++;
+        runningCancelled++;
+      } else {
+        queuedCancelled++;
+      }
+      dbRun(
+        `UPDATE runs SET status = 'CANCELLED', completed_at = datetime('now'), error_message = ?
+         WHERE id = ? AND status IN ('QUEUED','RUNNING')`,
+        [`Emergency-stopped by ${req.user.email}`, r.id]
+      );
+    }
+  });
+
+  // Audit is best-effort — never let a logging hiccup block the stop.
+  try {
+    auditLog(req.user.id, companyId || null, req.user.email,
+      `emergency_stop:${scope}:running=${runningCancelled},queued=${queuedCancelled}`);
+  } catch (_) { /* ignore */ }
+
+  return res.json({
+    stopped:          activeRuns.length,
+    running_cancelled: runningCancelled,
+    queued_cancelled:  queuedCancelled,
+    processes_killed:  processesKilled,
+    scope
+  });
+});
+
 // ── GET /v1/runs/batch/:batchId ──────────────────────────────────────────────
 // Returns all runs in a batch with aggregated status.
 router.get('/batch/:batchId', (req, res) => {
@@ -600,6 +711,74 @@ router.get('/batch/:batchId', (req, res) => {
     cancelled: runs.filter(r => r.status === 'CANCELLED').length,
     runs
   });
+});
+
+// ── GET /v1/runs/batch/:batchId/reports.zip (#405) ───────────────────────────
+// One-click bulk download: every run's artifacts in a batch, bundled into one
+// ZIP named {sandbox}_{date}_batch-{shortid}.zip. Strictly company-scoped; each
+// artifact is decrypted at-rest and added under a scenario-named entry.
+const bulkDownloadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many bulk downloads in a short window — please wait a moment.' }
+});
+router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
+  const companyId = req.companyId || req.user.companyId;
+  if (!companyId) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'A company context is required to download batch reports.' });
+  }
+
+  const runs = all(
+    `SELECT id, scenario_code, env_name_used, queued_at, started_at
+       FROM runs WHERE batch_id = ? AND company_id = ? ORDER BY queued_at ASC`,
+    [req.params.batchId, companyId]
+  );
+  if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
+
+  const { decryptFromFile } = require('../../utils/at-rest');
+  const { buildZip }        = require('../../utils/zip');
+  const SAFE_ARTIFACTS_DIR  = path.resolve(__dirname, '../../../data/artifacts');
+  const sanitize = s => String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+
+  const entries = [];
+  const used = new Set();
+  for (const r of runs) {
+    const arts = all(`SELECT id, type, filename, path FROM run_artifacts WHERE run_id = ?`, [r.id]);
+    for (const a of arts) {
+      const safePath = path.resolve(a.path || '');
+      if (!safePath.startsWith(SAFE_ARTIFACTS_DIR + path.sep) || !fs.existsSync(safePath)) continue;
+      let plaintext;
+      try { plaintext = decryptFromFile(safePath); } catch (_e) { continue; }   // skip an unreadable artifact, keep the rest
+      const scenario = sanitize(r.scenario_code) || ('run-' + String(r.id).slice(0, 8));
+      const ext = ((a.filename && a.filename.match(/\.([A-Za-z0-9]+)$/)) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
+      let name = `${scenario}.${ext}`;
+      if (used.has(name)) {
+        const short = String(r.id).slice(0, 8);
+        let n = 1;
+        do { name = `${scenario}_${short}${n > 1 ? '_' + n : ''}.${ext}`; n++; } while (used.has(name));
+      }
+      used.add(name);
+      entries.push({ name, data: plaintext });
+    }
+  }
+  if (!entries.length) {
+    return res.status(404).json({ status: 404, title: 'No reports', detail: 'No downloadable artifacts found for this batch yet.' });
+  }
+
+  const sandbox = sanitize((runs[0].env_name_used || 'sandbox').replace(/^OTST[_-]?/i, '').replace(/[_-]?Env$/i, '')) || 'sandbox';
+  const date    = String(runs[0].started_at || runs[0].queued_at || '').slice(0, 10) || 'run';
+  const zipName = `${sandbox}_${date}_batch-${String(req.params.batchId).slice(0, 8)}.zip`;
+
+  let zip;
+  try { zip = buildZip(entries); }
+  catch (_e) { return res.status(500).json({ status: 500, title: 'Zip failed', detail: 'Could not build the report archive.' }); }
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+  res.setHeader('Content-Length', String(zip.length));
+  return res.end(zip);
 });
 
 // ── GET /v1/runs/:id ──────────────────────────────────────────────────────────
@@ -635,7 +814,8 @@ router.get('/:id/logs', (req, res) => {
   // decrypting message. Caps the fetch at 5000 rows so a runaway log
   // doesn't blow up memory.
   const wantSearch = !!req.query.search;
-  sql += wantSearch ? ' ORDER BY id ASC LIMIT 5000' : ' ORDER BY id ASC LIMIT 500';
+  const sqlLimit = wantSearch ? 5000 : 500;
+  sql += ` ORDER BY id ASC LIMIT ${sqlLimit}`;
 
   const rows = all(sql, params);
   // Transparent decrypt of the message column (handles legacy plaintext).
@@ -647,7 +827,16 @@ router.get('/:id/logs', (req, res) => {
     filtered = events.filter(e => String(e.message || '').toLowerCase().includes(needle)).slice(0, 500);
   }
 
-  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered });
+  // #343 followup (v1.11.117): tell the client whether more rows are waiting
+  // behind the cursor. The SQL fetch is capped (500 / 5000-when-searching);
+  // a full page means the backlog probably continues. Without this flag the
+  // dashboard stopped polling the moment the run reached a terminal status
+  // and silently stranded everything past the first page — a FAILED run
+  // opened after the fact showed only its first ~500 log lines ("log stops
+  // before the offer request" symptom).
+  const hasMore = rows.length === sqlLimit;
+
+  return res.json({ run_id: req.params.id, status: runRow.status, events: filtered, has_more: hasMore });
 });
 
 // ── GET /v1/runs/:id/assertions ──────────────────────────────────────────────
@@ -893,15 +1082,15 @@ router.get('/:id/artifacts/:aid', (req, res) => {
 
 // ── POST /v1/runs/:id/share — share THIS run with certifiers (v1.10.0) ──────
 // Test manager opt-in: mark a single completed run as visible to certifiers.
-// Replaces the all-or-nothing companies.share_reports_with_certifier toggle
-// as the gating mechanism for certifier visibility (issue #60).
+// As of v1.11.15 this is the SOLE certifier-visibility mechanism — the old
+// company-wide share_reports_with_certifier toggle was removed, so a run is
+// certifier-visible iff shared_with_certifier_at IS NOT NULL. Driven from the
+// dashboard per-row share control (and still available on the run-detail page).
 //
 // Restrictions:
 //   - Only test_manager role of the run's owning company can share.
 //   - Run must be in a terminal status (COMPLETED / FAILED / CANCELLED).
 //     Sharing in-progress runs is meaningless and would leak partial state.
-//   - The company-wide share_reports_with_certifier toggle remains a master
-//     kill switch: when set to 0 it overrides per-run shares.
 //
 // Audit-logged with the run id and the actor's email.
 router.post('/:id/share', (req, res) => {

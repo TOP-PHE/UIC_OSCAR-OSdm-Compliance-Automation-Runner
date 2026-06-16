@@ -18,22 +18,71 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger, displayFulFilledBooking } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base")+"bookings.js");
 
+        // #204 EXPIRED-BOOKING: when armed, this GET verifies the booking is expired
+        // (not fulfilled). The normal FULFILLED/CONFIRMED validation below would
+        // wrongly fail, so short-circuit: assert admissions/reservations (or the
+        // booking itself) are EXPIRED/RELEASED/CANCELLED, then continue the loop.
+        if (String(bru.getEnvVar("__expiredBookingArmed")) === "true") {
+            const { nhfTestPrefix, advanceExpiredFlowQueueOrFinish } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _tag = nhfTestPrefix();
+            const _st = res.getStatus();
+            const EXPIRED = ["EXPIRED", "RELEASED", "CANCELLED"];
+            let _jd; try { _jd = res.getBody(); } catch (_e) { _jd = null; }
+            const _bk = _jd && _jd.booking ? _jd.booking : _jd;
+            if (_st === 404) {
+                validationLogger("[INFO] Expired booking: GET /bookings returned 404 — the provider purged the expired booking (acceptable).");
+                test(`${_tag}Expired booking: booking is gone (404) or its parts are expired/released`, () => { expect(true).to.be.true; });
+            } else if (_st === 200 && _bk && typeof _bk === "object") {
+                const _parts = [];
+                (Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : []).forEach((bo) => {
+                    ["admissions", "reservations", "ancillaries"].forEach((pt) => {
+                        (Array.isArray(bo[pt]) ? bo[pt] : []).forEach((p) => { if (p && p.status) _parts.push(String(p.status).toUpperCase()); });
+                    });
+                });
+                const _bookingExpired = _bk.status && EXPIRED.includes(String(_bk.status).toUpperCase());
+                const _allPartsExpired = _parts.length > 0 && _parts.every((s) => EXPIRED.includes(s));
+                validationLogger(`[INFO] Expired booking: booking.status=${_bk.status || "(none)"}, parts=[${_parts.join(", ") || "(none)"}]`);
+                test(`${_tag}Expired booking: admissions/reservations are EXPIRED/RELEASED/CANCELLED after the deadline`, () => {
+                    expect(_bookingExpired || _allPartsExpired,
+                        `expected expired/released; booking.status=${_bk.status}, parts=[${_parts.join(", ")}]`).to.be.true;
+                });
+            } else {
+                validationLogger(`[WARNING] Expired booking: unexpected GET /bookings status ${_st} — cannot confirm expiry.`);
+                test(`${_tag}Expired booking: GET /bookings is retrievable (200) or purged (404), got ${_st}`, () => {
+                    expect([200, 404]).to.include(_st);
+                });
+            }
+            try { displayFulFilledBooking(_jd); } catch (_e) { /* display only */ }
+            // PR B: auto-expansion — if more timers are queued for this
+            // scenario, re-arm + loop. Otherwise fall through to the existing
+            // cross-scenario tail.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired booking" })) return;
+            // Continue the multi-scenario loop (same tail as the normal path).
+            const _scList2    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx2 = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList2.length > 0 && _scNextIdx2 < _scList2.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
+        }
 
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
+          // #383: the status test above already recorded this failure once —
+          // a second identical registration only double-counted it.
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("GET Booking after Fulfillments");
           return;
@@ -52,23 +101,44 @@ runtime:
             loopbackOrStop("GET Booking after Fulfillments (JSON parse)");
             return;
         }
+        // #250: this is the GET /bookings AFTER POST /fulfillments — require the
+        // booking to embed the generated fulfillments (5th arg = requireFulfillments).
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
         ["FULFILLED", "CONFIRMED"],
-        ["FULFILLED", "CONFIRMED"]);
+        ["FULFILLED", "CONFIRMED"],
+        true);
 
         displayFulFilledBooking(jsonData);
 
+        // Partial refund (#218): when armed on this scenario, stash the just-
+        // fetched booking JSON so 10. POST Refund Offers can resolve scope
+        // (bookingPartIds for the chosen leg, passengerIds for the chosen
+        // passenger). Gated on partial flags to keep env vars lean for the
+        // common full-refund and SALE-only paths.
+        if (String(bru.getEnvVar("partialRefundByLeg")) === "true" ||
+            String(bru.getEnvVar("partialRefundByPax")) === "true") {
+            // Prefer the `booking` wrapper if the provider returns one
+            // (response shape varies); fall back to the root object.
+            const _bk = (jsonData && jsonData.booking) ? jsonData.booking : jsonData;
+            try { bru.setEnvVar("__bookingForRefund", JSON.stringify(_bk)); }
+            catch (_e) { /* leave unset on serialise failure */ }
+        }
+
         if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
             bru.runner.setNextRequest("10. POST Refund Offers");
-            console.log("scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")
+            console.log("[INFO] scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")
         } else if(bru.getEnvVar("scenarioType")?.includes("EXCHANGE")) {
             bru.runner.setNextRequest("10. POST Exchange Offers");
-            console.log("scenarioType in data file contains 'EXCHANGE' keyword, executing 10. POST Exchange Offers")    
+            console.log("[INFO] scenarioType in data file contains 'EXCHANGE' keyword, executing 10. POST Exchange Offers")    
         } else{
-            console.log("scenarioType in data file doesn't contain 'REFUND' or 'EXCHANGE' keyword, SALE scenario complete.");
+            console.log("[INFO] scenarioType in data file doesn't contain 'REFUND' or 'EXCHANGE' keyword, SALE scenario complete.");
             // ── Multi-scenario: loop to next scenario or truly stop ────────────
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {
@@ -76,7 +146,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ All scenarios complete — run finished');
+              console.log('[INFO] ✅ All scenarios complete — run finished');
               bru.runner.stopExecution();
             }
         }

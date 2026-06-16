@@ -1,9 +1,50 @@
+/**
+ * displays.js — reporting/console output helpers shared across the collection.
+ *
+ * `validationLogger(msg)` is the env-scoped logger every step uses (its lines are
+ * captured into the HTML report); the display* functions pretty-print the offer /
+ * booking / fulfilled-booking responses for the console + report.
+ */
 module.exports = {
   validationLogger,
   displayOfferResponse,
   displayBookingResponse,
-  displayFulFilledBooking
+  displayFulFilledBooking,
+  logStepStart
 };
+
+/**
+ * logStepStart(req) — print a "step is starting" line with a millisecond-
+ * precision UTC timestamp + Europe/Paris local-time annotation.
+ *
+ * Issue #324 (v1.11.107): testers correlating an OSCAR run with provider-
+ * side logs (Paxone, Bileto, …) needed the absolute wall-clock at which
+ * each request was sent. Bruno's res.getResponseTime() exposes a duration
+ * but the start timestamp was nowhere in the report.
+ *
+ * Output:
+ *   ⏩ [STEP] [2026-06-09T07:23:26.087Z (= 2026-06-09 09:23:26.087 Europe/Paris)] Executing request : 10. POST Refund Offers
+ *
+ * Same Europe/Paris pattern as the refund-offer `createdOn / validFrom /
+ * validUntil` annotations shipped in v1.11.106. The bracketed prefix is
+ * suffixed AFTER the existing `⏩ [STEP]` marker so any downstream tool
+ * matching on that marker still finds the line.
+ */
+function logStepStart(req) {
+  var now = new Date();
+  var utc = now.toISOString();
+  var local = '';
+  try {
+    local = ' (= ' + new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Paris',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      fractionalSecondDigits: 3
+    }).format(now) + ' Europe/Paris)';
+  } catch (_e) { /* sv-SE locale or fractionalSecondDigits unsupported — fall back to UTC only */ }
+  var name = (req && typeof req.getName === 'function') ? req.getName() : String(req || '');
+  console.log('[INFO] ⏩ [STEP] [' + utc + local + '] Executing request : ' + name);
+}
 
 // Function to log validation messages based on logging type (env-scoped)
 function validationLogger(message) {
@@ -39,7 +80,21 @@ function validationLogger(message) {
       }
       break;
     case "DEBUG":
-      if (message.includes("[DEBUG]") || message.includes("[INFO]")) {
+      // v1.11.111 fix: DEBUG is the MOST verbose level — it must include
+      // every less-verbose level too (the standard logging pyramid). Before
+      // this fix DEBUG passed only [DEBUG] and [INFO] but DROPPED [WARN] /
+      // [WARNING] / [ERROR], so a Test Manager who set loggingType=DEBUG
+      // (expecting MORE detail) actually saw FEWER critical lines than at
+      // the default INFO level — including the v1.11.110 trip-branch
+      // diagnostic [ERROR] lines, which is the exact case that surfaced
+      // this bug.
+      if (
+        message.includes("[DEBUG]")   ||
+        message.includes("[INFO]")    ||
+        message.includes("[WARN]")    ||
+        message.includes("[WARNING]") ||
+        message.includes("[ERROR]")
+      ) {
         shouldLog = true;
       }
       break;
@@ -51,6 +106,20 @@ function validationLogger(message) {
   }
   
   if (shouldLog) {
+    // R1 (#351): every PHYSICAL line carries the level tag. The OSCAR runner
+    // stores each stdout line as a separate event; untagged continuation
+    // lines of a multi-line message fall back to 'info' there, so a [DEBUG]
+    // multi-line dump leaked into the tester's INFO view line by line.
+    if (message.indexOf('\n') !== -1) {
+      var _tagMatch = message.match(/\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/);
+      if (_tagMatch) {
+        var _lineTag = '[' + _tagMatch[1] + '] ';
+        message = message.split('\n').map(function (l, i) {
+          if (i === 0 || !l.trim()) return l;
+          return /\[(DEBUG|INFO|WARN|WARNING|ERROR)\]/.test(l) ? l : _lineTag + l;
+        }).join('\n');
+      }
+    }
     // Print to console
     console.log(message);
     
@@ -66,7 +135,9 @@ function validationLogger(message) {
       
       existing.push({ level: level, message: message });
       bru.setVar('__rptLogs', JSON.stringify(existing));
-    } catch (_e) {}
+    } catch (e) {
+      console.log('[DEBUG] [displays] addReportLog skipped: ' + (e && e.message));
+    }
   }
 }
 
@@ -420,5 +491,5 @@ function displayFulFilledBooking(response) {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

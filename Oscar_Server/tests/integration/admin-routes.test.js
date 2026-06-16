@@ -29,7 +29,7 @@
 process.env.JWT_SECRET = 'test-jwt-secret-for-admin-routes';
 
 const jwt     = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
 const { run, get } = require('../../src/db/db');
@@ -271,6 +271,33 @@ describe('PATCH /v1/admin/users/:id', () => {
       .send({ email: newEmail });
     expect(res.status).toBe(200);
     expect(res.body.user.email).toBe(newEmail);
+  });
+
+  // ── issue #128: role change must not move a user off their company ──────────
+  test('Tester → Test Manager (no company_id) keeps the current company', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch(`/v1/admin/users/${targetUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ role: 'test_manager' }); // no company_id → must keep current company
+    expect(res.status).toBe(200);
+    expect(res.body.user.role).toBe('test_manager');
+    expect(res.body.user.company_id).toBe(companyId); // NOT reassigned to the platform company
+  });
+
+  test('Test Manager can be moved to another company via company_id', async () => {
+    const token = makeToken('administrator');
+    const otherCompanyId = uuidv4();
+    run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Other Co 128', 'other-co-128')`, [otherCompanyId]);
+    const res = await request(app)
+      .patch(`/v1/admin/users/${targetUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ role: 'test_manager', company_id: otherCompanyId });
+    expect(res.status).toBe(200);
+    expect(res.body.user.company_id).toBe(otherCompanyId);
+    // restore + clean up so afterAll / later suites see a consistent state
+    run('UPDATE users SET company_id = ? WHERE id = ?', [companyId, targetUserId]);
+    run('DELETE FROM companies WHERE id = ?', [otherCompanyId]);
   });
 });
 

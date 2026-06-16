@@ -76,6 +76,21 @@ queue.on('failed', ({ runId, error }) => {
   metricsForQueue.runsTotal.inc({ status: 'FAILED' });
 });
 
+// ── Startup reconciliation — fail runs orphaned by the previous process exit ──
+// The queue above is in-memory: on boot its pending list is empty, so any run
+// still RUNNING/QUEUED in the DB was orphaned by the previous exit (deploy,
+// crash, SIGTERM, docker restart) and would otherwise occupy company
+// concurrency slots forever — wedging the queue (observed after a Watchtower
+// deploy landed mid-batch: 4 orphaned RUNNING rows pinned all 4 slots, 2
+// QUEUED could never start). Mark them FAILED so slots free and the dashboard
+// reflects reality. Synchronous and safe here: DB migrations already ran
+// (require('./db/db') above) and no job has been enqueued yet.
+try {
+  require('./worker/reconcile').reconcileOrphanedRuns();
+} catch (e) {
+  log.error({ err: e.message }, 'Startup run reconciliation threw (non-fatal)');
+}
+
 // Periodically refresh queue depth + active-runs gauges from the queue's
 // own state. Every 5s — well below Prometheus's typical 15s scrape interval,
 // so a scrape never sees a totally stale value.
@@ -231,6 +246,42 @@ function isLoopbackBrunoCall(req) {
   return ip === '127.0.0.1' || ip === '::1';
 }
 
+// ── Route: GET /json_validator/datafile.schema.json (#333, v1.11.112) ───────
+// Serve the JSON schema bundled with the Bruno collection. Before this
+// route, operators had to set JSON_SCHEMA_URL to an external URL (the
+// default in .env.example pointed at a deprecated GitHub branch:
+// UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/…) that
+// produced false-positive validation failures. Serving the schema locally
+// removes the external dependency entirely — the schema always matches
+// the running collection's expectations because they're shipped together.
+//
+// Public: no auth, no rate limiter beyond the global expressjs default.
+// The file is a single static read from a path entirely under operator
+// control (COLLECTION_PATH bind-mount); there's no user-controlled
+// component in the resolved path, so path-traversal is not a vector.
+// Cache the file aggressively (the collection only changes on deploy).
+const COLLECTION_PATH_SAFE = path.resolve(process.env.COLLECTION_PATH || '/collection');
+const SCHEMA_FILE_PATH     = path.join(COLLECTION_PATH_SAFE, 'json_validator', 'datafile.schema.json');
+// Apply the same rate limiter we already use for /data/:filename
+// (CodeQL js/missing-rate-limiting — file-system access behind a route
+// should be rate-limited even if it's auth-less, to prevent abusive
+// polling). 300/min is generous — the schema is fetched once per scenario
+// run via the loopback Bruno subprocess.
+app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.type('application/json');
+  res.sendFile(SCHEMA_FILE_PATH, err => {
+    // CodeQL js/trivial-conditional — err is only present on failure;
+    // check explicitly against null/undefined and inspect the structured
+    // err code so the conditional has visible truthiness semantics.
+    if (err != null) {
+      log.warn({ errMsg: err.message, errCode: err.code, path: SCHEMA_FILE_PATH },
+        '[schema-route] sendFile failed — collection bind-mount missing or schema file moved?');
+      if (!res.headersSent) res.status(404).type('text/plain').send('schema file not found');
+    }
+  });
+});
+
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
@@ -277,6 +328,61 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));
   return res.end(plaintext);
+});
+
+// ── Loopback refresh of an OAuth access token mid-run (issue #204) ───────────
+// Long-running scenarios (e.g. expiredBookingTest's ~15 min wait on Paxone)
+// can outlive the OAuth token issued at run start. The provider then returns
+// 403 "not authenticated" on the next request, masking the booking-expiry
+// semantics the test is trying to grade. Bruno calls this loopback endpoint
+// AFTER the wait to obtain a fresh token; the provider then sees a valid
+// token and the test can observe the actual expiry behaviour.
+//
+// SECURITY: same loopback gate as /data — caller MUST be on 127.0.0.1/::1
+// with NO X-Forwarded-For header. There is no session/Bearer auth (Bruno is
+// a spawned child process). The endpoint only refreshes the token belonging
+// to the run being requested; it never crosses run boundaries.
+//
+// The SAFE_RUNID_RE used below is defined further down for the
+// /artifacts/:runId path — declared inline here so the order doesn't matter.
+const SAFE_RUNID_RE_FOR_REFRESH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req, res) => {
+  const { runId } = req.params;
+  if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
+  }
+  if (!isLoopbackBrunoCall(req)) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint is loopback-only.' });
+  }
+  const runRow = dbGet('SELECT id, user_id FROM runs WHERE id = ?', [runId]);
+  if (!runRow) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Run not found.' });
+  }
+  const userRow = dbGet('SELECT * FROM users WHERE id = ?', [runRow.user_id]);
+  if (!userRow) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User for this run not found.' });
+  }
+  // Query: ?force=1 / ?force=true → force a fresh fetch (skip the server-side
+  // cache). Default (no query) → respect the cache (returns the cached token
+  // when valid). This lets Bruno call us at scenario start as a cheap
+  // refresh-if-needed check (#204 token-watchdog), AND call us with force=1
+  // after a known long wait (the expired-booking test) to guarantee a fresh
+  // token regardless of what the cache thinks.
+  const force = req.query.force === '1' || String(req.query.force).toLowerCase() === 'true';
+  try {
+    const { resolveAccessToken } = require('./worker/access-token');
+    const accessToken = await resolveAccessToken(
+      userRow,
+      { info: (m) => log.info({ runId }, m), error: (m) => log.error({ runId }, m) },
+      { forceRefresh: force }
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ access_token: accessToken, forced: force });
+  } catch (err) {
+    const detail = err && err.message ? err.message : String(err);
+    log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
+    return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: `Token refresh failed: ${detail}` });
+  }
 });
 
 // ── Serve run artifacts (HTML reports, JSON results) ─────────────────────────
@@ -367,6 +473,7 @@ app.use('/v1/company/users',   require('./api/routes/company-users'));
 app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));
+app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
 app.use('/v1/admin',           require('./api/routes/admin'));
@@ -453,6 +560,11 @@ app.get('/health', (req, res) => {
 });
 
 // ── Serve static UI ───────────────────────────────────────────────────────────
+// #287: vanilla-jsoneditor (ISC) is **vendored** under public/vendor/ rather
+// than installed as an npm dependency — keeps the dep tree (and package-lock)
+// untouched and avoids re-resolving the whole graph for one front-end asset.
+// The lazy `import('/vendor/vanilla-jsoneditor/standalone.js')` in run-detail.html
+// is served by the same express.static below (CSP stays 'self', no extra mount).
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
 app.use(express.static(PUBLIC_DIR));
 

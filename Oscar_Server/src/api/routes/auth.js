@@ -20,7 +20,7 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
@@ -56,9 +56,17 @@ function setSessionCookie(res, token) {
 }
 
 // ── Rate limiting for auth endpoints (brute-force protection) ────────────────
+// Brute-force protection on credential-bearing auth endpoints (CodeQL
+// js/missing-rate-limiting). Keyed on IP (no keyGenerator → express-rate-limit
+// default). The cap is env-tunable so an operator running heavy multi-account
+// testing can raise it without a code change. Default raised 20 → 50 in
+// v1.11.14: a conformance-testing platform invites rapid user-switching across
+// vendor accounts, and 20/15min was tripping legitimate testers (each switch is
+// a login). 50/15min is still far below a useful brute-force rate.
+const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '50', 10);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15-minute window
-  max: 20,                    // max 20 attempts per window
+  max: AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many attempts. Please try again later.' }
@@ -66,7 +74,11 @@ const authLimiter = rateLimit({
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
 router.use('/bootstrap', authLimiter);
-router.use('/logout', authLimiter);
+// NOTE: /logout is intentionally NOT rate-limited. It carries no credential to
+// brute-force (it just revokes the caller's own session), and counting it in
+// the same bucket as /login halved the effective login budget during rapid
+// user-switching — each switch is a logout + a login. Removing it doubles the
+// usable headroom for legitimate testers at no security cost.
 const REGISTRATION_EXPIRY_HOURS = 24;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

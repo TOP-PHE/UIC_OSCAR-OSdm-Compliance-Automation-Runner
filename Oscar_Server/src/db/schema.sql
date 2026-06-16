@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS companies (
   -- expiry means "do not cache" (vendor didn't return expires_in).
   cached_token_enc        TEXT,
   cached_token_expires_at TEXT,
+  cached_token_cred_fp    TEXT,
   -- Optional requestor header (AES-GCM encrypted, base64)
   requestor_enc       TEXT,
   -- Data file
@@ -92,9 +93,10 @@ CREATE TABLE IF NOT EXISTS users (
   oauth_scope             TEXT,
   oauth_extra_enc         TEXT,
   oauth_custom_template   TEXT,
-  -- Token cache (cleared on any credential change)
+  -- Token cache (reused only while the credential fingerprint matches; #208)
   cached_token_enc        TEXT,
   cached_token_expires_at TEXT,
+  cached_token_cred_fp    TEXT,
   -- Optional headers
   requestor_enc           TEXT,
   subscription_key_enc    TEXT,
@@ -219,7 +221,7 @@ CREATE TABLE IF NOT EXISTS test_frameworks (
 CREATE TABLE IF NOT EXISTS test_resources (
   id            TEXT PRIMARY KEY,                -- UUID
   company_id    TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  resource_type TEXT NOT NULL DEFAULT 'TRAIN',   -- 'TRAIN' | 'MULTIMODAL'
+  resource_type TEXT NOT NULL DEFAULT 'TRAIN',   -- 'TRAIN' | 'JOURNEY' | 'MULTIMODAL'
   label         TEXT NOT NULL DEFAULT '',        -- human-readable short name
   data          TEXT NOT NULL DEFAULT '{}',      -- JSON blob (see API for schema)
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
@@ -339,6 +341,48 @@ CREATE TABLE IF NOT EXISTS token_blacklist (
   revoked_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+
+-- ── Test Findings & Open Points (conformance dialogue) ──────────────────────
+-- A per-test-system, threaded record of conformance findings. OSCAR's analysis
+-- opens a "finding" (an observation + its reading of the spec); the test team
+-- replies on the thread (finding_comment) and settles a category/severity. It
+-- is deliberately soft-worded — a finding may turn out to be the provider's
+-- deviation OR OSCAR's own bug, decided by the dialogue, not pre-judged.
+--
+-- Runtime link: a finding marked baseline_in_run=1 that carries a numeric
+-- expected_status is projected into the datafile's top-level knownDeviations[]
+-- (sibling of systemInfoParameters) so the #398 Bruno engine reports a matching
+-- response as a documented deviation instead of a FAILED run. Everything else
+-- is recorded for the dialogue only — no runtime effect.
+CREATE TABLE IF NOT EXISTS finding (
+  id               TEXT PRIMARY KEY,
+  company_id       TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  title            TEXT NOT NULL,                       -- short headline of the open point
+  step             TEXT,                                -- request/step label for status-level baselining (e.g. "GET Passenger"); NULL for assertion-level / general findings
+  expected_status  INTEGER,                             -- the provider's observed HTTP status to baseline (e.g. 501); NULL when not status-level
+  observed         TEXT,                                -- what the provider actually returned
+  interpretation   TEXT,                                -- OSCAR's reading + spec reference
+  category         TEXT NOT NULL DEFAULT 'open',        -- 'open' | 'provider_deviation' | 'oscar_issue' | 'not_supported' | 'spec_question'
+  severity         TEXT,                                -- soft label: 'major' | 'minor' | 'not_supported' | NULL (until classified)
+  status           TEXT NOT NULL DEFAULT 'open',        -- 'open' | 'discussing' | 'resolved'
+  baseline_in_run  INTEGER NOT NULL DEFAULT 0,          -- 1 = project into knownDeviations (needs expected_status); enforce switch
+  raise_to_osdm    INTEGER NOT NULL DEFAULT 0,          -- 1 = flagged as structured feedback for the OSDM working group
+  evidence         TEXT,                                -- free text / run link / response snippet
+  created_by       TEXT,                                -- author label ('OSCAR analysis' for seeded findings, else the user email)
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_finding_company ON finding(company_id);
+
+CREATE TABLE IF NOT EXISTS finding_comment (
+  id          TEXT PRIMARY KEY,
+  finding_id  TEXT NOT NULL REFERENCES finding(id) ON DELETE CASCADE,
+  author      TEXT NOT NULL,                            -- email of the poster (or 'OSCAR' for analysis posts)
+  role        TEXT,                                     -- poster's role at time of writing (test_manager | company_user | oscar)
+  body        TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_finding_comment_finding ON finding_comment(finding_id);
 
 -- ── Seed schema version ───────────────────────────────────────────────────────
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);

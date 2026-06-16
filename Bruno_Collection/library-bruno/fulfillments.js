@@ -1,5 +1,12 @@
+/**
+ * fulfillments.js — validate the FULFILLMENT documents on a booking.
+ *
+ * Runs after fulfillments are obtained (`06`/`07`). Checks each fulfillment
+ * document is OSDM-conformant: carries a downloadLink OR rawData (#254), the
+ * expected booked offer parts, and the passenger/purchaser details echoed on it.
+ */
 // Import needed library files
-const display = require('./displays.js');
+require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 
 module.exports = {
@@ -41,7 +48,7 @@ function checkBookedOfferParts(bookedOffer, partType, bookingState) {
 
 // Function to validate passengers
 function validatePassengers(booking, offer) {
-  validationLogger("[INFO] ➤ validatePassengers");
+  validationLogger("[DEBUG] ➤ validatePassengers");
   offer.passengerRefs.forEach(passenger => {
     const found = booking.passengers.some(bookedPassenger => {
       return bookedPassenger.externalRef === passenger;
@@ -55,7 +62,7 @@ function validatePassengers(booking, offer) {
 
 // Function to validate purchaser details
 function validatePurchaserDetails(purchaserDetail) {
-  validationLogger("[INFO] ➤ validatePurchaserDetails");
+  validationLogger("[DEBUG] ➤ validatePurchaserDetails");
   if (purchaserDetail) {
     // Some sandboxes (e.g. Turnit OSDM < 3.4) use flat detail.email/phoneNumber;
     // others (Paxone, Bileto, Sqills OSDM >= 3.4) use detail.contact.email/phoneNumber
@@ -72,7 +79,7 @@ function validatePurchaserDetails(purchaserDetail) {
 
 // Function to validate fulfillment IDs
 function validateFulfillmentId(booking) {
-  validationLogger("[INFO] ➤ validateFulfillmentId");
+  validationLogger("[DEBUG] ➤ validateFulfillmentId");
   const fulfillmentsIdRaw = bru.getEnvVar("fulfillmentIds");
   if (fulfillmentsIdRaw) {
     const expectedIds = Array.isArray(fulfillmentsIdRaw) ? fulfillmentsIdRaw : JSON.parse(fulfillmentsIdRaw);
@@ -91,7 +98,7 @@ function validateFulfillmentId(booking) {
 
 // Function to validate prices
 function validatePrices(booking, fulfillmentState, totalPrice) {
-  validationLogger("[INFO] ➤ validatePrices");
+  validationLogger("[DEBUG] ➤ validatePrices");
   if (fulfillmentState != null) {
     bru.setEnvVar("bookingConfirmedPrice", booking.confirmedPrice.amount);
     const bookingConfirmedPrice = Number(bru.getEnvVar("bookingConfirmedPrice"));
@@ -115,27 +122,27 @@ function validatePrices(booking, fulfillmentState, totalPrice) {
 
 // Function to check fulfillment details
 function checkFulfillment(booking, fulfillment) {
-  validationLogger("[INFO] ➤ checkFulfillment");
+  validationLogger("[DEBUG] ➤ checkFulfillment");
   const currentDate = new Date();
   const createdOn = new Date(fulfillment.createdOn);
 
   test("Correct booking reference is returned on fulfillment", () => {
-    validationLogger(`[INFO] Booking reference in fulfillments : ${fulfillment.bookingRef}, expected booking id : ${booking.id}`);
+    validationLogger(`[DEBUG] Booking reference in fulfillments : ${fulfillment.bookingRef}, expected booking id : ${booking.id}`);
     expect(fulfillment.bookingRef).to.equal(booking.id);
   });
 
   test("ControlNumber is returned on fulfillment", () => {
-    validationLogger(`[INFO] Fulfillment controlNumber : ${fulfillment.controlNumber}`);
+    validationLogger(`[DEBUG] Fulfillment controlNumber : ${fulfillment.controlNumber}`);
     expect(fulfillment.controlNumber).to.exist;
   });
 
   test(`CreatedOn is returned on fulfillment`, () => {
-    validationLogger(`[INFO] Fulfillment createdOn : ${fulfillment.createdOn}`);
+    validationLogger(`[DEBUG] Fulfillment createdOn : ${fulfillment.createdOn}`);
     expect(currentDate.toDateString()).to.equal(createdOn.toDateString());
   });
 
   test(`Correct state AVAILABLE, ON_HOLD, FULFILLED or CONFIRMED is returned on fulfillment: ${fulfillment.status}`, () => {
-    validationLogger(`[INFO] Fulfillment status : ${fulfillment.status}`);
+    validationLogger(`[DEBUG] Fulfillment status : ${fulfillment.status}`);
     expect(["FULFILLED", "CONFIRMED", "ON_HOLD", "AVAILABLE"]).to.include(fulfillment.status);
   });
 
@@ -156,7 +163,7 @@ function checkFulfillment(booking, fulfillment) {
 // Main function to check fulfilled booking
 function getBookingFulfillmentResponse(booking, offer, bookingState, fulfillmentState = undefined) {
   booking.bookedOffers.forEach(bookedOffer => {
-    validationLogger(`[INFO] Checking bookedOffer ${bookedOffer.offerId}`);
+    validationLogger(`[DEBUG] Checking bookedOffer ${bookedOffer.offerId}`);
 
     // Check different parts of the booked offer
     ['admissions', 'reservations', 'ancillaries', 'fees', 'fares'].forEach(partType => {
@@ -196,5 +203,5 @@ function getBookingFulfillmentResponse(booking, offer, bookingState, fulfillment
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  // no-op
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
 }

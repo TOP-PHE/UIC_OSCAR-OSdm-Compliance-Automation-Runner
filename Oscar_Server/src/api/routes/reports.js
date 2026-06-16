@@ -16,7 +16,7 @@
  */
 
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run: dbRun, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
@@ -104,10 +104,12 @@ router.get('/comparisons', (req, res) => {
   let rows;
 
   if (isPlatform && !req.companyId) {
-    // v15: certifiers cannot see report-comparisons from companies that
-    // opted out of certifier sharing. Administrators are unaffected.
+    // v1.11.15: per-report sharing is the sole certifier gate (the
+    // company-wide toggle was removed). A comparison involves two runs, so a
+    // certifier may see it only when BOTH underlying runs have been shared by
+    // the test_manager — otherwise we'd leak a comparison of non-shared runs.
     const certifierFilter = req.user.role === 'certification_user'
-      ? 'AND c.share_reports_with_certifier = 1'
+      ? 'AND ra.shared_with_certifier_at IS NOT NULL AND rb.shared_with_certifier_at IS NOT NULL'
       : '';
     rows = all(
       `SELECT rc.id, rc.company_id, c.name AS company_name, rc.run_a_id, rc.run_b_id, rc.created_at,
@@ -145,18 +147,16 @@ router.get('/comparisons/:id', (req, res) => {
     : get(`SELECT * FROM report_comparisons WHERE id = ? AND company_id = ?`, [req.params.id, req.companyId]);
   if (!row) return res.status(404).json({ status: 404, title: 'Comparison not found.' });
 
-  // v15: certifier privacy guard — return 404 (not 403) for non-shared
-  // companies so we don't disclose the comparison's existence.
-  if (req.user.role === 'certification_user') {
-    const c = get('SELECT share_reports_with_certifier FROM companies WHERE id = ?', [row.company_id]);
-    // SQLite stores BOOLEAN as INTEGER (0/1); `=== false` was unreachable (Sonar S3403).
-    if (c && c.share_reports_with_certifier === 0) {
-      return res.status(404).json({ status: 404, title: 'Comparison not found.' });
-    }
-  }
+  const runA = get('SELECT id, queued_at, api_base_used, status, shared_with_certifier_at FROM runs WHERE id = ?', [row.run_a_id]);
+  const runB = get('SELECT id, queued_at, api_base_used, status, shared_with_certifier_at FROM runs WHERE id = ?', [row.run_b_id]);
 
-  const runA = get('SELECT id, queued_at, api_base_used, status FROM runs WHERE id = ?', [row.run_a_id]);
-  const runB = get('SELECT id, queued_at, api_base_used, status FROM runs WHERE id = ?', [row.run_b_id]);
+  // v1.11.15: certifier privacy guard — per-report sharing is the sole gate.
+  // A comparison is visible to a certifier only when BOTH runs are shared.
+  // Return 404 (not 403) so we don't disclose the comparison's existence.
+  if (req.user.role === 'certification_user' &&
+      (!runA || !runA.shared_with_certifier_at || !runB || !runB.shared_with_certifier_at)) {
+    return res.status(404).json({ status: 404, title: 'Comparison not found.' });
+  }
 
   return res.json({
     id:         row.id,

@@ -24,11 +24,11 @@
 const path        = require('path');
 const fs          = require('fs');
 const { spawn }   = require('child_process');
-const { v4: uuidv4 } = require('uuid');
-const { get, run: dbRun, encrypt, decrypt, colEncrypt, getConfig } = require('../db/db');
-const { copyAndEncryptFileAsync } = require('../utils/at-rest');
+const { randomUUID: uuidv4 } = require('node:crypto');
+const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
+const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
-const { fetchToken } = require('./auth-profiles');
+const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
@@ -39,7 +39,14 @@ const RUN_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-
 // ── Config ────────────────────────────────────────────────────────────────────
 const COLLECTION_PATH = process.env.COLLECTION_PATH || '';
 const BRU_CMD         = process.env.BRU_CMD || 'bru.cmd';
-const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL || '';
+// v1.11.115: default to the schema OSCAR serves itself (loopback — Bruno
+// runs inside the same container as the server). Previously an unset
+// JSON_SCHEMA_URL produced an empty json_schema env var and every run
+// failed datafile validation with "Missing env var json_schema". The
+// loopback route exists since v1.11.112 and always matches the running
+// collection, so it is the correct out-of-the-box value.
+const JSON_SCHEMA_URL = process.env.JSON_SCHEMA_URL ||
+  `http://127.0.0.1:${process.env.PORT || 3001}/json_validator/datafile.schema.json`;
 const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');
 const ENVS_DIR        = path.join(COLLECTION_PATH, 'environments');
 const WORKSPACES_DIR  = path.resolve(__dirname, '../../data/workspaces');
@@ -57,6 +64,37 @@ function _incrementAndCheck(runId) {
 }
 function _resetLineCounter(runId) { _runLineCounters.delete(runId); }
 
+// ── Active Bruno child processes — runId → ChildProcess ──────────────────────
+// Lets the API forcibly terminate an in-flight run (emergency stop). Populated
+// when bru.cmd is spawned, cleared on close/error. killRun() escalates SIGTERM
+// → SIGKILL so a wedged scenario dies "hard but sure". The runner's own final
+// status write is guarded with `AND status = 'RUNNING'`, so a row already moved
+// to CANCELLED by the emergency-stop route is never resurrected to FAILED.
+const _activeProcs = new Map();   // runId → ChildProcess
+
+/**
+ * Forcibly terminate the Bruno child process for a run, if one is alive.
+ * SIGTERM first, then SIGKILL after a short grace period if it hasn't exited.
+ * @param {string} runId
+ * @returns {boolean} true if a live process was found and signalled
+ */
+function killRun(runId) {
+  const proc = _activeProcs.get(runId);
+  if (!proc) return false;
+  try {
+    proc.kill('SIGTERM');
+    setTimeout(() => {
+      // Still tracked ⇒ it never emitted 'close' ⇒ escalate.
+      if (_activeProcs.has(runId)) {
+        try { proc.kill('SIGKILL'); } catch (_) { /* already gone */ }
+      }
+    }, 3000).unref();
+  } catch (_) {
+    return false;
+  }
+  return true;
+}
+
 // ── Async FS helpers ──────────────────────────────────────────────────────────
 /** Non-throwing async equivalent of fs.existsSync(). */
 async function fsExists(p) {
@@ -64,14 +102,21 @@ async function fsExists(p) {
 }
 
 // ── Log helper — writes to run_events with optional structured metadata ───────
+// #341 followup (v1.11.117): pass ts explicitly with millisecond precision.
+// The schema default — datetime('now') — is SECOND-precision ("2026-06-09
+// 21:25:16"), so the v1.11.113 dashboard change to slice(11,23) could never
+// show milliseconds: they were never stored. new Date().toISOString() gives
+// "2026-06-10T07:42:13.123Z" — same UTC storage convention, ms included.
+// Old rows keep the second-precision format; the dashboard slice degrades
+// gracefully on them (shows HH:MM:SS).
 function logEvent(runId, level, message, meta) {
   const lineCount = _incrementAndCheck(runId);
   if (lineCount === MAX_LOG_LINES_PER_RUN + 1) {
     // Emit one final warning and then start dropping
     try {
       dbRun(
-        `INSERT INTO run_events (run_id, level, message, event_kind) VALUES (?, ?, ?, ?)`,
-        [runId, 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
+        `INSERT INTO run_events (run_id, ts, level, message, event_kind) VALUES (?, ?, ?, ?, ?)`,
+        [runId, new Date().toISOString(), 'warn', colEncrypt(`[runner] Log line cap reached (${MAX_LOG_LINES_PER_RUN}). Further events dropped to prevent DB bloat.`), 'log']
       );
     } catch (_) { /* swallow */ }
     return;
@@ -87,11 +132,11 @@ function logEvent(runId, level, message, meta) {
     // remain plaintext so the structured-log filtering UI keeps working
     // without per-row decrypt/comparison cost).
     dbRun(
-      `INSERT INTO run_events (run_id, level, message,
+      `INSERT INTO run_events (run_id, ts, level, message,
          category, phase, suite_name, request_name, http_status,
          event_kind, attempt_index, attempt_total, scenario_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [runId, level, colEncrypt(String(message).slice(0, 4000)),
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [runId, new Date().toISOString(), level, colEncrypt(String(message).slice(0, 4000)),
        category || null, phase || null, suite_name || null, request_name || null, http_status || null,
        event_kind || 'log',
        Number.isInteger(attempt_index) ? attempt_index : null,
@@ -170,10 +215,32 @@ class LogParser {
 
     // Standard line classification (only if not already classified as milestone)
     if (eventKind === 'log') {
+      // #353: two guards keep the folder/request matcher from eating library
+      // output, which created garbage per-area sections in the dashboard:
+      //  - a line carrying an explicit [LEVEL] tag is library narration
+      //    ("[DEBUG] 📊 Report updated → /app/…/report.html (39 assertions)"
+      //    matches the text/text-(parens) shape), never a Bruno CLI row;
+      //  - assertion rows are checked FIRST and include ✕ (U+2715 — what the
+      //    Bruno CLI actually prints, distinct from ✗): "✕ GET
+      //    /passenger-categories → … (HTTP 501 …)" also matches that shape.
+      const hasLevelTag = /^\[(DEBUG|INFO|WARN(?:ING)?|ERROR)\]/i.test(trimmed);
+      const isAssertionRow = /^\s*[✓✔✗✕×]/.test(trimmed) || /^\s*(pass|fail)\b/i.test(trimmed);
+      // #355: the library's token-skip line fires in the PRE-request script —
+      // BEFORE the Bruno CLI row that normally opens the 00-Access Token
+      // suite — so the FIRST one (benerail) landed in the Runner section.
+      // The line's home is known by construction (the token folder name is
+      // fixed in the collection).
+      if (/Skipping \[[^\]]*access token\]/i.test(trimmed)) {
+        this.currentSuite = '00-Access Token';
+        this.currentRequest = null;
+      }
       // Bruno CLI prints request execution lines like:
       //   "01-System Infos Requests\00. GET System Version Check (404 Not Found) - 302 ms"
-      const folderReqMatch = trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
-      if (folderReqMatch) {
+      const folderReqMatch = !hasLevelTag && !isAssertionRow
+        && trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
+      if (isAssertionRow) {
+        category = 'assertion';
+      } else if (folderReqMatch) {
         this.currentSuite   = folderReqMatch[1].trim();
         this.currentRequest = folderReqMatch[2].trim();
         this.phase = 'execution';
@@ -188,8 +255,6 @@ class LogParser {
       } else if (/^Running Request\s+/i.test(trimmed)) {
         this.currentRequest = trimmed.replace(/^Running Request\s+/i, '').trim();
         category = 'system';
-      } else if (/^\s*[✓✗]/.test(trimmed) || /^\s*(pass|fail)/i.test(trimmed)) {
-        category = 'assertion';
       } else if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+https?:\/\//i.test(trimmed)) {
         category = 'http';
         const m = trimmed.match(/\b([1-5]\d{2})\b/);
@@ -240,6 +305,125 @@ function _authLogger(runId) {
 // it expects secret values to be stored in a separate encrypted secrets store.
 // Since this env file is ephemeral (deleted immediately after the run), there
 // is no security risk in writing credentials as plain variables.
+/**
+ * Compute the effective run timeout (ms) for a run, taking into account
+ * per-scenario expired-flow tester-timer opt-ins:
+ *   • `expiredBookingTest` + `expiredBookingMaxWaitMinutes`  (#204)
+ *   • `expiredOfferTest`   + `expiredOfferMaxWaitMinutes`    (Phase 2)
+ * Any future expired-X flow that follows the same `<flag>` / `<maxWait>` shape
+ * can be added to the EXPIRED_FLOW_TIMERS table below without touching the
+ * scan loop or the budget arithmetic.
+ *
+ *   baseMs    = RUN_TIMEOUT_MS env (default 600000 = 10 min)
+ *   hardMaxMs = RUN_HARD_MAX_TIMEOUT_MS env (default 1800000 = 30 min)
+ *
+ * The datafile (already known to exist by the caller) is parsed; for every
+ * scenario in scope (matching `scenarioOverride` if set, else
+ * `scenariosToRun`), each registered timer is inspected. When BOTH the flag
+ * is on AND its max-wait field is in 1..60, a requested ms (minutes*60_000 +
+ * 60s buffer) is computed.
+ *
+ * Within a single scenario the per-timer requests are SUMMED (PR B: when 2+
+ * timers are armed on the same scenario, OSCAR runs N sub-runs sequentially,
+ * one per timer, so the wall-clock budget = sum of waits). ACROSS scenarios
+ * the largest single-scenario sum wins (the worker only runs one scenario at
+ * a time). The effective timeout is `min(hardMaxMs, max(baseMs, maxSum))`.
+ *
+ * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, clamped, source }.
+ * Never throws — datafile read/parse errors fall back to baseMs.
+ */
+const EXPIRED_FLOW_TIMERS = [
+  { flag: 'expiredBookingTest',             wait: 'expiredBookingMaxWaitMinutes',             label: 'expiredBookingMaxWaitMinutes'             },
+  { flag: 'expiredOfferTest',               wait: 'expiredOfferMaxWaitMinutes',               label: 'expiredOfferMaxWaitMinutes'               },
+  { flag: 'expiredAddReservationOfferTest', wait: 'expiredAddReservationOfferMaxWaitMinutes', label: 'expiredAddReservationOfferMaxWaitMinutes' },
+  { flag: 'expiredAddAncillaryOfferTest',   wait: 'expiredAddAncillaryOfferMaxWaitMinutes',   label: 'expiredAddAncillaryOfferMaxWaitMinutes'   },
+  { flag: 'expiredRefundOfferTest',         wait: 'expiredRefundOfferMaxWaitMinutes',         label: 'expiredRefundOfferMaxWaitMinutes'         },
+  { flag: 'expiredExchangeOfferTest',       wait: 'expiredExchangeOfferMaxWaitMinutes',       label: 'expiredExchangeOfferMaxWaitMinutes'       },
+];
+async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
+  const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
+  const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
+  let requestedMs = 0;
+  let triggeringScenario = null;
+  let triggeringTimer    = null;   // which expired-X timer drove the extension
+  let helperError = null;
+  let scenariosConsidered = 0;
+  let scenariosInScope = 0;
+  try {
+    // CRITICAL: since OSCAR v1.11.0 (Phase 2 of issue #60) the datafile on disk
+    // is AES-256-GCM encrypted under the OSCAR1 envelope. Plain fs.readFile here
+    // returns the CIPHERTEXT and the subsequent JSON.parse throws on the magic
+    // header — which was the actual cause of the #204 extension silently failing:
+    // the helper hit its catch block, fell back to baseMs, and the worker SIGTERMed
+    // the wait at the default 10 min RUN_TIMEOUT_MS.
+    //
+    // decryptFromFileAsync handles BOTH the encrypted form AND legacy plaintext
+    // datafiles (it detects the OSCAR1 magic header). Same pattern as the
+    // /v1/runs POST handler in api/routes/runs.js.
+    const buf = await decryptFromFileAsync(datafilePath);
+    const data = JSON.parse(buf.toString('utf8'));
+    const scenarios     = Array.isArray(data.scenarios) ? data.scenarios : [];
+    scenariosConsidered = scenarios.length;
+    const scenariosToRun = data.scenariosToRun;
+    const isInScope = (code) => {
+      if (scenarioOverride) return String(code) === String(scenarioOverride);
+      if (scenariosToRun === undefined || scenariosToRun === 'ALL' || scenariosToRun === '*') return true;
+      if (Array.isArray(scenariosToRun)) return scenariosToRun.map(String).includes(String(code));
+      if (typeof scenariosToRun === 'string') return scenariosToRun.split(/[,\s]+/).filter(Boolean).map(String).includes(String(code));
+      return false;
+    };
+    for (const s of scenarios) {
+      if (!s || !isInScope(s.code)) continue;
+      scenariosInScope++;
+      // PR B (auto-expansion): when a scenario has 2+ expired-X timers armed,
+      // OSCAR runs that scenario N times (one sub-run per timer). The worker
+      // SIGTERM must cover the SUM of the timers' max-waits inside one
+      // scenario, not the max — running 3 timers of 15 min each takes 45 min
+      // of wall-clock, not 15. Across scenarios we still take the MAX (only
+      // one scenario runs at a time per worker). The +60s buffer is added
+      // once per armed timer (one buffer per sub-run's request + assertions).
+      let scenarioBudgetMs = 0;
+      const armedInScenario = [];
+      for (const timer of EXPIRED_FLOW_TIMERS) {
+        const flagVal = s[timer.flag];
+        const isOn = flagVal === true || (typeof flagVal === 'string' && ['true', 'on', 'yes'].includes(flagVal.toLowerCase()));
+        if (!isOn) continue;
+        const m = Number(s[timer.wait]);
+        if (Number.isFinite(m) && m >= 1 && m <= 60) {
+          scenarioBudgetMs += Math.ceil(m * 60 * 1000) + 60000;
+          armedInScenario.push(timer.label);
+        }
+      }
+      if (scenarioBudgetMs > requestedMs) {
+        requestedMs        = scenarioBudgetMs;
+        triggeringScenario = s.code || null;
+        triggeringTimer    = armedInScenario.length > 1
+          ? `${armedInScenario.length} timers summed (${armedInScenario.join(' + ')})`
+          : (armedInScenario[0] || 'expired-flow timer');
+      }
+    }
+  } catch (err) {
+    // Capture (don't swallow) — the caller logs this so the operator can tell
+    // why an expected extension didn't fire.
+    helperError = err && err.message ? err.message : String(err);
+  }
+  const desired   = Math.max(baseMs, requestedMs);
+  const effective = Math.min(desired, hardMaxMs);
+  const clamped   = desired > hardMaxMs;
+  let source;
+  if (requestedMs > 0) {
+    const _timerLbl = triggeringTimer || 'expired-flow timer';
+    source = clamped
+      ? `scenario ${_timerLbl} (clamped at RUN_HARD_MAX_TIMEOUT_MS, triggered by '${triggeringScenario}')`
+      : `scenario ${_timerLbl} (triggered by '${triggeringScenario}')`;
+  } else if (helperError) {
+    source = `RUN_TIMEOUT_MS (datafile decrypt/parse FAILED — fell back to base; error: ${helperError})`;
+  } else {
+    source = `RUN_TIMEOUT_MS (no in-scope scenario requested an extension; ${scenariosConsidered} scenarios in datafile, ${scenariosInScope} matched the run scope)`;
+  }
+  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
+}
+
 function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra) {
   // Escape backslashes then double-quotes so the token is safe inside a YAML double-quoted scalar.
   // A token with a trailing " (common typo) would otherwise produce invalid YAML and crash Bruno.
@@ -385,77 +569,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
-  // 3. Resolve access token (per-tester credentials, per-tester token cache)
+  // 3. Resolve access token (per-tester credentials, per-tester token cache).
+  //    The oauth2/bearer logic + token cache live in access-token.js so the
+  //    Timetable Discovery endpoint reuses the exact same path (issue #157).
   let accessToken;
   try {
-    if (userRow.auth_mode === 'oauth2') {
-      const clientId     = decrypt(userRow.client_id_enc);
-      const clientSecret = decrypt(userRow.client_secret_enc);
-      const tokenUrl     = userRow.token_url;
-      const profile      = userRow.oauth_profile || 'oauth2_basic';
-
-      // Field-level "what's missing" message — operator doesn't have to play
-      // guess-which-credential after fixing one and getting the same error.
-      const missing = [];
-      if (!tokenUrl)     missing.push('token_url');
-      if (!clientId)     missing.push('client_id');
-      if (!clientSecret) missing.push('client_secret');
-      if (profile === 'sqills_extension' && !userRow.oauth_extra_enc) missing.push('extra credential (Basic auth value)');
-      if (profile === 'custom' && !userRow.oauth_custom_template)     missing.push('custom request template');
-      if (missing.length > 0) {
-        throw new Error(`Auth profile "${profile}" is missing: ${missing.join(', ')}. Set ${missing.length > 1 ? 'them' : 'it'} in your profile (Profile → API Configuration).`);
-      }
-
-      const log = _authLogger(runId);
-
-      // ── Cache check (per-tester since v12) ──────────────────────────────
-      // Reuse a previously-fetched token if it still has at least
-      // TOKEN_CACHE_SAFETY_MARGIN_S seconds left. Saves a round-trip to the
-      // vendor's auth endpoint for back-to-back scenarios run by the same
-      // tester. Cleared on any PATCH that touches that tester's auth config.
-      const TOKEN_CACHE_SAFETY_MARGIN_S = 60;
-      const now = new Date();
-      const expIso = userRow.cached_token_expires_at;
-      const cachedExp = expIso ? new Date(expIso) : null;
-      const cachedValid = cachedExp && !isNaN(cachedExp) &&
-        (cachedExp.getTime() - now.getTime() > TOKEN_CACHE_SAFETY_MARGIN_S * 1000);
-      if (cachedValid && userRow.cached_token_enc) {
-        const remainingS = Math.floor((cachedExp.getTime() - now.getTime()) / 1000);
-        log.info(`[runner] Auth — using cached token (user=${userRow.email}, expires in ${remainingS}s, at ${expIso}).`);
-        accessToken = decrypt(userRow.cached_token_enc);
-      } else {
-        if (cachedExp && !cachedValid) {
-          log.info(`[runner] Auth — cached token expired or within safety margin (was: ${expIso}); refetching.`);
-        }
-        const result = await fetchToken(profile, {
-          tokenUrl, clientId, clientSecret,
-          scope:          userRow.oauth_scope || '',
-          extra:          userRow.oauth_extra_enc ? decrypt(userRow.oauth_extra_enc) : '',
-          customTemplate: userRow.oauth_custom_template || ''
-        }, log);
-        accessToken = result.token;
-
-        // Persist the cache only when the vendor told us how long the token
-        // is good for. Anything else risks reusing a token past its real
-        // expiry, which would surface as a mid-run 401.
-        if (result.expiresIn && result.expiresIn > 0) {
-          const newExp = new Date(now.getTime() + result.expiresIn * 1000).toISOString();
-          dbRun(
-            'UPDATE users SET cached_token_enc = ?, cached_token_expires_at = ? WHERE id = ?',
-            [encrypt(accessToken), newExp, userRow.id]
-          );
-          log.info(`[runner] Auth — token cached until ${newExp}.`);
-        } else {
-          // Clear any stale cache so we don't accidentally serve an old token.
-          dbRun(
-            'UPDATE users SET cached_token_enc = NULL, cached_token_expires_at = NULL WHERE id = ?',
-            [userRow.id]
-          );
-        }
-      }
-    } else {
-      accessToken = decrypt(userRow.access_token_enc);
-      if (!accessToken) throw new Error('Bearer token not configured. Set it in your profile.');
+    accessToken = await resolveAccessToken(userRow, _authLogger(runId));
+    if (userRow.auth_mode !== 'oauth2') {
       logEvent(runId, 'info', '[runner] Bearer token resolved.');
     }
   } catch (err) {
@@ -513,12 +633,49 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
   const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra);
+  // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
+  // the run, i.e. now + effective timeout) as a read-only env var. The
+  // expired-booking test uses it to decide whether waiting until the booking's
+  // confirmation deadline fits the run budget — if not, it skips with a
+  // WARNING instead of being killed mid-wait.
+  //
+  // Tester timer (#204 + Phase 2): if any in-scope scenario sets a per-scenario
+  // expired-flow max-wait — currently `expiredBookingMaxWaitMinutes` or
+  // `expiredOfferMaxWaitMinutes` (see EXPIRED_FLOW_TIMERS) — the effective
+  // timeout is auto-extended to cover the largest request (clamped to
+  // RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both this env injection
+  // and the SIGTERM setTimeout below — they MUST agree.
+  const _runBudget = await computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride || null);
+  // Always emit the chosen budget so the operator can tell exactly what the
+  // runner decided — whether the extension fired, fell back silently, or hit
+  // an error during datafile decrypt/parse. Previously this only logged when
+  // the extension actually fired, which silently masked the #204 extension
+  // failure (the datafile read returned ciphertext, JSON.parse threw, the
+  // catch swallowed the error, and the run got SIGTERMed at the default 10
+  // min).
+  logEvent(runId, 'info',
+    `[runner] Effective RUN_TIMEOUT_MS = ${_runBudget.effectiveMs}ms (${Math.round(_runBudget.effectiveMs / 1000)}s); base=${_runBudget.baseMs}ms hardMax=${_runBudget.hardMaxMs}ms; source: ${_runBudget.source}`);
+  if (_runBudget.helperError) {
+    logEvent(runId, 'warn',
+      `[runner] computeEffectiveRunTimeoutMs hit an error reading the datafile (${_runBudget.helperError}) — fell back to base RUN_TIMEOUT_MS. Expired-flow tests (expiredBookingTest / expiredOfferTest / ...) will NOT get their requested extension; investigate above.`);
+  }
+  if (_runBudget.clamped) {
+    logEvent(runId, 'warn',
+      `[runner] expired-flow per-scenario max-wait requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
+  }
+  // #204: inject the runId so 06.yml can call the loopback refresh-access-token
+  // endpoint after the wait. The endpoint validates that the requested runId
+  // exists and only refreshes the token bound to that run.
+  const envYmlOut  = envYml
+    + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`
+    + `  - name: __runId\n    value: "${runId}"\n`
+    + `  - name: oscar_loopback_base\n    value: "http://127.0.0.1:${process.env.PORT || 3001}"\n`;
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
   try {
     await fs.promises.mkdir(envsDir, { recursive: true });
-    await fs.promises.writeFile(envFilePath, envYml, { mode: 0o600, encoding: 'utf8' });
+    await fs.promises.writeFile(envFilePath, envYmlOut, { mode: 0o600, encoding: 'utf8' });
     logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml` + (scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : ''));
   } catch (err) {
     const msg = `Failed to write env file: ${err.message}`;
@@ -586,12 +743,55 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       shell: needsShell,
       env:   safeEnv
     });
+    // Register for emergency-stop (killRun). Cleared in close/error below.
+    _activeProcs.set(runId, proc);
 
-    const runTimeoutMs = parseInt(getConfig('RUN_TIMEOUT_MS', '600000'), 10);
+    // Use the SAME effective timeout we just injected as runHardDeadlineMs.
+    // Falling back to RUN_TIMEOUT_MS would let the worker get SIGTERMed mid-
+    // wait when a scenario opted into a longer expired-flow per-scenario
+    // max-wait (expiredBookingMaxWaitMinutes, expiredOfferMaxWaitMinutes, …).
+    const runTimeoutMs = _runBudget.effectiveMs;
     const timeout = setTimeout(() => {
-      logEvent(runId, 'error', '[runner] Run timed out — killing process.');
+      logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);
       proc.kill('SIGTERM');
     }, runTimeoutMs);
+
+    // #204 token-watchdog (Piece 3 / defense-in-depth): periodically refresh
+    // the per-tester cached access token while the run is in flight, so the
+    // server-side cache never expires under an in-flight Bruno process. The
+    // ticker calls resolveAccessToken with forceRefresh:false; resolve's own
+    // safety-margin check decides whether to refetch or no-op against cache.
+    // This is BELT to the BRACES of (a) 01.yml's per-scenario refresh-on-start
+    // (Piece 2) and (b) 06.yml's force-refresh after the expired-booking wait.
+    //
+    // Skipped for bearer-auth runs (no cache to keep warm). Skipped when
+    // userRow is null (probably an admin/run-as-other context that hit the
+    // run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
+    // default 300000 (5 min).
+    let tokenWatchdog = null;
+    if (userRow && userRow.auth_mode === 'oauth2') {
+      const tickMs = parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
+      // Disabled when set to 0 (operator opt-out).
+      if (tickMs > 0) {
+        tokenWatchdog = setInterval(async () => {
+          try {
+            await resolveAccessToken(
+              userRow,
+              { info: (m) => logEvent(runId, 'info', `[token-watchdog] ${m}`),
+                error: (m) => logEvent(runId, 'error', `[token-watchdog] ${m}`) }
+              // no forceRefresh — let the safety-margin check decide
+            );
+          } catch (err) {
+            logEvent(runId, 'warn',
+              `[token-watchdog] tick failed: ${err && err.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
+          }
+        }, tickMs);
+        logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
+      }
+    }
+    function stopTokenWatchdog() {
+      if (tokenWatchdog) { clearInterval(tokenWatchdog); tokenWatchdog = null; }
+    }
 
     const logParser = new LogParser();
     // Seed the parser's scenario state from the run record. Single-scenario
@@ -604,12 +804,58 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       logParser.currentScenario = runRow.scenario_code;
     }
 
+    // #336 (v1.11.113): infer the actual log level from the line content
+    // instead of storing the literal stream name as the level. The
+    // dashboard's level filter (Info / Warn / Error) and the per-level
+    // CSS colouring rely on event.level — previously every Bruno line had
+    // level='stdout' so the filter was a no-op on Bruno output.
+    //
+    // Inference order:
+    //   1) explicit [LEVEL] tag from library-bruno emitters → that level
+    //   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
+    //   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
+    //   4) Known harmless platform noise (OpenSSL warn-once) → warn
+    //   5) stderr stream with no other signal → error (Bruno emits real
+    //      failures there; "stderr" alone is not a useful level)
+    //   6) stdout stream with no other signal → info (sensible default —
+    //      keeps the level-filter working without spamming "debug")
+    function inferLevel(line, streamFallback) {
+      // 1) explicit tag
+      if (/\[ERROR]/i.test(line))                                 return 'error';
+      if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
+      if (/\[INFO]/i.test(line))                                  return 'info';
+      if (/\[DEBUG]/i.test(line))                                 return 'debug';
+      // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
+      if (/^\s*✕\s/.test(line))                                   return 'error';
+      if (/^\s*✓\s/.test(line))                                   return 'info';
+      // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
+      //    that's the content. The "at …" STACK FRAMES are demoted to debug
+      //    (log-audit round 2): Bruno prints ~10 frames after every failed
+      //    assertion (testCapture.js → @usebruno internals → node:vm), pure
+      //    developer detail that tripled the visual size of each failure in
+      //    the dashboard. They remain one debug-filter click away.
+      if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
+      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'debug';
+      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
+      if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
+      // 4) Known platform noise
+      if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
+      // 4b) Bruno CLI's own skip echo (one per request the smart run filter
+      //     skips — e.g. the 6 vendor token requests at the top of every
+      //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
+      //     matching the [DEBUG] tag on the library's own skip line.
+      if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
+      // 5/6) stream-based fallback
+      return streamFallback;
+    }
+
     proc.stdout.on('data', chunk => {
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
         const meta = logParser.parse(line);
-        logEvent(runId, 'stdout', line, meta);
+        const level = inferLevel(line, 'info');
+        logEvent(runId, level, line, meta);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });
@@ -619,7 +865,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       lines.forEach(line => {
         if (!line.trim()) return;
         const meta = logParser.parse(line);
-        logEvent(runId, 'stderr', line, meta);
+        const level = inferLevel(line, 'error');
+        logEvent(runId, level, line, meta);
         if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
         if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
       });
@@ -627,10 +874,14 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
     proc.on('close', code => {
       clearTimeout(timeout);
+      stopTokenWatchdog();
+      _activeProcs.delete(runId);
       resolve(code ?? 1);
     });
     proc.on('error', err => {
       clearTimeout(timeout);
+      stopTokenWatchdog();
+      _activeProcs.delete(runId);
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });
@@ -788,12 +1039,21 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'error', `[runner] Failed to store structured results: ${err.message}`);
   }
 
-  // 11. Update run record
+  // 11. Update run record.
+  // Guard with `AND status = 'RUNNING'`: if the run was emergency-stopped
+  // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
+  // killed, this write must NOT resurrect it to COMPLETED/FAILED.
   const finalStatus = exitCode === 0 ? 'COMPLETED' : 'FAILED';
-  dbRun(
-    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ?`,
+  const finalUpd = dbRun(
+    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
     [finalStatus, exitCode, runId]
   );
+  if (finalUpd && Number(finalUpd.changes) === 0) {
+    // Row was already terminal (e.g. CANCELLED by emergency stop) — leave it.
+    logEvent(runId, 'info', '[runner] Final status not written — run already in a terminal state (likely cancelled).');
+    _resetLineCounter(runId);
+    return { exitCode };
+  }
 
   if (tokenFormatError) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_FORMAT_ERROR' WHERE id = ?`, [runId]);
@@ -813,4 +1073,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun };
+module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs };

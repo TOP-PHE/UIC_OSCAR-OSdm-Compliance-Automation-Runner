@@ -22,19 +22,19 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger, displayFulFilledBooking } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base")+"bookings.js");
 
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
@@ -64,16 +64,16 @@ runtime:
         displayFulFilledBooking(jsonData);
 
         if(bru.getEnvVar("scenarioAction")?.includes("PATCH")) {
-            console.log("scenarioAction in data file contains 'PATCH' keyword, not implemented");
+            console.log("[INFO] scenarioAction in data file contains 'PATCH' keyword, not implemented");
             const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
             loopbackOrStop("Exchange PATCH (not implemented)");
         //     //pm.execution.setNextRequest("13. PATCH Refund Offer");
-            //console.log("scenarioAction in data file contains 'PATCH' keyword, executing 13. PATCH Refund Offer")
+            //console.log("[INFO] scenarioAction in data file contains 'PATCH' keyword, executing 13. PATCH Refund Offer")
         } else if(bru.getEnvVar("scenarioAction")?.includes("DELETE")) {
             bru.runner.setNextRequest("16. DEL Exchange Offer");
-            console.log("scenarioAction in data file contains 'DELETE' keyword, executing 16. DEL Exchange Offer")    
+            console.log("[INFO] scenarioAction in data file contains 'DELETE' keyword, executing 16. DEL Exchange Offer")    
         } else{
-            console.log("scenarioAction in data file doesn't contain 'PATCH' or 'DELETE' keyword, ending test scenario ...")    
+            console.log("[INFO] scenarioAction in data file doesn't contain 'PATCH' or 'DELETE' keyword, ending test scenario ...")    
             bru.runner.setNextRequest("14. POST Obtaining Fulfillments from Booking");
 
         //     //pm.execution.setNextRequest(null);

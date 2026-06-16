@@ -21,9 +21,9 @@ runtime:
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { handleSystemInfoStatus, validateProducts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
         const endpoint = '/products';
-        const statusCode = res.getStatus();
 
         // Reset product list markers for this request execution
         bru.setEnvVar('productListHasValidData', 'false');
@@ -54,58 +54,40 @@ runtime:
           return ids;
         }
 
-        if (statusCode === 200) {
-          bruTest(`GET ${endpoint} -> 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-          let body;
-          try { body = res.getBody(); } catch (_e) {}
-          const bodyNotEmpty = Array.isArray(body)
-            ? body.length > 0
-            : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
-          bruTest(`GET ${endpoint} response body is present and not empty`, () => {
-            expect(body, 'Response body should not be null/undefined').to.exist;
-            expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
-          });
+        // Shared, version-aware status handling (out-of-version 404 → skip, etc.).
+        if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
-          const productIds = pickProductIds(body);
-          bruTest(`GET ${endpoint} response contains at least one product id`, () => {
-            expect(productIds.length, 'No product id found in list response').to.be.greaterThan(0);
-          });
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+        const bodyNotEmpty = Array.isArray(body)
+          ? body.length > 0
+          : (body != null && typeof body === 'object' && Object.keys(body).length > 0);
+        bruTest(`GET ${endpoint} response body is present and not empty`, () => {
+          expect(body, 'Response body should not be null/undefined').to.exist;
+          expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
+        });
 
-          if (productIds.length > 0) {
-            bru.setEnvVar('productListHasValidData', 'true');
-            bru.setEnvVar('productListCandidateIds', JSON.stringify(productIds));
-          }
-          validationLogger(`[INFO] GET ${endpoint} -> 200 OK, ${Array.isArray(body) ? body.length + ' item(s)' : 'body received'}`);
+        const productIds = pickProductIds(body);
+        bruTest(`GET ${endpoint} response contains at least one product id`, () => {
+          expect(productIds.length, 'No product id found in list response').to.be.greaterThan(0);
+        });
 
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
-          bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 403 Forbidden - insufficient permissions`);
-          bruTest(`GET ${endpoint} -> 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 404 Not Found - endpoint not implemented by this vendor`);
-          bruTest(`GET ${endpoint} -> 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404 - endpoint not supported').to.eql(200);
-          });
-
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET ${endpoint} -> ${statusCode} Server Error`);
-          bruTest(`GET ${endpoint} -> ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-
-        } else {
-          validationLogger(`[WARNING] GET ${endpoint} -> unexpected status ${statusCode}`);
-          bruTest(`GET ${endpoint} -> unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
+        if (productIds.length > 0) {
+          bru.setEnvVar('productListHasValidData', 'true');
+          bru.setEnvVar('productListCandidateIds', JSON.stringify(productIds));
         }
+        validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
+
+        // ── OSDM compliance (Layer 1): ProductCollectionResponse ──
+        // Envelope object → "products" array; every Product has required id,
+        // code (strings), owner (CompanyRef string), flexibility (string).
+        // type/travelClass are x-extensible-enum strings (type-checked only).
+        validateProducts(body).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
+
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('Product', body.products, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });

@@ -22,15 +22,15 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger, displayFulFilledBooking } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base")+"bookings.js");
 
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
@@ -74,6 +74,10 @@ runtime:
         }
         displayFulFilledBooking(jsonData);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────
+        // #385: a skipped expired-flow sub-run must not behead the queue —
+        // hand the remaining timers their pass before the next scenario.
+        if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
         const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
         const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
         if (_scList.length > 0 && _scNextIdx < _scList.length) {
@@ -81,7 +85,7 @@ runtime:
           bru.setEnvVar('__loopback', 'true');
           bru.runner.setNextRequest('01. POST Get Offer');
         } else {
-          console.log('✅ All scenarios complete — run finished');
+          console.log('[INFO] ✅ All scenarios complete — run finished');
           bru.runner.stopExecution();
         }
 

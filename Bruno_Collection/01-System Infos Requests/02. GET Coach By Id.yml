@@ -19,35 +19,12 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        const DEFAULT_LATEST_VERSION = '3.9.0';
-
-        function parseVersion(v) {
-          if (v == null) return null;
-          const m = String(v).trim().match(/(\d+)\.(\d+)(?:\.(\d+))?/);
-          if (!m) return null;
-          return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3] || 0) };
-        }
-
-        function score(v) {
-          return (v.major * 1000000) + (v.minor * 1000) + v.patch;
-        }
-
-        function pickLatestFromList(raw) {
-          if (!raw) return null;
-          return String(raw)
-            .split(',')
-            .map(s => parseVersion(s))
-            .filter(Boolean)
-            .sort((a, b) => score(b) - score(a))[0] || null;
-        }
-
-        const apiVersion = parseVersion(bru.getEnvVar('apiVersion'));
-        const apiVersionFromVersions = pickLatestFromList(bru.getEnvVar('apiVersionsAvailable'));
-        const scenarioVersion = parseVersion(bru.getEnvVar('osdmVersion'));
-        const effective = apiVersion || apiVersionFromVersions || scenarioVersion || parseVersion(DEFAULT_LATEST_VERSION);
-
-        const isCoachDeck = score(effective) >= score({ major: 3, minor: 8, patch: 0 });
-        bru.setVar('coachLayoutsResource', isCoachDeck ? 'coach-deck-layouts' : 'coach-layouts');
+        // Endpoint selection by the NEGOTIATED OSDM version (>= 3.8 → the
+        // coach-deck-layouts resource, else legacy coach-layouts). Version
+        // resolution is centralised in osdmVersion.js (issue #105). NB this is
+        // the negotiated/effective version, NOT the compliance version.
+        const { resolveEffectiveVersion, atLeast } = require(bru.getEnvVar("library_base") + "osdmVersion.js");
+        bru.setVar('coachLayoutsResource', atLeast(resolveEffectiveVersion(), '3.8.0') ? 'coach-deck-layouts' : 'coach-layouts');
 
         const cfgCoachId = bru.getEnvVar('coachId');
         const coachMissing = cfgCoachId == null || String(cfgCoachId).trim() === '' || /^null$/i.test(String(cfgCoachId).trim());
@@ -73,64 +50,50 @@ runtime:
         const layoutId = bru.getEnvVar("coachId");
         const statusCode = res.getStatus();
 
-        const coachListReady = String(bru.getEnvVar('coachListHasValidData') || '').toLowerCase() === 'true';
-        if (!coachListReady) {
-          validationLogger(`[ERROR] GET ${endpoint} prerequisite failed: GET Coach did not return valid list data`);
-          bruTest(`GET ${endpoint} prerequisite: GET Coach succeeded with valid body`, () => {
-            throw new Error('GET Coach did not provide valid data; cannot validate By-Id endpoint');
-          });
+        // ── Status classification FIRST (#355) — shared, version-aware and
+        // Problem-body-aware (#353): a provider that 501s this endpoint (or
+        // declares it unsupported via a Problem code) gets ONE skip line —
+        // not a prerequisite-failure cascade; out-of-version 404s skip;
+        // auth/4xx/5xx fail decoded without chai tails. Only a 200 proceeds.
+        let body = null;
+        try { body = res.getBody(); } catch (_e) {}
+        const { handleSystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        if (!handleSystemInfoStatus(statusCode, endpoint, { bruTest, validationLogger, body })) {
+          // Cascade-kill: when the id came from a broken GET Coach, the root
+          // cause already failed loudly THERE — add one context line here,
+          // no extra failing assertion.
+          const coachListReady = String(bru.getEnvVar('coachListHasValidData') || '').toLowerCase() === 'true';
+          const coachMissing = layoutId == null || String(layoutId).trim() === '' || /^null$/i.test(String(layoutId).trim());
+          if (!coachListReady || coachMissing) {
+            validationLogger(`[INFO] Context: GET Coach did not provide a usable coach id (see GET Coach above) — this call used ${coachMissing ? 'no id' : `id ${layoutId}`}.`);
+          }
           return;
         }
 
-        // ── Guard: if coachId is null/empty, skip endpoint validation but report it as failed ──
-        const coachMissing = layoutId == null || String(layoutId).trim() === '' || /^null$/i.test(String(layoutId).trim());
-        if (coachMissing) {
-          validationLogger(`[WARNING] ❌ Test skipped as not Coach value was configured`);
-          bruTest(`GET ${endpoint} validation skipped`, () => {
-            throw new Error('Test skipped as not Coach value was configured');
-          });
-          return;
-        }
+        // 200 — handleSystemInfoStatus already registered the "→ 200 OK"
+        // assertion; validate the body (no prerequisite gate: a 200 with a
+        // body is validatable regardless of how the id was obtained).
+        bruTest(`GET ${endpoint} response body is present`, () => {
+          expect(body, 'Response body should not be null/undefined').to.exist;
+        });
+        validationLogger(`[DEBUG] GET ${endpoint} → 200 OK, ID=${layoutId}`);
 
-        // ── Status code classification ────────────────────────────────────
-        if (statusCode === 200) {
-          bruTest(`GET ${endpoint} → 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-          let body;
-          try { body = res.getBody(); } catch (_e) {}
-          bruTest(`GET ${endpoint} response body is present`, () => {
-            expect(body, 'Response body should not be null/undefined').to.exist;
-          });
-          validationLogger(`[INFO] GET ${endpoint} → 200 OK, ID=${layoutId}`);
+        // ── OSDM compliance (Layer 1): Coach(Deck)LayoutResponse ──
+        // coach-deck-layouts/{id} (>=3.8) wraps a CoachDeckLayout under
+        // "coachDeckLayout"; coach-layouts/{id} wraps a CoachLayout under
+        // "coachLayout".
+        const osdmCompliance = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        const coachChecks = (resource === 'coach-deck-layouts')
+          ? osdmCompliance.validateCoachDeckLayout(body, endpoint)
+          : osdmCompliance.validateCoachLayout(body, endpoint);
+        coachChecks.forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
 
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET ${endpoint} → 401 Unauthorized — check access token`);
-          bruTest(`GET ${endpoint} → 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET ${endpoint} → 403 Forbidden — insufficient permissions`);
-          bruTest(`GET ${endpoint} → 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET ${endpoint} → 404 Not Found — ID=${layoutId} not found or endpoint not supported`);
-          bruTest(`GET ${endpoint} → 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404').to.eql(200);
-          });
-
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET ${endpoint} → ${statusCode} Server Error`);
-          bruTest(`GET ${endpoint} → ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-
-        } else {
-          validationLogger(`[WARNING] GET ${endpoint} → unexpected status ${statusCode}`);
-          bruTest(`GET ${endpoint} → unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
-        }
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        const coachComponent = (resource === 'coach-deck-layouts') ? 'CoachDeckLayout' : 'CoachLayout';
+        const coachItem = (resource === 'coach-deck-layouts') ? body.coachDeckLayout : body.coachLayout;
+        validateSchema(coachComponent, coachItem, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });

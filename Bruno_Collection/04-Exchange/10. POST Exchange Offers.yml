@@ -31,7 +31,7 @@ runtime:
       code: |-
         const { requestExchangeOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
 
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         requestExchangeOffersBody(bru.getEnvVar("overruleCode"));
     - type: after-response
@@ -40,12 +40,12 @@ runtime:
         const { postPatchExchangeOffersResponse } = require(bru.getEnvVar("library_base")+"exchanges.js");
 
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
@@ -81,6 +81,10 @@ runtime:
           } else {
             console.log('[INFO] No exchange offers returned after 3 attempts — skipping this scenario');
             bru.setEnvVar('__exchangeOfferRetryCount', '0');
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {
@@ -88,7 +92,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ No more scenarios — stopping run');
+              console.log('[INFO] ✅ No more scenarios — stopping run');
               bru.runner.stopExecution();
             }
           }

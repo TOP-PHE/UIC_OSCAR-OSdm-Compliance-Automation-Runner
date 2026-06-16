@@ -19,7 +19,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
 
         const totalPassengers = bru.getEnvVar("offerPassengerNumber") || 0;
         const currentIndex    = bru.getEnvVar("currentPassengerIndex") || 0;
@@ -48,23 +48,63 @@ runtime:
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");
 
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
-        });
+        // #398: known-deviation baseline. If the provider returns a status
+        // documented in the datafile's knownDeviations (e.g. GET Passenger →
+        // 501 on ÖBB), report it as a PASSING "known deviation" row + WARNING
+        // instead of a failure, so a clean run is not dragged to FAILED by an
+        // already-reported provider gap. Any other non-200 is a real failure.
+        const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar("library_base") + "loopback.js");
+        const _kdStatus = res.getStatus();
+        const _kdMatch  = _kdStatus !== 200 ? knownDeviationFor("04. GET Passenger", _kdStatus) : null;
+        if (_kdMatch) {
+            test(`HTTP response status — known deviation (documented): 04. GET Passenger returns ${_kdStatus}`, () => {});
+            noteKnownDeviation("04. GET Passenger", _kdStatus, _kdMatch);
+        } else {
+            test(`HTTP response status — expected 200, actual: ${_kdStatus}`, () => {
+                if (_kdStatus !== 200) throw new Error("HTTP " + _kdStatus + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
+            });
+        }
 
-        if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
-          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("GET Passenger");
+        // #361: on failure, the step-failure policy decides — HARD_STOP
+        // (default) abandons the scenario; CONTINUE records the failure and
+        // routes to the same successor the success path uses (the booking
+        // already exists; fulfillment needs nothing from this response).
+        const _policyNext = (() => {
+          const _pm = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
+          const _due = (_pm === "deferred" || _pm === "invalid") && bru.getEnvVar("__purchaserStepDone") !== "true";
+          // #361: the pre-fulfillment GET's real request name is
+          // "05. GET Booking before Fulfillments" — the historical
+          // "07. …" target never existed (the flow only worked because
+          // Bruno falls through to natural file order on an unknown name).
+          return _due ? "12. GET Booking Purchaser" : "05. GET Booking before Fulfillments";
+        })();
+
+        if (_kdStatus !== 200) {
+          // #398: a documented known deviation is NOT a failure — route on
+          // (GET Passenger yields no usable body either way) WITHOUT recording
+          // a step failure. A real (undocumented) non-200 keeps the #361 path.
+          if (_kdMatch) {
+            bru.runner.setNextRequest(_policyNext);
+            return;
+          }
+          // #383: the status test above already recorded this failure once —
+          // a second identical registration only double-counted it.
+          const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
+          failStepOrContinue("GET Passenger", _policyNext);
           return;
         }
 
         const jsonData = res.getBody();
 
         if (!jsonData.passenger) {
-            throw new Error("⛔ Exiting script, no passenger available in the response");
+            // #361: registered failure + policy routing instead of a bare
+            // throw that killed the script before any setNextRequest.
+            test("GET Passenger response carries a passenger object", () => {
+              throw new Error("No passenger in the 200 response body — see the HTTP-traffic viewer.");
+            });
+            const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
+            failStepOrContinue("GET Passenger", _policyNext);
+            return;
         }
 
         const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber"));
@@ -79,7 +119,18 @@ runtime:
         if (currentIndex < totalPassengers) {
             bru.runner.setNextRequest(req.getName());
         } else {
-            bru.runner.setNextRequest("07. GET Booking before Fulfillments");
+            // #258 / #203: when the scenario deferred the purchaser, run the
+            // purchaser create-or-update flow before fulfillment. 12. GET Booking
+            // Purchaser probes whether one exists, then routes to PATCH (update)
+            // or POST (create). 'deferred' supplies it (happy), 'invalid' probes
+            // it (expects rejection). 'inline'/'omit' skip it → straight to the
+            // pre-fulfillment GET (unchanged).
+            const _purMode = String(bru.getEnvVar("bookingPurchaserMode") || "inline").toLowerCase();
+            const _purStepDue = (_purMode === "deferred" || _purMode === "invalid")
+                && bru.getEnvVar("__purchaserStepDone") !== "true";
+            // #361: same name fix as _policyNext above — the request is
+            // "05. GET Booking before Fulfillments" ("07. …" never existed).
+            bru.runner.setNextRequest(_purStepDue ? "12. GET Booking Purchaser" : "05. GET Booking before Fulfillments");
         }
 
 settings:

@@ -40,6 +40,27 @@ FROM node:22-slim
 
 WORKDIR /app
 
+# Pull Debian security updates for OS-level packages (libc-bin, libcap2,
+# libsystemd0, …). The node:22-slim tag is rebuilt periodically but tagged
+# releases can lag Debian's security tracker by days or weeks. Running
+# apt-get upgrade on every image build clears HIGH/CRITICAL CVEs that Trivy
+# would otherwise flag against the base layer
+# (e.g. CVE-2026-0861 glibc memalign, CVE-2026-4878 libcap TOCTOU,
+# CVE-2026-29111 systemd code exec — all fixed in deb12u14 / u3 / u2 point
+# releases that ship in newer base-image rebuilds).
+# ca-certificates: node:22-slim ships WITHOUT the system CA store, so
+# /etc/ssl/certs does not exist. Every Bruno child process then printed
+# "Cannot open directory /etc/ssl/certs to load OpenSSL certificates."
+# to stderr at startup — harmless (Node verifies TLS against its bundled
+# Mozilla CA store regardless) but it polluted every single run log.
+# Installing ca-certificates creates the directory and silences the
+# warning at the source.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN npm install -g @usebruno/cli && \
     # Force-update axios inside Bruno CLI to clear 4 axios HIGH CVEs
     # (CVE-2026-42033, -42035, -42043, -42264 — prototype pollution /

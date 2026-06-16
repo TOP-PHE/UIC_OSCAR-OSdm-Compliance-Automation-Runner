@@ -42,62 +42,45 @@ runtime:
         const productId = bru.getEnvVar("productId");
         const statusCode = res.getStatus();
 
-        const productListReady = String(bru.getEnvVar('productListHasValidData') || '').toLowerCase() === 'true';
-        if (!productListReady) {
-          validationLogger(`[ERROR] GET ${endpoint} prerequisite failed: GET Products did not return valid list data`);
-          bruTest(`GET ${endpoint} prerequisite: GET Products succeeded with valid body`, () => {
-            throw new Error('GET Products did not provide valid data; cannot validate By-Id endpoint');
-          });
+        // ── Status classification FIRST (#355) — shared, version-aware and
+        // Problem-body-aware (#353): a provider that 501s this endpoint (or
+        // declares it unsupported via a Problem code) gets ONE skip line —
+        // not a prerequisite-failure cascade; out-of-version 404s skip;
+        // auth/4xx/5xx fail decoded without chai tails. Only a 200 proceeds.
+        let body = null;
+        try { body = res.getBody(); } catch (_e) {}
+        const { handleSystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        if (!handleSystemInfoStatus(statusCode, endpoint, { bruTest, validationLogger, body })) {
+          // Cascade-kill: when the id came from a broken GET Products, the
+          // root cause already failed loudly THERE — add one context line,
+          // no extra failing assertion.
+          const productListReady = String(bru.getEnvVar('productListHasValidData') || '').toLowerCase() === 'true';
+          const productIdMissing = productId == null || String(productId).trim() === '' || /^null$/i.test(String(productId).trim());
+          if (!productListReady || productIdMissing) {
+            validationLogger(`[INFO] Context: GET Products did not provide a usable product id (see GET Products above) — this call used ${productIdMissing ? 'no id' : `id ${productId}`}.`);
+          }
           return;
         }
 
-        const productIdMissing = productId == null || String(productId).trim() === '' || /^null$/i.test(String(productId).trim());
-        if (productIdMissing) {
-          validationLogger(`[WARNING] Test skipped because productId was not configured`);
-          bruTest(`GET ${endpoint} validation skipped`, () => {
-            throw new Error('Test skipped because productId was not configured');
-          });
-          return;
-        }
+        // 200 — handleSystemInfoStatus already registered the "→ 200 OK"
+        // assertion; validate the body (no prerequisite gate: a 200 with a
+        // body is validatable regardless of how the id was obtained).
+        bruTest(`GET ${endpoint} response body is present`, () => {
+          expect(body, 'Response body should not be null/undefined').to.exist;
+        });
+        validationLogger(`[DEBUG] GET ${endpoint} -> 200 OK, productId=${productId}`);
 
-        if (statusCode === 200) {
-          bruTest(`GET ${endpoint} -> 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-          let body;
-          try { body = res.getBody(); } catch (_e) {}
-          bruTest(`GET ${endpoint} response body is present`, () => {
-            expect(body, 'Response body should not be null/undefined').to.exist;
-          });
-          validationLogger(`[INFO] GET ${endpoint} -> 200 OK, productId=${productId}`);
+        // ── OSDM compliance (Layer 1): ProductResponse ──
+        // Envelope object wrapping a single Product under "product"; the
+        // Product has required id, code (strings), owner (object),
+        // flexibility (string). Extensible-enum fields type-checked only.
+        const { validateProduct } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        validateProduct(body).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
 
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 401 Unauthorized - check access token`);
-          bruTest(`GET ${endpoint} -> 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 403 Forbidden - insufficient permissions`);
-          bruTest(`GET ${endpoint} -> 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET ${endpoint} -> 404 Not Found - productId=${productId} not found or endpoint not supported`);
-          bruTest(`GET ${endpoint} -> 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404').to.eql(200);
-          });
-
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET ${endpoint} -> ${statusCode} Server Error`);
-          bruTest(`GET ${endpoint} -> ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-
-        } else {
-          validationLogger(`[WARNING] GET ${endpoint} -> unexpected status ${statusCode}`);
-          bruTest(`GET ${endpoint} -> unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
-        }
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('Product', body.product, { endpoint }).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });

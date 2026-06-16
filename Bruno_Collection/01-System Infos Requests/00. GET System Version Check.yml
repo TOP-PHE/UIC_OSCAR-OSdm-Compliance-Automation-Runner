@@ -20,53 +20,14 @@ runtime:
     - type: after-response
       code: |-
         // Import library functions
-        const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
         const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { handleSystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
-        // Handle and validate HTTP response status
-        // Handle and validate HTTP response status
-        const statusCode = res.getStatus();
-        // ── Status code classification ────────────────────────────────────
-        // 200: pass + continue to body/version validation
-        // 401/403: auth failure (FAIL, stop further checks)
-        // 404: endpoint not implemented by this vendor (FAIL, stop further checks)
-        // 5xx: server error (FAIL, stop further checks)
-        // other: unexpected (FAIL, stop further checks)
-        if (statusCode === 200) {
-          bruTest(`GET /versions → 200 OK`, () => {
-            expect(statusCode).to.eql(200);
-          });
-        } else if (statusCode === 401) {
-          validationLogger(`[ERROR] GET /versions → 401 Unauthorized — check access token`);
-          bruTest(`GET /versions → 401 Unauthorized (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 401 Unauthorized').to.eql(200);
-          });
-          return;
-        } else if (statusCode === 403) {
-          validationLogger(`[ERROR] GET /versions → 403 Forbidden — insufficient permissions`);
-          bruTest(`GET /versions → 403 Forbidden (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 403 Forbidden').to.eql(200);
-          });
-          return;
-        } else if (statusCode === 404) {
-          validationLogger(`[ERROR] GET /versions → 404 Not Found — endpoint not implemented by this vendor`);
-          bruTest(`GET /versions → 404 Not Found (FAIL)`, () => {
-            expect(statusCode, 'Expected 200, got 404 — /versions endpoint not supported').to.eql(200);
-          });
-          return;
-        } else if (statusCode >= 500) {
-          validationLogger(`[ERROR] GET /versions → ${statusCode} Server Error`);
-          bruTest(`GET /versions → ${statusCode} Server Error (FAIL)`, () => {
-            expect(statusCode, `Expected 200, got ${statusCode} server error`).to.eql(200);
-          });
-          return;
-        } else {
-          validationLogger(`[WARNING] GET /versions → unexpected status ${statusCode}`);
-          bruTest(`GET /versions → unexpected status ${statusCode}`, () => {
-            expect(statusCode, `Unexpected status ${statusCode}, expected 200`).to.eql(200);
-          });
-          return;
-        }
+        // Shared, version-aware status handling. /versions is an OSDM 3.6+
+        // endpoint — a 404 when the test-framework version is below 3.6 is
+        // reported as out of scope (skipped), not a failure.
+        if (!handleSystemInfoStatus(res.getStatus(), '/versions', { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
         // Parse JSON response safely
         let versionsData;
@@ -80,9 +41,23 @@ runtime:
           return;
         }
 
-        // Validate response is an array
-        bruTest(`/versions response is an array`, () => {
-          expect(versionsData).to.be.an("array");
+        // ── OSDM compliance (Layer 1): GET /versions → array<ApiVersion> ──
+        // Structural conformance against the OSDM ApiVersion schema: response
+        // is an array, has at least one entry, every entry carries a required
+        // non-empty "version" string, and optional "sunset" (ISO-8601
+        // date-time) / "nextVersion" (object) are well-typed when present.
+        // Logic lives in osdmCompliance.js (pure + Jest unit-tested).
+        const { validateApiVersions } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        validateApiVersions(versionsData).forEach((c) => {
+          bruTest(c.name, () => {
+            if (!c.ok) throw new Error(c.message);
+          });
+        });
+
+        // ── OSDM compliance (Layer 2): deep, version-matched schema ──
+        const { validateSchema } = require(bru.getEnvVar("library_base") + "osdmSchema.js");
+        validateSchema('ApiVersion', versionsData, { endpoint: '/versions' }).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
         // Extract API versions from response
@@ -116,20 +91,31 @@ runtime:
           });
         }
 
-        // Generate sanity check with warning if versions don't match
-        bruTest(`Scenario : ${scenarioCode} version used is ${expectedVersion}, version of the sytem is ${apiVersions}`, () => {
-          if (!foundMatch) {
-            validationLogger(`[INFO] Version mismatch detected`);
-            validationLogger(`[INFO] Scenario: ${scenarioCode}; version used: ${expectedVersion}; version of the sytem: ${apiVersions}`);
-            validationLogger(`[INFO] Action: Verify that the data file (osdmVersion) matches the API implementation`);
-            
-            // Log as warning, not failure
-            expect(foundMatch, 
-              `Version mismatch: Expected "${expectedVersion}" but API supports [${apiVersions}]. Check data file consistency.`)
-              .to.be.false;
-          } else {
-            validationLogger(`[✅ INFO] Version match confirmed: API supports "${expectedVersion}"`);
-          }
+        // Soft consistency check: a mismatch between the data file's
+        // osdmVersion and the versions the API advertises is a TEST-CONFIG
+        // issue, not provider non-conformance — so it warns without failing
+        // the run.
+        //
+        // Log-audit round 2 rewrite. The old block had three defects:
+        //   1. the mismatch narrative was logged at [INFO] — a discrepancy
+        //      is a [WARNING];
+        //   2. `expect(foundMatch).to.be.false` PASSED green on a mismatch
+        //      (inverted assertion standing in for "soft") — the report
+        //      showed ✓ with nothing flagging the discrepancy;
+        //   3. the match confirmation was tagged `[✅ INFO]` — a malformed
+        //      tag the level filter doesn't recognise, so it was DROPPED at
+        //      the default INFO logging level (visible only at FULL).
+        // Now: honest test title carrying both sides + the verdict, an
+        // explicit always-pass body (soft by design), [WARNING] with the
+        // action path on mismatch, well-formed [INFO] on match.
+        if (!foundMatch) {
+          validationLogger(`[WARNING] ⚠️ OSDM version mismatch — the data file expects "${expectedVersion}" but the API advertises [${apiVersions}]. Soft check: the run continues, but version-dependent validations (v3.8 fields, refundSpecifications, …) may not match this provider. Action: align Test Config → OSDM version with the provider's supported versions (or confirm the provider's /versions response).`);
+        } else {
+          validationLogger(`[INFO] ✅ Version match confirmed: API supports "${expectedVersion}"`);
+        }
+        bruTest(`OSDM version check (soft): data file "${expectedVersion}" vs API [${apiVersions}] — ${foundMatch ? 'match' : 'MISMATCH (run continues, see [WARNING] in log)'}`, () => {
+          // Soft by design — the verdict lives in the title + log line above.
+          expect(true).to.eql(true);
         });
 
         // Store version info for downstream requests to reference

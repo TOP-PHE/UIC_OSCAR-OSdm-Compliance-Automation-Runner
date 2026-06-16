@@ -21,7 +21,7 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
@@ -198,16 +198,28 @@ router.patch('/users/:id',
     updates.push('role = ?');
     values.push(resolvedRole);
 
-    if (resolvedRole === 'company_user') {
-      if (!company_id) {
-        return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required when role is company_user.' });
+    if (resolvedRole === 'company_user' || resolvedRole === 'test_manager') {
+      // Company-bound roles. Change the company only when a valid company_id is
+      // provided; otherwise KEEP the user's current company. Changing the role
+      // alone (e.g. Tester → Test Manager) must NOT move the user off their
+      // company (issue #128 — previously test_manager fell into the platform
+      // catch-all below). A company-bound role may not sit on the platform
+      // company, so require company_id if the user is currently on it.
+      if (company_id) {
+        const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
+        if (!targetCompany) {
+          return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
+        }
+        updates.push('company_id = ?');
+        values.push(company_id);
+      } else {
+        const platformCompany = ensurePlatformCompany();
+        if (user.company_id === platformCompany.id) {
+          return res.status(400).json({ status: 400, title: 'Bad Request', detail: `company_id is required for ${resolvedRole} (the user is currently on the platform company).` });
+        }
+        // Already on a real company and no company_id provided → keep it
+        // (no company_id update is pushed).
       }
-      const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
-      if (!targetCompany) {
-        return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
-      }
-      updates.push('company_id = ?');
-      values.push(company_id);
     } else if (resolvedRole === 'certification_user') {
       // Certifiers may optionally belong to a specific company; if not provided keep current
       if (company_id) {
@@ -291,8 +303,8 @@ router.post('/users/:id/generate-reset-link', (req, res) => {
   // Wipe any previous outstanding token for this user (one active link at a time)
   run('DELETE FROM password_reset_tokens WHERE user_id = ?', [user.id]);
 
-  const token     = require('uuid').v4();
-  const id        = require('uuid').v4();
+  const token     = uuidv4();
+  const id        = uuidv4();
   const PASSWORD_RESET_EXPIRY_HOURS = 24;
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
@@ -374,12 +386,33 @@ router.get('/activity', (req, res) => {
      LIMIT 10`
   );
 
-  const latestLogins = all(
-    `SELECT created_at, event_type, email, ip, user_agent
-     FROM auth_events
-     ORDER BY created_at DESC
-     LIMIT 50`
-  );
+  // Optional ?from=&to= (UTC datetimes "YYYY-MM-DD HH:MM:SS") — return login
+  // events in that half-open range instead of the most-recent 50. The client
+  // computes the range from the LOCAL day the admin picks (local midnight →
+  // +24h, converted to UTC), so the day filter matches the local times shown in
+  // the table. created_at is stored UTC in that exact format, so a lexical
+  // string range is also chronological. Without the params, the historic
+  // "latest 50" is returned.
+  const TS_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+  const fromParam = (typeof req.query.from === 'string' && TS_RE.test(req.query.from)) ? req.query.from : null;
+  const toParam   = (typeof req.query.to   === 'string' && TS_RE.test(req.query.to))   ? req.query.to   : null;
+  const useRange  = !!(fromParam && toParam);
+
+  const latestLogins = useRange
+    ? all(
+        `SELECT created_at, event_type, email, ip, user_agent
+         FROM auth_events
+         WHERE created_at >= ? AND created_at < ?
+         ORDER BY created_at DESC
+         LIMIT 1000`,
+        [fromParam, toParam]
+      )
+    : all(
+        `SELECT created_at, event_type, email, ip, user_agent
+         FROM auth_events
+         ORDER BY created_at DESC
+         LIMIT 50`
+      );
 
   return res.json({
     totals,
@@ -388,7 +421,8 @@ router.get('/activity', (req, res) => {
     failed_logins_last_24h: failedLogins24h,
     run_status_distribution: runStatus,
     top_submitters_last_7d: topSubmitters,
-    latest_auth_events: latestLogins
+    latest_auth_events: latestLogins,
+    auth_events_range: useRange ? { from: fromParam, to: toParam } : null
   });
 });
 
@@ -487,7 +521,12 @@ router.delete('/companies/:id', (req, res) => {
 const CONFIG_SCHEMA = {
   MAX_CONCURRENT_RUNS: { description: 'Max parallel runs (server-wide)', type: 'number', min: 1, max: 20 },
   PARALLEL_STAGGER_MS: { description: 'Delay between batch launches (ms)', type: 'number', min: 0, max: 30000 },
-  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms)',         type: 'number', min: 60000, max: 3600000 },
+  RUN_TIMEOUT_MS:      { description: 'Hard timeout per run (ms) — the effective budget is additionally clamped at the Run Budget Ceiling below', type: 'number', min: 60000, max: 3600000 },
+  // #394: the runner's hard ceiling was env-only and invisible here, so the
+  // panel accepted RUN_TIMEOUT_MS up to 3.6M while everything above 1.8M
+  // silently did nothing (min(max(base, scenario waits), ceiling)). Exposing
+  // it makes the clamp visible and editable; the DB value overrides the env.
+  RUN_HARD_MAX_TIMEOUT_MS: { description: 'Server-wide ceiling (ms) on the per-run budget, including expired-flow Max-wait extensions — the runner clamps anything above it (default 1800000 = 30 min). E.g. an expired-offer test against a provider whose offers stay bookable for 30 min needs ≥ 1920000.', type: 'number', min: 60000, max: 7200000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',

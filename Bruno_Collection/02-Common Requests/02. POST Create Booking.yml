@@ -26,33 +26,169 @@ runtime:
     - type: before-request
       code: |-
         const { buildBookingRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+
+        // #expired-offer test: when armed, wait until just past the offer
+        // deadline (earliest of part validUntil and offer.preBookableUntil —
+        // #385), then let the booking POST fire — the after-response asserts
+        // the provider correctly rejects the booking of a stale offer.
+        // #385: decided BEFORE the body is built, so a SKIP frees this step
+        // for the 🧪 place-selection probes in the same pass (their stand-down
+        // check honours __expiredOfferArmed). The guard also keeps probe-pass
+        // self-loops from re-planning and re-warning.
+        if (String(bru.getEnvVar("expiredOfferTest")) === "true"
+            && bru.getEnvVar("__expiredOfferArmed") !== "false") {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          const { planExpiredFlow, runExpiredFlowWait } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+          const limitRaw   = bru.getEnvVar("offerValidUntil");
+          const limitSrc   = bru.getEnvVar("offerValidUntilSource") || "offer-part validUntil";
+          const maxWaitMin = parseInt(bru.getEnvVar("expiredOfferMaxWaitMinutes") || "0", 10) || 0;
+          const plan = planExpiredFlow({
+            deadlineRaw:    limitRaw,
+            maxWaitMinutes: maxWaitMin,
+            resourceLabel:  "offer (" + limitSrc + ")",
+          });
+          if (!plan.armed) {
+            validationLogger(`[WARNING] expiredOfferTest SKIPPED: ${plan.reason}`);
+            bru.setEnvVar("__expiredOfferArmed", "false");
+          } else {
+            await runExpiredFlowWait({ plan, deadlineRaw: limitRaw, scenarioLabel: "expiredOfferTest (POST /bookings)" });
+            bru.setEnvVar("__expiredOfferArmed", "true");
+            validationLogger(`[INFO] expiredOfferTest: attempting POST /bookings, expecting the provider to reject it (offer expired).`);
+          }
+        }
+
         buildBookingRequest();
     - type: after-response
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
+        const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
 
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
-        });
+        // #expired-offer: when armed, the booking MUST be rejected — an expired
+        // offer must not be bookable. Grade the rejection here and short-circuit
+        // (skip the normal happy-path postCreateBookingResponse + downstream
+        // PATCH passenger / GET booking / POST /fulfillments) so the next
+        // scenario in the loop fires cleanly.
+        if (String(bru.getEnvVar("__expiredOfferArmed")) === "true") {
+            const { gradeExpiredFlowResponse, advanceExpiredFlowQueueOrFinish, nhfTestPrefix } = require(bru.getEnvVar("library_base") + "expiredFlow.js");
+            const _grade = gradeExpiredFlowResponse({ res: res, scenarioLabel: "Expired offer" });
+            const _tag = nhfTestPrefix();
+            test(`${_tag}Expired offer: POST /bookings is rejected with a client error (4xx) — an expired offer must not be bookable (got ${_grade.status})`, () => {
+                expect(_grade.isClientError, `expected a 4xx rejection, got ${_grade.status}`).to.be.true;
+            });
+            if (_grade.isClientError && !_grade.isAuthFailure) {
+                test(`${_tag}Expired offer: error body is an RFC-9457 Problem (title/detail/code present)`, () => {
+                    expect(_grade.hasProblemBody, "response body did not contain title/detail/code").to.be.true;
+                });
+            }
+            // PR B: auto-expansion — if this scenario has more queued timers,
+            // re-arm the next one and loop back to 01 within the same scenario.
+            // If the queue is exhausted (or single-timer), fall through to the
+            // existing cross-scenario tail below.
+            if (advanceExpiredFlowQueueOrFinish({ scenarioLabel: "Expired offer" })) return;
+            // Multi-scenario tail: loop to next scenario or stop. We do NOT
+            // continue the happy-path booking flow because the booking was
+            // (correctly) never created.
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
 
-        if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
-          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("POST Create Booking");
-          return;
+            const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+            const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+            if (_scList.length > 0 && _scNextIdx < _scList.length) {
+                bru.setEnvVar('__loopback', 'true');
+                bru.runner.setNextRequest('01. POST Get Offer');
+            } else {
+                bru.runner.stopExecution();
+            }
+            return;
         }
 
-        postCreateBookingResponse(
-            bru.getEnvVar("offer"),
-            res.getBody(),
-            ["PREBOOKED"],
-            ["ON_HOLD", "AVAILABLE"]
-        );
+        // #378: place-selection NHF probe sweep. When this response answers a
+        // PROBE pass (deliberately corrupted placeSelections), grade it and
+        // loop this very step — next probe, or one final CLEAN pass. A
+        // wrongly-ACCEPTED probe created a real booking: the grader registered
+        // the verdict and stopped the sweep; we FALL THROUGH so the response
+        // is processed as the run's booking (the flow continues with it).
+        const { gradePlaceProbeResponse } = require(bru.getEnvVar("library_base") + "placeProbes.js");
+        const _placeProbeOutcome = gradePlaceProbeResponse(res);
+        if (_placeProbeOutcome === "next-probe" || _placeProbeOutcome === "clean-pass") {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+        }
 
-        bru.deleteEnvVar("currentPassengerIndex");
+        const _status = res.getStatus();
+        let _body = null;
+        try { _body = res.getBody(); } catch (_e) { _body = null; }
+
+        // ── Two-step return booking (#178/#180), adaptive ─────────────────────
+        // Return scenarios first attempt a COMBINED booking (both offers). OSDM
+        // permits this, but some vendors don't (Bileto: "Only one offer can be
+        // booked at a time, for now"). On that rejection we emit a clearly-named
+        // FAILING assertion (so the vendor gap is easy to track in the report)
+        // and fall back to two SEPARATE bookings: outbound, then inbound.
+        const _isReturn = !!bru.getEnvVar("inboundOfferId") && !!bru.getEnvVar("outboundOfferId");
+        const _mode = bru.getEnvVar("__returnBookMode") || "";
+
+        function _isMultiOfferRejected(b, st) {
+          if (st !== 400 || !b || typeof b !== "object") return false;
+          const t = ((b.title || "") + " " + (b.detail || "")).toLowerCase();
+          return t.includes("too many offers") || t.includes("one offer") || t.includes("multiple offer");
+        }
+
+        if (_isReturn && _mode === "") {
+          // First attempt = combined (both offers in one booking).
+          if (_status === 200) {
+            test("[OSDM] Vendor books a round trip (both offers) in a single booking", () => {
+              expect(_status).to.eql(200);
+            });
+            postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+            bru.deleteEnvVar("currentPassengerIndex");
+          } else if (_isMultiOfferRejected(_body, _status)) {
+            // Trackable vendor-gap finding (intentionally FAILS).
+            test("[OSDM] Vendor supports booking multiple offers (round trip) in one booking", () => {
+              expect(false, `Vendor rejected the combined round-trip booking — ${(_body && _body.title) || ""}: ${(_body && _body.detail) || ""}. OSDM allows multiple offers; falling back to two separate bookings.`).to.be.true;
+            });
+            console.log("[WARNING] ⚠️ [VENDOR GAP] Provider does not support multiple offers in one booking request — falling back to two separate bookings (outbound, then inbound).");
+            bru.setEnvVar("__returnBookMode", "sep-out");
+            bru.runner.setNextRequest("02. POST Create Booking");
+            return;
+          } else {
+            test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            loopbackOrStop("POST Create Booking (combined return)");
+            return;
+          }
+        } else if (_isReturn && _mode === "sep-out") {
+          // Separate booking, leg 1 (outbound).
+          test("Return — outbound booking created (status 200)", () => { expect(_status).to.eql(200); });
+          if (_status !== 200) { loopbackOrStop("POST Create Booking (outbound leg)"); return; }
+          const _ob = _body && _body.booking;
+          if (_ob && _ob.id) { bru.setEnvVar("outboundBookingId", _ob.id); console.log("[INFO] 🔁 Outbound booking created: " + _ob.id); }
+          bru.setEnvVar("__returnBookMode", "sep-in");
+          bru.runner.setNextRequest("02. POST Create Booking");
+          return;
+        } else if (_isReturn && _mode === "sep-in") {
+          // Separate booking, leg 2 (inbound) — becomes the "current" booking
+          // and continues through the normal post-booking flow below.
+          test("Return — inbound booking created (status 200)", () => { expect(_status).to.eql(200); });
+          if (_status !== 200) { loopbackOrStop("POST Create Booking (inbound leg)"); return; }
+          bru.setEnvVar("__returnBookMode", "done");
+          postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+          console.log("[INFO] 🔁 Inbound booking created: " + bru.getEnvVar("bookingId") + " — round trip booked as 2 bookings (outbound=" + bru.getEnvVar("outboundBookingId") + ").");
+          bru.deleteEnvVar("currentPassengerIndex");
+        } else {
+          // One-way (unchanged behaviour), or the combined-200 success path.
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+              expect(_status, "[ERROR] Wrong response status").to.eql(200);
+          });
+          if (_status !== 200) {
+            test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => { throw new Error(`[ERROR] Wrong response status: ${_status}`); });
+            loopbackOrStop("POST Create Booking");
+            return;
+          }
+          postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
+          bru.deleteEnvVar("currentPassengerIndex");
+        }
 
         // Routing after POST Create Booking:
         //   1. Legacy `skipPatchPassengerRequest` still wins for explicit
@@ -71,7 +207,40 @@ runtime:
         // consequence the skip path (old `skipPatchPassengerRequest === true`)
         // silently never worked either. Fixed here to match the actual
         // request names in the collection.
-        if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
+        // 4. Post-booking add-reservation (ADD_TO_BOOKING, issue #104 Stage B):
+        //    when the scenario chose ADD_TO_BOOKING place selection, insert the
+        //    add-reservation step before the passenger steps. It then continues
+        //    to PATCH/GET Passenger itself. Inert for every current scenario.
+        //    Optional post-booking add-offer-part steps chain in order:
+        //    [Add Reservation] → [Add Ancillary] → PATCH/GET. Each runs only
+        //    when its gate is on; both default off → straight to PATCH/GET.
+        //    Adaptive fallback (#182): when the pre-booking seat map failed at
+        //    offer time (08. GET Place Maps set __placeMapAtOfferFailed), the
+        //    seat could not be picked before booking. We still want the customer
+        //    to pick a place, so route to the post-booking add-reservation step
+        //    here even though the scenario's nominal mode was SEATMAP_AT_OFFER —
+        //    "pre-book, then pick the seat" (the customer-natural flow that
+        //    providers like Bileto support).
+        const _addRes = (bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
+                          || bru.getEnvVar("__placeMapAtOfferFailed") === "true")
+            && String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
+            && bru.getEnvVar("__addReservationDone") !== "true";
+        const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
+            && bru.getEnvVar("__addAncillaryDone") !== "true";
+        // #184: when an add-reservation is due, first fetch the BOOKING-context
+        // seat map (08b) so the reservation can carry an AVAILABLE place. 08b
+        // runs once then routes to 09 itself; if it already ran we go straight
+        // to 09. The pre-booking SEATMAP_AT_OFFER path (picks already made at
+        // offer time) does not enter here — it is not an add-reservation flow.
+        const _postBookMap = _addRes
+            && bru.getEnvVar("__postBookingPlaceMapDone") !== "true";
+        if (_postBookMap) {
+            bru.runner.setNextRequest("08b. GET Place Map Post-Booking");
+        } else if (_addRes) {
+            bru.runner.setNextRequest("09. POST Add Reservation to Booking");
+        } else if (_addAnc) {
+            bru.runner.setNextRequest("11. Add Ancillary - Get Additional Offers");
+        } else if (bru.getEnvVar("skipPatchPassengerRequest") === "true"
             || bru.getEnvVar("salesFlow_patchPassengers") === "false") {
             bru.runner.setNextRequest("04. GET Passenger");
         } else {

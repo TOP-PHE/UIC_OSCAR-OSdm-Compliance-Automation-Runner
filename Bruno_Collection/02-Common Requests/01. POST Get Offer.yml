@@ -49,6 +49,17 @@ runtime:
           }
         }
 
+        // #204 token-watchdog: refresh the access token at scenario start.
+        // The endpoint respects the server-side cache — when the cached token
+        // is still valid this is a ~50ms no-op; when the cache is within the
+        // safety margin OSCAR refetches a new token from the OAuth server.
+        // This guards against long-batch runs where the original token might
+        // outlive its TTL between scenarios.
+        try {
+          const { refreshAccessTokenIfNeeded } = require(bru.getEnvVar("library_base") + "auth.js");
+          await refreshAccessTokenIfNeeded({ callerLabel: 'POST /offers (scenario start)' });
+        } catch (_e) { /* helper is best-effort; checkAuthRejection covers 401/403 downstream */ }
+
         const { postOfferResponsePreRequest } = require(bru.getEnvVar("library_base")+"offers.js");
         postOfferResponsePreRequest();
     - type: after-response
@@ -58,8 +69,8 @@ runtime:
         const { bruTest } = require(bru.getEnvVar("library_base")+"testCapture.js");
 
         // Validate HTTP response status
-        bruTest(`Status code is 200`, () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        bruTest(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         // Stop flow if status != 200
@@ -100,6 +111,10 @@ runtime:
           } else {
             console.log('[INFO] No offers returned after 3 attempts — skipping this scenario');
             bru.setEnvVar('__offerRetryCount', '0');
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {
@@ -107,7 +122,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ No more scenarios — stopping run');
+              console.log('[INFO] ✅ No more scenarios — stopping run');
               bru.runner.stopExecution();
             }
           }
@@ -117,11 +132,52 @@ runtime:
 
         //swaggerSchemaValidatorContent();
 
-        const requiresPlaceSelection = bru.getEnvVar("requiresPlaceSelection");
+        // ── OSDM compliance (Layer 1): offer-time AncillaryOfferPart shape (#108) ──
+        // No-op for offers without ancillaries; validates id/type/category on the
+        // selected offer's ancillaryOfferParts when present (e.g. Sqills).
+        const { validateAncillaryOfferParts } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+        validateAncillaryOfferParts(bru.getEnvVar("offer"), '/offers → ancillaryOfferParts').forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
 
-        if (requiresPlaceSelection !== true && requiresPlaceSelection !== "true") {
-          bru.runner.setNextRequest("03. POST Create Booking");
+        // ── Place-selection routing (issue #104) ──────────────────────────────
+        // Pre-booking seat map (SEATMAP_AT_OFFER) runs only when the scenario
+        // opted into Place selection AND chose the SEATMAP_AT_OFFER mode (both
+        // authorised by the Test Framework, issue #107). Legacy requiresPlaceSelection
+        // is kept as an OR-fallback for backward compatibility. When the gate is
+        // off (every current scenario) we route straight to Create Booking and
+        // set skipPlaceMaps — the historic behaviour, unchanged.
+        // ── Two-step return (#178) ────────────────────────────────────────────
+        // On the OUTBOUND offer of a return scenario, capture the chosen outbound
+        // offer and route to the inward (return) offer step BEFORE booking.
+        // Detected from the outbound tripSearchCriteria's
+        // returnSearchParameters.inwardReturnDate (SEARCH returns only).
+        const _isReturn = (function () {
+          try {
+            const t = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+            return !!(t.returnSearchParameters && t.returnSearchParameters.inwardReturnDate);
+          } catch (_) { return false; }
+        })();
+
+        if (_isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
+          bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
           bru.setGlobalEnvVar("skipPlaceMaps", true);
+          console.log("[INFO] 🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
+          bru.runner.setNextRequest("01b. POST Get Return Offer");
+        } else {
+          const _psMode   = bru.getEnvVar("placeSelectionMode");
+          const _psOptIn  = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
+          const _reqPlace = bru.getEnvVar("requiresPlaceSelection");
+          const _runPlaceMap = (_psMode === "SEATMAP_AT_OFFER" && _psOptIn)
+                            || (_reqPlace === true || _reqPlace === "true");
+
+          if (_runPlaceMap) {
+            bru.setGlobalEnvVar("skipPlaceMaps", false);
+            bru.runner.setNextRequest("08. GET Place Maps");
+          } else {
+            bru.runner.setNextRequest("02. POST Create Booking");
+            bru.setGlobalEnvVar("skipPlaceMaps", true);
+          }
         }
 
 settings:

@@ -31,8 +31,8 @@ const htmlPath   = path.join(VAL_DIR, `${dateStr}_${envName}_Report.html`);
 
 // ─── Load data ────────────────────────────────────────────────────────────────
 if (!fs.existsSync(BRU_JSON)) {
-  console.error('[mergeReport] ERROR: Bruno JSON report not found: ' + BRU_JSON);
-  console.error('  Run with: bru.cmd run --sandbox=developer --env <EnvName> --reporter-json "Validation_Reports/.bru_results.json"');
+  console.error('[ERROR] [mergeReport] Bruno JSON report not found: ' + BRU_JSON);
+  console.error('[ERROR]   Run with: bru.cmd run --sandbox=developer --env <EnvName> --reporter-json "Validation_Reports/.bru_results.json"');
   process.exit(1);
 }
 
@@ -41,14 +41,31 @@ const tmpData = fs.existsSync(TMP_JSON)
   ? JSON.parse(fs.readFileSync(TMP_JSON, 'utf8'))
   : { meta: {}, requests: [] };
 
-// ─── Parse Bruno JSON reporter (handle both v1 and v2 formats) ───────────────
-// Bruno CLI may emit { results: [...] } or { testResults: [...] } or just [...]
-const bruResults = Array.isArray(bruRaw)              ? bruRaw
+// ─── Parse Bruno JSON reporter (handle iteration wrapper + v1/v2 shapes) ─────
+// Bruno CLI shapes seen in the wild, in order of precedence:
+//   [{ iterationIndex, results: [...], summary: {...} }, ...]   ← current CLI
+//   { results: [...], summary: {...} }                          ← older single-iter
+//   { testResults: [...] }                                       ← legacy
+//   [...]                                                        ← legacy raw
+//
+// v1.11.9 fix: previously the iteration wrapper was misread — Array.isArray
+// returned true for the outer array, so `bruResults` became the 1-element
+// wrapper list itself and the per-entry map() treated the iteration object as
+// a single phantom request. Symptom: "1 request | 0 assertions" reports
+// regardless of how many requests actually ran. structureResults.js server-
+// side already handles this shape; mergeReport.js was missing the unwrap.
+const _isIterWrap = Array.isArray(bruRaw)
+  && bruRaw.length > 0
+  && bruRaw[0]
+  && Array.isArray(bruRaw[0].results);
+
+const bruResults = _isIterWrap                        ? bruRaw[0].results
+                 : Array.isArray(bruRaw)              ? bruRaw
                  : Array.isArray(bruRaw.results)      ? bruRaw.results
                  : Array.isArray(bruRaw.testResults)  ? bruRaw.testResults
                  : [];
 
-const bruSummary = bruRaw.summary || {};
+const bruSummary = (_isIterWrap ? bruRaw[0].summary : null) || bruRaw.summary || {};
 
 // ─── Build lookup of captured bodies by request URL (normalized) ──────────────
 function normUrl(u) { return (u || '').split('?')[0].replace(/\/+$/, '').toLowerCase(); }
@@ -125,11 +142,26 @@ const SENSITIVE_HEADER_NAMES = new Set([
   'set-cookie'
 ]);
 const REDACTED = '[REDACTED — credential]';
+// Partial masking: keep the head (scheme + token start) and the tail so a
+// tester can verify the right credential was sent. Graduated: long values
+// (tokens) keep head 10 / tail 4; short identity-style values (Requestor)
+// keep head 3 / tail 2; anything shorter is fully redacted. Same helper as
+// reportGenerator.js / structureResults.js.
+function maskCredentialValue(v) {
+  const s = String(v == null ? '' : v);
+  if (s.length >= 24) {
+    return `${s.slice(0, 10)}…[masked ${s.length - 14} chars]…${s.slice(-4)}`;
+  }
+  if (s.length >= 8) {
+    return `${s.slice(0, 3)}…[masked ${s.length - 5} chars]…${s.slice(-2)}`;
+  }
+  return REDACTED;
+}
 function redactHeaders(h) {
   if (!h || typeof h !== 'object') return h;
   const out = {};
   for (const [k, v] of Object.entries(h)) {
-    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? REDACTED : v;
+    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? maskCredentialValue(v) : v;
   }
   return out;
 }
@@ -221,13 +253,26 @@ function esc(s) {
 function prettyJson(raw) {
   if (raw == null || raw === '') return '';
   if (typeof raw === 'object') return JSON.stringify(raw, null, 2);
-  try { return JSON.stringify(JSON.parse(raw), null, 2); } catch (_) { return String(raw); }
+  // Only attempt a parse when the value actually looks like JSON, so a plain
+  // string is returned as-is instead of routing through an expected throw.
+  const first = String(raw).trim().charAt(0);
+  if (first !== '{' && first !== '[' && first !== '"') return String(raw);
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch (e) {
+    console.log('[WARNING] [mergeReport] prettyJson: JSON-like value failed to parse (' + (e && e.message) + ') — returning raw.');
+    return String(raw);
+  }
 }
 
 function maskHeaderValue(name, value) {
   const key = String(name || '').toLowerCase();
   const raw = value == null ? '' : String(value);
   const maskTail = 'xxxxxxxxxxxxxxxxx';
+
+  // Already masked at capture by redactHeaders (partial head…tail format or
+  // full redaction marker) — pass through, don't re-mask away the tail.
+  if (raw.includes('…[masked ') || raw.includes(REDACTED)) return raw;
 
   if (key === 'authorization' && /^bearer\s+/i.test(raw)) {
     const token = raw.replace(/^bearer\s+/i, '').trim();
@@ -297,9 +342,13 @@ function requestBlock(r) {
     </div>
   </details>
   <details>
-    <summary>📥 Response Body</summary>
+    <summary>📥 Response Headers &amp; Body</summary>
     <div class="panel">
-      ${r.resBody ? `<pre class="code">${esc(prettyJson(r.resBody))}</pre>` : '<em class="muted">No response body captured</em>'}
+      <div class="panel-section-title">Headers</div>
+      ${headerTable(r.resHeaders)}
+      ${r.resBody ? `
+      <div class="panel-section-title" style="margin-top:10px">Body</div>
+      <pre class="code">${esc(prettyJson(r.resBody))}</pre>` : '<em class="muted">No response body captured</em>'}
     </div>
   </details>
   <details open>
@@ -454,5 +503,5 @@ ${osdmSection}
 // ─── Write ─────────────────────────────────────────────────────────────────────
 if (!fs.existsSync(VAL_DIR)) fs.mkdirSync(VAL_DIR, { recursive: true });
 fs.writeFileSync(htmlPath, html, 'utf8');
-console.log(`[mergeReport] ✅ Report written → ${htmlPath}`);
-console.log(`[mergeReport]    ${mergedRequests.length} requests | ${totalTests} assertions | ${passTests} passed | ${failTests} failed`);
+console.log(`[INFO] [mergeReport] ✅ Report written → ${htmlPath}`);
+console.log(`[INFO] [mergeReport]    ${mergedRequests.length} requests | ${totalTests} assertions | ${passTests} passed | ${failTests} failed`);

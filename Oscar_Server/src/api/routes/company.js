@@ -22,8 +22,9 @@ const fs        = require('fs');
 const crypto    = require('crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
-const { get, all, run } = require('../../db/db');
-const { requireAuth, isPlatformRole, isTestManagerOrAbove } = require('../middleware/auth');
+const { get, all, run, colDecrypt } = require('../../db/db');
+const { annotateDatafile } = require('../../utils/frameworkGating');
+const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope } = require('../helpers/shared');
 const log = require('../../utils/logger').child({ module: 'company' });
@@ -97,17 +98,13 @@ function safeCompany(c) {
     api_base:                     c.api_base || null,
     datafile_hash:                c.datafile_hash || null,
     datafile_updated_at:          c.datafile_updated_at || null,
-    // Privacy toggle (v15). Surfaced as a boolean for the UI; stored as 0/1.
-    // True = certifiers can see this company's runs/reports (default).
-    share_reports_with_certifier: c.share_reports_with_certifier === 1 || c.share_reports_with_certifier === true,
+    // v1.11.15: the company-wide share_reports_with_certifier toggle was
+    // retired. Certifier visibility is now per-report (the test_manager
+    // shares individual runs from the dashboard). The DB column is kept for
+    // backward compatibility but is no longer surfaced or writable here.
     created_at:                   c.created_at,
     updated_at:                   c.updated_at
   };
-}
-
-function fileHash(filePath) {
-  const content = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 // At-rest encryption for company datafiles (Phase 2 of issue #60, v1.11.0).
@@ -141,7 +138,7 @@ router.patch('/', (req, res) => {
 
   // PATCH /v1/company now only handles company-shared fields. Per-tester
   // credentials moved to /v1/me/credentials in v12 — see me-credentials.js.
-  const { api_base, share_reports_with_certifier } = req.body || {};
+  const { api_base } = req.body || {};
 
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
@@ -159,32 +156,19 @@ router.patch('/', (req, res) => {
     });
   }
 
-  // share_reports_with_certifier is a privacy toggle reserved for the
-  // company's test_manager. Administrators do NOT bypass this — by design,
-  // only the company owner controls who sees their reports. (Admin still has
-  // unconditional read access to everything regardless of this flag.)
+  // v1.11.15: share_reports_with_certifier is no longer accepted here. If an
+  // old client still sends it, fail loudly with a pointer to the new model
+  // (per-report sharing from the dashboard) rather than silently ignoring it.
   if ('share_reports_with_certifier' in (req.body || {})) {
-    if (req.user.role !== 'test_manager') {
-      return res.status(403).json({
-        status: 403, title: 'Forbidden',
-        detail: 'Only test_manager can change share_reports_with_certifier.'
-      });
-    }
-    if (typeof share_reports_with_certifier !== 'boolean') {
-      return res.status(400).json({
-        status: 400, title: 'Bad Request',
-        detail: 'share_reports_with_certifier must be a boolean.'
-      });
-    }
+    return res.status(400).json({
+      status: 400, title: 'Bad Request',
+      detail: 'The company-wide share_reports_with_certifier toggle was removed in v1.11.15. Certifier visibility is now per-report — a test_manager shares individual runs from the dashboard (POST /v1/runs/:id/share).'
+    });
   }
 
   const updates = [];
   const values  = [];
   if (api_base) { updates.push('api_base = ?'); values.push(api_base.trim()); }
-  if ('share_reports_with_certifier' in (req.body || {})) {
-    updates.push('share_reports_with_certifier = ?');
-    values.push(share_reports_with_certifier ? 1 : 0);
-  }
 
   if (updates.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No fields to update.' });
@@ -333,6 +317,19 @@ router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const filePath = path.join(dir, `${company.slug}-datafile.json`);
+
+  // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
+  // is server-managed — derived from the findings the test team has baselined
+  // for runs — never hand-authored in the wizard. Overwrite whatever the client
+  // sent so a datafile save can't wipe or tamper with it. Soft: a failure here
+  // leaves the rest of the save intact.
+  try {
+    const { buildProjection } = require('../../utils/knownDeviationProjection');
+    body.knownDeviations = buildProjection(targetCompanyId);
+  } catch (err) {
+    log.warn({ err: err.message, companyId: targetCompanyId }, 'datafile save: knownDeviations projection failed');
+  }
+
   const content  = JSON.stringify(body, null, 4);
   // Hash the plaintext (so the hash matches the user-visible file content),
   // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
@@ -415,10 +412,39 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
     log.error({ err, companyId: targetCompanyId }, 'Failed to decrypt datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Datafile decryption failed.' });
   }
+
+  // ── #218 follow-up: framework-gating annotation ─────────────────────────
+  // Each scenario whose armed field isn't declared in the current framework
+  // gets `__featureNotDeclaredWarnings: [field, ...]` so the Bruno collection
+  // can emit a [WARNING] log line at scenario load (golden rule: what's not
+  // declared in the framework can't be tested). The on-disk file is NOT
+  // changed; only the bytes served to the client are augmented. If the
+  // framework can't be read for any reason we serve the raw datafile —
+  // soft validation: the warning is best-effort, never blocks the run.
+  let serveBytes = plaintext;
+  try {
+    const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
+    if (fwRow && fwRow.config) {
+      let fwConfig = null;
+      try { fwConfig = JSON.parse(colDecrypt(fwRow.config)); } catch (_) {}
+      if (fwConfig) {
+        const df = JSON.parse(plaintext.toString('utf8'));
+        const { annotatedCount } = annotateDatafile(df, fwConfig);
+        if (annotatedCount > 0) {
+          log.info({ companyId: targetCompanyId, annotatedCount }, 'datafile: annotated scenarios with feature-not-declared warnings');
+        }
+        serveBytes = Buffer.from(JSON.stringify(df), 'utf8');
+      }
+    }
+  } catch (err) {
+    log.warn({ err, companyId: targetCompanyId }, 'datafile annotator failed — serving unannotated bytes');
+    serveBytes = plaintext;
+  }
+
   res.setHeader('Content-Disposition', `attachment; filename="${company.slug}-datafile.json"`);
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Content-Length', String(plaintext.length));
-  return res.end(plaintext);
+  res.setHeader('Content-Length', String(serveBytes.length));
+  return res.end(serveBytes);
 });
 
 module.exports = router;

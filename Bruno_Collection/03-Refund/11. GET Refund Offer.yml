@@ -18,19 +18,34 @@ http:
 runtime:
   scripts:
     - type: before-request
-      code: 'console.log("⏩ [STEP] Executing request : " + req.getName());'
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postPatchRefundOfferResponse } = require(bru.getEnvVar("library_base")+"refunds.js");
 
+        // #398 known-deviation baseline. A documented non-200 here (e.g. Turnit
+        // GET /refund-offers/{id} -> 405: it creates the offer on 10. POST Refund
+        // Offers but does not allow GET retrieval) is reported as a PASSING
+        // "known deviation" + WARNING and the flow proceeds — the refund offer id
+        // came from step 10, so 12-16 (incl. 13. PATCH Refund Offer) don't need
+        // this body. Any UNdocumented non-200 still hard-stops below.
+        const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar("library_base") + "loopback.js");
+        const _kdStatus = res.getStatus();
+        const _kdMatch  = _kdStatus !== 200 ? knownDeviationFor("11. GET Refund Offer", _kdStatus) : null;
+        if (_kdMatch) {
+            test(`HTTP response status — known deviation (documented): 11. GET Refund Offer returns ${_kdStatus}`, () => {});
+            noteKnownDeviation("11. GET Refund Offer", _kdStatus, _kdMatch);
+            return;   // proceed to 12. GET Booking before Patch Refund (natural file order)
+        }
+
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");

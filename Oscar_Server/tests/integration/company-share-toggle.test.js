@@ -8,18 +8,20 @@
 'use strict';
 
 /**
- * company-share-toggle.test.js — Verify the v15 share_reports_with_certifier
- * flag is honoured at the right places.
+ * company-share-toggle.test.js — Verify the company-wide
+ * share_reports_with_certifier toggle was REMOVED in v1.11.15.
  *
- *   - Default value is true (backward compatibility)
- *   - Only test_manager can change it via PATCH /v1/company
- *   - Sanitised company response includes the boolean
+ * Certifier visibility is now per-report (a test_manager shares individual
+ * runs from the dashboard via POST /v1/runs/:id/share). This file guards the
+ * removal:
+ *   - GET /v1/company no longer exposes share_reports_with_certifier
+ *   - PATCH /v1/company rejects the field with 400 + a pointer to the new model
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-share-toggle';
 
 const jwt     = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
 const { run, get } = require('../../src/db/db');
@@ -49,58 +51,36 @@ beforeAll(() => {
        VALUES (?, ?, ?, 'x', 'administrator')`, [adminId, companyId, 'admin@share-test.com']);
 });
 
-describe('GET /v1/company exposes share_reports_with_certifier', () => {
-  test('defaults to true on a freshly-created company', async () => {
+describe('GET /v1/company no longer exposes share_reports_with_certifier (v1.11.15)', () => {
+  test('the sanitised company response omits the removed toggle', async () => {
     const tk = mkToken(tmId, 'test_manager');
     const res = await request(app).get('/v1/company').set('Authorization', `Bearer ${tk}`);
     expect(res.status).toBe(200);
-    expect(res.body.share_reports_with_certifier).toBe(true);
+    expect(res.body).not.toHaveProperty('share_reports_with_certifier');
   });
 });
 
-describe('PATCH /v1/company { share_reports_with_certifier } authorisation', () => {
-  test('200 when test_manager flips the flag to false', async () => {
+describe('PATCH /v1/company rejects the removed share_reports_with_certifier field (v1.11.15)', () => {
+  test('400 with a pointer to per-report sharing when test_manager sends it', async () => {
     const tk = mkToken(tmId, 'test_manager');
     const res = await request(app)
       .patch('/v1/company')
       .set('Authorization', `Bearer ${tk}`)
       .send({ share_reports_with_certifier: false });
-    expect(res.status).toBe(200);
-    expect(res.body.share_reports_with_certifier).toBe(false);
-    // Verify it persisted
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/per-report|removed in v1\.11\.15/i);
+    // And it must NOT have persisted any change to the (retained) column.
     const row = get('SELECT share_reports_with_certifier AS s FROM companies WHERE id = ?', [companyId]);
-    expect(row.s).toBe(0);
+    expect(row.s).toBe(1); // schema default, untouched
   });
 
-  test('200 when test_manager flips it back to true', async () => {
-    const tk = mkToken(tmId, 'test_manager');
-    const res = await request(app)
-      .patch('/v1/company')
-      .set('Authorization', `Bearer ${tk}`)
-      .send({ share_reports_with_certifier: true });
-    expect(res.status).toBe(200);
-    expect(res.body.share_reports_with_certifier).toBe(true);
-  });
-
-  test('403 when administrator tries to flip the flag', async () => {
-    // Admin can target the company via query param via the platform-role path.
+  test('400 regardless of role (admin also rejected before any write)', async () => {
     const tk = mkToken(adminId, 'administrator', companyId);
     const res = await request(app)
       .patch(`/v1/company?company_id=${companyId}`)
       .set('Authorization', `Bearer ${tk}`)
-      .send({ share_reports_with_certifier: false });
-    expect(res.status).toBe(403);
-    expect(res.body.detail).toMatch(/Only test_manager/);
-  });
-
-  test('400 when the flag value is not a boolean', async () => {
-    const tk = mkToken(tmId, 'test_manager');
-    const res = await request(app)
-      .patch('/v1/company')
-      .set('Authorization', `Bearer ${tk}`)
-      .send({ share_reports_with_certifier: 'no' });
+      .send({ share_reports_with_certifier: true });
     expect(res.status).toBe(400);
-    expect(res.body.detail).toMatch(/boolean/);
   });
 });
 

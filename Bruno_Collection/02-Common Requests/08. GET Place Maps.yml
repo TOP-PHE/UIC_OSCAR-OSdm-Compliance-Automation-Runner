@@ -1,0 +1,130 @@
+info:
+  name: 08. GET Place Maps
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{api_base}}/availabilities/place-map?contextId={{offerId}}&contextType=OFFER&resourceId={{reservationId}}&resourceType=RESERVATION"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Requestor
+      value: "{{requestor}}"
+  params:
+    - name: contextId
+      value: "{{offerId}}"
+      type: query
+    - name: contextType
+      value: OFFER
+      type: query
+    - name: resourceId
+      value: "{{reservationId}}"
+      type: query
+    - name: resourceType
+      value: RESERVATION
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
+    - type: after-response
+      code: |-
+        // /availabilities/place-map is the pre-booking seat-map step
+        // (SEATMAP_AT_OFFER, issue #104). It is transaction-scoped: it needs an
+        // OFFER + RESERVATION context (contextId=offerId, resourceId=
+        // reservationId) that only exists in the sale flow — which is why it now
+        // lives here and not under System Information. It runs only when
+        // 01. POST Get Offer routed here (place selection enabled); otherwise the
+        // smart run filter skips it. The chosen place feeds 02. POST Create
+        // Booking via preselectedCoach / preselectedPlace / layoutId.
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+        const { bruTest } = require(bru.getEnvVar("library_base") + "testCapture.js");
+        const { validatePlaceAvailability } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+
+        const endpoint = '/availabilities/place-map';
+        const statusCode = res.getStatus();
+        let body;
+        try { body = res.getBody(); } catch (_e) {}
+
+        // ── Status ────────────────────────────────────────────────────────
+        if (statusCode === 200) {
+          bruTest(`GET ${endpoint} → 200 OK`, () => { expect(statusCode).to.eql(200); });
+          validationLogger(`[DEBUG] GET ${endpoint} → 200 OK`);
+        } else {
+          validationLogger(`[ERROR] GET ${endpoint} → ${statusCode} (expected 200 for seat-map selection)`);
+          bruTest(`GET ${endpoint} → ${statusCode} (FAIL)`, () => {
+            expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
+          });
+        }
+
+        // ── OSDM compliance (Layer 1): PlaceAvailabilityResponse ──────────
+        validatePlaceAvailability(body, endpoint).forEach((c) => {
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
+
+        // ── Capability/offer mismatch diagnostic (#104) ───────────────────
+        // Place selection was requested but the system returned no seat map for
+        // this offer — report it (NOT_APPLICABLE-style), do not crash.
+        const _va = body && body.vehicleAvailability;
+        if (!_va) {
+          validationLogger('[WARNING] ❕ Place selection enabled but no vehicleAvailability returned — the system may not offer a seat map for this offer.');
+        }
+
+        // ── Adaptive fallback (#182): no offer-time seat map → select after booking ──
+        // Many providers (e.g. Bileto) hold seats against a BOOKING, so they
+        // expose no seat map for a bare OFFER (contextType=OFFER). When the
+        // offer-time map is unavailable (non-200 or no vehicleAvailability) we
+        // flag the OFFER-context gap (trackable) and let Create Booking route to
+        // the post-booking add-reservation step — i.e. "pre-book, then pick the
+        // seat", which is the customer-natural flow these providers support.
+        const _offerSeatMapOk = (statusCode === 200) && !!_va;
+        if (!_offerSeatMapOk && String(bru.getEnvVar("salesFlow_placeSelection")) === "true") {
+          bru.setEnvVar("__placeMapAtOfferFailed", "true");
+          bruTest("[OSDM] Vendor serves a pre-booking (OFFER-context) seat map", () => {
+            expect(_offerSeatMapOk, `No offer-time seat map (status ${statusCode}${_va ? "" : ", no vehicleAvailability"}). Falling back to post-booking place selection (add-reservation).`).to.be.true;
+          });
+          console.log("[WARNING] ⚠️ [VENDOR GAP] No offer-time (OFFER-context) seat map — selecting the place AFTER pre-booking (post-booking add-reservation).");
+        }
+
+        // ── Place pre-selection extraction → feeds Create Booking ─────────
+        // Pick one AVAILABLE place per passenger from the seat map (#182
+        // follow-up). OSCAR sees the whole vehicle in this single response, so it
+        // flattens the coaches, keeps only available places and takes the first N
+        // (N = passenger count). The picks feed 02. POST Create Booking via
+        // accommodationAndPlaceSelection — one placeSelections.places entry per
+        // passenger. Availability-only — no "seat together" optimisation.
+        const { collectAvailablePlaces } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
+        const vehicle = _va && _va.vehicle;
+        let _paxCount = 0;
+        try { _paxCount = (JSON.parse(bru.getEnvVar("bookingPassengerReferences") || "[]") || []).length; } catch (_e) {}
+        if (!_paxCount) _paxCount = parseInt(bru.getEnvVar("passengerCount"), 10) || 1;
+        const _picked = collectAvailablePlaces(vehicle, _paxCount);
+        if (_picked.length > 0) {
+          bru.setEnvVar("preselectedPlaces", JSON.stringify(_picked));
+          // Back-compat single-place vars (first pick).
+          bru.setEnvVar("preselectedCoach", _picked[0].coachNumber);
+          bru.setEnvVar("preselectedPlace", _picked[0].placeNumber);
+          if (_picked[0].layoutId != null) bru.setEnvVar("layoutId", _picked[0].layoutId);
+          console.log("[INFO] ✅ [PLACES] Selected " + _picked.length + "/" + _paxCount + " available place(s): " + _picked.map((p) => p.coachNumber + "/" + p.placeNumber).join(", "));
+          if (_picked.length < _paxCount) {
+            validationLogger("[WARNING] Only " + _picked.length + " available place(s) for " + _paxCount + " passenger(s) — surplus passengers reuse the last place.");
+          }
+        } else if (_va) {
+          validationLogger("[WARNING] Seat map returned but no AVAILABLE place found — booking without explicit place selection.");
+        }
+
+        // Continue the sale flow: place selection done → create the booking.
+        // (This file is seq 8; without explicit routing the runner would not
+        // reach Create Booking after a routed jump here.)
+        bru.runner.setNextRequest("02. POST Create Booking");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

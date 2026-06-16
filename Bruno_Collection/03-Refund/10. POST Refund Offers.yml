@@ -26,13 +26,184 @@ runtime:
     - type: before-request
       code: |-
         const { requestRefundOffersBody } = require(bru.getEnvVar("library_base")+"requestsBuilder.js");
+        const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
 
-        console.log("⏩ [STEP] Executing request : " + req.getName());
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+
+        // Partial refund (#218): when partialRefundByLeg or partialRefundByPax
+        // is on for this scenario, resolve the OSDM RefundSpecification[]
+        // payload from the booking-after-fulfillments JSON saved in 07.yml.
+        // Degradation rules (per #218 design):
+        //   - SEARCH-mode trips can return a single leg even though the scenario
+        //     asked for per-leg; the helper detects "<2 admissions" and degrades.
+        //   - Per-pax with a single-pax booking degrades.
+        //   - The degraded run STILL produces a full refund (the historical
+        //     behaviour); only the partial-scope assertions skip.
+        let _refundSpecs = null;
+        const _byLeg = String(bru.getEnvVar("partialRefundByLeg")) === "true";
+        const _byPax = String(bru.getEnvVar("partialRefundByPax")) === "true";
+        bru.setEnvVar("__partialRefundDegradedToFull", "false");
+        bru.setEnvVar("__partialRefundResolvedSpec", "");
+        bru.setEnvVar("__partialRefundExpectedAmount", "");
+        bru.setEnvVar("__partialRefundExpectedPartIds", "");
+        if (_byLeg || _byPax) {
+          const { resolvePartialRefundScope } = require(bru.getEnvVar("library_base") + "partialRefund.js");
+          let _bk = null;
+          try { _bk = JSON.parse(bru.getEnvVar("__bookingForRefund") || "null"); }
+          catch (_e) { _bk = null; }
+          if (!_bk) {
+            validationLogger(`[WARNING] Partial refund requested but no booking JSON was captured in 07.yml — falling back to full refund.`);
+            bru.setEnvVar("__partialRefundDegradedToFull", "true");
+          } else {
+            const _r = resolvePartialRefundScope(_bk, {
+              byLeg: _byLeg, byPax: _byPax,
+              legSel: bru.getEnvVar("partialRefundLegSelection") || "first",
+              paxSel: bru.getEnvVar("partialRefundPaxSelection") || "first",
+            });
+            if (_r.degraded) {
+              validationLogger(`[WARNING] Partial refund degraded to full: ${_r.reason}. The full-refund happy path runs; partial-scope assertions skip.`);
+              bru.setEnvVar("__partialRefundDegradedToFull", "true");
+            } else if (_r.armed) {
+              // OSDM-version guard: RefundSpecification[] only landed in v3.8.
+              // Older negotiated versions (e.g. 3.5 = Paxone's current sandbox)
+              // reject the field as OSDM_EXTRA_REQUEST_FIELDS_IGNORED and would
+              // silently produce a full refund. Skip the field; scope only via
+              // the trimmed fulfillmentIds[] (which v3.5+ already supports).
+              const _osdm = String(bru.getEnvVar("osdmVersion") || "").trim();
+              const _osdmParts = _osdm.split(".").map(p => parseInt(p, 10));
+              const _osdmOk = _osdmParts.length >= 2 && !isNaN(_osdmParts[0]) && !isNaN(_osdmParts[1])
+                && (_osdmParts[0] > 3 || (_osdmParts[0] === 3 && _osdmParts[1] >= 8));
+              if (_osdmOk) {
+                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId }];
+                if (_r.bookingPartIds.length > 0) _refundSpecs[0].bookingPartIds = _r.bookingPartIds;
+                if (_r.passengerIds.length   > 0) _refundSpecs[0].passengerIds   = _r.passengerIds;
+                bru.setEnvVar("__partialRefundResolvedSpec", JSON.stringify(_refundSpecs));
+                validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_r.fulfillmentId}, bookingPartIds=[${_r.bookingPartIds.join(", ")}], passengerIds=[${_r.passengerIds.join(", ")}]`);
+              } else {
+                // Still scope via fulfillmentIds[] — requestRefundOffersBody
+                // will trim the list down because _refundSpecs is non-null.
+                // We attach the bare {fulfillmentId} so the trimmer keeps only
+                // the target fulfillment but we don't actually send the field.
+                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId, __scopeOnly: true }];
+                validationLogger(`[INFO] Partial refund scope resolved but osdmVersion=${_osdm || "(unset)"} < 3.8 — refundSpecifications[] omitted from the request; scoping via fulfillmentIds[] only.`);
+                // The wire can only carry the per-pax axis (via fulfillmentIds).
+                // If the wizard ALSO armed per-leg, that axis is silently dropped
+                // on the wire — the provider has no way to learn we wanted just
+                // one leg. Warn loudly so the test report explains why the
+                // response covers BOTH legs of the chosen passenger rather than
+                // just the requested leg.
+                if (_byLeg) {
+                  validationLogger(`[WARNING] Partial refund per-leg axis dropped: osdmVersion=${_osdm || "(unset)"} < 3.8 does not support refundSpecifications.bookingPartIds. The provider will refund every booking part in the scoped fulfillment (all legs of the chosen passenger on Paxone-style providers, or all parts of the booking on single-fulfillment providers). Bump the scenario to osdmVersion >= 3.8 to convey the leg scope.`);
+                }
+                // Also warn when per-leg only is armed on a multi-fulfillment
+                // booking — fulfillmentIds[] picks ONE fulfillment which is
+                // (on Paxone) one passenger's worth, not "the chosen leg across
+                // all passengers". This case rarely arises in the wizard today
+                // (the wizard usually arms both axes together) but worth flagging.
+                if (_byLeg && !_byPax && Array.isArray(_bk.fulfillments) && _bk.fulfillments.length > 1) {
+                  validationLogger(`[WARNING] Partial refund per-leg-only on a ${_bk.fulfillments.length}-fulfillment booking with osdmVersion=${_osdm || "(unset)"} < 3.8 cannot be conveyed on the wire — the provider will refund the entire first fulfillment (one passenger across all legs), NOT the chosen leg across all passengers.`);
+                }
+              }
+              // Compute the expected refundable amount for the after-response
+              // alignment assertion. The set of booking-part ids the provider
+              // should refund depends on what we actually send on the wire:
+              //
+              //   - If we attach refundSpecifications[].bookingPartIds, the
+              //     provider refunds exactly those parts.
+              //   - If refundSpecifications has only passengerIds (no bookingPartIds),
+              //     the provider expands to every part the passenger owns.
+              //   - If we send only fulfillmentIds[] (no refundSpecifications),
+              //     the provider refunds every part listed in the scoped
+              //     fulfillment.bookingParts[]. On Paxone (1 fulfillment per
+              //     passenger) this equals the passengerIds expansion. On
+              //     single-fulfillment providers this means everything.
+              //
+              // The alignment assertion needs to reflect what was actually
+              // conveyed — not what the wizard wanted internally. Otherwise
+              // it cries wolf whenever an axis was dropped at the wire (e.g.
+              // per-leg on OSDM v3.5) even though the response is consistent
+              // with the request.
+              const _wireSpec = _refundSpecs && _refundSpecs[0];
+              const _hasSpecBookingPartIds = _wireSpec
+                && Array.isArray(_wireSpec.bookingPartIds)
+                && _wireSpec.bookingPartIds.length > 0
+                && !_wireSpec.__scopeOnly;
+              const _hasSpecPassengerIds = _wireSpec
+                && Array.isArray(_wireSpec.passengerIds)
+                && _wireSpec.passengerIds.length > 0
+                && !_wireSpec.__scopeOnly;
+              let _expectedIds = new Set();
+              let _expectedShape = "";
+              if (_hasSpecBookingPartIds) {
+                // Direct enumeration on the wire.
+                for (const _id of _wireSpec.bookingPartIds) _expectedIds.add(String(_id));
+                _expectedShape = `refundSpecifications.bookingPartIds (${_expectedIds.size} part(s))`;
+              } else if (_hasSpecPassengerIds) {
+                // Provider expands passenger-by-passenger. Walk admissions /
+                // reservations / ancillaries and keep anything owned by one
+                // of the target passenger ids.
+                const _targetPax = new Set(_wireSpec.passengerIds.map(String));
+                const _bos2 = Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : [];
+                for (const _bo of _bos2) {
+                  for (const _grp of ["admissions", "reservations", "ancillaries"]) {
+                    const _arr = Array.isArray(_bo[_grp]) ? _bo[_grp] : [];
+                    for (const _p of _arr) {
+                      if (!_p || !_p.id) continue;
+                      const _owners = Array.isArray(_p.passengerIds) ? _p.passengerIds.map(String) : [];
+                      if (_owners.some(o => _targetPax.has(o))) _expectedIds.add(String(_p.id));
+                    }
+                  }
+                }
+                _expectedShape = `refundSpecifications.passengerIds → ${_expectedIds.size} part(s) owned by [${_wireSpec.passengerIds.join(", ")}]`;
+              } else {
+                // No refundSpecifications on the wire — scope is just the
+                // referenced fulfillment(s). Use the fulfillment.bookingParts[].id
+                // list as the authoritative set.
+                const _scopeFFId = (_wireSpec && _wireSpec.fulfillmentId) || _r.fulfillmentId;
+                const _ff = (_bk.fulfillments || []).find(f => f && String(f.id) === String(_scopeFFId));
+                const _ffParts = (_ff && Array.isArray(_ff.bookingParts)) ? _ff.bookingParts : [];
+                for (const _p of _ffParts) { if (_p && _p.id) _expectedIds.add(String(_p.id)); }
+                _expectedShape = `fulfillment[${_scopeFFId}].bookingParts (${_expectedIds.size} part(s))`;
+              }
+              // Sum prices over _expectedIds across all bookedOffer part-arrays.
+              let _expected = 0;
+              let _currency = null;
+              let _scale    = null;
+              const _bos = Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : [];
+              for (const _bo of _bos) {
+                for (const _grp of ["admissions", "reservations", "ancillaries"]) {
+                  const _arr = Array.isArray(_bo[_grp]) ? _bo[_grp] : [];
+                  for (const _p of _arr) {
+                    if (!_p || !_expectedIds.has(String(_p.id))) continue;
+                    const _pr = _p.price || {};
+                    if (typeof _pr.amount === "number") _expected += _pr.amount;
+                    if (!_currency && _pr.currency) _currency = _pr.currency;
+                    if (_scale == null && typeof _pr.scale === "number") _scale = _pr.scale;
+                  }
+                }
+              }
+              bru.setEnvVar("__partialRefundExpectedAmount", JSON.stringify({ amount: _expected, currency: _currency, scale: _scale, shape: _expectedShape }));
+              bru.setEnvVar("__partialRefundExpectedPartIds", JSON.stringify([..._expectedIds]));
+              validationLogger(`[INFO] Partial refund expected refundableAmount=${_expected} ${_currency || ""} (scale=${_scale}); wire-scope: ${_expectedShape}.`);
+            }
+          }
+        }
+        // Strip the internal __scopeOnly marker before sending — requestsBuilder
+        // checks Array.isArray()/length > 0 only, so a stripped/null value here
+        // means "do NOT attach refundSpecifications to the body".
+        if (Array.isArray(_refundSpecs) && _refundSpecs[0] && _refundSpecs[0].__scopeOnly) {
+          // The trimmer in requestRefundOffersBody still needs the fulfillmentId
+          // to scope fulfillmentIds[]; pass it via a side channel instead.
+          bru.setEnvVar("__partialRefundScopeFulfillmentId", _refundSpecs[0].fulfillmentId);
+          _refundSpecs = null;
+        } else {
+          bru.setEnvVar("__partialRefundScopeFulfillmentId", "");
+        }
 
         if (bru.getEnvVar("refundDate") != null) {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), bru.getEnvVar("refundDate"));
+            requestRefundOffersBody(bru.getEnvVar("overruleCode"), bru.getEnvVar("refundDate"), _refundSpecs);
         } else {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), null);
+            requestRefundOffersBody(bru.getEnvVar("overruleCode"), null, _refundSpecs);
         }
     - type: after-response
       code: |-
@@ -40,12 +211,12 @@ runtime:
         const { postPatchRefundOfferResponse } = require(bru.getEnvVar("library_base")+"refunds.js");
 
         // Validate HTTP response status
-        test("Status code is 200", () => {
-            expect(res.getStatus(), "[ERROR] Wrong response status").to.eql(200);
+        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
+            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
         if (res.getStatus() !== 200) {
-          test("Status code is 200", () => {
+          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
           });
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
@@ -86,6 +257,51 @@ runtime:
           });
           postPatchRefundOfferResponse(jsonData, expectedexchangeOperationStatus=["PROPOSED"], expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
           bru.setEnvVar('__refundOfferRetryCount', '0'); // reset on success
+
+          // Partial-refund alignment check (#218 follow-up).
+          // If the scenario armed partial scope AND we didn't have to degrade,
+          // verify the provider honoured it: the returned refundableAmount
+          // must match the sum of the in-scope booking-part prices computed
+          // before-request. Any drift means the provider either ignored the
+          // refundSpecifications field (Paxone OSDM_EXTRA_REQUEST_FIELDS_IGNORED
+          // warning) or fell back to a full refund — both are bugs we want to
+          // surface, not silently accept.
+          try {
+            const _degraded   = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
+            const _expRaw     = bru.getEnvVar("__partialRefundExpectedAmount") || "";
+            if (!_degraded && _expRaw) {
+              const _exp = JSON.parse(_expRaw);
+              const _firstOffer = jsonData.refundOffers[0] || {};
+              const _refAmount  = (_firstOffer.refundableAmount && typeof _firstOffer.refundableAmount.amount === "number")
+                ? _firstOffer.refundableAmount.amount : null;
+              const _refCurrency = (_firstOffer.refundableAmount && _firstOffer.refundableAmount.currency) || null;
+
+              test("Partial refund: request/response alignment — response refundableAmount matches the sum of in-scope parts", () => {
+                if (_refAmount == null) {
+                  throw new Error("[ERROR] response refundOffers[0].refundableAmount.amount missing — cannot verify partial scope was honoured");
+                }
+                if (_exp.currency && _refCurrency && _exp.currency !== _refCurrency) {
+                  throw new Error(`[ERROR] Currency mismatch: expected ${_exp.currency}, got ${_refCurrency}`);
+                }
+                if (_refAmount !== _exp.amount) {
+                  throw new Error(
+                    `[ERROR] Provider returned refundableAmount=${_refAmount} but the wire scope expected ${_exp.amount}` +
+                    ` (${_refCurrency || _exp.currency || ""}, scale=${_exp.scale}; ${_exp.shape || "n/a"}). ` +
+                    `Provider likely ignored refundSpecifications[] (see response.warnings.OSDM_EXTRA_REQUEST_FIELDS_IGNORED) ` +
+                    `or refunded the full booking instead of the requested scope.`
+                  );
+                }
+                validationLogger(`[INFO] Partial refund request/response alignment OK — refundableAmount=${_refAmount} matches the sum of in-scope parts (${_exp.shape || "n/a"}).`);
+              });
+            } else if (_degraded) {
+              validationLogger(`[INFO] Partial refund degraded earlier — alignment assertion skipped (full refund is the contract in that case).`);
+            }
+          } catch (_alignErr) {
+            // Don't swallow — the test() above already emits the failure. The
+            // try/catch is here so a JSON.parse glitch on the env var doesn't
+            // crash the after-response handler.
+            validationLogger(`[WARNING] Partial-refund alignment check threw: ${_alignErr && _alignErr.message}`);
+          }
         } catch (noOffersErr) {
           test("Refund offers found in response", () => { throw noOffersErr; });
           const _retryCount = parseInt(bru.getEnvVar('__refundOfferRetryCount') || '0', 10) + 1;
@@ -96,6 +312,10 @@ runtime:
           } else {
             console.log('[INFO] No refund offers returned after 3 attempts — skipping this scenario');
             bru.setEnvVar('__refundOfferRetryCount', '0');
+            // #385: a skipped expired-flow sub-run must not behead the queue —
+            // hand the remaining timers their pass before the next scenario.
+            if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
             const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
             const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
             if (_scList.length > 0 && _scNextIdx < _scList.length) {
@@ -103,7 +323,7 @@ runtime:
               bru.setEnvVar('__loopback', 'true');
               bru.runner.setNextRequest('01. POST Get Offer');
             } else {
-              console.log('✅ No more scenarios — stopping run');
+              console.log('[INFO] ✅ No more scenarios — stopping run');
               bru.runner.stopExecution();
             }
           }

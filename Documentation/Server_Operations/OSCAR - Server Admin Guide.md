@@ -221,8 +221,11 @@ COLLECTION_PATH=C:\Users\patri\OneDrive\...\OTST_V2.0.1
 # Full path to the Bruno CLI command
 BRU_CMD=C:\Users\patri\AppData\Roaming\npm\bru.cmd
 
-# URL of the OSDM data file JSON schema (used for validation)
-JSON_SCHEMA_URL=https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/refs/heads/exch_dev/json_validator/datafile.schema.json
+# URL of the OSDM data file JSON schema (used for validation).
+# Since v1.11.112 OSCAR serves the schema itself; leave the default.
+# Do NOT use the deprecated OSDM-testing/exch_dev GitHub URL — its schema
+# is out of sync and produces false-positive validation failures.
+JSON_SCHEMA_URL=http://127.0.0.1:3001/json_validator/datafile.schema.json
 
 # Maximum time (ms) a single Bruno run is allowed to run before it is killed
 RUN_TIMEOUT_MS=600000
@@ -248,7 +251,9 @@ MAX_CONCURRENT_RUNS=1
 | `PORT` | `3001` | Server port |
 | `MAX_CONCURRENT_RUNS` | `10` | Global cap on parallel runs (also editable in admin UI) |
 | `PARALLEL_STAGGER_MS` | `2000` | Delay between batch job launches (ms) |
-| `RUN_TIMEOUT_MS` | `600000` | Hard timeout per run (ms, default 10 min) |
+| `RUN_TIMEOUT_MS` | `600000` | Hard timeout per run (ms, default 10 min). A scenario can request a longer wait via `expiredBookingMaxWaitMinutes` (#204) — see the next row for the cap. |
+| `RUN_HARD_MAX_TIMEOUT_MS` | `1800000` | **Server-wide ceiling** for the per-run hard timeout when a scenario opts into a longer wait (`expiredBookingMaxWaitMinutes` on the expired-booking test, #204). The runner extends the worker SIGTERM to `max(RUN_TIMEOUT_MS, scenario wait + buffer)` but never above this value. Default 30 min. Raise it if you need to test providers with confirmation deadlines longer than ~25 min — e.g. an expired-OFFER test against a provider whose `preBookableUntil` is offer +30 min needs ≥ `1920000`. Since #394 also editable in the admin panel (Server Config → "Run Budget Ceiling (ms)"); a value saved there is stored in `server_config` and **overrides this env var**. |
+| `TOKEN_WATCHDOG_INTERVAL_MS` | `300000` | **OAuth token watchdog tick interval** (#204). While a Bruno run is in flight, the runner ticks every N ms and calls `resolveAccessToken` on the cached per-tester token — the cache's own safety-margin check then decides whether to refetch from the OAuth server or no-op against cache. Keeps the cached token fresh under long-running scenario series. Default 5 min. Set to `0` to disable. Skipped automatically for bearer-mode runs. |
 | `ALLOWED_ORIGINS` | (all) | Comma-separated CORS whitelist |
 | `APP_URL` | `http://localhost:3001` | Base URL for email verification links |
 | `NODE_ENV` | (unset) | Set to `production` for SMTP email sending |
