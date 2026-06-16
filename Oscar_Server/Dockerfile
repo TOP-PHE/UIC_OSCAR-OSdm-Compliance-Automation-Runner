@@ -63,24 +63,30 @@ RUN apt-get update && \
 
 RUN npm install -g @usebruno/cli && \
     # ── Clear HIGH CVEs in Bruno CLI's bundled deps (issue #428) ─────────────
-    # Bruno pins vulnerable axios + form-data deep in its dependency tree, and
-    # @usebruno/js + @usebruno/requests pin axios by EXACT version (1.13.6).
-    # A plain `npm install axios@x --no-save` therefore has no manifest entry
-    # to satisfy, so npm prunes the fresh copy and restores the pinned 1.13.6 —
-    # the image kept shipping the vulnerable axios (the previous override
-    # silently no-op'd; a cold-cache build exposed it). npm `overrides` are
-    # transitive and authoritative across the whole tree, so set them on the
-    # CLI package and reinstall: every nested copy is forced to the patched
-    # version and its own deps re-resolve. axios 1.x / form-data 4.0.x are
-    # API-stable drop-ins. Clears (all HIGH — in BRUNO's deps, not OSCAR's):
+    # Bruno bundles vulnerable axios + form-data deep in its tree and pins them
+    # rigidly: axios 1.13.6 is a DIRECT dep of @usebruno/cli AND exact-pinned by
+    # @usebruno/js + @usebruno/requests. npm refuses to budge it — a `--no-save`
+    # reinstall is pruned back to the pin, and an `overrides` entry errors
+    # EOVERRIDE against the direct dependency. So we bypass npm resolution
+    # entirely and unpack the patched release tarball directly over every nested
+    # copy. axios/form-data's own runtime deps are hoisted in the tree with
+    # compatible semver ranges, so replacing just the package dir is safe;
+    # axios 1.x / form-data 4.0.x are API-stable drop-ins. Clears (all HIGH —
+    # in BRUNO's deps, not OSCAR's):
     #   axios     1.13.6 -> 1.18.0  (CVE-2026-42033/-42035/-42043/-42264 +
     #                                -44486/-44487/-44488/-44492/-44494/-44495/-44496)
     #   form-data 4.0.4  -> 4.0.6   (CVE-2026-12143)
-    cd /usr/local/lib/node_modules/@usebruno/cli && \
-    npm pkg set overrides='{"axios":"1.18.0","form-data":"4.0.6"}' --json && \
-    npm install --omit=dev --no-audit --no-fund && \
-    # Fail the build immediately if any nested copy is still on the old version
-    # (defensive — the overrides should leave none unpatched).
+    cd /tmp && \
+    npm pack axios@1.18.0 form-data@4.0.6 --silent && \
+    AXIOS_TGZ="$(ls axios-*.tgz)" && FORMDATA_TGZ="$(ls form-data-*.tgz)" && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
+      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$AXIOS_TGZ" -C "$d" --strip-components=1; \
+    done && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/form-data"); do \
+      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$FORMDATA_TGZ" -C "$d" --strip-components=1; \
+    done && \
+    rm -f /tmp/axios-*.tgz /tmp/form-data-*.tgz && \
+    # Fail the build immediately if any nested copy is still on the old version.
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
       v="$(node -p "require('$d/package.json').version")"; \
       [ "$v" = "1.18.0" ] || { echo "UNPATCHED axios@$v at $d"; exit 1; }; \

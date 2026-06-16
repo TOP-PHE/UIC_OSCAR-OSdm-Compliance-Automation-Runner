@@ -30,11 +30,13 @@ the in-place override was silently a no-op.**
   manifest entry to satisfy, so npm pruned the fresh copy and restored the pin —
   the image kept shipping 1.13.6. It passed historically only via a **cached
   Docker layer**; a cold-cache build re-exposes it (so this was latent on `main`).
-- **Fix:** use npm **`overrides`** (transitive + authoritative across the whole
-  tree) on the CLI package, reinstall, and **assert** at build time that every
-  nested `axios`/`form-data` copy is patched (fail the build otherwise). axios 1.x
-  and form-data 4.0.x are API-stable drop-ins. Dockerfile-only; collection
-  unchanged. Server 1.11.155 → 1.11.156.
+- **Fix:** axios is a *direct* dependency of `@usebruno/cli`, so an npm
+  `overrides` entry errors `EOVERRIDE`. Instead we **bypass npm resolution** and
+  unpack the patched release tarball (`npm pack`) directly over every nested
+  `axios`/`form-data` copy, then **assert** at build time that each is patched
+  (fail the build otherwise — no broken image ships). axios 1.x / form-data 4.0.x
+  are API-stable drop-ins and their runtime deps are already hoisted. Dockerfile-
+  only; collection unchanged. Server 1.11.155 → 1.11.156.
 
 ---
 
