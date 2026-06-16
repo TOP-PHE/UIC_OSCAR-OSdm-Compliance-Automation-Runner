@@ -514,6 +514,13 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE users ADD COLUMN cached_token_cred_fp TEXT');
       _safeAlter('ALTER TABLE companies ADD COLUMN cached_token_cred_fp TEXT');
   }},
+  { version: 21, name: 'companies-extra-headers', up: () => {
+      // Issue #426 — company-wide "dedicated headers". JSON array of
+      // { name, value } injected on every OSDM request (value may carry
+      // {{var}} templates resolved at send time). Lets a Test Manager add
+      // operator-specific headers from API Config without a code change.
+      _safeAlter('ALTER TABLE companies ADD COLUMN extra_headers TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

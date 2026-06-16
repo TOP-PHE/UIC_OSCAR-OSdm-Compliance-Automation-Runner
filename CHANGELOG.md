@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.157] — 2026-06-16
+
+**Feature (#426): configurable company "dedicated headers" in API Config — add
+operator-specific request headers without a code change.**
+
+### Added
+
+- **Company-wide "Dedicated Headers" in API Config** (`profile.html` → *Company —
+  Shared* card). A Test Manager can add any number of extra HTTP headers sent on
+  **every** OSDM request, via a `➕ Add dedicated header` button. Each row is a
+  header **name** + **value**; the value may be a literal (e.g. `staging`) or
+  reference an existing variable in double braces — `{{requestor}}`,
+  `{{Ocp-Apim-Subscription-Key}}`, `{{access_token}}` — resolved **per tester** at
+  request time, so secrets stay out of the shared config. The list is shared with
+  the company's testers and is read-only for non-Test-Managers.
+- **Storage + API.** New `companies.extra_headers` column (JSON array, migration
+  v21). `GET /v1/company` surfaces the parsed array; `PATCH /v1/company` accepts
+  `extra_headers` (**Test-Manager-only**) and validates it — RFC 7230 header-name
+  token, rejects CR/LF (header-injection guard), caps 25 headers × 4096 chars, and
+  drops blank rows.
+- **Injection.** `runner.buildEnvYml` emits an `__extraHeaders` env var
+  (YAML-escaped JSON); the Bruno collection's `before-request` hook
+  (`opencollection.yml`) parses it, resolves any `{{var}}` templates against the
+  env, and calls `req.setHeader(name, value)` per entry. This **generalises** the
+  previously hardcoded `Ocp-Apim-Subscription-Key` injection so new
+  operator-specific headers no longer need a collection edit. Collection
+  OTST_V2.0.90 → OTST_V2.0.91.
+
+### Verified
+
+- Harness over the **real extracted** code — **40/40**:
+  `normalizeExtraHeaders`/`parseExtraHeaders` (valid + blank-name drop; rejects for
+  space/colon names, CR/LF, >4096-char value, >25 rows, non-array; hyphen·dot and
+  `Ocp-Apim-Subscription-Key` names accepted; numeric/null value coercion; a
+  `{{var}}` value preserved verbatim); `buildEnvYml` `__extraHeaders` emission with
+  quote/backslash YAML round-trip and "no line when empty/undefined"; and the
+  `opencollection.yml` resolver (`{{var}}` incl. hyphenated + whitespace-padded
+  names, literal, partial `Bearer {{access_token}}`, unknown→empty, blank-name
+  skip, malformed JSON caught → no throw + no headers set, absent → no-op).
+- `npm run lint` clean (eslint + inline-HTML script linter, 15 files);
+  `opencollection.yml` parses (js-yaml). Server 1.11.156 → 1.11.157.
+
+---
+
 ## [server-v1.11.156] — 2026-06-16
 
 **Fix (#428): Trivy gate failing on Bruno CLI `axios` / `form-data` HIGH CVEs —

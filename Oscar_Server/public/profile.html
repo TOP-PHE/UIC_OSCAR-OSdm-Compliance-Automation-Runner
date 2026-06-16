@@ -104,6 +104,23 @@ input[type=password]::placeholder{letter-spacing:2px}
       <input type="url" id="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
     </div>
 
+    <!-- Dedicated headers (issue #426): company-wide custom request headers -->
+    <div class="field" id="extra-headers-block" style="margin-top:20px">
+      <label>Dedicated Headers <span style="color:#90a4ae;font-weight:400">(optional — sent on every OSDM request)</span></label>
+      <p style="font-size:12px;color:#90a4ae;margin:2px 0 10px">
+        Extra headers your test system requires. A value can be a literal (e.g. <code>staging</code>)
+        or reference a credential variable in double braces —
+        <code>{{requestor}}</code>, <code>{{Ocp-Apim-Subscription-Key}}</code>, <code>{{access_token}}</code> —
+        resolved per tester at request time, so secrets stay out of this shared config.
+        Shared with everyone in your company.
+      </p>
+      <div id="extra-headers-list"></div>
+      <button type="button" class="btn btn-secondary" id="add-header-btn" style="margin-top:4px">➕ Add dedicated header</button>
+      <p id="extra-headers-readonly-note" style="display:none;font-size:11px;color:#90a4ae;margin-top:8px">
+        🔒 Only a Test Manager can edit dedicated headers — shown read-only.
+      </p>
+    </div>
+
     <!-- v1.11.15: the company-wide "Share test reports with Certifiers"
          toggle was removed. Certifier visibility is now decided per-report:
          a Test Manager shares individual runs from the Dashboard. -->
@@ -288,6 +305,55 @@ function switchProfile() {
   document.getElementById('field-custom-template').style.display= meta.showTemplate ? '' : 'none';
 }
 
+// ── Dedicated headers (issue #426) ────────────────────────────────────────────
+// Company-wide custom request headers. Editable by Test Managers only; other
+// testers see them read-only. Each row = header name + value (literal or a
+// {{var}} template resolved per tester at request time).
+const CAN_EDIT_HEADERS = (user.role === 'test_manager');
+
+function makeHeaderRow(name, value) {
+  const row = document.createElement('div');
+  row.className = 'eh-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center';
+  const nameI = document.createElement('input');
+  nameI.type = 'text'; nameI.className = 'eh-name'; nameI.placeholder = 'Header-Name';
+  nameI.value = name || '';
+  nameI.style.cssText = 'flex:0 0 38%;padding:8px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px';
+  const valI = document.createElement('input');
+  valI.type = 'text'; valI.className = 'eh-value'; valI.placeholder = 'value or {{requestor}}';
+  valI.value = value || '';
+  valI.style.cssText = 'flex:1;padding:8px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px';
+  const rm = document.createElement('button');
+  rm.type = 'button'; rm.className = 'btn btn-secondary eh-remove'; rm.textContent = '✕';
+  rm.title = 'Remove header'; rm.style.cssText = 'flex:0 0 auto;padding:8px 12px';
+  rm.addEventListener('click', () => row.remove());
+  if (!CAN_EDIT_HEADERS) { nameI.disabled = true; valI.disabled = true; rm.style.display = 'none'; }
+  row.appendChild(nameI); row.appendChild(valI); row.appendChild(rm);
+  return row;
+}
+
+function renderExtraHeaders(arr) {
+  const list = document.getElementById('extra-headers-list');
+  list.innerHTML = '';
+  (Array.isArray(arr) ? arr : []).forEach(h => list.appendChild(makeHeaderRow(h && h.name, h && h.value)));
+  if (!CAN_EDIT_HEADERS) {
+    const addBtn = document.getElementById('add-header-btn');
+    const note   = document.getElementById('extra-headers-readonly-note');
+    if (addBtn) addBtn.style.display = 'none';
+    if (note)   note.style.display = 'block';
+  }
+}
+
+function collectExtraHeaders() {
+  const out = [];
+  document.querySelectorAll('#extra-headers-list .eh-row').forEach(r => {
+    const name  = (r.querySelector('.eh-name').value || '').trim();
+    const value = r.querySelector('.eh-value').value || '';
+    if (name) out.push({ name, value });
+  });
+  return out;
+}
+
 async function loadProfile() {
   // Two endpoints since v12: company-shared bits and per-tester credentials
   // are now separate resources. Fire both in parallel.
@@ -301,6 +367,7 @@ async function loadProfile() {
 
   // Company-shared
   document.getElementById('api_base').value          = c.api_base  || '';
+  renderExtraHeaders(c.extra_headers);   // issue #426 — company dedicated headers
   // v1.11.15: the share-reports-with-certifier toggle was removed here —
   // certifier sharing is now per-report from the Dashboard.
 
@@ -335,6 +402,9 @@ async function saveConfig() {
   // (certifier sharing is per-report from the Dashboard).
   const companyPayload = {};
   if (apiBase) companyPayload.api_base = apiBase;
+  // Issue #426 — always send the current header list (so emptying it clears the
+  // stored value). Test-Manager-only; the server rejects edits from other roles.
+  if (CAN_EDIT_HEADERS) companyPayload.extra_headers = collectExtraHeaders();
   if (Object.keys(companyPayload).length > 0) {
     const r = await fetch('/v1/company', {
       method: 'PATCH',
@@ -434,6 +504,9 @@ document.getElementById('auth_mode').addEventListener('change', switchMode);
 document.getElementById('oauth_profile').addEventListener('change', switchProfile);
 document.getElementById('save-btn').addEventListener('click', saveConfig);
 document.getElementById('clear-creds-btn').addEventListener('click', clearCredentials);
+document.getElementById('add-header-btn').addEventListener('click', () => {
+  document.getElementById('extra-headers-list').appendChild(makeHeaderRow('', ''));
+});
 
 loadProfile();
 </script>

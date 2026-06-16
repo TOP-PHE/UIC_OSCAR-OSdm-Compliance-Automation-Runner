@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.184",
+  "current_release": "2026.185",
   "releases": [
+    {
+      "release": "2026.185",
+      "date": "2026-06-16",
+      "server": "1.11.157",
+      "collection": "OTST_V2.0.91",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #426: company-wide 'dedicated headers' configurable from API Config — add operator-specific request headers without a code change. A Test Manager adds rows of { header name, value } in profile.html (the 'Company — Shared' card) via a '+ Add dedicated header' button; the value may be a literal or reference an existing variable in {{...}} (e.g. {{requestor}}, {{Ocp-Apim-Subscription-Key}}, {{access_token}}) resolved per tester at request time, so secrets stay out of the shared config. New companies.extra_headers column (JSON array, migration v21); GET /v1/company surfaces the parsed array; PATCH /v1/company accepts extra_headers (Test-Manager-only) and validates it (RFC 7230 header-name token, rejects CR/LF, caps 25 headers x 4096 chars, drops blank rows). runner.buildEnvYml emits an __extraHeaders env var (YAML-escaped JSON); opencollection.yml's before-request hook parses it, resolves {{var}} templates against the env, and req.setHeader(name, value) per entry — generalising the previously hardcoded Ocp-Apim-Subscription-Key injection so new headers no longer need a collection edit. Server 1.11.156 -> 1.11.157; collection OTST_V2.0.90 -> OTST_V2.0.91 (opencollection.yml).",
+        "Verification: harness over the REAL extracted code — 40/40: normalizeExtraHeaders/parseExtraHeaders (valid + blank-name drop + rejects for space/colon names, CR/LF, >4096 value, >25 rows, non-array; hyphen+dot and Ocp-Apim-Subscription-Key names accepted; numeric/null value coercion; {{var}} value preserved verbatim); buildEnvYml __extraHeaders emission with quote/backslash YAML round-trip and 'no line when empty/undefined'; opencollection.yml resolver ({{var}} incl. hyphenated + whitespace-padded names, literal, partial 'Bearer {{access_token}}', unknown var -> empty, blank-name skip, malformed JSON caught -> no throw + no headers, absent -> no-op). npm run lint clean (eslint + inline-HTML script linter, 15 files); opencollection.yml parses (js-yaml)."
+      ]
+    },
     {
       "release": "2026.184",
       "date": "2026-06-16",
