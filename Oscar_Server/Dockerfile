@@ -62,23 +62,34 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @usebruno/cli && \
-    # Force-update axios inside Bruno CLI to clear 4 axios HIGH CVEs
-    # (CVE-2026-42033, -42035, -42043, -42264 — prototype pollution /
-    # header injection / NO_PROXY bypass). Bruno's published version
-    # pins an older axios in THREE places — top-level + two nested
-    # sub-packages (@usebruno/js and @usebruno/requests each have their
-    # own node_modules/axios). All three need updating; npm doesn't
-    # auto-deduplicate when re-installing axios in just one location.
-    # axios 1.x is API-stable across minor bumps so 1.15.2 is a drop-in.
-    for owner in \
-        /usr/local/lib/node_modules/@usebruno/cli \
-        /usr/local/lib/node_modules/@usebruno/cli/node_modules/@usebruno/js \
-        /usr/local/lib/node_modules/@usebruno/cli/node_modules/@usebruno/requests; do \
-      if [ -f "$owner/package.json" ]; then \
-        rm -rf "$owner/node_modules/axios" && \
-        cd "$owner" && npm install axios@^1.15.2 --no-save --no-audit --no-fund; \
-      fi; \
+    # ── Clear HIGH CVEs in Bruno CLI's bundled deps (issue #428) ─────────────
+    # Bruno pins vulnerable axios + form-data deep in its dependency tree, and
+    # @usebruno/js + @usebruno/requests pin axios by EXACT version (1.13.6).
+    # A plain `npm install axios@x --no-save` therefore has no manifest entry
+    # to satisfy, so npm prunes the fresh copy and restores the pinned 1.13.6 —
+    # the image kept shipping the vulnerable axios (the previous override
+    # silently no-op'd; a cold-cache build exposed it). npm `overrides` are
+    # transitive and authoritative across the whole tree, so set them on the
+    # CLI package and reinstall: every nested copy is forced to the patched
+    # version and its own deps re-resolve. axios 1.x / form-data 4.0.x are
+    # API-stable drop-ins. Clears (all HIGH — in BRUNO's deps, not OSCAR's):
+    #   axios     1.13.6 -> 1.18.0  (CVE-2026-42033/-42035/-42043/-42264 +
+    #                                -44486/-44487/-44488/-44492/-44494/-44495/-44496)
+    #   form-data 4.0.4  -> 4.0.6   (CVE-2026-12143)
+    cd /usr/local/lib/node_modules/@usebruno/cli && \
+    npm pkg set overrides='{"axios":"1.18.0","form-data":"4.0.6"}' --json && \
+    npm install --omit=dev --no-audit --no-fund && \
+    # Fail the build immediately if any nested copy is still on the old version
+    # (defensive — the overrides should leave none unpatched).
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
+      v="$(node -p "require('$d/package.json').version")"; \
+      [ "$v" = "1.18.0" ] || { echo "UNPATCHED axios@$v at $d"; exit 1; }; \
     done && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/form-data"); do \
+      v="$(node -p "require('$d/package.json').version")"; \
+      [ "$v" = "4.0.6" ] || { echo "UNPATCHED form-data@$v at $d"; exit 1; }; \
+    done && \
+    echo "Bruno CLI deps patched: axios=1.18.0, form-data=4.0.6 in all nested copies" && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \

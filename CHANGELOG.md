@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.156] — 2026-06-16
+
+**Fix (#428): Trivy gate failing on Bruno CLI `axios` / `form-data` HIGH CVEs —
+the in-place override was silently a no-op.**
+
+### Security
+
+- **Clear 12 HIGH CVEs in the Bruno CLI's bundled dependencies** (`Oscar_Server/Dockerfile`):
+  - `axios` **1.13.6 → 1.18.0** — CVE-2026-42033 / -42035 / -42043 / -42264 and the
+    newly-published -44486 / -44487 / -44488 / -44492 / -44494 / -44495 / -44496 (11 HIGH).
+  - `form-data` **4.0.4 → 4.0.6** — CVE-2026-12143 (multipart boundary via `Math.random()`).
+- **Root cause:** `@usebruno/js` and `@usebruno/requests` pin `axios` by **exact**
+  version (1.13.6). The previous `npm install axios@^1.15.2 --no-save` had no
+  manifest entry to satisfy, so npm pruned the fresh copy and restored the pin —
+  the image kept shipping 1.13.6. It passed historically only via a **cached
+  Docker layer**; a cold-cache build re-exposes it (so this was latent on `main`).
+- **Fix:** use npm **`overrides`** (transitive + authoritative across the whole
+  tree) on the CLI package, reinstall, and **assert** at build time that every
+  nested `axios`/`form-data` copy is patched (fail the build otherwise). axios 1.x
+  and form-data 4.0.x are API-stable drop-ins. Dockerfile-only; collection
+  unchanged. Server 1.11.155 → 1.11.156.
+
+---
+
 ## [server-v1.11.155] — 2026-06-15
 
 **Fix (#422): baseline the documented Turnit refund/exchange `GET → 405` so it
