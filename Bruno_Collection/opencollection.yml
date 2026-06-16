@@ -501,6 +501,33 @@ request:
             req.setHeader('Ocp-Apim-Subscription-Key', _subscriptionKey);
         }
 
+        // Dedicated headers (issue #426) — company-wide custom headers configured
+        // by the Test Manager in API Config and carried here as JSON in the
+        // __extraHeaders env var. Each entry is { name, value }; the value may
+        // contain {{var}} templates resolved against the env at send time
+        // (e.g. {{requestor}}, {{access_token}}, {{Ocp-Apim-Subscription-Key}}).
+        // This generalises the hardcoded subscription-key block above so new
+        // operator-specific headers no longer need a collection edit.
+        try {
+            const _ehRaw = bru.getEnvVar("__extraHeaders");
+            if (_ehRaw) {
+                const _extraHeaders = JSON.parse(_ehRaw);
+                if (Array.isArray(_extraHeaders)) {
+                    for (const _hdr of _extraHeaders) {
+                        if (!_hdr || !_hdr.name) continue;
+                        const _resolved = String(_hdr.value == null ? '' : _hdr.value)
+                            .replace(/\{\{\s*([\w.\-]+)\s*\}\}/g, (_m, _k) => {
+                                const _v = bru.getEnvVar(_k);
+                                return _v == null ? '' : String(_v);
+                            });
+                        req.setHeader(_hdr.name, _resolved);
+                    }
+                }
+            }
+        } catch (_ehErr) {
+            console.log('[WARNING] dedicated headers injection failed: ' + (_ehErr && _ehErr.message));
+        }
+
         } // end RUNSCRIPT
     - type: after-response
       code: |-
