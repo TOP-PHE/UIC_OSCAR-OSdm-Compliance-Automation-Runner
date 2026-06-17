@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.186",
+  "current_release": "2026.187",
   "releases": [
+    {
+      "release": "2026.187",
+      "date": "2026-06-17",
+      "server": "1.11.159",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #433: the datafile JSON schema (json_validator/datafile.schema.json) rejected valid OSDM test data because three enums had drifted narrower than the OSDM spec the rest of OSCAR already uses. Surfaced on SBB: fulfillmentMedia TICKETLESS flagged 'Invalid JSON Data file structure'. Audited EVERY enum in the schema against the OSDM source-of-truth (library-bruno/model.js, library-bruno/osdmEnums.js, and the wizard public/js/scenarios.js); only three were stale and are now widened to match: fulfillmentMedia PDF_A4,UIC_PDF -> 7 (adds PKPASS, ALLOCATOR_APP, RCCST, RCT2, TICKETLESS); fulfillmentType ETICKET -> 4 (adds CIT_PAPER, PASS_CHIP, PASS_REFERENCE); passengers[].type PERSON -> the 20 OSDM_PASSENGER_TYPES (osdmEnums.js SSOT; runtime assertions in passengers.js/offers.js already accept all 20). serviceClass (5), travelClass (3), requestedOfferParts (8, incl. CONTINUOUS_SERVICE), flexibilities (3) and offerMode (2) were verified already in sync; OSCAR-internal harness enums (loggingType, scenarioAction, expired*Test, partialRefund*, placeSelectionMode, tripType, etc.) are out of scope. No runtime/behavior change — only the schema gate widened; OSCAR's flow already handles these values. Collection-side; server 1.11.158 -> 1.11.159, collection OTST_V2.0.92 -> OTST_V2.0.93.",
+        "Verification: schema parses (JSON.parse); re-extracted the 3 enums (7/4/20 values, 0 SSOT passenger types missing); ajv (the runtime validator) — 11/11: media/type/pax accept TICKETLESS, PKPASS, PDF_A4, CIT_PAPER, ETICKET, DOG, YOUTH, PERSON and reject BOGUS/NOPE/ALIEN."
+      ]
+    },
     {
       "release": "2026.186",
       "date": "2026-06-17",

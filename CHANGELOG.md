@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.159] — 2026-06-17
+
+**Fix (#433): datafile schema enums were narrower than the OSDM spec — valid
+provider test data (e.g. SBB's `TICKETLESS` fulfillment) was wrongly rejected.**
+
+### Fixed
+
+- **`json_validator/datafile.schema.json` — widened 3 stale enums to the OSDM
+  source-of-truth.** The schema validated every datafile, but three enums had
+  drifted *narrower* than the OSDM enum the rest of OSCAR already uses, so valid
+  data was rejected with "⛔ Invalid JSON Data file structure":
+  - `fulfillmentMedia`: `PDF_A4, UIC_PDF` → **7** (adds `PKPASS, ALLOCATOR_APP,
+    RCCST, RCT2, TICKETLESS`) — matches `model.js` FulfillmentMediaType + wizard.
+  - `fulfillmentType`: `ETICKET` → **4** (adds `CIT_PAPER, PASS_CHIP,
+    PASS_REFERENCE`) — matches `model.js` FulfillmentOptionType + wizard.
+  - `passengers[].type`: `PERSON` → the **20** `OSDM_PASSENGER_TYPES` — matches
+    `osdmEnums.js` (the declared SSOT; `passengers.js`/`offers.js` runtime
+    assertions already accept all 20).
+- **Audited every other schema enum** against the OSDM sources — `serviceClass`
+  (5), `travelClass` (3), `requestedOfferParts` (8, incl. CONTINUOUS_SERVICE),
+  `flexibilities`/`desiredFlexibility` (3) and `offerMode` (2) were already in
+  sync; OSCAR-internal harness enums are out of scope. No runtime/behavior change
+  — only the schema gate widened (the flow already handles these values).
+
+### Verified
+
+- Schema parses; the 3 enums now hold 7 / 4 / 20 values (0 SSOT passenger types
+  missing). **ajv** (the runtime validator) — **11/11**: `media`/`type`/`pax`
+  accept `TICKETLESS, PKPASS, PDF_A4, CIT_PAPER, ETICKET, DOG, YOUTH, PERSON` and
+  still reject `BOGUS`/`NOPE`/`ALIEN`. Collection OTST_V2.0.92 → OTST_V2.0.93;
+  server 1.11.158 → 1.11.159.
+
+---
+
 ## [server-v1.11.158] — 2026-06-17
 
 **Fix (#430): a 401/403 on an unsupported endpoint no longer hard-stops the whole
