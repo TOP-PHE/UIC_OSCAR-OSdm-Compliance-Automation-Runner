@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.187",
+  "current_release": "2026.188",
   "releases": [
+    {
+      "release": "2026.188",
+      "date": "2026-06-17",
+      "server": "1.11.160",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix (follow-up to #433/#434): the scenario WIZARD had the same OSDM enum drift the datafile schema did. The scenario Fulfillment Type dropdown is gated by the company's declared Test-Framework capabilities, but the framework editor's option lists (public/js/scenarios.js) contained INVALID non-OSDM values and missed valid ones — so SBB's dropdown offered only 'E-ticket' and TICKETLESS could never be declared. Sourced the four affected lists from the canonical ENUMS (single source of truth): WIZ_FULFIL_MEDIA (had bogus AZTEC_CODE/QR_CODE/NFC) -> 7 OSDM media incl. UIC_PDF/ALLOCATOR_APP/RCCST/RCT2/TICKETLESS; WIZ_FULFIL_TYPES (had bogus PAPER_TICKET) -> ETICKET/CIT_PAPER/PASS_CHIP/PASS_REFERENCE; WIZ_TRAVEL_CLASSES (had non-OSDM THIRD/BUSINESS) -> FIRST/SECOND/ANY_CLASS; WIZ_OFFER_MODES (had COMBINATION) -> INDIVIDUAL/COLLECTIVE. WIZ_SERVICE_CLASSES + WIZ_FLEXIBILITIES were already in sync. Flagged for a follow-up (narrower-but-all-valid, with dependent age/mapping code): WIZ_PAX_TYPES (missing PERSON/PRM_CHILD/COMPANION_DOG) and WIZ_OFFER_PARTS. To use a newly-available media/type in a scenario, declare it in the company's Test Framework first; the scenario dropdowns then offer it. Server-side; server 1.11.159 -> 1.11.160, collection unchanged OTST_V2.0.93.",
+        "Verification: scenarios.js node --check clean; the 4 rewired constants now reference ENUMS (defined earlier at line 26) and the removed bogus values (AZTEC_CODE, QR_CODE, NFC, PAPER_TICKET, THIRD, BUSINESS, COMBINATION) have no other references in the file."
+      ]
+    },
     {
       "release": "2026.187",
       "date": "2026-06-17",
