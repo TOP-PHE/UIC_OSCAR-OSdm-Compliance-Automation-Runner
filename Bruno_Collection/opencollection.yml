@@ -543,7 +543,9 @@ request:
         // assertion; stopExecution() just prevents the next request from running.
         try {
           const { checkAuthRejection } = require(bru.getEnvVar("library_base") + "auth.js");
-          checkAuthRejection(res, (req && typeof req.getName === 'function') ? req.getName() : '');
+          checkAuthRejection(res,
+            (req && typeof req.getName === 'function') ? req.getName() : '',
+            (req && typeof req.getUrl === 'function') ? String(req.getUrl()) : '');
         } catch (_authGuardErr) { console.log(`[WARNING] auth guard: ${_authGuardErr && _authGuardErr.message}`); }
 
         // ── H1/H2: run via bruTest so results accumulate in __rptTests ────────

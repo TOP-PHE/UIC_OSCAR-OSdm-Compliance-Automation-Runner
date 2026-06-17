@@ -705,6 +705,20 @@ function handleSystemInfoStatus(statusCode, endpoint, ctx) {
     return true;
   }
   if (cls.outcome === 'fail' && bruTest) {
+    // #430: a non-2xx the tester has baselined as a known deviation (e.g. a
+    // provider that answers 403 "endpoint not supported" on a system-info GET)
+    // is reported as a documented known deviation — a [WARNING], NOT a failure —
+    // consistent with the refund/exchange 405 baseline. The step label comes
+    // from the global `req` (the Bruno sandbox exposes it to library modules).
+    try {
+      const stepLabel = (typeof req !== 'undefined' && req && typeof req.getName === 'function') ? req.getName() : '';
+      const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar('library_base') + 'loopback.js');
+      const dev = stepLabel ? knownDeviationFor(stepLabel, statusCode) : null;
+      if (dev) {
+        noteKnownDeviation(stepLabel, statusCode, dev);
+        return false; // documented deviation — no failure registered, skip body checks
+      }
+    } catch (_e) { /* loopback unavailable — fall through to the normal failure */ }
     // Plain throw (not expect) so the failure text is exactly cls.message —
     // no chai ": expected 400 to deeply equal 200" tail (log-audit round 2).
     bruTest(cls.name, () => { throw new Error(cls.message); });
