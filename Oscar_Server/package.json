@@ -46,6 +46,7 @@
   },
   "_notes": "SQLite via built-in node:sqlite (Node.js 22+) — no native compilation needed",
   "overrides": {
-    "js-yaml": "4.2.0"
+    "js-yaml": "4.2.0",
+    "@babel/core": "^7.29.6"
   }
 }
