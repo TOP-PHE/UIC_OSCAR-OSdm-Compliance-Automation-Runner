@@ -3044,14 +3044,22 @@ const WIZ_PAX_DEFAULT_AGES = {
   PRM:          { min: 18, max: 99 },
   ACCOMP_PRM:   { min: 18, max: 99 }
 };
-// Offer search criteria
+// Offer search criteria. #433: source the OSDM-spec lists from the canonical
+// ENUMS block (single source of truth) instead of separate copies that had
+// drifted to non-OSDM values — WIZ_TRAVEL_CLASSES had THIRD/BUSINESS (OSDM is
+// FIRST/SECOND/ANY_CLASS) and WIZ_OFFER_MODES had COMBINATION (OSDM is
+// INDIVIDUAL/COLLECTIVE), so the framework editor offered invalid values and
+// hid valid ones.
 const WIZ_OFFER_PARTS    = ['RESERVATION','ADMISSION','ANCILLARY'];
-const WIZ_TRAVEL_CLASSES = ['FIRST','SECOND','THIRD','BUSINESS'];
+const WIZ_TRAVEL_CLASSES = ENUMS.travelClass;
 const WIZ_FLEXIBILITIES  = ['FULL_FLEXIBLE','SEMI_FLEXIBLE','NON_FLEXIBLE'];
-const WIZ_OFFER_MODES    = ['INDIVIDUAL','COMBINATION'];
-// Fulfillment
-const WIZ_FULFIL_MEDIA   = ['PDF_A4','PKPASS','AZTEC_CODE','QR_CODE','NFC'];
-const WIZ_FULFIL_TYPES   = ['ETICKET','PAPER_TICKET'];
+const WIZ_OFFER_MODES    = ENUMS.offerMode;
+// Fulfillment — likewise sourced from ENUMS. The old lists were stale: media
+// had bogus AZTEC_CODE/QR_CODE/NFC and was missing UIC_PDF/ALLOCATOR_APP/RCCST/
+// RCT2/TICKETLESS; types had bogus PAPER_TICKET and was missing CIT_PAPER/
+// PASS_CHIP/PASS_REFERENCE — so e.g. SBB's TICKETLESS could not be declared.
+const WIZ_FULFIL_MEDIA   = ENUMS.fulfillmentMedia;
+const WIZ_FULFIL_TYPES   = ENUMS.fulfillmentType;
 // Days of week for a train set's timetable services (#136). Stored per service;
 // empty = runs every day. Informational today (the offer request still targets a
 // specific %TRIP_DATE%), but documents the route's weekly pattern.
