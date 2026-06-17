@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.160] — 2026-06-17
+
+**Fix (follow-up to #433): the scenario wizard had the same OSDM enum drift as the
+datafile schema — the Fulfillment Type dropdown offered only "E-ticket".**
+
+### Fixed
+
+- **`public/js/scenarios.js` — the Test-Framework editor's enum lists were stale.**
+  A scenario's fulfillment options are gated by the company's declared framework
+  capabilities, but the framework editor's option lists held **invalid, non-OSDM
+  values** and missed valid ones, so the correct fulfillment could never be
+  declared (SBB saw only "E-ticket"; `TICKETLESS` was unreachable). Sourced the
+  four affected lists from the canonical `ENUMS` (single source of truth):
+  - `WIZ_FULFIL_MEDIA` (had bogus `AZTEC_CODE/QR_CODE/NFC`) → the **7** OSDM media.
+  - `WIZ_FULFIL_TYPES` (had bogus `PAPER_TICKET`) → the **4** OSDM types.
+  - `WIZ_TRAVEL_CLASSES` (had non-OSDM `THIRD/BUSINESS`) → `FIRST/SECOND/ANY_CLASS`.
+  - `WIZ_OFFER_MODES` (had `COMBINATION`) → `INDIVIDUAL/COLLECTIVE`.
+
+  `WIZ_SERVICE_CLASSES` + `WIZ_FLEXIBILITIES` were already in sync. **Flagged for a
+  follow-up** (narrower-but-all-valid, with dependent age/mapping code):
+  `WIZ_PAX_TYPES` (missing `PERSON/PRM_CHILD/COMPANION_DOG`) and `WIZ_OFFER_PARTS`.
+- **Workflow note:** to use a newly-available media/type in a scenario, declare it
+  in the company's **Test Framework** first — the scenario dropdowns are gated by
+  the framework, then offer whatever it declares.
+
+### Verified
+
+- `scenarios.js` `node --check` clean; the 4 rewired constants reference `ENUMS`
+  (defined earlier, line 26); the removed bogus values have no other references.
+  Server-only — server 1.11.159 → 1.11.160, collection unchanged OTST_V2.0.93.
+
+---
+
 ## [server-v1.11.159] — 2026-06-17
 
 **Fix (#433): datafile schema enums were narrower than the OSDM spec — valid
