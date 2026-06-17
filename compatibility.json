@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.185",
+  "current_release": "2026.186",
   "releases": [
+    {
+      "release": "2026.186",
+      "date": "2026-06-17",
+      "server": "1.11.158",
+      "collection": "OTST_V2.0.92",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #430: a 401/403 on an endpoint a provider simply doesn't support no longer hard-stops the whole run. The #208 auth fail-fast (checkAuthRejection in library-bruno/auth.js) treated ANY non-token 401/403 as a dead token and called stopExecution(), overriding both the step-failure policy and the known-deviation system — so a new provider's 403 on GET /versions (System Version Check, step 00) aborted the run before anything else executed. checkAuthRejection now flags the rejection but does NOT stop when ANY of: (a) it's the System Version Check / GET /versions (an optional capability probe — a genuinely dead token is still caught at the first business request, one step later); (b) stepFailurePolicy != HARD_STOP (the tester chose CONTINUE); or (c) the step+status is a declared known deviation. The default dead-token fail-fast (HARD_STOP + undeclared + business endpoint) is unchanged, so the cascade protection stays. opencollection.yml passes the request URL into checkAuthRejection for robust /versions detection. Additionally handleSystemInfoStatus (osdmCompliance.js) honors known deviations: a baselined system-info non-2xx (e.g. a provider's 403 on /versions) is reported as a documented known deviation (WARNING, not a failure), like the refund/exchange 405 baseline — so the tester can baseline 'GET /versions -> 403' once and keep the run green. Collection-side; server 1.11.157 -> 1.11.158, collection OTST_V2.0.91 -> OTST_V2.0.92.",
+        "Verification: harness over the REAL extracted checkAuthRejection + handleSystemInfoStatus — 14/14: non-401/403 and token steps ignored; 403/401 on /versions (by URL and by name) -> no stop; 403 on a business endpoint under HARD_STOP, undeclared -> STILL STOPS (regression guard, incl. default policy + 401); CONTINUE policy -> no stop; declared known deviation -> no stop; handleSystemInfoStatus: 200 -> ok, 403 undeclared -> fail registered, 403 baselined -> noteKnownDeviation + no fail, baselined-but-no-req -> safe fallback to fail. node --check on auth.js + osdmCompliance.js clean; opencollection.yml parses (js-yaml) and its after-response script parses as JS via new Function()."
+      ]
+    },
     {
       "release": "2026.185",
       "date": "2026-06-16",

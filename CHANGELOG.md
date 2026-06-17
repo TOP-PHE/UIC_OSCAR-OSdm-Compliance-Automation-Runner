@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.158] — 2026-06-17
+
+**Fix (#430): a 401/403 on an unsupported endpoint no longer hard-stops the whole
+run — the auth fail-fast now honors the step policy, exempts `/versions`, and
+yields to known deviations.**
+
+### Fixed
+
+- **`checkAuthRejection` ([auth.js]) no longer aborts the run on every non-token
+  401/403.** The #208 fail-fast treated any 401/403 as a dead/expired token and
+  called `stopExecution()`, overriding both the step-failure policy and the
+  known-deviation system — so a new provider that answers **403 "endpoint not
+  supported"** on `GET /versions` (System Version Check, step 00) killed the run
+  before anything else executed. It now flags the rejection but **does not stop**
+  when **any** of:
+  - **(a)** the request is the **System Version Check** (`GET /versions`) — an
+    optional capability probe; a genuinely dead token is still caught at the first
+    business request, one step later;
+  - **(b)** `stepFailurePolicy ≠ HARD_STOP` (the tester chose `CONTINUE`); or
+  - **(c)** the step+status is a **declared known deviation**.
+
+  The default dead-token fail-fast (HARD_STOP + undeclared + business endpoint) is
+  **unchanged**, so the cascade protection stays. `opencollection.yml` now passes
+  the request URL into `checkAuthRejection` for robust `/versions` detection.
+- **`handleSystemInfoStatus` honors known deviations.** A baselined system-info
+  non-2xx (e.g. a provider's 403 on `/versions`) is reported as a **documented
+  known deviation** (`[WARNING]`, not a failure), consistent with the
+  refund/exchange 405 baseline — so the tester can baseline `GET /versions → 403`
+  once and keep the run green.
+
+### Verified
+
+- Harness over the **real extracted** `checkAuthRejection` + `handleSystemInfoStatus`
+  — **14/14**: non-401/403 + token steps ignored; 403/401 on `/versions` (by URL
+  and by name) → no stop; **regression guard** — 403/401 on a business endpoint
+  under HARD_STOP (incl. default policy) still **STOPS**; `CONTINUE` → no stop;
+  declared known deviation → no stop; system-info 200 → ok, 403 undeclared → fail,
+  403 baselined → `noteKnownDeviation` + no fail, baselined-but-no-`req` → safe
+  fallback. `node --check` clean on both library files; `opencollection.yml` parses
+  (js-yaml) and its after-response script parses as JS. Collection
+  OTST_V2.0.91 → OTST_V2.0.92; server 1.11.157 → 1.11.158.
+
+---
+
 ## [server-v1.11.157] — 2026-06-16
 
 **Feature (#426): configurable company "dedicated headers" in API Config — add

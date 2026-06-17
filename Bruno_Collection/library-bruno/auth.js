@@ -98,13 +98,43 @@ function handleAccessTokenResponse(res, opts) {
  * @param {string} reqName  the current request's name
  * @returns {boolean} true when an auth rejection was detected (run stopped)
  */
-function checkAuthRejection(res, reqName) {
+function checkAuthRejection(res, reqName, reqUrl) {
   const name = String(reqName || '').toLowerCase();
   if (name.includes('token') || name.includes('access')) return false; // token step handles itself
 
   let status = -1;
   try { status = res.getStatus(); } catch (_e) { return false; }
   if (status !== 401 && status !== 403) return false;
+
+  // ── #430: hard-stop only when the 401/403 really looks like a dead token ──
+  // The fail-fast (#208) prevents a rejected token from cascading 401/403 over
+  // every request. But some providers answer 401/403 to mean "endpoint not
+  // supported", and that must NOT abort the whole run. We flag the rejection
+  // but DO NOT stop when ANY of:
+  //   (a) the request is the System Version Check (GET /versions) — an optional
+  //       capability probe; a genuinely dead token is still caught at the first
+  //       business request, one step later;
+  //   (b) the active step-failure policy is not HARD_STOP (the tester chose
+  //       CONTINUE to see the whole flow despite failures); or
+  //   (c) the tester has baselined this step+status as a known deviation.
+  const url = String(reqUrl || '').toLowerCase();
+  const isVersionsProbe = /\/versions(\?|$)/.test(url)
+    || name.includes('system version') || name.includes('version check');
+  const policy = String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase();
+  let isKnownDeviation = false;
+  try {
+    const { knownDeviationFor } = require(bru.getEnvVar('library_base') + 'loopback.js');
+    isKnownDeviation = !!knownDeviationFor(reqName, status);
+  } catch (_e) { /* loopback unavailable — treat as not a known deviation */ }
+
+  if (isVersionsProbe || policy !== 'HARD_STOP' || isKnownDeviation) {
+    const why = isVersionsProbe ? 'GET /versions is an optional capability probe'
+      : isKnownDeviation ? 'this status is a documented known deviation'
+      : 'step-failure policy is CONTINUE';
+    validationLogger(`[WARNING] ⚠️ HTTP ${status} on "${reqName || 'request'}" — run continues (${why}). `
+      + `If this is an expired/invalid token rather than an unsupported endpoint, the following requests will also 401/403.`);
+    return false; // flagged, but no hard stop
+  }
 
   const msg = `AUTHENTICATION REJECTED (HTTP ${status}) on "${reqName || 'request'}". `
     + `Your access / bearer token is most likely invalid or expired. `
