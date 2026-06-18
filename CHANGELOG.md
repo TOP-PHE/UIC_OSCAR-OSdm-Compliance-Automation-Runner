@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.162] — 2026-06-18
+
+**Feature (#437): log a *secrets-masked* dump of the token request for problem
+determination (e.g. debugging the CHAPS OAuth handshake).**
+
+### Added
+
+- **`auth-profiles.js` `_doFetch` now emits one masked token-request line** for
+  every profile (basic / post / paxone / sqills / custom) — the request body was
+  previously never logged because it carries the client secret. Shows the **Host**
+  (from the URL), **headers**, and **body** with a **default-deny mask**: only an
+  allowlist of structural fields keeps its value — headers
+  `content-type`/`accept`/`host`/`user-agent`/`accept-encoding`/`connection`; body
+  `grant_type`/`response_type`/`body_format`/`token_field`. Everything else
+  (`client_id`, `client_secret`, `scope`, `accountName`/`accountSecret`,
+  `Authorization`, `Ocp-Apim-Subscription-Key`, api keys, …) is masked to `***`,
+  with `(empty)` distinguishing a blank field from a populated one (often the
+  actual cause). A newly-introduced secret field is masked **by default**. Example
+  (oauth2_post / CHAPS):
+  ```
+  [runner] OAuth2[post] request (secrets masked) — Host: osdm-api-test.cd.cz | headers: Content-Type: application/x-www-form-urlencoded | Accept: application/json | body: grant_type=client_credentials&client_id=***&client_secret=***&scope=***
+  ```
+  Wrapped in `try/catch` so a diagnostics bug can never break the token fetch.
+
+### Verified
+
+- Harness over the **real extracted** `_maskHeaders`/`_maskBody` — **21/21**,
+  including the core security property: **no** confidential value (client id/secret,
+  scope, Basic value, Ocp-Apim key, account secrets) appears in the masked output —
+  across URLSearchParams (post/basic), JSON (paxone/sqills) and opaque bodies;
+  default-deny masks unknown headers/keys; empty → `(empty)`. `node --check` +
+  `eslint` clean. Server-only — server 1.11.161 → 1.11.162.
+
+---
+
 ## [server-v1.11.161] — 2026-06-17
 
 **Fix (follow-up to #433–#435): the scenario "Fulfillment Options" dropdowns

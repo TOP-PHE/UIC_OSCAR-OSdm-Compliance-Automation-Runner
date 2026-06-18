@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.189",
+  "current_release": "2026.190",
   "releases": [
+    {
+      "release": "2026.190",
+      "date": "2026-06-18",
+      "server": "1.11.162",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #437: log a secrets-masked dump of the token request for problem determination (e.g. debugging the CHAPS OAuth handshake). The token request body was deliberately never logged (it carries the client secret); now auth-profiles.js _doFetch emits one masked line covering every profile (basic/post/paxone/sqills/custom): Host (from the URL) + headers + body, with a DEFAULT-DENY mask — only an allowlist of structural fields keeps its value (headers: content-type/accept/host/user-agent/accept-encoding/connection; body: grant_type/response_type/body_format/token_field), everything else (client_id, client_secret, scope, accountName/accountSecret, Authorization, Ocp-Apim-Subscription-Key, api keys…) is masked to '***', with '(empty)' to distinguish a blank field from a populated one. A newly-introduced secret field is masked by default. Example (oauth2_post / CHAPS): '[runner] OAuth2[post] request (secrets masked) — Host: osdm-api-test.cd.cz | headers: Content-Type: application/x-www-form-urlencoded | Accept: application/json | body: grant_type=client_credentials&client_id=***&client_secret=***&scope=***'. Wrapped in try/catch so a diagnostics bug can never break the token fetch. Server-side; server 1.11.161 -> 1.11.162, collection unchanged OTST_V2.0.93.",
+        "Verification: harness over the REAL extracted _maskHeaders/_maskBody — 21/21, including the core security property that no confidential value (client id/secret, scope, Basic value, Ocp-Apim key, account secrets) appears in the masked output across URLSearchParams (post/basic), JSON (paxone/sqills) and opaque bodies; default-deny masks unknown headers/keys; empty -> (empty). node --check + eslint clean."
+      ]
+    },
     {
       "release": "2026.189",
       "date": "2026-06-17",
