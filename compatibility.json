@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.192",
+  "current_release": "2026.193",
   "releases": [
+    {
+      "release": "2026.193",
+      "date": "2026-06-18",
+      "server": "1.11.165",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #442: the 'custom' OAuth profile gains body_format 'raw' — send the substituted token body VERBATIM, with no URLSearchParams re-encoding. The existing 'form' mode builds the body with URLSearchParams, which percent-escapes % -> %25 (and + -> %2B; . and _ pass through). A token endpoint that consumes the body bytes as-is (CHAPS/CD /auth/login/, reported via #440 follow-up) then sees a different client_secret -> 401 err_5002 'Invalid username or password', even though the identical request works in a standalone raw client. body_format 'raw' lets OSCAR match that byte-for-byte (Content-Type defaults to application/x-www-form-urlencoded, overridable via the template headers). Tester template: {method:POST, headers:{Content-Type:application/x-www-form-urlencoded}, body:'client_id={{client_id}}&client_secret={{client_secret}}&grant_type=client_credentials&scope={{scope}}', body_format:'raw', token_field:access_token}. Server-side; server 1.11.164 -> 1.11.165, collection unchanged OTST_V2.0.93.",
+        "Diagnostic: in 'form' mode, when a credential value contains % or + (the characters form-encoding transforms), the run log names the field and points at body_format 'raw' — field name only, never the value (keeps the #437 default-deny mask contract). That one line pinpoints this class of 401.",
+        "Verification: harness over the REAL extracted _substitute + SAFE_BODY_KEYS — 9/9: raw passthrough preserves client_secret=ab%cd_e.f+g verbatim (no %25/%2B) while form sends ab%25cd_e.f%2Bg; the hint flags only fields carrying %/+ and never a SAFE_BODY_KEYS key (grant_type with a + stays safe). node --check + eslint clean on auth-profiles.js."
+      ]
+    },
     {
       "release": "2026.192",
       "date": "2026-06-18",
