@@ -163,11 +163,28 @@ async function _doFetch({ method, url, headers, body }, label, log) {
 // this is config, not a programming language.
 function _substitute(str, ctx) {
   if (typeof str !== 'string') return str;
+  // Case-INSENSITIVE: {{client_id}} and {{CLIENT_ID}} both resolve. A tester who
+  // typed the placeholder in caps would otherwise have it sent literally, which
+  // the OAuth server rejects with the same opaque 401 as a wrong secret. (#440)
   return str
-    .replace(/\{\{\s*client_id\s*\}\}/g,     ctx.clientId     || '')
-    .replace(/\{\{\s*client_secret\s*\}\}/g, ctx.clientSecret || '')
-    .replace(/\{\{\s*scope\s*\}\}/g,         ctx.scope        || '')
-    .replace(/\{\{\s*extra\s*\}\}/g,         ctx.extra        || '');
+    .replace(/\{\{\s*client_id\s*\}\}/gi,     ctx.clientId     || '')
+    .replace(/\{\{\s*client_secret\s*\}\}/gi, ctx.clientSecret || '')
+    .replace(/\{\{\s*scope\s*\}\}/gi,         ctx.scope        || '')
+    .replace(/\{\{\s*extra\s*\}\}/gi,         ctx.extra        || '');
+}
+
+// Placeholders the custom templater knows how to fill. Anything else inside a
+// {{...}} is a typo that passes through literally and gets rejected by the OAuth
+// server — so we name (never value) the unknown tokens in the run log. (#440)
+const _KNOWN_PLACEHOLDERS = new Set(['client_id', 'client_secret', 'scope', 'extra']);
+function _unknownPlaceholders(str) {
+  const out = new Set();
+  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(String(str == null ? '' : str))) !== null) {
+    if (!_KNOWN_PLACEHOLDERS.has(m[1].toLowerCase())) out.add(m[1]);
+  }
+  return [...out];
 }
 
 function _substituteDeep(value, ctx) {
@@ -290,6 +307,13 @@ async function _custom(ctx, log) {
     tpl = typeof customTemplate === 'string' ? JSON.parse(customTemplate) : customTemplate;
   } catch (err) {
     throw new Error(`Custom template is not valid JSON: ${err.message}`);
+  }
+  // Flag typo'd placeholders ({{secret}}, {{clientId}}, …) — they survive
+  // substitution literally and the OAuth server rejects them, producing the same
+  // opaque 401 as a wrong secret. Names only; never values. (#440)
+  const unknown = _unknownPlaceholders(typeof customTemplate === 'string' ? customTemplate : JSON.stringify(customTemplate));
+  if (unknown.length && log && typeof log.info === 'function') {
+    log.info(`[runner] Custom template — ${unknown.length} unrecognised placeholder(s) will be sent literally: ${unknown.map(u => `{{${u}}}`).join(', ')}. Supported (case-insensitive): {{client_id}}, {{client_secret}}, {{scope}}, {{extra}}.`);
   }
   const method = (tpl.method || 'POST').toUpperCase();
   const headers = _substituteDeep(tpl.headers || {}, ctx);

@@ -14,6 +14,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.164] — 2026-06-18
+
+**Fix (#440): trim OAuth credentials so a stray paste-whitespace can't cause a
+`401` that works fine in a standalone client — plus problem-determination
+diagnostics that name, never leak.**
+
+### Fixed
+
+- **`me-credentials.js` / `access-token.js`** — OSCAR trimmed `token_url` and
+  `oauth_scope` but never `client_id` / `client_secret`, so a trailing space or
+  newline pasted into the API-Config field was encrypted, stored, and sent to the
+  OAuth server verbatim → `401 "Invalid username or password"`, even though the
+  identical credential works in a standalone client that trims its inputs
+  (reported on CHAPS / ČD `…/auth/login/`). The #437 masked diagnostic couldn't
+  reveal it — `client_secret=***` masks a clean value and one with a trailing
+  newline alike. Every pasted secret is now `.trim()`-ed on store (as
+  `token_url`/`oauth_scope` already were), and `client_id`/`client_secret`/`scope`/
+  `extra` are trimmed again at use-time so credentials saved before this fix are
+  healed without re-entry (the cache fingerprint hashes the trimmed values).
+
+### Added (diagnostics — field/placeholder names only, never values; keeps the #437 mask contract)
+
+- **Whitespace note** — when stray whitespace is stripped from a credential, the
+  run log says so, naming the field only: `[runner] Auth — stripped leading/
+  trailing whitespace from client_secret before sending …`.
+- **Case-insensitive placeholders** — the custom-profile templater now resolves
+  `{{CLIENT_ID}}` as well as `{{client_id}}` (it was lowercase-only, so a
+  capitalised placeholder was sent literally → same opaque 401).
+- **Unknown-placeholder warning** — any unrecognised `{{…}}` in a custom template
+  (a typo like `{{secret}}`) is listed in the run log before the request goes out.
+
+### Verified
+
+- Harness over the REAL extracted `_substitute` (now case-insensitive) and
+  `_unknownPlaceholders` — 14/14. `node --check` clean on all three files; the
+  credFp NUL-byte separator preserved.
+
+---
+
 ## [server-v1.11.163] — 2026-06-18
 
 **Fix (follow-up to #437): the masked token-request line now shows the full URL,
