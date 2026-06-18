@@ -325,6 +325,25 @@ async function _custom(ctx, log) {
       const flat = typeof tpl.body === 'string' ? JSON.parse(_substitute(tpl.body, ctx)) : _substituteDeep(tpl.body, ctx);
       body = new URLSearchParams(Object.entries(flat).map(([k, v]) => [k, String(v ?? '')]));
       if (!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      // Hint when a value carries characters that form-encoding transforms
+      // (% -> %25, + -> %2B). A non-standard token endpoint that doesn't round-trip
+      // the percent-decode then sees a different secret -> 401 that works in a raw
+      // client. Names the field only, never the value; points at body_format "raw". (#442)
+      const reencoded = Object.entries(flat)
+        .filter(([k, v]) => !SAFE_BODY_KEYS.has(String(k).toLowerCase()) && /[%+]/.test(String(v ?? '')))
+        .map(([k]) => k);
+      if (reencoded.length && log && typeof log.info === 'function') {
+        log.info(`[runner] Custom template — ${reencoded.join(', ')} contain(s) characters that form-encoding percent-escapes (e.g. % -> %25, + -> %2B). If your provider expects the body unencoded (works in a raw client but 401s here), set "body_format":"raw" to send it verbatim.`);
+      }
+    } else if (fmt === 'raw') {
+      // Raw passthrough — send the substituted body VERBATIM, no re-encoding. Use
+      // when the provider expects the body bytes exactly as written and form-encoding
+      // would corrupt a value: e.g. a client_secret containing '%', which the 'form'
+      // encoder escapes to '%25'. Mirrors a standalone REST client's "raw body" mode
+      // so OSCAR can match a request that already works there. body should be a string;
+      // a non-string template body is JSON-stringified as a fallback. (#442)
+      body = typeof tpl.body === 'string' ? _substitute(tpl.body, ctx) : JSON.stringify(_substituteDeep(tpl.body, ctx));
+      if (!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/x-www-form-urlencoded';
     } else {
       // 'json' default
       const obj = typeof tpl.body === 'string' ? _substitute(tpl.body, ctx) : JSON.stringify(_substituteDeep(tpl.body, ctx));
