@@ -93,7 +93,7 @@ router.patch('/', (req, res) => {
   }
   if (oauth_extra !== undefined) {
     updates.push('oauth_extra_enc = ?');
-    values.push(oauth_extra ? encrypt(oauth_extra) : null);
+    values.push(oauth_extra ? encrypt(String(oauth_extra).trim()) : null);
   }
   if (oauth_custom_template !== undefined) {
     updates.push('oauth_custom_template = ?');
@@ -104,16 +104,20 @@ router.patch('/', (req, res) => {
   //   key present, truthy     → encrypt and store the new value
   //   key present, null/""    → clear the field (issue #16: tester wants to
   //                             remove credentials at the end of a campaign)
-  if (access_token  !== undefined) { updates.push('access_token_enc = ?');  values.push(access_token  ? encrypt(access_token)  : null); }
-  if (client_id     !== undefined) { updates.push('client_id_enc = ?');     values.push(client_id     ? encrypt(client_id)     : null); }
-  if (client_secret !== undefined) { updates.push('client_secret_enc = ?'); values.push(client_secret ? encrypt(client_secret) : null); }
+  // We .trim() every pasted secret before encrypting (as token_url/oauth_scope
+  // already are): a trailing space or newline from a copy-paste would otherwise
+  // be sent to the provider verbatim and rejected as a wrong secret — a 401 that
+  // works fine in a client that trims its inputs. (#440)
+  if (access_token  !== undefined) { updates.push('access_token_enc = ?');  values.push(access_token  ? encrypt(String(access_token).trim())  : null); }
+  if (client_id     !== undefined) { updates.push('client_id_enc = ?');     values.push(client_id     ? encrypt(String(client_id).trim())     : null); }
+  if (client_secret !== undefined) { updates.push('client_secret_enc = ?'); values.push(client_secret ? encrypt(String(client_secret).trim()) : null); }
   if (requestor !== undefined) {
     updates.push('requestor_enc = ?');
-    values.push(requestor ? encrypt(requestor) : null);
+    values.push(requestor ? encrypt(String(requestor).trim()) : null);
   }
   if (subscription_key !== undefined) {
     updates.push('subscription_key_enc = ?');
-    values.push(subscription_key ? encrypt(subscription_key) : null);
+    values.push(subscription_key ? encrypt(String(subscription_key).trim()) : null);
   }
 
   if (updates.length === 0) {

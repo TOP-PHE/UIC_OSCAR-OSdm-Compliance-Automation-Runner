@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.191",
+  "current_release": "2026.192",
   "releases": [
+    {
+      "release": "2026.192",
+      "date": "2026-06-18",
+      "server": "1.11.164",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #440: OSCAR trimmed token_url and oauth_scope but never client_id/client_secret, so a trailing space or newline pasted into the API-Config field was encrypted, stored and sent to the OAuth server verbatim -> 401 'Invalid username or password', even though the identical credential works in a standalone client that trims its inputs (reported on CHAPS/CD …/auth/login/). The #437 masked diagnostic could not reveal it (client_secret=*** masks a clean value and one with a trailing newline alike). Fix: me-credentials.js .trim()s every pasted secret before encrypting (as token_url/oauth_scope already were); access-token.js trims client_id/client_secret/scope/extra again at use-time so credentials saved before this fix are healed without re-entry, and the per-tester cache fingerprint now hashes the trimmed values. Server-side; server 1.11.163 -> 1.11.164, collection unchanged OTST_V2.0.93.",
+        "Diagnostics (field/placeholder names only, never values — keeps the #437 default-deny mask contract): (1) a run-log note when stray whitespace was stripped from a credential, naming the field; (2) case-INSENSITIVE custom-template placeholders so {{CLIENT_ID}} resolves like {{client_id}} (was lowercase-only; a capitalised placeholder was sent literally -> same opaque 401); (3) a warning listing any unrecognised {{…}} placeholders (typos like {{secret}}) that would be sent literally.",
+        "Verification: harness over the REAL extracted _substitute (now case-insensitive) and _unknownPlaceholders — 14/14 (lowercase/UPPER/Mixed/spaced placeholders resolve; unknown-placeholder detection flags typos, ignores known in any case, dedupes, null-safe). node --check clean on access-token.js, auth-profiles.js, me-credentials.js; credFp NUL-byte separator preserved."
+      ]
+    },
     {
       "release": "2026.191",
       "date": "2026-06-18",
