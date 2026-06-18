@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.190",
+  "current_release": "2026.191",
   "releases": [
+    {
+      "release": "2026.191",
+      "date": "2026-06-18",
+      "server": "1.11.163",
+      "collection": "OTST_V2.0.93",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix (follow-up to #437): the masked token-request diagnostic showed 'Host: <hostname>' (the HTTP Host header, which is hostname-only by spec), which read as a wrong/truncated URL during problem determination (e.g. CHAPS — showed 'Host: osdm-api-test.cd.cz' when the request target was https://osdm-api-test.cd.cz/auth/login/). _logMaskedRequest now shows the full request target (method + URL incl. path) instead: '[runner] Custom request (secrets masked) — POST https://osdm-api-test.cd.cz/auth/login/ | headers: … | body: …'. The full URL was always correct (it's also on the preceding line and the 200/4xx confirms the path); this just makes the masked line self-contained and unambiguous. Server-side; server 1.11.162 -> 1.11.163, collection unchanged OTST_V2.0.93.",
+        "Verification: node --check + eslint clean; _maskHeaders/_maskBody unchanged (still 21/21 from #437)."
+      ]
+    },
     {
       "release": "2026.190",
       "date": "2026-06-18",

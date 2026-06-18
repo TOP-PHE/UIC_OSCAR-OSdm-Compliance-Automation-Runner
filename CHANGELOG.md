@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.163] — 2026-06-18
+
+**Fix (follow-up to #437): the masked token-request line now shows the full URL,
+not just the `Host` header.**
+
+### Fixed
+
+- **`auth-profiles.js` `_logMaskedRequest`** — the diagnostic showed
+  `Host: <hostname>` (the HTTP `Host` header, which is hostname-only by spec), so
+  during problem determination it read as a truncated/wrong URL (CHAPS: showed
+  `Host: osdm-api-test.cd.cz` when the target was
+  `https://osdm-api-test.cd.cz/auth/login/`). It now shows the full request target:
+  ```
+  [runner] Custom request (secrets masked) — POST https://osdm-api-test.cd.cz/auth/login/ | headers: Content-Type: application/x-www-form-urlencoded | body: client_id=***&client_secret=***&grant_type=client_credentials&scope=***
+  ```
+  The URL was always correct (also on the preceding line; the HTTP status confirms
+  the path) — this just makes the masked line self-contained and unambiguous.
+
+### Verified
+
+- `node --check` + `eslint` clean; `_maskHeaders`/`_maskBody` unchanged (still the
+  21/21 from #437). Server-only — server 1.11.162 → 1.11.163.
+
+---
+
 ## [server-v1.11.162] — 2026-06-18
 
 **Feature (#437): log a *secrets-masked* dump of the token request for problem

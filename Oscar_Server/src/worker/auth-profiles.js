@@ -93,9 +93,11 @@ function _maskBody(body) {
 // Emit the masked request line. Never let a diagnostics bug break the fetch.
 function _logMaskedRequest(label, method, url, headers, body, log) {
   try {
-    let host = '';
-    try { host = new URL(url).host; } catch (_) { /* leave blank */ }
-    log.info(`[runner] ${label} request (secrets masked) — Host: ${host || '?'} | headers: ${_maskHeaders(headers)} | body: ${_maskBody(body)}`);
+    // Show the full request TARGET (method + URL incl. path), not just the
+    // hostname. The HTTP Host header is hostname-only by spec, so a bare
+    // "Host: …" line read as a "wrong URL" during problem determination. The
+    // masked `headers` below still show any explicit header values OSCAR set.
+    log.info(`[runner] ${label} request (secrets masked) — ${method} ${url} | headers: ${_maskHeaders(headers)} | body: ${_maskBody(body)}`);
   } catch (_) { /* diagnostics must never throw */ }
 }
 
