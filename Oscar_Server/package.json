@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.160",
+  "version": "1.11.161",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
@@ -32,7 +32,7 @@
     "express-validator": "~7.3.2",
     "helmet": "~8.2.0",
     "jsonwebtoken": "~9.0.2",
-    "multer": "~2.1.1",
+    "multer": "~2.2.0",
     "nodemailer": "~9.0.0",
     "pino": "~10.3.1",
     "pino-pretty": "~13.1.3",

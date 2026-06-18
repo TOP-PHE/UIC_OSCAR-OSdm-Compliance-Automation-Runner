@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.161] — 2026-06-17
+
+**Fix (follow-up to #433–#435): the scenario "Fulfillment Options" dropdowns
+still showed only "E-ticket" for a new provider — a *dead framework filter*.**
+
+### Fixed
+
+- **`public/js/scenarios.js` `buildFulfillmentSection` — show the full OSDM
+  fulfillment set in the scenario editor.** The dropdowns filtered the OSDM enums
+  by `wizData.framework.fulfillment.types/media`, which **defaults to
+  `['ETICKET']`/`['PDF_A4']`** — and the only function that edits it
+  (`fwToggleFulfilPill`) **isn't wired to any UI**, so a new company (SBB) was
+  permanently locked to E-ticket/PDF-A4 and could never request `TICKETLESS`. The
+  scenario "Fulfillment Options" editor is where the tester **explicitly chooses
+  what to request**, so it now sources the lists straight from the canonical
+  `ENUMS` (`typeList = ENUMS.fulfillmentType`, `mediaList = ENUMS.fulfillmentMedia`)
+  — the same set the datafile schema (#434) already accepts. The dead
+  `framework.fulfillment` filter (and its now-unused `fwFul` local) is removed;
+  the server-side framework gating still flags anything the provider hasn't
+  declared. This is the layer my #435 missed — that fixed the (separate, also
+  stale) framework-editor lists; this fixes the dropdown you actually see.
+
+### Security (rides along)
+
+- **Bumped `multer` `2.1.1 → 2.2.0`** to clear two newly-published **HIGH** DoS
+  advisories (GHSA-72gw-mp4g-v24j — deeply nested field names; GHSA-3p4h-7m6x-2hcm
+  — incomplete cleanup of aborted uploads) that `npm audit` started flagging on
+  every PR (latent on `main`). `multer` is the datafile-upload dependency (already
+  auth-gated + rate-limited). Minor bump within the existing 2.x — `npm audit` →
+  **0 vulnerabilities**. Unrelated to the dropdown fix, but required to clear CI.
+
+### Verified
+
+- `scenarios.js` `node --check` clean; no dangling `fwFul` reference; the dropdown
+  now offers the same OSDM set used by datafile validation. `npm audit` clean after
+  the multer bump. Server-only — server 1.11.160 → 1.11.161, collection unchanged
+  OTST_V2.0.93.
+
+---
+
 ## [server-v1.11.160] — 2026-06-17
 
 **Fix (follow-up to #433): the scenario wizard had the same OSDM enum drift as the
