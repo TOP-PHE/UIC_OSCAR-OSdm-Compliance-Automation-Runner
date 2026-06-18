@@ -14,6 +14,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.165] — 2026-06-18
+
+**Feat (#442): `custom` OAuth profile gains `body_format: "raw"` — send the token
+body verbatim, so a `client_secret` containing `%` isn't mangled by form-encoding.**
+
+### Added
+
+- **`auth-profiles.js` `_custom` — `body_format: "raw"`** — sends the substituted
+  template `body` **verbatim**, with no `URLSearchParams` re-encoding. The existing
+  `"form"` mode builds the body with `URLSearchParams`, which percent-escapes
+  `%` → `%25` (and `+` → `%2B`). A token endpoint that takes the body bytes as-is
+  (CHAPS / ČD `/auth/login/`) then sees a different secret → `401 err_5002 "Invalid
+  username or password"`, even though the same request works in a raw client. `"raw"`
+  lets OSCAR match that byte-for-byte. Defaults `Content-Type:
+  application/x-www-form-urlencoded` (overridable via the template `headers`).
+- **Form-mode hint** — when a credential value in `"form"` mode contains `%` or `+`
+  (the characters form-encoding transforms), the run log names the field and points
+  at `body_format: "raw"`. Field name only, never the value (keeps the #437 mask
+  contract). That one line pinpoints this class of 401.
+
+### Tester template (CHAPS)
+
+```json
+{ "method": "POST",
+  "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+  "body": "client_id={{client_id}}&client_secret={{client_secret}}&grant_type=client_credentials&scope={{scope}}",
+  "body_format": "raw",
+  "token_field": "access_token" }
+```
+
+### Verified
+
+- Harness over the REAL extracted `_substitute` + `SAFE_BODY_KEYS` — 9/9: raw keeps
+  `client_secret=ab%cd_e.f+g` verbatim while `form` sends `ab%25cd_e.f%2Bg`; the hint
+  flags only the field(s) carrying `%`/`+` and never a `SAFE_BODY_KEYS` key.
+  `node --check` + eslint clean.
+
+---
+
 ## [server-v1.11.164] — 2026-06-18
 
 **Fix (#440): trim OAuth credentials so a stray paste-whitespace can't cause a
