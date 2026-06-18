@@ -40,11 +40,71 @@ function isValidProfile(p) {
   return PROFILES.includes(p);
 }
 
+// ── Secrets-masked token-request diagnostic (#437) ──────────────────────────
+// Renders the token request (headers + body) for problem determination WITHOUT
+// leaking confidential values. Default-deny: only an explicit allowlist of
+// structural fields keeps its value; everything else (client_id, client_secret,
+// scope, account secrets, Authorization, Ocp-Apim-Subscription-Key, api keys…)
+// is masked to "***" — so a newly-introduced secret field is masked by default.
+// "(empty)" distinguishes a missing/blank field from a populated one, which is
+// often the actual cause being diagnosed (e.g. an empty scope).
+const SAFE_HEADER_NAMES = new Set([
+  'content-type', 'accept', 'host', 'user-agent', 'accept-encoding', 'connection'
+]);
+const SAFE_BODY_KEYS = new Set(['grant_type', 'response_type', 'body_format', 'token_field']);
+
+function _maskValue(v) {
+  return (v != null && String(v).length > 0) ? '***' : '(empty)';
+}
+function _maskHeaders(headers) {
+  return Object.entries(headers || {})
+    .map(([name, value]) =>
+      SAFE_HEADER_NAMES.has(String(name).toLowerCase()) ? `${name}: ${value}` : `${name}: ${_maskValue(value)}`)
+    .join(' | ') || '(none)';
+}
+function _maskKV(k, v) {
+  return SAFE_BODY_KEYS.has(String(k).toLowerCase()) ? `${k}=${v}` : `${k}=${_maskValue(v)}`;
+}
+function _maskBody(body) {
+  if (body == null) return '(none)';
+  if (body instanceof URLSearchParams) {
+    const parts = []; body.forEach((v, k) => parts.push(_maskKV(k, v)));
+    return parts.join('&') || '(empty form)';
+  }
+  if (typeof body === 'string') {
+    try {
+      const obj = JSON.parse(body);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        const masked = {};
+        for (const k of Object.keys(obj)) {
+          masked[k] = SAFE_BODY_KEYS.has(k.toLowerCase()) ? obj[k] : _maskValue(obj[k]);
+        }
+        return JSON.stringify(masked);
+      }
+    } catch (_) { /* not JSON — fall through */ }
+    if (/^[^=&\s]+=/.test(body)) { // looks like a urlencoded form
+      const parts = []; new URLSearchParams(body).forEach((v, k) => parts.push(_maskKV(k, v)));
+      return parts.join('&');
+    }
+    return '*** (opaque body)';
+  }
+  return '*** (unloggable body)';
+}
+// Emit the masked request line. Never let a diagnostics bug break the fetch.
+function _logMaskedRequest(label, method, url, headers, body, log) {
+  try {
+    let host = '';
+    try { host = new URL(url).host; } catch (_) { /* leave blank */ }
+    log.info(`[runner] ${label} request (secrets masked) — Host: ${host || '?'} | headers: ${_maskHeaders(headers)} | body: ${_maskBody(body)}`);
+  } catch (_) { /* diagnostics must never throw */ }
+}
+
 // ── Shared HTTP wrapper ─────────────────────────────────────────────────────
 // Every adapter funnels through this. Keeps timeout + error capture + RFC
 // 6749 §5.2 parsing consistent across profiles.
 async function _doFetch({ method, url, headers, body }, label, log) {
   log.info(`[runner] ${label} — ${method} ${url}`);
+  _logMaskedRequest(label, method, url, headers, body, log);
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let res;
