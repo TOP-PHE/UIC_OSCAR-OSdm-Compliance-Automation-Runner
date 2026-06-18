@@ -2691,12 +2691,15 @@ function buildOfferSection(idx, sc) {
 function buildFulfillmentSection(idx, sc, fulfGroup) {
   const fIdx = (state.requestedFulfillmentOptionsList || []).findIndex(f => f.id === sc.requestedFulfillmentOptionsListId);
   const opts  = (fulfGroup.requestedFulfillmentOptions || [])[0] || {};
-  const fwFul = ((wizData && wizData.framework) || {}).fulfillment || {};
-  // Filter the OSDM-defined enums down to what the framework enables. If the
-  // framework doesn't specify types/media, the full list is kept so the UI
-  // stays usable on under-configured frameworks.
-  const typeList   = fwFilter(ENUMS.fulfillmentType,  fwFul.types);
-  const mediaList  = fwFilter(ENUMS.fulfillmentMedia, fwFul.media);
+  // The scenario "Fulfillment Options" editor is where the tester EXPLICITLY
+  // chooses which fulfillment to request, so it offers the full OSDM set. It used
+  // to filter by the company's framework.fulfillment, but that defaults to
+  // ['ETICKET']/['PDF_A4'] and has no wired UI to broaden it — so a new provider
+  // (e.g. SBB) was locked to "E-ticket" and could never request TICKETLESS. The
+  // datafile schema (#433/#434) already accepts the full OSDM set; the server-side
+  // framework gating still flags anything the provider hasn't declared.
+  const typeList   = ENUMS.fulfillmentType;
+  const mediaList  = ENUMS.fulfillmentMedia;
 
   return `
   <div class="param-section">
