@@ -36,11 +36,21 @@ still showed only "E-ticket" for a new provider — a *dead framework filter*.**
   declared. This is the layer my #435 missed — that fixed the (separate, also
   stale) framework-editor lists; this fixes the dropdown you actually see.
 
+### Security (rides along)
+
+- **Bumped `multer` `2.1.1 → 2.2.0`** to clear two newly-published **HIGH** DoS
+  advisories (GHSA-72gw-mp4g-v24j — deeply nested field names; GHSA-3p4h-7m6x-2hcm
+  — incomplete cleanup of aborted uploads) that `npm audit` started flagging on
+  every PR (latent on `main`). `multer` is the datafile-upload dependency (already
+  auth-gated + rate-limited). Minor bump within the existing 2.x — `npm audit` →
+  **0 vulnerabilities**. Unrelated to the dropdown fix, but required to clear CI.
+
 ### Verified
 
 - `scenarios.js` `node --check` clean; no dangling `fwFul` reference; the dropdown
-  now offers the same OSDM set used by datafile validation. Server-only — server
-  1.11.160 → 1.11.161, collection unchanged OTST_V2.0.93.
+  now offers the same OSDM set used by datafile validation. `npm audit` clean after
+  the multer bump. Server-only — server 1.11.160 → 1.11.161, collection unchanged
+  OTST_V2.0.93.
 
 ---
 
