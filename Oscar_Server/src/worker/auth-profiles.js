@@ -40,11 +40,73 @@ function isValidProfile(p) {
   return PROFILES.includes(p);
 }
 
+// ── Secrets-masked token-request diagnostic (#437) ──────────────────────────
+// Renders the token request (headers + body) for problem determination WITHOUT
+// leaking confidential values. Default-deny: only an explicit allowlist of
+// structural fields keeps its value; everything else (client_id, client_secret,
+// scope, account secrets, Authorization, Ocp-Apim-Subscription-Key, api keys…)
+// is masked to "***" — so a newly-introduced secret field is masked by default.
+// "(empty)" distinguishes a missing/blank field from a populated one, which is
+// often the actual cause being diagnosed (e.g. an empty scope).
+const SAFE_HEADER_NAMES = new Set([
+  'content-type', 'accept', 'host', 'user-agent', 'accept-encoding', 'connection'
+]);
+const SAFE_BODY_KEYS = new Set(['grant_type', 'response_type', 'body_format', 'token_field']);
+
+function _maskValue(v) {
+  return (v != null && String(v).length > 0) ? '***' : '(empty)';
+}
+function _maskHeaders(headers) {
+  return Object.entries(headers || {})
+    .map(([name, value]) =>
+      SAFE_HEADER_NAMES.has(String(name).toLowerCase()) ? `${name}: ${value}` : `${name}: ${_maskValue(value)}`)
+    .join(' | ') || '(none)';
+}
+function _maskKV(k, v) {
+  return SAFE_BODY_KEYS.has(String(k).toLowerCase()) ? `${k}=${v}` : `${k}=${_maskValue(v)}`;
+}
+function _maskBody(body) {
+  if (body == null) return '(none)';
+  if (body instanceof URLSearchParams) {
+    const parts = []; body.forEach((v, k) => parts.push(_maskKV(k, v)));
+    return parts.join('&') || '(empty form)';
+  }
+  if (typeof body === 'string') {
+    try {
+      const obj = JSON.parse(body);
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        const masked = {};
+        for (const k of Object.keys(obj)) {
+          masked[k] = SAFE_BODY_KEYS.has(k.toLowerCase()) ? obj[k] : _maskValue(obj[k]);
+        }
+        return JSON.stringify(masked);
+      }
+    } catch (_) { /* not JSON — fall through */ }
+    if (/^[^=&\s]+=/.test(body)) { // looks like a urlencoded form
+      const parts = []; new URLSearchParams(body).forEach((v, k) => parts.push(_maskKV(k, v)));
+      return parts.join('&');
+    }
+    return '*** (opaque body)';
+  }
+  return '*** (unloggable body)';
+}
+// Emit the masked request line. Never let a diagnostics bug break the fetch.
+function _logMaskedRequest(label, method, url, headers, body, log) {
+  try {
+    // Show the full request TARGET (method + URL incl. path), not just the
+    // hostname. The HTTP Host header is hostname-only by spec, so a bare
+    // "Host: …" line read as a "wrong URL" during problem determination. The
+    // masked `headers` below still show any explicit header values OSCAR set.
+    log.info(`[runner] ${label} request (secrets masked) — ${method} ${url} | headers: ${_maskHeaders(headers)} | body: ${_maskBody(body)}`);
+  } catch (_) { /* diagnostics must never throw */ }
+}
+
 // ── Shared HTTP wrapper ─────────────────────────────────────────────────────
 // Every adapter funnels through this. Keeps timeout + error capture + RFC
 // 6749 §5.2 parsing consistent across profiles.
 async function _doFetch({ method, url, headers, body }, label, log) {
   log.info(`[runner] ${label} — ${method} ${url}`);
+  _logMaskedRequest(label, method, url, headers, body, log);
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let res;
@@ -101,11 +163,28 @@ async function _doFetch({ method, url, headers, body }, label, log) {
 // this is config, not a programming language.
 function _substitute(str, ctx) {
   if (typeof str !== 'string') return str;
+  // Case-INSENSITIVE: {{client_id}} and {{CLIENT_ID}} both resolve. A tester who
+  // typed the placeholder in caps would otherwise have it sent literally, which
+  // the OAuth server rejects with the same opaque 401 as a wrong secret. (#440)
   return str
-    .replace(/\{\{\s*client_id\s*\}\}/g,     ctx.clientId     || '')
-    .replace(/\{\{\s*client_secret\s*\}\}/g, ctx.clientSecret || '')
-    .replace(/\{\{\s*scope\s*\}\}/g,         ctx.scope        || '')
-    .replace(/\{\{\s*extra\s*\}\}/g,         ctx.extra        || '');
+    .replace(/\{\{\s*client_id\s*\}\}/gi,     ctx.clientId     || '')
+    .replace(/\{\{\s*client_secret\s*\}\}/gi, ctx.clientSecret || '')
+    .replace(/\{\{\s*scope\s*\}\}/gi,         ctx.scope        || '')
+    .replace(/\{\{\s*extra\s*\}\}/gi,         ctx.extra        || '');
+}
+
+// Placeholders the custom templater knows how to fill. Anything else inside a
+// {{...}} is a typo that passes through literally and gets rejected by the OAuth
+// server — so we name (never value) the unknown tokens in the run log. (#440)
+const _KNOWN_PLACEHOLDERS = new Set(['client_id', 'client_secret', 'scope', 'extra']);
+function _unknownPlaceholders(str) {
+  const out = new Set();
+  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(String(str == null ? '' : str))) !== null) {
+    if (!_KNOWN_PLACEHOLDERS.has(m[1].toLowerCase())) out.add(m[1]);
+  }
+  return [...out];
 }
 
 function _substituteDeep(value, ctx) {
@@ -229,6 +308,13 @@ async function _custom(ctx, log) {
   } catch (err) {
     throw new Error(`Custom template is not valid JSON: ${err.message}`);
   }
+  // Flag typo'd placeholders ({{secret}}, {{clientId}}, …) — they survive
+  // substitution literally and the OAuth server rejects them, producing the same
+  // opaque 401 as a wrong secret. Names only; never values. (#440)
+  const unknown = _unknownPlaceholders(typeof customTemplate === 'string' ? customTemplate : JSON.stringify(customTemplate));
+  if (unknown.length && log && typeof log.info === 'function') {
+    log.info(`[runner] Custom template — ${unknown.length} unrecognised placeholder(s) will be sent literally: ${unknown.map(u => `{{${u}}}`).join(', ')}. Supported (case-insensitive): {{client_id}}, {{client_secret}}, {{scope}}, {{extra}}.`);
+  }
   const method = (tpl.method || 'POST').toUpperCase();
   const headers = _substituteDeep(tpl.headers || {}, ctx);
   let body;
@@ -238,6 +324,25 @@ async function _custom(ctx, log) {
       // body must be an object after substitution
       const flat = typeof tpl.body === 'string' ? JSON.parse(_substitute(tpl.body, ctx)) : _substituteDeep(tpl.body, ctx);
       body = new URLSearchParams(Object.entries(flat).map(([k, v]) => [k, String(v ?? '')]));
+      if (!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      // Hint when a value carries characters that form-encoding transforms
+      // (% -> %25, + -> %2B). A non-standard token endpoint that doesn't round-trip
+      // the percent-decode then sees a different secret -> 401 that works in a raw
+      // client. Names the field only, never the value; points at body_format "raw". (#442)
+      const reencoded = Object.entries(flat)
+        .filter(([k, v]) => !SAFE_BODY_KEYS.has(String(k).toLowerCase()) && /[%+]/.test(String(v ?? '')))
+        .map(([k]) => k);
+      if (reencoded.length && log && typeof log.info === 'function') {
+        log.info(`[runner] Custom template — ${reencoded.join(', ')} contain(s) characters that form-encoding percent-escapes (e.g. % -> %25, + -> %2B). If your provider expects the body unencoded (works in a raw client but 401s here), set "body_format":"raw" to send it verbatim.`);
+      }
+    } else if (fmt === 'raw') {
+      // Raw passthrough — send the substituted body VERBATIM, no re-encoding. Use
+      // when the provider expects the body bytes exactly as written and form-encoding
+      // would corrupt a value: e.g. a client_secret containing '%', which the 'form'
+      // encoder escapes to '%25'. Mirrors a standalone REST client's "raw body" mode
+      // so OSCAR can match a request that already works there. body should be a string;
+      // a non-string template body is JSON-stringified as a fallback. (#442)
+      body = typeof tpl.body === 'string' ? _substitute(tpl.body, ctx) : JSON.stringify(_substituteDeep(tpl.body, ctx));
       if (!headers['Content-Type'] && !headers['content-type']) headers['Content-Type'] = 'application/x-www-form-urlencoded';
     } else {
       // 'json' default

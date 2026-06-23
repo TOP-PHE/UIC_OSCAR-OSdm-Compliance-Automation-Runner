@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS companies (
   datafile_path       TEXT,                      -- absolute path on server
   datafile_hash       TEXT,                      -- SHA-256 hex of uploaded file
   datafile_updated_at TEXT,
+  -- Company-wide "dedicated headers" (issue #426). JSON array of
+  -- { "name": "<HTTP header>", "value": "<literal or {{var}} template>" }.
+  -- Injected on every OSDM request by opencollection.yml's before-request
+  -- hook; {{var}} references resolve against the Bruno env at send time
+  -- (e.g. {{requestor}}, {{Ocp-Apim-Subscription-Key}}, {{access_token}}).
+  -- Lets a Test Manager add operator-specific headers without a code change.
+  extra_headers       TEXT,
   -- Privacy toggle (v15): when 0, certification_user role cannot see this
   -- company's runs/reports. Only test_manager(s) of the company and the
   -- platform administrator can. Default 1 keeps current behaviour.

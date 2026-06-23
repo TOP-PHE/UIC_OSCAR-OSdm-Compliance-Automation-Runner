@@ -1,14 +1,11 @@
 {
     "scenariosToRun": [
-        "OTST_RFND_PATCH_SRCH_CRIT_1ADT_2LEG_Muenchen_Hannover",
-        "OTST_RFND_DEL_SRCH_CRIT_1ADT_2LEG_Muenchen_Hannover",
-        "OTST_RFND_SRCH_CRIT_2ADT_2LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1CHD_2LEG",
-        "OTST_RFND_SRCH_CRIT_1ADT_2LEG_Amsterdam_Hannover",
-        "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
-        "OTST_EXCH_SRCH_CRIT_1ADT_2LEG_Amsterdam_Hannover",
-        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG_SEAT",
-        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG_COUCHETTE"
+        "SALE_SEARCH_AMS_HAJ_RESA",
+        "SALE_SEARCH_MUC_HAJ_RESA_COPY",
+        "SALE_SEARCH_HAJ_PRA_RESA",
+        "RFND_PAR_SEARCH_COP_PRA_RESA_2LEGS_5PAX",
+        "RFND_FULL_SEARCH_COP_PRA_RESA_2LEGS_5PAX_COPY",
+        "EXCH_FULL_SEARCH_COP_PRA_RESA_2LEGS_5PAX_COPY_COPY"
     ],
     "systemInfoParameters": {
         "coachId": null,
@@ -18,144 +15,260 @@
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_PATCH_SRCH_CRIT_1ADT_2LEG_Muenchen_Hannover",
+            "code": "SALE_SEARCH_AMS_HAJ_RESA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.0.5",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 5,
+            "passengersListId": 6,
+            "purchaserListId": 7,
+            "requestedFulfillmentOptionsListId": 8,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_MUC_HAJ_RESA_COPY",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.0.5",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 13,
+            "passengersListId": 14,
+            "purchaserListId": 15,
+            "requestedFulfillmentOptionsListId": 16,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_HAJ_PRA_RESA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.0.5",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 17,
+            "passengersListId": 18,
+            "purchaserListId": 19,
+            "requestedFulfillmentOptionsListId": 20,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "RFND_PAR_SEARCH_COP_PRA_RESA_2LEGS_5PAX",
             "scenarioType": "REFUND",
             "scenarioAction": "PATCH",
             "osdmVersion": "3.0.5",
             "desiredFlexibility": "FULL_FLEXIBLE",
-            "accommodationSelection": "COUCHETTE",
-            "requiresPlaceSelection": false,
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 2,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 21,
+            "passengersListId": 22,
+            "purchaserListId": 23,
+            "requestedFulfillmentOptionsListId": 24,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "EUR"
+            },
+            "passengerExternalRefFormat": "PAX%02d",
+            "partialRefundByLeg": "on",
+            "partialRefundByPax": "on",
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_DEL_SRCH_CRIT_1ADT_2LEG_Muenchen_Hannover",
+            "code": "RFND_FULL_SEARCH_COP_PRA_RESA_2LEGS_5PAX_COPY",
             "scenarioType": "REFUND",
-            "scenarioAction": "DELETE",
+            "scenarioAction": "PATCH",
             "osdmVersion": "3.0.5",
             "desiredFlexibility": "FULL_FLEXIBLE",
-            "accommodationSelection": "SEAT",
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 25,
+            "passengersListId": 26,
+            "purchaserListId": 27,
+            "requestedFulfillmentOptionsListId": 28,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "EUR"
+            },
+            "passengerExternalRefFormat": "PAX%02d",
+            "partialRefundByLeg": "off",
+            "partialRefundByPax": "off",
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "description": "No offer found with multipax",
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 2,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1CHD_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "description": "No offer found with multipax",
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 3,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_1ADT_2LEG_Amsterdam_Hannover",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 2,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "description": "INTERNAL_ERROR 400 Bad request",
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 3,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_EXCH_SRCH_CRIT_1ADT_2LEG_Amsterdam_Hannover",
+            "code": "EXCH_FULL_SEARCH_COP_PRA_RESA_2LEGS_5PAX_COPY_COPY",
             "scenarioType": "EXCHANGE",
-            "scenarioAction": null,
+            "scenarioAction": "PATCH",
             "osdmVersion": "3.0.5",
             "desiredFlexibility": "FULL_FLEXIBLE",
-            "accommodationSelection": "COUCHETTE",
-            "requiresPlaceSelection": false,
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 2,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_EXCH_SRCH_CRIT_1ADT_1LEG_SEAT",
-            "scenarioType": "EXCHANGE",
-            "scenarioAction": null,
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "accommodationSelection": "SEAT",
-            "requiresPlaceSelection": false,
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 3,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_EXCH_SRCH_CRIT_1ADT_1LEG_COUCHETTE",
-            "scenarioType": "EXCHANGE",
-            "scenarioAction": null,
-            "osdmVersion": "3.0.5",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "accommodationSelection": "COUCHETTE",
-            "requiresPlaceSelection": false,
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 3,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "tripRequirementId": 29,
+            "passengersListId": 30,
+            "purchaserListId": 31,
+            "requestedFulfillmentOptionsListId": 32,
+            "shared": false,
+            "created_by": "patrick.turnit@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "EUR"
+            },
+            "passengerExternalRefFormat": "PAX%02d",
+            "partialRefundByLeg": "off",
+            "partialRefundByPax": "off",
+            "stepFailurePolicy": "CONTINUE"
         }
     ],
     "offerSearchCriteriaList": [
@@ -217,6 +330,69 @@
                 {
                     "fulfillmentMedia": "PDF_A4",
                     "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 28,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 32,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
                 }
             ]
         }
@@ -282,6 +458,111 @@
                     "operatorCode": "urn:uic:rics:1100"
                 }
             ]
+        },
+        {
+            "id": 5,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:8000152",
+                "startDatetime": "%TRIP_DATE%T08:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T14:00:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "20",
+                "operatorCode": "1100"
+            }
+        },
+        {
+            "id": 9,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:8000152",
+                "startDatetime": "%TRIP_DATE%T08:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T14:00:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "20",
+                "operatorCode": "1100"
+            }
+        },
+        {
+            "id": 13,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8000600",
+                "destination": "urn:uic:stn:8000152",
+                "startDatetime": "%TRIP_DATE%T19:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 17,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8000152",
+                "destination": "urn:uic:stn:5457076",
+                "startDatetime": "%TRIP_DATE%T14:50:00+02:00",
+                "endDatetime": "%TRIP_DATE%T21:05:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "21",
+                "operatorCode": "1100"
+            }
+        },
+        {
+            "id": 21,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8600626",
+                "destination": "urn:uic:stn:5457076",
+                "startDatetime": "%TRIP_DATE%T06:50:00+02:00",
+                "endDatetime": "%TRIP_DATE%T21:05:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "21",
+                "operatorCode": "1100"
+            }
+        },
+        {
+            "id": 25,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8600626",
+                "destination": "urn:uic:stn:5457076",
+                "startDatetime": "%TRIP_DATE%T06:50:00+02:00",
+                "endDatetime": "%TRIP_DATE%T21:05:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "21",
+                "operatorCode": "1100"
+            }
+        },
+        {
+            "id": 29,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8600626",
+                "destination": "urn:uic:stn:5457076",
+                "startDatetime": "%TRIP_DATE%T06:50:00+02:00",
+                "endDatetime": "%TRIP_DATE%T21:05:00+02:00",
+                "productCategoryRef": "ST",
+                "productCategoryName": "Express train",
+                "productCategoryShortName": "ST",
+                "vehicleNumber": "21",
+                "operatorCode": "1100"
+            }
         }
     ],
     "purchaserList": [
@@ -293,6 +574,94 @@
                     "purchaserLastName": "DoePurchaser",
                     "purchaserPhoneNumber": "+33612345678",
                     "purchaserEmail": "emailPurchaser@email.com"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Morgan",
+                    "purchaserLastName": "Purchaser_Dupont",
+                    "purchaserEmail": "purchaser_morgan.purchaser_dupont@turnitsandbox.com",
+                    "purchaserPhoneNumber": "+9245722400"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Dana",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+9616396924",
+                    "purchaserEmail": "dana.szabo@turnitsandbox.com"
                 }
             ]
         }
@@ -309,7 +678,8 @@
                     "phoneNumber": "+33612345678",
                     "email": "email@email.com",
                     "type": "PERSON",
-                    "updateFirstName": "JohnUpdate"
+                    "updateFirstName": "JohnUpdate",
+                    "gender": "MALE"
                 }
             ]
         },
@@ -392,6 +762,477 @@
                     "type": "PERSON"
                 }
             ]
+        },
+        {
+            "id": 6,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Sophie",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Sophie",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+4703103259",
+                    "email": "marc.muller@turnitsandbox.com",
+                    "firstName": "Marc",
+                    "lastName": "Muller",
+                    "dateOfBirth": "1959-05-28",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1997-05-25",
+                    "updatePhoneNumber": "+8722592086",
+                    "updateEmail": "jordan.szabo@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+7749264006",
+                    "email": "marco.jensen@turnitsandbox.com",
+                    "firstName": "Marco",
+                    "lastName": "Jensen",
+                    "dateOfBirth": "1978-02-24",
+                    "updateFirstName": "Jan",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1933-02-02",
+                    "updatePhoneNumber": "+4627187997",
+                    "updateEmail": "jan.szabo@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "phoneNumber": "+5709526569",
+                    "email": "jan.wagner@turnitsandbox.com",
+                    "firstName": "Jan",
+                    "lastName": "Wagner",
+                    "dateOfBirth": "2016-04-03",
+                    "updateFirstName": "Sam",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "2018-11-10",
+                    "updatePhoneNumber": "+9022530761",
+                    "updateEmail": "sam.garcia@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX5",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "phoneNumber": "+7704139679",
+                    "email": "diego.novak@turnitsandbox.com",
+                    "firstName": "Diego",
+                    "lastName": "Novak",
+                    "dateOfBirth": "2019-02-19",
+                    "updateFirstName": "Marco",
+                    "updateLastName": "Dupont",
+                    "updateDateOfBirth": "2015-10-06",
+                    "updatePhoneNumber": "+0487176789",
+                    "updateEmail": "marco.dupont@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Sophie",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Sophie",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+4703103259",
+                    "email": "marc.muller@turnitsandbox.com",
+                    "firstName": "Marc",
+                    "lastName": "Muller",
+                    "dateOfBirth": "1959-05-28",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1997-05-25",
+                    "updatePhoneNumber": "+8722592086",
+                    "updateEmail": "jordan.szabo@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+7749264006",
+                    "email": "marco.jensen@turnitsandbox.com",
+                    "firstName": "Marco",
+                    "lastName": "Jensen",
+                    "dateOfBirth": "1978-02-24",
+                    "updateFirstName": "Jan",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1933-02-02",
+                    "updatePhoneNumber": "+4627187997",
+                    "updateEmail": "jan.szabo@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "phoneNumber": "+5709526569",
+                    "email": "jan.wagner@turnitsandbox.com",
+                    "firstName": "Jan",
+                    "lastName": "Wagner",
+                    "dateOfBirth": "2016-04-03",
+                    "updateFirstName": "Sam",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "2018-11-10",
+                    "updatePhoneNumber": "+9022530761",
+                    "updateEmail": "sam.garcia@turnitsandbox.com"
+                },
+                {
+                    "reference": "PAX5",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "phoneNumber": "+7704139679",
+                    "email": "diego.novak@turnitsandbox.com",
+                    "firstName": "Diego",
+                    "lastName": "Novak",
+                    "dateOfBirth": "2019-02-19",
+                    "updateFirstName": "Marco",
+                    "updateLastName": "Dupont",
+                    "updateDateOfBirth": "2015-10-06",
+                    "updatePhoneNumber": "+0487176789",
+                    "updateEmail": "marco.dupont@turnitsandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Marco",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Diego",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 18,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Charlie",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Noa",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com",
+                    "gender": "X"
+                }
+            ]
+        },
+        {
+            "id": 22,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Luca",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Anna",
+                    "lastName": "Muller",
+                    "dateOfBirth": "1962-04-10",
+                    "email": "lara.muller@turnitsandbox.com",
+                    "phoneNumber": "+4569265445",
+                    "updateFirstName": "Lara",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1945-12-06",
+                    "updatePhoneNumber": "+0591585932",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Jan",
+                    "lastName": "Klein",
+                    "dateOfBirth": "2013-03-01",
+                    "email": "sophie.klein@turnitsandbox.com",
+                    "phoneNumber": "+8111674904",
+                    "updateFirstName": "Thomas",
+                    "updateLastName": "Jensen",
+                    "updateDateOfBirth": "2002-11-26",
+                    "updatePhoneNumber": "+4350429900",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00004",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Julie",
+                    "lastName": "Muller",
+                    "dateOfBirth": "2003-12-28",
+                    "email": "jean.muller@turnitsandbox.com",
+                    "phoneNumber": "+4381004994",
+                    "updateFirstName": "Nora",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "2012-04-04",
+                    "updatePhoneNumber": "+9267382508",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00005",
+                    "type": "PERSON",
+                    "category": "SENIOR",
+                    "firstName": "Luca",
+                    "lastName": "Jensen",
+                    "dateOfBirth": "1966-02-26",
+                    "email": "lara.jensen@turnitsandbox.com",
+                    "phoneNumber": "+5746282852",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Martin",
+                    "updateDateOfBirth": "1964-09-22",
+                    "updatePhoneNumber": "+2913214475",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Luca",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Anna",
+                    "lastName": "Muller",
+                    "dateOfBirth": "1962-04-10",
+                    "email": "lara.muller@turnitsandbox.com",
+                    "phoneNumber": "+4569265445",
+                    "updateFirstName": "Lara",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1945-12-06",
+                    "updatePhoneNumber": "+0591585932",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Jan",
+                    "lastName": "Klein",
+                    "dateOfBirth": "2013-03-01",
+                    "email": "sophie.klein@turnitsandbox.com",
+                    "phoneNumber": "+8111674904",
+                    "updateFirstName": "Thomas",
+                    "updateLastName": "Jensen",
+                    "updateDateOfBirth": "2002-11-26",
+                    "updatePhoneNumber": "+4350429900",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00004",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Julie",
+                    "lastName": "Muller",
+                    "dateOfBirth": "2003-12-28",
+                    "email": "jean.muller@turnitsandbox.com",
+                    "phoneNumber": "+4381004994",
+                    "updateFirstName": "Nora",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "2012-04-04",
+                    "updatePhoneNumber": "+9267382508",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00005",
+                    "type": "PERSON",
+                    "category": "SENIOR",
+                    "firstName": "Luca",
+                    "lastName": "Jensen",
+                    "dateOfBirth": "1966-02-26",
+                    "email": "lara.jensen@turnitsandbox.com",
+                    "phoneNumber": "+5746282852",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Martin",
+                    "updateDateOfBirth": "1964-09-22",
+                    "updatePhoneNumber": "+2913214475",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 30,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+2257286495",
+                    "email": "sophie.garcia@turnitsandbox.com",
+                    "firstName": "Luca",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1973-07-11",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1982-05-12",
+                    "updatePhoneNumber": "+1442559494",
+                    "updateEmail": "sophie.simon@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Anna",
+                    "lastName": "Muller",
+                    "dateOfBirth": "1962-04-10",
+                    "email": "lara.muller@turnitsandbox.com",
+                    "phoneNumber": "+4569265445",
+                    "updateFirstName": "Lara",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1945-12-06",
+                    "updatePhoneNumber": "+0591585932",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Jan",
+                    "lastName": "Klein",
+                    "dateOfBirth": "2013-03-01",
+                    "email": "sophie.klein@turnitsandbox.com",
+                    "phoneNumber": "+8111674904",
+                    "updateFirstName": "Thomas",
+                    "updateLastName": "Jensen",
+                    "updateDateOfBirth": "2002-11-26",
+                    "updatePhoneNumber": "+4350429900",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00004",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Julie",
+                    "lastName": "Muller",
+                    "dateOfBirth": "2003-12-28",
+                    "email": "jean.muller@turnitsandbox.com",
+                    "phoneNumber": "+4381004994",
+                    "updateFirstName": "Nora",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "2012-04-04",
+                    "updatePhoneNumber": "+9267382508",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00005",
+                    "type": "PERSON",
+                    "category": "SENIOR",
+                    "firstName": "Luca",
+                    "lastName": "Jensen",
+                    "dateOfBirth": "1966-02-26",
+                    "email": "lara.jensen@turnitsandbox.com",
+                    "phoneNumber": "+5746282852",
+                    "updateFirstName": "Peter",
+                    "updateLastName": "Martin",
+                    "updateDateOfBirth": "1964-09-22",
+                    "updatePhoneNumber": "+2913214475",
+                    "updateEmail": "updated@turnitsandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        }
+    ],
+    "knownDeviations": [
+        {
+            "step": "03-Refund/11. GET Refund Offer",
+            "expectedStatus": 405,
+            "note": "Refund: GET refund-offer/{id} returns 405 (retrieval not allowed)",
+            "active": true
+        },
+        {
+            "step": "04-Exchange/12. GET Exchange Offer",
+            "expectedStatus": 405,
+            "note": "Exchange: GET exchange-operation/{id} returns 405 (retrieval not allowed)",
+            "active": true
         }
     ]
 }

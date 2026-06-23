@@ -2691,12 +2691,15 @@ function buildOfferSection(idx, sc) {
 function buildFulfillmentSection(idx, sc, fulfGroup) {
   const fIdx = (state.requestedFulfillmentOptionsList || []).findIndex(f => f.id === sc.requestedFulfillmentOptionsListId);
   const opts  = (fulfGroup.requestedFulfillmentOptions || [])[0] || {};
-  const fwFul = ((wizData && wizData.framework) || {}).fulfillment || {};
-  // Filter the OSDM-defined enums down to what the framework enables. If the
-  // framework doesn't specify types/media, the full list is kept so the UI
-  // stays usable on under-configured frameworks.
-  const typeList   = fwFilter(ENUMS.fulfillmentType,  fwFul.types);
-  const mediaList  = fwFilter(ENUMS.fulfillmentMedia, fwFul.media);
+  // The scenario "Fulfillment Options" editor is where the tester EXPLICITLY
+  // chooses which fulfillment to request, so it offers the full OSDM set. It used
+  // to filter by the company's framework.fulfillment, but that defaults to
+  // ['ETICKET']/['PDF_A4'] and has no wired UI to broaden it — so a new provider
+  // (e.g. SBB) was locked to "E-ticket" and could never request TICKETLESS. The
+  // datafile schema (#433/#434) already accepts the full OSDM set; the server-side
+  // framework gating still flags anything the provider hasn't declared.
+  const typeList   = ENUMS.fulfillmentType;
+  const mediaList  = ENUMS.fulfillmentMedia;
 
   return `
   <div class="param-section">
@@ -3044,14 +3047,22 @@ const WIZ_PAX_DEFAULT_AGES = {
   PRM:          { min: 18, max: 99 },
   ACCOMP_PRM:   { min: 18, max: 99 }
 };
-// Offer search criteria
+// Offer search criteria. #433: source the OSDM-spec lists from the canonical
+// ENUMS block (single source of truth) instead of separate copies that had
+// drifted to non-OSDM values — WIZ_TRAVEL_CLASSES had THIRD/BUSINESS (OSDM is
+// FIRST/SECOND/ANY_CLASS) and WIZ_OFFER_MODES had COMBINATION (OSDM is
+// INDIVIDUAL/COLLECTIVE), so the framework editor offered invalid values and
+// hid valid ones.
 const WIZ_OFFER_PARTS    = ['RESERVATION','ADMISSION','ANCILLARY'];
-const WIZ_TRAVEL_CLASSES = ['FIRST','SECOND','THIRD','BUSINESS'];
+const WIZ_TRAVEL_CLASSES = ENUMS.travelClass;
 const WIZ_FLEXIBILITIES  = ['FULL_FLEXIBLE','SEMI_FLEXIBLE','NON_FLEXIBLE'];
-const WIZ_OFFER_MODES    = ['INDIVIDUAL','COMBINATION'];
-// Fulfillment
-const WIZ_FULFIL_MEDIA   = ['PDF_A4','PKPASS','AZTEC_CODE','QR_CODE','NFC'];
-const WIZ_FULFIL_TYPES   = ['ETICKET','PAPER_TICKET'];
+const WIZ_OFFER_MODES    = ENUMS.offerMode;
+// Fulfillment — likewise sourced from ENUMS. The old lists were stale: media
+// had bogus AZTEC_CODE/QR_CODE/NFC and was missing UIC_PDF/ALLOCATOR_APP/RCCST/
+// RCT2/TICKETLESS; types had bogus PAPER_TICKET and was missing CIT_PAPER/
+// PASS_CHIP/PASS_REFERENCE — so e.g. SBB's TICKETLESS could not be declared.
+const WIZ_FULFIL_MEDIA   = ENUMS.fulfillmentMedia;
+const WIZ_FULFIL_TYPES   = ENUMS.fulfillmentType;
 // Days of week for a train set's timetable services (#136). Stored per service;
 // empty = runs every day. Informational today (the offer request still targets a
 // specific %TRIP_DATE%), but documents the route's weekly pattern.

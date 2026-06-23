@@ -15,9 +15,9 @@ variables:
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/data_base/turnit_datafile.json
+    value: http://localhost:8080/Bruno_Collection/data_base/turnit_datafile.json
   - name: json_schema
-    value: http://localhost:8080/json_validator/datafile.schema.json
+    value: http://localhost:8080/Bruno_Collection/json_validator/datafile.schema.json
   - name: scenariosToRunIndex
     value: "0"
   - name: scenarioTarget
