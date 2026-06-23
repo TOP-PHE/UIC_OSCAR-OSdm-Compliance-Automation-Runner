@@ -15,10 +15,228 @@ variables:
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/data_base/sqills_datafile.json
+    value: http://localhost:8080/Bruno_Collection/data_base/sqills_datafile.json
   - name: json_schema
-    value: http://localhost:8080/json_validator/datafile.schema.json
+    value: http://localhost:8080/Bruno_Collection/json_validator/datafile.schema.json
   - name: scenariosToRunIndex
     value: "0"
   - name: scenarioTarget
+    value: SALE_SEARCH_IC_BAS_AMS_1PAX
+  - name: __reportInitDone
+    value: "true"
+  - name: __envSanityAnnounced
+    value: "true"
+  - name: __knownDeviations
+    value: "[]"
+  - name: __knownDeviationHits
+    value: "0"
+  - name: __knownDeviationsSeen
+    value: "[]"
+  - name: __scenariosList
+    value: '["SALE_SEARCH_IC_HS_BAS_PAR_2LEGS_4ADT_2CHD_RETURN_REFUND_REASONCODE"]'
+  - name: __unitaryLoadedIdx
+    value: "0"
+  - name: osdmVersion
+    value: "3.4"
+  - name: loggingType
+    value: INFO
+  - name: stepFailurePolicy
+    value: HARD_STOP
+  - name: scenarioCode
+    value: SALE_SEARCH_IC_HS_BAS_PAR_2LEGS_4ADT_2CHD_RETURN_REFUND_REASONCODE
+  - name: scenarioType
+    value: REFUND
+  - name: requestedInformationProbe
+    value: off
+  - name: bookingPurchaserMode
+    value: inline
+  - name: expiredBookingTest
+    value: "false"
+  - name: expiredBookingMaxWaitMinutes
     value: ""
+  - name: expiredOfferTest
+    value: "false"
+  - name: expiredOfferMaxWaitMinutes
+    value: ""
+  - name: expiredAddReservationOfferTest
+    value: "false"
+  - name: expiredAddReservationOfferMaxWaitMinutes
+    value: ""
+  - name: expiredAddAncillaryOfferTest
+    value: "false"
+  - name: expiredAddAncillaryOfferMaxWaitMinutes
+    value: ""
+  - name: expiredRefundOfferTest
+    value: "false"
+  - name: expiredRefundOfferMaxWaitMinutes
+    value: ""
+  - name: expiredExchangeOfferTest
+    value: "false"
+  - name: expiredExchangeOfferMaxWaitMinutes
+    value: ""
+  - name: desiredFlexibility
+    value: FULL_FLEXIBLE
+  - name: placeSelectionProbes
+    value: "[]"
+  - name: __placeProbeIndex
+    value: "0"
+  - name: overruleCode
+    value: TECHNICAL_FAILURE
+  - name: partialRefundByLeg
+    value: "false"
+  - name: partialRefundByPax
+    value: "false"
+  - name: partialRefundLegSelection
+    value: ""
+  - name: partialRefundPaxSelection
+    value: ""
+  - name: salesFlow_patchPassengers
+    value: "true"
+  - name: salesFlow_placeSelection
+    value: "false"
+  - name: salesFlow_addAncillary
+    value: "true"
+  - name: salesFlow_getBooking
+    value: "true"
+  - name: salesFlow_deleteAncillary
+    value: "true"
+  - name: placeSelectionMode
+    value: SEATMAP_AT_OFFER
+  - name: __expiredFlowQueue
+    value: "[]"
+  - name: __expiredFlowQueueIndex
+    value: "0"
+  - name: TripType
+    value: SEARCH
+  - name: tripStartStopPlaceRef
+    value: urn:uic:stn:8500010
+  - name: tripEndStopPlaceRef
+    value: urn:uic:stn:8727100
+  - name: tripStartDatetime
+    value: 2026-07-03T07:00:00+01:00
+  - name: tripEndDatetime
+    value: 2026-07-03T09:00:00+01:00
+  - name: tripVehicleNumber
+    value: ""
+  - name: tripOperatorCode
+    value: ""
+  - name: offerTripSearchCriteria
+    value: '{"departureTime":"2026-07-03T07:00:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:8500010"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:8727100"}}'
+  - name: bookingPurchaserSpecifications
+    value: '{"detail":{"firstName":"JohnPurchaser","lastName":"DoePurchaser","contact":{"email":"emailPurchaser@email.com","phoneNumber":"+33699999999"}}}'
+  - name: offerPassengerSpecifications
+    value: '[{"externalRef":"PAX1","type":"PERSON","dateOfBirth":"1966-08-06","gender":"MALE"},{"externalRef":"PAX2","type":"PERSON","dateOfBirth":"1982-06-05","gender":"FEMALE"},{"externalRef":"PAX3","type":"PERSON","dateOfBirth":"2022-02-14","gender":"MALE"},{"externalRef":"PAX4","type":"PERSON","dateOfBirth":"2018-01-12","gender":"FEMALE"},{"externalRef":"PAX5","type":"PERSON","dateOfBirth":"2017-01-24","gender":"MALE"},{"externalRef":"PAX6","type":"PERSON","dateOfBirth":"2021-02-11","gender":"FEMALE"},{"externalRef":"PAX7","type":"PERSON","dateOfBirth":"1996-09-11"}]'
+  - name: bookingPassengerSpecifications
+    value: '[{"externalRef":"PAX1","type":"PERSON","dateOfBirth":"1966-08-06","gender":"MALE","detail":{"firstName":"Anna","lastName":"Dubois","contact":{"email":"anna.dubois@sqillssandbox.com","phoneNumber":"+0033470687"}}},{"externalRef":"PAX2","type":"PERSON","dateOfBirth":"1982-06-05","gender":"FEMALE","detail":{"firstName":"Lara","lastName":"Muller","contact":{"email":"anna.muller@sqillssandbox.com","phoneNumber":"+6507855937"}}},{"externalRef":"PAX3","type":"PERSON","dateOfBirth":"2022-02-14","gender":"MALE","detail":{"firstName":"Luca","lastName":"Michel","contact":{"email":"charlie.michel@sqillssandbox.com","phoneNumber":"+3951055781"}}},{"externalRef":"PAX4","type":"PERSON","dateOfBirth":"2018-01-12","gender":"FEMALE","detail":{"firstName":"Kai","lastName":"Lund","contact":{"email":"kai.lund@sqillssandbox.com","phoneNumber":"+0145032435"}}},{"externalRef":"PAX5","type":"PERSON","dateOfBirth":"2017-01-24","gender":"MALE","detail":{"firstName":"Noah","lastName":"Rossi","contact":{"email":"nicolas.rossi@sqillssandbox.com","phoneNumber":"+7630701648"}}},{"externalRef":"PAX6","type":"PERSON","dateOfBirth":"2021-02-11","gender":"FEMALE","detail":{"firstName":"Emma","lastName":"Lund","contact":{"email":"eli.lund@sqillssandbox.com","phoneNumber":"+2742779765"}}},{"externalRef":"PAX7","type":"PERSON","dateOfBirth":"1996-09-11","detail":{"firstName":"Paul","lastName":"Garcia","contact":{"email":"paul.garcia@sqillssandbox.com","phoneNumber":"+4284473615"}}}]'
+  - name: bookingPassengerReferences
+    value: '["PAX1","PAX2","PAX3","PAX4","PAX5","PAX6","PAX7"]'
+  - name: passengerAdditionalData
+    value: '[{"updateFirstName":"Max","updateLastName":"Klein","updateDateOfBirth":"1972-10-04","updateEmail":"max.klein@sqillssandbox.com","updatePhoneNumber":"+1739700582","updateGender":"MALE"},{"updateFirstName":"Elena","updateLastName":"Fischer","updateDateOfBirth":"1969-07-17","updateEmail":"taylor.fischer@sqillssandbox.com","updatePhoneNumber":"+0818420650","updateGender":"MALE"},{"updateFirstName":"Hans","updateLastName":"Fischer","updateDateOfBirth":"2012-07-02","updateEmail":"laura.fischer@sqillssandbox.com","updatePhoneNumber":"+5574443461","updateGender":"FEMALE"},{"updateFirstName":"Reese","updateLastName":"Martin","updateDateOfBirth":"2021-05-22","updateEmail":"reese.martin@sqillssandbox.com","updatePhoneNumber":"+4764271670","updateGender":"FEMALE"},{"updateFirstName":"Stefan","updateLastName":"Garcia","updateDateOfBirth":"2022-05-14","updateEmail":"updated@sqillssandbox.com","updatePhoneNumber":"+6836465581","updateGender":"MALE"},{"updateFirstName":"Chloe","updateLastName":"Laurent","updateDateOfBirth":"2015-07-23","updateEmail":"updated@sqillssandbox.com","updatePhoneNumber":"+6598074077","updateGender":"FEMALE"},{"updateFirstName":"Alex","updateLastName":"Laurent","updateDateOfBirth":"1984-12-01","updateEmail":"updated@sqillssandbox.com","updatePhoneNumber":"+4807974785","updateGender":"X"}]'
+  - name: updateFirstName_0
+    value: Max
+  - name: updateLastName_0
+    value: Klein
+  - name: updateDateOfBirth_0
+    value: 1972-10-04
+  - name: updateEmail_0
+    value: max.klein@sqillssandbox.com
+  - name: updatePhoneNumber_0
+    value: "+1739700582"
+  - name: updateGender_0
+    value: MALE
+  - name: updateFirstName_1
+    value: Elena
+  - name: updateLastName_1
+    value: Fischer
+  - name: updateDateOfBirth_1
+    value: 1969-07-17
+  - name: updateEmail_1
+    value: taylor.fischer@sqillssandbox.com
+  - name: updatePhoneNumber_1
+    value: "+0818420650"
+  - name: updateGender_1
+    value: MALE
+  - name: updateFirstName_2
+    value: Hans
+  - name: updateLastName_2
+    value: Fischer
+  - name: updateDateOfBirth_2
+    value: 2012-07-02
+  - name: updateEmail_2
+    value: laura.fischer@sqillssandbox.com
+  - name: updatePhoneNumber_2
+    value: "+5574443461"
+  - name: updateGender_2
+    value: FEMALE
+  - name: updateFirstName_3
+    value: Reese
+  - name: updateLastName_3
+    value: Martin
+  - name: updateDateOfBirth_3
+    value: 2021-05-22
+  - name: updateEmail_3
+    value: reese.martin@sqillssandbox.com
+  - name: updatePhoneNumber_3
+    value: "+4764271670"
+  - name: updateGender_3
+    value: FEMALE
+  - name: updateFirstName_4
+    value: Stefan
+  - name: updateLastName_4
+    value: Garcia
+  - name: updateDateOfBirth_4
+    value: 2022-05-14
+  - name: updateEmail_4
+    value: updated@sqillssandbox.com
+  - name: updatePhoneNumber_4
+    value: "+6836465581"
+  - name: updateGender_4
+    value: MALE
+  - name: updateFirstName_5
+    value: Chloe
+  - name: updateLastName_5
+    value: Laurent
+  - name: updateDateOfBirth_5
+    value: 2015-07-23
+  - name: updateEmail_5
+    value: updated@sqillssandbox.com
+  - name: updatePhoneNumber_5
+    value: "+6598074077"
+  - name: updateGender_5
+    value: FEMALE
+  - name: updateFirstName_6
+    value: Alex
+  - name: updateLastName_6
+    value: Laurent
+  - name: updateDateOfBirth_6
+    value: 1984-12-01
+  - name: updateEmail_6
+    value: updated@sqillssandbox.com
+  - name: updatePhoneNumber_6
+    value: "+4807974785"
+  - name: updateGender_6
+    value: X
+  - name: offerSearchCriteria
+    value: '{"travelClasses":["SECOND"]}'
+  - name: offerFulfillmentOptions
+    value: '[{"type":"ETICKET","media":"PDF_A4"}]'
+  - name: __unitaryLoadedTarget
+    value: ""
+  - name: OfferCollectionRequest
+    value: '{"tripSearchCriteria":{"departureTime":"2026-07-03T07:00:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:8500010"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:8727100"}},"anonymousPassengerSpecifications":[{"externalRef":"PAX1","type":"PERSON","dateOfBirth":"1966-08-06","gender":"MALE"},{"externalRef":"PAX2","type":"PERSON","dateOfBirth":"1982-06-05","gender":"FEMALE"},{"externalRef":"PAX3","type":"PERSON","dateOfBirth":"2022-02-14","gender":"MALE"},{"externalRef":"PAX4","type":"PERSON","dateOfBirth":"2018-01-12","gender":"FEMALE"},{"externalRef":"PAX5","type":"PERSON","dateOfBirth":"2017-01-24","gender":"MALE"},{"externalRef":"PAX6","type":"PERSON","dateOfBirth":"2021-02-11","gender":"FEMALE"},{"externalRef":"PAX7","type":"PERSON","dateOfBirth":"1996-09-11"}],"offerSearchCriteria":{"travelClasses":["SECOND"]},"requestedFulfillmentOptions":[{"type":"ETICKET","media":"PDF_A4"}]}'
+  - name: offerCurrency
+    value: EUR
+  - name: offerId
+    value: AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3OvJKVWeTDtONeHBof6kDGUbY0gpb8L2tNAFisAjg1hbQgn4k8uO_EJIIYdF3x_xjTN0bXKegkCSWWFGJ_Xxg_Y754FxYjgeR-_YFeYz4kKE2LE13COktXd8nm6noPpsfedao2ziufVbMOgZYkgnwgAKz5IjcxpB0I8hO52RsQJdfKMfig_GrbJmys3j-zdriqUS5udeNQ9k1GxNh4zMo7JUf8TNMv_-Hc6klDx1ZF_DiDF9OBGihUbEel1oAPvZaMqs4PjB9UtzSaCMqzJI03qqOsQ1irudgs991D7Trt832YCXF3HyEekbjXXu6nZ_bqNKCAFDnywoDkx_Qa04CVXioNhnGg0ysf7CevYPUSm2igiLCmRKXhSZeXzAECwJXQZt4J1NYpiCAEOUKaf5CFB6US4CRg91tpIDfqppjztq1KNgrgiMk1eVuzBu_986AeD79c011OruAJWwNyyNRZ7g8POC4-_mepNAeQhMhGiIBR4WpQ8qkvQo7xaXgncqU_DtvFuIvHeIQ8dhq4HW7-lDzCz0hSLOCTkWQqv2Hewv3i6oQzfV17g-KcelWfqZ-ffOMC
+  - name: offerValidUntil
+    value: 2026-07-03T07:10:00Z
+  - name: offerValidUntilSource
+    value: selectedOffer.preBookableUntil
+  - name: overallFlexibility
+    value: FULL_FLEXIBLE
+  - name: referencedAncillaryIds
+    value: "[]"
+  - name: coveredTripId
+    value: AAAAAAAAAAAAAAAqT_YoPORGOcnNpC3OuYKRQZTHtONe2j23AGiGrbaQCwOl_qndBEYar8B1GPQcTjuCdb_mMNc6Fsy8O8KFJvZ778qnizMi7HWNSbCq3_VFuE6hywNPryOYdXSLRGrG1n87vXnOt1TVRmX56PMrnhDq7sWF98HR_4YjTaytX_ysyr3PMDavnWAVl0FwlZUiBLry6ZS2mCZqW_j9HxilCuSUGHeAIHnqQ2ZJTVeAWy3QBDaQAfCOUYxoKCSCLQW4E5nP950lcARGF-F0Gcwvn_KexFjdnE9sdYwPOY8anI5d3T8J54-c0aImEI8r9IpQE9lLtjVtUkNvNJkaWyU8v9CgNqmt88fZFHAlTOnDqw==
+  - name: __offerRetryCount
+    value: "0"

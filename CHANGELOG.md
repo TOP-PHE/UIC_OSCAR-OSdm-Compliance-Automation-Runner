@@ -14,6 +14,365 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.165] — 2026-06-18
+
+**Feat (#442): `custom` OAuth profile gains `body_format: "raw"` — send the token
+body verbatim, so a `client_secret` containing `%` isn't mangled by form-encoding.**
+
+### Added
+
+- **`auth-profiles.js` `_custom` — `body_format: "raw"`** — sends the substituted
+  template `body` **verbatim**, with no `URLSearchParams` re-encoding. The existing
+  `"form"` mode builds the body with `URLSearchParams`, which percent-escapes
+  `%` → `%25` (and `+` → `%2B`). A token endpoint that takes the body bytes as-is
+  (CHAPS / ČD `/auth/login/`) then sees a different secret → `401 err_5002 "Invalid
+  username or password"`, even though the same request works in a raw client. `"raw"`
+  lets OSCAR match that byte-for-byte. Defaults `Content-Type:
+  application/x-www-form-urlencoded` (overridable via the template `headers`).
+- **Form-mode hint** — when a credential value in `"form"` mode contains `%` or `+`
+  (the characters form-encoding transforms), the run log names the field and points
+  at `body_format: "raw"`. Field name only, never the value (keeps the #437 mask
+  contract). That one line pinpoints this class of 401.
+
+### Tester template (CHAPS)
+
+```json
+{ "method": "POST",
+  "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+  "body": "client_id={{client_id}}&client_secret={{client_secret}}&grant_type=client_credentials&scope={{scope}}",
+  "body_format": "raw",
+  "token_field": "access_token" }
+```
+
+### Verified
+
+- Harness over the REAL extracted `_substitute` + `SAFE_BODY_KEYS` — 9/9: raw keeps
+  `client_secret=ab%cd_e.f+g` verbatim while `form` sends `ab%25cd_e.f%2Bg`; the hint
+  flags only the field(s) carrying `%`/`+` and never a `SAFE_BODY_KEYS` key.
+  `node --check` + eslint clean.
+
+---
+
+## [server-v1.11.164] — 2026-06-18
+
+**Fix (#440): trim OAuth credentials so a stray paste-whitespace can't cause a
+`401` that works fine in a standalone client — plus problem-determination
+diagnostics that name, never leak.**
+
+### Fixed
+
+- **`me-credentials.js` / `access-token.js`** — OSCAR trimmed `token_url` and
+  `oauth_scope` but never `client_id` / `client_secret`, so a trailing space or
+  newline pasted into the API-Config field was encrypted, stored, and sent to the
+  OAuth server verbatim → `401 "Invalid username or password"`, even though the
+  identical credential works in a standalone client that trims its inputs
+  (reported on CHAPS / ČD `…/auth/login/`). The #437 masked diagnostic couldn't
+  reveal it — `client_secret=***` masks a clean value and one with a trailing
+  newline alike. Every pasted secret is now `.trim()`-ed on store (as
+  `token_url`/`oauth_scope` already were), and `client_id`/`client_secret`/`scope`/
+  `extra` are trimmed again at use-time so credentials saved before this fix are
+  healed without re-entry (the cache fingerprint hashes the trimmed values).
+
+### Added (diagnostics — field/placeholder names only, never values; keeps the #437 mask contract)
+
+- **Whitespace note** — when stray whitespace is stripped from a credential, the
+  run log says so, naming the field only: `[runner] Auth — stripped leading/
+  trailing whitespace from client_secret before sending …`.
+- **Case-insensitive placeholders** — the custom-profile templater now resolves
+  `{{CLIENT_ID}}` as well as `{{client_id}}` (it was lowercase-only, so a
+  capitalised placeholder was sent literally → same opaque 401).
+- **Unknown-placeholder warning** — any unrecognised `{{…}}` in a custom template
+  (a typo like `{{secret}}`) is listed in the run log before the request goes out.
+
+### Verified
+
+- Harness over the REAL extracted `_substitute` (now case-insensitive) and
+  `_unknownPlaceholders` — 14/14. `node --check` clean on all three files; the
+  credFp NUL-byte separator preserved.
+
+---
+
+## [server-v1.11.163] — 2026-06-18
+
+**Fix (follow-up to #437): the masked token-request line now shows the full URL,
+not just the `Host` header.**
+
+### Fixed
+
+- **`auth-profiles.js` `_logMaskedRequest`** — the diagnostic showed
+  `Host: <hostname>` (the HTTP `Host` header, which is hostname-only by spec), so
+  during problem determination it read as a truncated/wrong URL (CHAPS: showed
+  `Host: osdm-api-test.cd.cz` when the target was
+  `https://osdm-api-test.cd.cz/auth/login/`). It now shows the full request target:
+  ```
+  [runner] Custom request (secrets masked) — POST https://osdm-api-test.cd.cz/auth/login/ | headers: Content-Type: application/x-www-form-urlencoded | body: client_id=***&client_secret=***&grant_type=client_credentials&scope=***
+  ```
+  The URL was always correct (also on the preceding line; the HTTP status confirms
+  the path) — this just makes the masked line self-contained and unambiguous.
+
+### Verified
+
+- `node --check` + `eslint` clean; `_maskHeaders`/`_maskBody` unchanged (still the
+  21/21 from #437). Server-only — server 1.11.162 → 1.11.163.
+
+---
+
+## [server-v1.11.162] — 2026-06-18
+
+**Feature (#437): log a *secrets-masked* dump of the token request for problem
+determination (e.g. debugging the CHAPS OAuth handshake).**
+
+### Added
+
+- **`auth-profiles.js` `_doFetch` now emits one masked token-request line** for
+  every profile (basic / post / paxone / sqills / custom) — the request body was
+  previously never logged because it carries the client secret. Shows the **Host**
+  (from the URL), **headers**, and **body** with a **default-deny mask**: only an
+  allowlist of structural fields keeps its value — headers
+  `content-type`/`accept`/`host`/`user-agent`/`accept-encoding`/`connection`; body
+  `grant_type`/`response_type`/`body_format`/`token_field`. Everything else
+  (`client_id`, `client_secret`, `scope`, `accountName`/`accountSecret`,
+  `Authorization`, `Ocp-Apim-Subscription-Key`, api keys, …) is masked to `***`,
+  with `(empty)` distinguishing a blank field from a populated one (often the
+  actual cause). A newly-introduced secret field is masked **by default**. Example
+  (oauth2_post / CHAPS):
+  ```
+  [runner] OAuth2[post] request (secrets masked) — Host: osdm-api-test.cd.cz | headers: Content-Type: application/x-www-form-urlencoded | Accept: application/json | body: grant_type=client_credentials&client_id=***&client_secret=***&scope=***
+  ```
+  Wrapped in `try/catch` so a diagnostics bug can never break the token fetch.
+
+### Verified
+
+- Harness over the **real extracted** `_maskHeaders`/`_maskBody` — **21/21**,
+  including the core security property: **no** confidential value (client id/secret,
+  scope, Basic value, Ocp-Apim key, account secrets) appears in the masked output —
+  across URLSearchParams (post/basic), JSON (paxone/sqills) and opaque bodies;
+  default-deny masks unknown headers/keys; empty → `(empty)`. `node --check` +
+  `eslint` clean. Server-only — server 1.11.161 → 1.11.162.
+
+---
+
+## [server-v1.11.161] — 2026-06-17
+
+**Fix (follow-up to #433–#435): the scenario "Fulfillment Options" dropdowns
+still showed only "E-ticket" for a new provider — a *dead framework filter*.**
+
+### Fixed
+
+- **`public/js/scenarios.js` `buildFulfillmentSection` — show the full OSDM
+  fulfillment set in the scenario editor.** The dropdowns filtered the OSDM enums
+  by `wizData.framework.fulfillment.types/media`, which **defaults to
+  `['ETICKET']`/`['PDF_A4']`** — and the only function that edits it
+  (`fwToggleFulfilPill`) **isn't wired to any UI**, so a new company (SBB) was
+  permanently locked to E-ticket/PDF-A4 and could never request `TICKETLESS`. The
+  scenario "Fulfillment Options" editor is where the tester **explicitly chooses
+  what to request**, so it now sources the lists straight from the canonical
+  `ENUMS` (`typeList = ENUMS.fulfillmentType`, `mediaList = ENUMS.fulfillmentMedia`)
+  — the same set the datafile schema (#434) already accepts. The dead
+  `framework.fulfillment` filter (and its now-unused `fwFul` local) is removed;
+  the server-side framework gating still flags anything the provider hasn't
+  declared. This is the layer my #435 missed — that fixed the (separate, also
+  stale) framework-editor lists; this fixes the dropdown you actually see.
+
+### Security (rides along)
+
+- **Bumped `multer` `2.1.1 → 2.2.0`** to clear two newly-published **HIGH** DoS
+  advisories (GHSA-72gw-mp4g-v24j — deeply nested field names; GHSA-3p4h-7m6x-2hcm
+  — incomplete cleanup of aborted uploads) that `npm audit` started flagging on
+  every PR (latent on `main`). `multer` is the datafile-upload dependency (already
+  auth-gated + rate-limited). Minor bump within the existing 2.x — `npm audit` →
+  **0 vulnerabilities**. Unrelated to the dropdown fix, but required to clear CI.
+
+### Verified
+
+- `scenarios.js` `node --check` clean; no dangling `fwFul` reference; the dropdown
+  now offers the same OSDM set used by datafile validation. `npm audit` clean after
+  the multer bump. Server-only — server 1.11.160 → 1.11.161, collection unchanged
+  OTST_V2.0.93.
+
+---
+
+## [server-v1.11.160] — 2026-06-17
+
+**Fix (follow-up to #433): the scenario wizard had the same OSDM enum drift as the
+datafile schema — the Fulfillment Type dropdown offered only "E-ticket".**
+
+### Fixed
+
+- **`public/js/scenarios.js` — the Test-Framework editor's enum lists were stale.**
+  A scenario's fulfillment options are gated by the company's declared framework
+  capabilities, but the framework editor's option lists held **invalid, non-OSDM
+  values** and missed valid ones, so the correct fulfillment could never be
+  declared (SBB saw only "E-ticket"; `TICKETLESS` was unreachable). Sourced the
+  four affected lists from the canonical `ENUMS` (single source of truth):
+  - `WIZ_FULFIL_MEDIA` (had bogus `AZTEC_CODE/QR_CODE/NFC`) → the **7** OSDM media.
+  - `WIZ_FULFIL_TYPES` (had bogus `PAPER_TICKET`) → the **4** OSDM types.
+  - `WIZ_TRAVEL_CLASSES` (had non-OSDM `THIRD/BUSINESS`) → `FIRST/SECOND/ANY_CLASS`.
+  - `WIZ_OFFER_MODES` (had `COMBINATION`) → `INDIVIDUAL/COLLECTIVE`.
+
+  `WIZ_SERVICE_CLASSES` + `WIZ_FLEXIBILITIES` were already in sync. **Flagged for a
+  follow-up** (narrower-but-all-valid, with dependent age/mapping code):
+  `WIZ_PAX_TYPES` (missing `PERSON/PRM_CHILD/COMPANION_DOG`) and `WIZ_OFFER_PARTS`.
+- **Workflow note:** to use a newly-available media/type in a scenario, declare it
+  in the company's **Test Framework** first — the scenario dropdowns are gated by
+  the framework, then offer whatever it declares.
+
+### Verified
+
+- `scenarios.js` `node --check` clean; the 4 rewired constants reference `ENUMS`
+  (defined earlier, line 26); the removed bogus values have no other references.
+  Server-only — server 1.11.159 → 1.11.160, collection unchanged OTST_V2.0.93.
+
+---
+
+## [server-v1.11.159] — 2026-06-17
+
+**Fix (#433): datafile schema enums were narrower than the OSDM spec — valid
+provider test data (e.g. SBB's `TICKETLESS` fulfillment) was wrongly rejected.**
+
+### Fixed
+
+- **`json_validator/datafile.schema.json` — widened 3 stale enums to the OSDM
+  source-of-truth.** The schema validated every datafile, but three enums had
+  drifted *narrower* than the OSDM enum the rest of OSCAR already uses, so valid
+  data was rejected with "⛔ Invalid JSON Data file structure":
+  - `fulfillmentMedia`: `PDF_A4, UIC_PDF` → **7** (adds `PKPASS, ALLOCATOR_APP,
+    RCCST, RCT2, TICKETLESS`) — matches `model.js` FulfillmentMediaType + wizard.
+  - `fulfillmentType`: `ETICKET` → **4** (adds `CIT_PAPER, PASS_CHIP,
+    PASS_REFERENCE`) — matches `model.js` FulfillmentOptionType + wizard.
+  - `passengers[].type`: `PERSON` → the **20** `OSDM_PASSENGER_TYPES` — matches
+    `osdmEnums.js` (the declared SSOT; `passengers.js`/`offers.js` runtime
+    assertions already accept all 20).
+- **Audited every other schema enum** against the OSDM sources — `serviceClass`
+  (5), `travelClass` (3), `requestedOfferParts` (8, incl. CONTINUOUS_SERVICE),
+  `flexibilities`/`desiredFlexibility` (3) and `offerMode` (2) were already in
+  sync; OSCAR-internal harness enums are out of scope. No runtime/behavior change
+  — only the schema gate widened (the flow already handles these values).
+
+### Verified
+
+- Schema parses; the 3 enums now hold 7 / 4 / 20 values (0 SSOT passenger types
+  missing). **ajv** (the runtime validator) — **11/11**: `media`/`type`/`pax`
+  accept `TICKETLESS, PKPASS, PDF_A4, CIT_PAPER, ETICKET, DOG, YOUTH, PERSON` and
+  still reject `BOGUS`/`NOPE`/`ALIEN`. Collection OTST_V2.0.92 → OTST_V2.0.93;
+  server 1.11.158 → 1.11.159.
+
+---
+
+## [server-v1.11.158] — 2026-06-17
+
+**Fix (#430): a 401/403 on an unsupported endpoint no longer hard-stops the whole
+run — the auth fail-fast now honors the step policy, exempts `/versions`, and
+yields to known deviations.**
+
+### Fixed
+
+- **`checkAuthRejection` ([auth.js]) no longer aborts the run on every non-token
+  401/403.** The #208 fail-fast treated any 401/403 as a dead/expired token and
+  called `stopExecution()`, overriding both the step-failure policy and the
+  known-deviation system — so a new provider that answers **403 "endpoint not
+  supported"** on `GET /versions` (System Version Check, step 00) killed the run
+  before anything else executed. It now flags the rejection but **does not stop**
+  when **any** of:
+  - **(a)** the request is the **System Version Check** (`GET /versions`) — an
+    optional capability probe; a genuinely dead token is still caught at the first
+    business request, one step later;
+  - **(b)** `stepFailurePolicy ≠ HARD_STOP` (the tester chose `CONTINUE`); or
+  - **(c)** the step+status is a **declared known deviation**.
+
+  The default dead-token fail-fast (HARD_STOP + undeclared + business endpoint) is
+  **unchanged**, so the cascade protection stays. `opencollection.yml` now passes
+  the request URL into `checkAuthRejection` for robust `/versions` detection.
+- **`handleSystemInfoStatus` honors known deviations.** A baselined system-info
+  non-2xx (e.g. a provider's 403 on `/versions`) is reported as a **documented
+  known deviation** (`[WARNING]`, not a failure), consistent with the
+  refund/exchange 405 baseline — so the tester can baseline `GET /versions → 403`
+  once and keep the run green.
+
+### Verified
+
+- Harness over the **real extracted** `checkAuthRejection` + `handleSystemInfoStatus`
+  — **14/14**: non-401/403 + token steps ignored; 403/401 on `/versions` (by URL
+  and by name) → no stop; **regression guard** — 403/401 on a business endpoint
+  under HARD_STOP (incl. default policy) still **STOPS**; `CONTINUE` → no stop;
+  declared known deviation → no stop; system-info 200 → ok, 403 undeclared → fail,
+  403 baselined → `noteKnownDeviation` + no fail, baselined-but-no-`req` → safe
+  fallback. `node --check` clean on both library files; `opencollection.yml` parses
+  (js-yaml) and its after-response script parses as JS. Collection
+  OTST_V2.0.91 → OTST_V2.0.92; server 1.11.157 → 1.11.158.
+
+---
+
+## [server-v1.11.157] — 2026-06-16
+
+**Feature (#426): configurable company "dedicated headers" in API Config — add
+operator-specific request headers without a code change.**
+
+### Added
+
+- **Company-wide "Dedicated Headers" in API Config** (`profile.html` → *Company —
+  Shared* card). A Test Manager can add any number of extra HTTP headers sent on
+  **every** OSDM request, via a `➕ Add dedicated header` button. Each row is a
+  header **name** + **value**; the value may be a literal (e.g. `staging`) or
+  reference an existing variable in double braces — `{{requestor}}`,
+  `{{Ocp-Apim-Subscription-Key}}`, `{{access_token}}` — resolved **per tester** at
+  request time, so secrets stay out of the shared config. The list is shared with
+  the company's testers and is read-only for non-Test-Managers.
+- **Storage + API.** New `companies.extra_headers` column (JSON array, migration
+  v21). `GET /v1/company` surfaces the parsed array; `PATCH /v1/company` accepts
+  `extra_headers` (**Test-Manager-only**) and validates it — RFC 7230 header-name
+  token, rejects CR/LF (header-injection guard), caps 25 headers × 4096 chars, and
+  drops blank rows.
+- **Injection.** `runner.buildEnvYml` emits an `__extraHeaders` env var
+  (YAML-escaped JSON); the Bruno collection's `before-request` hook
+  (`opencollection.yml`) parses it, resolves any `{{var}}` templates against the
+  env, and calls `req.setHeader(name, value)` per entry. This **generalises** the
+  previously hardcoded `Ocp-Apim-Subscription-Key` injection so new
+  operator-specific headers no longer need a collection edit. Collection
+  OTST_V2.0.90 → OTST_V2.0.91.
+
+### Verified
+
+- Harness over the **real extracted** code — **40/40**:
+  `normalizeExtraHeaders`/`parseExtraHeaders` (valid + blank-name drop; rejects for
+  space/colon names, CR/LF, >4096-char value, >25 rows, non-array; hyphen·dot and
+  `Ocp-Apim-Subscription-Key` names accepted; numeric/null value coercion; a
+  `{{var}}` value preserved verbatim); `buildEnvYml` `__extraHeaders` emission with
+  quote/backslash YAML round-trip and "no line when empty/undefined"; and the
+  `opencollection.yml` resolver (`{{var}}` incl. hyphenated + whitespace-padded
+  names, literal, partial `Bearer {{access_token}}`, unknown→empty, blank-name
+  skip, malformed JSON caught → no throw + no headers set, absent → no-op).
+- `npm run lint` clean (eslint + inline-HTML script linter, 15 files);
+  `opencollection.yml` parses (js-yaml). Server 1.11.156 → 1.11.157.
+
+---
+
+## [server-v1.11.156] — 2026-06-16
+
+**Fix (#428): Trivy gate failing on Bruno CLI `axios` / `form-data` HIGH CVEs —
+the in-place override was silently a no-op.**
+
+### Security
+
+- **Clear 12 HIGH CVEs in the Bruno CLI's bundled dependencies** (`Oscar_Server/Dockerfile`):
+  - `axios` **1.13.6 → 1.18.0** — CVE-2026-42033 / -42035 / -42043 / -42264 and the
+    newly-published -44486 / -44487 / -44488 / -44492 / -44494 / -44495 / -44496 (11 HIGH).
+  - `form-data` **4.0.4 → 4.0.6** — CVE-2026-12143 (multipart boundary via `Math.random()`).
+- **Root cause:** `@usebruno/js` and `@usebruno/requests` pin `axios` by **exact**
+  version (1.13.6). The previous `npm install axios@^1.15.2 --no-save` had no
+  manifest entry to satisfy, so npm pruned the fresh copy and restored the pin —
+  the image kept shipping 1.13.6. It passed historically only via a **cached
+  Docker layer**; a cold-cache build re-exposes it (so this was latent on `main`).
+- **Fix:** axios is a *direct* dependency of `@usebruno/cli`, so an npm
+  `overrides` entry errors `EOVERRIDE`. Instead we **bypass npm resolution** and
+  unpack the patched release tarball (`npm pack`) directly over every nested
+  `axios`/`form-data` copy, then **assert** at build time that each is patched
+  (fail the build otherwise — no broken image ships). axios 1.x / form-data 4.0.x
+  are API-stable drop-ins and their runtime deps are already hoisted. Dockerfile-
+  only; collection unchanged. Server 1.11.155 → 1.11.156.
+
+---
+
 ## [server-v1.11.155] — 2026-06-15
 
 **Fix (#422): baseline the documented Turnit refund/exchange `GET → 405` so it

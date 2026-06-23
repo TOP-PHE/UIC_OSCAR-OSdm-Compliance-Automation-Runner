@@ -424,7 +424,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
 }
 
-function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra) {
+function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra, extraHeaders) {
   // Escape backslashes then double-quotes so the token is safe inside a YAML double-quoted scalar.
   // A token with a trailing " (common typo) would otherwise produce invalid YAML and crash Bruno.
   const safeToken = accessToken.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -469,6 +469,16 @@ function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, 
   if (scenarioOverride) {
     lines.push(`  - name: scenario_override`);
     lines.push(`    value: "${scenarioOverride}"`);
+  }
+  if (Array.isArray(extraHeaders) && extraHeaders.length > 0) {
+    // Issue #426 — company-wide dedicated headers. Passed through as a JSON
+    // string for the collection's before-request hook to parse + inject (the
+    // hook resolves any {{var}} templates in the values). Escape backslashes
+    // then double-quotes so the JSON survives inside a YAML double-quoted
+    // scalar — same rule as the access-token escaping above.
+    const safeEh = JSON.stringify(extraHeaders).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    lines.push(`  - name: __extraHeaders`);
+    lines.push(`    value: "${safeEh}"`);
   }
   return lines.join('\n') + '\n';
 }
@@ -600,6 +610,18 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // sqills_extension token-fetch profile (auth-profiles.js).
   const oauthExtra = userRow.oauth_extra_enc ? decrypt(userRow.oauth_extra_enc) : null;
 
+  // 4d. Resolve company-wide dedicated headers (issue #426). Stored as a JSON
+  // array of { name, value } on the company row and passed verbatim to the
+  // collection's before-request hook, which injects each header and resolves
+  // any {{var}} templates in the values against the env at send time.
+  let extraHeaders = [];
+  try {
+    const _eh = companyRow.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
+    if (Array.isArray(_eh)) extraHeaders = _eh;
+  } catch (_ehErr) {
+    logEvent(runId, 'warn', `[runner] Ignoring malformed company extra_headers: ${_ehErr.message}`);
+  }
+
   // 5. Validate data file exists
   const datafileUrl = `http://localhost:${process.env.PORT || 3001}/data/${companyRow.slug}-datafile.json`;
   const datafilePath = companyRow.datafile_path;
@@ -632,7 +654,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // at submission time for UI display purposes.
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
-  const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra);
+  const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra, extraHeaders);
   // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
   // the run, i.e. now + effective timeout) as a read-only env var. The
   // expired-booking test uses it to decide whether waiting until the booking's
