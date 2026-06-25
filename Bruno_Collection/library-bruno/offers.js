@@ -549,6 +549,7 @@ function selectAndSetOffer(jsonData) {
   // INFO view. The complete offer is one click away in the run page's
   // HTTP-traffic viewer (and in the report); the [INFO] id + per-part scope
   // lines above are the log-side summary.
+  console.log("[INFO] 🔍 Selected Offer:", selectedOffer);
 
   // Store selected offer and related info in environment
   bru.setEnvVar("offer", selectedOffer);
@@ -642,10 +643,10 @@ function validateOfferSummary(selectedOffer) {
   });
 
   // Overall flexibility validation
+  bru.setEnvVar("overallFlexibility", overallFlexibility);
   test(`Offer summary - overallFlexibility is defined - overallFlexibility: ${overallFlexibility}`, function () {
     validationLogger(`[DEBUG] Offer summary - overallFlexibility is defined - overallFlexibility: ${overallFlexibility}`);
     expect(overallFlexibility).to.be.a("string");
-    bru.setEnvVar("overallFlexibility", overallFlexibility);
   });
 
   // overallServiceClass.type is a known value
@@ -1492,7 +1493,7 @@ function validateAncillaries(selectedOffer) {
       }
     });
   } else {
-    validationLogger(`[DEBUG] No ancillaryOfferParts found for offer.id : ${selectedOffer.id} → test skipped`);
+    validationLogger(`[DEBUG] No ancillaryOfferParts found for offer.id : ${selectedOffer.offerId} → test skipped`);
   }
 }
 

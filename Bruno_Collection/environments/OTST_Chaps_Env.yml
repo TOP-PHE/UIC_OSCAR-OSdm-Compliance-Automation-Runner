@@ -17,8 +17,8 @@ variables:
   - name: library_base
     value: ./library-bruno/
   - name: data_base
-    value: http://localhost:8080/data_base/chaps_datafile.json
+    value: http://localhost:8080/Bruno_Collection/data_base/chaps_datafile.json
   - name: json_schema
-    value: https://raw.githubusercontent.com/UnionInternationalCheminsdeFer/OSDM-testing/Bruno-Enhancements/json_validator/datafile.schema.json
+    value: http://localhost:8080/Bruno_Collection/json_validator/datafile.schema.json
   - name: scenariosToRunIndex
     value: "0"

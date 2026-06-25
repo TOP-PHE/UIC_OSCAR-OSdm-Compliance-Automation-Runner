@@ -233,7 +233,7 @@
             "type": ["string", "null"]
           },
           "overruleCode": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "tripRequirementId": {
             "type": "integer"
@@ -304,11 +304,17 @@
                 }
               },
               "offerMode": {
-                "type": "string",
+                "type": ["string", "null"],
                 "enum": [
                   "INDIVIDUAL",
-                  "COLLECTIVE"
+                  "COLLECTIVE",
+                  "",
+                  null
                 ]
+              },
+              "returnOffsetDays": {
+                "type": ["integer", "null"],
+                "description": "For return trips: number of days after outbound departure for the inbound trip."
               },
               "productTags": {
                 "type": "array",
@@ -353,6 +359,36 @@
               "",
               null
             ]
+          },
+          "accommodationSelection": {
+            "type": ["string", "null"],
+            "description": "Type of accommodation to select during place selection. E.g. 'SEAT', 'COMPARTMENT'.",
+            "enum": ["SEAT", "COMPARTMENT", "", null]
+          },
+          "stepFailurePolicy": {
+            "type": ["string", "null"],
+            "description": "How the runner behaves when a step fails. 'CONTINUE': log the error and proceed; 'HARD_STOP': abort the scenario immediately.",
+            "enum": ["CONTINUE", "HARD_STOP", "", null]
+          },
+          "purchaserListId": {
+            "type": "integer",
+            "description": "ID reference into purchaserList."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the scenario (e.g. possible trips)."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether the scenario is shared with the certifier."
+          },
+          "created_by": {
+            "type": "string",
+            "description": "Email of the user who created the scenario."
+          },
+          "version": {
+            "type": "string",
+            "description": "Scenario version string."
           }
         },
         "required": [
@@ -431,6 +467,47 @@
               "SEARCH",
               "SPECIFICATION"
             ]
+          },
+          "departureDay": {
+            "type": ["string", "null"],
+            "description": "Constrain departure to a specific day of week (for SEARCH trips).",
+            "enum": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY", "", null]
+          },
+          "trip": {
+            "type": "object",
+            "description": "Trip search/specification parameters.",
+            "properties": {
+              "origin": { "type": "string", "description": "URN of the origin stop place." },
+              "destination": { "type": "string", "description": "URN of the destination stop place." },
+              "startDatetime": { "type": "string", "description": "Earliest departure datetime (ISO 8601, supports %TRIP_DATE% placeholder)." },
+              "endDatetime": { "type": ["string", "null"], "description": "Latest arrival datetime (ISO 8601, supports %TRIP_DATE% placeholder). Empty string means no constraint." },
+              "vehicleNumber": { "type": "string" },
+              "operatorCode": { "type": "string" },
+              "productCategoryRef": { "type": "string" },
+              "productCategoryName": { "type": "string" },
+              "productCategoryShortName": { "type": "string" },
+              "description": { "type": "string" }
+            },
+            "required": ["origin", "destination", "startDatetime"]
+          },
+          "legs": {
+            "type": "array",
+            "description": "For SPECIFICATION trips or multi-leg SEARCH trips: explicit leg definitions.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "origin": { "type": "string" },
+                "destination": { "type": "string" },
+                "startDatetime": { "type": "string" },
+                "endDatetime": { "type": "string" },
+                "vehicleNumber": { "type": "string" },
+                "operatorCode": { "type": "string" },
+                "productCategoryRef": { "type": "string" },
+                "productCategoryName": { "type": "string" },
+                "productCategoryShortName": { "type": "string" }
+              },
+              "required": ["origin", "destination", "startDatetime"]
+            }
           }
         },
         "required": [
@@ -491,6 +568,17 @@
                 "updateGender": {
                   "type": "string"
                 },
+                "category": {
+                  "type": "string",
+                  "description": "Passenger category used for fare selection.",
+                  "enum": [
+                    "ADULT",
+                    "CHILD",
+                    "YOUTH",
+                    "SENIOR",
+                    "INFANT"
+                  ]
+                },
                 "type": {
                   "type": "string",
                   "enum": [
@@ -547,14 +635,16 @@
               "type": "object",
               "properties": {
                 "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
-                "offerMode": { "type": "string", "enum": ["INDIVIDUAL", "COLLECTIVE"] },
+                "offerMode": { "type": ["string", "null"], "enum": ["INDIVIDUAL", "COLLECTIVE", "", null] },
                 "requestedOfferParts": { "type": "array", "items": { "type": "string" } },
                 "flexibilities": { "type": "array", "items": { "type": "string" } },
                 "serviceClass": { "type": "array", "items": { "type": "string" } },
                 "travelClass": { "type": "array", "items": { "type": "string" } },
+                "requiresPlaceSelection": { "type": "boolean" },
                 "productTags": { "type": "array", "items": { "type": "string" } },
                 "productSelections": { "type": "array", "items": { "type": "object" } },
-                "inboundDate": { "type": "string" }
+                "inboundDate": { "type": "string" },
+                "returnOffsetDays": { "type": ["integer", "null"] }
               },
               "required": ["currency"]
             }

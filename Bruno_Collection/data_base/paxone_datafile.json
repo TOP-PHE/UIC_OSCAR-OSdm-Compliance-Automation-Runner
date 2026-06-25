@@ -3,15 +3,25 @@
         "OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG",
         "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
         "OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
+        "OTST_RFND_PARTIAL_SRCH_CRIT_2ADT_1LEG",
+        "RFND_OVERRULE_SRCH_CRIT_2ADT_1CHD_1LEG",
         "OTST_RFND_SRCH_CRIT_1ADT_2LEG",
         "OTST_RFND_SRCH_CRIT_2ADT_2LEG",
-        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG"
+        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG",
+        "NHF_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
+        "NHF_BTO_SALE_PATCH_SRCH_CRIT_1ADT_1LEG_COPY",
+        "NHF_RTO_SALE_PATCH_SRCH_CRIT_1ADT_1LEG_COPY_COPY",
+        "NHF_ETO_SALE_PATCH_SRCH_CRIT_3ADT_1LEG_PARTIAL_REFUND",
+        "SALE_PATCH_SRCH_LON_TOU_5ADT_2LEG_RFND_PARTIAL_1_PAX",
+        "PAX_SALE_1ADT_1LEG",
+        "OTST_SALE_PATCH_SRCH_NOCRIT_1ADT_1LEG_COPY",
+        "NHF_NOOFFER_LRO_LON_1PAX",
+        "NHF_BAD_STATIONCODE_LRO_BRU_1PAX",
+        "EXCH_FULL_LRO_BRU_1PAX"
     ],
     "systemInfoParameters": {
-            "coachId": null,
-            "productId": null
+        "coachId": null,
+        "productId": null
     },
     "scenarios": [
         {
@@ -25,8 +35,21 @@
             "refundDate": null,
             "tripRequirementId": 1,
             "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 3,
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
@@ -39,8 +62,21 @@
             "refundDate": null,
             "tripRequirementId": 1,
             "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 4,
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
@@ -53,36 +89,69 @@
             "refundDate": null,
             "tripRequirementId": 1,
             "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 5,
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
+            "code": "OTST_RFND_PARTIAL_SRCH_CRIT_2ADT_1LEG",
             "scenarioType": "REFUND",
-            "scenarioAction": null,
+            "scenarioAction": "PATCH",
             "osdmVersion": "3.5",
             "overruleCode": "PAYMENT_FAILURE",
             "refundDate": null,
             "tripRequirementId": 1,
             "passengersListId": 2,
-            "offerSearchCriteriaListId" : 2,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 2,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 6,
+            "stepFailurePolicy": "CONTINUE",
+            "partialRefundByLeg": "on",
+            "partialRefundByPax": "on",
+            "accommodationSelection": "SEAT"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
+            "code": "RFND_OVERRULE_SRCH_CRIT_2ADT_1CHD_1LEG",
             "scenarioType": "REFUND",
             "scenarioAction": null,
-            "overruleCode": "PAYMENT_FAILURE",
+            "overruleCode": "TECHNICAL_FAILURE",
             "refundDate": null,
             "osdmVersion": "3.5",
             "tripRequirementId": 1,
             "passengersListId": 3,
-            "offerSearchCriteriaListId" : 2,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 2,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 7,
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
@@ -95,8 +164,17 @@
             "refundDate": null,
             "tripRequirementId": 2,
             "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 8
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
@@ -110,11 +188,20 @@
             "tripRequirementId": 2,
             "passengersListId": 2,
             "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 9
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
+            "loggingType": "INFO",
             "code": "OTST_EXCH_SRCH_CRIT_1ADT_1LEG",
             "scenarioType": "EXCHANGE",
             "scenarioAction": null,
@@ -122,8 +209,417 @@
             "overruleCode": "PAYMENT_FAILURE",
             "tripRequirementId": 1,
             "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 1,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 2
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "NHF_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
+            "scenarioType": "REFUND",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 10,
+            "passengersListId": 11,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 13,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 12,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": 30,
+            "expiredOfferTest": "on",
+            "expiredOfferMaxWaitMinutes": 30,
+            "stepFailurePolicy": "CONTINUE"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "NHF_BTO_SALE_PATCH_SRCH_CRIT_1ADT_1LEG_COPY",
+            "scenarioType": "SALE",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": "PAYMENT_FAILURE",
+            "refundDate": null,
+            "tripRequirementId": 14,
+            "passengersListId": 15,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 17,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 16,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "expiredBookingTest": "on",
+            "expiredBookingMaxWaitMinutes": 30
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "NHF_RTO_SALE_PATCH_SRCH_CRIT_1ADT_1LEG_COPY_COPY",
+            "scenarioType": "REFUND",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 18,
+            "passengersListId": 19,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 21,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 20,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "bookingPurchaserMode": "inline",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "on",
+            "expiredRefundOfferMaxWaitMinutes": 30
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "NHF_ETO_SALE_PATCH_SRCH_CRIT_3ADT_1LEG_PARTIAL_REFUND",
+            "scenarioType": "REFUND",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 22,
+            "passengersListId": 23,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 25,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 24,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "bookingPurchaserMode": "inline",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": 30,
+            "expiredExchangeOfferTest": "on",
+            "expiredExchangeOfferMaxWaitMinutes": 20,
+            "partialRefundByPax": "on"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_PATCH_SRCH_LON_TOU_5ADT_2LEG_RFND_PARTIAL_1_PAX",
+            "scenarioType": "REFUND",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 26,
+            "passengersListId": 27,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 29,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "EUR"
+            },
+            "purchaserListId": 28,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "partialRefundByLeg": "on",
+            "partialRefundByPax": "on",
+            "partialRefundLegSelection": "last",
+            "partialRefundPaxSelection": "last"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "PAX_SALE_1ADT_1LEG",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.5",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "passengerExternalRefFormat": "",
+            "partialRefundByLeg": "off",
+            "partialRefundLegSelection": "first",
+            "partialRefundByPax": "off",
+            "partialRefundPaxSelection": "first",
+            "tripRequirementId": 30,
+            "passengersListId": 31,
+            "purchaserListId": 32,
+            "requestedFulfillmentOptionsListId": 33,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [
+                    "STANDARD"
+                ]
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "OTST_SALE_PATCH_SRCH_NOCRIT_1ADT_1LEG_COPY",
+            "scenarioType": "SALE",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "overruleCode": "PAYMENT_FAILURE",
+            "refundDate": null,
+            "tripRequirementId": 34,
+            "passengersListId": 35,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 37,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "offerSearchCriteria": {
+                "offerMode": null
+            },
+            "purchaserListId": 36,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "stepFailurePolicy": "CONTINUE",
+            "code": "NHF_NOOFFER_LRO_LON_1PAX",
+            "scenarioType": "EXCHANGE",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "desiredFlexibility": null,
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "passengerExternalRefFormat": "",
+            "partialRefundByLeg": "off",
+            "partialRefundLegSelection": "first",
+            "partialRefundByPax": "off",
+            "partialRefundPaxSelection": "first",
+            "tripRequirementId": 38,
+            "passengersListId": 39,
+            "purchaserListId": 40,
+            "requestedFulfillmentOptionsListId": 41,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL"
+            },
+            "accommodationSelection": "SEAT"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "stepFailurePolicy": "CONTINUE",
+            "code": "NHF_BAD_STATIONCODE_LRO_BRU_1PAX",
+            "scenarioType": "EXCHANGE",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "desiredFlexibility": null,
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "passengerExternalRefFormat": "",
+            "partialRefundByLeg": "off",
+            "partialRefundLegSelection": "first",
+            "partialRefundByPax": "off",
+            "partialRefundPaxSelection": "first",
+            "tripRequirementId": 42,
+            "passengersListId": 43,
+            "purchaserListId": 44,
+            "requestedFulfillmentOptionsListId": 45,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL"
+            },
+            "accommodationSelection": "SEAT"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "stepFailurePolicy": "CONTINUE",
+            "code": "EXCH_FULL_LRO_BRU_1PAX",
+            "scenarioType": "EXCHANGE",
+            "scenarioAction": "PATCH",
+            "osdmVersion": "3.5",
+            "desiredFlexibility": null,
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "passengerExternalRefFormat": "",
+            "partialRefundByLeg": "off",
+            "partialRefundLegSelection": "first",
+            "partialRefundByPax": "off",
+            "partialRefundPaxSelection": "first",
+            "tripRequirementId": 46,
+            "passengersListId": 47,
+            "purchaserListId": 48,
+            "requestedFulfillmentOptionsListId": 49,
+            "shared": false,
+            "created_by": "patrick.paxone@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL"
+            },
+            "accommodationSelection": "SEAT"
         }
     ],
     "offerSearchCriteriaList": [
@@ -152,30 +648,232 @@
         {
             "id": 1,
             "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 13,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 17,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 21,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 25,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 29,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 33,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 37,
+            "requestedFulfillmentOptions": []
+        },
+        {
+            "id": 41,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 45,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 49,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
         }
     ],
     "tripRequirements": [
         {
             "id": 1,
             "tripType": "SEARCH",
-            "trip": 
-                {
-                    "origin": "urn:uic:stn:0088140010",
-                    "destination": "urn:uic:stn:0070154005",
-                    "startDatetime": "%TRIP_DATE%T11:00:00Z+02:00",
-                    "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
-                }
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
         },
         {
             "id": 2,
             "tripType": "SEARCH",
-            "trip": 
+            "trip": {
+                "origin": "urn:uic:stn:80334524",
+                "destination": "urn:uic:stn:71718010",
+                "startDatetime": "%TRIP_DATE%T11:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 10,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 14,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 18,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 22,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 26,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:70154005",
+                "destination": "urn:uic:stn:87611004",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 30,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:70154005",
+                "destination": "urn:uic:stn:87611004",
+                "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "ccc",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 34,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:88140010",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00Z+02:00",
+                "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+            }
+        },
+        {
+            "id": 38,
+            "tripType": "SEARCH",
+            "legs": [
                 {
-                    "origin": "urn:uic:stn:0080334524",
-                    "destination": "urn:uic:stn:0071718010",
-                    "startDatetime": "%TRIP_DATE%T11:00:00Z+02:00",
-                    "endDatetime": "%TRIP_DATE%T15:20:00Z+02:00"
+                    "origin": "urn:uic:stn:87485003",
+                    "destination": "urn:uic:stn:70154005",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                    "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "",
+                    "operatorCode": ""
                 }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:87485003",
+                "destination": "urn:uic:stn:70154005",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00"
+            },
+            "departureDay": "TUESDAY"
+        },
+        {
+            "id": 42,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:87485003",
+                    "destination": "urn:uic:stn:70154005",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                    "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "",
+                    "operatorCode": ""
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:87485003",
+                "destination": "urn:uic:stn:8140010",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00"
+            },
+            "departureDay": "TUESDAY"
+        },
+        {
+            "id": 46,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:87485003",
+                    "destination": "urn:uic:stn:70154005",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                    "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "",
+                    "operatorCode": ""
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:87485003",
+                "destination": "urn:uic:stn:88140010",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00"
+            },
+            "departureDay": "TUESDAY"
         }
     ],
     "purchaserList": [
@@ -189,6 +887,204 @@
                     "purchaserEmail": "emailPurchaser@email.com"
                 }
             ]
+        },
+        {
+            "id": 2,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Dana",
+                    "purchaserLastName": "Purchaser_Simon",
+                    "purchaserEmail": "purchaser_dana.purchaser_simon@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+8950747627"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Robin",
+                    "purchaserLastName": "Purchaser_Szabo",
+                    "purchaserEmail": "purchaser_robin.purchaser_szabo@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+1667381331"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Casey",
+                    "purchaserLastName": "Purchaser_Lund",
+                    "purchaserEmail": "purchaser_casey.purchaser_lund@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9516449466"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Kim",
+                    "purchaserLastName": "Purchaser_Muller",
+                    "purchaserEmail": "purchaser_kim.purchaser_muller@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+5556503072"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Sidney",
+                    "purchaserLastName": "Purchaser_Szabo",
+                    "purchaserEmail": "purchaser_sidney.purchaser_szabo@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+1817549748"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Rowan",
+                    "purchaserLastName": "Purchaser_Bernard",
+                    "purchaserEmail": "purchaser_rowan.purchaser_bernard@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+1771787440"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Jordan",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_jordan.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+0670743004"
+                }
+            ]
+        },
+        {
+            "id": 12,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 28,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 32,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Robin",
+                    "purchaserLastName": "Szabo",
+                    "purchaserPhoneNumber": "+7739068598",
+                    "purchaserEmail": "robin.szabo@paxonesandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Taylor",
+                    "purchaserLastName": "Purchaser_Wagner",
+                    "purchaserEmail": "purchaser_taylor.purchaser_wagner@paxonesandbox.com",
+                    "purchaserPhoneNumber": "+9634714155"
+                }
+            ]
+        },
+        {
+            "id": 40,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Petra",
+                    "purchaserLastName": "Laurent",
+                    "purchaserPhoneNumber": "+2203615478",
+                    "purchaserEmail": "petra.laurent@paxonesandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 44,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Petra",
+                    "purchaserLastName": "Laurent",
+                    "purchaserPhoneNumber": "+2203615478",
+                    "purchaserEmail": "petra.laurent@paxonesandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 48,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Petra",
+                    "purchaserLastName": "Laurent",
+                    "purchaserPhoneNumber": "+2203615478",
+                    "purchaserEmail": "petra.laurent@paxonesandbox.com"
+                }
+            ]
         }
     ],
     "passengersList": [
@@ -200,15 +1096,15 @@
                     "dateOfBirth": "1999-01-01",
                     "firstName": "john",
                     "lastName": "doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
-                    "gender" : "X",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
                     "type": "PERSON",
                     "updateFirstName": "johnupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "updateGender": "MALE"
                 }
             ]
@@ -221,14 +1117,14 @@
                     "dateOfBirth": "1999-01-01",
                     "firstName": "john",
                     "lastName": "doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
-                    "gender" : "X",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
                     "updateFirstName": "johnupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON",
                     "updateGender": "MALE"
                 },
@@ -237,14 +1133,14 @@
                     "dateOfBirth": "1999-01-03",
                     "firstName": "marta",
                     "lastName": "doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
-                    "gender" : "X",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
                     "updateFirstName": "martaupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "1999-01-04",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON",
                     "updateGender": "FEMALE"
                 }
@@ -260,12 +1156,12 @@
                     "lastName": "doe",
                     "phoneNumber": "+33612345678",
                     "email": "email@email.com",
-                    "gender" : "X",
+                    "gender": "X",
                     "updateFirstName": "johnupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON",
                     "updateGender": "MALE"
                 },
@@ -276,12 +1172,12 @@
                     "lastName": "doe",
                     "phoneNumber": "+33612345678",
                     "email": "email@email.com",
-                    "gender" : "X",
+                    "gender": "X",
                     "updateFirstName": "martaupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "1999-01-04",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON",
                     "updateGender": "FEMALE"
                 },
@@ -292,16 +1188,325 @@
                     "lastName": "doe",
                     "phoneNumber": "+33612345678",
                     "email": "email@email.com",
-                    "gender" : "X",
+                    "gender": "X",
                     "updateFirstName": "aliceupdate",
                     "updateLastName": "doeupdate",
                     "updateDateOfBirth": "2010-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON",
                     "updateGender": "MALE"
                 }
             ]
+        },
+        {
+            "id": 11,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "MALE",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Sophie",
+                    "lastName": "Laurent",
+                    "dateOfBirth": "1992-07-05",
+                    "email": "liam.laurent@paxonesandbox.com",
+                    "phoneNumber": "+9732828674",
+                    "updateFirstName": "Alice",
+                    "updateLastName": "Jensen",
+                    "updateDateOfBirth": "1985-11-02",
+                    "updatePhoneNumber": "+9972702456",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "firstName": "Robert",
+                    "lastName": "Klein",
+                    "dateOfBirth": "2016-01-02",
+                    "email": "nora.klein@paxonesandbox.com",
+                    "phoneNumber": "+0885269588",
+                    "updateFirstName": "Thomas",
+                    "updateLastName": "Bernard",
+                    "updateDateOfBirth": "2022-07-13",
+                    "updatePhoneNumber": "+7189698027",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00004",
+                    "type": "PERSON",
+                    "category": "SENIOR",
+                    "firstName": "Noah",
+                    "lastName": "Schmidt",
+                    "dateOfBirth": "1938-02-06",
+                    "email": "rowan.schmidt@paxonesandbox.com",
+                    "phoneNumber": "+8283141275",
+                    "updateFirstName": "Oliver",
+                    "updateLastName": "Novak",
+                    "updateDateOfBirth": "1938-02-16",
+                    "updatePhoneNumber": "+9581951183",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Carlos",
+                    "lastName": "Novak",
+                    "dateOfBirth": "1934-09-08",
+                    "email": "paul.novak@paxonesandbox.com",
+                    "phoneNumber": "+3534287877",
+                    "updateFirstName": "Paul",
+                    "updateLastName": "Martin",
+                    "updateDateOfBirth": "1953-08-20",
+                    "updatePhoneNumber": "+5970151707",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Liam",
+                    "lastName": "Klein",
+                    "dateOfBirth": "2005-08-11",
+                    "email": "maria.klein@paxonesandbox.com",
+                    "phoneNumber": "+1071800220",
+                    "updateFirstName": "Carlos",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "2002-03-11",
+                    "updatePhoneNumber": "+5508983031",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00004",
+                    "type": "PERSON",
+                    "category": "SENIOR",
+                    "firstName": "Stefan",
+                    "lastName": "Dubois",
+                    "dateOfBirth": "1947-07-21",
+                    "email": "anna.dubois@paxonesandbox.com",
+                    "phoneNumber": "+7858090406",
+                    "updateFirstName": "Nicolas",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "1937-05-11",
+                    "updatePhoneNumber": "+7137525465",
+                    "updateEmail": "updated@paxonesandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+3157588187",
+                    "email": "carlos.szabo@paxonesandbox.com",
+                    "firstName": "Carlos",
+                    "lastName": "Szabo",
+                    "dateOfBirth": "1971-12-28",
+                    "updateFirstName": "Kai",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "1990-11-22",
+                    "updatePhoneNumber": "+5122145634",
+                    "updateEmail": "kai.simon@paxonesandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 35,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "john",
+                    "lastName": "doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "gender": "X",
+                    "type": "PERSON",
+                    "updateFirstName": "johnupdate",
+                    "updateLastName": "doeupdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 39,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+4673503283",
+                    "email": "noah.fischer@paxonesandbox.com",
+                    "firstName": "Noah",
+                    "lastName": "Fischer",
+                    "gender": "MALE",
+                    "dateOfBirth": "1957-10-15",
+                    "updateFirstName": "Marc",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1968-04-23",
+                    "updatePhoneNumber": "+3749358872",
+                    "updateEmail": "marc.wagner@paxonesandbox.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 43,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+4673503283",
+                    "email": "noah.fischer@paxonesandbox.com",
+                    "firstName": "Noah",
+                    "lastName": "Fischer",
+                    "gender": "MALE",
+                    "dateOfBirth": "1957-10-15",
+                    "updateFirstName": "Marc",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1968-04-23",
+                    "updatePhoneNumber": "+3749358872",
+                    "updateEmail": "marc.wagner@paxonesandbox.com",
+                    "updateGender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 47,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+4673503283",
+                    "email": "noah.fischer@paxonesandbox.com",
+                    "firstName": "Noah",
+                    "lastName": "Fischer",
+                    "gender": "MALE",
+                    "dateOfBirth": "1957-10-15",
+                    "updateFirstName": "Marc",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "1968-04-23",
+                    "updatePhoneNumber": "+3749358872",
+                    "updateEmail": "marc.wagner@paxonesandbox.com",
+                    "updateGender": "MALE"
+                }
+            ]
         }
-    ]
+    ],
+    "knownDeviations": []
 }

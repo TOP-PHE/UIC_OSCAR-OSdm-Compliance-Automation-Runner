@@ -11,6 +11,8 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   body:
@@ -115,7 +117,15 @@ runtime:
 
         // #253: pass the sibling FulfillmentResponse.fulfillmentDocuments[] (v3.8)
         // so each fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
-        validateFulfillments(jsonData.fulfillments, 0, expectedFulfillmentStatus=["FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments)
+        // Bug E: warn when POST /fulfillments returns no fulfillments[] — OSDM requires
+        // a FulfillmentResponse with the generated fulfillments (empty body = provider non-conformance).
+        // The booking state is still verified at 07. GET Booking after Fulfillments.
+        if (!jsonData || !Array.isArray(jsonData.fulfillments) || jsonData.fulfillments.length === 0) {
+            validationLogger('[WARNING] POST /fulfillments returned no fulfillments[] — OSDM requires a FulfillmentResponse body with the generated fulfillments. Proceeding; booking state will be verified at 07. GET Booking after Fulfillments.');
+        }
+        // Bug F: was expectedFulfillmentStatus=["FULFILLED", "CONFIRMED"] — a JS assignment
+        // expression that created an undeclared global variable. Fixed to a plain array literal.
+        validateFulfillments(jsonData.fulfillments, 0, ["FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments);
 
 settings:
   encodeUrl: true

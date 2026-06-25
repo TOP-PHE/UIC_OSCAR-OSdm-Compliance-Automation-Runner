@@ -1,150 +1,265 @@
 {
     "scenariosToRun": [
-        "OTST_TKT_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
-        "OTST_RFND_SRCH_CRIT_1ADT_2LEG",
-        "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
-        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG"
+        "SALE_SEARCH_IC_HS_BAS_PAR_2LEGS_4ADT_2CHD_RETURN_REFUND_REASONCODE"
     ],
     "systemInfoParameters": {
-            "coachId": null,
-            "productId": null
+        "coachId": null,
+        "productId": null
     },
     "scenarios": [
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_TKT_SRCH_CRIT_1ADT_1LEG",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_BAS_AMS_1PAX",
             "scenarioType": "SALE",
             "scenarioAction": null,
             "osdmVersion": "3.4",
             "desiredFlexibility": "FULL_FLEXIBLE",
             "overruleCode": null,
-			"refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-		{
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": "PATCH",
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": "DELETE",
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 2,
-            "offerSearchCriteriaListId" : 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 3,
-            "offerSearchCriteriaListId" : 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_1ADT_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 2,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId" : 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-			"refundDate": null,
-            "tripRequirementId": 3,
-            "passengersListId": 2,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-			"loggingType": "INFO",
-            "code": "OTST_EXCH_SRCH_CRIT_1ADT_1LEG",
-            "scenarioType": "EXCHANGE",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "FULL_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 1,
-            "passengersListId": 1,
+            "refundDate": null,
+            "tripRequirementId": 4,
+            "passengersListId": 5,
             "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "requestedFulfillmentOptionsListId": 7,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 6,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_AMS_BAS_1PAX",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 8,
+            "passengersListId": 9,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 11,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 10,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_HS_AMS_PAR_1PAX",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 12,
+            "passengersListId": 13,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 15,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "offerSearchCriteria": {},
+            "purchaserListId": 14,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_BAS_PAR_2ADT_2LEG",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 28,
+            "passengersListId": 29,
+            "purchaserListId": 30,
+            "requestedFulfillmentOptionsListId": 31,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "requestedOfferParts": [
+                    "ADMISSION",
+                    "RESERVATION"
+                ],
+                "currency": "EUR",
+                "offerMode": null
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_HS_AMS_PAR_1PAX_RETURN",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "refundDate": null,
+            "tripRequirementId": 32,
+            "passengersListId": 33,
+            "offerSearchCriteriaListId": 1,
+            "requestedFulfillmentOptionsListId": 35,
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": true,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": false
+            },
+            "offerSearchCriteria": {
+                "returnOffsetDays": 2,
+                "requestedOfferParts": [
+                    "ADMISSION",
+                    "ANCILLARY",
+                    "RESERVATION"
+                ]
+            },
+            "purchaserListId": 34,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_HS_BAS_PAR_2LEGS_4ADT_2CHD_RETURN_REFUND_REASONCODE",
+            "scenarioType": "REFUND",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": "TECHNICAL_FAILURE",
+            "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": false,
+                "addAncillary": true,
+                "getBooking": true,
+                "deleteAncillary": true
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 36,
+            "passengersListId": 37,
+            "purchaserListId": 38,
+            "requestedFulfillmentOptionsListId": 39,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "returnOffsetDays": null,
+                "travelClass": [
+                    "SECOND"
+                ]
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SQI_SALE_4ADT_2CHD_1LEG",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 40,
+            "passengersListId": 41,
+            "purchaserListId": 42,
+            "requestedFulfillmentOptionsListId": 43,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SQI_SALE_3ADT_2CHD_1LEG",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.4",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 44,
+            "passengersListId": 45,
+            "purchaserListId": 46,
+            "requestedFulfillmentOptionsListId": 47,
+            "shared": false,
+            "created_by": "patrick.sqills@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
         }
     ],
-	"offerSearchCriteriaList": [
+    "offerSearchCriteriaList": [
         {
             "id": 1,
             "offerSearchCriteria": [
                 {
-                    "requestedOfferParts": ["RESERVATION", "ADMISSION"],
+                    "requestedOfferParts": [
+                        "RESERVATION",
+                        "ADMISSION"
+                    ],
                     "currency": "EUR",
-                    "serviceClass": ["STANDARD"],
-                    "travelClass": ["FIRST"],
+                    "serviceClass": [
+                        "STANDARD"
+                    ],
+                    "travelClass": [
+                        "FIRST"
+                    ],
                     "requiresPlaceSelection": false,
-                    "flexibilities": ["FULL_FLEXIBLE", "NON_FLEXIBLE"]
+                    "flexibilities": [
+                        "FULL_FLEXIBLE",
+                        "NON_FLEXIBLE"
+                    ]
                 }
             ]
         },
@@ -152,12 +267,22 @@
             "id": 2,
             "offerSearchCriteria": [
                 {
-                    "requestedOfferParts": ["RESERVATION", "ADMISSION"],
+                    "requestedOfferParts": [
+                        "RESERVATION",
+                        "ADMISSION"
+                    ],
                     "currency": "EUR",
-                    "serviceClass": ["STANDARD"],
-                    "travelClass": ["FIRST"],
+                    "serviceClass": [
+                        "STANDARD"
+                    ],
+                    "travelClass": [
+                        "FIRST"
+                    ],
                     "requiresPlaceSelection": false,
-                    "flexibilities": ["FULL_FLEXIBLE", "NON_FLEXIBLE"],
+                    "flexibilities": [
+                        "FULL_FLEXIBLE",
+                        "NON_FLEXIBLE"
+                    ],
                     "offerMode": "COLLECTIVE"
                 }
             ]
@@ -172,41 +297,138 @@
                     "fulfillmentType": "ETICKET"
                 }
             ]
+        },
+        {
+            "id": 7,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 35,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentMedia": "PDF_A4",
+                    "fulfillmentType": "ETICKET"
+                }
+            ]
+        },
+        {
+            "id": 39,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 43,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 47,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
         }
     ],
     "tripRequirements": [
         {
             "id": 1,
             "tripType": "SEARCH",
-            "trip": 
-                {
-                    "origin": "urn:uic:stn:8500010",
-                    "destination": "urn:uic:stn:8400058",
-                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
-                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
-                    "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
-                    "productCategoryName": "OSDM Sqills Intercity train",
-                    "productCategoryShortName": "OSDM Sqills Intercity train",
-                    "vehicleNumber": "OSDM_202",
-                    "operatorCode": "urn:uic:rics:1"
-                }
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8400058",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
         },
         {
             "id": 2,
             "tripType": "SEARCH",
-            "trip": 
-                {
-                    "origin": "urn:uic:stn:8500010",
-                    "destination": "urn:uic:stn:8727100",
-                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
-                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
-                    "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
-                    "productCategoryName": "OSDM Sqills Intercity train",
-                    "productCategoryShortName": "OSDM Sqills Intercity train",
-                    "vehicleNumber": "OSDM_202",
-                    "operatorCode": "urn:uic:rics:1"
-                }
-        },        
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "OSDM_202",
+                "operatorCode": "urn:uic:rics:1"
+            }
+        },
         {
             "id": 3,
             "tripType": "SPECIFICATION",
@@ -234,6 +456,208 @@
                     "operatorCode": "urn:uic:rics:1"
                 }
             ]
+        },
+        {
+            "id": 4,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8400058",
+                "startDatetime": "%TRIP_DATE%T13:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 8,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8400058",
+                "destination": "urn:uic:stn:8500010",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 12,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8400058",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 16,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8727100",
+                "destination": "urn:uic:stn:8400058",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 20,
+            "tripType": "SPECIFICATION",
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            },
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:8500010",
+                    "destination": "urn:uic:stn:8400058",
+                    "startDatetime": "%TRIP_DATE%T06:10:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T13:35:00+02:00",
+                    "vehicleNumber": "OSDM_200",
+                    "operatorCode": "urn:uic:rics:1",
+                    "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                    "productCategoryName": "Sqills Intercity train",
+                    "productCategoryShortName": "Sqills Intercity train"
+                },
+                {
+                    "origin": "urn:uic:stn:8400058",
+                    "destination": "urn:uic:stn:8500010",
+                    "startDatetime": "%TRIP_DATE%T15:20:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T22:30:00+02:00",
+                    "vehicleNumber": "OSDM_207",
+                    "operatorCode": "urn:uic:rics:1",
+                    "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                    "productCategoryName": "Sqills Intercity train",
+                    "productCategoryShortName": "Sqills Intercity train"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "tripType": "SPECIFICATION",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:8500010",
+                    "destination": "urn:uic:stn:8400058",
+                    "startDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T16:35:00+02:00",
+                    "vehicleNumber": "OSDM_202",
+                    "operatorCode": "urn:uic:rics:1",
+                    "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                    "productCategoryName": "Sqills Intercity train",
+                    "productCategoryShortName": "Sqills Intercity train"
+                },
+                {
+                    "origin": "urn:uic:stn:8400058",
+                    "destination": "urn:uic:stn:8727100",
+                    "startDatetime": "%TRIP_DATE%T17:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T20:20:00+02:00",
+                    "vehicleNumber": "OSDM_111",
+                    "operatorCode": "urn:uic:rics:1",
+                    "productCategoryRef": "urn:uic:sbc:SQILLS_HS",
+                    "productCategoryName": "Sqills High Speed train",
+                    "productCategoryShortName": "Sqills High Speed train"
+                }
+            ]
+        },
+        {
+            "id": 28,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 32,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8400058",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T06:00:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "urn:uic:sbc:SQILLS_IC",
+                "productCategoryName": "OSDM Sqills Intercity train",
+                "productCategoryShortName": "OSDM Sqills Intercity train",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 36,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8500010",
+                "destination": "urn:uic:stn:8727100",
+                "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 40,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8727100",
+                "destination": "urn:uic:stn:8500010",
+                "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 44,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:8727100",
+                "destination": "urn:uic:stn:8500010",
+                "startDatetime": "%TRIP_DATE%T07:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T09:00:00+01:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
         }
     ],
     "purchaserList": [
@@ -247,6 +671,149 @@
                     "purchaserEmail": "emailPurchaser@email.com"
                 }
             ]
+        },
+        {
+            "id": 2,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Charlie",
+                    "purchaserLastName": "Purchaser_Klein",
+                    "purchaserEmail": "purchaser_charlie.purchaser_klein@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+5494244883"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 10,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 18,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 22,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Ines",
+                    "purchaserLastName": "Novak",
+                    "purchaserPhoneNumber": "+0722197325",
+                    "purchaserEmail": "ines.novak@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 30,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Jamie",
+                    "purchaserLastName": "Dubois",
+                    "purchaserPhoneNumber": "+5765608919",
+                    "purchaserEmail": "jamie.dubois@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 34,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Garcia",
+                    "purchaserEmail": "purchaser_eli.purchaser_garcia@sqillssandbox.com",
+                    "purchaserPhoneNumber": "+7121777030"
+                }
+            ]
+        },
+        {
+            "id": 38,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Marc",
+                    "purchaserLastName": "Wagner",
+                    "purchaserPhoneNumber": "+2204480231",
+                    "purchaserEmail": "marc.wagner@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 42,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Charlie",
+                    "purchaserLastName": "Simon",
+                    "purchaserPhoneNumber": "+9361140056",
+                    "purchaserEmail": "charlie.simon@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 46,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Luca",
+                    "purchaserLastName": "Klein",
+                    "purchaserPhoneNumber": "+7840204928",
+                    "purchaserEmail": "luca.klein@sqillssandbox.com"
+                }
+            ]
         }
     ],
     "passengersList": [
@@ -258,13 +825,13 @@
                     "dateOfBirth": "1999-01-01",
                     "firstName": "John",
                     "lastName": "Doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
                     "updateFirstName": "JohnUpdate",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "updateGender": "FEMALE",
                     "type": "PERSON"
                 }
@@ -278,12 +845,12 @@
                     "dateOfBirth": "1999-01-01",
                     "firstName": "John",
                     "lastName": "Doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON"
                 },
                 {
@@ -291,13 +858,13 @@
                     "dateOfBirth": "1999-01-03",
                     "firstName": "Marta",
                     "lastName": "Doe",
-					"phoneNumber": "+33612345678",
-					"email": "email@email.com",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
                     "updateFirstName": "MartaUpdate",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "1999-01-04",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON"
                 }
             ]
@@ -315,8 +882,8 @@
                     "updateFirstName": "JohnUpdate",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "1999-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON"
                 },
                 {
@@ -329,8 +896,8 @@
                     "updateFirstName": "MartaUpdate",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "1999-01-04",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON"
                 },
                 {
@@ -343,11 +910,477 @@
                     "updateFirstName": "AliceUpdate",
                     "updateLastName": "DoeUpdate",
                     "updateDateOfBirth": "2010-01-02",
-					"updatePhoneNumber": "+33612345679",
-					"updateEmail": "email@email.com",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
                     "type": "PERSON"
                 }
             ]
+        },
+        {
+            "id": 5,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 9,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 13,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 17,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 21,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 25,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0172442296",
+                    "email": "kim.garcia@sqillssandbox.com",
+                    "firstName": "Kim",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "2009-01-06",
+                    "updateFirstName": "Eva",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1984-12-28",
+                    "updatePhoneNumber": "+6971100053",
+                    "updateEmail": "eva.szabo@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 29,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0678974443",
+                    "email": "sam.moreau@sqillssandbox.com",
+                    "firstName": "Marco",
+                    "lastName": "Moreau",
+                    "dateOfBirth": "1998-10-20",
+                    "updateFirstName": "Carlos",
+                    "updateLastName": "Bianchi",
+                    "updateDateOfBirth": "1962-03-28",
+                    "updatePhoneNumber": "+9479530269",
+                    "updateEmail": "rowan.bianchi@sqillssandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Maria",
+                    "lastName": "Schmidt",
+                    "dateOfBirth": "1993-08-03",
+                    "email": "kai.schmidt@sqillssandbox.com",
+                    "phoneNumber": "+9708342581",
+                    "updateFirstName": "Sophie",
+                    "updateLastName": "Szabo",
+                    "updateDateOfBirth": "1987-06-20",
+                    "updatePhoneNumber": "+2402575101",
+                    "updateEmail": "updated@sqillssandbox.com",
+                    "gender": "FEMALE"
+                }
+            ]
+        },
+        {
+            "id": 33,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "dateOfBirth": "1999-01-01",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "phoneNumber": "+33612345678",
+                    "email": "email@email.com",
+                    "updateFirstName": "JohnUpdate",
+                    "updateLastName": "DoeUpdate",
+                    "updateDateOfBirth": "1999-01-02",
+                    "updatePhoneNumber": "+33612345679",
+                    "updateEmail": "email@email.com",
+                    "updateGender": "FEMALE",
+                    "type": "PERSON"
+                }
+            ]
+        },
+        {
+            "id": 37,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0033470687",
+                    "email": "anna.dubois@sqillssandbox.com",
+                    "firstName": "Anna",
+                    "lastName": "Dubois",
+                    "gender": "MALE",
+                    "dateOfBirth": "1966-08-06",
+                    "updateFirstName": "Max",
+                    "updateLastName": "Klein",
+                    "updateDateOfBirth": "1972-10-04",
+                    "updatePhoneNumber": "+1739700582",
+                    "updateEmail": "max.klein@sqillssandbox.com",
+                    "updateGender": "MALE"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "phoneNumber": "+6507855937",
+                    "email": "anna.muller@sqillssandbox.com",
+                    "firstName": "Lara",
+                    "lastName": "Muller",
+                    "gender": "FEMALE",
+                    "dateOfBirth": "1982-06-05",
+                    "updateFirstName": "Elena",
+                    "updateLastName": "Fischer",
+                    "updateDateOfBirth": "1969-07-17",
+                    "updatePhoneNumber": "+0818420650",
+                    "updateEmail": "taylor.fischer@sqillssandbox.com",
+                    "updateGender": "MALE"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "phoneNumber": "+3951055781",
+                    "email": "charlie.michel@sqillssandbox.com",
+                    "firstName": "Luca",
+                    "lastName": "Michel",
+                    "gender": "MALE",
+                    "dateOfBirth": "2022-02-14",
+                    "updateFirstName": "Hans",
+                    "updateLastName": "Fischer",
+                    "updateDateOfBirth": "2012-07-02",
+                    "updatePhoneNumber": "+5574443461",
+                    "updateEmail": "laura.fischer@sqillssandbox.com",
+                    "updateGender": "FEMALE"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "phoneNumber": "+0145032435",
+                    "email": "kai.lund@sqillssandbox.com",
+                    "firstName": "Kai",
+                    "lastName": "Lund",
+                    "gender": "FEMALE",
+                    "dateOfBirth": "2018-01-12",
+                    "updateFirstName": "Reese",
+                    "updateLastName": "Martin",
+                    "updateDateOfBirth": "2021-05-22",
+                    "updatePhoneNumber": "+4764271670",
+                    "updateEmail": "reese.martin@sqillssandbox.com",
+                    "updateGender": "FEMALE"
+                },
+                {
+                    "reference": "PAX5",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "firstName": "Noah",
+                    "lastName": "Rossi",
+                    "dateOfBirth": "2017-01-24",
+                    "email": "nicolas.rossi@sqillssandbox.com",
+                    "phoneNumber": "+7630701648",
+                    "updateFirstName": "Stefan",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "2022-05-14",
+                    "updatePhoneNumber": "+6836465581",
+                    "updateEmail": "updated@sqillssandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX6",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "firstName": "Emma",
+                    "lastName": "Lund",
+                    "dateOfBirth": "2021-02-11",
+                    "email": "eli.lund@sqillssandbox.com",
+                    "phoneNumber": "+2742779765",
+                    "updateFirstName": "Chloe",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "2015-07-23",
+                    "updatePhoneNumber": "+6598074077",
+                    "updateEmail": "updated@sqillssandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "PAX7",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Paul",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1996-09-11",
+                    "email": "paul.garcia@sqillssandbox.com",
+                    "phoneNumber": "+4284473615",
+                    "updateFirstName": "Alex",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "1984-12-01",
+                    "updatePhoneNumber": "+4807974785",
+                    "updateEmail": "updated@sqillssandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 41,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+6692389590",
+                    "email": "stefan.szabo@sqillssandbox.com",
+                    "firstName": "Pierre",
+                    "lastName": "Szabo",
+                    "dateOfBirth": "1961-02-28",
+                    "updateFirstName": "Diego",
+                    "updateLastName": "Bernard",
+                    "updateDateOfBirth": "1988-05-25",
+                    "updatePhoneNumber": "+4784550905",
+                    "updateEmail": "ines.bernard@sqillssandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "phoneNumber": "+0008110694",
+                    "email": "jordan.garcia@sqillssandbox.com",
+                    "firstName": "Laura",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "1987-12-04",
+                    "updateFirstName": "Anna",
+                    "updateLastName": "Simon",
+                    "updateDateOfBirth": "2006-10-17",
+                    "updatePhoneNumber": "+0373655307",
+                    "updateEmail": "oliver.simon@sqillssandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "phoneNumber": "+6938754025",
+                    "email": "kim.laurent@sqillssandbox.com",
+                    "firstName": "Liam",
+                    "lastName": "Laurent",
+                    "dateOfBirth": "2013-04-03",
+                    "updateFirstName": "Luca",
+                    "updateLastName": "Klein",
+                    "updateDateOfBirth": "1966-06-27",
+                    "updatePhoneNumber": "+9224219669",
+                    "updateEmail": "maria.klein@sqillssandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "phoneNumber": "+8689859482",
+                    "email": "diego.dubois@sqillssandbox.com",
+                    "firstName": "Nora",
+                    "lastName": "Dubois",
+                    "dateOfBirth": "1984-08-02",
+                    "updateFirstName": "Lucia",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "1980-06-21",
+                    "updatePhoneNumber": "+3850267313",
+                    "updateEmail": "max.laurent@sqillssandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "PAX5",
+                    "type": "PERSON",
+                    "phoneNumber": "+8922455744",
+                    "email": "pierre.bernard@sqillssandbox.com",
+                    "firstName": "Nicolas",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "2016-02-11",
+                    "updateFirstName": "Felix",
+                    "updateLastName": "Rossi",
+                    "updateDateOfBirth": "2012-10-07",
+                    "updatePhoneNumber": "+9521903079",
+                    "updateEmail": "marco.rossi@sqillssandbox.com",
+                    "gender": "MALE",
+                    "category": "CHILD"
+                },
+                {
+                    "reference": "PAX6",
+                    "type": "PERSON",
+                    "phoneNumber": "+0325323774",
+                    "email": "marc.muller@sqillssandbox.com",
+                    "firstName": "Sophie",
+                    "lastName": "Muller",
+                    "dateOfBirth": "2021-01-24",
+                    "updateFirstName": "Marie",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "2015-01-08",
+                    "updatePhoneNumber": "+8311109109",
+                    "updateEmail": "marie.garcia@sqillssandbox.com",
+                    "gender": "FEMALE",
+                    "category": "CHILD"
+                }
+            ]
+        },
+        {
+            "id": 45,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+3116622253",
+                    "email": "marie.dubois@sqillssandbox.com",
+                    "firstName": "Marie",
+                    "lastName": "Dubois",
+                    "dateOfBirth": "1961-03-02",
+                    "updateFirstName": "Eli",
+                    "updateLastName": "Wagner",
+                    "updateDateOfBirth": "2002-04-09",
+                    "updatePhoneNumber": "+7433033590",
+                    "updateEmail": "eli.wagner@sqillssandbox.com"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "phoneNumber": "+2952949668",
+                    "email": "anna.bianchi@sqillssandbox.com",
+                    "firstName": "Anna",
+                    "lastName": "Bianchi",
+                    "dateOfBirth": "1980-06-16",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Rossi",
+                    "updateDateOfBirth": "2004-08-09",
+                    "updatePhoneNumber": "+6907377540",
+                    "updateEmail": "jordan.rossi@sqillssandbox.com"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "phoneNumber": "+0687719646",
+                    "email": "jean.schmidt@sqillssandbox.com",
+                    "firstName": "Jean",
+                    "lastName": "Schmidt",
+                    "dateOfBirth": "1969-09-06",
+                    "updateFirstName": "Alex",
+                    "updateLastName": "Dupont",
+                    "updateDateOfBirth": "1967-11-06",
+                    "updatePhoneNumber": "+3760761326",
+                    "updateEmail": "alex.dupont@sqillssandbox.com"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "phoneNumber": "+2246369094",
+                    "email": "rowan.martin@sqillssandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Martin",
+                    "dateOfBirth": "2020-11-17",
+                    "updateFirstName": "Luca",
+                    "updateLastName": "Michel",
+                    "updateDateOfBirth": "2013-04-11",
+                    "updatePhoneNumber": "+7276359883",
+                    "updateEmail": "luca.michel@sqillssandbox.com",
+                    "category": "CHILD"
+                },
+                {
+                    "reference": "PAX5",
+                    "type": "PERSON",
+                    "phoneNumber": "+8809852162",
+                    "email": "sidney.garcia@sqillssandbox.com",
+                    "firstName": "Sidney",
+                    "lastName": "Garcia",
+                    "dateOfBirth": "2016-06-04",
+                    "updateFirstName": "Sam",
+                    "updateLastName": "Lund",
+                    "updateDateOfBirth": "2013-01-01",
+                    "updatePhoneNumber": "+7380238188",
+                    "updateEmail": "sam.lund@sqillssandbox.com",
+                    "category": "CHILD"
+                }
+            ]
         }
-    ]
+    ],
+    "knownDeviations": []
 }

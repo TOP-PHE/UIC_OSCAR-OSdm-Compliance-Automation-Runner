@@ -1,12 +1,20 @@
 {
     "scenariosToRun": [
-        "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
-        "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
-        "OTST_RFND_SRCH_CRIT_1ADT_2LEG",
-        "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
-        "OTST_EXCH_SRCH_CRIT_1ADT_1LEG"
+        "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA",
+        "SALE_SEARCH_IC_TUR_PRA_LEGS_1PAX_NOCRITERIA",
+        "SALE_SEARCH_IC_LIB_TUR_LEGS_1PAX_NOCRITERIA",
+        "SALE_SEARCH_IC_TUR_LIB_LEGS_1PAX_NOCRITERIA",
+        "SALE_SPEC_IC_TUR_PRA_LEGS_1PAX_NOCRITERIA",
+        "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_RETURN",
+        "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_POSTBOOK",
+        "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_HF",
+        "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASERPATCH_NHF_INVALID",
+        "RFND_RC_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASERPATCH_NHF_EMPTY",
+        "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_BKTILMEOU",
+        "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_FULLTIMEOUT_TESTS",
+        "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_FULLTIMEOUTPARTIEL_REFUND_PAX",
+        "RFND_PAR_SEARCH_IC_PRA_TUR_1LEGS_5PAX",
+        "BIL_SALE_1ADT_1LEG"
     ],
     "systemInfoParameters": {
         "coachId": null,
@@ -16,105 +24,525 @@
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_PATCH_SRCH_CRIT_1ADT_1LEG",
+            "code": "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 9,
+            "passengersListId": 10,
+            "purchaserListId": 11,
+            "requestedFulfillmentOptionsListId": 12,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": null,
+                "requestedOfferParts": []
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_TUR_PRA_LEGS_1PAX_NOCRITERIA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 13,
+            "passengersListId": 14,
+            "purchaserListId": 15,
+            "requestedFulfillmentOptionsListId": 16,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "CZK"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_LIB_TUR_LEGS_1PAX_NOCRITERIA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 17,
+            "passengersListId": 18,
+            "purchaserListId": 19,
+            "requestedFulfillmentOptionsListId": 20,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "CZK"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_TUR_LIB_LEGS_1PAX_NOCRITERIA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 21,
+            "passengersListId": 22,
+            "purchaserListId": 23,
+            "requestedFulfillmentOptionsListId": 24,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "offerMode": "INDIVIDUAL",
+                "currency": "CZK"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SPEC_IC_TUR_PRA_LEGS_1PAX_NOCRITERIA",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 25,
+            "passengersListId": 26,
+            "purchaserListId": 27,
+            "requestedFulfillmentOptionsListId": 28,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "currency": "CZK",
+                "offerMode": "INDIVIDUAL"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_RETURN",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 29,
+            "passengersListId": 30,
+            "purchaserListId": 31,
+            "requestedFulfillmentOptionsListId": 32,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "inboundDate": "2026-06-30T07:25",
+                "returnOffsetDays": 2,
+                "currency": "CZK"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_POSTBOOK",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "ADD_TO_BOOKING",
+            "tripRequirementId": 33,
+            "passengersListId": 34,
+            "purchaserListId": 35,
+            "requestedFulfillmentOptionsListId": 36,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            }
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_HF",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 37,
+            "passengersListId": 38,
+            "purchaserListId": 39,
+            "requestedFulfillmentOptionsListId": 40,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "deferred"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASERPATCH_NHF_INVALID",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 41,
+            "passengersListId": 42,
+            "purchaserListId": 43,
+            "requestedFulfillmentOptionsListId": 44,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "invalid"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "code": "RFND_RC_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASERPATCH_NHF_EMPTY",
             "scenarioType": "REFUND",
             "scenarioAction": "PATCH",
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": "TECHNICAL_FAILURE",
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 45,
+            "passengersListId": 46,
+            "purchaserListId": 47,
+            "requestedFulfillmentOptionsListId": 48,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "omit",
+            "stepFailurePolicy": "CONTINUE"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_DEL_SRCH_CRIT_1ADT_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": "DELETE",
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1LEG",
-            "scenarioType": "REFUND",
+            "code": "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_BKTILMEOU",
+            "scenarioType": "SALE",
             "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 2,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 49,
+            "passengersListId": 50,
+            "purchaserListId": 51,
+            "requestedFulfillmentOptionsListId": 52,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "deferred",
+            "expiredBookingTest": "on"
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_2ADT_1CHD_1LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 1,
-            "passengersListId": 3,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_SRCH_CRIT_1ADT_2LEG",
-            "scenarioType": "REFUND",
-            "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 2,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
-        },
-        {
-            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
-            "loggingType": "INFO",
-            "code": "OTST_RFND_TRIP_SPEC_2ADT_2LEG",
+            "code": "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_FULLTIMEOUT_TESTS",
             "scenarioType": "REFUND",
             "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "refundDate": null,
-            "tripRequirementId": 3,
-            "passengersListId": 2,
-            "offerSearchCriteriaListId": 2,
-            "requestedFulfillmentOptionsListId": 1
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 53,
+            "passengersListId": 54,
+            "purchaserListId": 55,
+            "requestedFulfillmentOptionsListId": 56,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "deferred",
+            "expiredBookingTest": "on",
+            "expiredOfferTest": "on",
+            "expiredOfferMaxWaitMinutes": 20,
+            "expiredBookingMaxWaitMinutes": 20,
+            "expiredAddReservationOfferTest": "on",
+            "expiredAddReservationOfferMaxWaitMinutes": 20,
+            "expiredAddAncillaryOfferTest": "on",
+            "expiredAddAncillaryOfferMaxWaitMinutes": 18,
+            "expiredRefundOfferTest": "on",
+            "expiredRefundOfferMaxWaitMinutes": 20
         },
         {
             "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
             "loggingType": "INFO",
-            "code": "OTST_EXCH_SRCH_CRIT_1ADT_1LEG",
-            "scenarioType": "EXCHANGE",
+            "code": "NHF_SALE_SEARCH_IC_PRA_TUR_LEGS_1PAX_NOCRITERIA_SEATMAP_PREBOOK_PURCHASEPATCH_FULLTIMEOUTPARTIEL_REFUND_PAX",
+            "scenarioType": "REFUND",
             "scenarioAction": null,
-            "osdmVersion": "3.4",
-            "desiredFlexibility": "NON_FLEXIBLE",
-            "overruleCode": "PAYMENT_FAILURE",
-            "tripRequirementId": 1,
-            "passengersListId": 1,
-            "offerSearchCriteriaListId": 1,
-            "requestedFulfillmentOptionsListId": 1
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": true,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": "SEATMAP_AT_OFFER",
+            "tripRequirementId": 57,
+            "passengersListId": 58,
+            "purchaserListId": 59,
+            "requestedFulfillmentOptionsListId": 60,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "bookingPurchaserMode": "deferred",
+            "expiredBookingTest": "off",
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": 20,
+            "expiredBookingMaxWaitMinutes": 20,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": 20,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": 18,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": 20,
+            "partialRefundByLeg": "off",
+            "partialRefundByPax": "on"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "DEBUG",
+            "code": "RFND_PAR_SEARCH_IC_PRA_TUR_1LEGS_5PAX",
+            "scenarioType": "REFUND",
+            "scenarioAction": null,
+            "osdmVersion": "3.8.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "tripRequirementId": 61,
+            "passengersListId": 62,
+            "purchaserListId": 63,
+            "requestedFulfillmentOptionsListId": 64,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": "INDIVIDUAL",
+                "requestedOfferParts": [],
+                "currency": "CZK"
+            },
+            "partialRefundByPax": "on",
+            "passengerExternalRefFormat": "PAX%02d"
+        },
+        {
+            "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+            "loggingType": "INFO",
+            "stepFailurePolicy": "HARD_STOP",
+            "code": "BIL_SALE_1ADT_1LEG",
+            "scenarioType": "SALE",
+            "scenarioAction": null,
+            "osdmVersion": "3.9.0",
+            "desiredFlexibility": "FULL_FLEXIBLE",
+            "overruleCode": null,
+            "salesFlowActions": {
+                "patchPassengers": false,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+            },
+            "placeSelectionMode": null,
+            "requestedInformationProbe": null,
+            "bookingPurchaserMode": "inline",
+            "expiredBookingTest": "off",
+            "expiredBookingMaxWaitMinutes": null,
+            "expiredOfferTest": "off",
+            "expiredOfferMaxWaitMinutes": null,
+            "expiredAddReservationOfferTest": "off",
+            "expiredAddReservationOfferMaxWaitMinutes": null,
+            "expiredAddAncillaryOfferTest": "off",
+            "expiredAddAncillaryOfferMaxWaitMinutes": null,
+            "expiredRefundOfferTest": "off",
+            "expiredRefundOfferMaxWaitMinutes": null,
+            "expiredExchangeOfferTest": "off",
+            "expiredExchangeOfferMaxWaitMinutes": null,
+            "passengerExternalRefFormat": "",
+            "partialRefundByLeg": "off",
+            "partialRefundLegSelection": "first",
+            "partialRefundByPax": "off",
+            "partialRefundPaxSelection": "first",
+            "tripRequirementId": 65,
+            "passengersListId": 66,
+            "purchaserListId": 67,
+            "requestedFulfillmentOptionsListId": 68,
+            "shared": false,
+            "created_by": "patrick.bileto@trackonpath.com",
+            "version": "1.0",
+            "offerSearchCriteria": {}
         }
     ],
     "offerSearchCriteriaList": [
@@ -180,6 +608,141 @@
                     "fulfillmentType": "ETICKET"
                 }
             ]
+        },
+        {
+            "id": 12,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 16,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 20,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 24,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 28,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 32,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 36,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 40,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 44,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 48,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 52,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 56,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 60,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 64,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
+        },
+        {
+            "id": 68,
+            "requestedFulfillmentOptions": [
+                {
+                    "fulfillmentType": "ETICKET",
+                    "fulfillmentMedia": "PDF_A4"
+                }
+            ]
         }
     ],
     "tripRequirements": [
@@ -240,6 +803,335 @@
                     "operatorCode": "urn:uic:rics:3189"
                 }
             ]
+        },
+        {
+            "id": 9,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 13,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:5454300",
+                "destination": "urn:uic:stn:5457076",
+                "startDatetime": "%TRIP_DATE%T06:44:30+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 17,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:5454212",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T04:05:00+02:00",
+                "endDatetime": "%TRIP_DATE%T04:38:00+02:00",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "1061",
+                "operatorCode": "urn:uic:rics:3189"
+            }
+        },
+        {
+            "id": 21,
+            "tripType": "SEARCH",
+            "trip": {
+                "origin": "urn:uic:stn:5454300",
+                "destination": "urn:uic:stn:5454212",
+                "startDatetime": "%TRIP_DATE%T07:20:00+02:00",
+                "endDatetime": "",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 25,
+            "tripType": "SPECIFICATION",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:22:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ]
+        },
+        {
+            "id": 29,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 33,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 37,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 41,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 45,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 49,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 53,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 57,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 61,
+            "tripType": "SEARCH",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:00:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T10:20:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1140",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ],
+            "trip": {
+                "origin": "urn:uic:stn:5457076",
+                "destination": "urn:uic:stn:5454300",
+                "startDatetime": "%TRIP_DATE%T04:00:00+02:00",
+                "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                "vehicleNumber": "",
+                "operatorCode": ""
+            }
+        },
+        {
+            "id": 65,
+            "tripType": "SPECIFICATION",
+            "legs": [
+                {
+                    "origin": "urn:uic:stn:5457076",
+                    "destination": "urn:uic:stn:5454300",
+                    "startDatetime": "%TRIP_DATE%T07:22:00+02:00",
+                    "endDatetime": "%TRIP_DATE%T09:10:00+02:00",
+                    "productCategoryRef": "",
+                    "productCategoryName": "",
+                    "productCategoryShortName": "",
+                    "vehicleNumber": "1142",
+                    "operatorCode": "urn:uic:rics:3189"
+                }
+            ]
         }
     ],
     "purchaserList": [
@@ -251,6 +1143,248 @@
                     "purchaserLastName": "DoePurchaser",
                     "purchaserPhoneNumber": "+33699999999",
                     "purchaserEmail": "emailPurchaser@email.com"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Rowan",
+                    "purchaserLastName": "Purchaser_Dupont",
+                    "purchaserEmail": "purchaser_rowan.purchaser_dupont@biletosandbox.com",
+                    "purchaserPhoneNumber": "+1062420279"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Morgan",
+                    "purchaserLastName": "Purchaser_Klein",
+                    "purchaserEmail": "purchaser_morgan.purchaser_klein@biletosandbox.com",
+                    "purchaserPhoneNumber": "+3091734240"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Jamie",
+                    "purchaserLastName": "Purchaser_Rossi",
+                    "purchaserEmail": "purchaser_jamie.purchaser_rossi@biletosandbox.com",
+                    "purchaserPhoneNumber": "+6381302207"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Rowan",
+                    "purchaserLastName": "Purchaser_Simon",
+                    "purchaserEmail": "purchaser_rowan.purchaser_simon@biletosandbox.com",
+                    "purchaserPhoneNumber": "+6833929512"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Sacha",
+                    "purchaserLastName": "Purchaser_Klein",
+                    "purchaserEmail": "purchaser_sacha.purchaser_klein@biletosandbox.com",
+                    "purchaserPhoneNumber": "+8953159546"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Eli",
+                    "purchaserLastName": "Purchaser_Dupont",
+                    "purchaserEmail": "purchaser_eli.purchaser_dupont@biletosandbox.com",
+                    "purchaserPhoneNumber": "+4265681486"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Purchaser_Kai",
+                    "purchaserLastName": "Purchaser_Novak",
+                    "purchaserEmail": "purchaser_kai.purchaser_novak@biletosandbox.com",
+                    "purchaserPhoneNumber": "+5885779463"
+                }
+            ]
+        },
+        {
+            "id": 11,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 15,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Marie",
+                    "purchaserLastName": "Dubois",
+                    "purchaserPhoneNumber": "+1549519605",
+                    "purchaserEmail": "marie.dubois@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 19,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Marie",
+                    "purchaserLastName": "Klein",
+                    "purchaserPhoneNumber": "+8994729652",
+                    "purchaserEmail": "marie.klein@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 23,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Anna",
+                    "purchaserLastName": "Schmidt",
+                    "purchaserPhoneNumber": "+8222015984",
+                    "purchaserEmail": "anna.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 27,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Sidney",
+                    "purchaserLastName": "Wagner",
+                    "purchaserPhoneNumber": "+5591085657",
+                    "purchaserEmail": "sidney.wagner@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 31,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 35,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 39,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 43,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 47,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 51,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 55,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 59,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 63,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Eva",
+                    "purchaserLastName": "Lund",
+                    "purchaserPhoneNumber": "+2444774641",
+                    "purchaserEmail": "eva.lund@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 67,
+            "purchaser": [
+                {
+                    "purchaserFirstName": "Carlos",
+                    "purchaserLastName": "Jensen",
+                    "purchaserPhoneNumber": "+3087374345",
+                    "purchaserEmail": "carlos.jensen@biletosandbox.com"
                 }
             ]
         }
@@ -365,6 +1499,392 @@
                     "updateGender": "FEMALE"
                 }
             ]
+        },
+        {
+            "id": 10,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Noah",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Noah",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 14,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0163462762",
+                    "email": "ines.szabo@biletosandbox.com",
+                    "firstName": "Luca",
+                    "lastName": "Szabo",
+                    "dateOfBirth": "1930-04-03",
+                    "updateFirstName": "Max",
+                    "updateLastName": "Bernard",
+                    "updateDateOfBirth": "1956-09-10",
+                    "updatePhoneNumber": "+4471836445",
+                    "updateEmail": "river.bernard@biletosandbox.com",
+                    "gender": "MALE"
+                }
+            ]
+        },
+        {
+            "id": 18,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+3850358189",
+                    "email": "ingrid.novak@biletosandbox.com",
+                    "firstName": "Ingrid",
+                    "lastName": "Novak",
+                    "dateOfBirth": "1994-05-01",
+                    "updateFirstName": "Carlos",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "1983-05-05",
+                    "updatePhoneNumber": "+0171225512",
+                    "updateEmail": "carlos.garcia@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 22,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+1949637439",
+                    "email": "eva.simon@biletosandbox.com",
+                    "firstName": "Eva",
+                    "lastName": "Simon",
+                    "dateOfBirth": "1972-10-21",
+                    "updateFirstName": "Dana",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "1976-05-01",
+                    "updatePhoneNumber": "+8583004936",
+                    "updateEmail": "dana.laurent@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 26,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+6212791139",
+                    "email": "eva.bianchi@biletosandbox.com",
+                    "firstName": "Eva",
+                    "lastName": "Bianchi",
+                    "dateOfBirth": "1982-04-26",
+                    "updateFirstName": "Kim",
+                    "updateLastName": "Fischer",
+                    "updateDateOfBirth": "1994-01-01",
+                    "updatePhoneNumber": "+6906830818",
+                    "updateEmail": "kim.fischer@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 30,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 34,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 38,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 42,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 46,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 50,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 54,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Rowan",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Jordan",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com"
+                }
+            ]
+        },
+        {
+            "id": 58,
+            "passengers": [
+                {
+                    "reference": "PAX1",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Peter",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Carlos",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX2",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Laura",
+                    "lastName": "Martin",
+                    "dateOfBirth": "1968-02-23",
+                    "email": "carlos.martin@biletosandbox.com",
+                    "phoneNumber": "+6569092754",
+                    "updateFirstName": "Laura",
+                    "updateLastName": "Jensen",
+                    "updateDateOfBirth": "1968-12-11",
+                    "updatePhoneNumber": "+9309779734",
+                    "updateEmail": "updated@biletosandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "PAX3",
+                    "type": "PERSON",
+                    "category": "YOUTH",
+                    "firstName": "Jan",
+                    "lastName": "Moreau",
+                    "dateOfBirth": "2001-03-25",
+                    "email": "jordan.moreau@biletosandbox.com",
+                    "phoneNumber": "+7942445877",
+                    "updateFirstName": "Pierre",
+                    "updateLastName": "Muller",
+                    "updateDateOfBirth": "2013-09-05",
+                    "updatePhoneNumber": "+4608897557",
+                    "updateEmail": "updated@biletosandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "PAX4",
+                    "type": "PERSON",
+                    "category": "CHILD",
+                    "firstName": "Ingrid",
+                    "lastName": "Laurent",
+                    "dateOfBirth": "2020-12-23",
+                    "email": "nora.laurent@biletosandbox.com",
+                    "phoneNumber": "+3577043944",
+                    "updateFirstName": "Sophie",
+                    "updateLastName": "Bianchi",
+                    "updateDateOfBirth": "2013-08-03",
+                    "updatePhoneNumber": "+5716645195",
+                    "updateEmail": "updated@biletosandbox.com",
+                    "gender": "FEMALE"
+                }
+            ]
+        },
+        {
+            "id": 62,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "phoneNumber": "+0384491012",
+                    "email": "rowan.bernard@biletosandbox.com",
+                    "firstName": "Nicolas",
+                    "lastName": "Bernard",
+                    "dateOfBirth": "1930-02-03",
+                    "updateFirstName": "Thomas",
+                    "updateLastName": "Schmidt",
+                    "updateDateOfBirth": "1990-10-21",
+                    "updatePhoneNumber": "+6563247217",
+                    "updateEmail": "jordan.schmidt@biletosandbox.com",
+                    "gender": "MALE"
+                },
+                {
+                    "reference": "00002",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Emma",
+                    "lastName": "Rossi",
+                    "dateOfBirth": "1984-08-14",
+                    "email": "greta.rossi@biletosandbox.com",
+                    "phoneNumber": "+2145669302",
+                    "updateFirstName": "Chloe",
+                    "updateLastName": "Klein",
+                    "updateDateOfBirth": "1935-05-10",
+                    "updatePhoneNumber": "+0939394443",
+                    "updateEmail": "updated@biletosandbox.com",
+                    "gender": "FEMALE"
+                },
+                {
+                    "reference": "00003",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "firstName": "Lucia",
+                    "lastName": "Rossi",
+                    "dateOfBirth": "1985-06-02",
+                    "email": "carlos.rossi@biletosandbox.com",
+                    "phoneNumber": "+4544870556",
+                    "updateFirstName": "Anna",
+                    "updateLastName": "Garcia",
+                    "updateDateOfBirth": "1946-03-20",
+                    "updatePhoneNumber": "+6601410016",
+                    "updateEmail": "updated@biletosandbox.com",
+                    "gender": "FEMALE"
+                }
+            ]
+        },
+        {
+            "id": 66,
+            "passengers": [
+                {
+                    "reference": "00001",
+                    "type": "PERSON",
+                    "category": "ADULT",
+                    "phoneNumber": "+6883910495",
+                    "email": "thomas.bianchi@biletosandbox.com",
+                    "firstName": "Thomas",
+                    "lastName": "Bianchi",
+                    "gender": "FEMALE",
+                    "dateOfBirth": "1976-09-01",
+                    "updateFirstName": "Lara",
+                    "updateLastName": "Laurent",
+                    "updateDateOfBirth": "1942-11-16",
+                    "updatePhoneNumber": "+1785062816",
+                    "updateEmail": "lara.laurent@biletosandbox.com",
+                    "updateGender": "FEMALE"
+                }
+            ]
+        }
+    ],
+    "knownDeviations": [
+        {
+            "step": "04. GET Passenger Categories",
+            "expectedStatus": 400,
+            "note": "GET /passenger-categories returns 400",
+            "active": true
+        },
+        {
+            "step": "08b. GET Place Map Post-Booking",
+            "expectedStatus": 501,
+            "note": "Post-booking seat map not served (501)",
+            "active": true
         }
     ]
 }
