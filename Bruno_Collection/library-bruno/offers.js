@@ -10,7 +10,7 @@
 // Import needed library files
 require('./displays.js');
 require('./requestsBuilder.js');
-const { bruTest: test } = require('./testCapture.js');
+const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
 const { processRequestedInformation } = require('./requestedInformation.js');
@@ -1046,7 +1046,7 @@ function validateAdmissions(selectedOffer) {
         expect(admission.price, "price should exist").to.be.an("object");
         expect(admission.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(admission.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expect(admission.price.scale, "price.scale should be a number").to.be.a("number");
+        expectTypeOrNull(admission.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
       });
 
       // offerMode is defined
@@ -1076,9 +1076,9 @@ function validateAdmissions(selectedOffer) {
 
       // isReusable is a boolean (if present)
       if (admission.isReusable !== undefined) {
-        test(`AdmissionOfferPart ${i + 1} isReusable is a boolean - isReusable: ${admission.isReusable}`, function () {
+        test(`AdmissionOfferPart ${i + 1} isReusable is a boolean or null - isReusable: ${admission.isReusable}`, function () {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} isReusable: ${admission.isReusable}`);
-          expect(admission.isReusable, "isReusable should be a boolean").to.be.a("boolean");
+          expectTypeOrNull(admission.isReusable, "boolean", "isReusable should be a boolean or null (nullable per OSDM)");
         });
       }
 
@@ -1159,7 +1159,7 @@ function validateAdmissions(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1217,7 +1217,7 @@ function validateReservations(selectedOffer) {
         expect(reservation.price, "price should exist").to.be.an("object");
         expect(reservation.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(reservation.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expect(reservation.price.scale, "price.scale should be a number").to.be.a("number");
+        expectTypeOrNull(reservation.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
       });
 
       // refundable and exchangeable are valid OSDM values
@@ -1259,7 +1259,7 @@ function validateReservations(selectedOffer) {
           availablePlaces.forEach((place, pIndex) => {
             validationLogger(`[DEBUG] availablePlaces[${pIndex}] accommodationType : ${place.accommodationType}, numericAvailability : ${place.numericAvailability}`);
             expect(typeof place.accommodationType).to.eql("string");
-            expect(typeof place.numericAvailability).to.eql("number");
+            expectTypeOrNull(place.numericAvailability, "number", `availablePlaces[${pIndex}].numericAvailability should be a number or null (nullable per OSDM)`);
             // tripLegCoverage structure (if present)
             if (place.tripLegCoverage) {
               expect(place.tripLegCoverage.tripId, `availablePlaces[${pIndex}].tripLegCoverage.tripId should be a string`).to.be.a("string");
@@ -1280,9 +1280,9 @@ function validateReservations(selectedOffer) {
 
       // Numeric Availability
       if ("numericAvailability" in reservation) {
-        test(`Reservation part ${i + 1} numericAvailability is a number - total: ${reservation.numericAvailability}`, () => {
+        test(`Reservation part ${i + 1} numericAvailability is a number or null - total: ${reservation.numericAvailability}`, () => {
           validationLogger(`[DEBUG] numericAvailability : ${reservation.numericAvailability}`);
-          expect(typeof reservation.numericAvailability).to.eql("number");
+          expectTypeOrNull(reservation.numericAvailability, "number", "numericAvailability should be a number or null (nullable per OSDM)");
         });
       } else {
         validationLogger(`[DEBUG] No numericAvailability for reservation id : ${reservation.id} → test skipped`);
@@ -1309,9 +1309,9 @@ function validateReservations(selectedOffer) {
 
       // Number of Private Compartments
       if ("numberOfPrivateCompartments" in reservation) {
-        test(`Reservation part ${i + 1} numberOfPrivateCompartments is a number - total: ${reservation.numberOfPrivateCompartments}`, () => {
+        test(`Reservation part ${i + 1} numberOfPrivateCompartments is a number or null - total: ${reservation.numberOfPrivateCompartments}`, () => {
           validationLogger(`[DEBUG] numberOfPrivateCompartments : ${reservation.numberOfPrivateCompartments}`);
-          expect(typeof reservation.numberOfPrivateCompartments).to.eql("number");
+          expectTypeOrNull(reservation.numberOfPrivateCompartments, "number", "numberOfPrivateCompartments should be a number or null (nullable per OSDM)");
         });
       } else {
         validationLogger(`[DEBUG] No numberOfPrivateCompartments for reservation id=${reservation.id} → test skipped`);
@@ -1382,7 +1382,7 @@ function validateReservations(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1472,7 +1472,7 @@ function validateAncillaries(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";

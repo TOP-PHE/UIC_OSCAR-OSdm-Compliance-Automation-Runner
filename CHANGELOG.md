@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.166 / OTST_V2.0.94] — 2026-06-18
+
+**Fix (#445): `nullable: true` scalar fields no longer FAIL when the provider
+returns `null` — a spec-legal value was producing false failures (reported on SBB
+FULL_FLEX).**
+
+### Fixed
+
+- **`offers.js` + `refunds.js`** — type assertions for OSDM scalar fields that are
+  declared `nullable: true` required the JS type and rejected `null`. A code
+  generator emits these as `null` when the field is not applicable (returned for
+  consistency) — which is conformant — so OSCAR was raising false failures. Now we
+  assert **the declared type OR `null`** via a shared `expectTypeOrNull()` helper
+  (`testCapture.js`). Fields covered (all confirmed `nullable: true` in OSDM 3.8.0):
+  `Price`/`Amount.scale` (admission/reservation price, `afterSaleFee.scale`,
+  refund `refundableAmount`/`refundFee`/breakdown scales), `isReusable`,
+  part-level + `availablePlaces` `numericAvailability`, `numberOfPrivateCompartments`.
+  Required fields (`price.amount`, `currency`) keep their strict checks. Also
+  corrected a stale comment in `refunds.js` that wrongly called `scale` "required".
+
+### Verified
+
+- Harness over the REAL extracted `expectTypeOrNull` — 11/11: `null` accepted for
+  number/boolean; the declared type still passes; a genuinely wrong type (string,
+  object) still FAILS; `undefined` (absent ≠ null) still fails. `node --check` clean
+  on all three files; residual-strict-assertion sweep finds none.
+
+---
+
 ## [server-v1.11.165] — 2026-06-18
 
 **Feat (#442): `custom` OAuth profile gains `body_format: "raw"` — send the token
