@@ -18,7 +18,7 @@
 
 'use strict';
 
-module.exports = { bruTest, resetTests };
+module.exports = { bruTest, resetTests, expectTypeOrNull };
 
 /**
  * Drop-in replacement for Bruno's test(name, fn).
@@ -82,4 +82,23 @@ function resetTests() {
   try {
     bru.setVar('__rptTests', '[]');
   } catch (_e) { /* safe to ignore */ }
+}
+
+/**
+ * Assert a value is of `jsType` OR null. Several OSDM scalar fields are declared
+ * `nullable: true` — e.g. Price/Amount.scale, AdmissionOfferPart.isReusable,
+ * ReservationOfferPart.numericAvailability, numberOfPrivateCompartments. A code
+ * generator emits them as `null` when not applicable but still present for
+ * consistency, which is SPEC-LEGAL — so a conformant null must NOT fail the run.
+ * Use inside a bruTest() callback in place of `expect(v).to.be.a(jsType)`. (#445)
+ */
+function expectTypeOrNull(value, jsType, label) {
+  if (value === null) {
+    try {
+      const { validationLogger } = require('./displays.js');
+      validationLogger(`[DEBUG] ${label || jsType} — null accepted (nullable: true in the OSDM schema)`);
+    } catch (_le) { /* displays.js not available — safe to ignore */ }
+    return;
+  }
+  expect(value, label).to.be.a(jsType);
 }

@@ -7,7 +7,7 @@
  */
 // Import needed library files
 require('./displays.js');
-const { bruTest: test } = require('./testCapture.js');
+const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
 
 module.exports = {
   postPatchRefundOfferResponse,
@@ -338,7 +338,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundableAmount, 'refundableAmount is not an object').to.be.an('object');
     expect(refundOffer.refundableAmount.amount,   'refundableAmount.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundableAmount.currency, 'refundableAmount.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expect(refundOffer.refundableAmount.scale,    'refundableAmount.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
+    expectTypeOrNull(refundOffer.refundableAmount.scale, "number", 'refundableAmount.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
 
     if (expectedFulfillmentStatuses.includes("CONFIRMED") || expectedFulfillmentStatuses.includes("FULFILLED")) {
       const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
@@ -373,7 +373,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundFee, 'refundFee is not an object').to.be.an('object');
     expect(refundOffer.refundFee.amount,   'refundFee.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundFee.currency, 'refundFee.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expect(refundOffer.refundFee.scale, 'refundFee.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
+    expectTypeOrNull(refundOffer.refundFee.scale, "number", 'refundFee.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
     expect(refundOffer.refundFee.amount).to.be.at.least(0);
   });
 
@@ -410,13 +410,13 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
         expect(breakdown.refundFee).to.exist;
         expect(breakdown.refundFee.amount).to.be.a('number').and.at.least(0);
         expect(breakdown.refundFee.currency).to.be.a('string');
-        expect(breakdown.refundFee.scale).to.be.a('number');
+        expectTypeOrNull(breakdown.refundFee.scale, "number", 'breakdown.refundFee.scale should be a number or null (nullable per OSDM)');
 
         // Validate refundableAmount
         expect(breakdown.refundableAmount).to.exist;
         expect(breakdown.refundableAmount.amount).to.be.a('number');
         expect(breakdown.refundableAmount.currency).to.be.a('string');
-        expect(breakdown.refundableAmount.scale).to.be.a('number');
+        expectTypeOrNull(breakdown.refundableAmount.scale, "number", 'breakdown.refundableAmount.scale should be a number or null (nullable per OSDM)');
 
         // Validate bookingParts
         expect(breakdown.bookingParts).to.be.an('array').that.is.not.empty;

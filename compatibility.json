@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.193",
+  "current_release": "2026.194",
   "releases": [
+    {
+      "release": "2026.194",
+      "date": "2026-06-18",
+      "server": "1.11.166",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #445: OSDM scalar fields declared nullable:true no longer FAIL when the provider returns null. offers.js + refunds.js asserted the JS type and rejected null; a code generator emits these fields as null when not applicable (returned for consistency), which is spec-legal — so OSCAR raised false failures (reported on SBB FULL_FLEX: isReusable null, price.scale null, numericAvailability null, numberOfPrivateCompartments null). Now assert the declared type OR null via a shared expectTypeOrNull() helper in testCapture.js. Fields covered, all confirmed nullable:true in OSDM 3.8.0: Price/Amount.scale (admission/reservation price, afterSaleFee.scale x3, refund refundableAmount/refundFee/breakdown scales x4), isReusable, part-level + availablePlaces numericAvailability, numberOfPrivateCompartments. Required fields (price.amount, currency) keep strict checks; corrected a stale refunds.js comment that wrongly called scale 'required'. Collection-side; server 1.11.165 -> 1.11.166, collection OTST_V2.0.93 -> OTST_V2.0.94.",
+        "Verification: harness over the REAL extracted expectTypeOrNull — 11/11 (null accepted for number/boolean; declared type still passes; a genuinely wrong type — string/object — still FAILS; undefined/absent still fails, since absent != null). node --check clean on testCapture.js/offers.js/refunds.js; a residual strict-assertion sweep over the nullable fields finds none remaining."
+      ]
+    },
     {
       "release": "2026.193",
       "date": "2026-06-18",
