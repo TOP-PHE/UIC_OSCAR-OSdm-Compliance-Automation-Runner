@@ -547,6 +547,20 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
+  // Bug B: inspect booking-level warnings / problems (OSDM envelope).
+  // Non-array 'warnings' means the provider returned a non-standard structure
+  // (e.g. Sqills wraps it as {warnings:[...]} instead of the expected Warning[]).
+  if (jsonData.warnings !== undefined && jsonData.warnings !== null && !Array.isArray(jsonData.warnings)) {
+    validationLogger(
+      `[WARNING] booking response 'warnings' is not an array (got ${typeof jsonData.warnings}) — ` +
+      `OSDM expects Warning[] at the response root. Provider returned a non-standard structure: ` +
+      `${JSON.stringify(jsonData.warnings).slice(0, 300)}`
+    );
+  }
+  if (typeof checkWarningsAndProblems === 'function') {
+    checkWarningsAndProblems(jsonData);
+  }
+
   const booking = jsonData.booking;
   if (typeof booking !== 'object' || booking === null) {
     validationLogger("[ERROR] No booking found or 'booking' is not an object.");
@@ -809,8 +823,21 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   });
   // Downstream (refund maths) reads these — set whichever members exist
   // (previously only set when BOTH existed, i.e. never on conformant data).
-  if (prov)      bru.setEnvVar("provisionalPriceAmount", prov.amount);
-  if (confirmed) bru.setEnvVar("confirmedPriceAmount",   confirmed.amount);
+  if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
+  // Bug C: guard against storing a 0 confirmedPrice at pre-confirmation stage
+  // when provisionalPrice is non-zero — provider anomaly (e.g. Sqills returns
+  // confirmedPrice.amount=0 at PREBOOKED) that would corrupt REFUND/EXCHANGE maths.
+  if (confirmed) {
+    if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
+      validationLogger(
+        `[WARNING] confirmedPrice.amount is 0 while provisionalPrice.amount is ${prov.amount} ` +
+        `at pre-confirmation stage — possible provider anomaly. confirmedPriceAmount NOT stored ` +
+        `to avoid corrupting downstream refund/exchange calculations.`
+      );
+    } else {
+      bru.setEnvVar("confirmedPriceAmount", confirmed.amount);
+    }
+  }
 
   // B4: Both prices must use the same currency (OSDM: currency must be consistent within a booking)
   if (prov?.currency && confirmed?.currency) {
@@ -830,7 +857,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   }
 
   const requestName = req?.getName?.() ?? "";
-  if (requestName === "03. POST Create Booking" || requestName === "07. GET Booking before Fulfillments") {
+  if (requestName === "02. POST Create Booking" || requestName === "05. GET Booking before Fulfillments") {
     test(`provisionalPrice matches minimalPrice: ${prov.amount} ${prov.currency} (scale: ${prov.scale})`, () => {
       expect(prov.amount).to.eql(mini.amount);
       expect(prov.currency).to.eql(mini.currency);
@@ -927,6 +954,8 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     }
 
     test(`Fulfillment[${idx}] id exists`, () => {
+      // Bug G: was missing an assertion — the test always passed even when id was absent.
+      expect(fulfillment.id).to.be.a('string').and.not.be.empty;
       validationLogger(`[DEBUG] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
     });
     bru.setEnvVar("fulfillmentIds", fulfillmentIds);
