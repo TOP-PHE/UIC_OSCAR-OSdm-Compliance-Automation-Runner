@@ -25,7 +25,7 @@ const express = require('express');
 const { get, run } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
-const { resolveCompanyScope } = require('../helpers/shared');
+const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
 const { osdmGet, buildTesterHeaders } = require('../../utils/osdm-client');
 const log = require('../../utils/logger').child({ module: 'places' });
@@ -39,24 +39,6 @@ router.use(requireAuth, enforceTenant);
 // it loudly so truncation is never silent.
 const MAX_PAGES = 100;
 const MAX_PLACES = 100000;
-
-function denyAdminAndCertifier(req, res) {
-  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
-    res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Administrators and certifiers do not have access to test data.' });
-    return true;
-  }
-  return false;
-}
-
-function requireTestManager(req, res) {
-  if (req.user.role !== 'test_manager') {
-    res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only Test Managers can refresh the places cache.' });
-    return false;
-  }
-  return true;
-}
 
 /**
  * Normalize an OSDM Place/StopPlace to the compact shape we cache and search.

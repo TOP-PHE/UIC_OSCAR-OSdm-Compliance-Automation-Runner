@@ -21,7 +21,7 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, colEncrypt, colDecrypt, decrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
-const { resolveCompanyScope } = require('../helpers/shared');
+const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
 const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
@@ -125,26 +125,9 @@ async function _postJson(apiBase, path, token, body, extraHeaders) {
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
-// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
-// Test resources are test data — administrators no longer have read or write
-// access. Certifiers never had a use case. Tightened from
-// "test_manager OR isPlatformRole" to a strict role allow-list.
-function denyAdminAndCertifier(req, res) {
-  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
-    res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Administrators and certifiers do not have access to test resources (issue #60).' });
-    return true;
-  }
-  return false;
-}
-function requireTestManager(req, res) {
-  if (req.user.role !== 'test_manager') {
-    res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only Test Managers can modify test resources.' });
-    return false;
-  }
-  return true;
-}
+// Role guards (issue #60): test resources are test data — administrators and
+// certifiers have no access, only Test Managers may write. Shared helpers now
+// live in helpers/shared.js (denyAdminAndCertifier / requireTestManager).
 
 // ── GET /v1/company/test-resources ────────────────────────────────────────────
 router.get('/test-resources', (req, res) => {
