@@ -46,7 +46,7 @@ jobs:
 
     steps:
       - name: Checkout (full history for blame)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Sonar needs the full Git history to attribute issues to commits
           # for the "new code" period. Shallow clones produce blank blame.
