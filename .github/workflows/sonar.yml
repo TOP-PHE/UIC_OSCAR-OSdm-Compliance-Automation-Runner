@@ -8,9 +8,20 @@
 name: SonarCloud
 
 # Runs on every push to main and on every PR targeting main, scoped to
-# server-relevant files. Sonar's PR decoration posts the quality-gate
-# verdict back as a check + a PR comment, so reviewers see issues
-# inline. Branch protection is what makes the gate actually blocking.
+# server-relevant files.
+#
+# Two-step job: "SonarCloud Scan" uploads the analysis (it exits 0 once the
+# upload succeeds — it does NOT know or care whether the Quality Gate passed);
+# "SonarQube Quality Gate check" then polls SonarCloud for the actual verdict
+# and is what turns this from "the scanner ran" into "the code meets the bar"
+# (issue #452 — the job used to have only the scan step, so the required check
+# was always green regardless of gate status). The gate-check step is
+# deliberately NOT (yet) in branch protection's
+# required-checks list — main's gate was red (pre-existing accessibility +
+# duplication issues) when this was added, and making it required immediately
+# would have blocked every PR, unrelated ones included. Once those are cleared
+# and this step is green on main, add "SonarQube Quality Gate check" to
+# required checks (repo Settings → Branches → main) to make it actually block.
 on:
   push:
     branches: [main]
@@ -86,4 +97,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Repository secret. Generate at https://sonarcloud.io/account/security
           # and store under repo settings → secrets and variables → actions.
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Polls SonarCloud for the Quality Gate verdict of the analysis just
+      # uploaded above and fails THIS step (not the job — see the file header)
+      # when it's red. Reads report-task.txt left on disk by the scan step, so
+      # it must run in the same job right after it. Same Dependabot guard as
+      # the scan step — nothing was analyzed for a bot PR, so there is no gate
+      # to poll. pollingTimeoutSec caps how long (and how many Action minutes)
+      # a slow SonarCloud gate computation can burn before we give up.
+      - name: SonarQube Quality Gate check
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        with:
+          pollingTimeoutSec: 600
+        env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
