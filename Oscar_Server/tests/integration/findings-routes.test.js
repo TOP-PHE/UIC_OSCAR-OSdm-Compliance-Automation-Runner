@@ -171,6 +171,45 @@ describe('findings — CRUD + threading', () => {
   });
 });
 
+// ── scenario_code (#447 — link a finding to the scenario that revealed it) ────
+describe('findings — scenarioCode', () => {
+  test('201 create carries scenarioCode through create → list → thread', async () => {
+    const created = await request(findingsApp)
+      .post('/v1/company/findings')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ title: 'NHF refund window mismatch', scenarioCode: 'NHF_RFND_SRCH_CRIT_2ADT_2LEG' });
+    expect(created.status).toBe(201);
+    expect(created.body.finding.scenarioCode).toBe('NHF_RFND_SRCH_CRIT_2ADT_2LEG');
+
+    const list = await request(findingsApp).get('/v1/company/findings').set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+    const row = list.body.findings.find(f => f.id === created.body.finding.id);
+    expect(row.scenarioCode).toBe('NHF_RFND_SRCH_CRIT_2ADT_2LEG');
+
+    const thread = await request(findingsApp).get(`/v1/company/findings/${created.body.finding.id}`).set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+    expect(thread.body.finding.scenarioCode).toBe('NHF_RFND_SRCH_CRIT_2ADT_2LEG');
+  });
+
+  test('scenarioCode is null when not given, and PATCH can set / clear it', async () => {
+    const created = await request(findingsApp)
+      .post('/v1/company/findings')
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ title: 'not tied to a scenario yet' });
+    expect(created.body.finding.scenarioCode).toBeNull();
+
+    const patched = await request(findingsApp)
+      .patch(`/v1/company/findings/${created.body.finding.id}`)
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ scenarioCode: 'OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG' });
+    expect(patched.body.finding.scenarioCode).toBe('OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG');
+
+    const cleared = await request(findingsApp)
+      .patch(`/v1/company/findings/${created.body.finding.id}`)
+      .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+      .send({ scenarioCode: null });
+    expect(cleared.body.finding.scenarioCode).toBeNull();
+  });
+});
+
 // ── buildProjection over a real DB ────────────────────────────────────────────
 describe('buildProjection', () => {
   test('includes only baselined findings that carry a step + numeric status', () => {

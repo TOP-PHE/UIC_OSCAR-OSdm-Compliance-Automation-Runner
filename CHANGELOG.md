@@ -14,6 +14,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.167] — 2026-06-25
+
+**Feat (#447, requested by Wiremind): link a Test Finding to the scenario that
+revealed it — faster to re-test a fix as a non-regression run.**
+
+### Added
+
+- **`finding.scenario_code`** — a new optional column (migration 22) recording
+  the datafile `scenario.code` that revealed the finding. Set on create/edit via
+  a free-text field with autocomplete against the test-system's current
+  scenario codes (sourced from `GET /v1/company/datafile`); accepts any value,
+  so a finding tied to a since-renamed or deleted scenario keeps its record.
+  Exposed on the API as `scenarioCode` (create, patch, list, thread, and the
+  JSON bulk-import path all carry it — same shape as `step`/`expectedStatus`).
+- **UI** — the finding list row and the thread's opening-post header show a
+  🧪 chip with the scenario code, linking straight to **Test Config**
+  (`/scenarios.html`) so the tester can find and re-select that exact scenario
+  to verify a fix, instead of re-deriving which one it was from the finding's
+  prose.
+
+### Verified
+
+- `db-migrations.test.js`: migration 22 applies on a fresh install AND restores
+  `scenario_code` on a DB already versioned past it (the #208-class upgrade
+  regression guard) — extended `REQUIRED_COLUMNS` + a dedicated upgrade test.
+- `findings-routes.test.js`: 2 new tests — `scenarioCode` round-trips through
+  create → list → thread, defaults to `null` when omitted, and PATCH can set
+  and clear it.
+- Full suite: 44 test suites / 960 tests, all green. `node --check` + eslint +
+  the inline-script HTML linter clean on every changed file.
+
+---
+
 ## [server-v1.11.166 / OTST_V2.0.94] — 2026-06-18
 
 **Fix (#445): `nullable: true` scalar fields no longer FAIL when the provider

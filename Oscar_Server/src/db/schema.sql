@@ -366,6 +366,7 @@ CREATE TABLE IF NOT EXISTS finding (
   company_id       TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   title            TEXT NOT NULL,                       -- short headline of the open point
   step             TEXT,                                -- request/step label for status-level baselining (e.g. "GET Passenger"); NULL for assertion-level / general findings
+  scenario_code    TEXT,                                -- the datafile scenario.code that revealed this finding (issue #447); NULL when not tied to one scenario
   expected_status  INTEGER,                             -- the provider's observed HTTP status to baseline (e.g. 501); NULL when not status-level
   observed         TEXT,                                -- what the provider actually returned
   interpretation   TEXT,                                -- OSCAR's reading + spec reference
