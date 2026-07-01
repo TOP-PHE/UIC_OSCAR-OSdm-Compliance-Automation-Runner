@@ -16,8 +16,9 @@
  *   GET    /v1/company/users                      — list users in this company
  *   POST   /v1/company/users                      — create a user (company_user or test_manager)
  *   PATCH  /v1/company/users/:id                  — change email / role within {company_user, test_manager}
+ *   POST   /v1/company/users/:id/approve          — activate a self-registered pending user (#449)
  *   POST   /v1/company/users/:id/reset-password   — reset password
- *   DELETE /v1/company/users/:id                  — delete user
+ *   DELETE /v1/company/users/:id                  — delete user (also rejects a pending user)
  *
  * Restrictions enforced server-side:
  *   - Only the test_manager role may invoke these endpoints (administrator
@@ -73,6 +74,7 @@ function sanitizeUserRow(row) {
     id:           row.id,
     email:        row.email,
     role:         normalizeRole(row.role),
+    status:       row.status || 'active',
     company_id:   row.company_id,
     company_name: row.company_name,
     created_at:   row.created_at
@@ -96,15 +98,20 @@ router.get('/', (req, res) => {
   }
 
   const q = (req.query.q || '').toString().trim().toLowerCase();
+  const status = (req.query.status || '').toString().trim();
   const params = [companyId];
   let where = 'u.company_id = ?';
   if (q) {
     where += ' AND lower(u.email) LIKE ?';
     params.push(`%${q}%`);
   }
+  if (status) {
+    where += ' AND u.status = ?';
+    params.push(status);
+  }
 
   const rows = all(
-    `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
             c.name AS company_name
      FROM users u
      JOIN companies c ON c.id = u.company_id
@@ -160,7 +167,7 @@ router.post('/',
     auditLog(req.user.id, companyId, req.user.email, `company_user_created:${lowerEmail}:${resolvedRole}`);
 
     const created = get(
-      `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
               c.name AS company_name
        FROM users u JOIN companies c ON c.id = u.company_id
        WHERE u.id = ?`,
@@ -244,7 +251,7 @@ router.patch('/:id',
     auditLog(req.user.id, companyId, req.user.email, `company_user_updated:${userId}`);
 
     const updated = get(
-      `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
               c.name AS company_name
        FROM users u JOIN companies c ON c.id = u.company_id
        WHERE u.id = ?`,
@@ -253,6 +260,33 @@ router.patch('/:id',
     return res.json({ user: sanitizeUserRow(updated) });
   }
 );
+
+// ── POST /v1/company/users/:id/approve ────────────────────────────────────────
+// Issue #449 — activates a self-registered user pending Test-Manager review.
+router.post('/:id/approve', (req, res) => {
+  const companyId = req.user.companyId;
+  const userId = req.params.id;
+
+  const target = get('SELECT id, email, status FROM users WHERE id = ? AND company_id = ?', [userId, companyId]);
+  if (!target) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found in this company.' });
+  }
+  if (target.status !== 'pending') {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User is not awaiting approval.' });
+  }
+
+  run('UPDATE users SET status = ? WHERE id = ?', ['active', userId]);
+  auditLog(req.user.id, companyId, req.user.email, `company_user_approved:${target.email}`);
+
+  const updated = get(
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+            c.name AS company_name
+     FROM users u JOIN companies c ON c.id = u.company_id
+     WHERE u.id = ?`,
+    [userId]
+  );
+  return res.json({ user: sanitizeUserRow(updated) });
+});
 
 // ── POST /v1/company/users/:id/reset-password ─────────────────────────────────
 router.post('/:id/reset-password', async (req, res) => {
