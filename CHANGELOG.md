@@ -14,6 +14,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.168] — 2026-07-01
+
+**Feat (#448): the Test Framework can now declare which OSDM fulfillment
+types/media the provider actually supports.**
+
+### Added
+
+- **Test Framework → new "🎟 Fulfillment" section** — pill pickers for
+  `fulfillmentType` (ETICKET, CIT_PAPER, PASS_CHIP, PASS_REFERENCE) and
+  `fulfillmentMedia` (PDF_A4, UIC_PDF, PKPASS, ALLOCATOR_APP, RCCST, RCT2,
+  TICKETLESS), wired to the already-existing `framework.fulfillment.{types,media}`
+  data model and generic `fw-pill` toggle mechanism (`fwTogglePill`) — the same
+  pattern used by Seat Selection / Passenger Types / Place Selection. Persists
+  via the existing debounced framework auto-save; no new endpoint needed.
+  Leaving a category empty means "no restriction" (matches `fwFilter`'s
+  existing empty-means-full-set contract, same as every other framework pill
+  group).
+- This directly activates the scenario-level "E. Fulfillment" picker
+  (`sc.fulfillmentTypes`/`sc.fulfillmentMedia`), which already calls
+  `fwFilter(..., fw.fulfillment.types/media)` — that call site existed and
+  worked correctly already, but had no real input to filter against (the
+  framework value was frozen at its un-editable default). It now reflects what
+  the Test Manager actually declared.
+
+### Removed
+
+- `fwToggleFulfilPill` — a narrower duplicate of the generic `fwTogglePill`
+  handler with zero call sites (defined, never wired to any UI action). The
+  new section uses the generic mechanism instead; keeping both would leave two
+  ways to do the same thing.
+
+### Verified
+
+- Harness over the REAL extracted `fwTogglePill` + `fwFilter` — 12/12: toggle
+  on/off correctly mutates `framework.fulfillment.types`/`.media` (and only the
+  targeted subKey); `fwFilter` reflects the change immediately; clearing a
+  category reverts to the unrestricted full OSDM set (existing empty-means-full
+  contract, unchanged). `node --check`, eslint, and the inline-script HTML
+  linter clean.
+
+### Notes
+
+- Scope: this ships the framework-level *declaration* UI, which is what issue
+  #448 asked for. The separate, pre-existing scenario editor for the shared
+  `requestedFulfillmentOptionsList` (`buildFulfillmentSection`, fixed in #436 to
+  show the unrestricted OSDM set) is intentionally left as-is — extending
+  *that* surface to warn on an undeclared type/media would need a genuinely
+  different mechanism (`frameworkGating.js`'s rule engine matches a single
+  boolean scenario flag against a `salesFlows` declaration; fulfillment options
+  are a list of `{type, media}` objects) and is a natural, separately-scoped
+  follow-up, not bundled into this PR.
+
+---
+
 ## [server-v1.11.167] — 2026-06-25
 
 **Feat (#447, requested by Wiremind): link a Test Finding to the scenario that
