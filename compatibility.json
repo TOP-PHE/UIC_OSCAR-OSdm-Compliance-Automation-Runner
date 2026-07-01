@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.200",
+  "current_release": "2026.201",
   "releases": [
+    {
+      "release": "2026.201",
+      "date": "2026-07-01",
+      "server": "1.11.173",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 1 (toward ratcheting up the SonarCloud new-coverage gate): added Jest+supertest integration tests for the three previously-untested (0% coverage) route files — company-test-resources.js (CRUD + guards + discover-timetable/reprobe-offers via bearer-cred + stubbed global.fetch; ~85% lines, 21 tests), reports.js (compare/comparisons/configured report-builder/templates/trends over a seeded runs+run_requests+run_events graph; ~98% lines, 33 tests), and company-test-framework.js (GET/PUT/DELETE + role gating + lazy salesFlows migration; ~94% lines, 15 tests). Overall Oscar_Server/src line coverage ~50% -> ~59%; full suite 45 -> 48 suites, 974 -> 1043 tests, all green. Documented the OSCAR-Gate new_coverage floor bump 35% -> 50% in sonar-project.properties (the actual condition must be bumped in the SonarCloud UI). Tests-only + Sonar-config-doc; no runtime change; server 1.11.172 -> 1.11.173, collection unchanged OTST_V2.0.94.",
+        "Verification: all three new test files pass in the monorepo checkout against the current source; full suite 1043/1043 green with --coverage; eslint + inline-script lint clean. Note: the discover-timetable/reprobe-offers deep harvest-and-merge loops remain uncovered (they need a fully-shaped vendor trips payload) — a follow-up target."
+      ]
+    },
     {
       "release": "2026.200",
       "date": "2026-07-01",
