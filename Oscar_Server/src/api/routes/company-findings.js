@@ -72,6 +72,7 @@ function toApiFinding(f) {
     id:             f.id,
     title:          f.title,
     step:           f.step || null,
+    scenarioCode:   f.scenario_code || null,
     expectedStatus: (f.expected_status === null || f.expected_status === undefined) ? null : f.expected_status,
     observed:       f.observed || '',
     interpretation: f.interpretation || '',
@@ -145,15 +146,16 @@ router.post('/findings', async (req, res) => {
   const severity       = SEVERITIES.includes(b.severity) ? b.severity : null;
   const expectedStatus = asStatus(b.expectedStatus);
   const step           = b.step ? String(b.step).trim() : null;
+  const scenarioCode   = b.scenarioCode ? String(b.scenarioCode).trim() : null;
   const baselineInRun  = (b.baselineInRun && expectedStatus !== null && step) ? 1 : 0;
   const createdBy      = (typeof b.createdBy === 'string' && b.createdBy.trim()) ? b.createdBy.trim() : req.user.email;
 
   run(
     `INSERT INTO finding
-       (id, company_id, title, step, expected_status, observed, interpretation,
+       (id, company_id, title, step, scenario_code, expected_status, observed, interpretation,
         category, severity, status, baseline_in_run, raise_to_osdm, evidence, created_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, companyId, title, step, expectedStatus, asStr(b.observed), asStr(b.interpretation),
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id, companyId, title, step, scenarioCode, expectedStatus, asStr(b.observed), asStr(b.interpretation),
      category, severity, 'open', baselineInRun, b.raiseToOsdm ? 1 : 0, asStr(b.evidence), createdBy]
   );
 
@@ -181,6 +183,7 @@ router.patch('/findings/:id', async (req, res) => {
 
   if (typeof b.title === 'string' && b.title.trim()) setCol('title', b.title.trim());
   if ('step' in b)            setCol('step', b.step ? String(b.step).trim() : null);
+  if ('scenarioCode' in b)    setCol('scenario_code', b.scenarioCode ? String(b.scenarioCode).trim() : null);
   if ('expectedStatus' in b)  setCol('expected_status', asStatus(b.expectedStatus));
   if ('observed' in b)        setCol('observed', asStr(b.observed));
   if ('interpretation' in b)  setCol('interpretation', asStr(b.interpretation));

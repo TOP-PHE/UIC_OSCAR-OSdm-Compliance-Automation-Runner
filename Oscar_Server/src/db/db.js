@@ -521,6 +521,12 @@ const MIGRATIONS = [
       // operator-specific headers from API Config without a code change.
       _safeAlter('ALTER TABLE companies ADD COLUMN extra_headers TEXT');
   }},
+  { version: 22, name: 'finding-scenario-code', up: () => {
+      // Issue #447 (Wiremind) — link a finding to the datafile scenario.code
+      // that revealed it, so re-testing a fix means "go run that scenario"
+      // instead of re-deriving which one it was from the finding's prose.
+      _safeAlter('ALTER TABLE finding ADD COLUMN scenario_code TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
