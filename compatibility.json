@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.201",
+  "current_release": "2026.202",
   "releases": [
+    {
+      "release": "2026.202",
+      "date": "2026-07-01",
+      "server": "1.11.174",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 2 (continuing the SonarCloud gate ratchet): version-info.test.js unit-tests utils/versionInfo.js (compatibility-matrix resolution: matrix-missing/malformed, untested combo, exact + '.x' wildcard match, unknown collection; 0% -> ~97%, 8 tests, jest.isolateModules + mkdtemp temp files); structure-results.test.js covers reports/structureResults.js (pure classifyVendorCapability + serializeBounded across all branches, plus extractStructuredResults over a seeded run with real AES-encrypted artifact files — PASS/FAIL requests, auth-header redaction, assertion counts; ~18% -> ~90%, 22 tests); and auth-routes.test.js was extended to cover the previously-untested auth surface — register/companies, register/check-token, the full password-reset flow (request/check-token/confirm + single-use + login-with-new-password), bootstrap/platform-user (wrong token/invalid role/create/duplicate), and /me + /logout + /sso-check (admin-only) (~49% -> ~86%). Overall Oscar_Server/src line coverage ~59% -> ~65%; full suite 48 -> 50 suites, 1043 -> 1089 tests, all green. Documented OSCAR-Gate new_coverage floor bump 50% -> 55% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.173 -> 1.11.174, collection unchanged OTST_V2.0.94.",
+        "Verification: all new/extended tests pass in the monorepo checkout; full suite 1089/1089 green with --coverage; eslint + inline-script lint clean; new test files scanned for the CodeQL patterns that hit batch 1 (no os.tmpdir writes — mkdtemp used; no unused imports)."
+      ]
+    },
     {
       "release": "2026.201",
       "date": "2026-07-01",
