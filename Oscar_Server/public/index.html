@@ -89,8 +89,8 @@ input:focus{outline:none;border-color:#0090D4}
 
   <!-- Login -->
   <form id="login" class="form active">
-    <div class="field"><label>Email</label><input type="email" id="l-email" required autocomplete="username"></div>
-    <div class="field"><label>Password</label><input type="password" id="l-password" required autocomplete="current-password"></div>
+    <div class="field"><label for="l-email">Email</label><input type="email" id="l-email" required autocomplete="username"></div>
+    <div class="field"><label for="l-password">Password</label><input type="password" id="l-password" required autocomplete="current-password"></div>
     <button class="btn" type="submit" id="l-btn">Sign In</button>
     <div style="margin-top:12px;text-align:center;font-size:13px">
       <a href="/forgot-password.html" style="color:#0090D4;text-decoration:none">Forgot password?</a>
@@ -121,14 +121,14 @@ input:focus{outline:none;border-color:#0090D4}
     </div>
     <form id="register-form">
       <div class="field">
-        <label>Company Name</label>
+        <label for="r-company">Company Name</label>
         <select id="r-company" required style="width:100%;padding:10px 12px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px;background:#fff">
           <option value="">— Select your company —</option>
         </select>
         <div id="r-company-hint" style="font-size:11px;color:#90a4ae;margin-top:4px">Your request will be reviewed by your company's Test Manager(s) before you can sign in.</div>
       </div>
       <div class="field">
-        <label>Email <span style="color:#90a4ae;font-weight:400">(company email address)</span></label>
+        <label for="r-email">Email <span style="color:#90a4ae;font-weight:400">(company email address)</span></label>
         <input type="email" id="r-email" required autocomplete="username">
       </div>
       <button class="btn" type="submit" id="r-btn">Send Confirmation Email</button>

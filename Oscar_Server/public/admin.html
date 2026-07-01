@@ -113,9 +113,9 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
     <div class="card">
       <h3>Create User</h3>
       <div class="row">
-        <div class="field"><label>Email</label><input id="new-email" type="email" placeholder="user@domain.com"></div>
-        <div class="field"><label>Password</label><input id="new-password" type="password" placeholder="Min 8 chars"></div>
-        <div class="field"><label>Role</label>
+        <div class="field"><label for="new-email">Email</label><input id="new-email" type="email" placeholder="user@domain.com"></div>
+        <div class="field"><label for="new-password">Password</label><input id="new-password" type="password" placeholder="Min 8 chars"></div>
+        <div class="field"><label for="new-role">Role</label>
           <select id="new-role">
             <option value="company_user">Tester</option>
             <option value="test_manager">Test Manager</option>
@@ -123,7 +123,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
             <option value="administrator">Administrator</option>
           </select>
         </div>
-        <div class="field" id="new-company-field"><label>Company</label><select id="new-company"></select></div>
+        <div class="field" id="new-company-field"><label for="new-company">Company</label><select id="new-company"></select></div>
         <button class="btn btn-primary" id="btn-create-user">Create</button>
       </div>
     </div>
@@ -131,7 +131,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
     <div class="card">
       <h3>User Directory</h3>
       <div class="row" style="margin-bottom:12px">
-        <div class="field"><label>Search</label><input id="user-search" type="text" placeholder="email or company"></div>
+        <div class="field"><label for="user-search">Search</label><input id="user-search" type="text" placeholder="email or company"></div>
       </div>
       <div class="table-wrap">
         <table>
@@ -156,11 +156,11 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
       <h3>Create Company</h3>
       <div class="row" style="align-items:flex-end">
         <div class="field">
-          <label>Company Name</label>
+          <label for="new-co-name">Company Name</label>
           <input id="new-co-name" type="text" placeholder="e.g. Deutsche Bahn">
         </div>
         <div class="field">
-          <label>Short ID <span style="font-weight:400;text-transform:none;font-size:10px;color:#90a4ae">(auto-generated, letters &amp; hyphens only)</span></label>
+          <label for="new-co-slug">Short ID <span style="font-weight:400;text-transform:none;font-size:10px;color:#90a4ae">(auto-generated, letters &amp; hyphens only)</span></label>
           <input id="new-co-slug" type="text" placeholder="e.g. deutsche-bahn" pattern="[a-z0-9\-]+" title="Lowercase letters, digits and hyphens only">
           <span style="font-size:10px;color:#90a4ae;margin-top:3px">Used internally to identify the company. Cannot be changed later.</span>
         </div>
@@ -194,7 +194,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th><input type="checkbox" id="chk-all-pending"></th><th>Run</th><th>Company</th><th>Submitted By</th><th>Deletion Requested By</th><th>Date</th><th>Actions</th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="chk-all-pending" aria-label="Select all pending-deletion rows"></th><th>Run</th><th>Company</th><th>Submitted By</th><th>Deletion Requested By</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody id="pending-del-tbody"></tbody>
         </table>
       </div>
@@ -215,15 +215,15 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
       <!-- Filters -->
       <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap;align-items:end">
         <div class="field" style="min-width:160px;max-width:240px">
-          <label>Filter by Company</label>
+          <label for="filter-company">Filter by Company</label>
           <select id="filter-company"><option value="">— All companies —</option></select>
         </div>
         <div class="field" style="min-width:200px;max-width:280px">
-          <label>Filter by User</label>
+          <label for="filter-user">Filter by User</label>
           <select id="filter-user"><option value="">— All users —</option></select>
         </div>
         <div class="field" style="min-width:140px;max-width:200px">
-          <label>Filter by Status</label>
+          <label for="filter-status">Filter by Status</label>
           <select id="filter-status">
             <option value="">— Any status —</option>
             <option value="COMPLETED">COMPLETED</option>
@@ -241,7 +241,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
         <table>
           <thead>
             <tr>
-              <th><input type="checkbox" id="chk-all-runs" title="Select all rows currently shown (after filters)"></th>
+              <th><input type="checkbox" id="chk-all-runs" aria-label="Select all runs currently shown" title="Select all rows currently shown (after filters)"></th>
               <th>Run</th><th>Company</th><th>Status</th><th>Submitted By</th><th>Date</th><th>Actions</th>
             </tr>
           </thead>

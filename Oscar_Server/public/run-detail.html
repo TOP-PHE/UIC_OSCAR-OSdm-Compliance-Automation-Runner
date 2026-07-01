@@ -216,10 +216,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
           <button class="btn btn-sm log-level-btn" data-level="warn" title="WARNING + ERROR only">warn+</button>
           <button class="btn btn-sm log-level-btn" data-level="error" title="ERROR only">error</button>
         </div>
-        <select id="log-req-filter" title="Show only the log lines of one tested endpoint" style="padding:4px 8px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;max-width:220px">
+        <select id="log-req-filter" aria-label="Filter logs by endpoint" title="Show only the log lines of one tested endpoint" style="padding:4px 8px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;max-width:220px">
           <option value="all">All endpoints</option>
         </select>
-        <input type="text" id="log-search" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
+        <input type="text" id="log-search" aria-label="Search logs" placeholder="Search logs..." style="padding:4px 10px;border:1px solid #cfd8dc;border-radius:4px;font-size:12px;width:160px">
         <span id="log-match-count" style="font-size:11px;color:#90a4ae"></span>
         <div style="display:flex;gap:4px">
           <button class="btn btn-sm" id="log-copy-btn">Copy</button>
@@ -243,8 +243,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
         <button class="btn btn-sm assertion-filter active" data-filter="all">All</button>
         <button class="btn btn-sm assertion-filter" data-filter="passed">Passed</button>
         <button class="btn btn-sm assertion-filter" data-filter="failed">Failed</button>
-        <select class="btn btn-sm" id="assertion-category-filter" style="font-size:11px"><option value="">All categories</option></select>
-        <select class="btn btn-sm" id="assertion-domain-filter" style="font-size:11px"><option value="">All domains</option></select>
+        <select class="btn btn-sm" id="assertion-category-filter" aria-label="Filter assertions by category" style="font-size:11px"><option value="">All categories</option></select>
+        <select class="btn btn-sm" id="assertion-domain-filter" aria-label="Filter assertions by domain" style="font-size:11px"><option value="">All domains</option></select>
       </div>
     </div>
     <div id="assertion-summary" style="padding:10px 16px;font-size:13px;background:#f5f5f5;border-bottom:1px solid #eceff1"></div>

@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.172] — 2026-07-01
+
+**Chore: clear the two conditions keeping `main`'s SonarCloud gate red, so the Quality Gate can become a required check.**
+
+### Fixed (accessibility — reliability rating C → A)
+
+- Associated a label with all **38 form controls** flagged by
+  `Web:InputWithoutLabelCheck` (which Sonar classifies as reliability *bugs*)
+  across 8 pages: the auth pages (`index`, `verify-email`, `reset-password`,
+  `forgot-password`), `profile.html`, `admin.html`, `run-detail.html`, and
+  `report-builder.html`. Used `<label for>` where a visible label already
+  existed, and `aria-label` for compact toolbar filters and the "select-all"
+  table checkboxes. This also resolves the 38 matching `S6853` a11y smells.
+
+### Changed (Sonar config — duplication 9.2% → ~1%)
+
+- Added `sonar.cpd.exclusions` for `Bruno_Collection/library-bruno/osdmSchemas.js`
+  — a **generated** file (its header says "do not hand-edit") whose
+  per-OSDM-version schema blocks are ~identical by design and accounted for
+  ~2,288 of the project's ~2,585 duplicated lines. It stays analyzed for
+  bugs/smells; only copy-paste detection is turned off.
+- Bumped `sonar.projectVersion` `1.2.0 → 1.11.172` (it was stale, which made
+  ~28k legacy lines count as "new code"). Keeping it in step with
+  `package.json` lets the "Previous version" new-code period track real
+  releases.
+
+### Verification
+
+- Every `<label for>` target confirmed to reference an existing element `id`
+  across all 8 files; eslint + inline-script HTML lint clean; full Jest suite
+  unaffected (HTML/config only). After merge, `main`'s gate is expected to go
+  green on both previously-failing conditions — enabling "SonarQube Quality
+  Gate check" to be added to branch protection.
+
+---
+
 ## [server-v1.11.171] — 2026-07-01
 
 **Feat (#450): discover stop places via the OSDM Places API — cache + full-text lookup in Test Config.**
