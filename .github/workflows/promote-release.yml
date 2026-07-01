@@ -54,7 +54,7 @@ jobs:
           fi
 
       - name: Checkout at release tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.ref.outputs.ref }}
 
