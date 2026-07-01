@@ -527,6 +527,12 @@ const MIGRATIONS = [
       // instead of re-deriving which one it was from the finding's prose.
       _safeAlter('ALTER TABLE finding ADD COLUMN scenario_code TEXT');
   }},
+  { version: 23, name: 'users-pending-approval-status', up: () => {
+      // Issue #449 — self-registered users now land as 'pending' until a
+      // Test Manager (or administrator) of their company approves them,
+      // replacing the old email-must-match-company-name gate.
+      _safeAlter("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

@@ -72,6 +72,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 .sb-DELETION_REQUESTED{background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
 .sb-DELETED_BY_ADMIN  {background:#fce4ec;color:#c62828;border:1px solid #ef9a9a;text-decoration:line-through}
 .sb-COMPLETED         {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
+.sb-pending           {background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
 .sb-FAILED            {background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
 .sb-RUNNING           {background:#fff8e1;color:#e65100;border:1px solid #ffcc80}
 .sb-QUEUED            {background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
@@ -137,6 +138,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
           <thead>
             <tr>
               <th>Email</th>
+              <th>Status</th>
               <th>Role</th>
               <th>Company</th>
               <th>Created</th>
@@ -535,10 +537,12 @@ async function loadUsers() {
   tbody.innerHTML = (data.users || []).map(u => `
     <tr>
       <td class="mono">${esc(u.email)}</td>
+      <td>${u.status === 'pending' ? '<span class="status-badge sb-pending">Pending</span>' : ''}</td>
       <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}" data-company-id="${esc(u.company_id || '')}">${roleOptions(u.role)}</select></td>
       <td id="company-cell-${u.id}">${companyCellHtml(u)}</td>
       <td>${fmtDate(u.created_at)}</td>
       <td>
+        ${u.status === 'pending' ? `<button class="btn btn-small btn-success" data-action="approve-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Approve</button>` : ''}
         <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
         <button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
         <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>
@@ -638,6 +642,14 @@ async function generateResetLink(userId, email) {
     data.resetUrl
   );
   showMsg(`Reset link generated for ${email}. Copy it from the dialog and share with the user.`, true);
+}
+
+async function approveUser(userId, email) {
+  const res = await fetch(`${USERS_API_BASE}/${userId}/approve`, { method: 'POST', headers: authHeaders });
+  const data = await res.json();
+  if (!res.ok) { showMsg(data.detail || data.title || 'Approval failed.', false); return; }
+  showMsg(`User approved: ${email}`, true);
+  loadUsers();
 }
 
 async function deleteUser(userId, email) {
@@ -1089,6 +1101,7 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   var action = el.getAttribute('data-action');
   var userId = el.getAttribute('data-user-id');
   if (action === 'save-user') saveUser(userId);
+  else if (action === 'approve-user') approveUser(userId, el.getAttribute('data-email'));
   else if (action === 'reset-pwd') resetPwd(userId, el.getAttribute('data-email'));
   else if (action === 'reset-link') generateResetLink(userId, el.getAttribute('data-email'));
   else if (action === 'delete-user') deleteUser(userId, el.getAttribute('data-email'));

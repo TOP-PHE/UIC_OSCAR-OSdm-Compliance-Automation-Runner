@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.169] — 2026-07-01
+
+**Feat (#449): user management at company level — Test-Manager approval replaces the email-must-match-company-name gate.**
+
+### Added
+
+- **Self-registration no longer requires the signup email to contain a
+  fragment of the company name.** `emailMatchesCompany()` is removed from
+  `auth.js`. The applicant instead must pick a real, existing company from
+  the `/register/companies` dropdown (already enforced client-side; now also
+  enforced server-side in `register/request`).
+- **New account approval workflow.** A confirmed self-registration lands as
+  `users.status = 'pending'` and cannot log in (403) until a Test Manager of
+  that company — or an administrator, as a cross-company fallback — approves
+  it. Every Test Manager of the company is emailed
+  (`sendPendingApprovalEmail`, `mailer.js`) with a link to the admin Users
+  tab as soon as the registration is confirmed.
+- **New endpoints** `POST /v1/company/users/:id/approve` and
+  `POST /v1/admin/users/:id/approve` activate a pending user. Rejecting one
+  reuses the existing `DELETE` endpoint.
+- **Admin UI** (`admin.html`) — a "Pending" status badge and an `Approve`
+  button appear on pending rows in the User Directory, for both the
+  Test-Manager and administrator views (both already routed through the
+  same `USERS_API_BASE` switch).
+- New `users.status` column (migration 23, `schema.sql`), default `'active'`.
+
+### Changed
+
+- Removed the `register/confirm` auto-create-company-from-free-text branch —
+  it was unreachable from the UI dropdown, and kept alive would have let a
+  stranger self-activate into a brand-new, unverified company with no Test
+  Manager to approve them.
+
+### Verification
+
+- `auth-routes.test.js` updated for the new contract (seeds a real company;
+  confirms `201` + `pending: true`/no token; login `403` while pending;
+  login succeeds after direct approval) plus a new pending-login-rejected
+  test. Full suite: 44 test suites / 961 tests green.
+- Manual run: registered with an email deliberately **not** matching the
+  company name → dev-mode confirm link → pending panel (no redirect, no
+  auto-login) → login rejected 403 → Test Manager sees the Pending badge +
+  Approve button on `admin.html` → approved → login now succeeds. Confirmed
+  `register/request` with an unknown company name returns 400.
+
+---
+
 ## [server-v1.11.168] — 2026-07-01
 
 **Feat (#448): the Test Framework can now declare which OSDM fulfillment

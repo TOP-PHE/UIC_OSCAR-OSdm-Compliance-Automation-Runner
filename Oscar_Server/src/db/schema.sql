@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS users (
   email                   TEXT NOT NULL UNIQUE,
   password_hash           TEXT NOT NULL,
   role                    TEXT NOT NULL DEFAULT 'company_user',
+  -- 'active' | 'pending' — self-registered users start 'pending' until a
+  -- Test Manager (or administrator) of their company approves them (#449).
+  status                  TEXT NOT NULL DEFAULT 'active',
   -- Credentials (encrypted secrets are AES-GCM, base64)
   auth_mode               TEXT NOT NULL DEFAULT 'bearer',   -- 'bearer' | 'oauth2'
   access_token_enc        TEXT,

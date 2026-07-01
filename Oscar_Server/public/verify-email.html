@@ -98,6 +98,14 @@ input:focus{outline:none;border-color:#0090D4}
       Redirecting you to the dashboard…
     </div>
   </div>
+
+  <div id="pending" style="display:none">
+    <div class="success">
+      ✅ <strong>Request submitted!</strong><br>
+      Your account is awaiting approval from your company's Test Manager(s).
+      You'll be able to sign in once approved.
+    </div>
+  </div>
 </div>
 </div>
 
@@ -161,12 +169,17 @@ async function doConfirm(e) {
       errEl.style.display = 'block';
       return;
     }
-    // oscar_token no longer stored in localStorage — httpOnly cookie is used instead
-    localStorage.setItem('oscar_company', JSON.stringify(data.company));
-    localStorage.setItem('oscar_user',    JSON.stringify(data.user));
     document.getElementById('main').style.display = 'none';
-    document.getElementById('done').style.display = 'block';
-    setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+    if (data.pending) {
+      // Issue #449 — no token is issued; account is awaiting Test Manager approval.
+      document.getElementById('pending').style.display = 'block';
+    } else {
+      // oscar_token no longer stored in localStorage — httpOnly cookie is used instead
+      localStorage.setItem('oscar_company', JSON.stringify(data.company));
+      localStorage.setItem('oscar_user',    JSON.stringify(data.user));
+      document.getElementById('done').style.display = 'block';
+      setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
+    }
   } catch(e) {
     errEl.textContent = 'Server unreachable.';
     errEl.style.display = 'block';
