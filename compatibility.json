@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.202",
+  "current_release": "2026.203",
   "releases": [
+    {
+      "release": "2026.203",
+      "date": "2026-07-01",
+      "server": "1.11.175",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 3 (continuing the SonarCloud gate ratchet): extended integration tests for the three biggest remaining coverage gaps. runs-routes.test.js grew from 10 to 75 tests (submit/list/queue-status/stop-all/batch+zip/logs/assertions/requests/artifacts/share/cancel/delete/bulk-delete/bulk-admin-action, with real seeded run graphs + encrypted artifacts) taking runs.js ~35% -> ~87% — the single largest uncovered file in the project. admin-routes.test.js grew from 40 to 73 tests (users/:id/approve, generate-reset-link, GET/PATCH /config with masking, alertmanager/apply, test-email dev-mode path, rotate-jwt-secret run last + self-restoring) taking admin.js ~60% -> ~89%. company-routes.test.js grew from 15 to 27 tests (extra_headers validation branches, the retired share_reports_with_certifier rejection, and the POST /datafile multipart upload path) taking company.js ~58% -> ~84%. Overall Oscar_Server/src line coverage ~65% -> ~74%; full suite 50 suites, 1089 -> 1199 tests, all green. Documented the OSCAR-Gate new_coverage floor bump 55% -> 65% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.174 -> 1.11.175, collection unchanged OTST_V2.0.94.",
+        "Verification: all extended test files independently re-run standalone with --coverage (not just trusting the authoring pass) — runs.js 75/75, admin.js 73/73, company.js 27/27; full suite 1199/1199 green; eslint clean on all three files; scanned for the CodeQL patterns that hit batch 1 (all os.tmpdir() usage wrapped in mkdtempSync, no unused imports). One real pre-existing behavior surfaced while writing tests (not a regression, not fixed here): POST /v1/company/datafile's multer filename callback treats certification_user as a platform role needing an explicit company_id, erroring 500 before the route's own test_manager-only 403 check runs for that specific role+endpoint combination — tests use a plain tester to exercise the intended 403 branch instead."
+      ]
+    },
     {
       "release": "2026.202",
       "date": "2026-07-01",
