@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.173] — 2026-07-01
+
+**Test: coverage batch 1 — integration tests for the three untested route files (overall `src` coverage ~50% → ~59%).**
+
+### Added
+
+- **`company-test-resources-routes.test.js`** (21 tests, ~85% of the file) —
+  CRUD + role gating + tenant isolation, plus the vendor-calling
+  `discover-timetable` / `reprobe-offers` endpoints (bearer creds +
+  stubbed `global.fetch`, no live vendor).
+- **`reports-routes.test.js`** (33 tests, ~98%) — `compare` / `comparisons` /
+  `configured` report builder / `templates` / `trends`, over a seeded
+  runs + run_requests + run_events graph.
+- **`company-test-framework-routes.test.js`** (15 tests, ~94%) — GET/PUT/DELETE,
+  role gating, and the lazy salesFlows migration path.
+
+All three files were previously at **0%** coverage. Full suite: 45 → 48
+suites, 974 → 1043 tests, all green.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **35% → 50%** in
+  `sonar-project.properties` (the actual gate condition must be bumped in the
+  SonarCloud UI to match) — locking in the coverage gain so new code can't
+  regress below it.
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- The `discover-timetable` / `reprobe-offers` deep harvest-and-merge loops
+  remain uncovered (they need a fully-shaped vendor `trips` payload) — a
+  follow-up target for a later batch.
+
+---
+
 ## [server-v1.11.172] — 2026-07-01
 
 **Chore: clear the two conditions keeping `main`'s SonarCloud gate red, so the Quality Gate can become a required check.**
