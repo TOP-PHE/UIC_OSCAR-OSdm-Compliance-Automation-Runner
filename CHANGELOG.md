@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.174] — 2026-07-01
+
+**Test: coverage batch 2 — versionInfo, structureResults, and the auth route's untested surface (overall `src` coverage ~59% → ~65%).**
+
+### Added
+
+- **`version-info.test.js`** (8 tests, ~97%) — `utils/versionInfo.js`
+  compatibility-matrix resolution: matrix-missing / malformed JSON, untested
+  combination, exact + `.x`-wildcard match, unknown collection. Uses
+  `jest.isolateModules` (the module resolves at load) + `mkdtemp` temp files.
+- **`structure-results.test.js`** (22 tests, ~90%) — `reports/structureResults.js`:
+  the pure `classifyVendorCapability` / `serializeBounded` across all branches,
+  plus `extractStructuredResults` over a seeded run with real AES-encrypted
+  artifact files (PASS/FAIL requests, auth-header redaction, assertion counts).
+- **`auth-routes.test.js` extended** (~49% → ~86%) — the previously-untested
+  auth surface: `register/companies`, `register/check-token`, the full
+  password-reset flow (request → check-token → confirm, single-use, then
+  login with the new password), `bootstrap/platform-user`, and the
+  authenticated `/me`, `/logout`, `/sso-check` (admin-only) endpoints.
+
+Full suite: 48 → 50 suites, 1043 → 1089 tests, all green.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **50% → 55%** in
+  `sonar-project.properties` (bump the actual gate condition in the SonarCloud
+  UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change. New test files were scanned
+  for the CodeQL patterns that tripped batch 1 (no `os.tmpdir()` writes —
+  `mkdtemp` used; no unused imports).
+
+---
+
 ## [server-v1.11.173] — 2026-07-01
 
 **Test: coverage batch 1 — integration tests for the three untested route files (overall `src` coverage ~50% → ~59%).**

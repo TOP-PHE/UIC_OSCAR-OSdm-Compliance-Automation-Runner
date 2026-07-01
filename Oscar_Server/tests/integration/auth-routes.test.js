@@ -16,7 +16,9 @@
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-auth-routes';
+process.env.PLATFORM_BOOTSTRAP_TOKEN = 'test-bootstrap-token';
 
+const jwt     = require('jsonwebtoken');
 const request = require('supertest');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { buildAppWithRoute } = require('../helpers/test-app');
@@ -28,13 +30,21 @@ const TEST_EMAIL = `t${Date.now()}@acmecorp.com`;
 const TEST_COMPANY = 'Acme Corporation';
 const TEST_COMPANY_SLUG = 'acme-corporation';
 const TEST_PASSWORD = 'SuperStr0ngPwd!';
+const COMPANY_ID = uuidv4();
+
+// Mint a session JWT the same shape auth.js's signToken produces, for the
+// authenticated endpoints (/me, /logout, /sso-check).
+function sessionToken({ id, email, role }) {
+  return jwt.sign({ sub: id, email, companyId: COMPANY_ID, role, jti: uuidv4() },
+    process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+}
 
 // Issue #449 — self-registration now targets a real, existing company (picked
 // from the /register/companies dropdown) instead of matching the email
 // against a free-text company name, so tests must seed one up front.
 beforeAll(() => {
   run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
-    [uuidv4(), TEST_COMPANY, TEST_COMPANY_SLUG]);
+    [COMPANY_ID, TEST_COMPANY, TEST_COMPANY_SLUG]);
 });
 
 describe('POST /v1/auth/register/request', () => {
@@ -232,9 +242,170 @@ describe('POST /v1/auth/register — company with a slug that differs from its n
   });
 });
 
+// ── GET /v1/auth/register/companies ───────────────────────────────────────────
+describe('GET /v1/auth/register/companies', () => {
+  test('lists company name + slug for the dropdown (no secrets)', async () => {
+    const res = await request(app).get('/v1/auth/register/companies');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.companies)).toBe(true);
+    const acme = res.body.companies.find(c => c.slug === TEST_COMPANY_SLUG);
+    expect(acme).toBeTruthy();
+    expect(acme.name).toBe(TEST_COMPANY);
+    expect(acme).not.toHaveProperty('id');
+  });
+});
+
+// ── GET /v1/auth/register/check-token ─────────────────────────────────────────
+describe('GET /v1/auth/register/check-token', () => {
+  test('400 without a token', async () => {
+    const res = await request(app).get('/v1/auth/register/check-token');
+    expect(res.status).toBe(400);
+  });
+
+  test('404 for an unknown token', async () => {
+    const res = await request(app).get('/v1/auth/register/check-token?token=' + uuidv4());
+    expect(res.status).toBe(404);
+  });
+
+  test('200 returns the email + company for a valid pending registration', async () => {
+    const email = `checktok${Date.now()}@acmecorp.com`;
+    const reqRes = await request(app).post('/v1/auth/register/request')
+      .send({ email, companySlug: TEST_COMPANY_SLUG });
+    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
+    const res = await request(app).get('/v1/auth/register/check-token?token=' + token);
+    expect(res.status).toBe(200);
+    expect(res.body.email).toBe(email);
+    expect(res.body.companyName).toBe(TEST_COMPANY);
+  });
+});
+
+// ── Password reset (issue #15) ────────────────────────────────────────────────
+describe('password reset flow', () => {
+  const email = `pwreset${Date.now()}@acmecorp.com`;
+
+  beforeAll(async () => {
+    // A real active user to reset.
+    const reqRes = await request(app).post('/v1/auth/register/request').send({ email, companySlug: TEST_COMPANY_SLUG });
+    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
+    await request(app).post('/v1/auth/register/confirm').send({ token, password: TEST_PASSWORD });
+    run("UPDATE users SET status = 'active' WHERE email = ?", [email]);
+  });
+
+  test('request returns a generic success even for an unknown email (no enumeration)', async () => {
+    const res = await request(app).post('/v1/auth/password-reset/request').send({ email: 'nobody-here@acmecorp.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBeTruthy();
+  });
+
+  test('check-token 400 without token, 404 for unknown', async () => {
+    expect((await request(app).get('/v1/auth/password-reset/check-token')).status).toBe(400);
+    expect((await request(app).get('/v1/auth/password-reset/check-token?token=' + uuidv4())).status).toBe(404);
+  });
+
+  test('request → check-token → confirm sets a new password', async () => {
+    const reqRes = await request(app).post('/v1/auth/password-reset/request').send({ email });
+    expect(reqRes.status).toBe(200);
+    // dev mode returns the reset URL directly
+    const token = reqRes.body.resetUrl.match(/token=([^&]+)/)[1];
+
+    const check = await request(app).get('/v1/auth/password-reset/check-token?token=' + token);
+    expect(check.status).toBe(200);
+    expect(check.body.email).toBe(email);
+
+    const NEW_PW = 'BrandNewP4ss!';
+    const conf = await request(app).post('/v1/auth/password-reset/confirm').send({ token, password: NEW_PW });
+    expect(conf.status).toBe(200);
+
+    // The token is single-use: reusing it now 404s.
+    const reuse = await request(app).post('/v1/auth/password-reset/confirm').send({ token, password: NEW_PW });
+    expect(reuse.status).toBe(404);
+
+    // The new password works.
+    const login = await request(app).post('/v1/auth/login').send({ email, password: NEW_PW });
+    expect(login.status).toBe(200);
+  });
+
+  test('confirm 404 for an unknown token', async () => {
+    const res = await request(app).post('/v1/auth/password-reset/confirm').send({ token: uuidv4(), password: TEST_PASSWORD });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── POST /v1/auth/bootstrap/platform-user ─────────────────────────────────────
+describe('POST /v1/auth/bootstrap/platform-user', () => {
+  const bootEmail = `bootadmin${Date.now()}@acmecorp.com`;
+  const hdr = { 'x-platform-bootstrap-token': process.env.PLATFORM_BOOTSTRAP_TOKEN };
+
+  test('401 with a wrong bootstrap token', async () => {
+    const res = await request(app).post('/v1/auth/bootstrap/platform-user')
+      .set('x-platform-bootstrap-token', 'wrong')
+      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'administrator' });
+    expect(res.status).toBe(401);
+  });
+
+  test('400 for a non-platform role', async () => {
+    const res = await request(app).post('/v1/auth/bootstrap/platform-user').set(hdr)
+      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'company_user' });
+    expect(res.status).toBe(400);
+  });
+
+  test('201 creates an administrator, then 409 on duplicate email', async () => {
+    const ok = await request(app).post('/v1/auth/bootstrap/platform-user').set(hdr)
+      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'administrator' });
+    expect(ok.status).toBe(201);
+    expect(ok.body.user.role).toBe('administrator');
+
+    const dup = await request(app).post('/v1/auth/bootstrap/platform-user').set(hdr)
+      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'administrator' });
+    expect(dup.status).toBe(409);
+  });
+});
+
+// ── Authenticated endpoints: /me, /logout, /sso-check ─────────────────────────
+describe('authenticated endpoints', () => {
+  const meUser = { id: uuidv4(), email: `me${Date.now()}@acmecorp.com`, role: 'company_user' };
+  const adminUser = { id: uuidv4(), email: `ssoadmin${Date.now()}@acmecorp.com`, role: 'administrator' };
+
+  beforeAll(() => {
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'company_user')`, [meUser.id, COMPANY_ID, meUser.email]);
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'administrator')`, [adminUser.id, COMPANY_ID, adminUser.email]);
+  });
+
+  test('GET /me 401 without a token', async () => {
+    expect((await request(app).get('/v1/auth/me')).status).toBe(401);
+  });
+
+  test('GET /me returns the user + company for a valid token', async () => {
+    const res = await request(app).get('/v1/auth/me').set('Authorization', `Bearer ${sessionToken(meUser)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe(meUser.email);
+    expect(res.body.company.id).toBe(COMPANY_ID);
+  });
+
+  test('POST /logout revokes the session', async () => {
+    const res = await request(app).post('/v1/auth/logout').set('Authorization', `Bearer ${sessionToken(meUser)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.logged_out).toBe(true);
+  });
+
+  test('GET /sso-check 401 for a non-administrator', async () => {
+    const res = await request(app).get('/v1/auth/sso-check').set('Authorization', `Bearer ${sessionToken(meUser)}`);
+    expect(res.status).toBe(401);
+  });
+
+  test('GET /sso-check 200 for an administrator, echoing identity headers', async () => {
+    const res = await request(app).get('/v1/auth/sso-check').set('Authorization', `Bearer ${sessionToken(adminUser)}`);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.headers['x-user-email']).toBe(adminUser.email);
+    expect(res.headers['x-user-role']).toBe('administrator');
+  });
+});
+
 afterAll(() => {
   // Clean up — remove test users and pending registrations
   run("DELETE FROM auth_events WHERE email LIKE '%@acmecorp.com'");
+  run("DELETE FROM password_reset_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@acmecorp.com')");
   run("DELETE FROM users WHERE email LIKE '%@acmecorp.com'");
   run("DELETE FROM pending_registrations WHERE email LIKE '%@acmecorp.com'");
   run("DELETE FROM companies WHERE slug = 'acme-corporation'");
