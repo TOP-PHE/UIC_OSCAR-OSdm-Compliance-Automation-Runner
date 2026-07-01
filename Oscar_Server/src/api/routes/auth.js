@@ -23,7 +23,7 @@ const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
-const { sendVerificationEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
+const { sendVerificationEmail, sendPendingApprovalEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
@@ -117,21 +117,6 @@ function logAuthEvent({ userId = null, companyId = null, email = null, eventType
     [userId, companyId, email, eventType, ip, userAgent]);
 }
 
-/**
- * Check that the email address contains at least one significant word
- * from the company name (3+ characters). This ensures users register
- * with their company email, not a personal one.
- */
-function emailMatchesCompany(email, companyName) {
-  const emailLower = email.toLowerCase();
-  const words = companyName.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .split(/[^a-z0-9]+/)
-    .filter(w => w.length >= 3);
-  if (words.length === 0) return true; // name too short to validate — let it through
-  return words.some(word => emailLower.includes(word));
-}
-
 // ── GET /v1/auth/register/companies ──────────────────────────────────────────
 // Public endpoint: returns list of company names for the registration dropdown.
 // Only returns name and slug — no secrets, no internal IDs.
@@ -155,11 +140,14 @@ router.post('/register/request',
 
   const lowerEmail = email.toLowerCase().trim();
 
-  // Email–company consistency check
-  if (!emailMatchesCompany(lowerEmail, companyName)) {
+  // Issue #449 — self-registration no longer requires the email to match the
+  // company name; instead it must target a real, existing company (picked
+  // from the /register/companies dropdown) so a Test Manager can approve it.
+  const targetCompany = get('SELECT id FROM companies WHERE slug = ?', [makeSlug(companyName)]);
+  if (!targetCompany) {
     return res.status(400).json({
       status: 400, title: 'Bad Request',
-      detail: `Your email does not appear to match your company name "${companyName}". Please use your company email address.`
+      detail: `Unknown company "${companyName}". Contact an administrator to have your company added.`
     });
   }
 
@@ -245,32 +233,55 @@ router.post('/register/confirm',
     return res.status(409).json({ status: 409, title: 'Conflict', detail: 'Account already created. Please sign in.' });
   }
 
+  // Issue #449 — the company must still exist (it was verified to exist at
+  // /register/request time, but may have been removed since). No auto-create:
+  // a stranger self-activating into a brand-new, unverified company would
+  // bypass the Test-Manager-approval step entirely.
   const slug = makeSlug(pending.company_name);
-  let company = get('SELECT * FROM companies WHERE slug = ?', [slug]);
-  const companyId = company ? company.id : uuidv4();
-  const userId    = uuidv4();
+  const company = get('SELECT * FROM companies WHERE slug = ?', [slug]);
+  if (!company) {
+    run('DELETE FROM pending_registrations WHERE token = ?', [token]);
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This company no longer exists. Please register again.' });
+  }
+
+  const userId = uuidv4();
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   transaction(() => {
-    if (!company) {
-      run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
-        [companyId, pending.company_name, slug]);
-    }
-    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, ?, 'company_user')`,
-      [userId, companyId, pending.email, passwordHash]);
+    run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, ?, 'company_user', 'pending')`,
+      [userId, company.id, pending.email, passwordHash]);
     run('DELETE FROM pending_registrations WHERE token = ?', [token]);
   });
 
-  company = get('SELECT * FROM companies WHERE id = ?', [companyId]);
-  const user  = get('SELECT * FROM users    WHERE id = ?', [userId]);
-  const jwtToken = signToken(user, company);
+  const user = get('SELECT * FROM users WHERE id = ?', [userId]);
+  logAuthEvent({ userId: user.id, companyId: company.id, email: user.email, eventType: 'register_confirmed_pending' });
 
-  logAuthEvent({ userId: user.id, companyId: company.id, email: user.email, eventType: 'register_confirmed' });
+  // Notify every Test Manager of this company — the new account cannot log
+  // in until one of them (or an administrator) approves it.
+  const testManagers = all(
+    `SELECT email FROM users WHERE company_id = ? AND role = 'test_manager'`,
+    [company.id]
+  );
+  if (testManagers.length === 0) {
+    log.warn({ companyId: company.id, applicant: user.email }, 'No test_manager to notify for pending registration — administrators must approve');
+  } else {
+    const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
+    try {
+      await sendPendingApprovalEmail({
+        to: testManagers.map(tm => tm.email),
+        applicantEmail: user.email,
+        companyName: company.name,
+        reviewUrl: `${appUrl}/admin.html`
+      });
+    } catch (err) {
+      log.error({ err: err.message, applicant: user.email, companyId: company.id }, 'Failed to send pending-approval notification to test managers');
+    }
+  }
 
-  setSessionCookie(res, jwtToken);
   return res.status(201).json({
-    token:   jwtToken,
-    user:    { id: user.id, email: user.email, role: normalizeRole(user.role) },
+    pending: true,
+    message: `Your request has been sent to ${company.name}'s Test Manager(s) for approval. You'll be able to sign in once approved.`,
+    user:    { id: user.id, email: user.email },
     company: { id: company.id, name: company.name, slug: company.slug }
   });
 });
@@ -525,6 +536,13 @@ router.post('/login',
     logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
     loginAttempts.inc({ result: 'failure' });
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
+  }
+
+  // Issue #449 — self-registered accounts stay locked out until a Test
+  // Manager (or administrator) of their company approves them.
+  if (user.status === 'pending') {
+    logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed_pending', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Your account is awaiting approval from your company\'s Test Manager.' });
   }
 
   const company = get('SELECT * FROM companies WHERE id = ?', [user.company_id]);

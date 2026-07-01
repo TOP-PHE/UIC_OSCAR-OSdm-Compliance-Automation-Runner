@@ -126,6 +126,77 @@ function escHtml(s) {
 }
 
 /**
+ * Issue #449 — notify every Test Manager of a company when someone
+ * self-registers requesting to join it. The account stays 'pending' (can't
+ * log in) until a Test Manager (or administrator) approves it from the
+ * admin Users tab. `to` is an array of Test Manager email addresses.
+ */
+async function sendPendingApprovalEmail({ to, applicantEmail, companyName, reviewUrl }) {
+  if (!isSmtpConfigured()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SMTP is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS in oscar-server.env');
+    }
+    log.warn({ to, applicantEmail, reviewUrl }, 'DEV MODE — SMTP not configured. Pending-approval notification not sent.');
+    return { devMode: true, reviewUrl };
+  }
+
+  const from = getConfig('SMTP_FROM', 'OSCAR Platform <noreply@oscar.uic.org>');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:'Segoe UI',Arial,sans-serif;background:#f5f7f9;margin:0;padding:30px 16px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.08);overflow:hidden">
+    <div style="background:#0090D4;padding:24px 32px;display:flex;align-items:center;gap:12px">
+      <span style="color:#fff;font-size:22px;font-weight:900;letter-spacing:1px">OSCAR</span>
+      <span style="color:#b3e0f7;font-size:13px">OSDM Conformance Automation Runner</span>
+    </div>
+    <div style="padding:32px">
+      <h2 style="color:#37474f;font-size:20px;margin:0 0 12px">New user awaiting your approval</h2>
+      <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 8px">
+        <strong>${escHtml(applicantEmail)}</strong> has requested a Tester account under
+        <strong>${escHtml(companyName)}</strong>.
+      </p>
+      <p style="color:#546e7a;font-size:14px;line-height:1.6;margin:0 0 28px">
+        As a Test Manager for this company, you can approve or reject this request from the Users tab.
+      </p>
+      <a href="${reviewUrl}"
+         style="display:inline-block;background:#0090D4;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:15px;font-weight:700">
+        Review Request
+      </a>
+      <p style="color:#90a4ae;font-size:12px;margin:28px 0 0;line-height:1.5">
+        If the button does not work, copy this link into your browser:<br>
+        <a href="${reviewUrl}" style="color:#0090D4;word-break:break-all">${reviewUrl}</a>
+      </p>
+    </div>
+    <div style="background:#f5f7f9;padding:16px 32px;text-align:center;border-top:1px solid #eceff1">
+      <p style="color:#b0bec5;font-size:11px;margin:0">&copy; UIC — International union of railways. 2026. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const text = `OSCAR — New user awaiting your approval\n\n${applicantEmail} has requested a Tester account under ${companyName}.\n\nReview and approve/reject from the Users tab:\n${reviewUrl}`;
+
+  const transporter = createTransport();
+
+  try {
+    const info = await transporter.sendMail({ from, to, subject: `OSCAR — New user awaiting approval (${companyName})`, text, html });
+    smtpSends.inc({ result: 'success', kind: 'pending_approval' });
+    return info;
+  } catch (sendErr) {
+    log.error({
+      err:          sendErr.message,
+      code:         sendErr.code,
+      responseCode: sendErr.responseCode,
+    }, 'Pending-approval notification send FAILED');
+    smtpSends.inc({ result: 'failure', kind: 'pending_approval' });
+    throw sendErr;
+  }
+}
+
+/**
  * Diagnostic — sends a small fixed-content email using the current SMTP
  * config. Used by the admin "Test Email" button to validate end-to-end
  * delivery without going through the registration flow.
@@ -319,4 +390,4 @@ If you did not request this reset, ignore this email — your password is unchan
   }
 }
 
-module.exports = { sendVerificationEmail, sendTestEmail, sendPasswordResetEmail, isSmtpConfigured };
+module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, isSmtpConfigured };

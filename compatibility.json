@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.196",
+  "current_release": "2026.197",
   "releases": [
+    {
+      "release": "2026.197",
+      "date": "2026-07-01",
+      "server": "1.11.169",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #449: self-registration no longer requires the signup email to contain a fragment of the company name (emailMatchesCompany removed) — instead the applicant must pick a real, existing company (already enforced client-side by the /register/companies dropdown; now also enforced server-side in /register/request) and the new account lands as status='pending' until a Test Manager (or administrator, cross-company fallback) of that company approves it via a new POST /v1/company/users/:id/approve (mirrored at /v1/admin/users/:id/approve). Every Test Manager of the company is emailed (sendPendingApprovalEmail, mailer.js) when a registration is confirmed; a pending user cannot log in (403) until approved. Removed the register/confirm auto-create-company-from-free-text branch, which was unreachable from the UI dropdown and would otherwise have let a stranger self-activate into a brand-new, unverified company with nobody to approve them. New users.status column (migration 23, default 'active', schema.sql). Server-side only; server 1.11.168 -> 1.11.169, collection unchanged OTST_V2.0.94.",
+        "Verification: auth-routes.test.js updated for the new contract (seeds a real company; confirms 201+pending/no-token; login 403 while pending; login succeeds after direct approval) plus a new 403-pending-login test. Full suite 44 test suites / 961 tests green. Manual run: register (email deliberately NOT matching the company name) -> dev-mode confirm link -> pending panel (no redirect) -> login 403 -> Test Manager sees Pending badge + Approve button on admin.html -> approve -> login succeeds. node --check clean on all touched server files."
+      ]
+    },
     {
       "release": "2026.196",
       "date": "2026-07-01",
