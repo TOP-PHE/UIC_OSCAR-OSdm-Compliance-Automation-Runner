@@ -24,6 +24,13 @@
  *   - POST /v1/admin/companies — create company
  *   - PATCH /v1/admin/companies/:id — update company
  *   - DELETE /v1/admin/companies/:id — delete company
+ *   - POST /v1/admin/users/:id/approve — activate a pending self-registered user
+ *   - POST /v1/admin/users/:id/generate-reset-link — issue an out-of-band reset link
+ *   - GET /v1/admin/config — read server config schema + values
+ *   - PATCH /v1/admin/config — update server config (validation + warnings)
+ *   - POST /v1/admin/alertmanager/apply — regenerate + reload alertmanager.yml
+ *   - POST /v1/admin/test-email — SMTP diagnostic send
+ *   - POST /v1/admin/rotate-jwt-secret — rotate the persisted JWT secret (run LAST — mutates process.env.JWT_SECRET)
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-admin-routes';
@@ -32,7 +39,7 @@ const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
-const { run, get } = require('../../src/db/db');
+const { run, get, all } = require('../../src/db/db');
 
 const app = buildAppWithRoute('/v1/admin', '../../src/api/routes/admin');
 
@@ -575,5 +582,451 @@ describe('DELETE /v1/admin/companies/:id', () => {
     expect(res.body.deleted).toBe(true);
     const deleted = get('SELECT id FROM companies WHERE id = ?', [emptyCompanyId]);
     expect(deleted).toBeUndefined();
+  });
+});
+
+// ── POST /v1/admin/users/:id/approve (issue #449) ─────────────────────────────
+
+describe('POST /v1/admin/users/:id/approve', () => {
+  let pendingUserId;
+
+  beforeAll(() => {
+    pendingUserId = uuidv4();
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, status)
+       VALUES (?, ?, 'pending-approve@admin-test.com', 'x', 'company_user', 'pending')`,
+      [pendingUserId, companyId]
+    );
+  });
+
+  afterAll(() => {
+    run('DELETE FROM users WHERE id = ?', [pendingUserId]);
+  });
+
+  test('404 for non-existent user id', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post(`/v1/admin/users/${uuidv4()}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('400 when target user is not pending', async () => {
+    const token = makeToken('administrator');
+    // adminId is already 'active' (default status)
+    const res = await request(app)
+      .post(`/v1/admin/users/${adminId}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/not awaiting approval/i);
+  });
+
+  test('200 flips a pending user to active', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post(`/v1/admin/users/${pendingUserId}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.id).toBe(pendingUserId);
+    expect(res.body.user.status).toBe('active');
+    const row = get('SELECT status FROM users WHERE id = ?', [pendingUserId]);
+    expect(row.status).toBe('active');
+  });
+
+  test('400 when re-approving an already-active user', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post(`/v1/admin/users/${pendingUserId}/approve`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+  });
+});
+
+// ── POST /v1/admin/users/:id/generate-reset-link (issue #15 workaround) ──────
+
+describe('POST /v1/admin/users/:id/generate-reset-link', () => {
+  let resetLinkUserId;
+
+  beforeAll(() => {
+    resetLinkUserId = uuidv4();
+    run(
+      `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+       VALUES (?, ?, 'reset-link-target@admin-test.com', 'x', 'company_user')`,
+      [resetLinkUserId, companyId]
+    );
+  });
+
+  afterAll(() => {
+    run('DELETE FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
+    run('DELETE FROM users WHERE id = ?', [resetLinkUserId]);
+  });
+
+  test('404 for non-existent user', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post(`/v1/admin/users/${uuidv4()}/generate-reset-link`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('200 creates a password_reset_tokens row and returns a resetUrl', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post(`/v1/admin/users/${resetLinkUserId}/generate-reset-link`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(resetLinkUserId);
+    expect(res.body.email).toBe('reset-link-target@admin-test.com');
+    expect(typeof res.body.resetUrl).toBe('string');
+    expect(res.body.resetUrl).toMatch(/reset-password\.html\?token=/);
+    expect(res.body).toHaveProperty('expires_at');
+
+    const tokenRow = get('SELECT * FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
+    expect(tokenRow).toBeTruthy();
+    expect(res.body.resetUrl).toContain(tokenRow.token);
+  });
+
+  test('calling it again replaces the previous token (single active link)', async () => {
+    const token = makeToken('administrator');
+    const firstRow = get('SELECT token FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
+    const res = await request(app)
+      .post(`/v1/admin/users/${resetLinkUserId}/generate-reset-link`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const rows = all('SELECT token FROM password_reset_tokens WHERE user_id = ?', [resetLinkUserId]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].token).not.toBe(firstRow.token);
+  });
+});
+
+// ── GET /v1/admin/config ───────────────────────────────────────────────────────
+
+describe('GET /v1/admin/config', () => {
+  test('401 without token', async () => {
+    const res = await request(app).get('/v1/admin/config');
+    expect(res.status).toBe(401);
+  });
+
+  test('403 for non-administrator', async () => {
+    const token = makeToken('company_user');
+    const res = await request(app)
+      .get('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('200 returns config schema and server_info for administrator', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .get('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.config).toBeTruthy();
+    expect(res.body.config).toHaveProperty('MAX_CONCURRENT_RUNS');
+    expect(res.body.config.MAX_CONCURRENT_RUNS).toHaveProperty('value');
+    expect(res.body.config.MAX_CONCURRENT_RUNS).toHaveProperty('type', 'number');
+    expect(res.body.config).toHaveProperty('LOG_LEVEL');
+    expect(res.body.config.LOG_LEVEL).toHaveProperty('options');
+    expect(res.body.server_info).toBeTruthy();
+    expect(res.body.server_info).toHaveProperty('node_version');
+    expect(res.body.server_info).toHaveProperty('platform');
+    expect(typeof res.body.server_info.uptime_seconds).toBe('number');
+  });
+
+  test('sensitive SMTP_PASS value is masked when set', async () => {
+    const token = makeToken('administrator');
+    // Set a SMTP_PASS value directly so we can assert the masking behaviour,
+    // then restore the prior value so we don't leak state into other tests.
+    const prior = get(`SELECT value FROM server_config WHERE key = 'SMTP_PASS'`);
+    run(
+      `INSERT INTO server_config (key, value, updated_at, updated_by)
+       VALUES ('SMTP_PASS', 'xsmtpsib-supersecretvalue12345', datetime('now'), 'test-setup')
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    );
+    const res = await request(app)
+      .get('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.config.SMTP_PASS.value).toMatch(/^xsmt\*{4}$/);
+    // restore
+    if (prior) {
+      run(`UPDATE server_config SET value = ? WHERE key = 'SMTP_PASS'`, [prior.value]);
+    } else {
+      run(`DELETE FROM server_config WHERE key = 'SMTP_PASS'`);
+    }
+  });
+});
+
+// ── PATCH /v1/admin/config ─────────────────────────────────────────────────────
+
+describe('PATCH /v1/admin/config', () => {
+  afterAll(() => {
+    // Restore MAX_CONCURRENT_RUNS to a sane default in case a test above left
+    // it altered — other suites (outside this file) may read server_config.
+    run(`DELETE FROM server_config WHERE key = 'MAX_CONCURRENT_RUNS'`);
+    run(`INSERT INTO server_config (key, value) VALUES ('MAX_CONCURRENT_RUNS', '10')`);
+  });
+
+  test('401 without token', async () => {
+    const res = await request(app).patch('/v1/admin/config').send({ MAX_CONCURRENT_RUNS: 5 });
+    expect(res.status).toBe(401);
+  });
+
+  test('403 for non-administrator', async () => {
+    const token = makeToken('company_user');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 5 });
+    expect(res.status).toBe(403);
+  });
+
+  test('200 updates a known numeric key within range', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 7 });
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toEqual(expect.arrayContaining([{ key: 'MAX_CONCURRENT_RUNS', value: '7' }]));
+    expect(res.body.errors).toHaveLength(0);
+    expect(res.body.config.MAX_CONCURRENT_RUNS.value).toBe('7');
+    const row = get(`SELECT value FROM server_config WHERE key = 'MAX_CONCURRENT_RUNS'`);
+    expect(row.value).toBe('7');
+  });
+
+  test('400 when the only submitted key is unknown', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ NOT_A_REAL_CONFIG_KEY: 'x' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/Unknown config key/);
+  });
+
+  test('400 when numeric value is out of range', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 999 });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/maximum is/);
+  });
+
+  test('400 when numeric value is not a number', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 'not-a-number' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/must be a number/);
+  });
+
+  test('400 when enum value is not one of the allowed options', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ LOG_LEVEL: 'not-a-real-level' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/must be one of/);
+  });
+
+  test('200 updates LOG_LEVEL enum value', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ LOG_LEVEL: 'debug' });
+    expect(res.status).toBe(200);
+    expect(res.body.config.LOG_LEVEL.value).toBe('debug');
+    // restore to a production-friendly default so other suites aren't noisy
+    run(`UPDATE server_config SET value = 'info' WHERE key = 'LOG_LEVEL'`);
+  });
+
+  test('a masked (unchanged) sensitive value is skipped rather than overwritten', async () => {
+    const token = makeToken('administrator');
+    // Seed a real SMTP_PASS, then PATCH with the masked placeholder shape —
+    // the route should skip it and leave the real value untouched.
+    run(
+      `INSERT INTO server_config (key, value, updated_at, updated_by)
+       VALUES ('SMTP_PASS', 'realsecretvalue123', datetime('now'), 'test-setup')
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    );
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ SMTP_PASS: 'real****' });
+    expect(res.status).toBe(200);
+    const row = get(`SELECT value FROM server_config WHERE key = 'SMTP_PASS'`);
+    expect(row.value).toBe('realsecretvalue123');
+    run(`DELETE FROM server_config WHERE key = 'SMTP_PASS'`);
+  });
+
+  test('surfaces a soft warning when SMTP_FROM equals SMTP_USER', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ SMTP_USER: 'a731f1001@smtp-brevo.com', SMTP_FROM: 'a731f1001@smtp-brevo.com' });
+    expect(res.status).toBe(200);
+    expect(res.body.warnings.length).toBeGreaterThan(0);
+    expect(res.body.warnings[0]).toHaveProperty('key', 'SMTP_FROM');
+    // restore
+    run(`DELETE FROM server_config WHERE key IN ('SMTP_USER', 'SMTP_FROM')`);
+  });
+
+  test('errors for unknown keys are returned alongside successful updates in the same request', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .patch('/v1/admin/config')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ MAX_CONCURRENT_RUNS: 8, BOGUS_KEY_XYZ: 'x' });
+    expect(res.status).toBe(200); // partial success — updated.length > 0
+    expect(res.body.updated).toEqual(expect.arrayContaining([{ key: 'MAX_CONCURRENT_RUNS', value: '8' }]));
+    expect(res.body.errors.some(e => e.includes('BOGUS_KEY_XYZ'))).toBe(true);
+  });
+});
+
+// ── POST /v1/admin/alertmanager/apply ─────────────────────────────────────────
+
+describe('POST /v1/admin/alertmanager/apply', () => {
+  test('401 without token', async () => {
+    const res = await request(app).post('/v1/admin/alertmanager/apply');
+    expect(res.status).toBe(401);
+  });
+
+  test('403 for non-administrator', async () => {
+    const token = makeToken('company_user');
+    const res = await request(app)
+      .post('/v1/admin/alertmanager/apply')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('200 with a graceful ok:false when SMTP_HOST is not configured', async () => {
+    // Test env has no SMTP_HOST / ALERT_RECIPIENTS configured — renderConfig()
+    // throws before any file write is attempted, and applyConfig() catches
+    // that and returns a diagnostic payload rather than writing to disk.
+    const priorHost = get(`SELECT value FROM server_config WHERE key = 'SMTP_HOST'`);
+    run(`DELETE FROM server_config WHERE key = 'SMTP_HOST'`);
+
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post('/v1/admin/alertmanager/apply')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.written).toBe(false);
+    expect(res.body.reloaded).toBe(false);
+    expect(res.body.error).toMatch(/SMTP_HOST is empty/);
+
+    if (priorHost) {
+      run(`INSERT INTO server_config (key, value) VALUES ('SMTP_HOST', ?)`, [priorHost.value]);
+    }
+  });
+});
+
+// ── POST /v1/admin/test-email ─────────────────────────────────────────────────
+
+describe('POST /v1/admin/test-email', () => {
+  test('401 without token', async () => {
+    const res = await request(app).post('/v1/admin/test-email').send({ to: 'someone@example.com' });
+    expect(res.status).toBe(401);
+  });
+
+  test('403 for non-administrator', async () => {
+    const token = makeToken('company_user');
+    const res = await request(app)
+      .post('/v1/admin/test-email')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ to: 'someone@example.com' });
+    expect(res.status).toBe(403);
+  });
+
+  test('400 when "to" is missing', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post('/v1/admin/test-email')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('400 when "to" is not a valid email address', async () => {
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post('/v1/admin/test-email')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ to: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+
+  test('409 when SMTP is not configured', async () => {
+    // Test env's server_config has no SMTP_HOST/SMTP_USER/SMTP_PASS — the
+    // dev/no-SMTP path returns 409 with a diagnostic detail rather than
+    // attempting a real network send.
+    const token = makeToken('administrator');
+    const res = await request(app)
+      .post('/v1/admin/test-email')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ to: 'recipient@admin-test.com' });
+    expect(res.status).toBe(409);
+    expect(res.body.title).toBe('SMTP Not Configured');
+    expect(res.body.detail).toMatch(/SMTP_HOST, SMTP_USER and SMTP_PASS/);
+  });
+});
+
+// ── POST /v1/admin/rotate-jwt-secret ──────────────────────────────────────────
+// IMPORTANT: this mutates process.env.JWT_SECRET (and the persisted config
+// value) as a side effect of the route itself — every makeToken() call after
+// this executes would sign against the OLD secret and start failing auth.
+// This suite therefore runs LAST in the file and restores process.env.JWT_SECRET
+// immediately after asserting, so it cannot bleed into any other test file
+// that happens to share the Jest worker process.
+
+describe('POST /v1/admin/rotate-jwt-secret', () => {
+  const originalJwtSecret = process.env.JWT_SECRET;
+
+  afterAll(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
+  });
+
+  test('401 without token', async () => {
+    const res = await request(app).post('/v1/admin/rotate-jwt-secret');
+    expect(res.status).toBe(401);
+  });
+
+  test('403 for non-administrator', async () => {
+    const token = makeToken('company_user');
+    const res = await request(app)
+      .post('/v1/admin/rotate-jwt-secret')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
+
+  test('200 rotates the persisted JWT secret and updates process.env.JWT_SECRET', async () => {
+    const token = makeToken('administrator');
+    const priorPersisted = get(`SELECT value FROM server_config WHERE key = 'JWT_SECRET'`);
+    const priorEnvSecret = process.env.JWT_SECRET;
+
+    const res = await request(app)
+      .post('/v1/admin/rotate-jwt-secret')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.rotated).toBe(true);
+    expect(res.body.message).toMatch(/all existing sessions/i);
+
+    const newPersisted = get(`SELECT value FROM server_config WHERE key = 'JWT_SECRET'`);
+    expect(newPersisted).toBeTruthy();
+    expect(newPersisted.value).not.toBe(priorPersisted && priorPersisted.value);
+    // The route also overwrites process.env.JWT_SECRET in-process — confirm
+    // that's exactly what changed (this is the part that would otherwise
+    // break every subsequent makeToken() call in this file).
+    expect(process.env.JWT_SECRET).toBe(newPersisted.value);
+    expect(process.env.JWT_SECRET).not.toBe(priorEnvSecret);
   });
 });
