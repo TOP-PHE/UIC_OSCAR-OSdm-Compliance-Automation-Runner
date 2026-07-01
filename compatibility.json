@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.197",
+  "current_release": "2026.198",
   "releases": [
+    {
+      "release": "2026.198",
+      "date": "2026-07-01",
+      "server": "1.11.170",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #449 (follow-up to 2026.197): self-registration now matches the company by its stable SLUG (submitted verbatim from the /register/companies dropdown, whose <option> value is now the slug) instead of re-deriving a slug from the display name via makeSlug(). A company whose slug was frozen before a rename — real incident: display name 'Paxone', stored slug 'paxone-gmbh', makeSlug('Paxone')='paxone' != stored — was rejected as 'Unknown company'. register/request now validates companySlug and looks up WHERE slug=?; the picked company's canonical name AND slug are stored on the pending registration (new pending_registrations.company_slug column, migration 24, schema.sql); register/confirm resolves the company by that stored slug (falling back to makeSlug(company_name) only for a pre-migration pending row). OpenAPI updated (companyName -> companySlug). Server-side + registration UI; server 1.11.169 -> 1.11.170, collection unchanged OTST_V2.0.94.",
+        "Verification: auth-routes.test.js switched to companySlug + a new end-to-end regression test seeding a name/slug-mismatched company ('Paxone'/'paxone-gmbh') and asserting request->confirm succeeds and creates a pending user under the right company; db-migrations.test.js covers migration 24. Full suite 44 suites / 962 tests green, eslint + inline-script lint clean. Manual browser run reproduced the exact Paxone mismatch (dropdown option label 'Paxone' / value 'paxone-gmbh') and confirmed the full request -> confirm -> pending flow now works."
+      ]
+    },
     {
       "release": "2026.197",
       "date": "2026-07-01",

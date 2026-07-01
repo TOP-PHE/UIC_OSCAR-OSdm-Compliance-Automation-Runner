@@ -207,7 +207,8 @@ CREATE INDEX IF NOT EXISTS idx_auth_events_event_type ON auth_events(event_type)
 CREATE TABLE IF NOT EXISTS pending_registrations (
   id           TEXT PRIMARY KEY,
   email        TEXT NOT NULL UNIQUE,
-  company_name TEXT NOT NULL,
+  company_name TEXT NOT NULL,           -- display-name snapshot (shown on the confirm page/email)
+  company_slug TEXT,                    -- stable slug of the picked company; the lookup key at confirm (#449)
   token        TEXT NOT NULL UNIQUE,
   expires_at   TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
