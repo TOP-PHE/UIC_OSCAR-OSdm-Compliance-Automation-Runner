@@ -3450,6 +3450,28 @@ function renderWizardStep1() {
       </div>
     </div>
   </div>
+
+  <!-- ⑤ Fulfillment capabilities (issue #448) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">🎟 Fulfillment<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <div class="fw-subsection">
+          <div class="fw-subsection-label">Fulfillment type — which delivery mechanisms does the system support?</div>
+          <div class="pill-group">
+            ${WIZ_FULFIL_TYPES.map(t=>`<div class="pill${(fw.fulfillment.types||[]).includes(t)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="types" data-val="${esc(t)}">${t.replace(/_/g,' ')}</div>`).join('')}
+          </div>
+        </div>
+        <div class="fw-subsection" style="margin-top:10px">
+          <div class="fw-subsection-label">Fulfillment media — how is the document delivered?</div>
+          <div class="pill-group">
+            ${WIZ_FULFIL_MEDIA.map(m=>`<div class="pill${(fw.fulfillment.media||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="media" data-val="${esc(m)}">${m.replace(/_/g,' ')}</div>`).join('')}
+          </div>
+        </div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">Scenarios can only request the fulfillment type/media declared here — leave a category empty to allow the full OSDM set.</div>
+      </div>
+    </div>
+  </div>
   `;
 
   } catch(e) {
@@ -3546,15 +3568,6 @@ function fwSetOfferMode(value) {
   wizData.framework.offerCriteria.offerMode = value;
   document.querySelectorAll('.offer-mode-pill').forEach(p =>
     p.classList.toggle('selected', p.dataset.val === value));
-}
-
-function fwToggleFulfilPill(el, subKey, value) {
-  const f   = wizData.framework.fulfillment;
-  if (!f[subKey]) f[subKey] = [];
-  const arr = f[subKey];
-  const idx = arr.indexOf(value);
-  if (idx === -1) { arr.push(value); el.classList.add('selected'); }
-  else            { arr.splice(idx,1); el.classList.remove('selected'); }
 }
 
 // ── Ancillary catalog helpers (issue #130) ───────────────────────────────────
