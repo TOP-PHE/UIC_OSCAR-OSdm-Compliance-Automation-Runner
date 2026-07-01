@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.170] — 2026-07-01
+
+**Fix (#449 follow-up): register against the company's stable slug, not a slug re-derived from its name.**
+
+### Fixed
+
+- Self-registration matched the chosen company by re-deriving a slug from its
+  **display name** (`makeSlug(name)`) and looking up `WHERE slug = ?`. That
+  breaks for any company whose stored slug was frozen before a rename — e.g.
+  the real "Paxone" (display name `Paxone`, stored slug `paxone-gmbh`,
+  `makeSlug('Paxone') = 'paxone'`), which was rejected with *"Unknown
+  company"*. Registration now submits and matches on the company's **stable
+  slug** (the `/register/companies` dropdown `<option>` value is the slug),
+  eliminating the name→slug re-derivation entirely.
+
+### Changed
+
+- `POST /v1/auth/register/request` now takes `companySlug` (was `companyName`)
+  and looks up `WHERE slug = ?`. The picked company's canonical name **and**
+  slug are stored on the pending registration; `register/confirm` resolves the
+  company by that stored slug (falling back to `makeSlug(company_name)` only
+  for a pre-migration pending row). OpenAPI spec updated to match.
+- New `pending_registrations.company_slug` column (migration 24, `schema.sql`).
+
+### Verification
+
+- `auth-routes.test.js` switched to `companySlug`, plus a new end-to-end
+  regression test that seeds a name/slug-mismatched company
+  (`Paxone`/`paxone-gmbh`) and asserts request → confirm succeeds and creates
+  a pending user under the right company. `db-migrations.test.js` covers
+  migration 24. Full suite: 44 suites / 962 tests green; lint clean.
+- Manual browser run reproduced the exact mismatch (dropdown label `Paxone`,
+  value `paxone-gmbh`) and confirmed request → confirm → pending now works.
+
+---
+
 ## [server-v1.11.169] — 2026-07-01
 
 **Feat (#449): user management at company level — Test-Manager approval replaces the email-must-match-company-name gate.**

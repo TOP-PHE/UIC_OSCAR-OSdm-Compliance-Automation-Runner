@@ -533,6 +533,15 @@ const MIGRATIONS = [
       // replacing the old email-must-match-company-name gate.
       _safeAlter("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
   }},
+  { version: 24, name: 'pending-registrations-company-slug', up: () => {
+      // Issue #449 follow-up — store the company's stable slug (from the
+      // registration dropdown) on the pending registration, so confirm
+      // resolves the EXACT company that was picked instead of re-deriving a
+      // slug from the display name via makeSlug(). A company whose slug was
+      // frozen before a rename (display name 'Paxone' but slug 'paxone-gmbh')
+      // otherwise fails the lookup — the "Unknown company" bug.
+      _safeAlter('ALTER TABLE pending_registrations ADD COLUMN company_slug TEXT');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
