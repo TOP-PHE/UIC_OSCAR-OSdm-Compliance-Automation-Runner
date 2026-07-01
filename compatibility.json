@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.199",
+  "current_release": "2026.200",
   "releases": [
+    {
+      "release": "2026.200",
+      "date": "2026-07-01",
+      "server": "1.11.172",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Chore (SonarCloud gate cleanup, toward making the quality gate a required check): fixes the two conditions that kept main's gate red. (1) Reliability: added an associated label to all 38 <input>/<select>/<textarea> flagged by Web:InputWithoutLabelCheck across 8 public/*.html pages (login/register/verify/reset/forgot, profile, admin, run-detail, report-builder) — <label for> where a visible label existed, aria-label for compact toolbar controls and select-all checkboxes; clears new_reliability_rating C->A and the matching S6853 accessibility smells. (2) Duplication: osdmSchemas.js is a GENERATED file whose per-OSDM-version schema blocks are ~identical by design and accounted for ~2,288 of ~2,585 duplicated lines; added sonar.cpd.exclusions for it (still analyzed for bugs/smells, only copy-paste detection off), dropping new_duplicated_lines_density ~9.2% -> ~1%. Also bumped sonar.projectVersion 1.2.0 -> 1.11.172 (it was stale, which made ~28k legacy lines count as 'new code'; keep it in step with package.json so the Previous-Version new-code period tracks real releases). No server behavioural change; server 1.11.171 -> 1.11.172, collection unchanged OTST_V2.0.94.",
+        "Verification: every label for= target confirmed to reference an existing element id across the 8 files; eslint + inline-script HTML lint clean; full jest suite unaffected (HTML/config only). After merge, main's SonarCloud gate is expected to go green on both previously-failing conditions, enabling 'SonarQube Quality Gate check' to be added to branch protection's required list."
+      ]
+    },
     {
       "release": "2026.199",
       "date": "2026-07-01",
