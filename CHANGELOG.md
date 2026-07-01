@@ -14,6 +14,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.175] — 2026-07-01
+
+**Test: coverage batch 3 — runs.js, admin.js, company.js (overall `src` coverage ~65% → ~74%).**
+
+### Added
+
+- **`runs-routes.test.js`** (10 → 75 tests) — the single biggest remaining
+  coverage gap: submit / list / queue-status / stop-all / batch + zip / logs /
+  assertions / requests / artifacts / share / cancel / delete / bulk-delete /
+  bulk-admin-action, over real seeded run graphs with encrypted artifacts.
+  `runs.js` ~35% → **~87%**.
+- **`admin-routes.test.js`** (40 → 73 tests) — `users/:id/approve`,
+  `generate-reset-link`, `GET`/`PATCH /config` (incl. sensitive-value
+  masking), `alertmanager/apply`, `test-email` (dev-mode path only, no real
+  SMTP), and `rotate-jwt-secret` (run last, self-restoring — it mutates
+  `process.env.JWT_SECRET`). `admin.js` ~60% → **~89%**.
+- **`company-routes.test.js`** (15 → 27 tests) — the `extra_headers`
+  validation branches (issue #426), the retired
+  `share_reports_with_certifier` rejection, and the `POST /datafile`
+  multipart upload path. `company.js` ~58% → **~84%**.
+
+Full suite: 50 suites, 1089 → **1199 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **55% → 65%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change. Every extended file was
+  independently re-run standalone with `--coverage` and scanned for the
+  CodeQL patterns that tripped batch 1 (no bare `os.tmpdir()` writes, no
+  unused imports) before being folded in.
+- **One real, pre-existing behavior surfaced while writing tests (not a
+  regression — not changed here):** `POST /v1/company/datafile`'s multer
+  `filename` callback treats `certification_user` as a platform role that
+  needs an explicit `company_id`, so it errors with a `500` *before* the
+  route's own test-manager-only `403` check ever runs, for that specific
+  role. The new test exercises the intended `403` branch with a plain tester
+  instead. Worth a follow-up if a certifier ever legitimately hits this
+  endpoint.
+
+---
+
 ## [server-v1.11.174] — 2026-07-01
 
 **Test: coverage batch 2 — versionInfo, structureResults, and the auth route's untested surface (overall `src` coverage ~59% → ~65%).**
