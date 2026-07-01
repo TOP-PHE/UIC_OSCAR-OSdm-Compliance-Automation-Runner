@@ -49,6 +49,8 @@ const REQUIRED_COLUMNS = {
     'observed', 'interpretation', 'category', 'severity', 'status',
     'baseline_in_run', 'raise_to_osdm', 'evidence', 'created_by',
   ],
+  // #450 — per-company OSDM /places cache (migration 25).
+  places_cache: ['company_id', 'places_json', 'place_count', 'cached_at'],
 };
 
 let _tmpFiles = [];
@@ -145,5 +147,26 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
     bootDbAgainst(dbFile);
 
     expect(columnsOf(dbFile, 'finding')).toContain('scenario_code');
+  });
+
+  // #450 — places_cache (migration 25). Simulate a DB already at version 24
+  // WITHOUT the table and confirm migration 25 creates it. `CREATE TABLE IF NOT
+  // EXISTS` in migration 25 means the table can only appear from the new
+  // migration running, never from schema.sql being re-applied here.
+  test('places_cache (added in migration 25) is created on an already-versioned DB', () => {
+    const dbFile = tempDbPath();
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(fs.readFileSync(SCHEMA_SQL, 'utf8'));
+      try { d.exec('DROP TABLE IF EXISTS places_cache'); } catch (_e) { /* already absent */ }
+      d.exec('DELETE FROM schema_version WHERE version >= 25');
+      d.exec('INSERT OR IGNORE INTO schema_version (version) VALUES (24)');
+      d.close();
+    }
+    expect(columnsOf(dbFile, 'places_cache')).toEqual([]); // table gone
+
+    bootDbAgainst(dbFile);
+
+    expect(columnsOf(dbFile, 'places_cache')).toContain('places_json');
   });
 });

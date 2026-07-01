@@ -473,6 +473,7 @@ app.use('/v1/company/users',   require('./api/routes/company-users'));
 app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));
+app.use('/v1/company',         require('./api/routes/company-places'));
 app.use('/v1/company',         require('./api/routes/company-findings'));
 app.use('/v1/runs',            require('./api/routes/runs'));
 app.use('/v1/reports',         require('./api/routes/reports'));
