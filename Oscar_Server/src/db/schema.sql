@@ -240,6 +240,18 @@ CREATE TABLE IF NOT EXISTS test_resources (
 );
 CREATE INDEX IF NOT EXISTS idx_test_resources_company ON test_resources(company_id);
 
+-- ── Places cache (OSDM GET /places bulk-download — issue #450) ───────────────
+-- One row per company: the vendor's stop-place list, bulk-downloaded on demand
+-- and used for a full-text stop-place lookup in Test Config (Timetable Discovery
+-- + Train Resource editor). Places are public reference data (station
+-- names/URNs) so the JSON blob is stored plaintext, not encrypted at rest.
+CREATE TABLE IF NOT EXISTS places_cache (
+  company_id  TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+  places_json TEXT NOT NULL DEFAULT '[]',        -- JSON array of { id, name, objectType }
+  place_count INTEGER NOT NULL DEFAULT 0,
+  cached_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ── Server config — runtime-editable key-value settings ─────────────────────
 -- Stores server configuration that can be changed by administrators at runtime
 -- without requiring a server restart. On first startup, values are seeded from

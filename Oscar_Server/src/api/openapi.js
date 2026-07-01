@@ -364,5 +364,53 @@ module.exports = {
         },
       },
     },
+    '/v1/company/places/refresh': {
+      post: {
+        tags: ['Company'],
+        summary: 'Bulk-download the vendor\'s OSDM GET /places list and cache it (test_manager only, #450)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Cache refreshed', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              place_count: { type: 'integer' },
+              cached_at: { type: 'string' },
+              truncated: { type: 'boolean', description: 'true if a safety cap stopped the download early' },
+            },
+          } } } },
+          400: { description: 'No OSDM api_base configured for the company' },
+          502: { description: 'Token fetch or vendor /places call failed' },
+        },
+      },
+    },
+    '/v1/company/places': {
+      get: {
+        tags: ['Company'],
+        summary: 'Cached stop-place metadata, or ?q= full-text lookup (tester + test_manager; admin/certifier denied)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Case-insensitive substring over place name + id; omit for cache metadata only' },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 20, maximum: 50 } },
+        ],
+        responses: {
+          200: { description: 'Metadata (no q) or ranked matches (with q)', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              place_count: { type: 'integer' },
+              cached_at: { type: 'string', nullable: true },
+              places: {
+                type: 'array',
+                items: { type: 'object', properties: {
+                  id: { type: 'string', example: 'urn:uic:stn:8500010' },
+                  name: { type: 'string', example: 'Zürich HB' },
+                  objectType: { type: 'string' },
+                } },
+              },
+            },
+          } } } },
+          403: { description: 'Administrators and certifiers are denied' },
+        },
+      },
+    },
   },
 };

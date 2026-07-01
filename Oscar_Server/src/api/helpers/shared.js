@@ -85,6 +85,30 @@ function resolveCompanyScope(req, res) {
 // certifier-sharing toggle was retired in favour of per-report sharing
 // (runs.shared_with_certifier_at). The helper had no remaining callers.
 
+// ── Test-data role guards (issue #60) ────────────────────────────────────────
+// Test configuration / resources / places are TEST DATA: administrators and
+// certifiers have no access; only Test Managers may write. Shared by every
+// company-test-* route (was triplicated per file). Both send the 403 and
+// return a boolean so callers stay one-liners:
+//   if (denyAdminAndCertifier(req, res)) return;
+//   if (!requireTestManager(req, res)) return;
+function denyAdminAndCertifier(req, res) {
+  if (req.user.role === 'administrator' || req.user.role === 'certification_user') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Administrators and certifiers do not have access to test data (issue #60).' });
+    return true;
+  }
+  return false;
+}
+function requireTestManager(req, res) {
+  if (req.user.role !== 'test_manager') {
+    res.status(403).json({ status: 403, title: 'Forbidden',
+      detail: 'Only Test Managers can modify test data.' });
+    return false;
+  }
+  return true;
+}
+
 module.exports = {
   ALLOWED_ROLES,
   PLATFORM_SLUG,
@@ -92,4 +116,6 @@ module.exports = {
   ensurePlatformCompany,
   auditLog,
   resolveCompanyScope,
+  denyAdminAndCertifier,
+  requireTestManager,
 };

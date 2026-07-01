@@ -850,8 +850,12 @@ function renderWizardStep2InSection() {
     const banner = document.createElement('div');
     banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 Test Data is managed by your Test Manager — read-only for testers.</div>';
     body.prepend(banner.firstChild);
-    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
+    body.querySelectorAll('[data-action="wiz-add-train"], [data-action="wiz-duplicate-train"], [data-action="wiz-save-all-trains"], [data-action="wiz-discover-timetable"], [data-action="wiz-download-places"], [data-action="wiz-delete-resource"], [data-action="wiz-edit-train"], [data-action="wiz-add-journey"], [data-action="wiz-duplicate-journey"], [data-action="wiz-delete-journey"]').forEach(el => el.style.display = 'none');
   }
+
+  // #450 — show how many stop places are cached (drives the origin/destination
+  // typeahead). Testers see the status too (read-only), just not the button.
+  refreshPlacesStatus();
 }
 
 // ── Section 3: Test Scenarios ────────────────────────────────────────────────
@@ -3710,6 +3714,8 @@ function renderWizardStep2() {
         ${trains.length > 0 ? '<button class="btn btn-secondary btn-sm" data-action="wiz-save-all-trains" title="Save every train you have open/edited in one go">💾 Save all trains</button>' : ''}
         <button class="btn btn-secondary btn-sm" data-action="wiz-reprobe-offers" title="Re-run the anonymous-adult offer probe for every route of the train list and refresh the availability warnings (#369)">&#128260; Re-probe offers</button>
         <button class="btn btn-secondary btn-sm" data-action="wiz-discover-timetable" title="Scan the sandbox timetable for an origin/destination and auto-create the train sets it actually runs">🔍 Discover timetable</button>
+        <button class="btn btn-secondary btn-sm" data-action="wiz-download-places" title="Bulk-download the vendor's stop places (OSDM GET /places) and cache them for the origin/destination lookups below (#450)">⬇ Download places</button>
+        <span id="wiz-places-status" style="font-size:11px;color:#90a4ae;align-self:center"></span>
       </div>
     </div>
   </div>
@@ -3902,12 +3908,12 @@ function buildTrainDetailHTML(tidx) {
         <!-- Row 2: Origin URN | Destination URN -->
         <div class="param-field">
           <label class="param-label">Origin station URN</label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010">
+          <input class="param-input" data-action="train-field" data-place-lookup data-tidx="${esc(tidx)}" data-tfield="originURN" value="${esc(d.originURN || '')}" placeholder="urn:uic:stn:8500010" autocomplete="off">
           <span class="field-error" id="tf-${esc(tidx)}-originURN-err"></span>
         </div>
         <div class="param-field">
           <label class="param-label">Destination station URN</label>
-          <input class="param-input" data-action="train-field" data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058">
+          <input class="param-input" data-action="train-field" data-place-lookup data-tidx="${esc(tidx)}" data-tfield="destinationURN" value="${esc(d.destinationURN || '')}" placeholder="urn:uic:stn:8400058" autocomplete="off">
           <span class="field-error" id="tf-${esc(tidx)}-destinationURN-err"></span>
         </div>
         <!-- Row 3: Product category ref | short name -->
@@ -4250,10 +4256,10 @@ function openTimetableDiscovery() {
       </p>
       <div style="display:flex;flex-direction:column;gap:10px">
         <label style="font-size:12px;color:#455a64;font-weight:600">Origin
-          <input id="tt-origin" class="param-input" value="${esc(seed.origin)}" placeholder="urn:uic:stn:8500010 (or just 8500010)" style="margin-top:3px">
+          <input id="tt-origin" class="param-input" data-place-lookup value="${esc(seed.origin)}" placeholder="urn:uic:stn:8500010 (or just 8500010)" style="margin-top:3px" autocomplete="off">
         </label>
         <label style="font-size:12px;color:#455a64;font-weight:600">Destination
-          <input id="tt-dest" class="param-input" value="${esc(seed.destination)}" placeholder="urn:uic:stn:8400058 (or just 8400058)" style="margin-top:3px">
+          <input id="tt-dest" class="param-input" data-place-lookup value="${esc(seed.destination)}" placeholder="urn:uic:stn:8400058 (or just 8400058)" style="margin-top:3px" autocomplete="off">
         </label>
         <label style="font-size:12px;color:#455a64;font-weight:600">Days to scan (1–14)
           <input id="tt-days" class="param-input" type="number" min="1" max="14" value="7" style="margin-top:3px;width:90px">
@@ -4359,6 +4365,162 @@ function renderDiscoveryDays(el, dayResults) {
   }).join('');
   el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
     <table style="margin-top:6px;border-collapse:collapse">${rows}</table></details>`;
+}
+
+// ── Places cache + stop-place lookup (issue #450) ────────────────────────────
+// A per-company cache of the vendor's OSDM GET /places list backs a typeahead
+// on every origin/destination URN field (Timetable Discovery + Train editor).
+// Manual entry still works — the lookup is purely an assist.
+
+// Refresh the "N places cached" status line in the Test Data toolbar.
+async function refreshPlacesStatus() {
+  const el = document.getElementById('wiz-places-status');
+  if (!el) return;
+  try {
+    const res = await fetch('/v1/company/places');
+    if (!res.ok) { el.textContent = ''; return; }
+    const b = await res.json();
+    if (!b.place_count) {
+      el.textContent = 'No places cached yet — click Download places to enable the origin/destination lookup.';
+      el.style.color = '#b0885a';
+    } else {
+      el.textContent = `${b.place_count} place(s) cached${b.cached_at ? ' · ' + placesAgo(b.cached_at) : ''}`;
+      el.style.color = '#90a4ae';
+    }
+  } catch (_) { el.textContent = ''; }
+}
+
+// Compact "x ago" for the cache timestamp. Server stores UTC "YYYY-MM-DD HH:MM:SS".
+function placesAgo(ts) {
+  const t = Date.parse(String(ts).replace(' ', 'T') + 'Z');
+  if (Number.isNaN(t)) return String(ts);
+  const secs = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+  return Math.floor(secs / 86400) + 'd ago';
+}
+
+// POST /places/refresh — bulk-download from the vendor and re-render the status.
+async function downloadPlaces(btn) {
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Downloading…'; }
+  try {
+    const res = await fetch('/v1/company/places/refresh', { method: 'POST' });
+    const b = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      oscarToast(`Places download failed: ${b.detail || b.title || ('HTTP ' + res.status)}`, 'error');
+      return;
+    }
+    oscarToast(`Cached ${b.place_count} stop place(s)${b.truncated ? ' (list truncated — see server log)' : ''}.`, b.place_count ? 'success' : 'warn');
+    await refreshPlacesStatus();
+  } catch (e) {
+    oscarToast('Places download network error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = original; }
+  }
+}
+
+// Lazily attach the typeahead to a place-lookup input the first time it is
+// focused. A single delegated focusin listener means we don't have to hook
+// every render path that produces these inputs.
+document.body.addEventListener('focusin', function(e) {
+  const input = e.target;
+  if (input && input.matches && input.matches('input[data-place-lookup]')) {
+    attachPlaceAutocomplete(input);
+  }
+});
+
+function attachPlaceAutocomplete(input) {
+  if (!input || input._placeAutocomplete) return;
+  input._placeAutocomplete = true;
+
+  let box = null;         // dropdown element
+  let items = [];         // current result rows
+  let active = -1;        // keyboard-highlighted index
+  let debounceTimer = null;
+  let seq = 0;            // guards against out-of-order fetch responses
+
+  function removeBox() {
+    if (box) { box.remove(); box = null; }
+    items = []; active = -1;
+  }
+
+  function positionBox() {
+    if (!box) return;
+    const r = input.getBoundingClientRect();
+    box.style.left = (window.scrollX + r.left) + 'px';
+    box.style.top = (window.scrollY + r.bottom + 2) + 'px';
+    box.style.width = r.width + 'px';
+  }
+
+  function render() {
+    if (!items.length) { removeBox(); return; }
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'place-lookup-box';
+      box.style.cssText = 'position:absolute;z-index:10000;background:#fff;border:1px solid #cfd8dc;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.15);max-height:240px;overflow-y:auto;font-size:12.5px';
+      document.body.appendChild(box);
+    }
+    box.innerHTML = items.map((p, i) => `
+      <div class="place-lookup-item" data-i="${i}" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid #f0f3f5;${i === active ? 'background:#e8f4fb' : ''}">
+        <div style="color:#263238">${esc(p.name)}</div>
+        <div class="mono" style="color:#90a4ae;font-size:11px">${esc(p.id)}</div>
+      </div>`).join('');
+    positionBox();
+    // mousedown (not click) so it fires before the input's blur closes the box.
+    box.querySelectorAll('.place-lookup-item').forEach(it => {
+      it.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        choose(parseInt(it.dataset.i, 10));
+      });
+    });
+  }
+
+  function choose(i) {
+    const p = items[i];
+    if (!p) return;
+    input.value = p.id;                 // the URN is what every consumer reads
+    removeBox();
+    // Fire input+change so any field with a delegated handler persists the
+    // value. Guarded so our own input listener doesn't re-query for it.
+    input._placeSuppress = true;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input._placeSuppress = false;
+  }
+
+  async function query(q) {
+    const mySeq = ++seq;
+    try {
+      const res = await fetch(`/v1/company/places?q=${encodeURIComponent(q)}&limit=20`);
+      if (!res.ok) { removeBox(); return; }
+      const b = await res.json();
+      if (mySeq !== seq) return;         // a newer keystroke superseded this one
+      items = Array.isArray(b.places) ? b.places : [];
+      active = -1;
+      render();
+    } catch (_) { removeBox(); }
+  }
+
+  input.addEventListener('input', () => {
+    if (input._placeSuppress) return;
+    const q = input.value.trim();
+    clearTimeout(debounceTimer);
+    if (q.length < 2) { removeBox(); return; }
+    debounceTimer = setTimeout(() => query(q), 200);
+  });
+
+  input.addEventListener('keydown', (ev) => {
+    if (!box || !items.length) return;
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); active = Math.min(items.length - 1, active + 1); render(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); active = Math.max(0, active - 1); render(); }
+    else if (ev.key === 'Enter') { if (active >= 0) { ev.preventDefault(); choose(active); } }
+    else if (ev.key === 'Escape') { removeBox(); }
+  });
+
+  input.addEventListener('blur', () => { setTimeout(removeBox, 150); });
+  window.addEventListener('scroll', () => { if (box) positionBox(); }, true);
 }
 
 // ── Add a new unsaved train and expand it ────────────────────────────────────
@@ -6200,6 +6362,8 @@ document.body.addEventListener('click', function(e) {
       wizSaveAllTrains(); break;
     case 'wiz-discover-timetable':
       openTimetableDiscovery(); break;
+    case 'wiz-download-places':
+      downloadPlaces(el); break;
     case 'wiz-reprobe-offers': {
       // #369: manual refresh of the per-route offer-availability findings.
       el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
