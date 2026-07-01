@@ -33,7 +33,7 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Need write-token for the commit-back step
           token: ${{ secrets.GITHUB_TOKEN }}
