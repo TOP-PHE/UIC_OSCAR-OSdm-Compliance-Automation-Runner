@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.198",
+  "current_release": "2026.199",
   "releases": [
+    {
+      "release": "2026.199",
+      "date": "2026-07-01",
+      "server": "1.11.171",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #450: Test Config can bulk-download the vendor's OSDM stop places (GET /places) and cache them per company for a full-text origin/destination lookup, so testers pick real place URNs instead of typing urn:uic:stn:NNNNNNN by hand (manual entry still works). New places_cache table (one row/company, plaintext JSON — places are public reference data; migration 25, schema.sql). New routes company-places.js mounted at /v1/company: POST /places/refresh (test_manager only) pages through GET {api_base}/places deduping by id, bounded (100 pages / 100k places, logs if a cap truncates), reusing resolveAccessToken + a new shared src/utils/osdm-client.js (osdmGet + buildTesterHeaders extracted from the discover-timetable boilerplate); GET /places returns cache metadata or, with ?q=, ranked prefix-first matches over name+id (tester+test_manager readable, admin/certifier denied per #60). UI (public/js/scenarios.js): a Download places button + 'N places cached' status in the Test Data → Train Resources toolbar, and a reusable typeahead (attachPlaceAutocomplete, lazily wired via a focusin delegate on [data-place-lookup]) on the Timetable Discovery modal origin/destination and the Train editor origin/destination URN fields. OpenAPI documents both endpoints. Server-side + Test Config UI; server 1.11.170 -> 1.11.171, collection unchanged OTST_V2.0.94.",
+        "Verification: new company-places.test.js (11 tests) — auth/role gating (tester reads, admin/certifier 403, refresh test_manager-only), ?q= filtering/prefix-ranking/limit-cap, refresh 400 with no api_base, and a fetch-stubbed refresh happy-path asserting cross-page dedupe + stop-when-no-new-ids + name-falls-back-to-id. db-migrations.test.js extended for migration 25 (places_cache created on a fresh DB and on an already-versioned DB missing the table). Full suite 45 suites / 974 tests green; eslint + inline-script lint clean. Manual browser run (seeded cache, no live vendor): Download-places status renders '6 place(s) cached', the typeahead filters (Basel/Zürich) and selecting fills the URN, manual typing still works."
+      ]
+    },
     {
       "release": "2026.198",
       "date": "2026-07-01",

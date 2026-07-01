@@ -542,6 +542,22 @@ const MIGRATIONS = [
       // otherwise fails the lookup — the "Unknown company" bug.
       _safeAlter('ALTER TABLE pending_registrations ADD COLUMN company_slug TEXT');
   }},
+  { version: 25, name: 'places-cache', up: () => {
+      // Issue #450 — per-company cache of the vendor's OSDM GET /places list,
+      // bulk-downloaded on demand and used for a full-text stop-place lookup in
+      // Test Config (Timetable Discovery + Train Resource editor). One row per
+      // company. Places are public reference data (station names/URNs), so the
+      // JSON blob is stored plaintext — not encrypted at rest like credentials
+      // or test data.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS places_cache (
+          company_id  TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+          places_json TEXT NOT NULL DEFAULT '[]',
+          place_count INTEGER NOT NULL DEFAULT 0,
+          cached_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        )`);
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

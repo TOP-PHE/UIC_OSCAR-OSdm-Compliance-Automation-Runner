@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.171] — 2026-07-01
+
+**Feat (#450): discover stop places via the OSDM Places API — cache + full-text lookup in Test Config.**
+
+### Added
+
+- **Bulk place download + cache.** A "⬇ Download places" button in the Test
+  Data → Train Resources toolbar calls the new
+  `POST /v1/company/places/refresh` (test_manager only), which pages through
+  the vendor's `GET {api_base}/places`, dedupes by `id`, and caches the list
+  per company. Bounded (100 pages / 100k places) with a loud log if a cap
+  truncates. A "N places cached · <ago>" status line shows the cache state.
+- **Full-text stop-place lookup.** `GET /v1/company/places` returns cache
+  metadata, or with `?q=` a ranked (name-prefix first) set of `{ id, name,
+  objectType }` matches over name + URN (tester + test_manager readable;
+  admin/certifier denied, per #60).
+- **Typeahead** on every origin/destination URN field — the Timetable
+  Discovery modal and the Train Resource editor — so testers pick a real place
+  (name shown, URN stored) instead of typing `urn:uic:stn:NNNNNNN` by hand.
+  Manual entry still works; the lookup is a pure assist.
+- New `places_cache` table (one row per company, plaintext JSON — places are
+  public reference data; migration 25). New shared helper
+  `src/utils/osdm-client.js` (`osdmGet` + `buildTesterHeaders`) reused from the
+  discover-timetable vendor-call boilerplate. OpenAPI documents both endpoints.
+
+### Verification
+
+- New `company-places.test.js` (11 tests): auth/role gating; `?q=` filtering,
+  prefix ranking, and limit cap; refresh `400` with no `api_base`; a
+  fetch-stubbed refresh happy-path asserting cross-page dedupe, the
+  stop-when-no-new-ids condition, and name-falls-back-to-id. `db-migrations`
+  extended for migration 25 (fresh install + already-versioned DB missing the
+  table). Full suite: 45 suites / 974 tests green; lint clean.
+- Manual browser run (seeded cache, no live vendor): the cache-status line
+  renders, the typeahead filters (Basel/Zürich) and selecting fills the URN,
+  and manual typing still works. The live `/places/refresh` download path is
+  covered by the fetch-stubbed integration test.
+
+---
+
 ## [server-v1.11.170] — 2026-07-01
 
 **Fix (#449 follow-up): register against the company's stable slug, not a slug re-derived from its name.**
