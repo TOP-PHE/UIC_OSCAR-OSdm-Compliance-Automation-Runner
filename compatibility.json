@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.194",
+  "current_release": "2026.195",
   "releases": [
+    {
+      "release": "2026.195",
+      "date": "2026-06-25",
+      "server": "1.11.167",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #447 (Wiremind): a Test Finding can now record the datafile scenario.code that revealed it, so re-testing a fix means selecting that exact scenario in Test Config instead of re-deriving which one it was. New nullable finding.scenario_code column (migration 22, schema.sql); exposed as scenarioCode on the findings API (create/patch/list/thread/bulk-import — same shape as step/expectedStatus). UI: a free-text field with autocomplete against the current datafile's scenario codes (any value accepted, so a since-renamed/deleted scenario keeps its record) on the create/edit form; the list row and thread header show a scenario chip linking to /scenarios.html. Server-side only; server 1.11.166 -> 1.11.167, collection unchanged OTST_V2.0.94.",
+        "Verification: db-migrations.test.js extended — migration 22 applies on a fresh install and restores scenario_code on a DB already versioned past it (the #208-class upgrade regression guard). findings-routes.test.js — 2 new tests: scenarioCode round-trips create -> list -> thread, defaults to null, PATCH sets/clears it. Full suite 44 test suites / 960 tests green. node --check + eslint + inline-script HTML lint clean."
+      ]
+    },
     {
       "release": "2026.194",
       "date": "2026-06-18",
