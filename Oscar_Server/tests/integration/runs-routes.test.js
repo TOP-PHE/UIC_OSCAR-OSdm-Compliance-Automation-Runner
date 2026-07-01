@@ -848,7 +848,9 @@ describe('POST /v1/runs/:id/share and DELETE /v1/runs/:id/share', () => {
 
     const row = get('SELECT shared_with_certifier_at, shared_with_certifier_by FROM runs WHERE id = ?', [covRunFull]);
     expect(row.shared_with_certifier_at).toBeTruthy();
-    expect(row.shared_with_certifier_by).toMatch(new RegExp(EMAIL_DOMAIN.replace('.', '\\.')));
+    // Plain substring check — a dynamically-built regex here would be an
+    // unanchored host/domain match (CodeQL js/incomplete-url-substring-sanitization).
+    expect(row.shared_with_certifier_by).toContain(EMAIL_DOMAIN);
   });
 
   test('after sharing, the certifier can now see the run in the platform-wide list', async () => {
