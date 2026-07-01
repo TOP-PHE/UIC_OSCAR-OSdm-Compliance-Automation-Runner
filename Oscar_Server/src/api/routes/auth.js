@@ -148,22 +148,25 @@ router.post('/register/request',
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
       .isLength({ max: 254 }).withMessage('email is too long'),
-    v.body('companyName').isString().withMessage('companyName is required')
-      .trim().isLength({ min: 2, max: 120 }).withMessage('companyName length 2–120 chars'),
+    v.body('companySlug').isString().withMessage('companySlug is required')
+      .trim().isLength({ min: 1, max: 160 }).withMessage('companySlug length 1–160 chars'),
   ]),
   async (req, res) => {
-  const { email, companyName } = req.body || {};
+  const { email, companySlug } = req.body || {};
 
   const lowerEmail = email.toLowerCase().trim();
 
   // Issue #449 — self-registration no longer requires the email to match the
-  // company name; instead it must target a real, existing company (picked
-  // from the /register/companies dropdown) so a Test Manager can approve it.
-  const targetCompany = get('SELECT id FROM companies WHERE slug = ?', [makeSlug(companyName)]);
+  // company name; instead it must target a real, existing company picked from
+  // the /register/companies dropdown, so a Test Manager can approve it. We
+  // match on the company's stable SLUG (sent verbatim from the dropdown), not
+  // a slug re-derived from the display name — a company whose slug was frozen
+  // before a rename (name 'Paxone', slug 'paxone-gmbh') would otherwise miss.
+  const targetCompany = get('SELECT id, name, slug FROM companies WHERE slug = ?', [companySlug.trim()]);
   if (!targetCompany) {
     return res.status(400).json({
       status: 400, title: 'Bad Request',
-      detail: `Unknown company "${companyName}". Contact an administrator to have your company added.`
+      detail: 'Unknown company. Please pick your company from the list, or contact an administrator to have it added.'
     });
   }
 
@@ -173,18 +176,19 @@ router.post('/register/request',
     log.warn({ email: lowerEmail }, 'Registration attempt for existing user — returning generic success (no email sent)');
     return res.json({ message: 'If this email is not already registered, a verification link has been sent.' });
   }
-  log.info({ email: lowerEmail, company: companyName.trim() }, 'New registration request');
+  log.info({ email: lowerEmail, company: targetCompany.slug }, 'New registration request');
 
   // Remove any previous pending request for this email (allow re-request)
   run('DELETE FROM pending_registrations WHERE email = ?', [lowerEmail]);
 
-  // Create pending registration
+  // Create pending registration — store the canonical name (for display) and
+  // the stable slug (the lookup key re-used at confirm time).
   const token    = uuidv4();
   const id       = uuidv4();
   const expiresAt = new Date(Date.now() + REGISTRATION_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
 
-  run('INSERT INTO pending_registrations (id, email, company_name, token, expires_at) VALUES (?, ?, ?, ?, ?)',
-    [id, lowerEmail, companyName.trim(), token, expiresAt]);
+  run('INSERT INTO pending_registrations (id, email, company_name, company_slug, token, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, lowerEmail, targetCompany.name, targetCompany.slug, token, expiresAt]);
 
   const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
   const verificationUrl = `${appUrl}/verify-email.html?token=${token}`;
@@ -192,12 +196,12 @@ router.post('/register/request',
   try {
     log.info({
       email: lowerEmail,
-      company: companyName.trim(),
+      company: targetCompany.slug,
       appUrl: process.env.APP_URL || 'NOT SET',
       smtpConfigured: isSmtpConfigured(),
     }, 'Sending verification email');
 
-    const result = await sendVerificationEmail({ to: lowerEmail, companyName: companyName.trim(), verificationUrl });
+    const result = await sendVerificationEmail({ to: lowerEmail, companyName: targetCompany.name, verificationUrl });
 
     // Dev mode: return the URL directly so it can be tested without SMTP
     if (result && result.devMode) {
@@ -251,11 +255,13 @@ router.post('/register/confirm',
   }
 
   // Issue #449 — the company must still exist (it was verified to exist at
-  // /register/request time, but may have been removed since). No auto-create:
-  // a stranger self-activating into a brand-new, unverified company would
-  // bypass the Test-Manager-approval step entirely.
-  const slug = makeSlug(pending.company_name);
-  const company = get('SELECT * FROM companies WHERE slug = ?', [slug]);
+  // /register/request time, but may have been removed since). Resolve by the
+  // stable slug captured at request time (falling back to a name-derived slug
+  // only for any pre-migration pending row that predates company_slug). No
+  // auto-create: a stranger self-activating into a brand-new, unverified
+  // company would bypass the Test-Manager-approval step entirely.
+  const lookupSlug = pending.company_slug || makeSlug(pending.company_name);
+  const company = get('SELECT * FROM companies WHERE slug = ?', [lookupSlug]);
   if (!company) {
     run('DELETE FROM pending_registrations WHERE token = ?', [token]);
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This company no longer exists. Please register again.' });
