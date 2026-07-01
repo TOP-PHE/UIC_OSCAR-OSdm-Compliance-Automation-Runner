@@ -74,6 +74,22 @@ const authLimiter = rateLimit({
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
 router.use('/bootstrap', authLimiter);
+
+// Issue #449 — register/confirm now does more (account creation, a
+// test_manager lookup, an outbound email) than before, and CodeQL's
+// js/missing-rate-limiting re-fingerprinted it as a new alert even though
+// the /register prefix above already rate-limits it. A dedicated, separate
+// bucket applied directly on the route satisfies CodeQL's route-local
+// detection without double-counting against the shared authLimiter store
+// (reusing the same limiter instance twice would halve its effective
+// window for every /register/* request).
+const registerConfirmLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many attempts. Please try again later.' }
+});
 // NOTE: /logout is intentionally NOT rate-limited. It carries no credential to
 // brute-force (it just revokes the caller's own session), and counting it in
 // the same bucket as /login halved the effective login budget during rapid
@@ -205,6 +221,7 @@ router.post('/register/request',
 // ── POST /v1/auth/register/confirm ───────────────────────────────────────────
 // Step 2: user clicks link, sets password → account is created
 router.post('/register/confirm',
+  registerConfirmLimiter,
   validate([
     v.body('token').isString().withMessage('token is required')
       .matches(/^[0-9a-fA-F-]{36}$/).withMessage('token must be a UUID'),
