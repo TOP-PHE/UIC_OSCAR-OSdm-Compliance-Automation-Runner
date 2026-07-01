@@ -33,7 +33,7 @@ const path    = require('node:path');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
-const { run, get, colEncrypt } = require('../../src/db/db');
+const { run, colEncrypt } = require('../../src/db/db');
 const { encryptBuffer } = require('../../src/utils/at-rest');
 
 const app = buildAppWithRoute('/v1/company', '../../src/api/routes/company-test-framework');
@@ -178,7 +178,10 @@ describe('test-framework — lazy salesFlows migration on GET', () => {
   test('migration reads scenarios from the company datafile when present', async () => {
     // Point the company at a real encrypted datafile carrying scenarios, then
     // reset the framework to un-stamped so the migration reads + parses it.
-    const dfPath = path.join(os.tmpdir(), `tf-df-${uuidv4()}.enc`);
+    // Use mkdtempSync for a private (0700) temp dir — writing straight into
+    // os.tmpdir() trips CodeQL's js/insecure-temporary-file.
+    const dfDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'tf-df-'));
+    const dfPath = path.join(dfDir, 'datafile.enc');
     const plain  = Buffer.from(JSON.stringify({ scenarios: [{ code: 'X', name: 'x' }] }), 'utf8');
     fs.writeFileSync(dfPath, encryptBuffer(plain));
     run(`UPDATE companies SET datafile_path = ? WHERE id = ?`, [dfPath, companyId]);
@@ -191,7 +194,7 @@ describe('test-framework — lazy salesFlows migration on GET', () => {
     expect(res.status).toBe(200);
     expect(res.body.config._salesFlowsMigratedAt).toBeTruthy();
 
-    fs.unlinkSync(dfPath);
+    fs.rmSync(dfDir, { recursive: true, force: true });
     run(`UPDATE companies SET datafile_path = NULL WHERE id = ?`, [companyId]);
   });
 });

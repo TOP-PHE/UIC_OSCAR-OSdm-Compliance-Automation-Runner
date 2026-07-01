@@ -27,7 +27,7 @@ const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
-const { run, get, all, encrypt } = require('../../src/db/db');
+const { run, get, encrypt } = require('../../src/db/db');
 
 const app = buildAppWithRoute('/v1/company', '../../src/api/routes/company-test-resources');
 
