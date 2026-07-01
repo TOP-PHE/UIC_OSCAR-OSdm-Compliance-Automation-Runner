@@ -46,7 +46,7 @@ describe('POST /v1/auth/register/request', () => {
   test('400 when company does not exist', async () => {
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: 'someone@unrelated.com', companyName: 'Not A Real Company' });
+      .send({ email: 'someone@unrelated.com', companySlug: 'not-a-real-company' });
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/unknown company/i);
   });
@@ -54,7 +54,7 @@ describe('POST /v1/auth/register/request', () => {
   test('200 + dev verification URL when SMTP not configured', async () => {
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: TEST_EMAIL, companyName: TEST_COMPANY });
+      .send({ email: TEST_EMAIL, companySlug: TEST_COMPANY_SLUG });
     expect(res.status).toBe(200);
     expect(res.body.verificationUrl).toMatch(/\?token=/);
   });
@@ -63,7 +63,7 @@ describe('POST /v1/auth/register/request', () => {
     // This email isn't registered yet, but the response should NOT reveal that
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: 'never-existed@acmecorp.com', companyName: TEST_COMPANY });
+      .send({ email: 'never-existed@acmecorp.com', companySlug: TEST_COMPANY_SLUG });
     expect(res.status).toBe(200);
     expect(res.body.message).toBeTruthy();
     // No leak about whether the email existed or not
@@ -79,7 +79,7 @@ describe('POST /v1/auth/register/confirm', () => {
     // Get a fresh token from the request endpoint
     const res = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: confirmEmail, companyName: TEST_COMPANY });
+      .send({ email: confirmEmail, companySlug: TEST_COMPANY_SLUG });
     token = res.body.verificationUrl.match(/token=([^&]+)/)[1];
   });
 
@@ -129,7 +129,7 @@ describe('POST /v1/auth/login', () => {
     // login behaviour rather than the approval flow itself.
     const reqRes = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email: TEST_EMAIL, companyName: TEST_COMPANY });
+      .send({ email: TEST_EMAIL, companySlug: TEST_COMPANY_SLUG });
     const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
     await request(app)
       .post('/v1/auth/register/confirm')
@@ -170,7 +170,7 @@ describe('POST /v1/auth/login', () => {
     const email = `pending${Date.now()}@acmecorp.com`;
     const reqRes = await request(app)
       .post('/v1/auth/register/request')
-      .send({ email, companyName: TEST_COMPANY });
+      .send({ email, companySlug: TEST_COMPANY_SLUG });
     const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
     await request(app)
       .post('/v1/auth/register/confirm')
@@ -181,6 +181,54 @@ describe('POST /v1/auth/login', () => {
       .send({ email, password: TEST_PASSWORD });
     expect(res.status).toBe(403);
     expect(res.body.detail).toMatch(/awaiting approval/i);
+  });
+});
+
+// Regression (#449): a company whose stored slug does NOT equal
+// makeSlug(its current display name) — e.g. renamed after creation, like
+// the real "Paxone" (slug 'paxone-gmbh') incident — must still be
+// registerable. The dropdown submits the stable slug, so the lookup no
+// longer re-derives it from the name and no longer misses.
+describe('POST /v1/auth/register — company with a slug that differs from its name', () => {
+  const RENAMED_NAME = 'Paxone';
+  const RENAMED_SLUG = 'paxone-gmbh';      // makeSlug('Paxone') would be 'paxone' — deliberately different
+  const RENAMED_EMAIL = `pax${Date.now()}@laposte.net`;
+
+  beforeAll(() => {
+    run(`INSERT INTO companies (id, name, slug, auth_mode) VALUES (?, ?, ?, 'bearer')`,
+      [uuidv4(), RENAMED_NAME, RENAMED_SLUG]);
+  });
+
+  test('request → confirm succeeds and creates a pending user under the right company', async () => {
+    const reqRes = await request(app)
+      .post('/v1/auth/register/request')
+      .send({ email: RENAMED_EMAIL, companySlug: RENAMED_SLUG });
+    expect(reqRes.status).toBe(200);
+    expect(reqRes.body.verificationUrl).toMatch(/\?token=/);
+
+    const token = reqRes.body.verificationUrl.match(/token=([^&]+)/)[1];
+    const confRes = await request(app)
+      .post('/v1/auth/register/confirm')
+      .send({ token, password: TEST_PASSWORD });
+    expect(confRes.status).toBe(201);
+    expect(confRes.body.pending).toBe(true);
+    expect(confRes.body.company.slug).toBe(RENAMED_SLUG);
+
+    const created = get(
+      `SELECT u.status, c.slug AS company_slug
+         FROM users u JOIN companies c ON c.id = u.company_id
+        WHERE u.email = ?`,
+      [RENAMED_EMAIL]
+    );
+    expect(created.status).toBe('pending');
+    expect(created.company_slug).toBe(RENAMED_SLUG);
+  });
+
+  afterAll(() => {
+    run('DELETE FROM auth_events WHERE email = ?', [RENAMED_EMAIL]);
+    run('DELETE FROM users WHERE email = ?', [RENAMED_EMAIL]);
+    run('DELETE FROM pending_registrations WHERE email = ?', [RENAMED_EMAIL]);
+    run("DELETE FROM companies WHERE slug = 'paxone-gmbh'");
   });
 });
 

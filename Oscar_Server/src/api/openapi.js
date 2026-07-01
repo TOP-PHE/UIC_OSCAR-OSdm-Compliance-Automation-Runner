@@ -112,13 +112,16 @@ module.exports = {
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
-            type: 'object', required: ['email', 'companyName'],
-            properties: { email: { type: 'string', format: 'email' }, companyName: { type: 'string' } },
+            type: 'object', required: ['email', 'companySlug'],
+            properties: {
+              email: { type: 'string', format: 'email' },
+              companySlug: { type: 'string', description: 'Stable slug of an existing company (from GET /v1/auth/register/companies)' },
+            },
           } } },
         },
         responses: {
           200: { description: 'Email sent (or dev-mode URL returned)' },
-          400: { description: 'Email does not match company name', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          400: { description: 'Unknown company (no company with that slug)', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           503: { description: 'SMTP failure' },
         },
       },

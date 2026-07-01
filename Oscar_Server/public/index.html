@@ -222,7 +222,10 @@ async function doRegister(e) {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         email:       document.getElementById('r-email').value.trim(),
-        companyName: document.getElementById('r-company').value.trim()
+        // The dropdown option value is the company's stable slug (see
+        // loadCompanies) — send it verbatim so the server matches the exact
+        // company, not a slug re-derived from the display name.
+        companySlug: document.getElementById('r-company').value
       })
     });
     const data = await res.json();
@@ -254,8 +257,8 @@ async function loadCompanies() {
     const sel = document.getElementById('r-company');
     (data.companies || []).forEach(c => {
       const opt = document.createElement('option');
-      opt.value = c.name;
-      opt.textContent = c.name;
+      opt.value = c.slug;        // stable identifier submitted to the server
+      opt.textContent = c.name;  // human-readable label
       sel.appendChild(opt);
     });
   } catch(e) { console.warn('Failed to load companies:', e.message); }
