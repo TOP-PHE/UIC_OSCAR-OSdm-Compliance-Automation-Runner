@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.203",
+  "current_release": "2026.204",
   "releases": [
+    {
+      "release": "2026.204",
+      "date": "2026-07-02",
+      "server": "1.11.176",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 4 (continuing the SonarCloud gate ratchet): closed the three biggest remaining non-route coverage gaps. New tests/unit/mailer.test.js (24 tests, new file) mocks nodemailer + seeds/restores server_config to exercise all four send*Email functions in both SMTP-configured and dev-mode-fallback branches, taking mailer.js 0% -> 100% (was completely untested). tests/unit/auth-middleware.test.js extended 20 -> 47 tests (cookie parsing incl. malformed/URL-decoded/multi-cookie, token_blacklist revocation branch, isTestManagerOrAbove + userFromRequest exhaustively over every role) taking middleware/auth.js ~62% -> 100%. tests/unit/auth-profiles.test.js extended 30 -> 57 tests (custom profile raw-body-format + placeholder-substitution edge cases, network/timeout/malformed-response failure paths, masked-diagnostic-logging assertions across all profiles) taking worker/auth-profiles.js ~85% -> ~99% (one line left: an unreachable _maskBody() fallback no adapter can actually produce, documented rather than reached through internals). Overall Oscar_Server/src line coverage ~74% -> ~77%; full suite 50 -> 51 suites, 1199 -> 1272 tests, all green. Bumped the documented OSCAR-Gate new_coverage floor 65% -> 68% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.175 -> 1.11.176, collection unchanged OTST_V2.0.94.",
+        "Verification: this batch used 3 parallel subagents; two independently flagged (and self-resolved) a transient mid-task file-read anomaly, so every file was independently re-verified from scratch after the fact rather than trusting any self-report — location/syntax-checked, re-run standalone with --coverage, scanned for both CodeQL patterns that hit earlier batches (insecure os.tmpdir() writes, unanchored new RegExp(string) URL/domain checks — neither present), and the exact test-count delta reconciled against origin/main via git show (1199 + 27 + 22 + 24 = 1272, confirmed exactly). Full combined suite 51/51 green, eslint clean."
+      ]
+    },
     {
       "release": "2026.203",
       "date": "2026-07-01",
