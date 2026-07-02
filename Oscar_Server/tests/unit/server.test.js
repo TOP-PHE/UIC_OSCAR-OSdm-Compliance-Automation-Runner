@@ -50,11 +50,14 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 jest.mock('../../src/worker/access-token');
 const { resolveAccessToken } = require('../../src/worker/access-token');
 
-// Distinctive, unlikely-to-collide port for the one real app.listen() call
-// this require triggers. supertest never actually dials this port — it
-// wraps the exported `app` object directly — this only has to avoid
-// EADDRINUSE against anything else that might be running.
-process.env.PORT = '39481';
+// PORT=0 → the OS picks any free ephemeral port for the one real
+// app.listen() call this require triggers. supertest never actually dials
+// this port — it wraps the exported `app` object directly — so the only
+// requirement is that binding succeeds. A "distinctive" fixed port number
+// is NOT safe: CI hit EADDRINUSE on a hand-picked port already bound by
+// something else on the runner. 0 is the standard, actually-robust way to
+// avoid the entire class of collision, rather than guessing a "safe" number.
+process.env.PORT = '0';
 
 const app = require('../../src/server');
 const { run, get } = require('../../src/db/db');
@@ -369,11 +372,12 @@ describe('mounted routers', () => {
 // The redirect block near the top of server.js only runs when
 // NODE_ENV==='production', checked once at require-time via an `if` around
 // `app.use(...)` — the only way to reach it is a SECOND, isolated require of
-// server.js with NODE_ENV set beforehand. jest.resetModules() + a distinct
-// PORT (avoids EADDRINUSE against the main `app`'s already-bound listener)
-// makes this safe; this second app.listen() is, like the main one, never
-// explicitly closed (server.js doesn't export the http.Server instance) —
-// same accepted, contained tradeoff as the rest of this file.
+// server.js with NODE_ENV set beforehand. jest.resetModules() + PORT=0
+// (the OS picks a fresh free port, independent of whatever the main `app`'s
+// listener already bound) makes this safe; this second app.listen() is,
+// like the main one, never explicitly closed (server.js doesn't export the
+// http.Server instance) — same accepted, contained tradeoff as the rest of
+// this file.
 describe('HTTPS-redirect middleware (NODE_ENV=production only)', () => {
   let prodApp;
   const originalNodeEnv = process.env.NODE_ENV;
@@ -382,7 +386,7 @@ describe('HTTPS-redirect middleware (NODE_ENV=production only)', () => {
   beforeAll(() => {
     jest.resetModules();
     process.env.NODE_ENV = 'production';
-    process.env.PORT = '39482';
+    process.env.PORT = '0';
     prodApp = require('../../src/server');
   });
 
