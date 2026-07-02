@@ -14,6 +14,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.178] — 2026-07-02
+
+**Test: coverage batch 6 — src/server.js, the Express app entry point (overall `src` coverage ~83% → ~88%).**
+
+### Added
+
+- **`tests/unit/server.test.js`** (new file, 30 tests) — the last remaining
+  major coverage gap (236 uncovered lines, 0% covered). Architecturally
+  different from every prior batch: requiring `server.js` has real side
+  effects (env-var validation with `process.exit(1)`, a JWT-secret DB
+  bootstrap, queue event wiring, startup run reconciliation, and a real
+  `app.listen()` that binds an OS port) rather than being a plain Express
+  router. The module is required exactly once against a dedicated,
+  never-dialed test port — supertest wraps the exported `app` directly and
+  needs no real listening socket. Covers:
+  - `GET /health` (DB / queue / disk / process checks)
+  - `GET /metrics`
+  - the datafile download route — filename-regex guard, unknown-company
+    404, non-loopback 401/403, owning-company 200, loopback-bypass 200
+  - the loopback-only access-token-refresh endpoint, including `?force=1`
+    and a `resolveAccessToken`-failure 502
+  - the run-artifact download route — ownership check, path/filename
+    guards, and a real AES-GCM tamper-detection 500 (a single flipped
+    ciphertext byte)
+  - route-mounting wiring
+  - via one isolated `NODE_ENV=production` re-require on a second
+    dedicated port: the HTTPS-redirect middleware (Sonar S5146
+    open-redirect guard)
+
+  `server.js` 0% → **~83%** lines. Full suite: 52 → **53 suites, 1289 →
+  1319 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **74% → 83%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- **Deliberately out of scope, documented rather than forced:** the
+  `process.exit(1)` missing-env-var path, the Alertmanager startup
+  config-seed hook (gated behind an unset env var so it naturally never
+  runs in tests), static/SPA file serving (Express's own tested
+  behaviour), and the global error handler (no non-invasive way to force
+  an unhandled throw through a real mounted route without modifying
+  source).
+- Given the elevated risk (two real, uncaptured `app.listen()` sockets —
+  the main require plus the isolated production re-require — and two
+  real, hardcoded, non-overridable data directories written to), this
+  batch was written directly rather than delegated, after reading
+  `server.js` end-to-end first.
+- **Caught and fixed two authoring mistakes before they became
+  false-negative-masking bugs:** a path-traversal test asserted 400/404
+  on a URL Express itself normalizes before routing (it actually hits the
+  SPA fallback at 200) — replaced with a same-segment filename that
+  genuinely reaches and fails the route's own regex guard; an
+  artifact-tamper test truncated the encrypted file below the 34-byte
+  header, which made `isEncryptedBuffer()` treat it as legacy plaintext
+  instead of tripping the AES-GCM auth-tag check — fixed by flipping one
+  byte in the ciphertext region instead of truncating. Also fixed an
+  FK-ordering bug in the file's own cleanup (deleting seeded users before
+  their still-referencing runs' company row violated `runs.user_id`'s
+  non-cascading foreign key).
+- Stress-tested for flakiness given the real side effects: 6 standalone
+  runs and 3 full-suite runs, all clean, before trusting the result.
+  Confirmed `data/datafiles/` and `data/artifacts/` have zero leftover
+  test files before and after; lint clean; scanned for both CodeQL
+  patterns that hit earlier batches — neither present.
+
+---
+
 ## [server-v1.11.177] — 2026-07-02
 
 **Test: coverage batch 5 — worker/runner.js, the Bruno CLI orchestrator (overall `src` coverage ~77% → ~83%).**
