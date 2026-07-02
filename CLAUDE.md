@@ -5,6 +5,16 @@ Working notes for picking this project back up cold. See also `README.md`
 (PR workflow habits, cross-session project context) — this file is the
 in-repo counterpart: technical state, not personal working style.
 
+**Checkout warning (read this first).** If you were handed a working
+directory that looks like a *flat* layout (`src/`, `public/`, `tests/` at
+the repo root, no `Oscar_Server/`/`Bruno_Collection/` split), **stop** —
+that's a stale, pre-migration checkout with git history **unrelated** to
+this repo (`git merge-base HEAD origin/main` returns nothing). This
+happened once already (2026-07-02): the fix was cloning a fresh copy of
+`TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner` as a sibling
+directory and working there instead. Check `ls` for the `Oscar_Server/` +
+`Bruno_Collection/` split before doing anything else.
+
 ## 1. Purpose & scope
 
 **OSCAR** (OSDM Conformance Automation Runner) is a multi-tenant platform that
@@ -70,6 +80,37 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   token request is logged with a **default-deny secret mask** (#437): only an
   explicit allowlist of structural fields shows its value, everything else
   renders `***` / `(empty)`.
+- **Self-registration is Test-Manager-gated, not email-domain-gated** (#449,
+  2026-07-01). The old rule ("email must contain a fragment of the company
+  name") is gone — it broke the moment a company was renamed after its slug
+  was set (real incident: "Paxone" renamed from something with slug
+  `paxone-gmbh`; `makeSlug('Paxone')` ≠ `'paxone-gmbh'`, so registration
+  against it 400'd as "unknown company" — the registration dropdown's
+  `<option>` value is now the company's **slug**, submitted verbatim,
+  never re-derived from the display name). Instead: the dropdown only lists
+  real, existing companies; a confirmed registration lands as
+  `users.status = 'pending'` and cannot log in (403) until a Test Manager
+  of that company (or an administrator, cross-company fallback) approves it
+  via `POST /v1/company/users/:id/approve` (mirrored at `/v1/admin/users`).
+  Every Test Manager is emailed on confirmation (`sendPendingApprovalEmail`,
+  `mailer.js`) — but email is fire-and-forget; the "Pending" badge + Approve
+  button on `admin.html`'s User Directory is the reliable signal regardless
+  of SMTP delivery. `denyAdminAndCertifier`/`requireTestManager` (the
+  test-data role guards, previously duplicated per-route) now live once in
+  `api/helpers/shared.js`.
+- **Stop-place lookup via a cached OSDM `GET /places` bulk download** (#450,
+  2026-07-01). `places_cache` (one row/company, plaintext JSON — places are
+  public reference data, not credentials) is populated on demand by
+  `POST /v1/company/places/refresh` (test_manager only), which pages the
+  vendor's `/places` endpoint via a new shared `utils/osdm-client.js`
+  (`osdmGet` + `buildTesterHeaders`, factored out of the pre-existing
+  discover-timetable vendor-call pattern in `company-test-resources.js`).
+  `GET /v1/company/places?q=` does server-side ranked full-text filtering
+  (name-prefix first). The scenario editor's `attachPlaceAutocomplete()`
+  (lazily wired via a single delegated `focusin` listener on
+  `[data-place-lookup]`) drives a typeahead on every origin/destination URN
+  field — selecting fills the field with the place's URN; manual typing
+  still always works, this is a pure assist.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -78,12 +119,56 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   against throwaway DBs, including an "already-versioned DB missing a column"
   regression scenario). Always add a *new* migration instead.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
-  build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler.
-  SonarCloud gained an actual **Quality Gate check step** (#452,
-  `sonarqube-quality-gate-action`) — deliberately **not yet required** in
-  branch protection since `main`'s gate is currently red on pre-existing
-  issues (see §6). Dependabot-triggered runs skip steps needing secrets
-  (GitHub withholds secrets from bot PRs) but still report the job green.
+  build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
+  **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
+  #460, once the pre-existing accessibility/duplication backlog that kept
+  `main`'s gate red was cleared — it's live, required, and green now).
+  Dependabot-triggered runs skip steps needing secrets (GitHub withholds
+  secrets from bot PRs) but still report the job green.
+- **SonarQube Cloud GitHub App is installed** (2026-07-02) — the repo was
+  previously wired via the CI-token upload path only (`SONAR_TOKEN` +
+  `sonarcloud-github-action`), which posts a plain pass/fail check but no PR
+  decoration. Installing the App at github.com/apps/sonarqubecloud (SonarCloud
+  rebranded from "SonarCloud" — the old `github.com/apps/sonarcloud` URL
+  404s) added a second, distinct `sonarqubecloud`-app check plus an actual
+  bot PR comment (Quality Gate verdict + issue/coverage summary). Both
+  integration paths now coexist and both need to stay green.
+- **Test coverage was a deliberate, ratcheted push** (2026-07-02, 6 PRs:
+  #461–#466) from ~50% to ~88% line coverage on `Oscar_Server/src`, biggest
+  gaps first: the 3 previously-untested route files → `runs.js`/`admin.js`/
+  `company.js` → `mailer.js`/`middleware/auth.js`/`worker/auth-profiles.js`
+  → `worker/runner.js` (the Bruno orchestrator, hardest — `child_process`
+  fully mocked, never a real subprocess) → `src/server.js` (the app entry
+  point — real side effects at require-time: `process.exit(1)` on missing
+  env, a real `app.listen()`). `sonar-project.properties` documents the
+  `new_coverage` gate-floor ratchet history (35%→83%) — bump it again next
+  time a batch meaningfully raises the overall number. **Hard-won lessons
+  for writing more tests here, all learned the expensive way:**
+  - Never emit synthetic events on a mocked `child_process` after a fixed
+    `setImmediate`/sleep tick — the code under test may do several real
+    `await`s before it actually calls `spawn()`; poll `spawn.mock.calls.length`
+    instead, or the event fires before the listener is attached and the test
+    hangs forever.
+  - Never pick a "distinctive" fixed port for a test that calls a real
+    `app.listen()` — it *will* eventually collide with something already
+    bound on some CI runner. Use `PORT=0` (OS picks a free ephemeral port)
+    instead; supertest wraps the exported Express `app` directly and never
+    dials the real port anyway.
+  - `runs.company_id` cascades on delete; `runs.user_id` does **not** — a
+    test's own cleanup must delete `companies` before `users`, or a still-
+    referencing `runs` row throws a foreign-key error.
+  - Any new `os.tmpdir()` usage in a NEW test file must go through
+    `fs.mkdtempSync(...)`, never a bare/predictable path — CodeQL
+    (`js/insecure-temporary-file`) flags it as high severity, scoped to the
+    PR's diff only (pre-existing code with the same shape isn't re-flagged).
+  - Never build `new RegExp(someDynamicString)` to check if a string
+    contains/matches something (even with manual `.replace()` escaping) —
+    CodeQL (`js/incomplete-url-substring-sanitization`) flags it regardless
+    of context. Use plain `.includes()`/`.toContain()` instead.
+  - CodeQL notes (not just failures) on a PR's own diff block merging too,
+    separately from the check-run status, if branch protection has "all
+    conversations must be resolved" — an unused-import note is exactly the
+    kind of thing that silently blocks merge behind a green checklist.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.
@@ -150,41 +235,66 @@ in the runner's path).
 | `Oscar_Server/src/worker/runner.js` | Bruno CLI run orchestrator |
 | `Oscar_Server/src/utils/frameworkGating.js` | golden-rule rule engine + datafile annotator |
 | `Oscar_Server/src/utils/knownDeviationProjection.js` | projects baselined findings into `knownDeviations[]` |
-| `Oscar_Server/public/js/scenarios.js` | **the big one** (7000+ lines) — Test Config + Test Framework wizard SPA |
+| `Oscar_Server/src/utils/osdm-client.js` | shared vendor-call helper (`osdmGet` + `buildTesterHeaders`), #450 |
+| `Oscar_Server/src/api/routes/company-places.js` | Places API cache: `POST /places/refresh` (paginated download) + `GET /places?q=` (ranked search), #450 |
+| `Oscar_Server/public/js/scenarios.js` | **the big one** (7000+ lines) — Test Config + Test Framework wizard SPA, incl. `attachPlaceAutocomplete()` |
 | `Oscar_Server/public/js/findings.js` | Test Findings & Open Points page |
 | `Bruno_Collection/library-bruno/*.js` | shared validators run inside Bruno: `scenarioParser`, `requestsBuilder`, `offers`, `bookings`, `refunds`, `exchanges`, `testCapture` (`bruTest()` assertion capture), `displays` (masked logging), `reportGenerator`/`mergeReport`, `loopback`, `osdmEnums` |
 | `Bruno_Collection/json_validator/datafile.schema.json` | datafile JSON-schema contract |
 | `compatibility.json`, `CHANGELOG.md` | version-pairing ledger + full release history |
-| `sonar-project.properties` | SonarCloud scope/exclusions + the custom "OSCAR Gate" thresholds (35% new-coverage / <4% duplication — deliberately below Sonar's stock 80%/3%, since `public/**` and `library-bruno/**` have thin/no test harnesses yet) |
+| `sonar-project.properties` | SonarCloud scope/exclusions + the custom "OSCAR Gate" thresholds (ratcheted 35%→83% new-coverage / <4% duplication as the coverage push landed — see §2) |
 | `tests/unit/db-migrations.test.js` | runs the **real** migration path against throwaway DBs — the #208 regression-class guard |
+| `tests/unit/runner.test.js` | `worker/runner.js` coverage — `child_process.spawn` fully mocked via a `makeFakeProc()` EventEmitter + `waitForSpawnCalls()` polling helper (never a fixed sleep) |
+| `tests/unit/server.test.js` | `src/server.js` coverage — supertest against the real exported `app`; one isolated `NODE_ENV=production` re-require covers the HTTPS-redirect middleware |
+| `tests/integration/company-places.test.js` | Places API: refresh pagination/dedupe (stubbed `fetch`), ranked `?q=` search, role gating |
 
 ## 6. Next steps
 
-- **Two of "the 4 issues" from this batch still open** (the other two, #447
-  and #448, are done — #447 merged, #448 is PR #454, open, CI green, awaiting
-  merge):
-  - **#449** — User management at company level.
-  - **#450** — Test Config/Test Data: use a Places API to discover stop places.
-- **PR #454** (#448, fulfillment-capabilities framework section) — green,
-  unmerged as of this writing.
-- **SonarCloud Quality Gate** (#452/#453) is live but non-required: `main`'s
-  gate is red on ~38 pre-existing accessibility issues (`<input>` missing an
-  associated `<label>` across `Oscar_Server/public/*.html`) + new-code
-  duplication. Clear those, confirm the gate goes green on `main`, **then**
-  add `"SonarQube Quality Gate check"` to branch protection's required list.
+- **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
+  **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
+  both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open
+  from that batch.
+- **Coverage initiative (2026-07-02, PRs #461–#466) is substantially
+  complete**: ~50% → ~88% line coverage on `Oscar_Server/src`, SonarQube
+  Quality Gate is required + green (§2). Not chased further because the two
+  remaining gaps are both deliberately excluded from the coverage metric
+  (`public/**`, `library-bruno/**` — see `sonar-project.properties`), not
+  because anything is left half-done. If coverage work resumes, that's where
+  it resumes — `library-bruno/` in particular has real logic
+  (`requestsBuilder`, `offers`, `reportGenerator`) and zero Jest harness.
+- **Issue backlog was swept and cross-checked against the code 2026-07-02**
+  (the list below is freshly verified, not inherited guesswork — re-check
+  with `gh issue list --state open` if much time has passed):
+  - **Closed as already-implemented**, each updated with the exact PR/commit
+    that did it: **#325** (PR #326, `dea4fcf`) and **#335** (duplicate of
+    #336, itself closed via PR #337, `21d502b`) — both were implemented but
+    never auto-linked, so they sat open; **#349** (logging-doctrine tracking
+    issue — its own "remaining cleanup" checklist is now 100% resolved,
+    verified item-by-item against current `Bruno_Collection/`, no single PR).
+  - **Confirmed still genuinely open, real remaining work:**
+    - **#306** — ephemeral Bruno env-yml carries the OAuth token in
+      plaintext on disk (`worker/runner.js`). Security-relevant, unfixed.
+    - **#239**, **#222**, **#211** — scenario-authoring gaps
+      (`optionalReservationSelections`, collective booking, night-train
+      sales/refund).
+    - **#198/#199/#200** — SNCF-specific scenarios (PRM/IRT, claims,
+      exchange).
+    - **All "fare" issues** (**#205, #206, #207, #242–#248, #255**) — fare
+      distribution (Shop/Book/Ticket) scenario coverage hasn't started at
+      all yet; a big, self-contained subject to come, not a small follow-up.
+  - **Explicitly reserved for the user's own review — do NOT close these:**
+    **#226** (exchange → new offer request), **#227** (optional offer-request
+    parameters, e.g. age vs. birth date / gender for night trains), **#221**
+    (post-refactor code/comment review before merging to master). The user
+    is handling these personally; leave them alone unless asked.
 - **Flagged, not built:** extend gating (or a parallel mechanism) so the
   unrestricted `buildFulfillmentSection` scenario editor also warns when a
   selected type/media isn't declared in the Test Framework — needs a
   different shape than `frameworkGating.js`'s current boolean-flag engine
   (fulfillment options are a list of `{type, media}` objects).
 - **CHAPS**: 8 conformance findings imported, awaiting the vendor's reply.
-- **Paxone**: 10 existing findings just had `scenarioCode` back-filled (via a
-  one-off console script) — worth confirming it actually ran to completion.
+- **Paxone**: 10 existing findings had `scenarioCode` back-filled (one-off
+  console script) — confirmed complete.
 - Background/non-code workstreams tracked in the user's cross-session memory,
   not here: OBB dossier for Marcel Koseler, NeTEx↔OSDM / EUDIT-OPI /
   InterMoD-GT6 convergence analyses.
-- Long-tail scenario-authoring backlog (FARE/SNCF/night-train coverage,
-  issues #198–#255ish) and a few stale/possibly-already-shipped issues (e.g.
-  #325) — don't trust the open/closed state blindly; check `gh issue list`
-  and cross-reference recent CHANGELOG entries before acting on an old issue
-  number.
