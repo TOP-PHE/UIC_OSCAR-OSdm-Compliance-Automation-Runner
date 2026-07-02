@@ -14,6 +14,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.177] — 2026-07-02
+
+**Test: coverage batch 5 — worker/runner.js, the Bruno CLI orchestrator (overall `src` coverage ~77% → ~83%).**
+
+### Added
+
+- **`tests/unit/runner.test.js`** (new file, 17 tests) — closes by far the
+  largest remaining coverage gap: the Bruno CLI orchestrator
+  (`worker/runner.js`, 388 uncovered lines / 16% covered going in).
+  `child_process.spawn` is fully mocked — **no real subprocess is ever
+  spawned** — driving `executeRun()` through:
+  - auth / missing-run / missing-datafile / env-write-failure early exits
+  - exit-code 0 vs non-zero final status, and the `proc.on('error', ...)`
+    path
+  - HTML report linking, both directly (reportGenerator output) and via the
+    `mergeReport.js` fallback, plus that second spawn call's own error path
+  - the JSON-results artifact copy
+  - `AUTH_401`/`TOKEN_FORMAT` detection in CLI output, surfaced onto
+    `runs.error_message`
+  - the emergency-stop terminal-state guard (a `CANCELLED` run is never
+    resurrected to `COMPLETED`)
+  - a real (not fake-timer), config-driven short-timeout kill test
+
+  `runner.js` 16% → **~68%** lines. Full suite: 51 → **52 suites, 1272 →
+  1289 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **68% → 74%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- Given the elevated risk here (a real, hardcoded, non-overridable
+  `ARTIFACTS_DIR` under this same repo, plus the real danger of accidentally
+  spawning a subprocess), this batch was written directly rather than
+  delegated to a subagent, after reading `executeRun()` end-to-end first.
+- **Hit and fixed one real bug while authoring**: emitting synthetic
+  `close`/`error` events on the fake child process after a single
+  `setImmediate` tick raced ahead of `executeRun`'s own multi-`await`
+  preamble (mkdir / env-yml write / datafile read) — the events fired
+  *before* `executeRun` had even called `spawn()`, so its real listeners
+  were never attached and the awaited promise hung forever. Fixed by
+  polling for the Nth actual `spawn()` call before emitting anything.
+- **Deliberately out of scope, documented rather than forced:** the
+  Linux-only workspace create/cleanup functions (platform-gated, never
+  engaged since no test sets `scenarioOverride`) and the token-watchdog
+  `setInterval` tick logic (disabled via `TOKEN_WATCHDOG_INTERVAL_MS=0` for
+  every test, avoiding a live interval that would otherwise keep Jest's
+  process alive). Both carry real production risk surface but need a
+  fundamentally different (fake-timer / platform-conditional) test strategy
+  this batch didn't take on.
+- Confirmed `data/artifacts/` has zero leftover test directories before and
+  after a full suite run; lint clean; scanned for both CodeQL patterns that
+  hit earlier batches (insecure `os.tmpdir()` writes, unanchored
+  `new RegExp(string)` checks) — neither present.
+
+---
+
 ## [server-v1.11.176] — 2026-07-02
 
 **Test: coverage batch 4 — mailer.js, middleware/auth.js, worker/auth-profiles.js (overall `src` coverage ~74% → ~77%).**

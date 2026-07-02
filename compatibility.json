@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.204",
+  "current_release": "2026.205",
   "releases": [
+    {
+      "release": "2026.205",
+      "date": "2026-07-02",
+      "server": "1.11.177",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 5 (continuing the SonarCloud gate ratchet): worker/runner.js, the Bruno CLI orchestrator and by far the single largest remaining coverage gap (388 uncovered lines, 16% covered) before this batch. New tests/unit/runner.test.js (17 tests) fully mocks child_process.spawn (never spawns a real subprocess) driving executeRun() through: auth/missing-run/missing-datafile/env-write-failure early exits; exit-code 0 vs non-zero final status; the process-error ('error' event) path; HTML report linking both directly (reportGenerator output) and via the mergeReport.js fallback, plus the second (mergeReport.js) spawn call and its own error path; JSON-results artifact copy; AUTH_401/TOKEN_FORMAT CLI-output detection surfaced onto runs.error_message; the emergency-stop terminal-state guard (a CANCELLED run is never resurrected to COMPLETED); and a real (not fake-timer), config-driven short-timeout kill test. runner.js 16% -> ~68% lines. Overall Oscar_Server/src line coverage ~77% -> ~83%; full suite 51 -> 52 suites, 1272 -> 1289 tests, all green. Bumped the documented OSCAR-Gate new_coverage floor 68% -> 74% (bump the actual SonarCloud condition to match). Deliberately out of scope, documented not forced: the Linux-only workspace create/cleanup functions (platform-gated, never engaged since no test sets scenarioOverride, matching real single-scenario/CI-agnostic behaviour) and the token-watchdog setInterval tick logic (disabled via TOKEN_WATCHDOG_INTERVAL_MS=0 for every test, avoiding a live interval that would otherwise keep Jest's process alive) — both already carry real production risk surface but needed a fundamentally different (fake-timer / platform-conditional) test strategy this batch didn't take on. Tests-only + Sonar-config-doc; no runtime change; server 1.11.176 -> 1.11.177, collection unchanged OTST_V2.0.94.",
+        "Verification: given the elevated risk (a real, hardcoded, non-overridable ARTIFACTS_DIR under this same repo, plus real subprocess-spawn danger), this batch was written directly rather than delegated to a subagent, after first reading executeRun() end-to-end. Hit and fixed one real bug during authoring: emitting synthetic 'close'/'error' events on the fake child process after only a single setImmediate tick raced ahead of executeRun's own several-await preamble (mkdir/env-yml-write/datafile-read) — events fired before executeRun had even called spawn(), so its real listeners were never attached and the awaiting promise hung forever; fixed by polling for the Nth actual spawn() call before emitting. Full suite 52/52 green; confirmed data/artifacts/ has zero leftover test directories before and after a full run; eslint clean; scanned for both CodeQL patterns that hit earlier batches (insecure os.tmpdir() writes, unanchored new RegExp(string) checks) — neither present."
+      ]
+    },
     {
       "release": "2026.204",
       "date": "2026-07-02",
