@@ -60,7 +60,7 @@ const { resolveAccessToken } = require('../../src/worker/access-token');
 process.env.PORT = '0';
 
 const app = require('../../src/server');
-const { run, get } = require('../../src/db/db');
+const { run } = require('../../src/db/db');
 const { encryptToFile } = require('../../src/utils/at-rest');
 
 const DATAFILES_DIR = path.resolve(__dirname, '../../data/datafiles');
