@@ -51,6 +51,28 @@ request:
         //   EXCHANGE      → Common Requests + Exchange (Refund excluded)
         RUNSCRIPT: {
 
+        // ── 0. OSCAR credential seeding (#306) ───────────────────────────────
+        // The OSCAR runner no longer writes credentials into the ephemeral env
+        // yml on disk; it hands them to the Bruno child process via its
+        // environment (OSCAR_ACCESS_TOKEN / OSCAR_SUBSCRIPTION_KEY /
+        // OSCAR_OAUTH_EXTRA). Seed each runtime var only while it is still
+        // empty — a token refreshed mid-run via the OSCAR loopback (#204,
+        // auth.js) must never be clobbered by the stale spawn-time value.
+        // Standalone Bruno (no OSCAR_* env vars) is a strict no-op.
+        try {
+          var _pTok = bru.getProcessEnv('OSCAR_ACCESS_TOKEN');
+          if (_pTok && !bru.getEnvVar('access_token')) bru.setEnvVar('access_token', _pTok);
+          var _pSub = bru.getProcessEnv('OSCAR_SUBSCRIPTION_KEY');
+          if (_pSub && !bru.getEnvVar('Ocp-Apim-Subscription-Key')) bru.setEnvVar('Ocp-Apim-Subscription-Key', _pSub);
+          var _pXtr = bru.getProcessEnv('OSCAR_OAUTH_EXTRA');
+          if (_pXtr) {
+            if (!bru.getEnvVar('oauth_extra'))     bru.setEnvVar('oauth_extra', _pXtr);
+            if (!bru.getEnvVar('auth_key_secret')) bru.setEnvVar('auth_key_secret', _pXtr);
+          }
+        } catch (_credErr) {
+          console.log('[WARNING] OSCAR credential seeding from process env failed: ' + (_credErr && _credErr.message));
+        }
+
         // ── Per-request console capture for HTML report ─────────────────────
         // Captures console.log/warn/error messages emitted during this request
         // so they can be rendered in the request "Console Log" sub-section.

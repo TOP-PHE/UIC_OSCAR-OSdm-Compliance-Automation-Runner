@@ -917,6 +917,7 @@ admin-override with extra audit logging — not implemented in Phase 1.)
 | Sysadmin `cat /opt/OSCAR/.../data/artifacts/<run>/report.html` | File starts with OSCAR1 magic + IV + tag; payload is ciphertext. `head -c 6` reveals `OSCAR1`, the rest is gibberish. |
 | Sysadmin `cat /opt/OSCAR/.../data/datafiles/<slug>-datafile.json` | Same OSCAR1 envelope — JSON contents unreadable without the key. |
 | Backup / cloud snapshot leaks | Same as live disk — every sensitive byte is ciphertext at rest. |
+| Sysadmin (or a mid-run volume snapshot) reads the per-run Bruno env file under `environments/` | **Credential-free since #306** (server v1.11.179 / collection OTST_V2.0.95): the access token, subscription key and oauth-extra travel via the Bruno child **process environment**, never the file. Every credential-bearing path on disk is now encrypted or eliminated — a worker crash mid-run leaves nothing sensitive behind. |
 
 #### NOT defended in code (operational policy required)
 
