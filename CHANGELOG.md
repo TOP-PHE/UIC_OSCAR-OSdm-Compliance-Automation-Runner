@@ -14,6 +14,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.182] — 2026-07-03
+
+### Added
+
+- **`public/news/index.json`** — backfilled 18 welcome-page news entries
+  covering everything merged since the last news update (2026-06-09,
+  partial refund) through today: Night Train accommodation testing (#211),
+  the env-yml credential-free security fix (#306), Places API stop-place
+  discovery (#450), Test-Manager-gated registration (#449), fulfillment
+  type/media declaration (#448), Test Finding ↔ scenario linking (#447),
+  CHAPS-onboarding auth diagnostics (#437-443), dedicated headers (#427),
+  Test Findings & Open Points (#400/#401) plus its category accordion and
+  bulk-import follow-ups (#409/#413), batch ZIP downloads (#406), the Run
+  Budget Ceiling admin field + catalog refundability sweep (#395), the
+  IRT/NJ accommodation-aware testing programme (#372/#374/#380/#381/#382),
+  run-setup UX polish (#364/#367), the Discovery offer probe + Re-probe
+  button (#368/#370), the OSDM Trip Search Criteria wizard panel (#360),
+  and the step-failure policy toggle (#362). Content-only; no runtime
+  behaviour affected.
+
+---
+
 ## [server-v1.11.181] — 2026-07-03
 
 ### Fixed
