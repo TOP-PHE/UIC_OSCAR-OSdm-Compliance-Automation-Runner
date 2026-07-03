@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.210",
+  "current_release": "2026.211",
   "releases": [
+    {
+      "release": "2026.211",
+      "date": "2026-07-03",
+      "server": "1.11.183",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #239 — book a mandatory reservation via the booking request's optionalReservationSelections node ({reservationId} per reservationOfferPart), the OSDM mechanism for offers where a reservation is mandatory but no specific place/compartment needs stating. Independent of the existing placeSelections/accommodationSelection mechanism (#371/#373/#211), which additionally states WHICH place is wanted. New scenario-level boolean bookMandatoryReservations (datafile.schema.json) drives a new offers.js handleOptionalReservationSelections() (called alongside handleAccommodationAndPlaceSelection in postOfferResponse) that harvests all of the selected offer's reservationOfferParts.id into the optionalReservationSelections env var; requestsBuilder.js attaches it to each booked offer object (outbound-only for two-step returns, same simplification already established for placeSelections). Wizard gains a 'Book via optionalReservationSelections' toggle in Booking Flow Actions. bookings.js logs which mechanism a scenario used for report traceability — no new assertion needed since the existing generic validateOfferParts() reservation↔booked-reservation check already covers correctness regardless of the booking mechanism used.",
+        "Not breaking: the new field is optional and additive, defaulting off — an older collection under this server, or this collection under an older server, both degrade gracefully (the mechanism is simply not exercised). min_collection unchanged at OTST_V2.0.95.",
+        "Verification: full suite 53 suites / 1321 tests green (no server-side test file touched — bookMandatoryReservations only feeds a new Bruno_Collection mechanism); eslint + inline-script lint clean; node --check on every edited Bruno_Collection JS file; datafile.schema.json JSON-parses; opencollection.yml YAML-parses and its before-request hook JS syntax-checks clean, confirmed the new field name appears in its reset delete-list."
+      ]
+    },
     {
       "release": "2026.210",
       "date": "2026-07-03",

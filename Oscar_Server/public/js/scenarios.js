@@ -1964,6 +1964,19 @@ function buildSalesFlowActionsSection(idx, sc) {
           </div>
         </div>`;
 
+  // #239: book the offer's reservationOfferParts via optionalReservationSelections
+  // — the OSDM mechanism for a mandatory reservation that doesn't state a
+  // specific place/compartment. Independent of the accommodation/place
+  // pickers above (those additionally state WHICH place is wanted).
+  const _bookMandatoryRes = sc.bookMandatoryReservations === true;
+  const mandatoryReservationHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Mandatory reservation booking <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— books the offer's reservationOfferPart(s) via optionalReservationSelections, without stating a specific place (OSDM's mechanism for reservation-mandatory offers)</span></div>
+          <div class="pill-group">
+            <div class="pill${_bookMandatoryRes ? ' selected' : ''}" data-action="toggle-book-mandatory-reservations" data-idx="${esc(idx)}" title="${esc(_bookMandatoryRes ? 'Enabled — click to disable' : 'Disabled (default) — click to enable')}"${_accStyle}>🎫 Book via optionalReservationSelections</div>
+          </div>
+        </div>`;
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🛒 Booking Flow Actions <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">optional steps during the booking → fulfillment phase (applies to SALE, REFUND and EXCHANGE scenarios, which all start with a booking)</span><span class="ps-arrow">▶</span></div>
@@ -1973,6 +1986,7 @@ function buildSalesFlowActionsSection(idx, sc) {
         ${modePickerHtml}
         ${accommodationPickerHtml}
         ${genderPickerHtml}
+        ${mandatoryReservationHtml}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),
@@ -6280,6 +6294,18 @@ document.body.addEventListener('click', function(e) {
       genSc.accommodationGenderPreference = el.dataset.val || null;
       const genGrp = el.parentElement;
       if (genGrp) genGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+      markDirty();
+      break;
+    }
+    case 'toggle-book-mandatory-reservations': {
+      // #239: single boolean toggle — book via optionalReservationSelections.
+      e.stopPropagation();
+      const mrIdx = parseInt(el.dataset.idx);
+      const mrSc = state.scenarios[mrIdx];
+      if (!mrSc) break;
+      mrSc.bookMandatoryReservations = mrSc.bookMandatoryReservations !== true;
+      el.classList.toggle('selected', mrSc.bookMandatoryReservations === true);
+      el.title = mrSc.bookMandatoryReservations ? 'Enabled — click to disable' : 'Disabled (default) — click to enable';
       markDirty();
       break;
     }

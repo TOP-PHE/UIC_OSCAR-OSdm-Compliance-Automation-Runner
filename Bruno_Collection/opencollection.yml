@@ -294,7 +294,7 @@ request:
                 // Scenario / trip
                 "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
                 "selectedAccommodation",
-                "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "requiresPlaceSelection",
+                "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
                 "overruleCode", "refundDate", "TripType",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
                 "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
