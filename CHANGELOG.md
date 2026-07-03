@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-v1.11.181] — 2026-07-03
+## [server-v1.11.182] — 2026-07-03
 
 ### Added
 
@@ -33,6 +33,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   button (#368/#370), the OSDM Trip Search Criteria wizard panel (#360),
   and the step-failure policy toggle (#362). Content-only; no runtime
   behaviour affected.
+
+---
+
+## [server-v1.11.181] — 2026-07-03
+
+### Fixed
+
+- **Flaky CI test** — `tests/unit/runner.test.js`'s "links a reportGenerator
+  HTML artifact when one is present" intermittently failed in CI (never
+  locally). The report-linking step in `runner.js` filters candidate report
+  files by `mtime >= runStartTime`, guarding against linking a stale report
+  left by a previous run. `runStartTime` used millisecond-precision
+  `Date.now()`; some CI container filesystem storage drivers round a
+  freshly-written file's reported mtime to coarser precision, which could
+  put it just below `runStartTime` even though the write genuinely happened
+  after — silently dropping the artifact link. Fixed by subtracting a
+  2-second safety margin from `runStartTime` before the comparison — a real
+  leftover report is always at minimum seconds old in practice, so the
+  margin costs nothing on the staleness guarantee it exists for.
 
 ---
 
