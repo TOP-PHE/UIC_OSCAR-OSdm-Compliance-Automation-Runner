@@ -164,6 +164,9 @@ function buildBookingRequest() {
     : parseEnvJson("offerPassengerSpecifications");
 
   const placeSelections = parseEnvJson("placeSelections", []);
+  // #239: OSDM's mechanism for booking a mandatory reservation without
+  // stating a specific place/compartment — independent of placeSelections.
+  const optionalReservationSelections = parseEnvJson("optionalReservationSelections", []);
   const passengerRefs = parseEnvJson("bookingPassengerReferences");
 
   // Two-step return (#178/#180): when an inbound offer was fetched, book the
@@ -180,6 +183,9 @@ function buildBookingRequest() {
   if (inboundOfferId && outboundOfferId) {
     const outboundOffer = { offerId: outboundOfferId, passengerRefs };
     if (placeSelections.length > 0) outboundOffer.placeSelections = placeSelections;
+    // #239: manual place/reservation selections apply to the outbound offer
+    // only, same simplification already established for placeSelections above.
+    if (optionalReservationSelections.length > 0) outboundOffer.optionalReservationSelections = optionalReservationSelections;
     if (returnMode === "sep-out") {
       offers.push(outboundOffer);
       validationLogger(`[INFO] 🔁 Return booking (separate) — outbound only (${outboundOfferId}).`);
@@ -194,6 +200,7 @@ function buildBookingRequest() {
   } else {
     const offer = { offerId: bru.getEnvVar("offerId"), passengerRefs };
     if (placeSelections.length > 0) offer.placeSelections = placeSelections;
+    if (optionalReservationSelections.length > 0) offer.optionalReservationSelections = optionalReservationSelections;
     offers.push(offer);
   }
 

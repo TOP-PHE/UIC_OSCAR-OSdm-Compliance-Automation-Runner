@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.183 / collection-OTST_V2.0.97] — 2026-07-03
+
+**Feature (#239): book a mandatory reservation via `optionalReservationSelections`
+— independent of the existing place/compartment-selection mechanism.**
+
+### Added
+
+- **`datafile.schema.json`** — new scenario boolean `bookMandatoryReservations`.
+- **`offers.js`** — new `handleOptionalReservationSelections()`, called
+  alongside `handleAccommodationAndPlaceSelection()` in `postOfferResponse`:
+  when the flag is set, harvests every `reservationOfferParts[].id` on the
+  selected offer into the `optionalReservationSelections` env var
+  (`[{reservationId}, ...]`).
+- **`requestsBuilder.js`** — `buildBookingRequest()` attaches
+  `optionalReservationSelections` to each booked offer object, mirroring the
+  existing `placeSelections` attachment (outbound-only for two-step return
+  scenarios, same established simplification).
+- **`scenarios.js`** — new "Book via optionalReservationSelections" toggle
+  in the Booking Flow Actions section.
+- **`bookings.js`** — logs which reservation-booking mechanism a scenario
+  used, for report traceability. No new assertion needed: the existing
+  generic `validateOfferParts()` reservation↔booked-reservation check
+  already covers correctness regardless of which mechanism requested it.
+
+### Changed
+
+- Not breaking — the new field is optional and additive, defaulting off.
+  `min_collection` unchanged at `OTST_V2.0.95`.
+
+### Tests
+
+- Full suite 53 suites / 1321 tests green (no server-side test file
+  touched). `node --check` on every edited `Bruno_Collection` file; schema
+  JSON-parses; `opencollection.yml` YAML + before-request JS syntax-check
+  clean, including the new field in its scenario-reset delete-list.
+
+---
+
 ## [server-v1.11.182] — 2026-07-03
 
 ### Added

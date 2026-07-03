@@ -917,6 +917,14 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
 
+  // #239: the reservation↔booked-reservation correspondence just checked above
+  // by validateOfferParts is the same check regardless of HOW the reservation
+  // was requested (placeSelections vs optionalReservationSelections) — note
+  // which mechanism this scenario used, for report traceability.
+  if (bru.getEnvVar("bookMandatoryReservations") === "true") {
+    validationLogger(`[INFO] Reservation booked via optionalReservationSelections (issue #239) — ${bookedOffers.flatMap(b => b.reservations || []).length} reservation(s) in the booking response.`);
+  }
+
   // #377: close the accommodation loop ONCE, on the create-booking step —
   // re-reads (05/07) would only duplicate the goal rows in the report.
   if ((req?.getName?.() ?? "") === "02. POST Create Booking") {
