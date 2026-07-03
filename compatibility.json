@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.208",
+  "current_release": "2026.209",
   "releases": [
+    {
+      "release": "2026.209",
+      "date": "2026-07-03",
+      "server": "1.11.181",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix: flaky CI test in tests/unit/runner.test.js ('links a reportGenerator HTML artifact when one is present') — the report-artifact linking step in runner.js filters candidate report files by mtime >= runStartTime (excluding stale reports left by a previous run). runStartTime was captured with plain Date.now() millisecond precision; some CI container filesystem storage drivers round/truncate a written file's reported mtime to coarser-than-millisecond precision, which could put a freshly-written file's mtime just BELOW runStartTime even though the write genuinely happened after — silently dropping the html_report artifact link. Root-caused via git history (PR touching only public/news/index.json triggered the exact same pre-existing test failure, confirming it isn't caused by any application change) and by re-reading the mtime-comparison code directly (runner.js, both usages of runStartTime). Fix: subtract a 2-second safety margin from runStartTime before the comparison — a real previous run's leftover report is always at minimum seconds old in practice (the guard exists for same-day, same-company leftovers, not sub-second races), so the margin costs nothing on the staleness guarantee while eliminating the truncation race. Verified: full suite 53 suites / 1321 tests green locally; runner.test.js specifically 19/19; eslint clean. Server 1.11.180 -> 1.11.181, collection unchanged."
+      ]
+    },
     {
       "release": "2026.208",
       "date": "2026-07-03",
