@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.211",
+  "current_release": "2026.212",
   "releases": [
+    {
+      "release": "2026.212",
+      "date": "2026-07-03",
+      "server": "1.11.184",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): announce #239 (book mandatory reservations via optionalReservationSelections) on the welcome page. Content-only change (public/news/index.json); no runtime behaviour affected. Verified: JSON parses, all 45 entries carry the required fields."
+      ]
+    },
     {
       "release": "2026.211",
       "date": "2026-07-03",

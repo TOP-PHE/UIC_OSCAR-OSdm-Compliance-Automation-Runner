@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.184] — 2026-07-03
+
+### Added
+
+- **`public/news/index.json`** — announced #239 (book mandatory
+  reservations via `optionalReservationSelections`) on the welcome page.
+  Content-only; no runtime behaviour affected.
+
+---
+
 ## [server-v1.11.183 / collection-OTST_V2.0.97] — 2026-07-03
 
 **Feature (#239): book a mandatory reservation via `optionalReservationSelections`
