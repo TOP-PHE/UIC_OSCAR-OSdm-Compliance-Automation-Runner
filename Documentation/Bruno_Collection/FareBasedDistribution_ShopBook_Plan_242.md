@@ -1,143 +1,180 @@
 # Fare-Based Distribution — Shop / Book Design Proposal (#242)
 
-Status: **PROPOSAL — awaiting OTST team review.** Nothing in this document has
-been implemented. No code, schema, or scenario changes ship until the team
-signs off and Patrick gives an explicit OK.
+Status: **PROPOSAL rev 1.1 — awaiting OTST team review.** Nothing in this
+document has been implemented. No code, schema, or scenario changes ship
+until the team signs off and Patrick gives an explicit OK.
+
+> **rev 1.1 (2026-07-03):** rev 1.0's desk analysis has been replaced with
+> the results of three research tracks run at Patrick's request: (a) a
+> line-by-line audit of the actual `library-bruno` code, (b) the OSDM
+> functional spec on osdm.io ("Constructing Products from Fares" deep-dive)
+> plus the `UnionInternationalCheminsdeFer/OSDM` repo's versioned schemas
+> v3.2→v3.9, and (c) a scan of every real sandbox test result in
+> `OSCAR reports/` (239 files, 4 vendors). The upstream issue
+> `OSDM-testing#93` is also now resolved (§3.1). Material changes vs rev
+> 1.0 are marked **[rev 1.1]** where the conclusion flipped.
 
 Issues covered: [#242](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/242)
 (umbrella), [#205](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/205),
 [#207](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/207),
 [#243](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/243)–[#248](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/248).
-Deliberately touched only lightly, flagged as follow-on work in §10:
-[#206](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/206)
-(refund of a booked fare) and [#255](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/255)
-(BIKE passenger type on a fare reservation).
+Follow-ons only lightly scoped (§10):
+[#206](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/206) (fare refund),
+[#255](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/255) (BIKE on a fare reservation).
 
-SFR reference: [Fare based distribution Shop Book Ticket](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/wiki/Fare-based-distribution-Shop-Book-Ticket)
-(fetched verbatim from the wiki source for this document — quoted in §2.5).
+Primary sources:
+- SFR wiki: [Fare based distribution Shop Book Ticket](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/wiki/Fare-based-distribution-Shop-Book-Ticket) (quoted in full, §2.6)
+- OSDM deep-dive: [Constructing Products from Fares](https://osdm.io/spec/constructing-products-from-fares/) + [Data Models](https://osdm.io/spec/models/) ("Offers with Partial Coverage")
+- Schemas: `Bruno_Collection/json_validator/openapi3_0.json` (bundled, 3.x) cross-checked against `UnionInternationalCheminsdeFer/OSDM` `specification/schemas/*.yml` (master) and the versioned bundles at tags `v3.2`…`v3.9`
+- Upstream: [OSDM-testing#93](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/issues/93)
 
 ---
 
 ## 1. Summary
 
-OSCAR today tests only the **Product-based** distribution model: an offer's
-admission/reservation/ancillary parts, each carrying a station-to-station
-trip and a price, booked and fulfilled as a unit. OSDM defines a second,
-parallel model — **Fare-based distribution** — where the priced object is a
-`Fare` (not an `Admission`/`Reservation`/`Ancillary`), scoped not to a whole
-trip but to a *section* of one, and carrying a materially different set of
-required fields: regional validity, combination rules with other fares,
-travel-validity constraints (excluded time ranges, trip allocation, return
-constraints), and required travel-account cards. The OTST team has asked for
-OSCAR to cover this model; it hasn't started (confirmed by direct grep —
-zero hits for `Fare`, `regionalConstraint`, `combinationConstraint`,
-`travelValidityConstraint`, or `requestedSections` anywhere in
-`Bruno_Collection/library-bruno` or the datafile schema/wizard today).
+OSCAR today tests only the **Product-based** distribution model. OSDM
+defines a second model — **Fare-based distribution** — in which the
+provider returns `Fare` building blocks and **the distributor constructs
+the distributable product** from them, following combination rules carried
+*inside* the fares. The fares arrive in the same `POST /offers` response,
+under `Offer.fares[]` (a sibling array of `admissionOfferParts[]` /
+`reservationOfferParts[]` / `ancillaryOfferParts[]`), requested via
+`offerSearchCriteria.requestedOfferParts: ["FARE_ADMISSION", ...]`.
 
-This document proposes the **Shop** (offer search) and **Book** (booking →
-fulfillment) portion of that coverage — the "Ticket" half of the SFR's own
-"Shop/Book/Ticket" framing is the fulfillment step, which is included here
-since it's the natural completion of "Book." What is **not** covered, and
-why, is in §10.
+Three empirical facts now frame this proposal:
 
-The centerpiece of this proposal, per Patrick's explicit request, is **§5
-(the assertion list)** and **§6 (how deep validation should go, given that
-fare combinability rules can be checked at several depths, some of which
-are arguably outside what a single-vendor conformance tool can honestly
-verify)**. Everything else here exists to ground those two sections in the
-actual spec and the actual codebase, not guesswork.
+1. **OSCAR ignores `Offer.fares[]` entirely today** — and carries dead code
+   aimed at field names that don't exist in the spec, plus three concrete
+   bugs that would fire the moment a vendor returns fares (§3.2, §3.3).
+2. **No tested sandbox has ever returned fare content — but none was ever
+   asked.** Across all 239 result files from Bileto, Paxone, Turnit and
+   CHAPS, zero fare markers appear; and no OSCAR request has ever sent
+   `requestedOfferParts` at all. Vendor fare capability is **untested, not
+   disproven**. Bileto is the natural first probe: its serializer already
+   emits an empty `"fares": []` container on every booked offer (§4).
+3. **The spec is more precise than the SFR** on the two points Patrick
+   flagged: assertion depth and combinability. The combination-model
+   semantics, the flexibility-cluster ordering rule, the partial-coverage
+   no-gap/no-overlap rules, and the "fare fulfillment content is usually
+   empty **by design**" statement are all in the osdm.io deep-dive, and
+   several rev 1.0 assertions change as a result (§6, §7).
+
+The centerpiece remains **§6 (the assertion list)** and **§7 (how deep
+combinability validation should honestly go)**, both now grounded in the
+verified spec text and the audited code rather than desk reasoning.
 
 ---
 
-## 2. What OSDM says — Fare vs. the Product model OSCAR already tests
+## 2. What OSDM says — verified against spec text and versioned schemas
 
-### 2.1 Fare is a parallel offer-part family, not a variant of Product
+### 2.1 The distribution model: provider sells fares, distributor builds products
 
-`OfferPartType` (`openapi3_0.json:15218-15231`) is the enum used everywhere
-OSCAR already requests offer parts (`requestedOfferParts`):
+From the deep-dive: fares "do not constitute a distributable product. It is
+up to the distributor to build the distributable product" — they are
+"building blocks for a distributor to form products, product based offers
+and transport contracts." The provider states, inside each fare, the rules
+under which it may be combined; the distributor applies them. Mixed
+requests (fares + products in one offer search) are allowed; **an offer
+must include fares for all passengers**; free transport must be expressed
+as a zero-price fare, not an absent one.
 
-```
-ADMISSION, RESERVATION, ANCILLARY,
-FARE_ADMISSION, FARE_RESERVATION, FARE_ANCILLARY,
-CONTINUOUS_SERVICE, ALL
-```
-
-The `FARE_*` values are full siblings of the values OSCAR already tests —
-same request mechanism, same response envelope (`offerCollectionResponse`
-can contain both `admissionOfferParts`-style and fare-style parts in one
-response, per the SFR: *"a response can contain both fares and products"*).
-What differs is the **shape of the offer part itself**.
+This is why several "obvious" conformance checks are *not* the provider's
+to fail: the correctness of a **combined product** is distributor logic,
+outside the provider's response (this becomes Tier C/D in §7).
 
 ### 2.2 The `Fare` object (`openapi3_0.json:13044-13188`)
 
-Required fields: `id`, `type` (`FareType`, x-extensible-enum
-`ADMISSION | RESERVATION | ANCILLARY` — yes, this is a *different* enum from
-`OfferPartType`, confusingly reusing the same three words for "what kind of
-service this fare covers"), `prices[]`, `regionalConstraint`, `travelClass`,
-`afterSalesCondition`, `combinationConstraint[]` (min 1),
-`travelValidityConstraint`, `requiredCards[]` (min 1).
+Required: `id`, `type` (`FareType`, x-extensible-enum
+`ADMISSION | RESERVATION | ANCILLARY` — per the code-list catalog, **no
+provider-specific values allowed** despite the x-extensible-enum marker),
+`prices[]` (note: **plural**, multi-currency — Product parts carry a single
+`price`; this matters for code reuse, §3.4), `regionalConstraint`,
+`travelClass`, `afterSalesCondition` (a **link**, not the Product-style
+inline `afterSalesConditions[]` — same reuse caveat), `combinationConstraint[]`
+(min 1), `travelValidityConstraint`.
 
-Optional but structurally significant: `serviceConstraint`,
-`carrierConstraint`, `fulfillmentConstraint`, `availablePlaces`,
-`placeSelection`, `placeAllocation`, `coveredSection`, `passengerRefs`,
-`involvedTCOs[]`, `luggageConstraint`.
+**[rev 1.1] `requiredCards` is version-gated:** required with `minItems: 1`
+in OSDM **3.2.0–3.5.x** (a schema-valid 3.5 fare literally cannot say "no
+card needed"); **dropped from `required` at 3.6.0** (omit = no card
+needed), `minItems: 1` still applying when present. OSCAR tests vendors on
+3.5.0–3.9.0, so this assertion must read the scenario's `osdmVersion`.
+This resolves rev 1.0's open question §8.2.
 
-Three sub-schemas carry almost all of the *fare-specific* (non-Product)
-logic:
+Deprecation note for the design horizon: the fare place-related fields
+(`availablePlaces`, `placeSelection`, `placeAllocation`,
+`availablePreferences`) are deprecated in master/3.10-dev, and
+reservation-as-fare is deprecated in favour of a general `Reservation`
+with `distributionMode: FARE_MODE`. First-pass scope should not build on
+either.
 
-| Sub-schema | Spec location | What it declares |
-|---|---|---|
-| `RegionalConstraint` | `:17766-17795` | `entryConnectionPoint`/`exitConnectionPoint` (both `FareConnectionPoint` — border crossings between two "fare regimes") + `regionalValidities[]` (min 1) |
-| `FareCombinationModel` | `:13189-13236` | `model` (required: `SEPARATE_TICKET \| SEPARATE_CONTRACT \| CLUSTERING \| COMBINING`), `combinableCarriers[]`, `isValidOnlyWhenCombined`, `referenceCluster` (CLUSTERING only), `allowedClusters[]` (CLUSTERING only), `allowedCommonContracts[]` |
-| `TravelValidity` | `:19721-19764` | `validityRange` (required) + `validTravelDates`, `excludedTimeRanges[]`, `numberOfTravelDays`, `returnConstraint`, `trainValidity`, `tripAllocationConstraint`, `tripInterruptionConstraint` |
+### 2.3 Combination constraints — free string, four documented models
 
-Issue #243's screenshot names the cluster enum values a `referenceCluster`
-must be one of: **`BUSINESS > FULL-FLEX > SEMI-FLEX > NON-FLEX > PROMO`**
-(an ordered flexibility hierarchy — the SFR's language, not a literal OSDM
-enum name in the spec text I could find; treat as the OTST team's own
-codified list until confirmed against a live sandbox response).
+**[rev 1.1]** `FareCombinationModel.model` is **not an enum** — it is a
+free string whose schema description says "A distributor needs to support
+the following models: SEPARATE_TICKET, SEPARATE_CONTRACT, CLUSTERING,
+COMBINING" (identical wording in the 3.5.0 and 3.9.0 bundles). The
+deep-dive's own prose drifts between spellings (`CLUSTERING_MODEL`,
+`SEPARATE_CONTRACTS`, `SEPARATE_TICKETS`, even "`COMBINATION` model") — a
+conformance check must match **leniently** and can never hard-FAIL an
+unrecognised value.
 
-### 2.3 Sectioning a trip: `requestedSections` (net-new to OSCAR)
+Documented semantics ("Fare Combination Rules"):
 
-Fares aren't necessarily priced for the whole journey — a passenger crossing
-a border needs a domestic fare on each side plus (depending on the
-combination model) something bridging them. The mechanism for asking for a
-fare on *part* of a trip is `requestedSections` — a **top-level sibling**
-of `tripSearchCriteria`/`tripIds`/`tripSpecifications` on the offer request
-body (`openapi3_0.json:15064-15094`):
+| Model | Meaning |
+|---|---|
+| `CLUSTERING` | distributor may apply **its own** standard after-sales rules for the flexibility cluster of the final product (`referenceCluster` + `allowedClusters`) |
+| `COMBINING` | distributor **must obey the after-sales fees provided in the fare** |
+| `SEPARATE_CONTRACT` | separate contracts, possibly on one fulfillment document; separation "has to be indicated clearly on the ticket"; `allowedCommonContracts` lists providers allowing a common contract |
+| `SEPARATE_TICKET` | named in the required-support list but **never formally defined** in the spec text |
 
-> *"If you are searching for fares you pass in the complete trip and then
-> use the `requestedSections` attribute to define which part(s) you need
-> fares (including virtual border points)."*
+"A Fare can have multiple combination constraints. **One of them must
+match** to construct a combination."
 
-`Section` (`:18606-18632`) = `{startPlace, startLegId?, endPlace, endLegId?,
-externalTripRef?}` — structurally identical to the existing
-origin/destination pattern OSCAR already builds trip searches from. **When
-`requestedSections` is absent, the totality of the trip is priced** — this
-is the mechanism issues #244/#246/#248 test negatively (empty or
-trip-covering `requestedSections` on a domestic trip → no bookable fare,
-since there's no border to section around).
+### 2.4 The flexibility clusters — deep-dive table, not a code list
 
-### 2.4 Three ways to ask, ×2 (positive/negative) — issues #243–248
+**[rev 1.1]** Exact spellings (underscores): `BUSINESS`, `FULL_FLEX`,
+`SEMI_FLEX`, `NON_FLEX`, `PROMO`. Definitions: BUSINESS =
+refundable/exchangeable *after* departure; FULL_FLEX = *before* departure;
+SEMI_FLEX = with fee, minimum validity; NON_FLEX = neither; PROMO =
+bilateral only. **Ordering rule** (this is the normative teeth for §7
+Tier B): a fare "can only be included in a product of the same cluster
+model or a cluster model that allows **less** flexibility… a FULL_FLEX
+fare might be allowed to be included in a SEMI_FLEX product, but not in a
+BUSINESS product."
 
-The SFR splits the *offer request shape* into three independent variants,
-each with its own positive + negative issue pair:
+This list appears **only** in the deep-dive — it is *not* in the
+code-list catalog and *not* a schema enum (`referenceCluster` /
+`allowedClusters` are plain strings). So: soft check, exact-match on the
+five known values, WARNING (never FAIL) on anything else. This resolves
+rev 1.0's open question §8.3. Do not confuse with `Offer.flexibility`
+(`FULL_FLEXIBLE`/`SEMI_FLEXIBLE`/`NON_FLEXIBLE`) — different field,
+different vocabulary.
 
-| Request shape | Positive | Negative | OSCAR support today |
-|---|---|---|---|
-| `tripSearchCriteria` (search by origin/destination/time) | #243 | #244 | ✅ primary path, fully built |
-| `tripIds` (search by a previously-discovered `Trip.id`, e.g. from `GET /trips`) | #245 | #246 | ❌ **not built at all** — confirmed by grep, `requestsBuilder.js` never emits a `tripIds` body field |
-| `tripSpecifications` (explicit origin/destination/product-category triple) | #247 | #248 | ✅ built (`requestsBuilder.js:121`, the "OSDM Trip Search Criteria" wizard panel, #359/#360) |
+### 2.5 `requestedSections`, connection points, partial coverage
 
-All three converge on the same downstream flow once offers come back —
-`requestedSections` and the Fare response shape don't depend on which
-request variant produced the offer.
+`requestedSections` (top-level sibling of `tripSearchCriteria` /
+`tripIds` / `tripSpecifications` on the offer request,
+`openapi3_0.json:15064-15094`): "you pass in the complete trip and use the
+requestedSections attribute to define which part(s) you need fares
+(including virtual border points)." `Section` =
+`{startPlace, startLegId?, endPlace, endLegId?, externalTripRef?}`;
+absent → the totality of the trip is priced (the lever for the negative
+cases #244/#246/#248).
 
-### 2.5 The SFR's own scenario + suggested validations (verbatim)
+Virtual border points: fares "often start or end at country borders where
+no train station exists" — modelled as `FareConnectionPoint` (station sets
+on each side, **UIC code mandatory**, legacy `BORDER_POINT` code
+optional). The distributor is "recommended to check the matching of the
+connection points… match **without gap**."
 
-The linked wiki page's content, in full — this is short but is the only
-UIC-authored fare-specific SFR text found (the wiki has 21 pages; this is
-the only one matching "fare"):
+**Partial coverage** (osdm.io/spec/models/, "Offers with Partial
+Coverage") — the normative basis for coverage assertions: coverage is
+declared via `coveredTripLegIndexes`; offers covering the same leg-set
+form an `offerCluster`; **no overlap** (a trip leg may be covered by only
+one offerCluster within a tripOffer) and **no gap** (every trip leg
+covered by ≥1 offer in each TripOffer).
+
+### 2.6 The SFR's scenario + suggested validations (verbatim)
 
 > **Scenario:** offer request with a trip specification, indicate
 > `FARE_ADMISSION` in `offerSearchCriteria.offerParts`, set
@@ -145,331 +182,374 @@ the only one matching "fare"):
 > connection point to a station. Book → fulfill → get booking → refund
 > (offer, get, patch) → get booking again.
 >
-> **Suggested validations:**
-> - one or more fares should be provided
-> - the fares should cover the requested section
-> - the fares should cover the requested passengers (same as in usual offers)
-> - a regional validity must be provided in the fare(s)
-> - combination constraints with combination model(s) must be provided
-> - after-sales conditions must be provided
-> - `travelValidityConstraint` must be provided
-> - for rail, `involvedTCOs` must be provided
-> - fare type must be `ADMISSION`
-> - *(fulfillment step)* the fulfillment documents are missing or empty
+> **Suggested validations:** one or more fares provided; fares cover the
+> requested section; fares cover the requested passengers; a regional
+> validity provided; combination constraints with combination model(s)
+> provided; after-sales conditions provided; `travelValidityConstraint`
+> provided; for rail `involvedTCOs` provided; fare type `ADMISSION`;
+> *(fulfillment)* the fulfillment documents are missing or empty.
 
-That last line is worth reading twice: **the SFR itself flags an expected
-provider gap** at fulfillment. This maps directly onto OSCAR's existing
-Known-Deviation baseline mechanism (#398/#401) rather than a hard assertion
-— see §6.4.
+**[rev 1.1] The last line is spec-sanctioned normal behaviour, not a
+deviation**: "The distributor constructs the fulfillment for the product
+offer. The booking of the fare returns a fulfillmentId for the fares, but
+**usually the content of the fulfillment will be empty**" — non-empty
+content only "in special cases… (e.g. proprietary bar codes) based on
+bilateral agreements." rev 1.0 proposed handling this via the
+Known-Deviation baseline; that was wrong — the assertion inverts (§6.4).
 
----
+### 2.7 Versions
 
-## 3. What's reusable vs. genuinely new in OSCAR
-
-A deliberate check before proposing new code: how much of this can lean on
-what already exists?
-
-**Already there, reusable as-is:**
-- `ENUMS.requestedOfferParts` at the **Test Framework** level
-  (`scenarios.js:56-57`) already lists `FARE_ADMISSION`/`FARE_RESERVATION`/
-  `FARE_ANCILLARY` — a company can already *declare* fare support today.
-  Nothing to build here.
-- The generic booking-response part-count matcher,
-  `validateOfferParts(offerParts, bookedParts, partType, expectedStatus)`
-  (`bookings.js:408`), takes `partType` as a plain string label used only
-  for report text — it is not Product-specific in its logic (offer-part
-  count vs. booked-part count, per-index equality checks). This can very
-  plausibly accept `"fare"` as a fourth `partType` alongside admission/
-  reservation/ancillary, once the response is parsed into a flat array —
-  **the biggest single reuse win** in this whole proposal.
-- Refund flow (#206's precondition) — `10-16.` requests, the schedule-aware
-  effective-refundability engine (`afterSalesRules.js`, #391), the
-  after-sales-conditions pairing (#390), the refund-permissibility
-  cross-check (#388) are all Product-agnostic: they operate on
-  `afterSalesConditions`/fulfillment IDs, fields the `Fare` object also
-  carries via `afterSalesCondition`. Likely near-zero new code for #206
-  once Shop/Book lands — a validation pass against a live fare refund
-  would confirm this rather than assume it.
-- Places API typeahead (`attachPlaceAutocomplete(input)`, #450) attaches to
-  any input element — directly reusable for the new `requestedSections`
-  start/end place fields (§4.2).
-- `requestsBuilder.js:121` already builds `tripSpecifications`;
-  `:123`/`:687` already build `tripSearchCriteria`. Two of the three
-  request shapes need no new request-building code.
-
-**Confirmed absent — genuinely new build:**
-- The **scenario-level** `requestedOfferParts` picker (`WIZ_OFFER_PARTS`,
-  `scenarios.js:3093` = `['RESERVATION','ADMISSION','ANCILLARY']`) does
-  **not** include the `FARE_*` values, even though the framework-level enum
-  does. A company could declare fare support and still have no way to
-  select it on an actual scenario — a small, surgical, low-risk unlock.
-- `requestedSections` — zero hits anywhere in the schema, wizard, or
-  parser. Fully new: schema field, wizard section builder, request-builder
-  wiring.
-- `isPartOfInternationalTrip` — same, zero hits, fully new (a single
-  boolean, trivial to add).
-- `tripIds` as a request shape (#245/#246) — zero hits in
-  `requestsBuilder.js`. New request-building branch, plus (per the SFR)
-  a precursor `GET /trips` step to obtain the id to feed in.
-- Any Fare-shaped response validation at all: nothing in `offers.js`
-  understands `admissionOfferParts`-style parts vs. fare-style parts today;
-  a new `validateFares(selectedOffer)` (offer response) analogous to the
-  existing `validateAdmissions()`/`validateReservations()` is needed,
-  because the *required-field set* genuinely differs (regional/combination/
-  travel-validity constraints have no Product equivalent).
-- A `Fare` type/`Section` type-aware `Ajv`/Layer-1 shape check, if OSCAR's
-  compliance layer validates response shapes structurally before running
-  business assertions (worth confirming against `osdmCompliance.js`, not
-  yet checked at proposal stage).
+`FARE_ADMISSION` and the full Fare model are present in **every** version
+OSCAR encounters (verified 3.2.0→3.9.0; fares exist since 3.0). The only
+material cross-version difference found: the `requiredCards` gating (§2.2).
 
 ---
 
-## 4. Proposed scenario / datafile model (sketch, not final)
+## 3. What the code actually does today (audit results)
 
-Not implemented — sketched here so the assertion list in §5 has concrete
-fields to reference, and so the OTST team can react to the *shape* of the
-solution, not just the assertions.
+Everything in this section is from a line-by-line read of the current
+`main`; citations are `Bruno_Collection/library-bruno/` unless noted.
 
-### 4.1 Requesting fares
-- Scenario field `requestedOfferParts` gains `FARE_ADMISSION` /
-  `FARE_RESERVATION` / `FARE_ANCILLARY` as scenario-level pickable values
-  (§3's "surgical unlock").
-- New boolean `isPartOfInternationalTrip` (mirrors the SFR's step 1).
-- New request-shape field for `tripIds` (a third radio option alongside
-  the existing implicit `tripSearchCriteria`/`tripSpecifications` choice),
-  gated behind a precursor "discover trip" step when selected.
+### 3.1 Upstream #93 — resolved, and OSCAR is cleaner than feared
 
-### 4.2 Requested sections
-- New repeatable "Requested section" block: start place / end place (both
-  wired to `attachPlaceAutocomplete`, reusing #450), optional
-  `startLegId`/`endLegId`, optional `externalTripRef`. Empty list = "price
-  the whole trip" (matches the spec's own default semantics, §2.3).
-- A "fare connection point" is structurally just a `Place` per
-  `FareConnectionPoint`'s `allOf: [Place, ...]` (`:13237-13263`) — no new
-  place-picking mechanism needed beyond what already exists for
-  origin/destination.
+The issue rev 1.0 could not resolve: [OSDM-testing#93](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/issues/93)
+("Numbers of offerParts validation in the offer", Angelo Farruggia, open,
+milestone V1.4). The original collection asserted **one offerPart per leg
+per passenger** — count-based. Upstream consensus in the comments
+(Koseler, Petrak, Farruggia): drop the count logic; check that the
+**union of the parts' coverage attributes** covers all legs and all
+passengers; and account for OSDM's partial-coverage offers.
 
-### 4.3 Everything downstream (booking, fulfillment, refund)
-No new scenario fields anticipated — a fare-offer's `id` slots into the
-exact same `offers[].offerId`/`passengerRefs` booking-request shape
-already built (`requestsBuilder.js:145-224`); fulfillment and refund reuse
-the existing flow unchanged (§3).
+**OSCAR's fork does not have the count disease** — no legs×passengers
+count assertion exists anywhere (only a descriptive comment in
+`partialRefund.js:45`). Current coverage checking is
+`assertOfferCoverageIntegrity` (`offers.js:1562-1592`): pure **referential
+integrity** (every `tripCoverage` {tripId, legId} pair points at a real
+trip/leg). But there is also **no union-completeness check** — nothing
+verifies the parts jointly cover all legs/passengers. Net: a clean slate;
+the fare coverage check (§6.2) should be built union-based from day one,
+per the upstream consensus **and** §2.5's offerCluster no-gap/no-overlap
+rules, and can then also serve the Product flow (closing OSCAR's side of
+#93 as a by-product).
+
+### 3.2 Where fares land today: ignored — plus dead code aimed at wrong keys
+
+`postOfferResponse` (`offers.js:245`) validates only the three classic
+part families (`:327-331`); `selectAndSetOffer` (`:454`) filters on
+`reservationOfferParts` only. **No code anywhere reads `Offer.fares[]`.**
+Nothing crashes on a fares-carrying offer (all reads are `|| []`-guarded);
+a fares-only offer would pass trivially — silently unvalidated.
+
+Worse: `captureExpiredOfferDeadline` (`offers.js:415-418`) scans
+`fareAdmissionOfferParts` / `fareReservationOfferParts` /
+`fareAncillaryOfferParts` — **keys that do not exist in the spec's Offer
+schema** (the spec key is `fares`). Dead code from an earlier aborted
+start; never fires; should be removed or re-aimed as part of this work.
+
+### 3.3 Three concrete bugs found (one fires today, fares or not)
+
+| # | Location | Bug | When it fires |
+|---|---|---|---|
+| B1 | `fulfillments.js:198` | total-price check's test title claims "+ Fees + Fares" but the sum includes only admission+reservation+ancillary env prices → guaranteed spurious FAIL on any fare-carrying booking | first fare booking |
+| B2 | `bookings.js:1072` | test **title** eagerly evaluates `fulfillment.bookingParts.map(...)`; `bookingParts` is optional per spec (Fulfillment required = id/status/bookingRef/createdOn) → TypeError **outside** the test kills the whole after-response script | **today**, any vendor omitting `bookingParts` |
+| B3 | `bookings.js:1072-1078` | every `fulfillment.bookingParts[].id` must be ∈ `admissionReservationAncillaryBookingPartsIds` — fare part ids are never captured into that list → fare fulfillments FAIL the membership check | first fare fulfillment |
+
+B2 is a pre-existing latent crash independent of fares and is worth fixing
+regardless of this proposal's outcome.
+
+### 3.4 Reuse picture — corrected from rev 1.0
+
+**[rev 1.1]** rev 1.0 called `validateOfferParts` (`bookings.js:408-448`)
+"the biggest single reuse win." The audit says: **mechanically generic,
+admission-flavored in its field list.** It pairs `offerParts[i] ↔
+bookedParts[i]` by index (no count/id assertions — ids only harvested),
+then checks `exchangeable/refundable` intersection, `isReservationRequired/
+offerMode` equality, `status` vs expected, `price.{amount,currency,scale}`,
+`validFrom/validUntil`, and afterSalesConditions pairing. For a `Fare`:
+nothing crashes, but `prices[]`≠`price` and
+`afterSalesCondition`≠`afterSalesConditions[]` mean **everything except
+`status` degrades to WARNINGs** (and `status` works — `Fare.status` is
+`BookingPartStatus`). Callers hardcode the three families
+(`bookings.js:916-918`), so booked fares are never compared at all today.
+Reuse therefore = a thin **fare-field adapter** (map `prices[0]`→price
+shape, resolve the after-sales link) feeding the existing matcher with a
+4th `"fare"` partType — still a reuse win, just not a free one.
+
+Other audited reuse points:
+
+- **Refunds**: the refund request body is `{fulfillmentIds}` populated
+  family-agnostically (`bookings.js:1005-1014`), so a fare's fulfillment
+  **would flow into POST /refund-offers mechanically** — but all refund
+  *validation* is hardcoded three-family (`refunds.js:103-107`,
+  `:672-686`, `:738-739`), and `afterSalesRules.js:40-79` reads the
+  Product field shapes (degrades safely to "non-permitting", never
+  crashes). Fare refunds today would execute **unvalidated** — #206's real
+  scope is extending those three lookups plus the same field adapter, not
+  a rebuild. rev 1.0's "near-zero new code" was too optimistic; "small,
+  bounded new code" is accurate.
+- **Schema validation**: nothing comes free. The generic Ajv validator
+  exists (`validators.js:151-245`) but its only offer-flow call site is
+  **commented out** (`02-Common Requests/01. POST Get Offer.yml:133`);
+  `osdmSchema.js` covers System-Information components only. Fare Layer-1
+  shape checks need explicit wiring (or hand-written checks in the
+  established `osdmCompliance.js` style).
+- **Fulfillment documents**: `validateFulfillments` (`bookings.js:970`)
+  already treats absent/empty `fulfillmentDocuments` as a DEBUG-level
+  "pre-issuance state" — the fare-mode empty-document case (§2.6) passes
+  **today** with no change. The fare hazards are B2/B3 above, not the
+  document check.
+- **Request builder**: `buildOfferCollectionRequest`
+  (`requestsBuilder.js:108-142`) emits `tripSpecifications` or
+  `tripSearchCriteria` + passengers + `offerSearchCriteria` +
+  fulfillment options. Confirmed absent: `requestedSections`, `tripIds`,
+  `isPartOfInternationalTrip`. (Curio: a **negative probe** already
+  injects `requestedSections` at `02-Common Requests/Post Offer-Req param
+  chk.yml:266-268` — the field has been on the wire from OSCAR before,
+  never as a feature.)
+- Places API typeahead (`attachPlaceAutocomplete`, #450) — reusable as-is
+  for the new section start/end place fields.
+- The **Test Framework** capability enum already lists the `FARE_*`
+  values (`scenarios.js:56-57`); the **scenario-level** picker
+  (`WIZ_OFFER_PARTS`, `scenarios.js:3093`) does not — the small unlock
+  stands as in rev 1.0.
 
 ---
 
-## 5. Proposed assertion list
+## 4. Sandbox evidence — fare capability is untested, not disproven
 
-Organised by **where** in the flow the check runs, and inside each step, by
-**how confident OSCAR can be** that a failure means the provider is wrong
-(vs. an ambiguous or provider-discretionary case that should WARN, not
-FAIL — the same philosophy already established for accommodation/offerMode
-work, #391/#436). Each row names the concrete field.
+Scan of `…/OTST/OSCAR reports/` (all real OSCAR runs; 232 extracted
+batch files + 7 loose, none encrypted): **zero fare markers across all
+four vendors** — no `FARE_ADMISSION`, `combinationConstraint`,
+`referenceCluster`, `regionalConstraint`, `requestedSections`,
+`travelValidityConstraint`, `involvedTCOs`, or model names anywhere.
 
-### 5.1 Offer response — structural presence (Layer-1, hard FAIL if absent)
+| Vendor | Files | Fare content | Note |
+|---|---|---|---|
+| Bileto | 74 | **NO — but closest**: `"fares": []` emitted on every `bookedOffers[]` entry (92×); `regionalValidity: null` present on admissions (118×) | serializer knows the container → **best first probe target** |
+| Paxone | 124 | NO — 0 markers | |
+| Turnit | 22 | NO — 0 markers | |
+| CHAPS | 12 | NO — prose-only mention ("differential fare paid on the train") | |
 
-These map straight to the `Fare` schema's own `required[]` list
-(`openapi3_0.json:13048-13058`) — a provider omitting a *spec-required*
-field is unambiguously non-conformant:
-
-| # | Assertion | Field |
-|---|---|---|
-| 1 | Fare has an `id`, `type`, and at least one price | `id`, `type`, `prices[]` |
-| 2 | `regionalConstraint` present, with ≥1 `regionalValidities` entry | `regionalConstraint.regionalValidities[]` |
-| 3 | `travelClass` present | `travelClass` |
-| 4 | `afterSalesCondition` present | `afterSalesCondition` |
-| 5 | `combinationConstraint` present, ≥1 entry, each with a `model` from the 4-value enum | `combinationConstraint[].model` |
-| 6 | `travelValidityConstraint` present, with a `validityRange` | `travelValidityConstraint.validityRange` |
-| 7 | `requiredCards` present, ≥1 entry, each with a `type` | `requiredCards[].type` — **see §9.1, semantics need confirming** |
-
-### 5.2 Offer response — coverage & consistency (generalising existing Product-flow patterns)
-
-These are **not new concepts** — they're the exact same checks OSCAR
-already runs for Product offers (#379 trip coverage, #382 reservation
-spec-coverage), re-pointed at the Fare-specific fields:
-
-| # | Assertion | Precedent this generalises |
-|---|---|---|
-| 8 | Fare's `coveredSection` matches a `requestedSections` entry (or the whole trip, if none was requested) | offer-covers-requested-trip check (#379) |
-| 9 | Fare's `passengerRefs` count/identity matches the requested passengers | `offer.passengerRefs` count check already in `offers.js` |
-| 10 | `type` (`FareType`) is `ADMISSION` for this scenario family (per the SFR's explicit expectation) — `RESERVATION`/`ANCILLARY` fares are a **different** scenario family, not a failure of this one | soft check, scenario-scoped — see §6 |
-| 11 | `referenceCluster` (when the model is `CLUSTERING`) is one of the declared flexibility values | new x-extensible-enum-style soft WARNING (provider-fairness precedent, #391/#436) — not hard-FAIL, since the SFR's ordered list isn't confirmed as a literal spec enum (§2.2) |
-| 12 | Negative cases (#244/#246/#248): a domestic trip, or `requestedSections` equal to the full trip, or an empty `requestedSections` on an international trip that needs no sectioning → **zero** fare offer parts returned | direct assertion, no precedent needed — simple absence check |
-
-### 5.3 Booking response — echo & lifecycle (reusing the generic part-matcher, §3)
-
-| # | Assertion | Mechanism |
-|---|---|---|
-| 13 | Every fare offered gets a corresponding booked fare (count + id/type match) | `validateOfferParts(..., "fare", ...)` — §3's reuse win |
-| 14 | Booked fare's price ties out to the offered fare's price | same equality-check idiom as `validatePartPrices()` (`bookings.js:97`) already applies to admission/reservation/ancillary |
-| 15 | Booked fare's `travelValidityConstraint`/`regionalConstraint` are structurally echoed (not necessarily byte-identical — providers may re-derive validity ranges at booking time; confirm equality vs. presence-only against a real response before deciding) | new, but same "does the response ever change key structural fields" audit lens as #390's window-aware pairing work |
-
-### 5.4 Fulfillment response
-
-| # | Assertion | Note |
-|---|---|---|
-| 16 | Fulfillment created for the fare booking part | standard fulfillment existence check, already generic (`validateFulfillments()`, `bookings.js:917`) |
-| 17 | Fulfillment **documents** missing/empty | **the SFR itself expects this** — candidate for a Known-Deviation baseline entry (#398/#401) per company, not a universal hard assertion; see §6.4 |
-
-### 5.5 Refund (#206, only lightly scoped here — full design deferred)
-
-Reuse the existing refund engine unchanged; the one Fare-specific thing to
-confirm once a live sandbox is available: does `afterSaleFee`/effective
-refundability read correctly off a `Fare`'s `afterSalesCondition` link the
-same way it reads off an `Admission`'s? If yes (likely, same schema ref),
-zero new code. If no, scoped as its own small follow-up, not blocking Shop/Book.
+Decisive nuance: **no OSCAR request has ever sent `requestedOfferParts`
+at all** (zero occurrences in any request body, any vendor, any batch) —
+so no vendor was ever *asked* for fares. Absence of evidence here is
+genuinely not evidence of absence. The cheapest possible next step —
+before any build — is a **manual probe**: one Bileto (then others) offer
+request with `requestedOfferParts: ["FARE_ADMISSION"]` on an
+international O/D, and see what comes back (fares? empty? 400? ignored?).
+That single data point decides whether Phase 1 tests run against a real
+sandbox or ship dormant. (No OBB or Sqills results exist in the reports
+folder; their capability is equally unknown.)
 
 ---
 
-## 6. How deep should validation go? (the question Patrick asked directly)
+## 5. Proposed scenario / datafile model (sketch, not final)
 
-Fare's `combinationConstraint` describes **four** models:
-`SEPARATE_TICKET`, `SEPARATE_CONTRACT`, `CLUSTERING`, `COMBINING`. There are
-at least four distinct depths at which OSCAR could claim to "test"
-combinability, each a real jump in cost and in what OSCAR can honestly
-assert:
+Unchanged in substance from rev 1.0; restated with §3's confirmations:
 
-### Tier A — Declared shape only (proposed baseline, §5.1 row 5)
-Confirm `combinationConstraint[]` exists and each entry's `model` is one of
-the four known values, and that CLUSTERING entries carry a
-`referenceCluster`. **This is checking that the provider said *something*
-coherent about combinability — not that the something is correct.**
+- Scenario-level `requestedOfferParts` gains the `FARE_*` values
+  (framework-level enum already has them).
+- New boolean `isPartOfInternationalTrip` (SFR step 1; single body field,
+  `openapi3_0.json:20392`).
+- New repeatable **Requested section** block: start/end place (wired to
+  `attachPlaceAutocomplete`), optional `startLegId`/`endLegId`,
+  `externalTripRef`. Empty list = whole trip priced.
+- `tripIds` as a third request shape (#245/#246), gated behind a
+  precursor trip-discovery step.
+- Downstream (booking/fulfillment/refund): no new scenario fields — a
+  fare offer's `id` books through the existing
+  `offers[].offerId/passengerRefs` shape unchanged.
 
-### Tier B — Self-consistency within one offer response
-If a single offer response returns multiple fares in the same `CLUSTERING`
-model, check their `referenceCluster`/`allowedClusters` values are mutually
-sane (e.g., no fare declares another's cluster as `allowedClusters` while
-that other fare's own list excludes the reverse). This is checkable from
-**one** provider's one response — no second vendor, no live re-booking
-needed. Moderate new logic, genuinely testable.
+---
+
+## 6. Proposed assertion list (rev 1.1)
+
+Organised by flow step; severity follows the established provider-fairness
+posture (#391/#436): hard FAIL only where the spec is unambiguous.
+
+### 6.1 Offer response — structural presence (Layer-1)
+
+Per the `Fare` schema's own `required[]`:
+
+| # | Assertion | Severity |
+|---|---|---|
+| 1 | each fare has `id`, `type`, `prices[]` (≥1, each amount/currency valid) | FAIL |
+| 2 | `regionalConstraint` present with ≥1 `regionalValidities` | FAIL |
+| 3 | `travelClass` present | FAIL |
+| 4 | `afterSalesCondition` present | FAIL |
+| 5 | `combinationConstraint[]` present, ≥1, each entry has a non-empty `model` string | FAIL |
+| 5b | **[rev 1.1]** each `model` matches one of the four documented models under **lenient** matching (case/`_MODEL` suffix/plural tolerant, per the spec's own prose drift §2.3) | WARNING when unrecognised — free string, can't hard-fail |
+| 6 | `travelValidityConstraint` present with `validityRange` | FAIL |
+| 7 | **[rev 1.1]** `requiredCards`: version-gated — `osdmVersion` ≤3.5: required, ≥1 entry each with `type` (FAIL); ≥3.6: optional, but when present ≥1 entry with `type` (FAIL on present-but-malformed only) | FAIL / version-gated |
+| 7b | `involvedTCOs` present for rail fares (SFR expectation; spec field optional) | WARNING |
+
+### 6.2 Offer response — coverage & consistency
+
+Grounded in §2.5's normative partial-coverage rules + the upstream #93
+union consensus (§3.1):
+
+| # | Assertion | Severity |
+|---|---|---|
+| 8 | **union-based section coverage**: the fares' `coveredSection`s jointly cover every `requestedSections` entry (or the whole trip when none requested) — never count-based | FAIL |
+| 8b | **[rev 1.1]** offerCluster integrity per §2.5: within a trip's offers, no leg covered by two offerClusters (no overlap) and every leg covered by ≥1 offer (no gap) | FAIL |
+| 9 | fares cover **all** requested passengers ("an offer must include fares for all passengers", §2.1); free-transport passengers get a zero-price fare, not an absent one | FAIL |
+| 10 | `type` is `ADMISSION` for this scenario family | scenario-scoped soft check |
+| 11 | **[rev 1.1]** when a model is `CLUSTERING`: `referenceCluster` present and ∈ {`BUSINESS`,`FULL_FLEX`,`SEMI_FLEX`,`NON_FLEX`,`PROMO`} (exact spellings, §2.4) | WARNING on unknown value (deep-dive list, not a schema enum) |
+| 12 | negative cases (#244/#246/#248): domestic trip / whole-trip section / empty sections on a section-less itinerary → **zero** fares returned | FAIL (simple absence check) |
+
+### 6.3 Booking response
+
+Via the fare-field adapter + existing matcher (§3.4):
+
+| # | Assertion | Severity |
+|---|---|---|
+| 13 | every offered fare booked (union/id-based, adapter-fed `validateOfferParts(..., "fare")`) | FAIL |
+| 14 | booked fare price ties out to the offered `prices[]` (currency-matched entry) | FAIL |
+| 15 | `status` lifecycle correct (`BookingPartStatus`, works unchanged today) | FAIL |
+| 16 | `regionalConstraint`/`travelValidityConstraint` structurally present on the booked fare (presence, not byte-equality — providers may re-derive validity at booking; revisit after first live response) | WARNING |
+
+### 6.4 Fulfillment — **[rev 1.1] inverted from rev 1.0**
+
+| # | Assertion | Severity |
+|---|---|---|
+| 17 | fulfillment created for the fare booking part, `fulfillmentId` returned | FAIL |
+| 18 | fulfillment **documents empty/absent = normal fare-mode behaviour** → INFO line ("distributor constructs the ticket"); documents **non-empty** → INFO note "bilateral-agreement fulfillment content present" (never FAIL either way) | INFO |
+| — | prerequisite bug fixes B1/B2/B3 (§3.3) — without them a fare fulfillment spuriously fails or crashes the script | pre-work |
+
+rev 1.0 proposed a Known-Deviation baseline entry for empty documents;
+withdrawn — the spec says empty is the norm, so no deviation exists to
+baseline.
+
+### 6.5 Refund (#206 — scoped, not designed here)
+
+Mechanics already flow (fulfillmentIds are family-agnostic, §3.4); the
+work is extending the three hardcoded family-lookups in `refunds.js` and
+teaching `afterSalesRules.js` the fare field shapes
+(`afterSalesCondition` link, `prices[]`). Small, bounded; deferred to its
+own phase.
+
+---
+
+## 7. How deep should combinability validation go?
+
+The four documented models (§2.3) can be "tested" at four depths:
+
+### Tier A — Declared shape (baseline, §6.1 rows 5/5b/11)
+The provider said *something* coherent: models present, leniently
+recognisable, CLUSTERING entries carry a cluster. Table stakes; checks
+presence, not correctness.
+
+### Tier B — Self-consistency within one response **[rev 1.1: now has normative teeth]**
+The deep-dive's ordering rule (§2.4) makes this concrete and genuinely
+assertable from a **single** provider response, no second vendor needed:
+
+- every `referenceCluster`/`allowedClusters` value ∈ the five known
+  clusters (else WARNING, x-extensible-style);
+- `allowedClusters` ⊇ nothing *more flexible* than `referenceCluster` —
+  a NON_FLEX fare listing BUSINESS in `allowedClusters` contradicts "same
+  or less flexibility" (WARNING: contradicts the deep-dive ordering);
+- mutual sanity across fares of one response: if fare A (cluster X) allows
+  cluster Y and fare B (cluster Y) exists in the same response, flag when
+  B's own constraints exclude X entirely — an asymmetry the distributor
+  cannot resolve (WARNING + report note, since multi-constraint "one must
+  match" semantics can legitimise some asymmetries);
+- `COMBINING` fares must carry usable after-sales fee data (the
+  distributor is bound to it — its absence makes the model inoperable):
+  WARNING when the after-sales link resolves to nothing.
 
 ### Tier C — Live combination behaviour, single vendor
-Actually **book two fares together** (e.g., two `SEPARATE_TICKET` fares
-crossing a `FareConnectionPoint`) and confirm the provider's booking
-response is consistent with what the individual offers declared. This
-requires a sandbox whose test data models ≥2 combinable fare families for
-the *same* vendor — not guaranteed to exist in any current OSCAR company's
-datafile, and not something OSCAR can manufacture (it depends on the
-vendor's own fare catalog shape).
+Book two fares across a `FareConnectionPoint` and check the booking is
+consistent with the declared constraints. **Empirical gate first** (§4):
+no current sandbox has demonstrated even single-fare support. The manual
+`FARE_ADMISSION` probe (Bileto first) decides whether Tier C is plannable
+at all. Deferred pending that data point.
 
 ### Tier D — Cross-carrier combination enforcement
-The genuinely hard case: booking fare A from carrier X with fare B from
-carrier Y and confirming the *combined* booking is accepted or rejected per
-`combinableCarriers`/`allowedCommonContracts`. This requires **two
-providers in one test**, which is a different category of test
-(interop/settlement between two UIC members) than what OSCAR — a
-per-company conformance runner — is built to exercise. My own prior
-analysis of the OSDM/NeTEx boundary (cross-referenced, not re-derived here)
-independently identifies exactly this multi-carrier combination layer as
-the piece that exists **only** in OSDM's transaction model with no
-declarative counterpart to check it against — there is no second, canonical
-source of truth to assert the combination *should* have succeeded or
-failed. Any "test" at this tier is really testing one specific bilateral
-agreement between two named carriers, not a conformance rule.
+Combining fare A (carrier X) with fare B (carrier Y) per
+`combinableCarriers`/`allowedCommonContracts` requires **two providers in
+one test** — interop/settlement territory, not per-vendor conformance.
+Additionally, §2.1 places combined-product correctness on the
+**distributor**, which in a fare-mode test is OSCAR itself — the provider
+cannot fail a check about logic the spec assigns to the caller.
+Recommendation unchanged: explicitly out of OSCAR's scope; flag at UIC
+level as an interop-test concern rather than quietly under-delivering.
 
-**My recommendation:** ship Tier A now (it's simply the `Fare` object's own
-required fields — no separate design decision needed, it's table stakes).
-Propose Tier B as the real "did we test combinability" deliverable for this
-first pass — it's honest, self-contained, and doesn't need any special test
-data most vendors won't have. Explicitly **defer** Tier C pending a check of
-whether any current OSCAR company's fare catalog would even support it (an
-empirical question, not a design one — worth someone on the OTST team
-checking a live sandbox before we plan for it). Recommend **not** attempting
-Tier D inside OSCAR at all — flag it as a UIC-level interop test concern,
-separate from per-vendor conformance, and say so explicitly rather than
-quietly under-delivering against an implied expectation.
-
-**This is the one section I most want the team's disagreement on** — the
-Tier C/D line is a judgment call about what "conformance testing"
-reasonably means for something as inherently multi-party as fare
-combination, and reasonable people could draw it differently.
+**Recommendation:** Tier A + Tier B in the first pass (B is now concrete,
+§ above); Tier C behind the sandbox probe; Tier D declared out of scope.
+Still the section most deserving the team's pushback.
 
 ---
 
-## 7. Phased delivery (proposed, pending OK)
+## 8. Phased delivery (proposed, pending OK)
 
-1. **Phase 1 — Shop.** §3's genuinely-new items: `requestedSections` +
-   `isPartOfInternationalTrip` scenario fields, scenario-level
-   `FARE_*` unlock, `validateFares()` in `offers.js` (§5.1 + §5.2, Tier A
-   depth). Covers #243/#244/#247/#248 (the `tripSearchCriteria` and
-   `tripSpecifications` variants — no new request-shape code needed).
-2. **Phase 2 — `tripIds` request shape.** The one missing request
-   mechanism (§2.4). Covers #245/#246.
-3. **Phase 3 — Book + Fulfillment.** §5.3/§5.4, reusing
-   `validateOfferParts()` with a new `"fare"` partType. Covers #205/#207
-   (Product-vs-Fare negative case) and closes out the core SFR scenario.
-4. **Phase 4 — Tier B combinability self-consistency** (§6), if the team
-   confirms it's worth a dedicated phase rather than folding into Phase 1.
-5. **Phase 5 — Refund** (#206) — thin, mostly a verification pass against
-   the existing refund engine per §5.5, not a rebuild.
-6. **Not yet phased:** #255 (BIKE passenger type on a fare reservation) —
-   orthogonal passenger-type dimension, layers on cleanly once Phase 3
-   ships; needs its own short look at whether BIKE already flows through
-   the existing passenger-type machinery for Fares the same way it does
-   for Product (`osdmEnums.js` already lists `BICYCLE` as a passenger
-   type, per #380-era work — likely low-effort once there's a Fare
-   booking to hang it on).
-
----
-
-## 8. Open questions for the OTST team
-
-1. **§6 — where's the Tier C/D line?** Concretely: is there *any* vendor
-   sandbox OSCAR currently has access to whose fare catalog would let us
-   even attempt a live 2-fare combination booking? If the answer is "no
-   vendor has this yet," Tier B is the practical ceiling regardless of
-   ambition.
-2. **§5.1 row 7 — `requiredCards` semantics.** The schema requires ≥1 entry
-   on *every* fare. Does this mean every fare, even a plain point-to-point
-   ticket, must declare a travel-account type (settlement/accounting
-   metadata), or is this a spec artifact that in practice some
-   implementations under-populate? Worth confirming against a real
-   response before deciding whether absence is a hard FAIL or a WARNING.
-3. **§2.2 — is the `BUSINESS > FULL-FLEX > SEMI-FLEX > NON-FLEX > PROMO`
-   ordering a literal spec enum** or codified OTST-team convention from
-   observed implementations? Changes whether row 11 is a strict `oneOf` or
-   a softer "is this a plausible flexibility label" check.
-4. **Scenario model — new `scenarioType`, or a flag on `SALE`?** This
-   proposal assumes Fare scenarios are `SALE`-family scenarios that merely
-   request `FARE_ADMISSION` instead of `ADMISSION` (§4.1) — no new
-   top-level scenario type. Confirm that matches how the team thinks about
-   it, since it affects the wizard's information architecture.
-5. **Upstream issue #93** (referenced from #243: *"There is an issue to
-   take into account if the logic of the product will be re-used for offer
-   validation"*) — lives in the original `UnionInternationalCheminsdeFer/
-   OSDM-testing` repo, not migrated into this one; I could not resolve its
-   content. If it contains a decision already made upstream, it should
-   override §3's reuse proposal where they conflict.
+0. **Phase 0 — pre-work, independent of fare review:** fix B1/B2/B3
+   (§3.3) and remove/re-aim the dead `fare*OfferParts` scan (§3.2). B2 is
+   a live crash risk for any vendor omitting `bookingParts` today.
+   *Recommended to ship immediately as plain bug fixes — but per the
+   review-first instruction, listed here for the explicit OK rather than
+   started.*
+1. **Phase 0.5 — empirical probe (no code):** manually send one
+   `requestedOfferParts: ["FARE_ADMISSION"]` offer request to Bileto
+   (then Paxone/Turnit/CHAPS) on an international O/D; record what comes
+   back. Decides whether Phase 1 lands runnable or dormant, and whether
+   Tier C is worth planning.
+2. **Phase 1 — Shop:** `requestedSections` + `isPartOfInternationalTrip`
+   scenario fields, scenario-level `FARE_*` unlock, `validateFares()`
+   implementing §6.1 + §6.2 (+ Tier B if the team agrees). Covers
+   #243/#244/#247/#248.
+3. **Phase 2 — `tripIds` request shape** (+ precursor trip discovery).
+   Covers #245/#246.
+4. **Phase 3 — Book + Fulfillment:** fare-field adapter + `"fare"`
+   partType through the booking matcher; fulfillment per §6.4. Covers
+   #205/#207 and completes the SFR core scenario.
+5. **Phase 4 — Refund (#206):** the bounded `refunds.js`/
+   `afterSalesRules.js` extensions (§6.5).
+6. **Unphased:** #255 (BIKE passenger type on a fare reservation) — note
+   §2.2: reservation-as-fare is deprecated in favour of
+   `distributionMode: FARE_MODE`; #255's design should target that form.
 
 ---
 
-## 9. Out of scope for this document
+## 9. Open questions for the OTST team (rev 1.1 — pruned)
 
-- **Ticket-time / consumption validation** (barcode content per IRS
-  90918-4/-9/-10, physical fulfillment-document structure) — a fulfillment
-  *existing* is in scope (§5.4); its printed/barcoded content is not.
-- **#226** (delete exchange → new offer request) — unrelated mechanism,
-  not fare-specific.
-- **#221** (post-refactor code review) and **#227** (offer-request
-  age/gender parameters) — explicitly reserved for Patrick's own review
-  per standing instruction; not touched here even tangentially.
-- Any actual implementation — this entire document is the proposal to be
-  reviewed, not a plan being executed.
+Resolved since rev 1.0 and removed: `requiredCards` semantics (→
+version-gated, §2.2); cluster-list status (→ deep-dive table, exact
+spellings, soft check, §2.4); upstream #93 content (→ resolved, §3.1).
+
+Remaining:
+
+1. **§7 — confirm the Tier line.** Tier A+B first pass, C behind the
+   probe, D out of scope: agreed?
+2. **Phase 0 timing** — may the three bug fixes (and dead-code removal)
+   ship now as ordinary bug PRs, ahead of the fare review outcome? B2 can
+   crash a run today.
+3. **Phase 0.5 probe** — who runs it, and against which sandboxes beyond
+   Bileto? (One manual request per vendor; no OSCAR changes needed.)
+4. **Scenario model** — fare scenarios as `SALE`-family with `FARE_*`
+   requested parts (no new scenarioType), per §5: confirm.
+5. **`SEPARATE_TICKET`** is never defined in the spec text (§2.3) — does
+   the team have an agreed operational meaning, or should OSCAR treat it
+   as recognised-but-semantics-unchecked?
 
 ---
 
-## 10. References
+## 10. Out of scope
 
-- Umbrella: [#242](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/242) · Positive/negative pairs: [#243](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/243)/[#244](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/244), [#245](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/245)/[#246](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/246), [#247](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/247)/[#248](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/248) · Product-comparison pair: [#205](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/205)/[#207](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/207) · Follow-ons: [#206](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/206), [#255](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/255)
-- SFR wiki: [Fare based distribution Shop Book Ticket](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/wiki/Fare-based-distribution-Shop-Book-Ticket)
-  (quoted in full, §2.5)
-- Spec citations: all `openapi3_0.json` line numbers above refer to
-  `Bruno_Collection/json_validator/openapi3_0.json` in this repo, current
-  as of `main` at the time of writing (2026-07-03).
-- Prior related work this proposal builds on: #371/#373/#379/#382 (Product
-  trip/reservation coverage patterns generalised in §5.2), #388/#390/#391/
-  #392/#397 (refund/effective-refundability engine reused in §5.5), #398/
-  #401 (Known-Deviation baseline, referenced in §5.4/§6.4), #450 (Places
-  API typeahead, reused in §4.2).
-- Template: this document follows the structure of
-  `RequestedInformation_Plan_258.md` and `OPT_Place_Selection_Plan_104.md`
-  in this same folder.
+- Ticket-time/consumption validation (barcode content per IRS 90918-4/-9/-10).
+- **#226** (delete exchange → new offer) — unrelated mechanism.
+- **#221** / **#227** — explicitly reserved for Patrick's own review.
+- Building on the deprecated fare place-selection fields or
+  reservation-as-fare (§2.2) — first pass targets the non-deprecated core.
+- Any implementation — this document is the proposal under review.
+
+---
+
+## 11. References
+
+- Umbrella [#242](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/242) · pairs [#243](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/243)/[#244](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/244), [#245](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/245)/[#246](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/246), [#247](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/247)/[#248](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/248) · product-comparison [#205](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/205)/[#207](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/207) · follow-ons [#206](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/206), [#255](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/issues/255) · upstream [OSDM-testing#93](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/issues/93)
+- Spec: [Constructing Products from Fares](https://osdm.io/spec/constructing-products-from-fares/) · [Data Models — Offers with Partial Coverage](https://osdm.io/spec/models/) · [Code-list catalog](https://osdm.io/spec/catalog-of-code-lists/) · `UnionInternationalCheminsdeFer/OSDM` `specification/schemas/fare.yml`, `offer.yml` + versioned bundles `v3.2`…`v3.9`
+- SFR: [Fare based distribution Shop Book Ticket](https://github.com/UnionInternationalCheminsdeFer/OSDM-testing/wiki/Fare-based-distribution-Shop-Book-Ticket) (§2.6, verbatim)
+- Local schema citations: `Bruno_Collection/json_validator/openapi3_0.json` at `main`, 2026-07-03
+- Sandbox evidence: `…/projets/OSDM/OTST/OSCAR reports/` — 239 files, Bileto/Paxone/Turnit/CHAPS, 2026-05-24→2026-06-18 (§4)
+- Prior OSCAR work built on: #371/#373/#379/#382 (coverage patterns), #388/#390/#391/#392/#397 (refund engine), #398/#401 (Known-Deviation baseline), #450 (Places typeahead)
+- Template: `RequestedInformation_Plan_258.md`, `OPT_Place_Selection_Plan_104.md`
