@@ -331,6 +331,7 @@ function postOfferResponse(jsonData) {
   validateAncillaries(selectedOffer);
 
   handleAccommodationAndPlaceSelection(selectedOffer);
+  handleOptionalReservationSelections(selectedOffer);
 
   // Expired-add-reservation-offer test (Phase 5a): capture the validUntil of
   // the SPECIFIC reservationOfferPart that the post-booking
@@ -1778,6 +1779,31 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
   const tripLegCoverage = getTripLegCoverage(selectedOffer, accommodationSelection);
   bru.setEnvVar("tripLegCoverage", JSON.stringify(tripLegCoverage));
   validationLogger(`[DEBUG] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
+}
+
+// #239: book the selected offer's reservationOfferParts via
+// optionalReservationSelections — the OSDM mechanism for offers where a
+// reservation is mandatory, distinct from (and independent of)
+// placeSelections/accommodationSelection above, which additionally state
+// WHICH place/compartment is wanted. This only declares the reservation(s)
+// themselves should be booked, one {reservationId} entry per part.
+function handleOptionalReservationSelections(selectedOffer) {
+  const bookMandatoryReservations = bru.getEnvVar("bookMandatoryReservations");
+  if (bookMandatoryReservations !== true && bookMandatoryReservations !== "true") {
+    return;
+  }
+  validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
+
+  const reservationParts = selectedOffer.reservationOfferParts || [];
+  if (reservationParts.length === 0) {
+    validationLogger("[WARN] bookMandatoryReservations is enabled but the selected offer has no reservationOfferParts — nothing to add to optionalReservationSelections.");
+    bru.setEnvVar("optionalReservationSelections", JSON.stringify([]));
+    return;
+  }
+
+  const selections = reservationParts.map(part => ({ reservationId: part.id }));
+  bru.setEnvVar("optionalReservationSelections", JSON.stringify(selections));
+  validationLogger(`[INFO] optionalReservationSelections will book ${selections.length} reservationOfferPart(s): ${reservationParts.map(p => p.id).join(", ")}`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
