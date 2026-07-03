@@ -704,8 +704,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
   // Record wall-clock time before Bruno starts so we can later filter report
   // files by mtime — stale reports from previous runs (same day, same company)
-  // must NOT be linked as artifacts for this run.
-  const runStartTime = Date.now();
+  // must NOT be linked as artifacts for this run. Subtract a safety margin:
+  // some filesystems (observed in CI container storage drivers) round/truncate
+  // a file's reported mtime to coarser-than-millisecond precision, which can
+  // put a file's mtime just BELOW runStartTime even though it was genuinely
+  // written after. A previous run's report is always at minimum seconds old
+  // in practice, so a couple of seconds of margin costs nothing on the
+  // staleness guarantee while eliminating this sub-second truncation race.
+  const MTIME_FILTER_SAFETY_MARGIN_MS = 2000;
+  const runStartTime = Date.now() - MTIME_FILTER_SAFETY_MARGIN_MS;
 
   // Detect auth/format failures in Bruno log output
   let authErrorDetected  = false;
