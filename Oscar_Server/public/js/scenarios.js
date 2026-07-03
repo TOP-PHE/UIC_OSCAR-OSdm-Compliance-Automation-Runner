@@ -1946,6 +1946,24 @@ function buildSalesFlowActionsSection(idx, sc) {
           </div>
         </div>`;
 
+  // #211: gender-segregation preference (MEN/LADIES/MIXED), only meaningful
+  // for night-train COUCHETTE/BERTH compartments — asserts the offer's
+  // availablePlaces.placeProperties, states the preference in the booking
+  // request, and checks the booked response echoes it. Not a passenger-level
+  // field (see #227, out of scope here).
+  const _accGender = sc.accommodationGenderPreference || '';
+  const genderPickerHtml = `
+        <div class="fw-subsection" style="margin-top:12px">
+          <div class="fw-subsection-label" style="margin-bottom:6px">Preferred place gender <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— for gender-segregated night-train Couchette/Berth compartments; states the desired placeProperties in the booking request and checks it's echoed back</span></div>
+          <div class="pill-group">
+            ${[['', '— any —', 'No gender preference (default — current behaviour)'],
+               ['MEN', '♂ Men', 'Select a MEN-designated compartment place'],
+               ['LADIES', '♀ Ladies', 'Select a LADIES-designated compartment place'],
+               ['MIXED', '⚥ Mixed', 'Select a MIXED-designated compartment place']]
+              .map(([v, l, d]) => `<div class="pill${_accGender === v ? ' selected' : ''}" data-action="set-accommodation-gender" data-idx="${esc(idx)}" data-val="${esc(v)}" title="${esc(d)}"${_accStyle}>${l}</div>`).join('')}
+          </div>
+        </div>`;
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">🛒 Booking Flow Actions <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">optional steps during the booking → fulfillment phase (applies to SALE, REFUND and EXCHANGE scenarios, which all start with a booking)</span><span class="ps-arrow">▶</span></div>
@@ -1954,6 +1972,7 @@ function buildSalesFlowActionsSection(idx, sc) {
         <div class="pill-group">${pills}</div>
         ${modePickerHtml}
         ${accommodationPickerHtml}
+        ${genderPickerHtml}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),
@@ -6248,6 +6267,19 @@ document.body.addEventListener('click', function(e) {
       accSc.accommodationSelection = el.dataset.val || null;
       const accGrp = el.parentElement;
       if (accGrp) accGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+      markDirty();
+      break;
+    }
+    case 'set-accommodation-gender': {
+      // #211: single-select gender-segregation preference (MEN/LADIES/MIXED)
+      // for night-train COUCHETTE/BERTH compartments; '' (— any —) clears it.
+      e.stopPropagation();
+      const genIdx = parseInt(el.dataset.idx);
+      const genSc = state.scenarios[genIdx];
+      if (!genSc) break;
+      genSc.accommodationGenderPreference = el.dataset.val || null;
+      const genGrp = el.parentElement;
+      if (genGrp) genGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
       markDirty();
       break;
     }

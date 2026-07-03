@@ -14,6 +14,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.180 / collection-OTST_V2.0.96] — 2026-07-03
+
+**Feature (#211): Night Train Sales & Refund — the SFR's two accommodation
+families (bed in shared compartment vs. private compartment) are now
+reliably distinguishable and validated end-to-end.**
+
+### Added
+
+- **`datafile.schema.json`** — `accommodationSelection` enum synced to match
+  what the wizard/code have used since #373 (was stale: only
+  `SEAT`/`COMPARTMENT`, now includes `COUCHETTE`/`BERTH`/`VEHICLE`). New
+  sibling field `accommodationGenderPreference` (`MEN`/`LADIES`/`MIXED`) for
+  gender-segregated night-train compartments — not a passenger-level field;
+  #227 (age/gender as an offer-request input) stays untouched.
+- **`scenarios.js`** — new "Preferred place gender" wizard pill picker,
+  wired the same way as the existing accommodation-type picker.
+
+### Changed
+
+- **`offers.js` `handleAccommodationAndPlaceSelection()`** — reservationOfferPart
+  selection is now offerMode-aware: when the scenario declares `offerMode`,
+  prefers a part whose own `offerMode` matches (a vendor offering both an
+  INDIVIDUAL and a COLLECTIVE part of the same accommodation type could
+  previously have the wrong one silently booked). Also prefers a place
+  whose `placeProperties` matches the new gender preference, and harvests
+  `placeProperties` into `selectedAccommodation` so it flows into the
+  booking request. Falls back with a `[WARNING]` (never a hard fail) when
+  no match exists.
+- **`offers.js`** — new soft assertions: `minGroupItemsToBeBooked`/
+  `maxGroupItemsToBeBooked` type-checked when present; COUCHETTE/BERTH
+  `availablePlaces` warn when no MEN/LADIES/MIXED `placeProperties` is
+  declared.
+- **`bookings.js` `validateAccommodationGoal()`** — the place-count check is
+  now a **hard** assertion when the scenario declared an `offerMode`
+  (exactly 1 place for INDIVIDUAL, place count == party size for
+  COLLECTIVE); stays a soft `[WARNING]` for every scenario that doesn't
+  declare `offerMode` (unaffected, backward compatible). Added a
+  `placeProperties` request-vs-response echo check (`[WARNING]` only).
+- Not breaking — every new field is optional/additive; `min_collection`
+  unchanged at `OTST_V2.0.95`.
+
+### Tests
+
+- Full suite 53 suites / 1321 tests green (unaffected — no server-side test
+  file touched directly). `Bruno_Collection` has no Jest harness (documented
+  pre-existing gap); verified instead via `node --check` on every edited
+  file, schema JSON-parse, and `opencollection.yml` YAML + before-request JS
+  syntax-check. Live browser verification of the new wizard picker was not
+  completed — obtaining a test-manager session would have required
+  resetting a seeded dev user's password, which the permission system
+  correctly blocked as an unauthorized credential mutation; the picker is a
+  byte-for-byte pattern match of the already-proven `accommodationSelection`
+  picker.
+
+---
+
 ## [server-v1.11.179 / collection-OTST_V2.0.95] — 2026-07-03
 
 **Security (#306): the ephemeral Bruno env yml is now credential-free — no plaintext

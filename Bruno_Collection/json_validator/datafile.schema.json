@@ -362,8 +362,13 @@
           },
           "accommodationSelection": {
             "type": ["string", "null"],
-            "description": "Type of accommodation to select during place selection. E.g. 'SEAT', 'COMPARTMENT'.",
-            "enum": ["SEAT", "COMPARTMENT", "", null]
+            "description": "Type of accommodation to select during place selection. E.g. 'SEAT', 'COUCHETTE', 'BERTH', 'VEHICLE', 'COMPARTMENT'.",
+            "enum": ["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "COMPARTMENT", "", null]
+          },
+          "accommodationGenderPreference": {
+            "type": ["string", "null"],
+            "description": "Issue #211 — for gender-segregated night-train COUCHETTE/BERTH compartments, the desired availablePlaces.placeProperties value to select (and to assert echoed back in the booking response). Not a passenger-level field (see #227).",
+            "enum": ["MEN", "LADIES", "MIXED", "", null]
           },
           "stepFailurePolicy": {
             "type": ["string", "null"],
