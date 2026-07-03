@@ -521,8 +521,11 @@ function accommodationAndPlaceSelection() {
 
   if (hasSelAcc) {
     // #371: the offer told us exactly which compartment is bookable - send
-    // its real type/subType (e.g. COUCHETTE / COUCHETTE_COMFORT_4); no
-    // fabricated placeProperties.
+    // its real type/subType (e.g. COUCHETTE / COUCHETTE_COMFORT_4). #211:
+    // selectedAccommodation may also carry a real placeProperties value
+    // (e.g. gender-segregation MEN/LADIES/MIXED) harvested from the offer's
+    // availablePlaces in offers.js — Object.assign below carries it through
+    // as-is; nothing here is fabricated.
     placeSelection.accommodations = [Object.assign({ passengerRefs }, selectedAccommodation)];
   } else if (accommodationSelection === "COUCHETTE") {
     // Legacy fallback for providers whose offers carry no availablePlaces

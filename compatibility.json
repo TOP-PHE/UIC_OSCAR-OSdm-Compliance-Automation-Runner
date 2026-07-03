@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.207",
+  "current_release": "2026.208",
   "releases": [
+    {
+      "release": "2026.208",
+      "date": "2026-07-03",
+      "server": "1.11.180",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #211 — Night Train Sales & Refund: the two SFR-specified scenario families (bed in shared compartment, offerMode INDIVIDUAL; private compartment, offerMode COLLECTIVE) are now reliably distinguishable and validated end-to-end. Investigation found most of the mechanism already existed from the earlier NJ/IRT accommodation programme (#377-#392) — offerMode, the COUCHETTE/BERTH accommodation-type picker, admission-by-reference validation, and multi-passenger booking into one shared reservation were all already wired end-to-end. The real gaps: (1) datafile.schema.json's accommodationSelection enum was stale (only SEAT/COMPARTMENT) while the wizard/code had used COUCHETTE/BERTH since #373 — synced to match; added a sibling accommodationGenderPreference enum (MEN/LADIES/MIXED). (2) offers.js handleAccommodationAndPlaceSelection() picked the first reservationOfferPart matching the desired accommodationType with NO regard for offerMode — a vendor offering both an INDIVIDUAL and a COLLECTIVE part of the same type could silently book the wrong one; now prefers a part whose own offerMode matches the scenario's, and a place whose placeProperties matches the desired gender preference (soft WARNING fallback, never a hard fail, when no match exists — provider-fairness precedent from #391/#436). Also harvests placeProperties from the matched availablePlace into selectedAccommodation, which flows into the booking request's accommodations[] via the existing Object.assign in requestsBuilder.js (no code change needed there). (3) New SFR-specific soft assertions: admissionOfferParts.minGroupItemsToBeBooked/maxGroupItemsToBeBooked type-checked when present (expectTypeOrNull, same idiom as existing nullable-scalar checks); COUCHETTE/BERTH availablePlaces WARN when no MEN/LADIES/MIXED placeProperties is present. (4) bookings.js validateAccommodationGoal(): the place-count-vs-party-size check is now a HARD assertion when the scenario declared an offerMode (exactly 1 place for INDIVIDUAL, place count == party size for COLLECTIVE) while staying a soft WARNING for every scenario that doesn't declare offerMode (unaffected, backward compatible); added a placeProperties request-vs-response echo check (WARNING only — OSDM doesn't guarantee the response echoes it). (5) New 'Preferred place gender' wizard pill picker in scenarios.js, wired the same way as the existing accommodation-type picker. Deliberately NOT touching #227 (passenger-level gender as an offer-request parameter) — the SFR's 'gender-dependent' language refers to the accommodation's placeProperties field, a different, already-partially-built mechanism; #227 stays reserved for the repo owner.",
+        "Not breaking: every new field is optional and additive — an older server against this collection, or this server against the prior OTST_V2.0.95 collection, both degrade gracefully (the new preferences are simply not exercised). min_collection unchanged at OTST_V2.0.95.",
+        "Verification: full suite 53 suites / 1321 tests green (no server-side test file touched directly — Bruno_Collection has no Jest harness, a documented pre-existing gap, out of scope here); eslint + inline-script lint clean; node --check on every edited Bruno_Collection JS file; datafile.schema.json JSON-parses; opencollection.yml YAML-parses and its before-request hook JS syntax-checks clean. Live browser verification of the new wizard pill picker was not completed this session — resetting a seeded dev user's password to obtain a test-manager session was correctly blocked by the permission system as an unauthorized credential mutation; the picker is a byte-for-byte pattern match of the already-proven accommodationSelection picker (same data-action/click-handler/scenarioParser wiring) plus a clean syntax check."
+      ]
+    },
     {
       "release": "2026.207",
       "date": "2026-07-03",

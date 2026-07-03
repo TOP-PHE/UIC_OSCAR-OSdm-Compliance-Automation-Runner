@@ -1057,6 +1057,26 @@ function validateAdmissions(selectedOffer) {
         });
       }
 
+      // #211 (SFR night-train spec): minGroupItemsToBeBooked/maxGroupItemsToBeBooked
+      // are optional OSDM fields — not every vendor populates them, so this is a
+      // soft type-check only, never a hard requirement that they equal 1.
+      if ("minGroupItemsToBeBooked" in admission) {
+        test(`AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked is a number or null - value: ${admission.minGroupItemsToBeBooked}`, function () {
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked: ${admission.minGroupItemsToBeBooked}`);
+          expectTypeOrNull(admission.minGroupItemsToBeBooked, "number", "minGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
+        });
+      } else {
+        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare minGroupItemsToBeBooked (optional per OSDM) → check skipped`);
+      }
+      if ("maxGroupItemsToBeBooked" in admission) {
+        test(`AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked is a number or null - value: ${admission.maxGroupItemsToBeBooked}`, function () {
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked: ${admission.maxGroupItemsToBeBooked}`);
+          expectTypeOrNull(admission.maxGroupItemsToBeBooked, "number", "maxGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
+        });
+      } else {
+        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare maxGroupItemsToBeBooked (optional per OSDM) → check skipped`);
+      }
+
       // appliedPassengerTypes each has a type and passengerRef
       const appliedPassengerTypes = admission.appliedPassengerTypes || [];
       if (appliedPassengerTypes.length > 0) {
@@ -1274,6 +1294,19 @@ function validateReservations(selectedOffer) {
             validationLogger(`[WARNING] Reservation part ${i + 1} availablePlaces[${pIndex}].accommodationType '${_t}' is outside the OSDM base AccommodationType list [${KNOWN_ACCOMMODATION_TYPES.join(", ")}] — legal for an x-extensible-enum (custom code), but cross-vendor tooling may not understand it.`);
           }
         });
+        // #211 (SFR night-train spec): gender-segregated COUCHETTE/BERTH
+        // compartments are expected to carry a MEN/LADIES/MIXED placeProperties
+        // entry. Soft WARNING, not a FAIL — placeProperties is not a
+        // mandatory OSDM field and some vendors may not run gender-segregated
+        // night trains at all.
+        const GENDER_PLACE_PROPERTIES = ["MEN", "LADIES", "MIXED"];
+        const _nightAccPlaces = availablePlaces.filter(pl => pl && ["COUCHETTE", "BERTH"].includes(String(pl.accommodationType || "").toUpperCase()));
+        if (_nightAccPlaces.length > 0) {
+          const _hasGenderProp = _nightAccPlaces.some(pl => Array.isArray(pl.placeProperties) && pl.placeProperties.some(p => GENDER_PLACE_PROPERTIES.includes(p)));
+          if (!_hasGenderProp) {
+            validationLogger(`[WARNING] Reservation part ${i + 1} has COUCHETTE/BERTH availablePlaces but none declare a gender-segregation placeProperties value (${GENDER_PLACE_PROPERTIES.join("/")}) — legal (placeProperties is optional per OSDM), but night-train gender-dependent scenarios (#211) cannot be exercised against this offer.`);
+          }
+        }
       } else {
         validationLogger(`[DEBUG] No availablePlaces for reservation id=${reservation.id} → test skipped`);
       }
@@ -1689,22 +1722,54 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
 
   matchingParts.forEach(part => validationLogger(`[DEBUG] ${accommodationSelection} reservationOfferPart.id: ${part.id}`));
   bru.setEnvVar("reservationIds", JSON.stringify(matchingParts.map(part => part.id)));
-  bru.setEnvVar("reservationId", matchingParts[0].id);
+
+  // #211: night-train scenarios distinguish "bed in shared compartment"
+  // (offerMode INDIVIDUAL) from "private compartment" (offerMode COLLECTIVE)
+  // — both can appear as separate reservationOfferParts of the SAME
+  // accommodationType in one offer response. Without this, an INDIVIDUAL-
+  // intent scenario could silently book a COLLECTIVE part or vice versa,
+  // making the two SFR scenario families untrustworthy to distinguish.
+  const desiredOfferMode = bru.getEnvVar("offerMode");
+  let selectedParts = matchingParts;
+  if (desiredOfferMode) {
+    const modeMatches = matchingParts.filter(part => part.offerMode === desiredOfferMode);
+    if (modeMatches.length > 0) {
+      selectedParts = modeMatches;
+    } else {
+      validationLogger(`[WARNING] No ${accommodationSelection} reservationOfferPart declares offerMode '${desiredOfferMode}' — falling back to the first ${accommodationSelection} part regardless of offerMode. The booked offerMode may not match what this scenario intended to test.`);
+    }
+  }
+  const selectedPart = selectedParts[0];
+  bru.setEnvVar("reservationId", selectedPart.id);
 
   // #371 (OBB IRT/NJ): persist the SELECTED part's real accommodation so the
   // booking request's placeSelections states which compartment is booked
   // (accommodationType + accommodationSubType from availablePlaces - e.g.
   // COUCHETTE / COUCHETTE_COMFORT_4) instead of a hardcoded placeholder.
-  const _selPlace = (matchingParts[0].availablePlaces || [])
-    .find(pl => pl && pl.accommodationType === accommodationSelection) || null;
+  // #211: when the scenario asked for a specific gender-segregated
+  // placeProperties value (MEN/LADIES/MIXED), prefer the availablePlace that
+  // carries it — a single reservationOfferPart can list places for more than
+  // one gender designation (e.g. a MEN place and a LADIES place).
+  const desiredGender = bru.getEnvVar("accommodationGenderPreference");
+  const candidatePlaces = (selectedPart.availablePlaces || [])
+    .filter(pl => pl && pl.accommodationType === accommodationSelection);
+  let _selPlace = null;
+  if (desiredGender) {
+    _selPlace = candidatePlaces.find(pl => Array.isArray(pl.placeProperties) && pl.placeProperties.includes(desiredGender)) || null;
+    if (!_selPlace) {
+      validationLogger(`[WARNING] No ${accommodationSelection} availablePlace declares placeProperties '${desiredGender}' — falling back to the first available place. The booked gender designation may not match what this scenario intended to test.`);
+    }
+  }
+  if (!_selPlace) _selPlace = candidatePlaces[0] || null;
   if (_selPlace) {
     const _acc = { accommodationType: _selPlace.accommodationType };
     if (typeof _selPlace.accommodationSubType === 'string' && _selPlace.accommodationSubType) _acc.accommodationSubType = _selPlace.accommodationSubType;
+    if (Array.isArray(_selPlace.placeProperties) && _selPlace.placeProperties.length > 0) _acc.placeProperties = _selPlace.placeProperties;
     bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
-    validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''} (reservation part ${matchingParts[0].id})`);
+    validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''}${_acc.placeProperties ? ' [' + _acc.placeProperties.join(',') + ']' : ''} (reservation part ${selectedPart.id}${desiredOfferMode ? ', offerMode ' + (selectedPart.offerMode || 'n/a') : ''})`);
   }
 
-  notePlaceSelectionCapabilities(matchingParts[0]);
+  notePlaceSelectionCapabilities(selectedPart);
 
   test(`At least one reservationOfferPart has accommodationType: ${accommodationSelection}`, function () {
     expect(matchingParts.length, "No matching reservationOfferParts found").to.be.above(0);
