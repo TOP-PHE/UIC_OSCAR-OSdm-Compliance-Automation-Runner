@@ -521,3 +521,69 @@ describe('killRun', () => {
     await runPromise;
   });
 });
+
+// ── #306 — secretless env yml (credentials travel via the process env) ────────
+describe('executeRun — #306 credential transport', () => {
+  test('the ephemeral env yml carries no credentials; the spawn env does', async () => {
+    const { encrypt } = require('../../src/db/db');
+    const { companyId, userId } = seedCompanyUser();
+    run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
+      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId]);
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
+
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+
+    // Read the env yml while it is still on disk (unlinked after 'close').
+    const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
+    const envFile = path.join(ENVS_DIR, `OTST_${slug}_${runId.slice(0, 8)}_Env.yml`);
+    const yml = fs.readFileSync(envFile, 'utf8');
+    // Neither the secret values nor even the variable names may appear.
+    expect(yml).not.toContain('tok-secret-123');
+    expect(yml).not.toContain('subkey-secret-456');
+    expect(yml).not.toContain('basic-extra-789');
+    expect(yml).not.toContain('access_token');
+    expect(yml).not.toContain('Ocp-Apim-Subscription-Key');
+    expect(yml).not.toContain('oauth_extra');
+    expect(yml).not.toContain('auth_key_secret');
+    // Non-secret plumbing is still written to the file.
+    expect(yml).toContain('api_base');
+    expect(yml).toContain('__runId');
+
+    // Credentials travel via the child process environment instead.
+    const spawnEnv = spawn.mock.calls[0][2].env;
+    expect(spawnEnv.OSCAR_ACCESS_TOKEN).toBe('tok-secret-123');
+    expect(spawnEnv.OSCAR_SUBSCRIPTION_KEY).toBe('subkey-secret-456');
+    expect(spawnEnv.OSCAR_OAUTH_EXTRA).toBe('basic-extra-789');
+    // The server's own secret env is still never forwarded (allowlist).
+    expect(spawnEnv).not.toHaveProperty('ENCRYPTION_KEY');
+    expect(spawnEnv).not.toHaveProperty('JWT_SECRET');
+
+    fakeProc.emit('close', 0);
+    await runPromise;
+  });
+
+  test('optional credential env vars are absent when the tester has none configured', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+
+    const spawnEnv = spawn.mock.calls[0][2].env;
+    expect(spawnEnv.OSCAR_ACCESS_TOKEN).toBe('tok-abc');
+    expect(spawnEnv).not.toHaveProperty('OSCAR_SUBSCRIPTION_KEY');
+    expect(spawnEnv).not.toHaveProperty('OSCAR_OAUTH_EXTRA');
+
+    fakeProc.emit('close', 0);
+    await runPromise;
+  });
+});
