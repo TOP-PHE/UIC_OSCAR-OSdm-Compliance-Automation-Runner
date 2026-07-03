@@ -14,6 +14,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.179 / collection-OTST_V2.0.95] — 2026-07-03
+
+**Security (#306): the ephemeral Bruno env yml is now credential-free — no plaintext
+secret ever touches disk.**
+
+### Changed
+
+- **`worker/runner.js`** — `buildEnvYml()` no longer writes `access_token`,
+  `Ocp-Apim-Subscription-Key` or `oauth_extra`/`auth_key_secret` into the
+  per-run environment file; it carries only non-secret plumbing (API base,
+  datafile URL, requestor, run id, scenario override, extra headers).
+  `executeRun()` instead hands the three credentials to the Bruno child
+  process via its environment — `OSCAR_ACCESS_TOKEN`,
+  `OSCAR_SUBSCRIPTION_KEY`, `OSCAR_OAUTH_EXTRA` — on top of the existing
+  strict env allowlist (`ENCRYPTION_KEY`/`JWT_SECRET` still never
+  forwarded). Closes the crash-window exposure: a worker SIGKILL between
+  env-write and cleanup, or a mid-run volume snapshot, now leaves nothing
+  sensitive behind. Every credential-bearing path on disk is encrypted or
+  eliminated.
+- **`Bruno_Collection/opencollection.yml`** — new step 0 in the
+  before-request hook seeds the credentials from the process environment
+  into Bruno runtime vars via `bru.getProcessEnv()` (official Bruno API,
+  identical on the Linux workspace path and the Windows fallback). Seeding
+  fires only while the runtime var is still empty, so a token refreshed
+  mid-run through the OSCAR loopback (#204) is never clobbered; standalone
+  Bruno (no `OSCAR_*` env) is a strict no-op.
+- Env-file deletion failure downgraded from CRITICAL error to warning
+  (hygiene only — the file carries no credentials any more).
+- `TOKEN_FORMAT_ERROR` messaging (runner log + `run-detail.html` banner +
+  docs) no longer blames the token for YAML parse errors — the token can no
+  longer cause them; a malformed API base URL / requestor still can.
+- **BREAKING PAIRING** — `compatibility.json` `min_collection` raised to
+  `OTST_V2.0.95`: an older collection under server ≥ 1.11.179 never receives
+  the access token and 401s on every call. Deploy both halves together (the
+  `refresh-collection.yml` workflow already does).
+
+### Documentation
+
+- Server Admin Guide §15 threat table: env-file row added — "every
+  credential-bearing path on disk is encrypted or eliminated" now holds
+  without the env-yml caveat (the #306 acceptance criterion).
+- Specification §9.9 (ephemeral env files), §10.1 (YAML safety), §10.2
+  (error sentinels), §12 (banner); Solution Architecture §14.3.4 example +
+  Issue-3 superseded note.
+
+### Tests
+
+- `tests/unit/runner.test.js` 17 → 19: the on-disk env yml contains neither
+  secret values nor credential variable names while the run is in flight;
+  the spawn env carries the `OSCAR_*` vars exactly when configured. Full
+  suite 53 suites / 1321 tests green.
+
+---
+
 ## [server-v1.11.178] — 2026-07-02
 
 **Test: coverage batch 6 — src/server.js, the Express app entry point (overall `src` coverage ~83% → ~88%).**

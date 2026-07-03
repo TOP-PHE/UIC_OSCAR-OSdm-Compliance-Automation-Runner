@@ -479,8 +479,6 @@ is used directly.
 ```yaml
 name: OTST_AcmeCorp_Env
 variables:
-  - name: access_token
-    value: "eyJhbGciOiJSUzI1NiJ9..."
   - name: api_base
     value: "https://api.acmecorp.com/osdm/v3"
   - name: requestor
@@ -495,11 +493,19 @@ variables:
     value: "0"
 ```
 
-> **Critical implementation note:** No variable uses `secret: true`. The Bruno CLI does not
-> read the `value` field from secret-flagged entries in `.yml` files — it expects secret
-> values to come from a separate encrypted store. Using `secret: true` results in an empty
-> `access_token` and every OSDM API call returning HTTP 401. Since this file is ephemeral
-> (deleted immediately after the run), writing credentials as plain variables is safe.
+> **Credential transport (#306, since server v1.11.179 / collection OTST_V2.0.95):** the
+> generated env file carries **no credentials**. The resolved `access_token`, the
+> `Ocp-Apim-Subscription-Key` and the `oauth_extra` value are handed to the Bruno child
+> process via its **process environment** (`OSCAR_ACCESS_TOKEN`, `OSCAR_SUBSCRIPTION_KEY`,
+> `OSCAR_OAUTH_EXTRA`); the collection's before-request hook in `opencollection.yml` seeds
+> them into Bruno runtime variables with `bru.getProcessEnv()`, only while the runtime
+> variable is still empty (so a mid-run loopback token refresh, #204, is never clobbered).
+> No secret ever touches disk — even if the worker is SIGKILLed between the env-file write
+> and cleanup, the leftover file is credential-free.
+>
+> Historical note: before #306 the token was written into this file as a plain variable
+> (`secret: true` is not readable by the Bruno CLI from `.yml` environments and produced an
+> empty token + HTTP 401 everywhere, so it was never an option).
 
 This file is written to `{COLLECTION_PATH}/environments/` at run start and deleted immediately
 after `bru.cmd` exits. The token is never stored in the application database in plain text —
@@ -745,6 +751,10 @@ npm error not ok
 **Fix:** Removed `secret: true` from all variables in `buildEnvYml()`. Since the env file is ephemeral (written immediately before the run and deleted immediately after), there is no security risk in writing credentials as plain variables. A code comment was added to document this constraint for future maintainers.
 
 **Lesson for migration:** In the full architecture, the worker will inject credentials as environment variables from Vault at pod startup (not via `.yml` files), bypassing this limitation entirely.
+
+> **Superseded by #306 (server v1.11.179 / collection OTST_V2.0.95):** exactly that env-var
+> injection is now the shipped mechanism — credentials travel via the Bruno child process
+> environment (`OSCAR_*` vars) and the env `.yml` is credential-free. See §14.3.4.
 
 ---
 

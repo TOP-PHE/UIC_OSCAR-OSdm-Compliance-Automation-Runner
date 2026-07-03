@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.206",
+  "current_release": "2026.207",
   "releases": [
+    {
+      "release": "2026.207",
+      "date": "2026-07-03",
+      "server": "1.11.179",
+      "collection": "OTST_V2.0.95",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Security #306 — the ephemeral Bruno env yml no longer carries credentials on disk. Previously the per-run environments/<env>.yml held the decrypted OAuth access token, the Ocp-Apim-Subscription-Key and the oauth_extra/auth_key_secret value in plaintext (0o600, deleted after the run — but a SIGKILL/OOM/host-reboot between write and cleanup, or a mid-run volume snapshot, left them readable). Now buildEnvYml() writes only non-secret plumbing (api_base, data_base, requestor, runId, scenario override, extra headers) and executeRun() hands the three credentials to the Bruno child process via its environment (OSCAR_ACCESS_TOKEN / OSCAR_SUBSCRIPTION_KEY / OSCAR_OAUTH_EXTRA) on top of the existing strict env allowlist (ENCRYPTION_KEY/JWT_SECRET still never forwarded). The collection's before-request hook (opencollection.yml) seeds them into Bruno runtime vars via bru.getProcessEnv() — official Bruno API, works identically on the Linux workspace path and the Windows fallback — and only while the runtime var is still empty, so a token refreshed mid-run through the OSCAR loopback (#204) is never clobbered by the stale spawn-time value; standalone Bruno (no OSCAR_* env) is a strict no-op. The scenario-start env reset's explicit delete-list never touched the credential vars, verified. Crash-time acceptance criterion met by construction: no decrypted credential byte ever reaches a block device. Follow-on wording fixes: the env-file deletion failure is downgraded CRITICAL->warn (hygiene only now), and the TOKEN_FORMAT_ERROR run banner + docs no longer blame the token for YAML parse errors (it can no longer cause them — api_base/requestor still can). Docs updated: Server Admin Guide threat table now claims every credential-bearing path on disk is encrypted or eliminated; Specification §9.9/§10.1/§10.2/§12; Solution Architecture §14.3.4 + Issue-3 superseded note.",
+        "BREAKING PAIRING: min_collection raised to OTST_V2.0.95 — a pre-V2.0.95 collection running under server >=1.11.179 never receives the access token (no seeding hook) and every OSDM call returns 401; conversely collection >=V2.0.95 under an older server still works (the hook only seeds when the yml did not provide the var). Deploy server and collection together, as refresh-collection.yml already does.",
+        "Tests: runner.test.js 17 -> 19 (env yml on disk contains neither the secret values nor the credential variable names while spawn is in flight; spawn env carries the OSCAR_* vars exactly when configured; server secrets still absent). Full suite 53 suites / 1321 tests green; eslint clean; opencollection.yml YAML-parse + before-request JS syntax-check clean."
+      ]
+    },
     {
       "release": "2026.206",
       "date": "2026-07-02",
