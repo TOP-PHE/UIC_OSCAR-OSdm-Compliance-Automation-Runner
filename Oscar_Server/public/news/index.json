@@ -1,5 +1,149 @@
 [
   {
+    "id": "2026-07-03-night-train-accommodation",
+    "date": "July 3, 2026",
+    "tag": "New Feature",
+    "title": "Night Train testing — gender-segregated compartments and private-compartment bookings",
+    "summary": "Two distinct night-train accommodation flows are now reliably testable: a bed in a shared, gender-segregated COUCHETTE/BERTH compartment (offerMode INDIVIDUAL), and a private compartment booked for a whole group (offerMode COLLECTIVE). A new 'Preferred place gender' picker sits next to the existing accommodation-type picker in the scenario editor.",
+    "content": "Night trains have accommodation rules day trains don't: gender-segregated shared compartments (a MEN, LADIES or MIXED berth/couchette), and private compartments booked whole by a group rather than seat by seat. Both flows exist in the OSDM spec today, but OSCAR had no reliable way to tell them apart when testing — a vendor offering both an INDIVIDUAL bed-in-compartment and a COLLECTIVE private-compartment variant of the same accommodation type could have the wrong one silently selected and booked, which would have made the two test families untrustworthy.\n\nThat gap is now closed. The scenario editor's existing Accommodation type picker (Seat / Couchette / Berth, introduced last month for reservation-mandatory trains) gains a sibling: Preferred place gender (— any — / Men / Ladies / Mixed). Set an offerMode of INDIVIDUAL or COLLECTIVE on your scenario, optionally pick a gender preference, and OSCAR now selects the matching reservationOfferPart from the vendor's offer response instead of just grabbing the first one of the right accommodation type — falling back with a clear warning (never a silent wrong pick) if the vendor's offer doesn't have a match for what you asked for.\n\nThe booking-side checks are stricter too, but only where they should be: when your scenario declares an offerMode, OSCAR now asserts exactly one allocated place for an individual bed-in-compartment booking, and that the allocated place count matches your party size for a private compartment — previously this was only a soft warning for every scenario. If you don't set an offerMode, nothing changes; every existing scenario keeps behaving exactly as it did.\n\nNo operator action required. The new picker appears automatically in the Booking Flow Actions section of any SALE/REFUND/EXCHANGE scenario."
+  },
+  {
+    "id": "2026-07-03-env-yml-credential-free",
+    "date": "July 3, 2026",
+    "tag": "Security",
+    "title": "The last plaintext credential on disk is gone — the ephemeral Bruno environment file",
+    "summary": "The per-run environment file OSCAR hands to the Bruno test engine no longer contains your OAuth access token, subscription key, or OAuth extra credential in plaintext. Credentials now travel via the test process's own environment instead of a file on disk, closing the one remaining gap from the at-rest encryption work shipped in May.",
+    "content": "Back in May, OSCAR encrypted every credential-bearing file and database column at rest — except one. Every test run generates a short-lived YAML environment file that the Bruno test engine reads to know your API endpoint, your access token, and a handful of other run parameters. That file was deleted the moment the run finished, and was restricted to owner-only file permissions the whole time — but for the duration of the run, it sat on disk in plaintext. If the server process were ever killed abruptly between writing that file and cleaning it up — an out-of-memory kill, a host reboot, a container restart — the file, and the credential inside it, could be left behind until the next cleanup.\n\nThat gap is now closed. The environment file OSCAR writes for each run no longer contains your access token, subscription key, or OAuth extra value at all — it carries only non-secret plumbing like your API base URL and the datafile location. The actual credentials are instead handed directly to the Bruno test process through its own process environment, which the test collection reads and uses exactly as before. From the perspective of running a test, nothing changes — no new configuration, no new step. But there is now no point in the lifecycle of a test run where your credential exists as a readable file on disk, even for a moment.\n\nNo operator or tester action is required."
+  },
+  {
+    "id": "2026-07-01-places-api-discovery",
+    "date": "July 1, 2026",
+    "tag": "New Feature",
+    "title": "Stop-place lookup — type a station name, OSCAR finds the URN for you",
+    "summary": "Origin and destination fields across Timetable Discovery and the Train Resource editor now offer a live typeahead: start typing a station name and OSCAR searches your vendor's own OSDM Places catalog and fills in the correct place URN. A Test Manager refreshes the catalog once from the company profile; manual URN entry still always works as a fallback.",
+    "content": "Finding the right OSDM place identifier for a station has always meant either already knowing the URN by heart or digging through a vendor's documentation. That friction showed up every time a tester set up a new route in Timetable Discovery or the Train Resource editor.\n\nFrom this release, a Test Manager can refresh a local, cached copy of their vendor's OSDM place catalog with one click from the company profile page — OSCAR pages through the vendor's GET /places endpoint and stores the result. Every origin and destination field across the scenario editor then offers a live, ranked search-as-you-type: type part of a station name and a dropdown of matching places appears, ranked with name-prefix matches first. Pick one and the field is filled with the place's real URN automatically.\n\nNothing about manual entry changes — if you already know the URN, or your vendor's catalog isn't cached yet, typing it in directly still works exactly as before. This is a pure convenience layer on top of the existing fields, not a replacement for them. Because places are public reference data (not credentials), the cached catalog is stored unencrypted, same as any other reference dataset in OSCAR.\n\nTo turn it on, a Test Manager opens the company profile and clicks the places refresh action once; the typeahead is then live everywhere origin/destination fields appear."
+  },
+  {
+    "id": "2026-07-01-test-manager-gated-registration",
+    "date": "July 1, 2026",
+    "tag": "Security",
+    "title": "Self-registration is now approved by your Test Manager, not guessed from your email address",
+    "summary": "The old self-registration rule — your email address had to contain a fragment of your company's name — is gone. Registering against a company now lands you in a 'pending' state until a Test Manager (or an administrator) explicitly approves you; every Test Manager is emailed when someone registers against their company.",
+    "content": "Self-registration previously tried to guess whether you belonged to a company by checking whether your email address contained a piece of the company's name. It was a rough heuristic at best, and it broke outright the moment a company was renamed after its account was first set up — a real incident surfaced exactly this: a company's internal slug no longer matched its current display name, so every new registration attempt against it was rejected as 'unknown company', even though the company clearly existed.\n\nRegistration now works differently. The company you register against is picked from a dropdown of real, existing companies — no more email-domain guessing. Once you submit the form, your account is created but held in a pending state: you cannot log in yet. A Test Manager at your company (or, as a fallback, an administrator) sees your registration and approves it with one click from the User Directory; every Test Manager at the company is emailed the moment you register, so approval doesn't depend on someone happening to check a dashboard. Once approved, you can log in immediately.\n\nIf you've registered recently and can't log in yet, this is why — ask your Test Manager to check the User Directory's pending list. No action is required from existing, already-active accounts; this only affects the registration flow for new users."
+  },
+  {
+    "id": "2026-07-01-fulfillment-declaration",
+    "date": "July 1, 2026",
+    "tag": "New Feature",
+    "title": "Test Framework can now declare which fulfillment types and media you support",
+    "summary": "Section 1 of Test Config (Test Framework) gains a Fulfillment section with type and media pill pickers, so your declared capabilities now cover fulfillment the same way they already cover sales flows, transport modes, and passenger types.",
+    "content": "OSCAR's golden rule is that a scenario may only exercise what your Test Framework declares support for. Every other capability area — sales flows, transport modes, passenger types, seat-selection modes, offer criteria — already had a declaration section in Test Config except one: fulfillment type and media (ETICKET, PDF, print-at-home, and the rest). The scenario editor's fulfillment picker existed and worked, but nothing constrained it to what a given vendor actually supports.\n\nThe Test Framework page now has a dedicated Fulfillment section with pill pickers for both fulfillment type and fulfillment media, matching the same declare-then-gate pattern as every other capability area. Declare what your implementation supports there, and the scenario editor's fulfillment options reflect it.\n\nNo migration is needed for existing companies — the fulfillment picker in the scenario editor continues to show every OSDM fulfillment option until you declare a narrower set in your Test Framework."
+  },
+  {
+    "id": "2026-07-01-finding-scenario-link",
+    "date": "July 1, 2026",
+    "tag": "Improvement",
+    "title": "Test Findings now link directly to the scenario that revealed them",
+    "summary": "A finding in the Test Findings & Open Points register can now be tagged with the scenario code that surfaced it — a small 🧪 chip on the finding links straight back to that scenario in Test Config, so anyone reading a finding can jump to exactly what produced it.",
+    "content": "A Test Finding records an observation and a spec reading, but until now it didn't record which scenario actually produced the evidence — reconstructing that meant searching run history or asking whoever wrote the finding. A new optional field on every finding, Scenario code, closes that gap: type or pick the scenario code that revealed the issue (an autocomplete suggests scenarios that exist in your Test Config), and the finding gains a small 🧪 chip that links straight to that scenario.\n\nThis is entirely optional and backward-compatible — existing findings without a scenario code are unaffected and continue to display normally."
+  },
+  {
+    "id": "2026-06-18-chaps-auth-diagnostics",
+    "date": "June 18, 2026",
+    "tag": "Improvement",
+    "title": "Better auth diagnostics — see exactly what a token request sent, and why it failed",
+    "summary": "When your OAuth token request fails, the run log now shows a full, secrets-masked dump of what was actually sent — including the complete URL, not just the hostname. Credential fields are trimmed automatically on save and at use, so a stray copy-paste space can no longer cause a silent 401. A new 'raw' body format option handles vendors whose token endpoint rejects standard form-encoding.",
+    "content": "Diagnosing a failed OAuth token exchange used to mean guessing — the run log said little more than 'authentication failed', leaving you to wonder whether it was a wrong client secret, a malformed request, or something in how OSCAR built the call. Onboarding a new vendor sandbox surfaced exactly this: a 401 with no further clue, that turned out to be a plain credential typo — but finding that took far longer than it should have.\n\nEvery token request now logs a structural dump of exactly what was sent: the full request URL (not just the host, which used to be all that was shown), the headers, and the body shape — with every credential value replaced by a fixed *** mask via a default-deny allowlist, so nothing secret ever appears in a log line, only the fact that a field was present. On top of that, every credential field (client ID, client secret, subscription key, and the rest) is now automatically trimmed of leading/trailing whitespace both when you save it and when it's used — untrimmed paste-whitespace was a real, hard-to-diagnose cause of a 401 that looked exactly like a wrong password.\n\nA new Custom auth profile option, body_format: raw, also ships for vendors whose token endpoint doesn't play well with standard form-urlencoding — one vendor's token body contained characters that got silently mangled (a % became %25) by the default encoding, and needed the token body sent completely verbatim instead.\n\nNo action needed unless you were already hitting one of these issues — if you were, the fix is automatic on your next run."
+  },
+  {
+    "id": "2026-06-16-dedicated-headers",
+    "date": "June 16, 2026",
+    "tag": "New Feature",
+    "title": "Company-wide dedicated HTTP headers for every OSDM request",
+    "summary": "API Config gains a 'Dedicated headers' list — name/value pairs your company needs sent on every OSDM call (a custom API-key header, a partner identifier, anything your vendor requires outside the standard OSDM headers). Values can reference other config fields like {{requestor}}.",
+    "content": "Some OSDM implementations require a header beyond what the spec itself defines — a vendor-specific API key, a partner or channel identifier, anything particular to that integration. Until now the only way to add one was a one-off code change; there was no way for a company to configure it themselves.\n\nAPI Config now has a Dedicated headers section: add any number of name/value pairs, and every one of them is sent on every OSDM request your company makes, company-wide. Values can reference other fields you've already configured using {{variableName}} templating — for example a header value of {{requestor}} resolves to whatever requestor ID you've set, rather than needing to be retyped.\n\nThis is entirely opt-in and empty by default; nothing changes for companies that don't need it."
+  },
+  {
+    "id": "2026-06-15-findings-accordion",
+    "date": "June 15, 2026",
+    "tag": "Improvement",
+    "title": "Test Findings page reorganised — collapsed by status, easier to scan",
+    "summary": "The Test Findings & Open Points list now groups findings into New / Work-in-progress / Closed accordion sections, with New and WIP expanded by default and Closed collapsed — so a long-running register of findings stays scannable instead of turning into one flat, ever-growing list.",
+    "content": "As a company's Test Findings register grows past a handful of entries — especially once resolved and not-supported findings pile up alongside active ones — a single flat list stops being useful at a glance. The page now groups findings into three collapsible sections by status: New, Work-in-progress, and Closed, with New and WIP open by default so what needs attention is immediately visible, and Closed collapsed out of the way but one click from reopening.\n\nNo data changes — this is purely a display reorganisation of the same findings you already have."
+  },
+  {
+    "id": "2026-06-15-findings-bulk-import",
+    "date": "June 15, 2026",
+    "tag": "Improvement",
+    "title": "Import a whole batch of Test Findings in one paste",
+    "summary": "A new Import button on the Test Findings page accepts a JSON array of findings pasted in directly — useful after a conformance review pass produces a batch of observations to record at once, instead of creating each finding one at a time through the form.",
+    "content": "Recording findings one at a time through the creation form works fine for a single observation, but after a thorough conformance review pass — reading through several batches of runs and identifying half a dozen distinct issues at once — repeating that form six or eight times in a row is pure friction. The new Import button opens a paste box that accepts a strict JSON array of findings in one action, validates the shape, and creates every entry in one click.\n\nThis is an additive convenience — the existing one-at-a-time creation form is unchanged and remains the right tool for recording a single finding as you notice it."
+  },
+  {
+    "id": "2026-06-14-test-findings-open-points",
+    "date": "June 14, 2026",
+    "tag": "New Feature",
+    "title": "Test Findings & Open Points — a shared, threaded record of every conformance discussion",
+    "summary": "A new register, per company, for tracking conformance observations as an ongoing dialogue rather than a one-off bug list: OSCAR opens a finding with its spec reading, the vendor's team classifies and replies (provider deviation / OSCAR issue / not supported / spec question), and a finding can be marked as a known, documented baseline — so that exact, agreed-upon deviation stops dragging future runs to FAILED.",
+    "content": "Every OSDM conformance test eventually surfaces genuine points of disagreement or clarification with a vendor: is a given HTTP status the vendor's own considered choice, an actual bug, a case OSDM itself leaves ambiguous, or something OSCAR is asserting too strictly? Until now there was nowhere in OSCAR to have that conversation — findings lived in emails, spreadsheets, or nowhere at all, disconnected from the runs that produced them.\n\nTest Findings & Open Points is a per-company register built around exactly this back-and-forth. OSCAR (or a Test Manager) opens a finding recording an observation and the spec reading behind it; the vendor's team — or your own team, reviewing your own results — replies and classifies it as a provider deviation, an OSCAR-side issue, something genuinely not supported, or an open spec question; a threaded comment history keeps the whole discussion attached to the finding as it moves from open to discussing to resolved.\n\nThe most immediately useful piece: a finding can be promoted into your test system's baseline. Mark a finding as baselined with the exact HTTP status it documents, and any future run that hits that exact, already-documented status now reports a passing 'known deviation' — still logged clearly so nothing is hidden, but no longer dragging the whole run to FAILED for something you and the vendor have already discussed and agreed on. Any other, different status still fails normally, so this can never be used to quietly hide a real regression. This baseline mechanism is scoped per test system, configured by a Test Manager — never a shared, cross-company catalog.\n\nTo use it: open the new Test Findings & Open Points page from the navigation, record an observation, and work the conversation through to a classification. When you and the vendor agree a deviation is expected and documented, baseline it with its HTTP status from the finding's detail view."
+  },
+  {
+    "id": "2026-06-14-bulk-report-zip",
+    "date": "June 14, 2026",
+    "tag": "New Feature",
+    "title": "Download an entire test batch as one ZIP file",
+    "summary": "Any batch of parallel-run scenarios can now be downloaded as a single ZIP containing every report in the batch, instead of opening and saving each report one at a time.",
+    "content": "Parallel test runs group naturally into batches on the dashboard, but until now getting the reports out of OSCAR meant opening each scenario's report individually and saving it — tedious for a batch of a dozen or more scenarios. A new one-click action on any batch bundles every report belonging to it into a single ZIP file for download.\n\nNo change to individual report viewing — this is an additional option alongside it, for whenever you need the whole batch at once."
+  },
+  {
+    "id": "2026-06-13-run-budget-ceiling-and-refundability-sweep",
+    "date": "June 13, 2026",
+    "tag": "Improvement",
+    "title": "Run Budget Ceiling exposed in the admin panel, plus a catalogue-wide refundability sweep",
+    "summary": "The hard ceiling on how long a single run is allowed to run — previously a hidden environment variable — is now a configurable field in the admin Server Config panel. Separately, every offer response is now swept for a specific fairness check: does the vendor's refundable flag actually match what its own after-sales schedule says?",
+    "content": "Long-running scenarios — an expired-offer or expired-booking wait test in particular — need a run timeout budget big enough to actually reach the wait they're testing. That ceiling existed already, but only as a hidden environment variable an operator had to know about and edit outside the application; a scenario could ask for a longer wait than the hidden ceiling allowed, and simply get cut short with no obvious explanation from the UI.\n\nThe ceiling — Run Budget Ceiling — is now a visible, editable field in the admin Server Config panel, so an operator can raise it for scenarios that genuinely need a longer wait window without touching server configuration files directly.\n\nAlongside it, offer responses are now swept for a specific, common inconsistency: a vendor's catalog declaring an offer's refundable flag as NO, while that same offer's own after-sales schedule actually permits a refund (with or without a fee) up until some point before travel. When that mismatch is detected across a catalog, OSCAR now surfaces a single clear warning summarising how many offers in the response show the inconsistency — visibility into a class of catalog-wide flag/schedule disagreement that was previously invisible per-offer."
+  },
+  {
+    "id": "2026-06-12-irt-nj-accommodation-testing",
+    "date": "June 12, 2026",
+    "tag": "New Feature",
+    "title": "Accommodation-aware testing for reservation-mandatory (IRT/NJ) trains",
+    "summary": "A new Accommodation type picker (Seat / Couchette / Berth) in the scenario editor drives the whole booking flow for trains where seat reservation isn't optional: the offer search is filtered to matching offers, the booking request states the real compartment the offer advertised, and a new 🎯 goal-check line in every report confirms the place actually allocated matches what was requested — end to end, not just at the offer step.",
+    "content": "Trains with mandatory reservations (IRT, night trains) behave differently from ordinary day trains: which offers even exist depends on the accommodation family you're asking about, and the booking request has to state the specific compartment being reserved rather than leaving it implicit. OSCAR's existing SEATMAP_AT_OFFER / ADD_TO_BOOKING place-selection modes covered optional seat selection well, but had no way to drive this mandatory-reservation flow, or to confirm the vendor actually delivered the accommodation it advertised.\n\nThe scenario editor's Booking Flow Actions section gains an Accommodation type picker: Seat, Couchette, or Berth. Picking one filters the offer search to only offers containing that accommodation family, and — critically — carries the real accommodation subtype the vendor's own offer advertised (not a fabricated placeholder) into the booking request's placeSelections. Every report gains a 🎯 Accommodation goal line that traces the whole chain: what was requested, what the offer advertised, and what the booking response actually allocated — closing the loop from search intent all the way to the confirmed reservation, and flagging clearly if the provider substitutes a different accommodation along the way.\n\nAlongside the accommodation goal-check, this release also adds a place-selection Not-Happy-Flow probe sweep (deliberately omitting a place selection, requesting an unknown accommodation type, or sending a wrong reservation ID, to confirm the vendor's API rejects these malformed requests as it should) and a set of reservation-coverage assertions confirming a booking's reservation parts correctly reference the trip legs they claim to cover.\n\nTo use it, open a scenario's Booking Flow Actions and pick Seat, Couchette, or Berth under the new Accommodation type picker — required for any reservation-mandatory train, optional (and safely ignorable) for ordinary day trains."
+  },
+  {
+    "id": "2026-06-11-run-setup-ux-polish",
+    "date": "June 11, 2026",
+    "tag": "Improvement",
+    "title": "Run setup polish — Departure day next to Departure time, clearer placeholders, better toasts",
+    "summary": "A round of small usability fixes on the run-setup pages: Departure day now sits directly next to Departure time instead of in a separate section, empty fields show honest placeholder text instead of misleading examples, and confirmation toasts now appear in the upper third of the screen, larger and harder to miss.",
+    "content": "A handful of small friction points in daily use, fixed together: Departure day and Departure time — logically one setting — now sit side by side instead of being split across different parts of the form. Empty input fields now show placeholder text that honestly says what's expected rather than an example value that could be mistaken for a pre-filled default. And toast notifications confirming an action succeeded (or failed) now appear larger and in the upper third of the page, instead of a small, easy-to-miss corner notice.\n\nNo behavioural change, no operator action — purely making the existing run-setup flow a little clearer to use."
+  },
+  {
+    "id": "2026-06-11-discovery-offer-probe",
+    "date": "June 11, 2026",
+    "tag": "New Feature",
+    "title": "Discovery offer probe — see per-route availability warnings before you run a full scenario",
+    "summary": "Test Data now probes each configured route for actual offer availability and surfaces a warning directly in the route list if a route currently returns no offers — so you find out before launching a full scenario, not after. A Re-probe button lets you refresh that check on demand.",
+    "content": "Discovering, after launching a full scenario run, that a configured route simply has no offers available right now — wrong day of week, off-season, whatever the reason — wastes a run and the time spent reading its result. Test Data's route list now probes each route's actual offer availability directly and shows a clear warning inline next to any route currently returning nothing, before you ever submit a run against it.\n\nBecause availability can change (a route with no offers today might have some tomorrow), a Re-probe button lets you refresh the check on demand rather than only at initial route setup.\n\nNo action required to benefit from this — the probe runs automatically as part of viewing Test Data; use Re-probe when you want a fresh read."
+  },
+  {
+    "id": "2026-06-10-trip-search-criteria",
+    "date": "June 10, 2026",
+    "tag": "New Feature",
+    "title": "OSDM Trip Search Criteria — a dedicated wizard panel for your route search parameters",
+    "summary": "The scenario editor gains a dedicated sub-panel for OSDM's Trip Search Criteria fields, wired directly into the scenario data model — giving explicit, discoverable control over route search parameters that previously had no dedicated place in the wizard.",
+    "content": "OSDM's Trip Search Criteria carries several fields shaping exactly how a route search is expressed, but the scenario editor had no dedicated place to set them — anything beyond the basics required editing the underlying scenario data directly. A new wizard sub-panel now surfaces these fields explicitly, wired through the same parser and data model as every other scenario field, so they're discoverable and editable the same way as the rest of the scenario.\n\nNo change for existing scenarios that don't use these fields — they continue to behave as before."
+  },
+  {
+    "id": "2026-06-10-step-failure-policy",
+    "date": "June 10, 2026",
+    "tag": "New Feature",
+    "title": "Step-failure policy — choose whether a scenario stops cold or logs and continues",
+    "summary": "Every scenario now has a Step Failure Policy: HARD_STOP (the default — a failing step aborts the scenario immediately, as OSCAR has always behaved) or CONTINUE (log the failure and keep going through the rest of the scenario's steps, useful for surveying a vendor's overall behaviour in one run instead of stopping at the first problem).",
+    "content": "Until now, any assertion failure partway through a scenario ended the scenario there and then — the right default for a strict conformance check, but sometimes exactly the wrong behaviour when you want a broad survey of how a vendor's API behaves across an entire flow, not just up to the first thing that trips.\n\nEvery scenario now carries a Step Failure Policy, defaulting to HARD_STOP (unchanged behaviour — stop immediately on a failing step) with a new CONTINUE option: log the failure clearly and keep executing the rest of the scenario's steps regardless, so a single early problem doesn't hide everything that would have run after it.\n\nExisting scenarios default to HARD_STOP automatically, so nothing changes unless you deliberately opt a scenario into CONTINUE."
+  },
+  {
     "id": "2026-06-09-partial-refund",
     "date": "June 9, 2026",
     "tag": "New Feature",
