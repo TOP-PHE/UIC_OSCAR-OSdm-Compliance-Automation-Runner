@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.208",
+  "current_release": "2026.209",
   "releases": [
+    {
+      "release": "2026.209",
+      "date": "2026-07-03",
+      "server": "1.11.181",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): backfilled 18 welcome-page news entries covering everything merged since the last news update (2026-06-09, partial refund) through today — Night Train accommodation testing (#211), the env-yml credential-free security fix (#306), stop-place discovery via the Places API (#450), Test-Manager-gated registration (#449), fulfillment type/media declaration (#448), Test Finding <-> scenario linking (#447), CHAPS-onboarding auth diagnostics (masked token logging, credential trimming, raw-body profile, #437-443), company-wide dedicated headers (#427), the Test Findings category accordion and bulk-import (#409/#413), Test Findings & Open Points itself (#400/#401, the threaded conformance-dialogue register with known-deviation baselining), one-click batch ZIP downloads (#406), the Run Budget Ceiling admin field + catalog refundability sweep (#395), the IRT/NJ accommodation-aware testing programme (Accommodation type picker, real-compartment placeSelections, the 🎯 goal-check line, place-selection NHF probes, reservation spec-coverage — #372/#374/#380/#381/#382), run-setup UX polish (#364/#367), the Discovery offer probe + Re-probe button (#368/#370), the OSDM Trip Search Criteria wizard panel (#360), and the step-failure policy HARD_STOP/CONTINUE toggle (#362). Content-only change (public/news/index.json); no runtime behaviour affected. Verified: JSON parses, all 44 entries carry the required fields, served correctly by a live dev server, UTF-8 (emoji/em-dash) intact."
+      ]
+    },
     {
       "release": "2026.208",
       "date": "2026-07-03",
