@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-07-03-optional-reservation-selections",
+    "date": "July 3, 2026",
+    "tag": "New Feature",
+    "title": "Book a mandatory reservation without stating a specific place — optionalReservationSelections",
+    "summary": "A new 'Book via optionalReservationSelections' toggle in Booking Flow Actions lets you book an offer's mandatory reservation(s) using OSDM's lighter-weight optionalReservationSelections node, instead of the fuller placeSelections mechanism that also states a specific place or compartment.",
+    "content": "Some offers require a reservation to be booked but don't need the booking request to specify exactly which place or compartment — OSDM covers this with a simpler node, optionalReservationSelections, that just lists which reservationOfferPart(s) to book by ID. Until now OSCAR only exercised the fuller placeSelections mechanism (which additionally states a specific accommodation, subtype, and place), leaving no way to test the lighter path a reservation-mandatory offer may expect instead.\n\nA new toggle, Book via optionalReservationSelections, sits in every scenario's Booking Flow Actions section. Turn it on and OSCAR takes every reservationOfferPart on the offer you selected and lists them by ID in the booking request's optionalReservationSelections node — no place or compartment details, just the reservation itself being claimed. It's independent of the existing Accommodation type picker: turn on both if your test needs to state a specific compartment AND you want the reservation itself expressed this way, or use this toggle alone for a simpler mandatory-reservation booking.\n\nNo new report checks were needed for this — the existing reservation-count validation between the offer and the booking response already covers correctness, regardless of which of the two mechanisms was used to request it.\n\nTo use it, open a scenario's Booking Flow Actions and turn on Book via optionalReservationSelections."
+  },
+  {
     "id": "2026-07-03-night-train-accommodation",
     "date": "July 3, 2026",
     "tag": "New Feature",
