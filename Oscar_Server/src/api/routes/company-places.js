@@ -27,7 +27,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { osdmGet, buildTesterHeaders } = require('../../utils/osdm-client');
+const { osdmGet, buildTesterHeaders, mergeDedicatedHeaders } = require('../../utils/osdm-client');
 const log = require('../../utils/logger').child({ module: 'places' });
 
 const router = express.Router();
@@ -68,7 +68,7 @@ router.post('/places/refresh', async (req, res) => {
   const companyId = resolveCompanyScope(req, res);
   if (companyId === null) return;
 
-  const company = get('SELECT id, slug, api_base FROM companies WHERE id = ?', [companyId]);
+  const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [companyId]);
   if (!company || !company.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
@@ -84,6 +84,13 @@ router.post('/places/refresh', async (req, res) => {
     return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
   }
   const extraHeaders = buildTesterHeaders(userRow);
+  // #477: company-wide Dedicated Headers (API Config) were never applied on
+  // this server-side direct-call path — only the Bruno run path read them.
+  mergeDedicatedHeaders(extraHeaders, company, {
+    requestor: extraHeaders.Requestor || '',
+    access_token: token,
+    'Ocp-Apim-Subscription-Key': extraHeaders['Ocp-Apim-Subscription-Key'] || ''
+  });
 
   // Page through /places, deduping by id. OSDM's `page` query param is an
   // opaque, vendor-defined cursor; we page 1..N and stop as soon as a page adds

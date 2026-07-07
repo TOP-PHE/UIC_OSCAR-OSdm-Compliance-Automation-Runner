@@ -62,4 +62,33 @@ function buildTesterHeaders(userRow) {
   return headers;
 }
 
-module.exports = { osdmGet, buildTesterHeaders, DEFAULT_TIMEOUT_MS };
+/**
+ * #477: merge a company's Dedicated Headers (`companies.extra_headers`, a
+ * JSON array of `{name, value}` configured in API Config) into a headers
+ * object, mutating and returning it. Mirrors the Bruno run path's identical
+ * mechanism (`opencollection.yml`'s `__extraHeaders` block) exactly: a value
+ * may contain `{{var}}` templates, resolved case-sensitively against
+ * `resolvedVars`; an unresolved var becomes an empty string, never the
+ * literal `{{...}}`. Malformed/missing `extra_headers` is a silent no-op —
+ * every server-side direct-call route (Timetable Discovery, Re-probe,
+ * Places refresh) was otherwise missing these entirely, unlike the Bruno
+ * run path which has always read them.
+ */
+function mergeDedicatedHeaders(headers, companyRow, resolvedVars = {}) {
+  try {
+    const raw = companyRow && companyRow.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
+    if (!Array.isArray(raw)) return headers;
+    for (const hdr of raw) {
+      if (!hdr || !hdr.name) continue;
+      const resolved = String(hdr.value == null ? '' : hdr.value)
+        .replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_m, key) => {
+          const v = resolvedVars[key];
+          return v == null ? '' : String(v);
+        });
+      headers[hdr.name] = resolved;
+    }
+  } catch (_e) { /* malformed extra_headers — fail open, same posture as the Bruno-side try/catch */ }
+  return headers;
+}
+
+module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, DEFAULT_TIMEOUT_MS };

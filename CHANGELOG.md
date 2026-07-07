@@ -14,6 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.185] — 2026-07-07
+
+### Fixed
+
+- **#477 — Discovery, Re-probe, and Places refresh now apply the company's
+  Dedicated Headers.** Previously only the Bruno test-run path read
+  `companies.extra_headers` — Discover Timetable, Re-probe offers
+  (`company-test-resources.js`), and the Places API refresh
+  (`company-places.js`) each built their own local header set from only
+  the tester's Requestor/subscription-key, silently dropping any custom
+  header a company had configured (e.g. SBB's `tracestate`/`traceparent`/
+  `accept-language`), which made Discovery unusable on those sandboxes.
+
+### Added
+
+- **`utils/osdm-client.js`** — new shared `mergeDedicatedHeaders(headers,
+  companyRow, resolvedVars)`, parsing `extra_headers` and resolving
+  `{{var}}` templates against a caller-supplied map (case-sensitive,
+  unresolved → empty string) — mirrors `opencollection.yml`'s
+  `__extraHeaders` block exactly, in plain JS since these routes have no
+  Bruno environment. Wired into all three affected routes.
+
+### Tests
+
+- 12 new unit tests for `mergeDedicatedHeaders` (literal values, `{{var}}`
+  resolution, unresolved-var/case-sensitivity edge cases, malformed/
+  missing `extra_headers` fail-open, override semantics).
+- 3 new integration tests capturing the real outgoing `fetch` headers on
+  all three routes, asserting both a literal and a `{{access_token}}`-
+  templated dedicated header actually reach the vendor call.
+- Full suite 54 suites / 1335 tests green (was 53/1321); eslint clean.
+
+---
+
 ## [server-v1.11.184] — 2026-07-03
 
 ### Added
