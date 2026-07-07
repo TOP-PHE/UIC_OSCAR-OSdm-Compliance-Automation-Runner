@@ -364,9 +364,6 @@ function postOfferResponse(jsonData) {
   // #393: the verdict above covers only the SELECTED offer — sweep the whole
   // response for flag-vs-schedule contradictions (one summary line, R9).
   sweepCatalogFlagVsSchedule(jsonData.offers);
-
-  // Mirror original no-op env set (kept for compatibility)
-  bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", bru.getEnvVar("admissionReservationAncillaryOfferPartsIds"));
 }
 
 // OSDM Flexibility ordered least → most restrictive. An offer's overall

@@ -5,12 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/availabilities/place-map?contextId={{bookingId}}&contextType=BOOKING&resourceId={{reservationId}}&resourceType=RESERVATION"
+  url: "{{api_base}}/availabilities/place-map"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   params:

@@ -11,6 +11,8 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   body:
@@ -116,6 +118,8 @@ runtime:
             jsonData = res.getBody();
             if (jsonData.refundOffer) {
                 refundOffersArray.push(jsonData.refundOffer);
+            } else if (Array.isArray(jsonData.refundOffers) && jsonData.refundOffers.length > 0) {
+                refundOffersArray.push(...jsonData.refundOffers);
             }
             jsonDataToArray = {
                 refundOffers: refundOffersArray
@@ -130,9 +134,14 @@ runtime:
             return;
         }
         if (!jsonData.refundOffer) {
-            throw new Error("⛔ Exiting script, no refundOffer available in the response");
+            test("refundOffer exists in response (required for downstream steps)", () => {
+                throw new Error("⛔ refundOffer missing in PATCH response — cannot proceed");
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("PATCH Refund Offer (missing refundOffer)");
+            return;
         }
-        postPatchRefundOfferResponse(jsonDataToArray, expectedexchangeOperationStatus = ["CONFIRMED"], expectedFulfillmentStatus=["REFUNDED"]);
+        postPatchRefundOfferResponse(jsonDataToArray, ["CONFIRMED"], ["REFUNDED"]);
 
 settings:
   encodeUrl: true

@@ -72,6 +72,12 @@ runtime:
         const body = useOfferParts
           ? { offerId: offerId, passengerRefs: passengerRefs, ancillaryOfferIds: ancillaryOfferIds }
           : { offerId: offerId, ancillaryOfferId: ancillaryOfferIds[0], passengerRefs: passengerRefs };
+
+        if (ancillaryOfferIds.length === 0) {
+          const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
+          validationLogger(`[WARNING] No ancillary offer IDs resolved from any source (addAncillaryOfferIds / referencedAncillaryIds / offer.ancillaryOfferParts are all empty). ${useOfferParts ? 'ancillaryOfferIds will be [] (no-op).' : 'ancillaryOfferId will be missing from the body — provider will likely 400.'}`);
+        }
+
         bru.setVar('addAncillaryBody', JSON.stringify(body));
 
         // #expired-add-ancillary-offer test (Phase 5b): when armed, wait until
@@ -183,6 +189,9 @@ runtime:
           bruTest(`POST ${endpoint} (ancillary) → ${statusCode} (FAIL)`, () => {
             expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
           });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Add Ancillary to Booking");
+          return;
         }
 
         // ── OSDM compliance (Layer 1): BookedOfferPart/Ancillary response ──

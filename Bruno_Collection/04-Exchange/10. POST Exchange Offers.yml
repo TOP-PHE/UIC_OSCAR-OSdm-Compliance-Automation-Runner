@@ -5,17 +5,16 @@ info:
 
 http:
   method: POST
-  url: "{{api_base}}/bookings/{{bookingId}}/exchange-offers?embed=ALL"
+  url: "{{api_base}}/bookings/{{bookingId}}/exchange-offers"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-    - name: Content-Type2
-      value: application/json;version={{osdm-version}}
-      disabled: true
   params:
     - name: embed
       value: ALL
@@ -69,7 +68,7 @@ runtime:
 
         // Retry up to 3 times if no exchange offers returned
         try {
-          postPatchExchangeOffersResponse(jsonData, expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
+          postPatchExchangeOffersResponse(jsonData, ["CONFIRMED", "FULFILLED"]);
           bru.setEnvVar('__exchangeOfferRetryCount', '0'); // reset on success
         } catch (noOffersErr) {
           test("Exchange offers found in response", () => { throw noOffersErr; });

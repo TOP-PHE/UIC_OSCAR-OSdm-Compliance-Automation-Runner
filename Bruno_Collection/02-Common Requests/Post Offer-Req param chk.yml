@@ -72,7 +72,7 @@ runtime:
           
           // Fallback: manually build headers from request definition
           try {
-            const contentType = res.getHeader("content-type") ? "application/json;version={{osdmVersion}}" : "application/json;version={{osdmVersion}}";
+            const contentType = "application/json;version={{osdmVersion}}";
             headers.push({ key: "Content-Type", value: resolveVars(contentType) });
             headers.push({ key: "Accept", value: "application/json" });
             headers.push({ key: "Authorization", value: resolveVars("Bearer {{access_token}}") });
@@ -235,7 +235,7 @@ runtime:
             {
               key: "requestedFulfillmentOptions",
               hints: ["requestedfulfillmentoptions", "fulfillment"],
-              apply: b => { b.requestedFulfillmentOptions = [{ fulfillmentType: "ETICKET", fulfillmentMedia: "UIC_PDF" }]; }
+              apply: b => { b.requestedFulfillmentOptions = [{ type: "ETICKET", media: "PDF_A4" }]; }
             },
             {
               key: "corporateCodes",
