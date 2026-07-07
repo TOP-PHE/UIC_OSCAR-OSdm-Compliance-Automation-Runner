@@ -23,6 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
+const { mergeDedicatedHeaders } = require('../../utils/osdm-client');
 const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
@@ -238,7 +239,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   if (days > 14) days = 14;
 
   // api_base lives on the company; OSDM credentials live on the tester.
-  const company = get('SELECT id, slug, api_base FROM companies WHERE id = ?', [targetCompanyId]);
+  const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company || !company.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
@@ -259,6 +260,9 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   const extraHeaders = {};
   try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
   try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  // #477: company-wide Dedicated Headers (API Config) — previously only the
+  // Bruno run path applied these; Discovery silently ignored them.
+  mergeDedicatedHeaders(extraHeaders, company, token);
 
   // Search day-by-day. For each day we try the endpoints in preference order
   // (trips-collection → offers); both responses carry `trips[]`. Once one
@@ -405,7 +409,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 
-  const company = get('SELECT id, slug, api_base FROM companies WHERE id = ?', [targetCompanyId]);
+  const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company || !company.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
@@ -420,6 +424,9 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   const extraHeaders = {};
   try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
   try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  // #477: company-wide Dedicated Headers (API Config) — previously only the
+  // Bruno run path applied these; Re-probe silently ignored them.
+  mergeDedicatedHeaders(extraHeaders, company, token);
 
   const rows = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']);
   const trains = rows.map(r => {

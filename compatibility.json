@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.212",
+  "current_release": "2026.213",
   "releases": [
+    {
+      "release": "2026.213",
+      "date": "2026-07-07",
+      "server": "1.11.185",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #477 — Test Data Discovery (Discover Timetable + Re-probe offers) and the Places API refresh route now apply the company's Dedicated Headers (API Config, extra_headers), which they previously ignored entirely — only the Bruno test-run path read them. Symptom: on a company requiring custom headers (e.g. SBB's tracestate/traceparent/accept-language), Discover Timetable 400'd on every searched day ('tracestate header is null or empty') while normal scenario runs worked fine, since those two code paths never shared header-building logic. New shared osdm-client.js helper mergeDedicatedHeaders(headers, companyRow, resolvedVars) parses companies.extra_headers and resolves {{var}} templates against the caller-supplied map (case-sensitive, unresolved var -> empty string, never the literal placeholder) — mirrors opencollection.yml's __extraHeaders block exactly, just in plain JS since there's no Bruno environment on this server-side path. Wired into all three call sites: discoverTimetable + reprobeOffers (company-test-resources.js, previously built their own local Requestor/subscription-key-only header set) and the Places refresh route (company-places.js, via buildTesterHeaders which had the identical gap).",
+        "Server-only change; no Bruno_Collection/schema/scenario changes.",
+        "Tests: 12 new unit tests for mergeDedicatedHeaders (literal values, {{var}} resolution, unresolved-var-to-empty-string, case sensitivity, malformed/missing extra_headers fail-open, non-array ignored, name-less entry skipped, override semantics, mutate-and-return) + 3 new integration tests capturing the real outgoing fetch headers on all three routes (discover-timetable, reprobe-offers, places/refresh), asserting both a literal dedicated header and a {{access_token}}-templated one. Full suite 54 suites / 1335 tests green (was 53/1321); eslint clean. Live browser verification not performed — same seeded-credential constraint as the #211 wizard picker; relying on unit + integration coverage that captures the actual HTTP headers at the fetch boundary."
+      ]
+    },
     {
       "release": "2026.212",
       "date": "2026-07-03",

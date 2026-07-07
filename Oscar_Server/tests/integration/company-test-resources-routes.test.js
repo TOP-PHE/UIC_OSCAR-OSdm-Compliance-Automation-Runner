@@ -210,6 +210,29 @@ describe('test-resources — discover-timetable', () => {
       expect(Array.isArray(res.body.dayResults)).toBe(true);
     } finally { global.fetch = origFetch; }
   });
+
+  // #477: the company's Dedicated Headers (API Config) were previously never
+  // applied on this server-side call — only the Bruno run path read them.
+  test('#477 — sends the company Dedicated Headers, resolving {{access_token}}', async () => {
+    run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [
+      JSON.stringify([{ name: 'tracestate', value: 'processid=abc,instance:/offers' }, { name: 'authorization-echo', value: 'Bearer {{access_token}}' }]),
+      companyId
+    ]);
+    const origFetch = global.fetch;
+    let capturedHeaders = null;
+    global.fetch = async (_url, opts) => { capturedHeaders = opts.headers; return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [] }) }; };
+    try {
+      const res = await request(app).post('/v1/company/test-resources/discover-timetable')
+        .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`)
+        .send({ originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8503000', days: 1 });
+      expect(res.status).toBe(200);
+      expect(capturedHeaders.tracestate).toBe('processid=abc,instance:/offers');
+      expect(capturedHeaders['authorization-echo']).toBe('Bearer stub-bearer-token');
+    } finally {
+      global.fetch = origFetch;
+      run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
+    }
+  });
 });
 
 // ── reprobe-offers ─────────────────────────────────────────────────────────────
@@ -241,6 +264,32 @@ describe('test-resources — reprobe-offers', () => {
       expect(Array.isArray(res.body.routes)).toBe(true);
     } finally {
       global.fetch = origFetch;
+      run('DELETE FROM test_resources WHERE id = ?', [trainId]);
+    }
+  });
+
+  // #477: same gap as discover-timetable — Re-probe never applied the
+  // company's Dedicated Headers.
+  test('#477 — sends the company Dedicated Headers', async () => {
+    const trainId = uuidv4();
+    const { colEncrypt } = require('../../src/db/db');
+    run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Probe me', ?)`,
+      [trainId, companyId, colEncrypt(JSON.stringify({ originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8503000' }))]);
+    run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [
+      JSON.stringify([{ name: 'traceparent', value: 'cafebabe-0815' }]),
+      companyId
+    ]);
+    const origFetch = global.fetch;
+    let capturedHeaders = null;
+    global.fetch = async (_url, opts) => { capturedHeaders = opts.headers; return { ok: true, status: 200, text: async () => JSON.stringify({ trips: [] }) }; };
+    try {
+      const res = await request(app).post('/v1/company/test-resources/reprobe-offers')
+        .set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+      expect(res.status).toBe(200);
+      expect(capturedHeaders.traceparent).toBe('cafebabe-0815');
+    } finally {
+      global.fetch = origFetch;
+      run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
       run('DELETE FROM test_resources WHERE id = ?', [trainId]);
     }
   });
