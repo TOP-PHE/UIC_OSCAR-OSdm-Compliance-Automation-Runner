@@ -10,7 +10,7 @@
 // Import needed library files
 require('./displays.js');
 require('./requestsBuilder.js');
-const { bruTest: test } = require('./testCapture.js');
+const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
 const { processRequestedInformation } = require('./requestedInformation.js');
@@ -331,6 +331,7 @@ function postOfferResponse(jsonData) {
   validateAncillaries(selectedOffer);
 
   handleAccommodationAndPlaceSelection(selectedOffer);
+  handleOptionalReservationSelections(selectedOffer);
 
   // Expired-add-reservation-offer test (Phase 5a): capture the validUntil of
   // the SPECIFIC reservationOfferPart that the post-booking
@@ -363,9 +364,6 @@ function postOfferResponse(jsonData) {
   // #393: the verdict above covers only the SELECTED offer — sweep the whole
   // response for flag-vs-schedule contradictions (one summary line, R9).
   sweepCatalogFlagVsSchedule(jsonData.offers);
-
-  // Mirror original no-op env set (kept for compatibility)
-  bru.setEnvVar("admissionReservationAncillaryOfferPartsIds", bru.getEnvVar("admissionReservationAncillaryOfferPartsIds"));
 }
 
 // OSDM Flexibility ordered least → most restrictive. An offer's overall
@@ -1046,7 +1044,7 @@ function validateAdmissions(selectedOffer) {
         expect(admission.price, "price should exist").to.be.an("object");
         expect(admission.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(admission.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expect(admission.price.scale, "price.scale should be a number").to.be.a("number");
+        expectTypeOrNull(admission.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
       });
 
       // offerMode is defined
@@ -1055,6 +1053,26 @@ function validateAdmissions(selectedOffer) {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} offerMode: ${admission.offerMode}`);
           expect(admission.offerMode).to.be.oneOf(["INDIVIDUAL", "COLLECTIVE"]);
         });
+      }
+
+      // #211 (SFR night-train spec): minGroupItemsToBeBooked/maxGroupItemsToBeBooked
+      // are optional OSDM fields — not every vendor populates them, so this is a
+      // soft type-check only, never a hard requirement that they equal 1.
+      if ("minGroupItemsToBeBooked" in admission) {
+        test(`AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked is a number or null - value: ${admission.minGroupItemsToBeBooked}`, function () {
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked: ${admission.minGroupItemsToBeBooked}`);
+          expectTypeOrNull(admission.minGroupItemsToBeBooked, "number", "minGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
+        });
+      } else {
+        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare minGroupItemsToBeBooked (optional per OSDM) → check skipped`);
+      }
+      if ("maxGroupItemsToBeBooked" in admission) {
+        test(`AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked is a number or null - value: ${admission.maxGroupItemsToBeBooked}`, function () {
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked: ${admission.maxGroupItemsToBeBooked}`);
+          expectTypeOrNull(admission.maxGroupItemsToBeBooked, "number", "maxGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
+        });
+      } else {
+        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare maxGroupItemsToBeBooked (optional per OSDM) → check skipped`);
       }
 
       // appliedPassengerTypes each has a type and passengerRef
@@ -1076,9 +1094,9 @@ function validateAdmissions(selectedOffer) {
 
       // isReusable is a boolean (if present)
       if (admission.isReusable !== undefined) {
-        test(`AdmissionOfferPart ${i + 1} isReusable is a boolean - isReusable: ${admission.isReusable}`, function () {
+        test(`AdmissionOfferPart ${i + 1} isReusable is a boolean or null - isReusable: ${admission.isReusable}`, function () {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} isReusable: ${admission.isReusable}`);
-          expect(admission.isReusable, "isReusable should be a boolean").to.be.a("boolean");
+          expectTypeOrNull(admission.isReusable, "boolean", "isReusable should be a boolean or null (nullable per OSDM)");
         });
       }
 
@@ -1159,7 +1177,7 @@ function validateAdmissions(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1217,7 +1235,7 @@ function validateReservations(selectedOffer) {
         expect(reservation.price, "price should exist").to.be.an("object");
         expect(reservation.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(reservation.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expect(reservation.price.scale, "price.scale should be a number").to.be.a("number");
+        expectTypeOrNull(reservation.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
       });
 
       // refundable and exchangeable are valid OSDM values
@@ -1259,7 +1277,7 @@ function validateReservations(selectedOffer) {
           availablePlaces.forEach((place, pIndex) => {
             validationLogger(`[DEBUG] availablePlaces[${pIndex}] accommodationType : ${place.accommodationType}, numericAvailability : ${place.numericAvailability}`);
             expect(typeof place.accommodationType).to.eql("string");
-            expect(typeof place.numericAvailability).to.eql("number");
+            expectTypeOrNull(place.numericAvailability, "number", `availablePlaces[${pIndex}].numericAvailability should be a number or null (nullable per OSDM)`);
             // tripLegCoverage structure (if present)
             if (place.tripLegCoverage) {
               expect(place.tripLegCoverage.tripId, `availablePlaces[${pIndex}].tripLegCoverage.tripId should be a string`).to.be.a("string");
@@ -1274,15 +1292,28 @@ function validateReservations(selectedOffer) {
             validationLogger(`[WARNING] Reservation part ${i + 1} availablePlaces[${pIndex}].accommodationType '${_t}' is outside the OSDM base AccommodationType list [${KNOWN_ACCOMMODATION_TYPES.join(", ")}] — legal for an x-extensible-enum (custom code), but cross-vendor tooling may not understand it.`);
           }
         });
+        // #211 (SFR night-train spec): gender-segregated COUCHETTE/BERTH
+        // compartments are expected to carry a MEN/LADIES/MIXED placeProperties
+        // entry. Soft WARNING, not a FAIL — placeProperties is not a
+        // mandatory OSDM field and some vendors may not run gender-segregated
+        // night trains at all.
+        const GENDER_PLACE_PROPERTIES = ["MEN", "LADIES", "MIXED"];
+        const _nightAccPlaces = availablePlaces.filter(pl => pl && ["COUCHETTE", "BERTH"].includes(String(pl.accommodationType || "").toUpperCase()));
+        if (_nightAccPlaces.length > 0) {
+          const _hasGenderProp = _nightAccPlaces.some(pl => Array.isArray(pl.placeProperties) && pl.placeProperties.some(p => GENDER_PLACE_PROPERTIES.includes(p)));
+          if (!_hasGenderProp) {
+            validationLogger(`[WARNING] Reservation part ${i + 1} has COUCHETTE/BERTH availablePlaces but none declare a gender-segregation placeProperties value (${GENDER_PLACE_PROPERTIES.join("/")}) — legal (placeProperties is optional per OSDM), but night-train gender-dependent scenarios (#211) cannot be exercised against this offer.`);
+          }
+        }
       } else {
         validationLogger(`[DEBUG] No availablePlaces for reservation id=${reservation.id} → test skipped`);
       }
 
       // Numeric Availability
       if ("numericAvailability" in reservation) {
-        test(`Reservation part ${i + 1} numericAvailability is a number - total: ${reservation.numericAvailability}`, () => {
+        test(`Reservation part ${i + 1} numericAvailability is a number or null - total: ${reservation.numericAvailability}`, () => {
           validationLogger(`[DEBUG] numericAvailability : ${reservation.numericAvailability}`);
-          expect(typeof reservation.numericAvailability).to.eql("number");
+          expectTypeOrNull(reservation.numericAvailability, "number", "numericAvailability should be a number or null (nullable per OSDM)");
         });
       } else {
         validationLogger(`[DEBUG] No numericAvailability for reservation id : ${reservation.id} → test skipped`);
@@ -1309,9 +1340,9 @@ function validateReservations(selectedOffer) {
 
       // Number of Private Compartments
       if ("numberOfPrivateCompartments" in reservation) {
-        test(`Reservation part ${i + 1} numberOfPrivateCompartments is a number - total: ${reservation.numberOfPrivateCompartments}`, () => {
+        test(`Reservation part ${i + 1} numberOfPrivateCompartments is a number or null - total: ${reservation.numberOfPrivateCompartments}`, () => {
           validationLogger(`[DEBUG] numberOfPrivateCompartments : ${reservation.numberOfPrivateCompartments}`);
-          expect(typeof reservation.numberOfPrivateCompartments).to.eql("number");
+          expectTypeOrNull(reservation.numberOfPrivateCompartments, "number", "numberOfPrivateCompartments should be a number or null (nullable per OSDM)");
         });
       } else {
         validationLogger(`[DEBUG] No numberOfPrivateCompartments for reservation id=${reservation.id} → test skipped`);
@@ -1382,7 +1413,7 @@ function validateReservations(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1472,7 +1503,7 @@ function validateAncillaries(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expect(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number`).to.be.a('number');
+              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1689,22 +1720,54 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
 
   matchingParts.forEach(part => validationLogger(`[DEBUG] ${accommodationSelection} reservationOfferPart.id: ${part.id}`));
   bru.setEnvVar("reservationIds", JSON.stringify(matchingParts.map(part => part.id)));
-  bru.setEnvVar("reservationId", matchingParts[0].id);
+
+  // #211: night-train scenarios distinguish "bed in shared compartment"
+  // (offerMode INDIVIDUAL) from "private compartment" (offerMode COLLECTIVE)
+  // — both can appear as separate reservationOfferParts of the SAME
+  // accommodationType in one offer response. Without this, an INDIVIDUAL-
+  // intent scenario could silently book a COLLECTIVE part or vice versa,
+  // making the two SFR scenario families untrustworthy to distinguish.
+  const desiredOfferMode = bru.getEnvVar("offerMode");
+  let selectedParts = matchingParts;
+  if (desiredOfferMode) {
+    const modeMatches = matchingParts.filter(part => part.offerMode === desiredOfferMode);
+    if (modeMatches.length > 0) {
+      selectedParts = modeMatches;
+    } else {
+      validationLogger(`[WARNING] No ${accommodationSelection} reservationOfferPart declares offerMode '${desiredOfferMode}' — falling back to the first ${accommodationSelection} part regardless of offerMode. The booked offerMode may not match what this scenario intended to test.`);
+    }
+  }
+  const selectedPart = selectedParts[0];
+  bru.setEnvVar("reservationId", selectedPart.id);
 
   // #371 (OBB IRT/NJ): persist the SELECTED part's real accommodation so the
   // booking request's placeSelections states which compartment is booked
   // (accommodationType + accommodationSubType from availablePlaces - e.g.
   // COUCHETTE / COUCHETTE_COMFORT_4) instead of a hardcoded placeholder.
-  const _selPlace = (matchingParts[0].availablePlaces || [])
-    .find(pl => pl && pl.accommodationType === accommodationSelection) || null;
+  // #211: when the scenario asked for a specific gender-segregated
+  // placeProperties value (MEN/LADIES/MIXED), prefer the availablePlace that
+  // carries it — a single reservationOfferPart can list places for more than
+  // one gender designation (e.g. a MEN place and a LADIES place).
+  const desiredGender = bru.getEnvVar("accommodationGenderPreference");
+  const candidatePlaces = (selectedPart.availablePlaces || [])
+    .filter(pl => pl && pl.accommodationType === accommodationSelection);
+  let _selPlace = null;
+  if (desiredGender) {
+    _selPlace = candidatePlaces.find(pl => Array.isArray(pl.placeProperties) && pl.placeProperties.includes(desiredGender)) || null;
+    if (!_selPlace) {
+      validationLogger(`[WARNING] No ${accommodationSelection} availablePlace declares placeProperties '${desiredGender}' — falling back to the first available place. The booked gender designation may not match what this scenario intended to test.`);
+    }
+  }
+  if (!_selPlace) _selPlace = candidatePlaces[0] || null;
   if (_selPlace) {
     const _acc = { accommodationType: _selPlace.accommodationType };
     if (typeof _selPlace.accommodationSubType === 'string' && _selPlace.accommodationSubType) _acc.accommodationSubType = _selPlace.accommodationSubType;
+    if (Array.isArray(_selPlace.placeProperties) && _selPlace.placeProperties.length > 0) _acc.placeProperties = _selPlace.placeProperties;
     bru.setEnvVar("selectedAccommodation", JSON.stringify(_acc));
-    validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''} (reservation part ${matchingParts[0].id})`);
+    validationLogger(`[INFO] Selected accommodation for the booking placeSelections: ${_acc.accommodationType}${_acc.accommodationSubType ? ' / ' + _acc.accommodationSubType : ''}${_acc.placeProperties ? ' [' + _acc.placeProperties.join(',') + ']' : ''} (reservation part ${selectedPart.id}${desiredOfferMode ? ', offerMode ' + (selectedPart.offerMode || 'n/a') : ''})`);
   }
 
-  notePlaceSelectionCapabilities(matchingParts[0]);
+  notePlaceSelectionCapabilities(selectedPart);
 
   test(`At least one reservationOfferPart has accommodationType: ${accommodationSelection}`, function () {
     expect(matchingParts.length, "No matching reservationOfferParts found").to.be.above(0);
@@ -1713,6 +1776,31 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
   const tripLegCoverage = getTripLegCoverage(selectedOffer, accommodationSelection);
   bru.setEnvVar("tripLegCoverage", JSON.stringify(tripLegCoverage));
   validationLogger(`[DEBUG] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
+}
+
+// #239: book the selected offer's reservationOfferParts via
+// optionalReservationSelections — the OSDM mechanism for offers where a
+// reservation is mandatory, distinct from (and independent of)
+// placeSelections/accommodationSelection above, which additionally state
+// WHICH place/compartment is wanted. This only declares the reservation(s)
+// themselves should be booked, one {reservationId} entry per part.
+function handleOptionalReservationSelections(selectedOffer) {
+  const bookMandatoryReservations = bru.getEnvVar("bookMandatoryReservations");
+  if (bookMandatoryReservations !== true && bookMandatoryReservations !== "true") {
+    return;
+  }
+  validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
+
+  const reservationParts = selectedOffer.reservationOfferParts || [];
+  if (reservationParts.length === 0) {
+    validationLogger("[WARN] bookMandatoryReservations is enabled but the selected offer has no reservationOfferParts — nothing to add to optionalReservationSelections.");
+    bru.setEnvVar("optionalReservationSelections", JSON.stringify([]));
+    return;
+  }
+
+  const selections = reservationParts.map(part => ({ reservationId: part.id }));
+  bru.setEnvVar("optionalReservationSelections", JSON.stringify(selections));
+  validationLogger(`[INFO] optionalReservationSelections will book ${selections.length} reservationOfferPart(s): ${reservationParts.map(p => p.id).join(", ")}`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {

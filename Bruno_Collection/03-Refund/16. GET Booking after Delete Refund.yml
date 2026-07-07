@@ -5,12 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/bookings/{{bookingId}}?embed=ALL"
+  url: "{{api_base}}/bookings/{{bookingId}}"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   params:
@@ -54,7 +56,12 @@ runtime:
         }
 
         if (!jsonData.booking) {
-            throw new Error("⛔ Exiting script, no booking available in the response");
+            test("booking exists in response (required for downstream steps)", () => {
+                throw new Error("⛔ booking missing in GET response — cannot proceed");
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("GET Booking after Delete Refund (missing booking)");
+            return;
         }
 
         if(bru.getEnvVar("isRefundConfirmed")) {
@@ -62,15 +69,15 @@ runtime:
             postCreateBookingResponse(
             bru.getEnvVar("offer"),
             jsonData,
-            expectedBookedOffersStatus=["FULFILLED", "CONFIRMED"],
-            expectedFulfillmentStatus=["FULFILLED", "CONFIRMED", "REFUNDED"]);
+            ["FULFILLED", "CONFIRMED"],
+            ["FULFILLED", "CONFIRMED", "REFUNDED"]);
         } else {
             // Refund was never confirmed (DELETE before PATCH) → parts still FULFILLED, fulfillment unchanged
             postCreateBookingResponse(
             bru.getEnvVar("offer"),
             jsonData,
-            expectedBookedOffersStatus=["FULFILLED", "CONFIRMED"],
-            expectedFulfillmentStatus=["FULFILLED", "CONFIRMED"]);
+            ["FULFILLED", "CONFIRMED"],
+            ["FULFILLED", "CONFIRMED"]);
         }
         displayFulFilledBooking(jsonData);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────

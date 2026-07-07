@@ -14,6 +14,777 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.184] — 2026-07-03
+
+### Added
+
+- **`public/news/index.json`** — announced #239 (book mandatory
+  reservations via `optionalReservationSelections`) on the welcome page.
+  Content-only; no runtime behaviour affected.
+
+---
+
+## [server-v1.11.183 / collection-OTST_V2.0.97] — 2026-07-03
+
+**Feature (#239): book a mandatory reservation via `optionalReservationSelections`
+— independent of the existing place/compartment-selection mechanism.**
+
+### Added
+
+- **`datafile.schema.json`** — new scenario boolean `bookMandatoryReservations`.
+- **`offers.js`** — new `handleOptionalReservationSelections()`, called
+  alongside `handleAccommodationAndPlaceSelection()` in `postOfferResponse`:
+  when the flag is set, harvests every `reservationOfferParts[].id` on the
+  selected offer into the `optionalReservationSelections` env var
+  (`[{reservationId}, ...]`).
+- **`requestsBuilder.js`** — `buildBookingRequest()` attaches
+  `optionalReservationSelections` to each booked offer object, mirroring the
+  existing `placeSelections` attachment (outbound-only for two-step return
+  scenarios, same established simplification).
+- **`scenarios.js`** — new "Book via optionalReservationSelections" toggle
+  in the Booking Flow Actions section.
+- **`bookings.js`** — logs which reservation-booking mechanism a scenario
+  used, for report traceability. No new assertion needed: the existing
+  generic `validateOfferParts()` reservation↔booked-reservation check
+  already covers correctness regardless of which mechanism requested it.
+
+### Changed
+
+- Not breaking — the new field is optional and additive, defaulting off.
+  `min_collection` unchanged at `OTST_V2.0.95`.
+
+### Tests
+
+- Full suite 53 suites / 1321 tests green (no server-side test file
+  touched). `node --check` on every edited `Bruno_Collection` file; schema
+  JSON-parses; `opencollection.yml` YAML + before-request JS syntax-check
+  clean, including the new field in its scenario-reset delete-list.
+
+---
+
+## [server-v1.11.182] — 2026-07-03
+
+### Added
+
+- **`public/news/index.json`** — backfilled 18 welcome-page news entries
+  covering everything merged since the last news update (2026-06-09,
+  partial refund) through today: Night Train accommodation testing (#211),
+  the env-yml credential-free security fix (#306), Places API stop-place
+  discovery (#450), Test-Manager-gated registration (#449), fulfillment
+  type/media declaration (#448), Test Finding ↔ scenario linking (#447),
+  CHAPS-onboarding auth diagnostics (#437-443), dedicated headers (#427),
+  Test Findings & Open Points (#400/#401) plus its category accordion and
+  bulk-import follow-ups (#409/#413), batch ZIP downloads (#406), the Run
+  Budget Ceiling admin field + catalog refundability sweep (#395), the
+  IRT/NJ accommodation-aware testing programme (#372/#374/#380/#381/#382),
+  run-setup UX polish (#364/#367), the Discovery offer probe + Re-probe
+  button (#368/#370), the OSDM Trip Search Criteria wizard panel (#360),
+  and the step-failure policy toggle (#362). Content-only; no runtime
+  behaviour affected.
+
+---
+
+## [server-v1.11.181] — 2026-07-03
+
+### Fixed
+
+- **Flaky CI test** — `tests/unit/runner.test.js`'s "links a reportGenerator
+  HTML artifact when one is present" intermittently failed in CI (never
+  locally). The report-linking step in `runner.js` filters candidate report
+  files by `mtime >= runStartTime`, guarding against linking a stale report
+  left by a previous run. `runStartTime` used millisecond-precision
+  `Date.now()`; some CI container filesystem storage drivers round a
+  freshly-written file's reported mtime to coarser precision, which could
+  put it just below `runStartTime` even though the write genuinely happened
+  after — silently dropping the artifact link. Fixed by subtracting a
+  2-second safety margin from `runStartTime` before the comparison — a real
+  leftover report is always at minimum seconds old in practice, so the
+  margin costs nothing on the staleness guarantee it exists for.
+
+---
+
+## [server-v1.11.180 / collection-OTST_V2.0.96] — 2026-07-03
+
+**Feature (#211): Night Train Sales & Refund — the SFR's two accommodation
+families (bed in shared compartment vs. private compartment) are now
+reliably distinguishable and validated end-to-end.**
+
+### Added
+
+- **`datafile.schema.json`** — `accommodationSelection` enum synced to match
+  what the wizard/code have used since #373 (was stale: only
+  `SEAT`/`COMPARTMENT`, now includes `COUCHETTE`/`BERTH`/`VEHICLE`). New
+  sibling field `accommodationGenderPreference` (`MEN`/`LADIES`/`MIXED`) for
+  gender-segregated night-train compartments — not a passenger-level field;
+  #227 (age/gender as an offer-request input) stays untouched.
+- **`scenarios.js`** — new "Preferred place gender" wizard pill picker,
+  wired the same way as the existing accommodation-type picker.
+
+### Changed
+
+- **`offers.js` `handleAccommodationAndPlaceSelection()`** — reservationOfferPart
+  selection is now offerMode-aware: when the scenario declares `offerMode`,
+  prefers a part whose own `offerMode` matches (a vendor offering both an
+  INDIVIDUAL and a COLLECTIVE part of the same accommodation type could
+  previously have the wrong one silently booked). Also prefers a place
+  whose `placeProperties` matches the new gender preference, and harvests
+  `placeProperties` into `selectedAccommodation` so it flows into the
+  booking request. Falls back with a `[WARNING]` (never a hard fail) when
+  no match exists.
+- **`offers.js`** — new soft assertions: `minGroupItemsToBeBooked`/
+  `maxGroupItemsToBeBooked` type-checked when present; COUCHETTE/BERTH
+  `availablePlaces` warn when no MEN/LADIES/MIXED `placeProperties` is
+  declared.
+- **`bookings.js` `validateAccommodationGoal()`** — the place-count check is
+  now a **hard** assertion when the scenario declared an `offerMode`
+  (exactly 1 place for INDIVIDUAL, place count == party size for
+  COLLECTIVE); stays a soft `[WARNING]` for every scenario that doesn't
+  declare `offerMode` (unaffected, backward compatible). Added a
+  `placeProperties` request-vs-response echo check (`[WARNING]` only).
+- Not breaking — every new field is optional/additive; `min_collection`
+  unchanged at `OTST_V2.0.95`.
+
+### Tests
+
+- Full suite 53 suites / 1321 tests green (unaffected — no server-side test
+  file touched directly). `Bruno_Collection` has no Jest harness (documented
+  pre-existing gap); verified instead via `node --check` on every edited
+  file, schema JSON-parse, and `opencollection.yml` YAML + before-request JS
+  syntax-check. Live browser verification of the new wizard picker was not
+  completed — obtaining a test-manager session would have required
+  resetting a seeded dev user's password, which the permission system
+  correctly blocked as an unauthorized credential mutation; the picker is a
+  byte-for-byte pattern match of the already-proven `accommodationSelection`
+  picker.
+
+---
+
+## [server-v1.11.179 / collection-OTST_V2.0.95] — 2026-07-03
+
+**Security (#306): the ephemeral Bruno env yml is now credential-free — no plaintext
+secret ever touches disk.**
+
+### Changed
+
+- **`worker/runner.js`** — `buildEnvYml()` no longer writes `access_token`,
+  `Ocp-Apim-Subscription-Key` or `oauth_extra`/`auth_key_secret` into the
+  per-run environment file; it carries only non-secret plumbing (API base,
+  datafile URL, requestor, run id, scenario override, extra headers).
+  `executeRun()` instead hands the three credentials to the Bruno child
+  process via its environment — `OSCAR_ACCESS_TOKEN`,
+  `OSCAR_SUBSCRIPTION_KEY`, `OSCAR_OAUTH_EXTRA` — on top of the existing
+  strict env allowlist (`ENCRYPTION_KEY`/`JWT_SECRET` still never
+  forwarded). Closes the crash-window exposure: a worker SIGKILL between
+  env-write and cleanup, or a mid-run volume snapshot, now leaves nothing
+  sensitive behind. Every credential-bearing path on disk is encrypted or
+  eliminated.
+- **`Bruno_Collection/opencollection.yml`** — new step 0 in the
+  before-request hook seeds the credentials from the process environment
+  into Bruno runtime vars via `bru.getProcessEnv()` (official Bruno API,
+  identical on the Linux workspace path and the Windows fallback). Seeding
+  fires only while the runtime var is still empty, so a token refreshed
+  mid-run through the OSCAR loopback (#204) is never clobbered; standalone
+  Bruno (no `OSCAR_*` env) is a strict no-op.
+- Env-file deletion failure downgraded from CRITICAL error to warning
+  (hygiene only — the file carries no credentials any more).
+- `TOKEN_FORMAT_ERROR` messaging (runner log + `run-detail.html` banner +
+  docs) no longer blames the token for YAML parse errors — the token can no
+  longer cause them; a malformed API base URL / requestor still can.
+- **BREAKING PAIRING** — `compatibility.json` `min_collection` raised to
+  `OTST_V2.0.95`: an older collection under server ≥ 1.11.179 never receives
+  the access token and 401s on every call. Deploy both halves together (the
+  `refresh-collection.yml` workflow already does).
+
+### Documentation
+
+- Server Admin Guide §15 threat table: env-file row added — "every
+  credential-bearing path on disk is encrypted or eliminated" now holds
+  without the env-yml caveat (the #306 acceptance criterion).
+- Specification §9.9 (ephemeral env files), §10.1 (YAML safety), §10.2
+  (error sentinels), §12 (banner); Solution Architecture §14.3.4 example +
+  Issue-3 superseded note.
+
+### Tests
+
+- `tests/unit/runner.test.js` 17 → 19: the on-disk env yml contains neither
+  secret values nor credential variable names while the run is in flight;
+  the spawn env carries the `OSCAR_*` vars exactly when configured. Full
+  suite 53 suites / 1321 tests green.
+
+---
+
+## [server-v1.11.178] — 2026-07-02
+
+**Test: coverage batch 6 — src/server.js, the Express app entry point (overall `src` coverage ~83% → ~88%).**
+
+### Added
+
+- **`tests/unit/server.test.js`** (new file, 30 tests) — the last remaining
+  major coverage gap (236 uncovered lines, 0% covered). Architecturally
+  different from every prior batch: requiring `server.js` has real side
+  effects (env-var validation with `process.exit(1)`, a JWT-secret DB
+  bootstrap, queue event wiring, startup run reconciliation, and a real
+  `app.listen()` that binds an OS port) rather than being a plain Express
+  router. The module is required exactly once against a dedicated,
+  never-dialed test port — supertest wraps the exported `app` directly and
+  needs no real listening socket. Covers:
+  - `GET /health` (DB / queue / disk / process checks)
+  - `GET /metrics`
+  - the datafile download route — filename-regex guard, unknown-company
+    404, non-loopback 401/403, owning-company 200, loopback-bypass 200
+  - the loopback-only access-token-refresh endpoint, including `?force=1`
+    and a `resolveAccessToken`-failure 502
+  - the run-artifact download route — ownership check, path/filename
+    guards, and a real AES-GCM tamper-detection 500 (a single flipped
+    ciphertext byte)
+  - route-mounting wiring
+  - via one isolated `NODE_ENV=production` re-require on a second
+    dedicated port: the HTTPS-redirect middleware (Sonar S5146
+    open-redirect guard)
+
+  `server.js` 0% → **~83%** lines. Full suite: 52 → **53 suites, 1289 →
+  1319 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **74% → 83%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- **Deliberately out of scope, documented rather than forced:** the
+  `process.exit(1)` missing-env-var path, the Alertmanager startup
+  config-seed hook (gated behind an unset env var so it naturally never
+  runs in tests), static/SPA file serving (Express's own tested
+  behaviour), and the global error handler (no non-invasive way to force
+  an unhandled throw through a real mounted route without modifying
+  source).
+- Given the elevated risk (two real, uncaptured `app.listen()` sockets —
+  the main require plus the isolated production re-require — and two
+  real, hardcoded, non-overridable data directories written to), this
+  batch was written directly rather than delegated, after reading
+  `server.js` end-to-end first.
+- **Caught and fixed two authoring mistakes before they became
+  false-negative-masking bugs:** a path-traversal test asserted 400/404
+  on a URL Express itself normalizes before routing (it actually hits the
+  SPA fallback at 200) — replaced with a same-segment filename that
+  genuinely reaches and fails the route's own regex guard; an
+  artifact-tamper test truncated the encrypted file below the 34-byte
+  header, which made `isEncryptedBuffer()` treat it as legacy plaintext
+  instead of tripping the AES-GCM auth-tag check — fixed by flipping one
+  byte in the ciphertext region instead of truncating. Also fixed an
+  FK-ordering bug in the file's own cleanup (deleting seeded users before
+  their still-referencing runs' company row violated `runs.user_id`'s
+  non-cascading foreign key).
+- Stress-tested for flakiness given the real side effects: 6 standalone
+  runs and 3 full-suite runs, all clean, before trusting the result.
+  Confirmed `data/datafiles/` and `data/artifacts/` have zero leftover
+  test files before and after; lint clean; scanned for both CodeQL
+  patterns that hit earlier batches — neither present.
+
+---
+
+## [server-v1.11.177] — 2026-07-02
+
+**Test: coverage batch 5 — worker/runner.js, the Bruno CLI orchestrator (overall `src` coverage ~77% → ~83%).**
+
+### Added
+
+- **`tests/unit/runner.test.js`** (new file, 17 tests) — closes by far the
+  largest remaining coverage gap: the Bruno CLI orchestrator
+  (`worker/runner.js`, 388 uncovered lines / 16% covered going in).
+  `child_process.spawn` is fully mocked — **no real subprocess is ever
+  spawned** — driving `executeRun()` through:
+  - auth / missing-run / missing-datafile / env-write-failure early exits
+  - exit-code 0 vs non-zero final status, and the `proc.on('error', ...)`
+    path
+  - HTML report linking, both directly (reportGenerator output) and via the
+    `mergeReport.js` fallback, plus that second spawn call's own error path
+  - the JSON-results artifact copy
+  - `AUTH_401`/`TOKEN_FORMAT` detection in CLI output, surfaced onto
+    `runs.error_message`
+  - the emergency-stop terminal-state guard (a `CANCELLED` run is never
+    resurrected to `COMPLETED`)
+  - a real (not fake-timer), config-driven short-timeout kill test
+
+  `runner.js` 16% → **~68%** lines. Full suite: 51 → **52 suites, 1272 →
+  1289 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **68% → 74%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- Given the elevated risk here (a real, hardcoded, non-overridable
+  `ARTIFACTS_DIR` under this same repo, plus the real danger of accidentally
+  spawning a subprocess), this batch was written directly rather than
+  delegated to a subagent, after reading `executeRun()` end-to-end first.
+- **Hit and fixed one real bug while authoring**: emitting synthetic
+  `close`/`error` events on the fake child process after a single
+  `setImmediate` tick raced ahead of `executeRun`'s own multi-`await`
+  preamble (mkdir / env-yml write / datafile read) — the events fired
+  *before* `executeRun` had even called `spawn()`, so its real listeners
+  were never attached and the awaited promise hung forever. Fixed by
+  polling for the Nth actual `spawn()` call before emitting anything.
+- **Deliberately out of scope, documented rather than forced:** the
+  Linux-only workspace create/cleanup functions (platform-gated, never
+  engaged since no test sets `scenarioOverride`) and the token-watchdog
+  `setInterval` tick logic (disabled via `TOKEN_WATCHDOG_INTERVAL_MS=0` for
+  every test, avoiding a live interval that would otherwise keep Jest's
+  process alive). Both carry real production risk surface but need a
+  fundamentally different (fake-timer / platform-conditional) test strategy
+  this batch didn't take on.
+- Confirmed `data/artifacts/` has zero leftover test directories before and
+  after a full suite run; lint clean; scanned for both CodeQL patterns that
+  hit earlier batches (insecure `os.tmpdir()` writes, unanchored
+  `new RegExp(string)` checks) — neither present.
+
+---
+
+## [server-v1.11.176] — 2026-07-02
+
+**Test: coverage batch 4 — mailer.js, middleware/auth.js, worker/auth-profiles.js (overall `src` coverage ~74% → ~77%).**
+
+### Added
+
+- **`tests/unit/mailer.test.js`** (new file, 24 tests) — mocks `nodemailer`
+  and seeds/restores `server_config` directly to exercise all four
+  `send*Email` functions in both the SMTP-configured and
+  dev-mode-fallback (no SMTP) branches. `mailer.js` 0% → **100%**
+  (previously completely untested).
+- **`auth-middleware.test.js`** (20 → 47 tests) — cookie parsing (malformed
+  pairs, URL-decoding, multi-cookie, invalid RFC-6265 names), the
+  `token_blacklist` revocation branch, and `isTestManagerOrAbove` /
+  `userFromRequest` exercised over every role in the app.
+  `middleware/auth.js` ~62% → **100%**.
+- **`auth-profiles.test.js`** (30 → 57 tests) — the `custom` profile's
+  raw-body-format and placeholder-substitution edge cases, network/timeout/
+  malformed-response failure paths, and masked-diagnostic-logging
+  assertions across every OAuth profile (confirming secrets never leak into
+  logs). `worker/auth-profiles.js` ~85% → **~99%** (one line left: an
+  unreachable `_maskBody()` fallback no adapter can actually produce —
+  documented rather than reached through internals).
+
+Full suite: 50 → **51 suites, 1199 → 1272 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **65% → 68%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- This batch used 3 parallel subagents. Two independently flagged (and
+  self-resolved) a transient mid-task file-read anomaly, so every file was
+  re-verified from scratch rather than trusting any self-report: re-run
+  standalone with `--coverage`, scanned for both CodeQL patterns that hit
+  earlier batches (insecure `os.tmpdir()` writes, unanchored
+  `new RegExp(string)` URL/domain checks — neither present), and the exact
+  test-count delta reconciled against `origin/main` (1199 + 27 + 22 + 24 =
+  1272, confirmed exactly).
+
+---
+
+## [server-v1.11.175] — 2026-07-01
+
+**Test: coverage batch 3 — runs.js, admin.js, company.js (overall `src` coverage ~65% → ~74%).**
+
+### Added
+
+- **`runs-routes.test.js`** (10 → 75 tests) — the single biggest remaining
+  coverage gap: submit / list / queue-status / stop-all / batch + zip / logs /
+  assertions / requests / artifacts / share / cancel / delete / bulk-delete /
+  bulk-admin-action, over real seeded run graphs with encrypted artifacts.
+  `runs.js` ~35% → **~87%**.
+- **`admin-routes.test.js`** (40 → 73 tests) — `users/:id/approve`,
+  `generate-reset-link`, `GET`/`PATCH /config` (incl. sensitive-value
+  masking), `alertmanager/apply`, `test-email` (dev-mode path only, no real
+  SMTP), and `rotate-jwt-secret` (run last, self-restoring — it mutates
+  `process.env.JWT_SECRET`). `admin.js` ~60% → **~89%**.
+- **`company-routes.test.js`** (15 → 27 tests) — the `extra_headers`
+  validation branches (issue #426), the retired
+  `share_reports_with_certifier` rejection, and the `POST /datafile`
+  multipart upload path. `company.js` ~58% → **~84%**.
+
+Full suite: 50 suites, 1089 → **1199 tests, all green**.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **55% → 65%** in
+  `sonar-project.properties` (bump the actual gate condition in the
+  SonarCloud UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change. Every extended file was
+  independently re-run standalone with `--coverage` and scanned for the
+  CodeQL patterns that tripped batch 1 (no bare `os.tmpdir()` writes, no
+  unused imports) before being folded in.
+- **One real, pre-existing behavior surfaced while writing tests (not a
+  regression — not changed here):** `POST /v1/company/datafile`'s multer
+  `filename` callback treats `certification_user` as a platform role that
+  needs an explicit `company_id`, so it errors with a `500` *before* the
+  route's own test-manager-only `403` check ever runs, for that specific
+  role. The new test exercises the intended `403` branch with a plain tester
+  instead. Worth a follow-up if a certifier ever legitimately hits this
+  endpoint.
+
+---
+
+## [server-v1.11.174] — 2026-07-01
+
+**Test: coverage batch 2 — versionInfo, structureResults, and the auth route's untested surface (overall `src` coverage ~59% → ~65%).**
+
+### Added
+
+- **`version-info.test.js`** (8 tests, ~97%) — `utils/versionInfo.js`
+  compatibility-matrix resolution: matrix-missing / malformed JSON, untested
+  combination, exact + `.x`-wildcard match, unknown collection. Uses
+  `jest.isolateModules` (the module resolves at load) + `mkdtemp` temp files.
+- **`structure-results.test.js`** (22 tests, ~90%) — `reports/structureResults.js`:
+  the pure `classifyVendorCapability` / `serializeBounded` across all branches,
+  plus `extractStructuredResults` over a seeded run with real AES-encrypted
+  artifact files (PASS/FAIL requests, auth-header redaction, assertion counts).
+- **`auth-routes.test.js` extended** (~49% → ~86%) — the previously-untested
+  auth surface: `register/companies`, `register/check-token`, the full
+  password-reset flow (request → check-token → confirm, single-use, then
+  login with the new password), `bootstrap/platform-user`, and the
+  authenticated `/me`, `/logout`, `/sso-check` (admin-only) endpoints.
+
+Full suite: 48 → 50 suites, 1043 → 1089 tests, all green.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **50% → 55%** in
+  `sonar-project.properties` (bump the actual gate condition in the SonarCloud
+  UI to match).
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change. New test files were scanned
+  for the CodeQL patterns that tripped batch 1 (no `os.tmpdir()` writes —
+  `mkdtemp` used; no unused imports).
+
+---
+
+## [server-v1.11.173] — 2026-07-01
+
+**Test: coverage batch 1 — integration tests for the three untested route files (overall `src` coverage ~50% → ~59%).**
+
+### Added
+
+- **`company-test-resources-routes.test.js`** (21 tests, ~85% of the file) —
+  CRUD + role gating + tenant isolation, plus the vendor-calling
+  `discover-timetable` / `reprobe-offers` endpoints (bearer creds +
+  stubbed `global.fetch`, no live vendor).
+- **`reports-routes.test.js`** (33 tests, ~98%) — `compare` / `comparisons` /
+  `configured` report builder / `templates` / `trends`, over a seeded
+  runs + run_requests + run_events graph.
+- **`company-test-framework-routes.test.js`** (15 tests, ~94%) — GET/PUT/DELETE,
+  role gating, and the lazy salesFlows migration path.
+
+All three files were previously at **0%** coverage. Full suite: 45 → 48
+suites, 974 → 1043 tests, all green.
+
+### Changed
+
+- Documented the OSCAR-Gate `new_coverage` floor bump **35% → 50%** in
+  `sonar-project.properties` (the actual gate condition must be bumped in the
+  SonarCloud UI to match) — locking in the coverage gain so new code can't
+  regress below it.
+
+### Notes
+
+- Tests-only + Sonar-config-doc; no runtime change.
+- The `discover-timetable` / `reprobe-offers` deep harvest-and-merge loops
+  remain uncovered (they need a fully-shaped vendor `trips` payload) — a
+  follow-up target for a later batch.
+
+---
+
+## [server-v1.11.172] — 2026-07-01
+
+**Chore: clear the two conditions keeping `main`'s SonarCloud gate red, so the Quality Gate can become a required check.**
+
+### Fixed (accessibility — reliability rating C → A)
+
+- Associated a label with all **38 form controls** flagged by
+  `Web:InputWithoutLabelCheck` (which Sonar classifies as reliability *bugs*)
+  across 8 pages: the auth pages (`index`, `verify-email`, `reset-password`,
+  `forgot-password`), `profile.html`, `admin.html`, `run-detail.html`, and
+  `report-builder.html`. Used `<label for>` where a visible label already
+  existed, and `aria-label` for compact toolbar filters and the "select-all"
+  table checkboxes. This also resolves the 38 matching `S6853` a11y smells.
+
+### Changed (Sonar config — duplication 9.2% → ~1%)
+
+- Added `sonar.cpd.exclusions` for `Bruno_Collection/library-bruno/osdmSchemas.js`
+  — a **generated** file (its header says "do not hand-edit") whose
+  per-OSDM-version schema blocks are ~identical by design and accounted for
+  ~2,288 of the project's ~2,585 duplicated lines. It stays analyzed for
+  bugs/smells; only copy-paste detection is turned off.
+- Bumped `sonar.projectVersion` `1.2.0 → 1.11.172` (it was stale, which made
+  ~28k legacy lines count as "new code"). Keeping it in step with
+  `package.json` lets the "Previous version" new-code period track real
+  releases.
+
+### Verification
+
+- Every `<label for>` target confirmed to reference an existing element `id`
+  across all 8 files; eslint + inline-script HTML lint clean; full Jest suite
+  unaffected (HTML/config only). After merge, `main`'s gate is expected to go
+  green on both previously-failing conditions — enabling "SonarQube Quality
+  Gate check" to be added to branch protection.
+
+---
+
+## [server-v1.11.171] — 2026-07-01
+
+**Feat (#450): discover stop places via the OSDM Places API — cache + full-text lookup in Test Config.**
+
+### Added
+
+- **Bulk place download + cache.** A "⬇ Download places" button in the Test
+  Data → Train Resources toolbar calls the new
+  `POST /v1/company/places/refresh` (test_manager only), which pages through
+  the vendor's `GET {api_base}/places`, dedupes by `id`, and caches the list
+  per company. Bounded (100 pages / 100k places) with a loud log if a cap
+  truncates. A "N places cached · <ago>" status line shows the cache state.
+- **Full-text stop-place lookup.** `GET /v1/company/places` returns cache
+  metadata, or with `?q=` a ranked (name-prefix first) set of `{ id, name,
+  objectType }` matches over name + URN (tester + test_manager readable;
+  admin/certifier denied, per #60).
+- **Typeahead** on every origin/destination URN field — the Timetable
+  Discovery modal and the Train Resource editor — so testers pick a real place
+  (name shown, URN stored) instead of typing `urn:uic:stn:NNNNNNN` by hand.
+  Manual entry still works; the lookup is a pure assist.
+- New `places_cache` table (one row per company, plaintext JSON — places are
+  public reference data; migration 25). New shared helper
+  `src/utils/osdm-client.js` (`osdmGet` + `buildTesterHeaders`) reused from the
+  discover-timetable vendor-call boilerplate. OpenAPI documents both endpoints.
+
+### Verification
+
+- New `company-places.test.js` (11 tests): auth/role gating; `?q=` filtering,
+  prefix ranking, and limit cap; refresh `400` with no `api_base`; a
+  fetch-stubbed refresh happy-path asserting cross-page dedupe, the
+  stop-when-no-new-ids condition, and name-falls-back-to-id. `db-migrations`
+  extended for migration 25 (fresh install + already-versioned DB missing the
+  table). Full suite: 45 suites / 974 tests green; lint clean.
+- Manual browser run (seeded cache, no live vendor): the cache-status line
+  renders, the typeahead filters (Basel/Zürich) and selecting fills the URN,
+  and manual typing still works. The live `/places/refresh` download path is
+  covered by the fetch-stubbed integration test.
+
+---
+
+## [server-v1.11.170] — 2026-07-01
+
+**Fix (#449 follow-up): register against the company's stable slug, not a slug re-derived from its name.**
+
+### Fixed
+
+- Self-registration matched the chosen company by re-deriving a slug from its
+  **display name** (`makeSlug(name)`) and looking up `WHERE slug = ?`. That
+  breaks for any company whose stored slug was frozen before a rename — e.g.
+  the real "Paxone" (display name `Paxone`, stored slug `paxone-gmbh`,
+  `makeSlug('Paxone') = 'paxone'`), which was rejected with *"Unknown
+  company"*. Registration now submits and matches on the company's **stable
+  slug** (the `/register/companies` dropdown `<option>` value is the slug),
+  eliminating the name→slug re-derivation entirely.
+
+### Changed
+
+- `POST /v1/auth/register/request` now takes `companySlug` (was `companyName`)
+  and looks up `WHERE slug = ?`. The picked company's canonical name **and**
+  slug are stored on the pending registration; `register/confirm` resolves the
+  company by that stored slug (falling back to `makeSlug(company_name)` only
+  for a pre-migration pending row). OpenAPI spec updated to match.
+- New `pending_registrations.company_slug` column (migration 24, `schema.sql`).
+
+### Verification
+
+- `auth-routes.test.js` switched to `companySlug`, plus a new end-to-end
+  regression test that seeds a name/slug-mismatched company
+  (`Paxone`/`paxone-gmbh`) and asserts request → confirm succeeds and creates
+  a pending user under the right company. `db-migrations.test.js` covers
+  migration 24. Full suite: 44 suites / 962 tests green; lint clean.
+- Manual browser run reproduced the exact mismatch (dropdown label `Paxone`,
+  value `paxone-gmbh`) and confirmed request → confirm → pending now works.
+
+---
+
+## [server-v1.11.169] — 2026-07-01
+
+**Feat (#449): user management at company level — Test-Manager approval replaces the email-must-match-company-name gate.**
+
+### Added
+
+- **Self-registration no longer requires the signup email to contain a
+  fragment of the company name.** `emailMatchesCompany()` is removed from
+  `auth.js`. The applicant instead must pick a real, existing company from
+  the `/register/companies` dropdown (already enforced client-side; now also
+  enforced server-side in `register/request`).
+- **New account approval workflow.** A confirmed self-registration lands as
+  `users.status = 'pending'` and cannot log in (403) until a Test Manager of
+  that company — or an administrator, as a cross-company fallback — approves
+  it. Every Test Manager of the company is emailed
+  (`sendPendingApprovalEmail`, `mailer.js`) with a link to the admin Users
+  tab as soon as the registration is confirmed.
+- **New endpoints** `POST /v1/company/users/:id/approve` and
+  `POST /v1/admin/users/:id/approve` activate a pending user. Rejecting one
+  reuses the existing `DELETE` endpoint.
+- **Admin UI** (`admin.html`) — a "Pending" status badge and an `Approve`
+  button appear on pending rows in the User Directory, for both the
+  Test-Manager and administrator views (both already routed through the
+  same `USERS_API_BASE` switch).
+- New `users.status` column (migration 23, `schema.sql`), default `'active'`.
+
+### Changed
+
+- Removed the `register/confirm` auto-create-company-from-free-text branch —
+  it was unreachable from the UI dropdown, and kept alive would have let a
+  stranger self-activate into a brand-new, unverified company with no Test
+  Manager to approve them.
+
+### Verification
+
+- `auth-routes.test.js` updated for the new contract (seeds a real company;
+  confirms `201` + `pending: true`/no token; login `403` while pending;
+  login succeeds after direct approval) plus a new pending-login-rejected
+  test. Full suite: 44 test suites / 961 tests green.
+- Manual run: registered with an email deliberately **not** matching the
+  company name → dev-mode confirm link → pending panel (no redirect, no
+  auto-login) → login rejected 403 → Test Manager sees the Pending badge +
+  Approve button on `admin.html` → approved → login now succeeds. Confirmed
+  `register/request` with an unknown company name returns 400.
+
+---
+
+## [server-v1.11.168] — 2026-07-01
+
+**Feat (#448): the Test Framework can now declare which OSDM fulfillment
+types/media the provider actually supports.**
+
+### Added
+
+- **Test Framework → new "🎟 Fulfillment" section** — pill pickers for
+  `fulfillmentType` (ETICKET, CIT_PAPER, PASS_CHIP, PASS_REFERENCE) and
+  `fulfillmentMedia` (PDF_A4, UIC_PDF, PKPASS, ALLOCATOR_APP, RCCST, RCT2,
+  TICKETLESS), wired to the already-existing `framework.fulfillment.{types,media}`
+  data model and generic `fw-pill` toggle mechanism (`fwTogglePill`) — the same
+  pattern used by Seat Selection / Passenger Types / Place Selection. Persists
+  via the existing debounced framework auto-save; no new endpoint needed.
+  Leaving a category empty means "no restriction" (matches `fwFilter`'s
+  existing empty-means-full-set contract, same as every other framework pill
+  group).
+- This directly activates the scenario-level "E. Fulfillment" picker
+  (`sc.fulfillmentTypes`/`sc.fulfillmentMedia`), which already calls
+  `fwFilter(..., fw.fulfillment.types/media)` — that call site existed and
+  worked correctly already, but had no real input to filter against (the
+  framework value was frozen at its un-editable default). It now reflects what
+  the Test Manager actually declared.
+
+### Removed
+
+- `fwToggleFulfilPill` — a narrower duplicate of the generic `fwTogglePill`
+  handler with zero call sites (defined, never wired to any UI action). The
+  new section uses the generic mechanism instead; keeping both would leave two
+  ways to do the same thing.
+
+### Verified
+
+- Harness over the REAL extracted `fwTogglePill` + `fwFilter` — 12/12: toggle
+  on/off correctly mutates `framework.fulfillment.types`/`.media` (and only the
+  targeted subKey); `fwFilter` reflects the change immediately; clearing a
+  category reverts to the unrestricted full OSDM set (existing empty-means-full
+  contract, unchanged). `node --check`, eslint, and the inline-script HTML
+  linter clean.
+
+### Notes
+
+- Scope: this ships the framework-level *declaration* UI, which is what issue
+  #448 asked for. The separate, pre-existing scenario editor for the shared
+  `requestedFulfillmentOptionsList` (`buildFulfillmentSection`, fixed in #436 to
+  show the unrestricted OSDM set) is intentionally left as-is — extending
+  *that* surface to warn on an undeclared type/media would need a genuinely
+  different mechanism (`frameworkGating.js`'s rule engine matches a single
+  boolean scenario flag against a `salesFlows` declaration; fulfillment options
+  are a list of `{type, media}` objects) and is a natural, separately-scoped
+  follow-up, not bundled into this PR.
+
+---
+
+## [server-v1.11.167] — 2026-06-25
+
+**Feat (#447, requested by Wiremind): link a Test Finding to the scenario that
+revealed it — faster to re-test a fix as a non-regression run.**
+
+### Added
+
+- **`finding.scenario_code`** — a new optional column (migration 22) recording
+  the datafile `scenario.code` that revealed the finding. Set on create/edit via
+  a free-text field with autocomplete against the test-system's current
+  scenario codes (sourced from `GET /v1/company/datafile`); accepts any value,
+  so a finding tied to a since-renamed or deleted scenario keeps its record.
+  Exposed on the API as `scenarioCode` (create, patch, list, thread, and the
+  JSON bulk-import path all carry it — same shape as `step`/`expectedStatus`).
+- **UI** — the finding list row and the thread's opening-post header show a
+  🧪 chip with the scenario code, linking straight to **Test Config**
+  (`/scenarios.html`) so the tester can find and re-select that exact scenario
+  to verify a fix, instead of re-deriving which one it was from the finding's
+  prose.
+
+### Verified
+
+- `db-migrations.test.js`: migration 22 applies on a fresh install AND restores
+  `scenario_code` on a DB already versioned past it (the #208-class upgrade
+  regression guard) — extended `REQUIRED_COLUMNS` + a dedicated upgrade test.
+- `findings-routes.test.js`: 2 new tests — `scenarioCode` round-trips through
+  create → list → thread, defaults to `null` when omitted, and PATCH can set
+  and clear it.
+- Full suite: 44 test suites / 960 tests, all green. `node --check` + eslint +
+  the inline-script HTML linter clean on every changed file.
+
+---
+
+## [server-v1.11.166 / OTST_V2.0.94] — 2026-06-18
+
+**Fix (#445): `nullable: true` scalar fields no longer FAIL when the provider
+returns `null` — a spec-legal value was producing false failures (reported on SBB
+FULL_FLEX).**
+
+### Fixed
+
+- **`offers.js` + `refunds.js`** — type assertions for OSDM scalar fields that are
+  declared `nullable: true` required the JS type and rejected `null`. A code
+  generator emits these as `null` when the field is not applicable (returned for
+  consistency) — which is conformant — so OSCAR was raising false failures. Now we
+  assert **the declared type OR `null`** via a shared `expectTypeOrNull()` helper
+  (`testCapture.js`). Fields covered (all confirmed `nullable: true` in OSDM 3.8.0):
+  `Price`/`Amount.scale` (admission/reservation price, `afterSaleFee.scale`,
+  refund `refundableAmount`/`refundFee`/breakdown scales), `isReusable`,
+  part-level + `availablePlaces` `numericAvailability`, `numberOfPrivateCompartments`.
+  Required fields (`price.amount`, `currency`) keep their strict checks. Also
+  corrected a stale comment in `refunds.js` that wrongly called `scale` "required".
+
+### Verified
+
+- Harness over the REAL extracted `expectTypeOrNull` — 11/11: `null` accepted for
+  number/boolean; the declared type still passes; a genuinely wrong type (string,
+  object) still FAILS; `undefined` (absent ≠ null) still fails. `node --check` clean
+  on all three files; residual-strict-assertion sweep finds none.
+
+---
+
 ## [server-v1.11.165] — 2026-06-18
 
 **Feat (#442): `custom` OAuth profile gains `body_format: "raw"` — send the token

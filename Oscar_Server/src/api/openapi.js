@@ -112,13 +112,16 @@ module.exports = {
         requestBody: {
           required: true,
           content: { 'application/json': { schema: {
-            type: 'object', required: ['email', 'companyName'],
-            properties: { email: { type: 'string', format: 'email' }, companyName: { type: 'string' } },
+            type: 'object', required: ['email', 'companySlug'],
+            properties: {
+              email: { type: 'string', format: 'email' },
+              companySlug: { type: 'string', description: 'Stable slug of an existing company (from GET /v1/auth/register/companies)' },
+            },
           } } },
         },
         responses: {
           200: { description: 'Email sent (or dev-mode URL returned)' },
-          400: { description: 'Email does not match company name', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          400: { description: 'Unknown company (no company with that slug)', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           503: { description: 'SMTP failure' },
         },
       },
@@ -358,6 +361,54 @@ module.exports = {
           200: { description: 'Password reset' },
           400: { description: 'Password too weak' },
           404: { description: 'User not in this company' },
+        },
+      },
+    },
+    '/v1/company/places/refresh': {
+      post: {
+        tags: ['Company'],
+        summary: 'Bulk-download the vendor\'s OSDM GET /places list and cache it (test_manager only, #450)',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Cache refreshed', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              place_count: { type: 'integer' },
+              cached_at: { type: 'string' },
+              truncated: { type: 'boolean', description: 'true if a safety cap stopped the download early' },
+            },
+          } } } },
+          400: { description: 'No OSDM api_base configured for the company' },
+          502: { description: 'Token fetch or vendor /places call failed' },
+        },
+      },
+    },
+    '/v1/company/places': {
+      get: {
+        tags: ['Company'],
+        summary: 'Cached stop-place metadata, or ?q= full-text lookup (tester + test_manager; admin/certifier denied)',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'q', in: 'query', required: false, schema: { type: 'string' }, description: 'Case-insensitive substring over place name + id; omit for cache metadata only' },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 20, maximum: 50 } },
+        ],
+        responses: {
+          200: { description: 'Metadata (no q) or ranked matches (with q)', content: { 'application/json': { schema: {
+            type: 'object',
+            properties: {
+              place_count: { type: 'integer' },
+              cached_at: { type: 'string', nullable: true },
+              places: {
+                type: 'array',
+                items: { type: 'object', properties: {
+                  id: { type: 'string', example: 'urn:uic:stn:8500010' },
+                  name: { type: 'string', example: 'Zürich HB' },
+                  objectType: { type: 'string' },
+                } },
+              },
+            },
+          } } } },
+          403: { description: 'Administrators and certifiers are denied' },
         },
       },
     },

@@ -34,7 +34,8 @@
     importing: false, // JSON-import view open
     importText: '',   // pasted import JSON
     openCats: {},     // category → expanded?      (accordion level 1, collapsed by default)
-    openGroups: {}    // 'category|status' → expanded? (accordion level 2, collapsed by default)
+    openGroups: {},   // 'category|status' → expanded? (accordion level 2, collapsed by default)
+    scenarioCodes: [] // datafile scenario.code list — autocomplete source for "which scenario revealed this" (#447)
   };
 
   // ── Soft-label vocabularies ──────────────────────────────────────────────────
@@ -94,6 +95,18 @@
     try { state.user = JSON.parse(localStorage.getItem('oscar_user') || '{}'); } catch (_e) { state.user = {}; }
     state.isTM = state.user.role === 'test_manager';
     loadFindings();
+    loadScenarioCodes();
+  }
+
+  // Best-effort autocomplete source for "which scenario revealed this" (#447).
+  // No datafile yet, or the fetch fails, just leaves the list empty — the
+  // scenario field still works as free text either way.
+  async function loadScenarioCodes() {
+    try {
+      var df = await api('GET', '/v1/company/datafile');
+      state.scenarioCodes = (df.scenarios || []).map(function (s) { return s.code; }).filter(Boolean);
+      if (state.form || state.thread) render();
+    } catch (_e) { /* no datafile yet — fine */ }
   }
 
   async function loadFindings() {
@@ -268,13 +281,20 @@
           + '<span style="font-size:12px;color:#90a4ae" title="replies">💬 ' + (f.commentCount || 0) + '</span>'
         + '</div>'
       + '</div>'
-      + ((f.step || f.expectedStatus != null)
+      + ((f.scenarioCode || f.step || f.expectedStatus != null)
           ? '<div style="padding:0 18px 11px 18px;font-size:12px;color:#607d8b">'
+            + (f.scenarioCode ? scenarioLink(f.scenarioCode) + (f.step ? ' &middot; ' : '') : '')
             + (f.step ? 'Step <code>' + esc(f.step) + '</code>' : '')
             + (f.expectedStatus != null ? ' &middot; documented HTTP <strong>' + esc(f.expectedStatus) + '</strong>' : '')
             + '</div>'
           : '')
       + '</div>';
+  }
+
+  // Link to Test Config with the scenario code visible — the fastest path to
+  // re-select and re-run the exact scenario that revealed this finding (#447).
+  function scenarioLink(code) {
+    return '🧪 <a href="/scenarios.html" title="Open Test Config to find and re-run this scenario" style="color:#0277bd;text-decoration:none"><code>' + esc(code) + '</code></a>';
   }
 
   function setAllCats(open) {
@@ -298,6 +318,7 @@
        + (f.raiseToOsdm ? '<span class="badge badge-info">📣 OSDM</span>' : '') + '</div></div>';
     h += '<div class="card-body" style="padding:16px 18px">';
     h += '<div style="font-size:11px;color:#90a4ae;margin-bottom:12px">Opened by <strong>' + esc(f.createdBy || '—') + '</strong> · ' + esc(fmtTs(f.createdAt))
+       + (f.scenarioCode ? ' &nbsp;·&nbsp; ' + scenarioLink(f.scenarioCode) : '')
        + ((f.step || f.expectedStatus != null) ? ' &nbsp;·&nbsp; step <code>' + esc(f.step || '—') + '</code>' + (f.expectedStatus != null ? ' → HTTP ' + esc(f.expectedStatus) : '') : '')
        + '</div>';
     if (f.observed)       h += block('Observed', f.observed);
@@ -393,17 +414,20 @@
   // ── Compose / edit form ──────────────────────────────────────────────────────
   function blankForm(mode) {
     return { mode: mode, id: null, fields: {
-      title: '', step: '', expectedStatus: '', observed: '', interpretation: '', evidence: '',
+      title: '', step: '', scenarioCode: '', expectedStatus: '', observed: '', interpretation: '', evidence: '',
       category: 'open', severity: null, baselineInRun: false, raiseToOsdm: false } };
   }
   function renderForm(form) {
     var x = form.fields;
-    function inp(field, ph) { return '<input class="param-input" data-action="form-field" data-field="' + field + '" value="' + esc(x[field] || '') + '" placeholder="' + esc(ph) + '">'; }
+    function inp(field, ph, extra) { return '<input class="param-input" data-action="form-field" data-field="' + field + '" value="' + esc(x[field] || '') + '" placeholder="' + esc(ph) + '"' + (extra || '') + '>'; }
     function ta(field, ph) { return '<textarea class="param-input" data-action="form-field" data-field="' + field + '" placeholder="' + esc(ph) + '" style="min-height:64px;resize:vertical">' + esc(x[field] || '') + '</textarea>'; }
     var h = '<div class="card" style="margin-bottom:14px;border:1px solid #b3e5fc">';
     h += '<div class="card-head"><div class="card-head-title">' + (form.mode === 'edit' ? '✎ Edit finding' : '＋ Open a finding') + '</div></div>';
     h += '<div class="card-body" style="padding:16px 18px">';
     h += field('Title', inp('title', 'Short headline of the open point'));
+    h += field('Scenario that revealed this (optional)',
+        inp('scenarioCode', 'e.g. NHF_RFND_SRCH_CRIT_2ADT_2LEG — pick from Test Config to re-run when the fix lands', ' list="finding-scenario-codes"')
+        + '<datalist id="finding-scenario-codes">' + state.scenarioCodes.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist>');
     h += '<div style="display:flex;gap:10px;flex-wrap:wrap">'
        + '<div style="flex:2;min-width:220px">' + field('Step (optional)', inp('step', 'e.g. GET Passenger — enables status-level baselining')) + '</div>'
        + '<div style="flex:1;min-width:120px">' + field('Documented HTTP (optional)', inp('expectedStatus', 'e.g. 501')) + '</div></div>';
@@ -436,7 +460,7 @@
     var h = '<div class="card" style="margin-bottom:14px;border:1px solid #b3e5fc">';
     h += '<div class="card-head"><div class="card-head-title">⬆ Import findings</div></div>';
     h += '<div class="card-body" style="padding:16px 18px">';
-    h += '<div style="font-size:12px;color:#78909c;margin-bottom:8px">Paste a JSON array of findings — e.g. OSCAR\'s analysis for this test-system. Each needs a <code>title</code>; optional: <code>step, expectedStatus, observed, interpretation, category, severity, baselineInRun, raiseToOsdm</code>. They\'re created as open points (authored “OSCAR analysis” unless the item sets <code>createdBy</code>) for you to review and reply to.</div>';
+    h += '<div style="font-size:12px;color:#78909c;margin-bottom:8px">Paste a JSON array of findings — e.g. OSCAR\'s analysis for this test-system. Each needs a <code>title</code>; optional: <code>step, scenarioCode, expectedStatus, observed, interpretation, category, severity, baselineInRun, raiseToOsdm</code>. They\'re created as open points (authored “OSCAR analysis” unless the item sets <code>createdBy</code>) for you to review and reply to.</div>';
     h += '<textarea class="param-input" data-action="import-text" spellcheck="false" placeholder=\'[ {"title":"...","category":"provider_deviation","severity":"minor","observed":"...","interpretation":"..."} ]\' style="min-height:240px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5">' + esc(state.importText || '') + '</textarea>';
     h += '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">'
        + '<button class="btn btn-secondary btn-sm" data-action="import-cancel">Cancel</button>'
@@ -474,7 +498,7 @@
   function startEdit(id) {
     var f = liveFinding(id); if (!f) return;
     state.form = { mode: 'edit', id: id, fields: {
-      title: f.title || '', step: f.step || '', expectedStatus: (f.expectedStatus == null ? '' : String(f.expectedStatus)),
+      title: f.title || '', step: f.step || '', scenarioCode: f.scenarioCode || '', expectedStatus: (f.expectedStatus == null ? '' : String(f.expectedStatus)),
       observed: f.observed || '', interpretation: f.interpretation || '', evidence: f.evidence || '',
       category: f.category || 'open', severity: f.severity || null, baselineInRun: !!f.baselineInRun, raiseToOsdm: !!f.raiseToOsdm } };
     render(); window.scrollTo(0, 0);
@@ -485,6 +509,7 @@
     if (!(x.title || '').trim()) { toast('A finding needs a title.', 'warning'); return; }
     var payload = {
       title: x.title.trim(), step: (x.step || '').trim() || null,
+      scenarioCode: (x.scenarioCode || '').trim() || null,
       expectedStatus: (x.expectedStatus === '' || x.expectedStatus == null) ? null : parseInt(x.expectedStatus, 10),
       observed: x.observed || '', interpretation: x.interpretation || '', evidence: x.evidence || '',
       category: x.category || 'open', severity: x.severity || null,
@@ -521,6 +546,7 @@
         await api('POST', '/v1/company/findings', {
           title:          String(o.title).trim(),
           step:           (o.step != null && String(o.step).trim()) ? String(o.step).trim() : null,
+          scenarioCode:   (o.scenarioCode != null && String(o.scenarioCode).trim()) ? String(o.scenarioCode).trim() : null,
           expectedStatus: o.expectedStatus,
           observed:       o.observed || '',
           interpretation: o.interpretation || '',

@@ -521,6 +521,43 @@ const MIGRATIONS = [
       // operator-specific headers from API Config without a code change.
       _safeAlter('ALTER TABLE companies ADD COLUMN extra_headers TEXT');
   }},
+  { version: 22, name: 'finding-scenario-code', up: () => {
+      // Issue #447 (Wiremind) — link a finding to the datafile scenario.code
+      // that revealed it, so re-testing a fix means "go run that scenario"
+      // instead of re-deriving which one it was from the finding's prose.
+      _safeAlter('ALTER TABLE finding ADD COLUMN scenario_code TEXT');
+  }},
+  { version: 23, name: 'users-pending-approval-status', up: () => {
+      // Issue #449 — self-registered users now land as 'pending' until a
+      // Test Manager (or administrator) of their company approves them,
+      // replacing the old email-must-match-company-name gate.
+      _safeAlter("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+  }},
+  { version: 24, name: 'pending-registrations-company-slug', up: () => {
+      // Issue #449 follow-up — store the company's stable slug (from the
+      // registration dropdown) on the pending registration, so confirm
+      // resolves the EXACT company that was picked instead of re-deriving a
+      // slug from the display name via makeSlug(). A company whose slug was
+      // frozen before a rename (display name 'Paxone' but slug 'paxone-gmbh')
+      // otherwise fails the lookup — the "Unknown company" bug.
+      _safeAlter('ALTER TABLE pending_registrations ADD COLUMN company_slug TEXT');
+  }},
+  { version: 25, name: 'places-cache', up: () => {
+      // Issue #450 — per-company cache of the vendor's OSDM GET /places list,
+      // bulk-downloaded on demand and used for a full-text stop-place lookup in
+      // Test Config (Timetable Discovery + Train Resource editor). One row per
+      // company. Places are public reference data (station names/URNs), so the
+      // JSON blob is stored plaintext — not encrypted at rest like credentials
+      // or test data.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS places_cache (
+          company_id  TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+          places_json TEXT NOT NULL DEFAULT '[]',
+          place_count INTEGER NOT NULL DEFAULT 0,
+          cached_at   TEXT NOT NULL DEFAULT (datetime('now'))
+        )`);
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

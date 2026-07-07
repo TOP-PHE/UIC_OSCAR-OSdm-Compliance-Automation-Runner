@@ -87,7 +87,7 @@ jobs:
           # installed on — for OSCAR Release Bot, only this repo.
 
       - name: Checkout (with previous commit for diff)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
           # Use the App token so subsequent `git push origin <tag>`

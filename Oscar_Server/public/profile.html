@@ -100,7 +100,7 @@ input[type=password]::placeholder{letter-spacing:2px}
       This URL is shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.
     </p>
     <div class="field">
-      <label>OSDM API Endpoint</label>
+      <label for="api_base">OSDM API Endpoint</label>
       <input type="url" id="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
     </div>
 
@@ -139,7 +139,7 @@ input[type=password]::placeholder{letter-spacing:2px}
       Visible to you only. Each tester maintains their own credentials — when they change, only your runs are affected.
     </p>
     <div class="field">
-      <label>Authentication Mode</label>
+      <label for="auth_mode">Authentication Mode</label>
       <select id="auth_mode">
         <option value="bearer">Bearer Token (pre-obtained)</option>
         <option value="oauth2">OAuth2 Client Credentials</option>
@@ -149,7 +149,7 @@ input[type=password]::placeholder{letter-spacing:2px}
     <!-- Bearer mode -->
     <div id="mode-bearer" class="mode-section active">
       <div class="field">
-        <label>Bearer Token <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
+        <label for="access_token">Bearer Token <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
         <input type="password" id="access_token" placeholder="eyJhbGci..." autocomplete="off">
       </div>
     </div>
@@ -157,7 +157,7 @@ input[type=password]::placeholder{letter-spacing:2px}
     <!-- OAuth2 mode -->
     <div id="mode-oauth2" class="mode-section">
       <div class="field">
-        <label>Auth Profile</label>
+        <label for="oauth_profile">Auth Profile</label>
         <select id="oauth_profile">
           <option value="oauth2_basic">Standard OAuth2 — credentials in Basic auth header</option>
           <option value="oauth2_post">Standard OAuth2 — credentials in body (Bileto, Turnit)</option>
@@ -168,29 +168,29 @@ input[type=password]::placeholder{letter-spacing:2px}
         <div id="profile-help" style="margin-top:6px;font-size:12px;color:#90a4ae"></div>
       </div>
       <div class="field">
-        <label>Token URL <span style="color:#90a4ae;font-weight:400">(masked — operator-internal endpoint)</span></label>
+        <label for="token_url">Token URL <span style="color:#90a4ae;font-weight:400">(masked — operator-internal endpoint)</span></label>
         <input type="password" id="token_url" autocomplete="off" placeholder="https://auth.yourcompany.com/token">
       </div>
       <div class="row">
         <div class="field">
-          <label><span id="client_id_label">Client ID</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
+          <label for="client_id"><span id="client_id_label">Client ID</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
           <input type="password" id="client_id" autocomplete="off">
         </div>
         <div class="field">
-          <label><span id="client_secret_label">Client Secret</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
+          <label for="client_secret"><span id="client_secret_label">Client Secret</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
           <input type="password" id="client_secret" autocomplete="off">
         </div>
       </div>
       <div class="field" id="field-scope">
-        <label>Scope <span style="color:#90a4ae;font-weight:400">(optional — Turnit needs e.g. retailer-api; masked)</span></label>
+        <label for="oauth_scope">Scope <span style="color:#90a4ae;font-weight:400">(optional — Turnit needs e.g. retailer-api; masked)</span></label>
         <input type="password" id="oauth_scope" placeholder="retailer-api" autocomplete="off">
       </div>
       <div class="field" id="field-extra" style="display:none">
-        <label>Extra Credential <span style="color:#90a4ae;font-weight:400">(Sqills: pre-encoded Basic auth value — leave blank to keep current)</span></label>
+        <label for="oauth_extra">Extra Credential <span style="color:#90a4ae;font-weight:400">(Sqills: pre-encoded Basic auth value — leave blank to keep current)</span></label>
         <input type="password" id="oauth_extra" autocomplete="off" placeholder="the Authorization value (e.g. base64 of id:secret)">
       </div>
       <div class="field" id="field-custom-template" style="display:none">
-        <label>Custom Request Template <span style="color:#90a4ae;font-weight:400">(JSON; placeholders: {{client_id}}, {{client_secret}}, {{scope}}, {{extra}})</span></label>
+        <label for="oauth_custom_template">Custom Request Template <span style="color:#90a4ae;font-weight:400">(JSON; placeholders: {{client_id}}, {{client_secret}}, {{scope}}, {{extra}})</span></label>
         <textarea id="oauth_custom_template" rows="10" style="width:100%;padding:9px 11px;border:1px solid #cfd8dc;border-radius:6px;font-family:Consolas,monospace;font-size:12px" placeholder='{
   "method": "POST",
   "headers": {"Content-Type": "application/json"},
@@ -202,12 +202,12 @@ input[type=password]::placeholder{letter-spacing:2px}
     </div>
 
     <div class="field">
-      <label>Requestor Header <span style="color:#90a4ae;font-weight:400">(optional — only some operators; masked)</span></label>
+      <label for="requestor">Requestor Header <span style="color:#90a4ae;font-weight:400">(optional — only some operators; masked)</span></label>
       <input type="password" id="requestor" autocomplete="off" placeholder="your-requestor-id">
     </div>
 
     <div class="field">
-      <label>Ocp-Apim-Subscription-Key <span style="color:#90a4ae;font-weight:400">(optional — Azure APIM sandboxes; masked)</span></label>
+      <label for="subscription_key">Ocp-Apim-Subscription-Key <span style="color:#90a4ae;font-weight:400">(optional — Azure APIM sandboxes; masked)</span></label>
       <input type="password" id="subscription_key" autocomplete="off" placeholder="your-subscription-key">
     </div>
 

@@ -56,7 +56,7 @@ runtime:
         let chosen = null;
         for (const o of offers) {
           const parts = (o && Array.isArray(o.ancillaryOfferParts)) ? o.ancillaryOfferParts.filter((p) => p && p.id) : [];
-          if (parts.length > 0) { chosen = { offerId: o.offerId, ids: parts.map((p) => p.id), parts: parts }; break; }
+          if (parts.length > 0) { chosen = { offerId: o.offerId || o.id, ids: parts.map((p) => p.id), parts: parts }; break; }
         }
 
         if (chosen && chosen.offerId && chosen.ids.length > 0) {

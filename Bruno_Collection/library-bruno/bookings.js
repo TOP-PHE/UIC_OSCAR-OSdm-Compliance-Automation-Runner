@@ -539,17 +539,59 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   validationLogger(`[INFO] 🎯 Accommodation goal MET: requested ${requested} → offer advertised ${offeredLabel} (part ${reservationId}) → booking allocated ${alloc.accommodationType}${alloc.accommodationSubType ? '/' + alloc.accommodationSubType : ''} with ${_resPlaces.length} reserved place(s)${_placesText}.`);
   let _party = 0;
   try { _party = (JSON.parse(bru.getEnvVar("offerPassengerSpecifications") || "[]") || []).length; } catch (_e) { _party = 0; }
-  if (_party > 0 && _resPlaces.length > 0 && _resPlaces.length < _party) {
+
+  // #211 (SFR night-train spec): when the scenario declared an offerMode,
+  // the SFR's two families have a STRICT place-count expectation — exactly
+  // one place for INDIVIDUAL (bed in shared compartment), place count ==
+  // party size for COLLECTIVE (private compartment). Without a declared
+  // offerMode, keep the pre-existing soft WARNING (many non-night-train
+  // scenarios legitimately allocate a multi-passenger compartment as one
+  // place and should not suddenly start failing).
+  const _declaredOfferMode = bru.getEnvVar("offerMode");
+  if (_party > 0 && _resPlaces.length > 0 && (_declaredOfferMode === "INDIVIDUAL" || _declaredOfferMode === "COLLECTIVE")) {
+    if (_declaredOfferMode === "INDIVIDUAL") {
+      test(`🎯 offerMode INDIVIDUAL — exactly one place allocated (bed in shared compartment)`, () => {
+        if (_resPlaces.length !== 1) {
+          throw new Error(`offerMode INDIVIDUAL requires exactly one allocated place; got ${_resPlaces.length}${_placesText}.`);
+        }
+      });
+    } else {
+      test(`🎯 offerMode COLLECTIVE — allocated place count (${_resPlaces.length}) matches party size (${_party})`, () => {
+        if (_resPlaces.length !== _party) {
+          throw new Error(`offerMode COLLECTIVE (private compartment) requires the allocated place count to equal the party size (${_party}); got ${_resPlaces.length}${_placesText}.`);
+        }
+      });
+    }
+  } else if (_party > 0 && _resPlaces.length > 0 && _resPlaces.length < _party) {
     validationLogger(`[WARNING] 🎯 ${_resPlaces.length} reserved place(s) for a party of ${_party} — legitimate when a place is a multi-passenger compartment (${alloc.accommodationSubType || alloc.accommodationType}), under-allocation otherwise. Check the place list above.`);
+  }
+
+  // #211: the SFR's "selected gender property from request matches booked
+  // response value" — compare the requested placeProperties (harvested onto
+  // selectedAccommodation in offers.js) against whatever the booking
+  // response echoes. OSDM does not guarantee placeAllocation echoes
+  // placeProperties, so this only runs (and only WARNS, never fails) when
+  // both sides actually carry a value to compare.
+  if (selAcc && Array.isArray(selAcc.placeProperties) && selAcc.placeProperties.length > 0) {
+    const _bookedProps = Array.isArray(alloc.placeProperties) ? alloc.placeProperties
+      : (Array.isArray(_resPlaces[0]?.placeProperties) ? _resPlaces[0].placeProperties : null);
+    if (Array.isArray(_bookedProps)) {
+      const _requestedSet = selAcc.placeProperties;
+      const _matches = _requestedSet.some(p => _bookedProps.includes(p));
+      if (!_matches) {
+        validationLogger(`[WARNING] 🎯 Requested gender-segregation placeProperties [${_requestedSet.join(',')}] but the booking response's placeProperties are [${_bookedProps.join(',')}] — no overlap. The provider may have reassigned the compartment.`);
+      } else {
+        validationLogger(`[DEBUG] 🎯 Gender-segregation placeProperties confirmed in the booking response: [${_bookedProps.join(',')}].`);
+      }
+    } else {
+      validationLogger(`[DEBUG] Requested gender-segregation placeProperties [${selAcc.placeProperties.join(',')}] but the booking response echoes no placeProperties — not guaranteed by OSDM, check skipped.`);
+    }
   }
 }
 
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
-  // Bug B: inspect booking-level warnings / problems (OSDM envelope).
-  // Non-array 'warnings' means the provider returned a non-standard structure
-  // (e.g. Sqills wraps it as {warnings:[...]} instead of the expected Warning[]).
   if (jsonData.warnings !== undefined && jsonData.warnings !== null && !Array.isArray(jsonData.warnings)) {
     validationLogger(
       `[WARNING] booking response 'warnings' is not an array (got ${typeof jsonData.warnings}) — ` +
@@ -821,12 +863,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
     validationLogger(`[DEBUG] ${_stageName} fields present (currency, scale)`);
   });
-  // Downstream (refund maths) reads these — set whichever members exist
-  // (previously only set when BOTH existed, i.e. never on conformant data).
   if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
-  // Bug C: guard against storing a 0 confirmedPrice at pre-confirmation stage
-  // when provisionalPrice is non-zero — provider anomaly (e.g. Sqills returns
-  // confirmedPrice.amount=0 at PREBOOKED) that would corrupt REFUND/EXCHANGE maths.
   if (confirmed) {
     if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
       validationLogger(
@@ -871,6 +908,14 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validateOfferParts(selectedOffer.admissionOfferParts   || [], bookedOffers.flatMap(b => b.admissions   || []), "admission",   expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.reservationOfferParts || [], bookedOffers.flatMap(b => b.reservations || []), "reservation", expectedBookedOffersStatus);
   validateOfferParts(selectedOffer.ancillaryOfferParts   || [], bookedOffers.flatMap(b => b.ancillaries  || []), "ancillary",   expectedBookedOffersStatus);
+
+  // #239: the reservation↔booked-reservation correspondence just checked above
+  // by validateOfferParts is the same check regardless of HOW the reservation
+  // was requested (placeSelections vs optionalReservationSelections) — note
+  // which mechanism this scenario used, for report traceability.
+  if (bru.getEnvVar("bookMandatoryReservations") === "true") {
+    validationLogger(`[INFO] Reservation booked via optionalReservationSelections (issue #239) — ${bookedOffers.flatMap(b => b.reservations || []).length} reservation(s) in the booking response.`);
+  }
 
   // #377: close the accommodation loop ONCE, on the create-booking step —
   // re-reads (05/07) would only duplicate the goal rows in the report.

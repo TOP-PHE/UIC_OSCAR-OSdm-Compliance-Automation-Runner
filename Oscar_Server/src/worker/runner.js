@@ -424,15 +424,16 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
 }
 
-function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride, oauthExtra, extraHeaders) {
-  // Escape backslashes then double-quotes so the token is safe inside a YAML double-quoted scalar.
-  // A token with a trailing " (common typo) would otherwise produce invalid YAML and crash Bruno.
-  const safeToken = accessToken.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {
+  // #306: this file deliberately carries NO credentials. The access token,
+  // Ocp-Apim-Subscription-Key and oauth_extra travel via the Bruno child
+  // process's environment (OSCAR_* vars set at spawn time in executeRun) and
+  // are seeded into Bruno's runtime vars by the collection's before-request
+  // hook (opencollection.yml, bru.getProcessEnv) — so no secret ever touches
+  // disk, even if the worker dies between the env-file write and cleanup.
   const lines = [
     `name: ${envName}`,
     `variables:`,
-    `  - name: access_token`,
-    `    value: "${safeToken}"`,
     `  - name: api_base`,
     `    value: "${apiBase}"`,
     `  - name: library_base`,
@@ -448,24 +449,6 @@ function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, 
     lines.push(`  - name: requestor`);
     lines.push(`    value: "${requestor}"`);
   }
-  if (subscriptionKey) {
-    lines.push(`  - name: Ocp-Apim-Subscription-Key`);
-    lines.push(`    value: "${subscriptionKey}"`);
-  }
-  if (oauthExtra) {
-    // Sqills (and any other vendor) sometimes layers a Basic auth header on
-    // top of the OAuth bearer token for OSDM API calls. The pre-encoded
-    // Basic value lives encrypted in users.oauth_extra_enc; we surface it
-    // to Bruno here so the request templates can reference it directly.
-    // Exposed under both names for collection-template flexibility:
-    //   - oauth_extra      (matches OSCAR's schema)
-    //   - auth_key_secret  (matches the vendor-supplied Sqills templates)
-    const safeExtra = String(oauthExtra).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    lines.push(`  - name: oauth_extra`);
-    lines.push(`    value: "${safeExtra}"`);
-    lines.push(`  - name: auth_key_secret`);
-    lines.push(`    value: "${safeExtra}"`);
-  }
   if (scenarioOverride) {
     lines.push(`  - name: scenario_override`);
     lines.push(`    value: "${scenarioOverride}"`);
@@ -475,7 +458,7 @@ function buildEnvYml(envName, apiBase, accessToken, requestor, subscriptionKey, 
     // string for the collection's before-request hook to parse + inject (the
     // hook resolves any {{var}} templates in the values). Escape backslashes
     // then double-quotes so the JSON survives inside a YAML double-quoted
-    // scalar — same rule as the access-token escaping above.
+    // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
     const safeEh = JSON.stringify(extraHeaders).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     lines.push(`  - name: __extraHeaders`);
     lines.push(`    value: "${safeEh}"`);
@@ -645,7 +628,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'info', `[runner] Workspace created → ${workspaceDir}`);
   }
 
-  // 6. Generate ephemeral env file
+  // 6. Generate ephemeral env file (credential-free since #306 — secrets go
+  //    through the child process environment at spawn time instead)
   // Use a per-run unique env name to prevent file collisions when multiple
   // runs for the same company execute concurrently (MAX_CONCURRENT_RUNS > 1).
   // On Linux the workspace provides isolation, but on Windows (no workspace)
@@ -654,7 +638,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // at submission time for UI display purposes.
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
-  const envYml     = buildEnvYml(envName, companyRow.api_base, accessToken, requestor, subscriptionKey, datafileUrl, scenarioOverride || null, oauthExtra, extraHeaders);
+  const envYml     = buildEnvYml(envName, companyRow.api_base, requestor, datafileUrl, scenarioOverride || null, extraHeaders);
   // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
   // the run, i.e. now + effective timeout) as a read-only env var. The
   // expired-booking test uses it to decide whether waiting until the booking's
@@ -720,8 +704,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
   // Record wall-clock time before Bruno starts so we can later filter report
   // files by mtime — stale reports from previous runs (same day, same company)
-  // must NOT be linked as artifacts for this run.
-  const runStartTime = Date.now();
+  // must NOT be linked as artifacts for this run. Subtract a safety margin:
+  // some filesystems (observed in CI container storage drivers) round/truncate
+  // a file's reported mtime to coarser-than-millisecond precision, which can
+  // put a file's mtime just BELOW runStartTime even though it was genuinely
+  // written after. A previous run's report is always at minimum seconds old
+  // in practice, so a couple of seconds of margin costs nothing on the
+  // staleness guarantee while eliminating this sub-second truncation race.
+  const MTIME_FILTER_SAFETY_MARGIN_MS = 2000;
+  const runStartTime = Date.now() - MTIME_FILTER_SAFETY_MARGIN_MS;
 
   // Detect auth/format failures in Bruno log output
   let authErrorDetected  = false;
@@ -752,6 +743,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     for (const key of ALLOWED_ENV) {
       if (process.env[key] !== undefined) safeEnv[key] = process.env[key];
     }
+    // #306: hand the per-run credentials to Bruno via its process
+    // environment — never via the env yml on disk (see buildEnvYml). The
+    // collection's before-request hook (opencollection.yml) seeds them into
+    // Bruno's runtime vars with bru.getProcessEnv(), only while the runtime
+    // var is still empty — so a mid-run loopback token refresh (#204) is
+    // never clobbered by the stale spawn-time value.
+    safeEnv.OSCAR_ACCESS_TOKEN = accessToken;
+    if (subscriptionKey) safeEnv.OSCAR_SUBSCRIPTION_KEY = subscriptionKey;
+    if (oauthExtra)      safeEnv.OSCAR_OAUTH_EXTRA      = String(oauthExtra);
     // Shell mode is only required when BRU_CMD points at a Windows
     // batch wrapper (.cmd / .bat) — direct execve cannot launch those.
     // On Linux / macOS / Windows-with-.exe we use shell: false so
@@ -924,7 +924,9 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       }
     }
     if (!envDeleted) {
-      logEvent(runId, 'error', '[runner] CRITICAL: Failed to delete ephemeral env file after 3 attempts. Credentials may persist on disk.');
+      // #306: not a credential leak — the env yml carries no secrets any more
+      // (credentials travel via the child process environment). Hygiene only.
+      logEvent(runId, 'warn', '[runner] Failed to delete ephemeral env file after 3 attempts. The file carries no credentials (#306); leftover is cosmetic.');
     }
     logEvent(runId, 'info', `[runner] Ephemeral env file ${envDeleted ? 'deleted' : 'DELETION FAILED'}.`);
   }
@@ -1080,7 +1082,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   if (tokenFormatError) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_FORMAT_ERROR' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',
-      '[runner] ⚠️ YAML parse error — the API token contains invalid characters (e.g. a stray quote or whitespace). Please check and re-save your token.');
+      '[runner] ⚠️ YAML parse error in the run environment file — a configured value (e.g. API base URL or requestor) contains invalid characters such as a stray quote. Please check and re-save your API Config.');
   } else if (authErrorDetected) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_AUTH_ERROR' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',

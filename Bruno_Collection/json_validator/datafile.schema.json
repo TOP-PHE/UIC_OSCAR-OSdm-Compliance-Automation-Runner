@@ -362,8 +362,17 @@
           },
           "accommodationSelection": {
             "type": ["string", "null"],
-            "description": "Type of accommodation to select during place selection. E.g. 'SEAT', 'COMPARTMENT'.",
-            "enum": ["SEAT", "COMPARTMENT", "", null]
+            "description": "Type of accommodation to select during place selection. E.g. 'SEAT', 'COUCHETTE', 'BERTH', 'VEHICLE', 'COMPARTMENT'.",
+            "enum": ["SEAT", "COUCHETTE", "BERTH", "VEHICLE", "COMPARTMENT", "", null]
+          },
+          "accommodationGenderPreference": {
+            "type": ["string", "null"],
+            "description": "Issue #211 — for gender-segregated night-train COUCHETTE/BERTH compartments, the desired availablePlaces.placeProperties value to select (and to assert echoed back in the booking response). Not a passenger-level field (see #227).",
+            "enum": ["MEN", "LADIES", "MIXED", "", null]
+          },
+          "bookMandatoryReservations": {
+            "type": "boolean",
+            "description": "Issue #239 — book the selected offer's reservationOfferParts via the booking request's optionalReservationSelections node ({reservationId} per part), the OSDM-defined mechanism for offers where a reservation is mandatory. Independent of placeSelections/accommodationSelection, which additionally state WHICH place/compartment is wanted; this only declares the reservation itself should be booked."
           },
           "stepFailurePolicy": {
             "type": ["string", "null"],

@@ -13,6 +13,7 @@
  * GET    /v1/admin/users                 — list users across platform
  * POST   /v1/admin/users                 — create user
  * PATCH  /v1/admin/users/:id             — update role/company/email
+ * POST   /v1/admin/users/:id/approve     — activate a self-registered pending user (#449)
  * POST   /v1/admin/users/:id/reset-password — reset password
  * DELETE /v1/admin/users/:id             — delete user
  * GET    /v1/admin/activity              — server activity metrics
@@ -63,6 +64,7 @@ function sanitizeUserRow(row) {
     id: row.id,
     email: row.email,
     role: normalizeRole(row.role),
+    status: row.status || 'active',
     company_id: row.company_id,
     company_name: row.company_name,
     company_slug: row.company_slug,
@@ -76,7 +78,7 @@ router.get('/users', (req, res) => {
   let rows;
   if (q) {
     rows = all(
-      `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
               c.name AS company_name, c.slug AS company_slug
        FROM users u
        JOIN companies c ON c.id = u.company_id
@@ -86,7 +88,7 @@ router.get('/users', (req, res) => {
     );
   } else {
     rows = all(
-      `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
               c.name AS company_name, c.slug AS company_slug
        FROM users u
        JOIN companies c ON c.id = u.company_id
@@ -149,7 +151,7 @@ router.post('/users',
   auditLog(req.user.id, targetCompany.id, req.user.email, `user_created:${lowerEmail}:${resolvedRole}`);
 
   const created = get(
-    `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
      JOIN companies c ON c.id = u.company_id
@@ -254,7 +256,31 @@ router.patch('/users/:id',
   auditLog(req.user.id, null, req.user.email, `user_updated:${userId}`);
 
   const updated = get(
-    `SELECT u.id, u.email, u.role, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+            c.name AS company_name, c.slug AS company_slug
+     FROM users u
+     JOIN companies c ON c.id = u.company_id
+     WHERE u.id = ?`,
+    [userId]
+  );
+
+  return res.json({ user: sanitizeUserRow(updated) });
+});
+
+router.post('/users/:id/approve', (req, res) => {
+  const userId = req.params.id;
+
+  const target = get('SELECT id, email, status FROM users WHERE id = ?', [userId]);
+  if (!target) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  if (target.status !== 'pending') {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User is not awaiting approval.' });
+  }
+
+  run('UPDATE users SET status = ? WHERE id = ?', ['active', userId]);
+  auditLog(req.user.id, null, req.user.email, `user_approved:${target.email}`);
+
+  const updated = get(
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
      JOIN companies c ON c.id = u.company_id

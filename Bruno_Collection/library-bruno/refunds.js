@@ -7,7 +7,7 @@
  */
 // Import needed library files
 require('./displays.js');
-const { bruTest: test } = require('./testCapture.js');
+const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
 
 module.exports = {
   postPatchRefundOfferResponse,
@@ -280,18 +280,14 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance)
   if (_checkDatePresent('validUntil', refundOffer.validUntil, validUntil)) {
     const _label = _withLocal(refundOffer.validUntil, validUntil);
-    test(`Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`, () => {
+    test(`Refund offer[${index}] validUntil is valid and in the future: ${_label}`, () => {
       expect(validUntil.getTime(),
         `validUntil (${refundOffer.validUntil}) is not in the future relative to now (${currentDate.toISOString()})`
       ).to.be.above(currentDate.getTime());
-
-      const expectedValidUntil = new Date(currentDate.getTime() + 15 * 60 * 1000);
-      const tolerance = 2 * 60 * 1000; // 2 minutes
-      const difference = Math.abs(validUntil.getTime() - expectedValidUntil.getTime());
-      expect(difference,
-        `validUntil is ${Math.round(difference/1000)}s away from the expected ~15min mark (tolerance ±${tolerance/1000}s). Got ${refundOffer.validUntil}, expected ~${expectedValidUntil.toISOString()}.`
-      ).to.be.at.most(tolerance);
-      validationLogger(`[DEBUG] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
+      // Note: OSDM recommends ~15 minutes but does not mandate a specific TTL.
+      // We only assert "must be in the future" to avoid false failures on providers
+      // that legitimately use a different window (5 min, 30 min, etc.).
+      validationLogger(`[DEBUG] Refund offer[${index}] validUntil is in the future: ${_label}`);
     });
   }
 
@@ -338,7 +334,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundableAmount, 'refundableAmount is not an object').to.be.an('object');
     expect(refundOffer.refundableAmount.amount,   'refundableAmount.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundableAmount.currency, 'refundableAmount.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expect(refundOffer.refundableAmount.scale,    'refundableAmount.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
+    expectTypeOrNull(refundOffer.refundableAmount.scale, "number", 'refundableAmount.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
 
     if (expectedFulfillmentStatuses.includes("CONFIRMED") || expectedFulfillmentStatuses.includes("FULFILLED")) {
       const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
@@ -373,7 +369,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundFee, 'refundFee is not an object').to.be.an('object');
     expect(refundOffer.refundFee.amount,   'refundFee.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundFee.currency, 'refundFee.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expect(refundOffer.refundFee.scale, 'refundFee.scale is not a number (OSDM Price.scale: required integer, typically 0)').to.be.a('number');
+    expectTypeOrNull(refundOffer.refundFee.scale, "number", 'refundFee.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
     expect(refundOffer.refundFee.amount).to.be.at.least(0);
   });
 
@@ -410,13 +406,13 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
         expect(breakdown.refundFee).to.exist;
         expect(breakdown.refundFee.amount).to.be.a('number').and.at.least(0);
         expect(breakdown.refundFee.currency).to.be.a('string');
-        expect(breakdown.refundFee.scale).to.be.a('number');
+        expectTypeOrNull(breakdown.refundFee.scale, "number", 'breakdown.refundFee.scale should be a number or null (nullable per OSDM)');
 
         // Validate refundableAmount
         expect(breakdown.refundableAmount).to.exist;
         expect(breakdown.refundableAmount.amount).to.be.a('number');
         expect(breakdown.refundableAmount.currency).to.be.a('string');
-        expect(breakdown.refundableAmount.scale).to.be.a('number');
+        expectTypeOrNull(breakdown.refundableAmount.scale, "number", 'breakdown.refundableAmount.scale should be a number or null (nullable per OSDM)');
 
         // Validate bookingParts
         expect(breakdown.bookingParts).to.be.an('array').that.is.not.empty;

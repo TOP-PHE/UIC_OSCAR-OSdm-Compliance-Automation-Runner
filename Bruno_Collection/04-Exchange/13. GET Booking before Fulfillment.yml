@@ -5,12 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/bookings/{{bookingId}}?embed=ALL"
+  url: "{{api_base}}/bookings/{{bookingId}}"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   params:
@@ -58,8 +60,8 @@ runtime:
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
-        expectedBookedOffersStatus=["EXCHANGE_ONGOING"],
-        expectedFulfillmentStatus=["FULFILLED", "CONFIRMED", "ON_HOLD"]);
+        ["EXCHANGE_ONGOING"],
+        ["FULFILLED", "CONFIRMED", "ON_HOLD"]);
 
         displayFulFilledBooking(jsonData);
 

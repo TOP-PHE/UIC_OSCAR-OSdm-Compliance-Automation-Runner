@@ -383,12 +383,26 @@ API credentials (bearer token, OAuth2 client ID and secret, Ocp-Apim-Subscriptio
 
 ### 9.9 Ephemeral Environment Files
 
-The Bruno environment `.yml` file written to disk for each run contains the decrypted bearer token. It is:
+The Bruno environment `.yml` file written to disk for each run is **credential-free**
+(#306, since server v1.11.179 / collection OTST_V2.0.95): the decrypted access token,
+`Ocp-Apim-Subscription-Key` and `oauth_extra` are handed to the Bruno child process via
+its process environment (`OSCAR_ACCESS_TOKEN` / `OSCAR_SUBSCRIPTION_KEY` /
+`OSCAR_OAUTH_EXTRA`) and seeded into Bruno runtime variables by the collection's
+before-request hook (`bru.getProcessEnv()`), never written to disk. The seeding only
+fires while the runtime variable is empty, so a token refreshed mid-run via the OSCAR
+loopback (#204) is never overwritten by the stale spawn-time value. The `.yml` file
+itself carries only non-secret plumbing (API base URL, datafile URL, requestor, run id,
+scenario override) and is:
 - Written with restricted file permissions (`mode: 0o600` — owner-only read/write)
 - Deleted immediately after the Bruno process exits
 - Deletion uses a 3-attempt retry loop (500ms backoff) to handle Windows file locks
-- Each failed deletion attempt is logged as a warning
-- If all 3 attempts fail, a **CRITICAL** error is logged alerting that credentials may persist on disk
+- Each failed deletion attempt is logged as a warning (hygiene only — a leftover file
+  contains no credentials)
+
+With this, **every credential-bearing path on disk is encrypted or eliminated**: DB
+columns and datafiles/artifacts are AES-256-GCM at rest (§9.8, at-rest envelope), and
+the last plaintext-on-disk credential (the pre-#306 env yml) no longer exists — a
+worker crash between env-file write and cleanup leaves nothing sensitive behind.
 
 ### 9.10 Path Traversal Prevention
 
@@ -446,13 +460,12 @@ JWT tokens are stored in `localStorage`. To mitigate XSS risk:
 
 ### 10.1 Token YAML Safety
 
-When writing the ephemeral Bruno environment file, the bearer token is escaped to prevent YAML parse errors caused by special characters (most commonly a stray double-quote `"` from a copy-paste typo):
-
-```javascript
-const safeToken = accessToken.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-```
-
-The token is written as a double-quoted YAML scalar. Without escaping, a token ending with `"` would produce invalid YAML (`Unexpected scalar`) and Bruno would fail immediately without running any tests.
+Since #306 the token never enters the environment `.yml` at all (it travels via the
+child process environment, §9.9), so a malformed token can no longer break YAML parsing.
+The escaping rule survives for the values that are still written to the file as
+double-quoted YAML scalars (e.g. the `__extraHeaders` JSON): backslashes then
+double-quotes are escaped so a stray `"` cannot produce invalid YAML (`Unexpected
+scalar`) that would make Bruno fail before running any tests.
 
 ### 10.2 Authentication Error Detection
 
@@ -460,7 +473,7 @@ During Bruno execution, the runner monitors all stdout/stderr output for two cat
 
 | Sentinel written to DB | Detection pattern | Meaning |
 |---|---|---|
-| `TOKEN_FORMAT_ERROR` | `YAMLParseError`, `Unexpected scalar`, `Error parsing environment` | The token contains characters that break YAML parsing — fix the token value |
+| `TOKEN_FORMAT_ERROR` | `YAMLParseError`, `Unexpected scalar`, `Error parsing environment` | A configured value written to the env file (API base URL, requestor, extra headers — not the token, which no longer enters the file since #306) breaks YAML parsing — fix the API Config value |
 | `TOKEN_AUTH_ERROR` | `Wrong response status: 401`, `401 Unauthorized`, `HTTP 401` | The token is syntactically valid but rejected by the remote API — token expired or revoked |
 
 After the Bruno process exits, if either flag was set, the runner writes the sentinel string to `runs.error_message` and appends a human-readable error event to `run_events`.
@@ -497,10 +510,10 @@ This logic applies to all endpoint types that return offers (booking, refund sea
 The run detail page (`run-detail.html`) displays a warning banner when the `error_message` field of a completed run contains a recognised sentinel value:
 
 ### TOKEN_FORMAT_ERROR banner
-Displayed when the bearer token contains characters that prevented Bruno from parsing the YAML environment file.
-- Title: *"Invalid token format — Bruno could not parse the API configuration"*
-- Message: explains that a special character (e.g. trailing `"`) was detected and instructs the user to correct the token.
-- Action button: links to the Company Profile page to fix the token.
+Displayed when a configured API value prevented Bruno from parsing the YAML environment file (since #306 the token itself no longer enters that file).
+- Title: *"Invalid API configuration — Bruno could not parse the run environment"*
+- Message: explains that a special character (e.g. trailing `"`) was detected in an API setting (e.g. base URL or requestor) and instructs the user to correct it.
+- Action button: links to the Company Profile page to fix the API config.
 
 ### TOKEN_AUTH_ERROR banner
 Displayed when Bruno received an HTTP 401 from the remote API during test execution.

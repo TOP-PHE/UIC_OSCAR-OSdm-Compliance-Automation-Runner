@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS users (
   email                   TEXT NOT NULL UNIQUE,
   password_hash           TEXT NOT NULL,
   role                    TEXT NOT NULL DEFAULT 'company_user',
+  -- 'active' | 'pending' — self-registered users start 'pending' until a
+  -- Test Manager (or administrator) of their company approves them (#449).
+  status                  TEXT NOT NULL DEFAULT 'active',
   -- Credentials (encrypted secrets are AES-GCM, base64)
   auth_mode               TEXT NOT NULL DEFAULT 'bearer',   -- 'bearer' | 'oauth2'
   access_token_enc        TEXT,
@@ -204,7 +207,8 @@ CREATE INDEX IF NOT EXISTS idx_auth_events_event_type ON auth_events(event_type)
 CREATE TABLE IF NOT EXISTS pending_registrations (
   id           TEXT PRIMARY KEY,
   email        TEXT NOT NULL UNIQUE,
-  company_name TEXT NOT NULL,
+  company_name TEXT NOT NULL,           -- display-name snapshot (shown on the confirm page/email)
+  company_slug TEXT,                    -- stable slug of the picked company; the lookup key at confirm (#449)
   token        TEXT NOT NULL UNIQUE,
   expires_at   TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
@@ -235,6 +239,18 @@ CREATE TABLE IF NOT EXISTS test_resources (
   updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_test_resources_company ON test_resources(company_id);
+
+-- ── Places cache (OSDM GET /places bulk-download — issue #450) ───────────────
+-- One row per company: the vendor's stop-place list, bulk-downloaded on demand
+-- and used for a full-text stop-place lookup in Test Config (Timetable Discovery
+-- + Train Resource editor). Places are public reference data (station
+-- names/URNs) so the JSON blob is stored plaintext, not encrypted at rest.
+CREATE TABLE IF NOT EXISTS places_cache (
+  company_id  TEXT PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+  places_json TEXT NOT NULL DEFAULT '[]',        -- JSON array of { id, name, objectType }
+  place_count INTEGER NOT NULL DEFAULT 0,
+  cached_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- ── Server config — runtime-editable key-value settings ─────────────────────
 -- Stores server configuration that can be changed by administrators at runtime
@@ -366,6 +382,7 @@ CREATE TABLE IF NOT EXISTS finding (
   company_id       TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   title            TEXT NOT NULL,                       -- short headline of the open point
   step             TEXT,                                -- request/step label for status-level baselining (e.g. "GET Passenger"); NULL for assertion-level / general findings
+  scenario_code    TEXT,                                -- the datafile scenario.code that revealed this finding (issue #447); NULL when not tied to one scenario
   expected_status  INTEGER,                             -- the provider's observed HTTP status to baseline (e.g. 501); NULL when not status-level
   observed         TEXT,                                -- what the provider actually returned
   interpretation   TEXT,                                -- OSCAR's reading + spec reference

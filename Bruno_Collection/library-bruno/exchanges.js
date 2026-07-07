@@ -293,7 +293,7 @@ function validateExchangeAppliedOverruleCode(appliedOverruleCode, expectedOverru
 
   const title = expectedOverruleCode === null
     ? "AppliedOverruleCode is null as expected"
-    : `AppliedOverruleCode is valid, (expected: appliedOverruleCode = ${appliedOverruleCode}, actual: expectedOverruleCode = ${expectedOverruleCode})`;
+    : `AppliedOverruleCode is valid, (expected: ${expectedOverruleCode}, actual: ${appliedOverruleCode})`;
 
   test(title, () => {
     expect(appliedOverruleCode).to.equal(expectedOverruleCode);

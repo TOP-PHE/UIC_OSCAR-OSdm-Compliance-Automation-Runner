@@ -1,8 +1,236 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.193",
+  "current_release": "2026.212",
   "releases": [
+    {
+      "release": "2026.212",
+      "date": "2026-07-03",
+      "server": "1.11.184",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): announce #239 (book mandatory reservations via optionalReservationSelections) on the welcome page. Content-only change (public/news/index.json); no runtime behaviour affected. Verified: JSON parses, all 45 entries carry the required fields."
+      ]
+    },
+    {
+      "release": "2026.211",
+      "date": "2026-07-03",
+      "server": "1.11.183",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #239 — book a mandatory reservation via the booking request's optionalReservationSelections node ({reservationId} per reservationOfferPart), the OSDM mechanism for offers where a reservation is mandatory but no specific place/compartment needs stating. Independent of the existing placeSelections/accommodationSelection mechanism (#371/#373/#211), which additionally states WHICH place is wanted. New scenario-level boolean bookMandatoryReservations (datafile.schema.json) drives a new offers.js handleOptionalReservationSelections() (called alongside handleAccommodationAndPlaceSelection in postOfferResponse) that harvests all of the selected offer's reservationOfferParts.id into the optionalReservationSelections env var; requestsBuilder.js attaches it to each booked offer object (outbound-only for two-step returns, same simplification already established for placeSelections). Wizard gains a 'Book via optionalReservationSelections' toggle in Booking Flow Actions. bookings.js logs which mechanism a scenario used for report traceability — no new assertion needed since the existing generic validateOfferParts() reservation↔booked-reservation check already covers correctness regardless of the booking mechanism used.",
+        "Not breaking: the new field is optional and additive, defaulting off — an older collection under this server, or this collection under an older server, both degrade gracefully (the mechanism is simply not exercised). min_collection unchanged at OTST_V2.0.95.",
+        "Verification: full suite 53 suites / 1321 tests green (no server-side test file touched — bookMandatoryReservations only feeds a new Bruno_Collection mechanism); eslint + inline-script lint clean; node --check on every edited Bruno_Collection JS file; datafile.schema.json JSON-parses; opencollection.yml YAML-parses and its before-request hook JS syntax-checks clean, confirmed the new field name appears in its reset delete-list."
+      ]
+    },
+    {
+      "release": "2026.210",
+      "date": "2026-07-03",
+      "server": "1.11.182",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs(news): backfilled 18 welcome-page news entries covering everything merged since the last news update (2026-06-09, partial refund) through today — Night Train accommodation testing (#211), the env-yml credential-free security fix (#306), stop-place discovery via the Places API (#450), Test-Manager-gated registration (#449), fulfillment type/media declaration (#448), Test Finding <-> scenario linking (#447), CHAPS-onboarding auth diagnostics (masked token logging, credential trimming, raw-body profile, #437-443), company-wide dedicated headers (#427), the Test Findings category accordion and bulk-import (#409/#413), Test Findings & Open Points itself (#400/#401, the threaded conformance-dialogue register with known-deviation baselining), one-click batch ZIP downloads (#406), the Run Budget Ceiling admin field + catalog refundability sweep (#395), the IRT/NJ accommodation-aware testing programme (Accommodation type picker, real-compartment placeSelections, the 🎯 goal-check line, place-selection NHF probes, reservation spec-coverage — #372/#374/#380/#381/#382), run-setup UX polish (#364/#367), the Discovery offer probe + Re-probe button (#368/#370), the OSDM Trip Search Criteria wizard panel (#360), and the step-failure policy HARD_STOP/CONTINUE toggle (#362). Content-only change (public/news/index.json); no runtime behaviour affected. Verified: JSON parses, all 44 entries carry the required fields, served correctly by a live dev server, UTF-8 (emoji/em-dash) intact."
+      ]
+    },
+    {
+      "release": "2026.209",
+      "date": "2026-07-03",
+      "server": "1.11.181",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix: flaky CI test in tests/unit/runner.test.js ('links a reportGenerator HTML artifact when one is present') — the report-artifact linking step in runner.js filters candidate report files by mtime >= runStartTime (excluding stale reports left by a previous run). runStartTime was captured with plain Date.now() millisecond precision; some CI container filesystem storage drivers round/truncate a written file's reported mtime to coarser-than-millisecond precision, which could put a freshly-written file's mtime just BELOW runStartTime even though the write genuinely happened after — silently dropping the html_report artifact link. Root-caused via git history (PR touching only public/news/index.json triggered the exact same pre-existing test failure, confirming it isn't caused by any application change) and by re-reading the mtime-comparison code directly (runner.js, both usages of runStartTime). Fix: subtract a 2-second safety margin from runStartTime before the comparison — a real previous run's leftover report is always at minimum seconds old in practice (the guard exists for same-day, same-company leftovers, not sub-second races), so the margin costs nothing on the staleness guarantee while eliminating the truncation race. Verified: full suite 53 suites / 1321 tests green locally; runner.test.js specifically 19/19; eslint clean. Server 1.11.180 -> 1.11.181, collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.208",
+      "date": "2026-07-03",
+      "server": "1.11.180",
+      "collection": "OTST_V2.0.96",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feature #211 — Night Train Sales & Refund: the two SFR-specified scenario families (bed in shared compartment, offerMode INDIVIDUAL; private compartment, offerMode COLLECTIVE) are now reliably distinguishable and validated end-to-end. Investigation found most of the mechanism already existed from the earlier NJ/IRT accommodation programme (#377-#392) — offerMode, the COUCHETTE/BERTH accommodation-type picker, admission-by-reference validation, and multi-passenger booking into one shared reservation were all already wired end-to-end. The real gaps: (1) datafile.schema.json's accommodationSelection enum was stale (only SEAT/COMPARTMENT) while the wizard/code had used COUCHETTE/BERTH since #373 — synced to match; added a sibling accommodationGenderPreference enum (MEN/LADIES/MIXED). (2) offers.js handleAccommodationAndPlaceSelection() picked the first reservationOfferPart matching the desired accommodationType with NO regard for offerMode — a vendor offering both an INDIVIDUAL and a COLLECTIVE part of the same type could silently book the wrong one; now prefers a part whose own offerMode matches the scenario's, and a place whose placeProperties matches the desired gender preference (soft WARNING fallback, never a hard fail, when no match exists — provider-fairness precedent from #391/#436). Also harvests placeProperties from the matched availablePlace into selectedAccommodation, which flows into the booking request's accommodations[] via the existing Object.assign in requestsBuilder.js (no code change needed there). (3) New SFR-specific soft assertions: admissionOfferParts.minGroupItemsToBeBooked/maxGroupItemsToBeBooked type-checked when present (expectTypeOrNull, same idiom as existing nullable-scalar checks); COUCHETTE/BERTH availablePlaces WARN when no MEN/LADIES/MIXED placeProperties is present. (4) bookings.js validateAccommodationGoal(): the place-count-vs-party-size check is now a HARD assertion when the scenario declared an offerMode (exactly 1 place for INDIVIDUAL, place count == party size for COLLECTIVE) while staying a soft WARNING for every scenario that doesn't declare offerMode (unaffected, backward compatible); added a placeProperties request-vs-response echo check (WARNING only — OSDM doesn't guarantee the response echoes it). (5) New 'Preferred place gender' wizard pill picker in scenarios.js, wired the same way as the existing accommodation-type picker. Deliberately NOT touching #227 (passenger-level gender as an offer-request parameter) — the SFR's 'gender-dependent' language refers to the accommodation's placeProperties field, a different, already-partially-built mechanism; #227 stays reserved for the repo owner.",
+        "Not breaking: every new field is optional and additive — an older server against this collection, or this server against the prior OTST_V2.0.95 collection, both degrade gracefully (the new preferences are simply not exercised). min_collection unchanged at OTST_V2.0.95.",
+        "Verification: full suite 53 suites / 1321 tests green (no server-side test file touched directly — Bruno_Collection has no Jest harness, a documented pre-existing gap, out of scope here); eslint + inline-script lint clean; node --check on every edited Bruno_Collection JS file; datafile.schema.json JSON-parses; opencollection.yml YAML-parses and its before-request hook JS syntax-checks clean. Live browser verification of the new wizard pill picker was not completed this session — resetting a seeded dev user's password to obtain a test-manager session was correctly blocked by the permission system as an unauthorized credential mutation; the picker is a byte-for-byte pattern match of the already-proven accommodationSelection picker (same data-action/click-handler/scenarioParser wiring) plus a clean syntax check."
+      ]
+    },
+    {
+      "release": "2026.207",
+      "date": "2026-07-03",
+      "server": "1.11.179",
+      "collection": "OTST_V2.0.95",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Security #306 — the ephemeral Bruno env yml no longer carries credentials on disk. Previously the per-run environments/<env>.yml held the decrypted OAuth access token, the Ocp-Apim-Subscription-Key and the oauth_extra/auth_key_secret value in plaintext (0o600, deleted after the run — but a SIGKILL/OOM/host-reboot between write and cleanup, or a mid-run volume snapshot, left them readable). Now buildEnvYml() writes only non-secret plumbing (api_base, data_base, requestor, runId, scenario override, extra headers) and executeRun() hands the three credentials to the Bruno child process via its environment (OSCAR_ACCESS_TOKEN / OSCAR_SUBSCRIPTION_KEY / OSCAR_OAUTH_EXTRA) on top of the existing strict env allowlist (ENCRYPTION_KEY/JWT_SECRET still never forwarded). The collection's before-request hook (opencollection.yml) seeds them into Bruno runtime vars via bru.getProcessEnv() — official Bruno API, works identically on the Linux workspace path and the Windows fallback — and only while the runtime var is still empty, so a token refreshed mid-run through the OSCAR loopback (#204) is never clobbered by the stale spawn-time value; standalone Bruno (no OSCAR_* env) is a strict no-op. The scenario-start env reset's explicit delete-list never touched the credential vars, verified. Crash-time acceptance criterion met by construction: no decrypted credential byte ever reaches a block device. Follow-on wording fixes: the env-file deletion failure is downgraded CRITICAL->warn (hygiene only now), and the TOKEN_FORMAT_ERROR run banner + docs no longer blame the token for YAML parse errors (it can no longer cause them — api_base/requestor still can). Docs updated: Server Admin Guide threat table now claims every credential-bearing path on disk is encrypted or eliminated; Specification §9.9/§10.1/§10.2/§12; Solution Architecture §14.3.4 + Issue-3 superseded note.",
+        "BREAKING PAIRING: min_collection raised to OTST_V2.0.95 — a pre-V2.0.95 collection running under server >=1.11.179 never receives the access token (no seeding hook) and every OSDM call returns 401; conversely collection >=V2.0.95 under an older server still works (the hook only seeds when the yml did not provide the var). Deploy server and collection together, as refresh-collection.yml already does.",
+        "Tests: runner.test.js 17 -> 19 (env yml on disk contains neither the secret values nor the credential variable names while spawn is in flight; spawn env carries the OSCAR_* vars exactly when configured; server secrets still absent). Full suite 53 suites / 1321 tests green; eslint clean; opencollection.yml YAML-parse + before-request JS syntax-check clean."
+      ]
+    },
+    {
+      "release": "2026.206",
+      "date": "2026-07-02",
+      "server": "1.11.178",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 6 (continuing the SonarCloud gate ratchet): src/server.js, the Express app entry point and the last remaining major coverage gap (236 uncovered lines, 0% covered). Architecturally different from every prior batch — requiring the module has real side effects (env-var validation with process.exit(1), JWT-secret DB bootstrap, queue event wiring, startup run reconciliation, and a real app.listen() that binds an OS port) rather than being a plain Express router. New tests/unit/server.test.js (30 tests) requires the module exactly once against a dedicated, never-dialed test port (supertest wraps the exported `app` directly and needs no real listening socket) and covers: GET /health (DB/queue/disk/process checks), GET /metrics, the datafile download route (filename-regex guard, unknown-company 404, non-loopback 401/403, owning-company 200, loopback-bypass 200), the loopback-only access-token-refresh endpoint (incl. force=1 and a resolveAccessToken-failure 502), the run-artifact download route (ownership check via canUserSeeRun, path/filename guards, a real AES-GCM tamper-detection 500 via a single flipped ciphertext byte), route-mounting wiring, and — via one isolated NODE_ENV=production re-require on a second dedicated port — the HTTPS-redirect middleware (Sonar S5146 open-redirect guard: the localhost and /metrics bypasses, already-https passthrough, the redirect itself). Deliberately out of scope, documented not forced: the process.exit(1) missing-env-var path, the Alertmanager startup config-seed hook (gated behind an unset env var so it naturally never runs), static/SPA file serving (Express's own tested behaviour), and the global error handler (no non-invasive way to force an unhandled throw through a real mounted route without modifying source). server.js 0% -> ~83% lines. Overall Oscar_Server/src line coverage ~83% -> ~88%; full suite 52 -> 53 suites, 1289 -> 1319 tests, all green. Bumped the documented OSCAR-Gate new_coverage floor 74% -> 83% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.177 -> 1.11.178, collection unchanged OTST_V2.0.94.",
+        "Verification: given the elevated risk (two real, uncaptured app.listen() sockets — the main require plus one isolated NODE_ENV=production re-require via jest.resetModules() — and two real, hardcoded, non-overridable data directories written to), this batch was written directly rather than delegated, after reading server.js end-to-end first. Caught and fixed two authoring mistakes before they became false-negative-masking bugs: (1) a path-traversal test asserted 400/404 on a URL Express itself normalizes before routing (hits the SPA fallback at 200 instead) — replaced with a same-segment filename that actually reaches and fails the route's own regex guard; (2) an artifact-tamper test truncated the encrypted file below HEADER_LEN (34 bytes), which made isEncryptedBuffer() treat it as legacy plaintext instead of tripping the AES-GCM auth-tag check — fixed by flipping one byte in the ciphertext region instead of truncating. Also fixed an FK-ordering bug in the file's own afterAll (deleting seeded users before their still-cascading-pending runs' company row violated runs.user_id's non-cascading FK). Stress-tested for flakiness given the real side effects: 6 standalone runs and 3 full-suite runs, all clean, before trusting the result. Confirmed data/datafiles/ and data/artifacts/ have zero leftover test files before and after; eslint clean; scanned for both CodeQL patterns that hit earlier batches — neither present."
+      ]
+    },
+    {
+      "release": "2026.205",
+      "date": "2026-07-02",
+      "server": "1.11.177",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 5 (continuing the SonarCloud gate ratchet): worker/runner.js, the Bruno CLI orchestrator and by far the single largest remaining coverage gap (388 uncovered lines, 16% covered) before this batch. New tests/unit/runner.test.js (17 tests) fully mocks child_process.spawn (never spawns a real subprocess) driving executeRun() through: auth/missing-run/missing-datafile/env-write-failure early exits; exit-code 0 vs non-zero final status; the process-error ('error' event) path; HTML report linking both directly (reportGenerator output) and via the mergeReport.js fallback, plus the second (mergeReport.js) spawn call and its own error path; JSON-results artifact copy; AUTH_401/TOKEN_FORMAT CLI-output detection surfaced onto runs.error_message; the emergency-stop terminal-state guard (a CANCELLED run is never resurrected to COMPLETED); and a real (not fake-timer), config-driven short-timeout kill test. runner.js 16% -> ~68% lines. Overall Oscar_Server/src line coverage ~77% -> ~83%; full suite 51 -> 52 suites, 1272 -> 1289 tests, all green. Bumped the documented OSCAR-Gate new_coverage floor 68% -> 74% (bump the actual SonarCloud condition to match). Deliberately out of scope, documented not forced: the Linux-only workspace create/cleanup functions (platform-gated, never engaged since no test sets scenarioOverride, matching real single-scenario/CI-agnostic behaviour) and the token-watchdog setInterval tick logic (disabled via TOKEN_WATCHDOG_INTERVAL_MS=0 for every test, avoiding a live interval that would otherwise keep Jest's process alive) — both already carry real production risk surface but needed a fundamentally different (fake-timer / platform-conditional) test strategy this batch didn't take on. Tests-only + Sonar-config-doc; no runtime change; server 1.11.176 -> 1.11.177, collection unchanged OTST_V2.0.94.",
+        "Verification: given the elevated risk (a real, hardcoded, non-overridable ARTIFACTS_DIR under this same repo, plus real subprocess-spawn danger), this batch was written directly rather than delegated to a subagent, after first reading executeRun() end-to-end. Hit and fixed one real bug during authoring: emitting synthetic 'close'/'error' events on the fake child process after only a single setImmediate tick raced ahead of executeRun's own several-await preamble (mkdir/env-yml-write/datafile-read) — events fired before executeRun had even called spawn(), so its real listeners were never attached and the awaiting promise hung forever; fixed by polling for the Nth actual spawn() call before emitting. Full suite 52/52 green; confirmed data/artifacts/ has zero leftover test directories before and after a full run; eslint clean; scanned for both CodeQL patterns that hit earlier batches (insecure os.tmpdir() writes, unanchored new RegExp(string) checks) — neither present."
+      ]
+    },
+    {
+      "release": "2026.204",
+      "date": "2026-07-02",
+      "server": "1.11.176",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 4 (continuing the SonarCloud gate ratchet): closed the three biggest remaining non-route coverage gaps. New tests/unit/mailer.test.js (24 tests, new file) mocks nodemailer + seeds/restores server_config to exercise all four send*Email functions in both SMTP-configured and dev-mode-fallback branches, taking mailer.js 0% -> 100% (was completely untested). tests/unit/auth-middleware.test.js extended 20 -> 47 tests (cookie parsing incl. malformed/URL-decoded/multi-cookie, token_blacklist revocation branch, isTestManagerOrAbove + userFromRequest exhaustively over every role) taking middleware/auth.js ~62% -> 100%. tests/unit/auth-profiles.test.js extended 30 -> 57 tests (custom profile raw-body-format + placeholder-substitution edge cases, network/timeout/malformed-response failure paths, masked-diagnostic-logging assertions across all profiles) taking worker/auth-profiles.js ~85% -> ~99% (one line left: an unreachable _maskBody() fallback no adapter can actually produce, documented rather than reached through internals). Overall Oscar_Server/src line coverage ~74% -> ~77%; full suite 50 -> 51 suites, 1199 -> 1272 tests, all green. Bumped the documented OSCAR-Gate new_coverage floor 65% -> 68% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.175 -> 1.11.176, collection unchanged OTST_V2.0.94.",
+        "Verification: this batch used 3 parallel subagents; two independently flagged (and self-resolved) a transient mid-task file-read anomaly, so every file was independently re-verified from scratch after the fact rather than trusting any self-report — location/syntax-checked, re-run standalone with --coverage, scanned for both CodeQL patterns that hit earlier batches (insecure os.tmpdir() writes, unanchored new RegExp(string) URL/domain checks — neither present), and the exact test-count delta reconciled against origin/main via git show (1199 + 27 + 22 + 24 = 1272, confirmed exactly). Full combined suite 51/51 green, eslint clean."
+      ]
+    },
+    {
+      "release": "2026.203",
+      "date": "2026-07-01",
+      "server": "1.11.175",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 3 (continuing the SonarCloud gate ratchet): extended integration tests for the three biggest remaining coverage gaps. runs-routes.test.js grew from 10 to 75 tests (submit/list/queue-status/stop-all/batch+zip/logs/assertions/requests/artifacts/share/cancel/delete/bulk-delete/bulk-admin-action, with real seeded run graphs + encrypted artifacts) taking runs.js ~35% -> ~87% — the single largest uncovered file in the project. admin-routes.test.js grew from 40 to 73 tests (users/:id/approve, generate-reset-link, GET/PATCH /config with masking, alertmanager/apply, test-email dev-mode path, rotate-jwt-secret run last + self-restoring) taking admin.js ~60% -> ~89%. company-routes.test.js grew from 15 to 27 tests (extra_headers validation branches, the retired share_reports_with_certifier rejection, and the POST /datafile multipart upload path) taking company.js ~58% -> ~84%. Overall Oscar_Server/src line coverage ~65% -> ~74%; full suite 50 suites, 1089 -> 1199 tests, all green. Documented the OSCAR-Gate new_coverage floor bump 55% -> 65% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.174 -> 1.11.175, collection unchanged OTST_V2.0.94.",
+        "Verification: all extended test files independently re-run standalone with --coverage (not just trusting the authoring pass) — runs.js 75/75, admin.js 73/73, company.js 27/27; full suite 1199/1199 green; eslint clean on all three files; scanned for the CodeQL patterns that hit batch 1 (all os.tmpdir() usage wrapped in mkdtempSync, no unused imports). One real pre-existing behavior surfaced while writing tests (not a regression, not fixed here): POST /v1/company/datafile's multer filename callback treats certification_user as a platform role needing an explicit company_id, erroring 500 before the route's own test_manager-only 403 check runs for that specific role+endpoint combination — tests use a plain tester to exercise the intended 403 branch instead."
+      ]
+    },
+    {
+      "release": "2026.202",
+      "date": "2026-07-01",
+      "server": "1.11.174",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 2 (continuing the SonarCloud gate ratchet): version-info.test.js unit-tests utils/versionInfo.js (compatibility-matrix resolution: matrix-missing/malformed, untested combo, exact + '.x' wildcard match, unknown collection; 0% -> ~97%, 8 tests, jest.isolateModules + mkdtemp temp files); structure-results.test.js covers reports/structureResults.js (pure classifyVendorCapability + serializeBounded across all branches, plus extractStructuredResults over a seeded run with real AES-encrypted artifact files — PASS/FAIL requests, auth-header redaction, assertion counts; ~18% -> ~90%, 22 tests); and auth-routes.test.js was extended to cover the previously-untested auth surface — register/companies, register/check-token, the full password-reset flow (request/check-token/confirm + single-use + login-with-new-password), bootstrap/platform-user (wrong token/invalid role/create/duplicate), and /me + /logout + /sso-check (admin-only) (~49% -> ~86%). Overall Oscar_Server/src line coverage ~59% -> ~65%; full suite 48 -> 50 suites, 1043 -> 1089 tests, all green. Documented OSCAR-Gate new_coverage floor bump 50% -> 55% (bump the actual SonarCloud condition to match). Tests-only + Sonar-config-doc; no runtime change; server 1.11.173 -> 1.11.174, collection unchanged OTST_V2.0.94.",
+        "Verification: all new/extended tests pass in the monorepo checkout; full suite 1089/1089 green with --coverage; eslint + inline-script lint clean; new test files scanned for the CodeQL patterns that hit batch 1 (no os.tmpdir writes — mkdtemp used; no unused imports)."
+      ]
+    },
+    {
+      "release": "2026.201",
+      "date": "2026-07-01",
+      "server": "1.11.173",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test coverage batch 1 (toward ratcheting up the SonarCloud new-coverage gate): added Jest+supertest integration tests for the three previously-untested (0% coverage) route files — company-test-resources.js (CRUD + guards + discover-timetable/reprobe-offers via bearer-cred + stubbed global.fetch; ~85% lines, 21 tests), reports.js (compare/comparisons/configured report-builder/templates/trends over a seeded runs+run_requests+run_events graph; ~98% lines, 33 tests), and company-test-framework.js (GET/PUT/DELETE + role gating + lazy salesFlows migration; ~94% lines, 15 tests). Overall Oscar_Server/src line coverage ~50% -> ~59%; full suite 45 -> 48 suites, 974 -> 1043 tests, all green. Documented the OSCAR-Gate new_coverage floor bump 35% -> 50% in sonar-project.properties (the actual condition must be bumped in the SonarCloud UI). Tests-only + Sonar-config-doc; no runtime change; server 1.11.172 -> 1.11.173, collection unchanged OTST_V2.0.94.",
+        "Verification: all three new test files pass in the monorepo checkout against the current source; full suite 1043/1043 green with --coverage; eslint + inline-script lint clean. Note: the discover-timetable/reprobe-offers deep harvest-and-merge loops remain uncovered (they need a fully-shaped vendor trips payload) — a follow-up target."
+      ]
+    },
+    {
+      "release": "2026.200",
+      "date": "2026-07-01",
+      "server": "1.11.172",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Chore (SonarCloud gate cleanup, toward making the quality gate a required check): fixes the two conditions that kept main's gate red. (1) Reliability: added an associated label to all 38 <input>/<select>/<textarea> flagged by Web:InputWithoutLabelCheck across 8 public/*.html pages (login/register/verify/reset/forgot, profile, admin, run-detail, report-builder) — <label for> where a visible label existed, aria-label for compact toolbar controls and select-all checkboxes; clears new_reliability_rating C->A and the matching S6853 accessibility smells. (2) Duplication: osdmSchemas.js is a GENERATED file whose per-OSDM-version schema blocks are ~identical by design and accounted for ~2,288 of ~2,585 duplicated lines; added sonar.cpd.exclusions for it (still analyzed for bugs/smells, only copy-paste detection off), dropping new_duplicated_lines_density ~9.2% -> ~1%. Also bumped sonar.projectVersion 1.2.0 -> 1.11.172 (it was stale, which made ~28k legacy lines count as 'new code'; keep it in step with package.json so the Previous-Version new-code period tracks real releases). No server behavioural change; server 1.11.171 -> 1.11.172, collection unchanged OTST_V2.0.94.",
+        "Verification: every label for= target confirmed to reference an existing element id across the 8 files; eslint + inline-script HTML lint clean; full jest suite unaffected (HTML/config only). After merge, main's SonarCloud gate is expected to go green on both previously-failing conditions, enabling 'SonarQube Quality Gate check' to be added to branch protection's required list."
+      ]
+    },
+    {
+      "release": "2026.199",
+      "date": "2026-07-01",
+      "server": "1.11.171",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #450: Test Config can bulk-download the vendor's OSDM stop places (GET /places) and cache them per company for a full-text origin/destination lookup, so testers pick real place URNs instead of typing urn:uic:stn:NNNNNNN by hand (manual entry still works). New places_cache table (one row/company, plaintext JSON — places are public reference data; migration 25, schema.sql). New routes company-places.js mounted at /v1/company: POST /places/refresh (test_manager only) pages through GET {api_base}/places deduping by id, bounded (100 pages / 100k places, logs if a cap truncates), reusing resolveAccessToken + a new shared src/utils/osdm-client.js (osdmGet + buildTesterHeaders extracted from the discover-timetable boilerplate); GET /places returns cache metadata or, with ?q=, ranked prefix-first matches over name+id (tester+test_manager readable, admin/certifier denied per #60). UI (public/js/scenarios.js): a Download places button + 'N places cached' status in the Test Data → Train Resources toolbar, and a reusable typeahead (attachPlaceAutocomplete, lazily wired via a focusin delegate on [data-place-lookup]) on the Timetable Discovery modal origin/destination and the Train editor origin/destination URN fields. OpenAPI documents both endpoints. Server-side + Test Config UI; server 1.11.170 -> 1.11.171, collection unchanged OTST_V2.0.94.",
+        "Verification: new company-places.test.js (11 tests) — auth/role gating (tester reads, admin/certifier 403, refresh test_manager-only), ?q= filtering/prefix-ranking/limit-cap, refresh 400 with no api_base, and a fetch-stubbed refresh happy-path asserting cross-page dedupe + stop-when-no-new-ids + name-falls-back-to-id. db-migrations.test.js extended for migration 25 (places_cache created on a fresh DB and on an already-versioned DB missing the table). Full suite 45 suites / 974 tests green; eslint + inline-script lint clean. Manual browser run (seeded cache, no live vendor): Download-places status renders '6 place(s) cached', the typeahead filters (Basel/Zürich) and selecting fills the URN, manual typing still works."
+      ]
+    },
+    {
+      "release": "2026.198",
+      "date": "2026-07-01",
+      "server": "1.11.170",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #449 (follow-up to 2026.197): self-registration now matches the company by its stable SLUG (submitted verbatim from the /register/companies dropdown, whose <option> value is now the slug) instead of re-deriving a slug from the display name via makeSlug(). A company whose slug was frozen before a rename — real incident: display name 'Paxone', stored slug 'paxone-gmbh', makeSlug('Paxone')='paxone' != stored — was rejected as 'Unknown company'. register/request now validates companySlug and looks up WHERE slug=?; the picked company's canonical name AND slug are stored on the pending registration (new pending_registrations.company_slug column, migration 24, schema.sql); register/confirm resolves the company by that stored slug (falling back to makeSlug(company_name) only for a pre-migration pending row). OpenAPI updated (companyName -> companySlug). Server-side + registration UI; server 1.11.169 -> 1.11.170, collection unchanged OTST_V2.0.94.",
+        "Verification: auth-routes.test.js switched to companySlug + a new end-to-end regression test seeding a name/slug-mismatched company ('Paxone'/'paxone-gmbh') and asserting request->confirm succeeds and creates a pending user under the right company; db-migrations.test.js covers migration 24. Full suite 44 suites / 962 tests green, eslint + inline-script lint clean. Manual browser run reproduced the exact Paxone mismatch (dropdown option label 'Paxone' / value 'paxone-gmbh') and confirmed the full request -> confirm -> pending flow now works."
+      ]
+    },
+    {
+      "release": "2026.197",
+      "date": "2026-07-01",
+      "server": "1.11.169",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #449: self-registration no longer requires the signup email to contain a fragment of the company name (emailMatchesCompany removed) — instead the applicant must pick a real, existing company (already enforced client-side by the /register/companies dropdown; now also enforced server-side in /register/request) and the new account lands as status='pending' until a Test Manager (or administrator, cross-company fallback) of that company approves it via a new POST /v1/company/users/:id/approve (mirrored at /v1/admin/users/:id/approve). Every Test Manager of the company is emailed (sendPendingApprovalEmail, mailer.js) when a registration is confirmed; a pending user cannot log in (403) until approved. Removed the register/confirm auto-create-company-from-free-text branch, which was unreachable from the UI dropdown and would otherwise have let a stranger self-activate into a brand-new, unverified company with nobody to approve them. New users.status column (migration 23, default 'active', schema.sql). Server-side only; server 1.11.168 -> 1.11.169, collection unchanged OTST_V2.0.94.",
+        "Verification: auth-routes.test.js updated for the new contract (seeds a real company; confirms 201+pending/no-token; login 403 while pending; login succeeds after direct approval) plus a new 403-pending-login test. Full suite 44 test suites / 961 tests green. Manual run: register (email deliberately NOT matching the company name) -> dev-mode confirm link -> pending panel (no redirect) -> login 403 -> Test Manager sees Pending badge + Approve button on admin.html -> approve -> login succeeds. node --check clean on all touched server files."
+      ]
+    },
+    {
+      "release": "2026.196",
+      "date": "2026-07-01",
+      "server": "1.11.168",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #448: Test Framework gains a new Fulfillment section — pill pickers for fulfillmentType (ETICKET, CIT_PAPER, PASS_CHIP, PASS_REFERENCE) and fulfillmentMedia (PDF_A4, UIC_PDF, PKPASS, ALLOCATOR_APP, RCCST, RCT2, TICKETLESS), so a Test Manager can declare which OSDM fulfillment capabilities the provider actually supports. Wired to the pre-existing framework.fulfillment.{types,media} data model + generic fw-pill/fwTogglePill mechanism (same pattern as Seat Selection/Passenger Types); persists via the existing debounced auto-save. This activates the scenario-level 'E. Fulfillment' picker's existing fwFilter(..., fw.fulfillment.types/media) call, which worked correctly already but had no real input to filter against. Removed fwToggleFulfilPill, a zero-call-site duplicate of the generic handler. Scope: framework-level declaration only; the separate requestedFulfillmentOptionsList scenario editor (fixed in #436 to show the unrestricted OSDM set) is intentionally untouched — warning on an undeclared type/media there needs a different mechanism than frameworkGating.js's current boolean-flag rule engine, tracked as a follow-up. Server-side only; server 1.11.167 -> 1.11.168, collection unchanged OTST_V2.0.94.",
+        "Verification: harness over the REAL extracted fwTogglePill + fwFilter — 12/12 (toggle on/off mutates only the targeted subKey; fwFilter reflects it immediately; clearing a category reverts to the unrestricted full set per the existing empty-means-full contract). node --check + eslint + inline-script HTML lint clean."
+      ]
+    },
+    {
+      "release": "2026.195",
+      "date": "2026-06-25",
+      "server": "1.11.167",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Feat #447 (Wiremind): a Test Finding can now record the datafile scenario.code that revealed it, so re-testing a fix means selecting that exact scenario in Test Config instead of re-deriving which one it was. New nullable finding.scenario_code column (migration 22, schema.sql); exposed as scenarioCode on the findings API (create/patch/list/thread/bulk-import — same shape as step/expectedStatus). UI: a free-text field with autocomplete against the current datafile's scenario codes (any value accepted, so a since-renamed/deleted scenario keeps its record) on the create/edit form; the list row and thread header show a scenario chip linking to /scenarios.html. Server-side only; server 1.11.166 -> 1.11.167, collection unchanged OTST_V2.0.94.",
+        "Verification: db-migrations.test.js extended — migration 22 applies on a fresh install and restores scenario_code on a DB already versioned past it (the #208-class upgrade regression guard). findings-routes.test.js — 2 new tests: scenarioCode round-trips create -> list -> thread, defaults to null, PATCH sets/clears it. Full suite 44 test suites / 960 tests green. node --check + eslint + inline-script HTML lint clean."
+      ]
+    },
+    {
+      "release": "2026.194",
+      "date": "2026-06-18",
+      "server": "1.11.166",
+      "collection": "OTST_V2.0.94",
+      "min_collection": "OTST_V2.0.0",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Fix #445: OSDM scalar fields declared nullable:true no longer FAIL when the provider returns null. offers.js + refunds.js asserted the JS type and rejected null; a code generator emits these fields as null when not applicable (returned for consistency), which is spec-legal — so OSCAR raised false failures (reported on SBB FULL_FLEX: isReusable null, price.scale null, numericAvailability null, numberOfPrivateCompartments null). Now assert the declared type OR null via a shared expectTypeOrNull() helper in testCapture.js. Fields covered, all confirmed nullable:true in OSDM 3.8.0: Price/Amount.scale (admission/reservation price, afterSaleFee.scale x3, refund refundableAmount/refundFee/breakdown scales x4), isReusable, part-level + availablePlaces numericAvailability, numberOfPrivateCompartments. Required fields (price.amount, currency) keep strict checks; corrected a stale refunds.js comment that wrongly called scale 'required'. Collection-side; server 1.11.165 -> 1.11.166, collection OTST_V2.0.93 -> OTST_V2.0.94.",
+        "Verification: harness over the REAL extracted expectTypeOrNull — 11/11 (null accepted for number/boolean; declared type still passes; a genuinely wrong type — string/object — still FAILS; undefined/absent still fails, since absent != null). node --check clean on testCapture.js/offers.js/refunds.js; a residual strict-assertion sweep over the nullable fields finds none remaining."
+      ]
+    },
     {
       "release": "2026.193",
       "date": "2026-06-18",

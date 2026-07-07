@@ -89,8 +89,8 @@ input:focus{outline:none;border-color:#0090D4}
 
   <!-- Login -->
   <form id="login" class="form active">
-    <div class="field"><label>Email</label><input type="email" id="l-email" required autocomplete="username"></div>
-    <div class="field"><label>Password</label><input type="password" id="l-password" required autocomplete="current-password"></div>
+    <div class="field"><label for="l-email">Email</label><input type="email" id="l-email" required autocomplete="username"></div>
+    <div class="field"><label for="l-password">Password</label><input type="password" id="l-password" required autocomplete="current-password"></div>
     <button class="btn" type="submit" id="l-btn">Sign In</button>
     <div style="margin-top:12px;text-align:center;font-size:13px">
       <a href="/forgot-password.html" style="color:#0090D4;text-decoration:none">Forgot password?</a>
@@ -121,16 +121,15 @@ input:focus{outline:none;border-color:#0090D4}
     </div>
     <form id="register-form">
       <div class="field">
-        <label>Company Name</label>
+        <label for="r-company">Company Name</label>
         <select id="r-company" required style="width:100%;padding:10px 12px;border:1px solid #cfd8dc;border-radius:6px;font-size:14px;background:#fff">
           <option value="">— Select your company —</option>
         </select>
-        <div id="r-company-hint" style="font-size:11px;color:#90a4ae;margin-top:4px">Your email must contain your company name.</div>
+        <div id="r-company-hint" style="font-size:11px;color:#90a4ae;margin-top:4px">Your request will be reviewed by your company's Test Manager(s) before you can sign in.</div>
       </div>
       <div class="field">
-        <label>Email <span style="color:#90a4ae;font-weight:400">(company email address)</span></label>
+        <label for="r-email">Email <span style="color:#90a4ae;font-weight:400">(company email address)</span></label>
         <input type="email" id="r-email" required autocomplete="username">
-        <div id="r-match-msg" style="font-size:11px;margin-top:4px;display:none"></div>
       </div>
       <button class="btn" type="submit" id="r-btn">Send Confirmation Email</button>
     </form>
@@ -214,25 +213,6 @@ async function doLogin(e) {
   finally { btn.disabled = false; btn.textContent = 'Sign In'; }
 }
 
-function checkEmailCompany() {
-  const company = document.getElementById('r-company').value.trim();
-  const email   = document.getElementById('r-email').value.trim().toLowerCase();
-  const msgEl   = document.getElementById('r-match-msg');
-  if (!company || !email) { msgEl.style.display = 'none'; return; }
-  const words = company.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .split(/[^a-z0-9]+/).filter(w => w.length >= 3);
-  const matches = words.length === 0 || words.some(w => email.includes(w));
-  msgEl.style.display = 'block';
-  if (matches) {
-    msgEl.style.color = '#2e7d32';
-    msgEl.textContent = '✓ Email matches company name.';
-  } else {
-    msgEl.style.color = '#c62828';
-    msgEl.textContent = '✗ Email does not appear to match company name "' + company + '".';
-  }
-}
-
 async function doRegister(e) {
   e.preventDefault();
   const btn = document.getElementById('r-btn');
@@ -242,7 +222,10 @@ async function doRegister(e) {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         email:       document.getElementById('r-email').value.trim(),
-        companyName: document.getElementById('r-company').value.trim()
+        // The dropdown option value is the company's stable slug (see
+        // loadCompanies) — send it verbatim so the server matches the exact
+        // company, not a slug re-derived from the display name.
+        companySlug: document.getElementById('r-company').value
       })
     });
     const data = await res.json();
@@ -274,8 +257,8 @@ async function loadCompanies() {
     const sel = document.getElementById('r-company');
     (data.companies || []).forEach(c => {
       const opt = document.createElement('option');
-      opt.value = c.name;
-      opt.textContent = c.name;
+      opt.value = c.slug;        // stable identifier submitted to the server
+      opt.textContent = c.name;  // human-readable label
       sel.appendChild(opt);
     });
   } catch(e) { console.warn('Failed to load companies:', e.message); }
@@ -287,8 +270,6 @@ document.getElementById('tab-login').addEventListener('click', () => showTab('lo
 document.getElementById('tab-register').addEventListener('click', () => showTab('register'));
 document.getElementById('login').addEventListener('submit', doLogin);
 document.getElementById('register-form').addEventListener('submit', doRegister);
-document.getElementById('r-company').addEventListener('change', checkEmailCompany);
-document.getElementById('r-email').addEventListener('input', checkEmailCompany);
 
 // If already logged in, go straight to the welcome page
 if (localStorage.getItem('oscar_user')) {

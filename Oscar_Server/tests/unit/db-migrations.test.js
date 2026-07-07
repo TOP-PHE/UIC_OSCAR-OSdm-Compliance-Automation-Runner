@@ -44,6 +44,13 @@ const REQUIRED_COLUMNS = {
     'cached_token_enc', 'cached_token_expires_at', 'cached_token_cred_fp',
     'requestor_enc', 'subscription_key_enc',
   ],
+  finding: [
+    'id', 'company_id', 'title', 'step', 'scenario_code', 'expected_status',
+    'observed', 'interpretation', 'category', 'severity', 'status',
+    'baseline_in_run', 'raise_to_osdm', 'evidence', 'created_by',
+  ],
+  // #450 — per-company OSDM /places cache (migration 25).
+  places_cache: ['company_id', 'places_json', 'place_count', 'cached_at'],
 };
 
 let _tmpFiles = [];
@@ -119,5 +126,47 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
     // Regression guard: the column is present again. Fails loudly if a required
     // column is ever buried in an already-applied migration instead of a new one.
     expect(columnsOf(dbFile, 'users')).toContain('cached_token_cred_fp');
+  });
+
+  // #447 — finding.scenario_code (migration 22). Same shape as the #208 guard
+  // above: simulate a DB that already ran migrations up to 21 (the finding
+  // table exists, without scenario_code) and confirm ONLY the new migration
+  // brings the column back — never a re-run of an already-applied one.
+  test('finding.scenario_code (added in migration 22) is restored on an already-versioned DB', () => {
+    const dbFile = tempDbPath();
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(fs.readFileSync(SCHEMA_SQL, 'utf8'));
+      try { d.exec('ALTER TABLE finding DROP COLUMN scenario_code'); } catch (_e) { /* already absent */ }
+      d.exec('DELETE FROM schema_version WHERE version >= 22');
+      d.exec('INSERT OR IGNORE INTO schema_version (version) VALUES (21)');
+      d.close();
+    }
+    expect(columnsOf(dbFile, 'finding')).not.toContain('scenario_code');
+
+    bootDbAgainst(dbFile);
+
+    expect(columnsOf(dbFile, 'finding')).toContain('scenario_code');
+  });
+
+  // #450 — places_cache (migration 25). Simulate a DB already at version 24
+  // WITHOUT the table and confirm migration 25 creates it. `CREATE TABLE IF NOT
+  // EXISTS` in migration 25 means the table can only appear from the new
+  // migration running, never from schema.sql being re-applied here.
+  test('places_cache (added in migration 25) is created on an already-versioned DB', () => {
+    const dbFile = tempDbPath();
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(fs.readFileSync(SCHEMA_SQL, 'utf8'));
+      try { d.exec('DROP TABLE IF EXISTS places_cache'); } catch (_e) { /* already absent */ }
+      d.exec('DELETE FROM schema_version WHERE version >= 25');
+      d.exec('INSERT OR IGNORE INTO schema_version (version) VALUES (24)');
+      d.close();
+    }
+    expect(columnsOf(dbFile, 'places_cache')).toEqual([]); // table gone
+
+    bootDbAgainst(dbFile);
+
+    expect(columnsOf(dbFile, 'places_cache')).toContain('places_json');
   });
 });
