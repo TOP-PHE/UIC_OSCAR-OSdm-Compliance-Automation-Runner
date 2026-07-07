@@ -11,14 +11,10 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-  auth: inherit
-
-runtime:
-  scripts:
-    - type: before-request
-      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
@@ -67,10 +63,15 @@ runtime:
             return;
         }
         if (!jsonData.refundOffer) {
-            throw new Error("⛔ Exiting script, no refundOffer available in the response");
+            test("refundOffer exists in response (required for downstream steps)", () => {
+                throw new Error("⛔ refundOffer missing in response — cannot proceed");
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("GET Refund Offer (missing refundOffer)");
+            return;
         }
 
-        postPatchRefundOfferResponse(jsonData, expectedexchangeOperationStatus = ["PROPOSED"], expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
+        postPatchRefundOfferResponse(jsonData, ["PROPOSED"], ["CONFIRMED", "FULFILLED"]);
 
 settings:
   encodeUrl: true

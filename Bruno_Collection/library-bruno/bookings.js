@@ -592,9 +592,6 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
-  // Bug B: inspect booking-level warnings / problems (OSDM envelope).
-  // Non-array 'warnings' means the provider returned a non-standard structure
-  // (e.g. Sqills wraps it as {warnings:[...]} instead of the expected Warning[]).
   if (jsonData.warnings !== undefined && jsonData.warnings !== null && !Array.isArray(jsonData.warnings)) {
     validationLogger(
       `[WARNING] booking response 'warnings' is not an array (got ${typeof jsonData.warnings}) — ` +
@@ -866,12 +863,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
     validationLogger(`[DEBUG] ${_stageName} fields present (currency, scale)`);
   });
-  // Downstream (refund maths) reads these — set whichever members exist
-  // (previously only set when BOTH existed, i.e. never on conformant data).
   if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
-  // Bug C: guard against storing a 0 confirmedPrice at pre-confirmation stage
-  // when provisionalPrice is non-zero — provider anomaly (e.g. Sqills returns
-  // confirmedPrice.amount=0 at PREBOOKED) that would corrupt REFUND/EXCHANGE maths.
   if (confirmed) {
     if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
       validationLogger(
@@ -1007,7 +999,6 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     }
 
     test(`Fulfillment[${idx}] id exists`, () => {
-      // Bug G: was missing an assertion — the test always passed even when id was absent.
       expect(fulfillment.id).to.be.a('string').and.not.be.empty;
       validationLogger(`[DEBUG] Fulfillment[${idx}] id exists: ${fulfillment.id}`);
     });

@@ -5,16 +5,16 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/bookings/{{bookingId}}?embed=ALL"
+  url: "{{api_base}}/bookings/{{bookingId}}"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-    - name: version
-      value: "{{osdmVersion}}"
   params:
     - name: embed
       value: ALL
@@ -60,8 +60,8 @@ runtime:
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
-        expectedBookedOffersStatus=["EXCHANGED"],
-        expectedFulfillmentStatus=["EXCHANGED", "FULFILLED", "CONFIRMED"]);
+        ["EXCHANGED"],
+        ["EXCHANGED", "FULFILLED", "CONFIRMED"]);
 
         displayFulFilledBooking(jsonData);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────

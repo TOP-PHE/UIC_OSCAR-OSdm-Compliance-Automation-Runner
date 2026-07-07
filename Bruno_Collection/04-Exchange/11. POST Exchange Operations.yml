@@ -11,11 +11,10 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-    - name: Content-Type2
-      value: application/json;version={{osdm-version}}
-      disabled: true
   body:
     type: json
     data: "{{requestExchangeOperationsBodyData}}"
@@ -126,11 +125,15 @@ runtime:
             return;
         }
         if (!jsonData.exchangeOperation) {
-            throw new Error("⛔ Exiting script, no exchangeOperation available in the response");
+            test("exchangeOperation exists in response (required for downstream steps)", () => {
+                throw new Error("⛔ exchangeOperation missing in response — cannot proceed");
+            });
+            const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+            loopbackOrStop("POST Exchange Operations (missing exchangeOperation)");
+            return;
         }
-        test('Successfully received exchangeOperation', () => expect(res.getStatus()).to.eql(200));
 
-        postPatchExchangeOperationsResponse(jsonData, expectedexchangeOperationStatus = ["PREBOOKED"], expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
+        postPatchExchangeOperationsResponse(jsonData, ["PREBOOKED"], ["CONFIRMED", "FULFILLED"]);
 
 settings:
   encodeUrl: true

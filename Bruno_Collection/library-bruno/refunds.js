@@ -280,18 +280,14 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
   // Validate validUntil (approx 15 minutes in future with 2 minutes tolerance)
   if (_checkDatePresent('validUntil', refundOffer.validUntil, validUntil)) {
     const _label = _withLocal(refundOffer.validUntil, validUntil);
-    test(`Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`, () => {
+    test(`Refund offer[${index}] validUntil is valid and in the future: ${_label}`, () => {
       expect(validUntil.getTime(),
         `validUntil (${refundOffer.validUntil}) is not in the future relative to now (${currentDate.toISOString()})`
       ).to.be.above(currentDate.getTime());
-
-      const expectedValidUntil = new Date(currentDate.getTime() + 15 * 60 * 1000);
-      const tolerance = 2 * 60 * 1000; // 2 minutes
-      const difference = Math.abs(validUntil.getTime() - expectedValidUntil.getTime());
-      expect(difference,
-        `validUntil is ${Math.round(difference/1000)}s away from the expected ~15min mark (tolerance ±${tolerance/1000}s). Got ${refundOffer.validUntil}, expected ~${expectedValidUntil.toISOString()}.`
-      ).to.be.at.most(tolerance);
-      validationLogger(`[DEBUG] Refund offer[${index}] validUntil is valid and approximately 15 minutes in the future: ${_label}`);
+      // Note: OSDM recommends ~15 minutes but does not mandate a specific TTL.
+      // We only assert "must be in the future" to avoid false failures on providers
+      // that legitimately use a different window (5 min, 30 min, etc.).
+      validationLogger(`[DEBUG] Refund offer[${index}] validUntil is in the future: ${_label}`);
     });
   }
 

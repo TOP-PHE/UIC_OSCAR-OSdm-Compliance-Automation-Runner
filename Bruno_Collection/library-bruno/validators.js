@@ -42,7 +42,6 @@ function resolveAjvConstructor() {
 function setAuthToken(responseBody) {
   try {
     let jsonData;
-    validationLogger("[INFO] Token Resp body", jsonData);
     if (responseBody) {
       jsonData = typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody;
     } else if (typeof res !== 'undefined' && typeof res.getBody === 'function') {

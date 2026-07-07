@@ -11,11 +11,10 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-    - name: Content-Type2
-      value: application/json;version={{osdm-version}}
-      disabled: true
   body:
     type: json
     data: "{{requestRefundOffersBodyData}}"
@@ -200,11 +199,8 @@ runtime:
           bru.setEnvVar("__partialRefundScopeFulfillmentId", "");
         }
 
-        if (bru.getEnvVar("refundDate") != null) {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), bru.getEnvVar("refundDate"), _refundSpecs);
-        } else {
-            requestRefundOffersBody(bru.getEnvVar("overruleCode"), null, _refundSpecs);
-        }
+        const _refundDate = bru.getEnvVar("refundDate") || null;
+        requestRefundOffersBody(bru.getEnvVar("overruleCode"), _refundDate, _refundSpecs);
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
@@ -255,7 +251,7 @@ runtime:
               }
               return offer;
           });
-          postPatchRefundOfferResponse(jsonData, expectedexchangeOperationStatus=["PROPOSED"], expectedFulfillmentStatus=["CONFIRMED", "FULFILLED"]);
+          postPatchRefundOfferResponse(jsonData, ["PROPOSED"], ["CONFIRMED", "FULFILLED"]);
           bru.setEnvVar('__refundOfferRetryCount', '0'); // reset on success
 
           // Partial-refund alignment check (#218 follow-up).

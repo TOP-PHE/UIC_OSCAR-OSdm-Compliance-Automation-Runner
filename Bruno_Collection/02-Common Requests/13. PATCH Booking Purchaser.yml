@@ -90,6 +90,9 @@ runtime:
           bruTest(`PATCH ${endpoint} → ${status} (FAIL)`, () => {
             expect(ok2xx, `Expected 2xx, got ${status}`).to.be.true;
           });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("PATCH Booking Purchaser");
+          return;
         }
 
         bru.setEnvVar("__purchaserStepDone", "true");

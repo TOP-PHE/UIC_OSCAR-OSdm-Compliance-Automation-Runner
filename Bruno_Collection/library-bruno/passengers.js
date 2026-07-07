@@ -29,11 +29,11 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   const phoneNumber = detail.contact?.phoneNumber ?? detail.phoneNumber ?? "";
   const email       = detail.contact?.email       ?? detail.email       ?? "";
 
-  const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber"));
+  const totalPassengers = Number(bru.getEnvVar("offerPassengerNumber")) || 0;
   const passengerDataRaw = bru.getEnvVar("passengerAdditionalData") || "[]";
   const passenger = (typeof passengerDataRaw === "string" ? JSON.parse(passengerDataRaw) : passengerDataRaw)[passengerIndex];
 
-  if (passengerIndex >= totalPassengers) {
+  if (passengerIndex >= totalPassengers || !passenger) {
     validationLogger("[INFO] ✅ All passengers already processed. Skipping further validation.");
     return;
   }

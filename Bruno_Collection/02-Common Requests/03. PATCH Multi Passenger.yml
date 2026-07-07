@@ -11,6 +11,8 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
   body:
@@ -20,7 +22,7 @@ http:
         "id": "{{passengerId}}",
         "externalRef": "{{passengerSpecificationExternalRef}}",
         "dateOfBirth": "{{patchDateOfBirth}}",
-        "type": "PERSON",
+        "type": "{{patchType}}",
         "gender": "{{patchGender}}",
         "detail": {
           "firstName": "{{patchFirstName}}",
@@ -111,6 +113,7 @@ runtime:
         bru.setEnvVar("patchEmail",        data.updateEmail        || "");
         bru.setEnvVar("patchPhoneNumber",  data.updatePhoneNumber  || "");
         bru.setEnvVar("patchGender",       data.updateGender || passengerGender.gender);
+        bru.setEnvVar("patchType",         (passengerGender && passengerGender.type) || "PERSON");
     - type: after-response
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");

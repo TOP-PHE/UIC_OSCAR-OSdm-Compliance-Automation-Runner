@@ -11,10 +11,10 @@ http:
       value: Bearer {{access_token}}
     - name: Content-Type
       value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
     - name: Requestor
       value: "{{requestor}}"
-    - name: version
-      value: "{{osdmVersion}}"
   auth: inherit
 
 runtime:
@@ -26,6 +26,10 @@ runtime:
         test("Status code is 204, offer is deleted", function () {
             expect(res.getStatus()).to.equal(204);
         });
+        if (res.getStatus() !== 204) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("DEL Exchange Offer");
+        }
 
 settings:
   encodeUrl: true

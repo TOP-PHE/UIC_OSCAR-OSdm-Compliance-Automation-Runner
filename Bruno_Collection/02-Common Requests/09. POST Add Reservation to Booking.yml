@@ -52,7 +52,10 @@ runtime:
         try { passengerRefs = JSON.parse(bru.getEnvVar('bookingPassengerReferences') || '[]'); } catch (_e) {}
         const reservationOfferId = bru.getEnvVar('reservationId');
         let tripLegCoverage = null;
-        try { tripLegCoverage = JSON.parse(bru.getEnvVar('tripLegCoverage') || 'null'); } catch (_e) {}
+        try {
+          const _tlcRaw = JSON.parse(bru.getEnvVar('tripLegCoverage') || 'null');
+          tripLegCoverage = Array.isArray(_tlcRaw) ? (_tlcRaw[0] || null) : _tlcRaw;
+        } catch (_e) {}
 
         // Availability-aware place picks (#184): when 08b. GET Place Map
         // Post-Booking served a BOOKING-context seat map, preselectedPlaces holds
@@ -172,6 +175,9 @@ runtime:
           bruTest(`POST ${endpoint} → ${statusCode} (FAIL)`, () => {
             expect(statusCode, `Expected 200, got ${statusCode}`).to.eql(200);
           });
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Add Reservation to Booking");
+          return;
         }
 
         // ── OSDM compliance (Layer 1): BookedOfferPart/Reservation response ──

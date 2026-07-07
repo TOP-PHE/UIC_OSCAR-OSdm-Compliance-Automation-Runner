@@ -100,7 +100,7 @@ function effectiveRefundability(part, atMs, action) {
   out.effective = out.refundableWindows > 0 ? 'WITH_CONDITION' : 'NO';
   if (flag === 'NO' && out.refundableWindows > 0) {
     out.contradiction = 'FLAG_NO_SCHEDULE_REFUNDABLE';
-  } else if (flag === 'YES' && out.refundableWindows < out.windows) {
+  } else if (flag === 'YES' && (out.refundableWindows < out.windows || !out.freeWindow)) {
     out.contradiction = 'FLAG_YES_ZERO_WINDOW';
   }
   return out;
