@@ -27,21 +27,27 @@ describe('mergeDedicatedHeaders', () => {
     expect(headers.tracestate).toBe('processid=abc');
   });
 
-  test('resolves a {{var}} template against resolvedVars', () => {
+  test('resolves {{access_token}} against the accessToken argument', () => {
     const headers = {};
-    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'authorization-echo', value: 'Bearer {{access_token}}' }]) }, { access_token: 'tok-123' });
+    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'authorization-echo', value: 'Bearer {{access_token}}' }]) }, 'tok-123');
     expect(headers['authorization-echo']).toBe('Bearer tok-123');
+  });
+
+  test('resolves {{requestor}} and {{Ocp-Apim-Subscription-Key}} against the already-resolved headers object', () => {
+    const headers = { Requestor: 'req-42', 'Ocp-Apim-Subscription-Key': 'sub-key-99' };
+    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'x-combo', value: '{{requestor}}/{{Ocp-Apim-Subscription-Key}}' }]) }, 'tok-123');
+    expect(headers['x-combo']).toBe('req-42/sub-key-99');
   });
 
   test('an unresolved var becomes an empty string, never the literal {{...}}', () => {
     const headers = {};
-    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'x-unknown', value: 'prefix-{{does_not_exist}}-suffix' }]) }, { access_token: 'tok-123' });
+    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'x-unknown', value: 'prefix-{{does_not_exist}}-suffix' }]) }, 'tok-123');
     expect(headers['x-unknown']).toBe('prefix--suffix');
   });
 
   test('var matching is case-sensitive, same as the Bruno run path', () => {
     const headers = {};
-    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'x-case', value: '{{Access_Token}}' }]) }, { access_token: 'tok-123' });
+    mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'x-case', value: '{{Access_Token}}' }]) }, 'tok-123');
     expect(headers['x-case']).toBe('');
   });
 

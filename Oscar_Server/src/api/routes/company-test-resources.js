@@ -262,11 +262,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Discovery silently ignored them.
-  mergeDedicatedHeaders(extraHeaders, company, {
-    requestor: extraHeaders.Requestor || '',
-    access_token: token,
-    'Ocp-Apim-Subscription-Key': extraHeaders['Ocp-Apim-Subscription-Key'] || ''
-  });
+  mergeDedicatedHeaders(extraHeaders, company, token);
 
   // Search day-by-day. For each day we try the endpoints in preference order
   // (trips-collection → offers); both responses carry `trips[]`. Once one
@@ -430,11 +426,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Re-probe silently ignored them.
-  mergeDedicatedHeaders(extraHeaders, company, {
-    requestor: extraHeaders.Requestor || '',
-    access_token: token,
-    'Ocp-Apim-Subscription-Key': extraHeaders['Ocp-Apim-Subscription-Key'] || ''
-  });
+  mergeDedicatedHeaders(extraHeaders, company, token);
 
   const rows = all('SELECT * FROM test_resources WHERE company_id = ? AND resource_type = ?', [targetCompanyId, 'TRAIN']);
   const trains = rows.map(r => {

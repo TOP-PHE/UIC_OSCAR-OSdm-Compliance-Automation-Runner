@@ -17,6 +17,7 @@
  */
 
 const { decrypt } = require('../db/db');
+const log = require('./logger').child({ module: 'osdm-client' });
 
 const DEFAULT_TIMEOUT_MS = 20000;
 
@@ -67,19 +68,26 @@ function buildTesterHeaders(userRow) {
  * JSON array of `{name, value}` configured in API Config) into a headers
  * object, mutating and returning it. Mirrors the Bruno run path's identical
  * mechanism (`opencollection.yml`'s `__extraHeaders` block) exactly: a value
- * may contain `{{var}}` templates, resolved case-sensitively against
- * `resolvedVars`; an unresolved var becomes an empty string, never the
+ * may contain `{{requestor}}`, `{{access_token}}` or
+ * `{{Ocp-Apim-Subscription-Key}}` templates — resolved case-sensitively from
+ * `headers`/`accessToken` (the same values `buildTesterHeaders`/the caller
+ * already resolved), an unresolved var becomes an empty string, never the
  * literal `{{...}}`. Malformed/missing `extra_headers` is a silent no-op —
  * every server-side direct-call route (Timetable Discovery, Re-probe,
  * Places refresh) was otherwise missing these entirely, unlike the Bruno
  * run path which has always read them.
  */
-function mergeDedicatedHeaders(headers, companyRow, resolvedVars = {}) {
+function mergeDedicatedHeaders(headers, companyRow, accessToken) {
+  const resolvedVars = {
+    requestor: headers.Requestor || '',
+    access_token: accessToken || '',
+    'Ocp-Apim-Subscription-Key': headers['Ocp-Apim-Subscription-Key'] || ''
+  };
   try {
-    const raw = companyRow && companyRow.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
+    const raw = companyRow?.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
     if (!Array.isArray(raw)) return headers;
     for (const hdr of raw) {
-      if (!hdr || !hdr.name) continue;
+      if (!hdr?.name) continue;
       const resolved = String(hdr.value == null ? '' : hdr.value)
         .replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_m, key) => {
           const v = resolvedVars[key];
@@ -87,7 +95,9 @@ function mergeDedicatedHeaders(headers, companyRow, resolvedVars = {}) {
         });
       headers[hdr.name] = resolved;
     }
-  } catch (_e) { /* malformed extra_headers — fail open, same posture as the Bruno-side try/catch */ }
+  } catch (e) {
+    log.warn(`mergeDedicatedHeaders: ignoring malformed extra_headers for company ${companyRow?.id} — ${e.message}`);
+  }
   return headers;
 }
 

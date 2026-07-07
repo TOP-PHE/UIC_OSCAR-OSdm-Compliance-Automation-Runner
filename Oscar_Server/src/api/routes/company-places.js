@@ -86,11 +86,7 @@ router.post('/places/refresh', async (req, res) => {
   const extraHeaders = buildTesterHeaders(userRow);
   // #477: company-wide Dedicated Headers (API Config) were never applied on
   // this server-side direct-call path — only the Bruno run path read them.
-  mergeDedicatedHeaders(extraHeaders, company, {
-    requestor: extraHeaders.Requestor || '',
-    access_token: token,
-    'Ocp-Apim-Subscription-Key': extraHeaders['Ocp-Apim-Subscription-Key'] || ''
-  });
+  mergeDedicatedHeaders(extraHeaders, company, token);
 
   // Page through /places, deduping by id. OSDM's `page` query param is an
   // opaque, vendor-defined cursor; we page 1..N and stop as soon as a page adds
