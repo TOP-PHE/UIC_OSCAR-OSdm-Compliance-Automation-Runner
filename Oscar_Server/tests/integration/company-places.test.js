@@ -179,6 +179,27 @@ describe('places — refresh', () => {
       global.fetch = origFetch;
     }
   });
+
+  // #477: the company's Dedicated Headers (API Config) were previously never
+  // applied on this route — only the Bruno run path read them.
+  test('#477 — sends the company Dedicated Headers, resolving {{access_token}}', async () => {
+    run(`UPDATE companies SET extra_headers = ? WHERE id = ?`, [
+      JSON.stringify([{ name: 'accept-language', value: 'en' }, { name: 'authorization-echo', value: 'Bearer {{access_token}}' }]),
+      companyId
+    ]);
+    const origFetch = global.fetch;
+    let capturedHeaders = null;
+    global.fetch = async (_url, opts) => { capturedHeaders = opts.headers; return { ok: true, status: 200, text: async () => JSON.stringify({ places: [] }) }; };
+    try {
+      const res = await request(app).post('/v1/company/places/refresh').set('Authorization', `Bearer ${makeToken('test_manager', tmId)}`);
+      expect(res.status).toBe(200);
+      expect(capturedHeaders['accept-language']).toBe('en');
+      expect(capturedHeaders['authorization-echo']).toBe('Bearer stub-bearer-token');
+    } finally {
+      global.fetch = origFetch;
+      run(`UPDATE companies SET extra_headers = NULL WHERE id = ?`, [companyId]);
+    }
+  });
 });
 
 afterAll(() => {
