@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.185",
+  "version": "1.11.186",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
@@ -40,7 +40,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "eslint": "~9.39.0",
+    "eslint": "~9.39.5",
     "jest": "^30.4.2",
     "supertest": "^7.2.2"
   },
