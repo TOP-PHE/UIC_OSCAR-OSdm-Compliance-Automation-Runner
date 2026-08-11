@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.98] — 2026-08-11
+
+### Fixed
+
+- **`04. GET Passenger` no longer hard-fails when a provider legitimately
+  doesn't implement the endpoint** (OTST review request — Farruggia,
+  2026-07-29). Previously any non-200/non-known-deviation status FAILed
+  outright. Now reuses the Problem-body-aware classifier already proven
+  safe on System-Info endpoints (#353,
+  `osdmCompliance.js#classifySystemInfoStatus`) instead of a blanket
+  accept-list of statuses — a blanket list would mask a genuinely broken
+  403/404 unrelated to "not implemented" (e.g. a wrong `passengerId`).
+  Auto-skips (passing assertion, routes on exactly like a known deviation)
+  **only** on HTTP 501, or a non-2xx carrying an OSDM Problem body whose
+  `code` explicitly says `OPERATION_NOT_PERMITTED`/`NOT_IMPLEMENTED`/
+  `NOT_SUPPORTED`/`UNSUPPORTED`. A bare 403/404/405/406 with no such
+  signal still fails, exactly as before. The existing #398 known-deviation
+  baseline still takes priority when both would apply.
+
+### Tests
+
+- `Bruno_Collection` has no Jest harness (documented gap) — verified via
+  YAML parse + JS syntax-check on both scripts, plus a full manual trace
+  of every branch (200 / known-deviation / auto-skip via 501 / auto-skip
+  via Problem body / bare 403-or-404 still fails / multi-passenger loop
+  continuation / step-failure-policy routing).
+
+---
+
 ## [server-v1.11.185] — 2026-07-07
 
 ### Fixed
