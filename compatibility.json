@@ -1,12 +1,12 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.214",
+  "current_release": "2026.215",
   "releases": [
     {
-      "release": "2026.214",
+      "release": "2026.215",
       "date": "2026-08-11",
-      "server": "1.11.185",
+      "server": "1.11.186",
       "collection": "OTST_V2.0.98",
       "min_collection": "OTST_V2.0.95",
       "max_collection": "OTST_V2.0.x",
@@ -14,6 +14,20 @@
         "fix(collection): 04. GET Passenger no longer hard-FAILs when a provider legitimately doesn't implement the endpoint (OTST review request, Farruggia, 2026-07-29). Previously any non-200/non-known-deviation status FAILed outright. Now reuses the same Problem-body-aware classifier already proven safe on System-Info endpoints (#353, osdmCompliance.js classifySystemInfoStatus) rather than a blanket accept-list of the reviewer's suggested 403/404/405/406 -- a blanket list would mask a genuinely broken 403/404 unrelated to 'not implemented' (e.g. a wrong passengerId in the URL). Auto-skips (PASSING assertion + INFO/WARNING log, routes on exactly like a known deviation) ONLY on HTTP 501, or a non-2xx carrying an OSDM Problem body whose code explicitly says OPERATION_NOT_PERMITTED/NOT_IMPLEMENTED/NOT_SUPPORTED/UNSUPPORTED. A bare 403/404/405/406 with no such signal still FAILs exactly as before -- no regression for providers with a real bug there. The existing #398 known-deviation baseline (manually documented per-provider) still takes priority when both would apply, unchanged.",
         "Verified isEndpointApplicable('Passenger') defaults to true (not in the small version-gated-endpoint table, osdmVersion.js) before reuse, so the classifier's version-gating 404 branch (System-Info-specific) correctly never fires for this endpoint.",
         "Verification: Bruno_Collection has no Jest harness (documented pre-existing gap) -- verified via js-yaml YAML-parse + before-request/after-response JS syntax-check on the edited file (both scripts), plus a full manual trace of every branch (200 / known-deviation / auto-skip-via-501 / auto-skip-via-Problem-body / bare-403-or-404-still-fails / multi-passenger loop continuation / step-failure-policy routing)."
+      ]
+    },
+    {
+      "release": "2026.214",
+      "date": "2026-08-11",
+      "server": "1.11.186",
+      "collection": "OTST_V2.0.97",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(docker): patch nanoid CVE-2026-67213/-67214 (infinite loop in customAlphabet, both HIGH) inside the built image, blocking the Trivy container-scan gate on every open PR. Same shape as the #428 axios/form-data problem: nanoid 3.3.8 is exact-pinned (no semver range) as a DIRECT dependency of four of Bruno CLI's own sub-packages (@usebruno/converters, @usebruno/filestore, @usebruno/js, @usebruno/schema) inside the globally npm-installed @usebruno/cli tree -- npm refuses to budge an exact pin via reinstall, and a package.json overrides entry EOVERRIDEs against a direct dependency the same way axios did. Fixed the same way: unpack the patched nanoid@3.3.17 release tarball directly over every nested node_modules/nanoid copy in the Docker build, with a verification loop that fails the build if any copy is still on the old version. Targeted 3.3.17 (same 3.x major line as installed), not the 5.x fixed line -- nanoid 5 is ESM-only, a breaking API change; 3.3.17 is the API-stable drop-in.",
+        "Root cause of the surfacing pattern: this CVE pair was published/added to Trivy's database sometime between 2026-08-07 (PR #478 last green) and 2026-08-11, so every PR against main -- regardless of its own diff -- started failing the required Container image scan (Trivy) check, exactly like the pre-existing body-parser/ip-address npm-audit findings (#482/#484) blocked PR #485. Not caused by, and not fixable from, any individual feature PR's own changes.",
+        "Verification: nanoid 3.3.17 confirmed as a real published npm version (npm view). No local Docker available in this environment -- verified end-to-end via this PR's own required Docker image build + Container image scan (Trivy) CI jobs, matching how the axios/form-data precedent (#429) was itself verified. Oscar_Server/** change only (Dockerfile); no Bruno_Collection change, no application runtime behaviour change.",
+        "Follow-up (this same PR, discovered mid-review): folded in a lockfile-only ip-address 10.2.0 -> 10.5.0 bump too, to break a circular CI dependency with the then-open ip-address Dependabot PR (#484, now closed as redundant/superseded once main carried the identical change) -- Trivy (required) blocked #484 until nanoid was patched here, while this PR's own npm-audit step was in turn blocked by the same pre-existing ip-address findings #484 fixed. Matches #484's diff exactly (transitive dependency of express-rate-limit, not promoted to direct)."
       ]
     },
     {

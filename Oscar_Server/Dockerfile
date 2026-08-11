@@ -96,6 +96,23 @@ RUN npm install -g @usebruno/cli && \
       [ "$v" = "4.0.6" ] || { echo "UNPATCHED form-data@$v at $d"; exit 1; }; \
     done && \
     echo "Bruno CLI deps patched: axios=1.18.0, form-data=4.0.6 in all nested copies" && \
+    # ── Same shape, different day: nanoid (CVE-2026-67213/-67214, infinite loop
+    # in customAlphabet, both HIGH) is exact-pinned "3.3.8" as a DIRECT dep of
+    # FOUR Bruno sub-packages (@usebruno/converters, @usebruno/filestore,
+    # @usebruno/js, @usebruno/schema) — same EOVERRIDE dead end as axios above,
+    # same fix. Target 3.3.17, not the 5.x fixed line: nanoid 5 is ESM-only and
+    # a breaking API change; 3.3.17 is the API-stable drop-in on the same major.
+    npm pack nanoid@3.3.17 --silent && \
+    NANOID_TGZ="$(ls nanoid-*.tgz)" && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
+      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$NANOID_TGZ" -C "$d" --strip-components=1; \
+    done && \
+    rm -f /tmp/nanoid-*.tgz && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
+      v="$(node -p "require('$d/package.json').version")"; \
+      [ "$v" = "3.3.17" ] || { echo "UNPATCHED nanoid@$v at $d"; exit 1; }; \
+    done && \
+    echo "Bruno CLI deps patched: nanoid=3.3.17 in all nested copies" && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \

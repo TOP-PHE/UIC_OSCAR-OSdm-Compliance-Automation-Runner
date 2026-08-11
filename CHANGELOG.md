@@ -43,6 +43,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.186] — 2026-08-11
+
+### Fixed
+
+- **Docker image — nanoid CVE-2026-67213/-67214** (infinite loop in
+  `customAlphabet`, both HIGH), which was blocking the required Container
+  image scan (Trivy) check on **every** open PR, not just ones touching
+  dependencies. Same shape as the earlier axios/form-data problem (#428):
+  `nanoid@3.3.8` is exact-pinned as a direct dependency inside four of
+  Bruno CLI's own sub-packages, so a plain reinstall or `overrides` entry
+  can't budge it. Fixed the same way — unpack the patched `nanoid@3.3.17`
+  tarball directly over every nested copy in the Docker build, with a
+  verification step that fails the build if any copy is still unpatched.
+- **`ip-address` 10.2.0 → 10.5.0** (lockfile only), folded into the same
+  PR after discovering it broke a circular CI dependency with the
+  then-open `ip-address` Dependabot PR (#484, closed as redundant once
+  main carried the identical change) — Trivy blocked #484 until nanoid
+  was patched here, while this PR's own audit step was blocked by the
+  same pre-existing `ip-address` findings #484 fixed.
+
+---
+
 ## [server-v1.11.185] — 2026-07-07
 
 ### Fixed
