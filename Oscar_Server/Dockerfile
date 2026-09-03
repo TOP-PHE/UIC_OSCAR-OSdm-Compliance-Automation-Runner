@@ -100,9 +100,13 @@ RUN npm install -g @usebruno/cli && \
     # in customAlphabet, both HIGH) is exact-pinned "3.3.8" as a DIRECT dep of
     # FOUR Bruno sub-packages (@usebruno/converters, @usebruno/filestore,
     # @usebruno/js, @usebruno/schema) — same EOVERRIDE dead end as axios above,
-    # same fix. Target 3.3.17, not the 5.x fixed line: nanoid 5 is ESM-only and
-    # a breaking API change; 3.3.17 is the API-stable drop-in on the same major.
-    npm pack nanoid@3.3.17 --silent && \
+    # same fix. Target 3.3.18, not the 5.x fixed line: nanoid 5 is ESM-only and
+    # a breaking API change; 3.3.18 is the API-stable drop-in on the same major.
+    # (Correction: an earlier pass at this fix targeted 3.3.17 believing it was
+    # the patched release — Trivy kept flagging CVE-2026-67213 against it
+    # afterwards, because the actual fix landed one patch release later, in
+    # 3.3.18. 3.3.17 was still vulnerable.)
+    npm pack nanoid@3.3.18 --silent && \
     NANOID_TGZ="$(ls nanoid-*.tgz)" && \
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
       rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$NANOID_TGZ" -C "$d" --strip-components=1; \
@@ -110,9 +114,30 @@ RUN npm install -g @usebruno/cli && \
     rm -f /tmp/nanoid-*.tgz && \
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
       v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "3.3.17" ] || { echo "UNPATCHED nanoid@$v at $d"; exit 1; }; \
+      [ "$v" = "3.3.18" ] || { echo "UNPATCHED nanoid@$v at $d"; exit 1; }; \
     done && \
-    echo "Bruno CLI deps patched: nanoid=3.3.17 in all nested copies" && \
+    echo "Bruno CLI deps patched: nanoid=3.3.18 in all nested copies" && \
+    # ── @faker-js/faker (CVE-2026-73231, HIGH — arbitrary code execution via
+    # attacker-controlled fake templates) ships inside @usebruno/cli, which
+    # bundles it to power the `{{$faker.*}}` request-templating helper. Not an
+    # EOVERRIDE case (nothing pins it as a direct dep the way axios/nanoid are),
+    # but a plain `npm install` inside a stripped, no-package-lock global
+    # install is unreliable here too, so same tarball-unpack fix for
+    # consistency. 9.x -> 10.x is a major bump, but OSCAR's own collection
+    # never uses `{{$faker...}}` (grep confirms zero references in
+    # Bruno_Collection/), so there is no call surface in this project that a
+    # v10 breaking change could actually hit — it only needs to load cleanly.
+    npm pack @faker-js/faker@10.5.0 --silent && \
+    FAKER_TGZ="$(ls faker-js-faker-*.tgz)" && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/@faker-js/faker"); do \
+      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$FAKER_TGZ" -C "$d" --strip-components=1; \
+    done && \
+    rm -f /tmp/faker-js-faker-*.tgz && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/@faker-js/faker"); do \
+      v="$(node -p "require('$d/package.json').version")"; \
+      [ "$v" = "10.5.0" ] || { echo "UNPATCHED @faker-js/faker@$v at $d"; exit 1; }; \
+    done && \
+    echo "Bruno CLI deps patched: @faker-js/faker=10.5.0 in all nested copies" && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
