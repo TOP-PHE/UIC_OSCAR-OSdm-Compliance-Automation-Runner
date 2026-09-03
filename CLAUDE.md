@@ -201,14 +201,13 @@ npm test           # jest (tests/unit + tests/integration)
 ```
 Node 22+ required (built-in `node:sqlite`).
 
-**Local quirk (this checkout only):** the path contains a space
-(`…/UIC_New_Revenue_Management project/…`), which breaks `npx jest`'s default
-glob resolution ("0 tests found" even though tests exist). Workaround:
-```bash
-npx jest --rootDir="$(pwd)" --testMatch="**/*.test.js"
-```
-Not a real project issue — CI runs plain `npm test` with no problem (no space
-in the runner's path).
+**Local checkout path (since 2026-08):**
+`…\TrackOnPath\Contract\UIC\projets\OSDM\OTST\UIC-OSCAR\oscar-monorepo` — no
+space in it, so plain `npm test` / `npx jest` work locally exactly as in CI.
+(The previous checkout lived under `…/UIC_New_Revenue_Management project/…`;
+the space broke `npx jest`'s default glob resolution — "0 tests found". If a
+checkout ever lands in a path with a space again, the workaround is
+`npx jest --rootDir="$(pwd)" --testMatch="**/*.test.js"`.)
 
 **Version bookkeeping — bump per functional PR:**
 - `Oscar_Server/package.json` (`version`) — server semver, bump on any
