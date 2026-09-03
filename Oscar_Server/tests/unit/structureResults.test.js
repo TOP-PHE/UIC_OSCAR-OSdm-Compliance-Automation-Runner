@@ -68,7 +68,7 @@ describe('classifyVendorCapability', () => {
     expect(classifyVendorCapability(500, 0, 0, '07. POST Book')).toBe('ERROR');
   });
 
-  // NOT_IMPLEMENTED (#488/#489 field review) — a bare 403/405/406/500 is
+  // NOT_IMPLEMENTED (#488/#489 field review) — a bare 403/405/500 is
   // ONLY trusted as "not implemented" on the exact, known optional/read-only
   // capability-probe endpoints (mirrors osdmCompliance.js's
   // classifySystemInfoStatus, which no longer requires a confirming OSDM
@@ -86,8 +86,8 @@ describe('classifyVendorCapability', () => {
   test('httpStatus 405 on GET Passenger → NOT_IMPLEMENTED', () => {
     expect(classifyVendorCapability(405, 0, 0, '04. GET Passenger')).toBe('NOT_IMPLEMENTED');
   });
-  test('httpStatus 406 on a System-Info endpoint → NOT_IMPLEMENTED', () => {
-    expect(classifyVendorCapability(406, 0, 0, '08. GET Products')).toBe('NOT_IMPLEMENTED');
+  test('httpStatus 406 on a System-Info endpoint → null (deliberately NOT a "not supported" signal: not an OSDM-listed status; RFC 9110 = content negotiation / version mismatch)', () => {
+    expect(classifyVendorCapability(406, 0, 0, '08. GET Products')).toBeNull();
   });
   test('httpStatus 404 on an unrelated request name → still NOT_IMPLEMENTED (404 rule is endpoint-independent)', () => {
     expect(classifyVendorCapability(404, 0, 0, '07. POST Book')).toBe('NOT_IMPLEMENTED');

@@ -34,7 +34,8 @@ http:
         // #488/#489 field review: this GET is optional/read-only — reuse the
         // same "not implemented" classifier as System-Info endpoints and GET
         // Passenger (osdmCompliance.js), which now also trusts a bare
-        // 403/404/405/406/500 (no confirming OSDM Problem body required).
+        // 403/404/405/500 (no confirming OSDM Problem body required; 406
+        // deliberately excluded — 2026-09-03 standards review).
         let _niSkip = null;
         if (_kdStatus !== 200 && !_kdMatch) {
           const { classifySystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");

@@ -406,6 +406,33 @@ describe('osdmCompliance.classifySystemInfoStatus (version-aware status)', () =>
     expect(classifySystemInfoStatus(503, '/products').outcome).toBe('fail');
     expect(classifySystemInfoStatus(418, '/products').outcome).toBe('fail');
   });
+
+  test('406 → fail (dropped in the 2026-09-03 standards review: not an OSDM-listed status; RFC 9110 = content negotiation failed, i.e. most likely an unsupported OSDM version, not a missing endpoint)', () => {
+    expect(classifySystemInfoStatus(406, '/products').outcome).toBe('fail');
+  });
+
+  test('501 → skip + INFO regardless of body', () => {
+    const c = classifySystemInfoStatus(501, '/products');
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/\[INFO\]/);
+    expect(c.log).toMatch(/HTTP 501 Not Implemented/);
+  });
+
+  // Problem-body path — OSDM's registry (osdm.io/spec/errors-problems) has one
+  // on-point code, OPERATION_NOT_PERMITTED; PARAMETER_NOT_SUPPORTED and
+  // VALUE_NOT_SUPPORTED describe the REQUEST, not the endpoint.
+  test('400 + OPERATION_NOT_PERMITTED Problem body → skip + INFO naming the code', () => {
+    const c = classifySystemInfoStatus(400, '/products', { code: 'urn:uic:problem:OPERATION_NOT_PERMITTED', title: 'Not permitted' });
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/\[INFO\]/);
+    expect(c.log).toMatch(/OPERATION_NOT_PERMITTED/);
+  });
+  test('400 + PARAMETER_NOT_SUPPORTED Problem body → fail (request-level code, not "endpoint unimplemented")', () => {
+    expect(classifySystemInfoStatus(400, '/products', { code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED' }).outcome).toBe('fail');
+  });
+  test('400 + VALUE_NOT_SUPPORTED in a problems[] envelope → fail (request-level code)', () => {
+    expect(classifySystemInfoStatus(400, '/products', { problems: [{ code: 'urn:uic:problem:VALUE_NOT_SUPPORTED' }] }).outcome).toBe('fail');
+  });
 });
 
 describe('osdmCompliance.handleSystemInfoStatus (report application)', () => {

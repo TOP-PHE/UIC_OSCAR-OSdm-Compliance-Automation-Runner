@@ -216,7 +216,7 @@ const AUTH_NAME_RE = /access.?token/i;
 // #488/#489 field review (Farruggia + Heuguet, OTST, 2026-07/08 + 2026-09):
 // the SAME optional, read-only GET requests that osdmCompliance.js's
 // classifySystemInfoStatus (Bruno_Collection/library-bruno/) now treats as
-// "not implemented" on a bare 403/404/405/406/500 — no confirming OSDM
+// "not implemented" on a bare 403/404/405/500 — no confirming OSDM
 // Problem body required, since field testing against SBB showed providers
 // routinely just answer with a bare status and nothing else. Mirrored here,
 // by exact Bruno request name (entry.name / reqName), so this report-level
@@ -225,13 +225,21 @@ const AUTH_NAME_RE = /access.?token/i;
 // live run already accepted as a documented capability gap.
 //
 // Deliberately an EXACT-NAME allowlist, not a blanket status-code rule: a
-// blind "403/404/405/406/500 anywhere = NOT_IMPLEMENTED" would also
+// blind "403/404/405/500 anywhere = NOT_IMPLEMENTED" would also
 // reclassify an unrelated NHF (negative-test) probe elsewhere in the
 // collection that deliberately sends a bad request and asserts one of these
 // same codes as its correct, passing outcome — that request DOES implement
 // the endpoint; it correctly rejected bad input. Scoping to these exact
 // names (kept in sync with every call site of classifySystemInfoStatus /
 // handleSystemInfoStatus) makes that cross-contamination impossible.
+//
+// 406 is deliberately NOT in the accepted list (2026-09-03 standards review,
+// osdm.io/spec/errors-problems + RFC 9110): it is not among OSDM's prescribed
+// statuses, and per RFC 9110 it means content negotiation failed — in OSDM
+// most plausibly an unsupported version/media type, a different problem the
+// certifier should see, not a missing endpoint. 403/500 are likewise NOT
+// "not implemented" per the standard (authorization refusal / generic server
+// error) and are accepted purely on the SBB field evidence.
 const CAPABILITY_PROBE_ENDPOINTS = new Set([
   '00. GET System Version Check',
   '01. GET Coach',
@@ -255,7 +263,7 @@ const CAPABILITY_PROBE_ENDPOINTS = new Set([
  * without decoding a sea of failed assertions.
  *
  *   NOT_IMPLEMENTED — 501, 404 on an endpoint defined in the OSDM spec, or a
- *                      bare 403/405/406/500 on one of the known optional
+ *                      bare 403/405/500 on one of the known optional
  *                      capability-probe endpoints (CAPABILITY_PROBE_ENDPOINTS)
  *   NOT_APPLICABLE  — attempted by the runner but inapplicable to this offer
  *                      (e.g. Add ancillary on an offer with no ancillaryOfferParts,
@@ -275,7 +283,7 @@ function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions,
   if (!s || Number.isNaN(s)) return null;
   if (s === 501) return 'NOT_IMPLEMENTED';
   if (s === 404) return 'NOT_IMPLEMENTED';   // OSDM endpoints we're hitting are spec-defined
-  if ([403, 405, 406, 500].includes(s) && CAPABILITY_PROBE_ENDPOINTS.has(reqName)) return 'NOT_IMPLEMENTED';
+  if ([403, 405, 500].includes(s) && CAPABILITY_PROBE_ENDPOINTS.has(reqName)) return 'NOT_IMPLEMENTED';
   if (s >= 500) return 'ERROR';
   if (s >= 200 && s < 300) {
     if (totalAssertions === 0) return 'IMPLEMENTED';

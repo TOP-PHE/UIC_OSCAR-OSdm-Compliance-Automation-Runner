@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Round 2** (this entry — a real SBB run showed round 1 only partially
     worked: SBB answers unimplemented endpoints with a bare 403/404/500
     and no confirming Problem body): the shared classifier now **also**
-    auto-skips on a bare 403/404/405/406/500 — INFO when the signal is
+    auto-skips on a bare 403/404/405/500 — INFO when the signal is
     unambiguous (501, 404, or a confirming body), WARNING (accepted, but
     flags the ambiguity to the provider) otherwise. `401` stays a hard
     FAIL unconditionally — a token problem, never an availability signal.
@@ -63,6 +63,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     responses. Resolved with an exact-endpoint-name allowlist instead of
     a blanket rule, closing the NHF-mislabeling risk that motivated the
     original deferral.
+  - **Standards check** (Heuguet, 2026-09-03 — OSDM `spec/errors-problems`
+    + RFC 9110): OSDM defines no endpoint-level "not implemented" signal of
+    its own; it adopts the standard HTTP codes and leaves their meaning to
+    RFC 9110, by which only 501/404/405 genuinely mean "not
+    implemented/supported here". 403 (authorization refused) and 500
+    (generic server error) are kept purely on the SBB field evidence,
+    WARNING-tier. Three corrections from the review: **406 dropped** from
+    the accepted list in both classifiers (not an OSDM-listed status; its
+    RFC meaning — content negotiation failed — most plausibly signals an
+    unsupported OSDM version, a different problem a tester should see, and
+    it was never in the field evidence; a provider that really answers 406
+    can still be baselined per company via Known Deviations); the
+    provider-facing WARNING now attributes the 404/501 expectation to
+    RFC 9110 rather than claiming OSDM "expects" it (OSDM does not say so);
+    and the Problem-code match now excludes OSDM's `PARAMETER_NOT_SUPPORTED`
+    / `VALUE_NOT_SUPPORTED`, which describe the request, not the endpoint
+    (`OPERATION_NOT_PERMITTED` is the only on-point OSDM code).
 
 ### Tests
 
@@ -106,13 +123,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `structureResults.js#classifyVendorCapability` — which drives
   `public/report-builder.html`'s certifier-facing "list of
   supported/not-supported endpoints" — now also classifies a bare
-  403/405/406/500 as `NOT_IMPLEMENTED`, but **only** on the exact, known
+  403/405/500 as `NOT_IMPLEMENTED`, but **only** on the exact, known
   optional/read-only capability-probe endpoints (the same request names
   already wired to `classifySystemInfoStatus`). An exact-name allowlist,
   not a blanket status-code rule — a blind rule would also reclassify an
   unrelated NHF (negative-test) probe elsewhere that deliberately expects
   one of these same codes as its correct, passing outcome. Without this,
-  the matrix still showed `ERROR` (or `null`, for 403/405/406) for the
+  the matrix still showed `ERROR` (or `null`, for 403/405) for the
   exact same responses the live per-run assertion already accepts as a
   documented capability gap — e.g. a bare 500 on `GET Refund Offer`.
   `classifyVendorCapability` gained an optional 4th `reqName` parameter;
