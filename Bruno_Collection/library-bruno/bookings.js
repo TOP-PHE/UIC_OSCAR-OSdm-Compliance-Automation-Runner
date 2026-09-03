@@ -13,7 +13,8 @@ const { processRequestedInformation, summariseRequestedInformation } = require('
 module.exports = {
   postCreateBookingResponse,
   validateFulfillments,
-  alignPassengerIdsToSubmittedOrder
+  alignPassengerIdsToSubmittedOrder,
+  isPostConfirmationStage
 };
 
 // ─── Passenger id ordering ───────────────────────────────────────────────────
@@ -589,6 +590,33 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   }
 }
 
+// ─── Lifecycle-scoped price member ───────────────────────────────────────────
+// An OSDM Booking carries two price members (openapi3_0.json, Booking schema;
+// same wording on osdm.io/spec/models):
+//   provisionalPrice — "Price of all unconfirmed pre-booked parts in the booking"
+//   confirmedPrice   — "Sum of all prices of confirmed parts in the booking minus
+//                       the sum of all confirmed refund amounts."
+// So the member a GET-Booking step must assert depends on the booking-part
+// stage that step expects (BookingPartStatus enum: PREBOOKED, ON_HOLD,
+// CONFIRMED, FULFILLED, CANCELLED, RELEASED, REFUNDED, EXCHANGE_ONGOING,
+// EXCHANGED, ERROR):
+//   pre-confirmation  (PREBOOKED / ON_HOLD)                 → provisionalPrice
+//   confirmed onwards (CONFIRMED / FULFILLED) and the after-sales states that
+//   only exist for confirmed parts (REFUNDED / EXCHANGED) → confirmedPrice
+// #375 introduced the split but matched FULFILLED|CONFIRMED only, so
+// `14. GET Booking after Patch Refund` (stage REFUNDED) kept demanding
+// provisionalPrice — legitimately absent once nothing is pre-booked any more
+// (OTST review, Farruggia/SBB, relayed 2026-09-03, #496). EXCHANGED
+// (`04-Exchange/15. GET Booking after Fulfillment`) is corrected on the same
+// principle. EXCHANGE_ONGOING is deliberately NOT on the confirmed side: the
+// exchange operation itself creates new pre-booked parts, and OSDM says
+// provisionalPrice "includes booking parts from exchange operations" — so
+// `13. GET Booking before Fulfillment` keeps asserting provisionalPrice.
+const POST_CONFIRMATION_STAGE_RE = /CONFIRMED|FULFILLED|REFUNDED|EXCHANGED/i;
+function isPostConfirmationStage(expectedBookedOffersStatus) {
+  return POST_CONFIRMATION_STAGE_RE.test(String(expectedBookedOffersStatus || ''));
+}
+
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
@@ -838,12 +866,15 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   const mini      = selectedOffer.offerSummary.minimalPrice;
   const confirmed = booking.confirmedPrice;
 
-  // #375: price members are LIFECYCLE-scoped in OSDM — provisionalPrice
-  // before confirmation, confirmedPrice once confirmed/fulfilled. Asserting
-  // BOTH at every stage false-failed every conformant provider, and the
-  // combined field check crashed with a TypeError when one was absent.
-  // Key on the expected booking-part status this call already receives.
-  const _expectsConfirmed = /FULFILLED|CONFIRMED/i.test(String(expectedBookedOffersStatus || ''));
+  // #375 / #496: price members are LIFECYCLE-scoped in OSDM — provisionalPrice
+  // before confirmation, confirmedPrice once confirmed and through the
+  // after-sales states (REFUNDED / EXCHANGED), where nothing is pre-booked any
+  // more. Asserting BOTH at every stage false-failed every conformant provider,
+  // and the combined field check crashed with a TypeError when one was absent.
+  // Key on the expected booking-part status this call already receives — see
+  // isPostConfirmationStage() above for the exact mapping.
+  const _stageLabel = String(expectedBookedOffersStatus || '');
+  const _expectsConfirmed = isPostConfirmationStage(expectedBookedOffersStatus);
   const _stagePrice = _expectsConfirmed ? confirmed : prov;
   const _stageName  = _expectsConfirmed ? 'confirmedPrice' : 'provisionalPrice';
   const _otherPrice = _expectsConfirmed ? prov : confirmed;
@@ -865,6 +896,20 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   });
   if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
   if (confirmed) {
+    // #496: after an after-sales operation, surface confirmedPrice before vs
+    // after so a certifier can eyeball the OSDM identity "confirmedPrice =
+    // confirmed parts − confirmed refund amounts". Logged, NOT asserted, until
+    // OTST confirms the expected provider behaviour — SBB INT still showed the
+    // pre-refund amount after REFUNDED.
+    const _prevConfirmedAmount = bru.getEnvVar("confirmedPriceAmount");
+    if (_expectsConfirmed && /REFUNDED|EXCHANGED/i.test(_stageLabel) &&
+        _prevConfirmedAmount !== undefined && _prevConfirmedAmount !== null && _prevConfirmedAmount !== '') {
+      validationLogger(
+        `[INFO] confirmedPrice at stage ${_stageLabel}: ${confirmed.amount} ${confirmed.currency} (scale ${confirmed.scale}) — ` +
+        `was ${_prevConfirmedAmount} before the after-sales operation. OSDM defines confirmedPrice as the sum of ` +
+        `confirmed parts minus all confirmed refund amounts; not asserted (see #496).`
+      );
+    }
     if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
       validationLogger(
         `[WARNING] confirmedPrice.amount is 0 while provisionalPrice.amount is ${prov.amount} ` +
