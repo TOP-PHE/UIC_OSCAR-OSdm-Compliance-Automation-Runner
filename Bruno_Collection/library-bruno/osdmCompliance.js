@@ -621,7 +621,7 @@ function validateAncillaryOfferParts(offer, endpoint) {
 // non-2xx with an RFC-9457/OSDM Problem whose code says the operation is
 // unsupported (e.g. urn:uic:problem:OPERATION_NOT_PERMITTED), say exactly
 // that in ONE decoded line instead of the generic "unexpected status 400"
-// cascade. HTTP 501 (the clean OSDM not-implemented signal) gets the same
+// cascade. HTTP 501 (RFC 9110's not-implemented code; an OSDM-listed status) gets the same
 // decoded treatment instead of being mislabelled "Server Error".
 
 // Best-effort extraction of the first OSDM Problem from a non-2xx body.
@@ -649,40 +649,83 @@ function classifySystemInfoStatus(statusCode, endpoint, body) {
     };
   }
   if (statusCode === 401) {
+    // A token problem, never an availability signal — stays a hard FAIL
+    // regardless of how lenient the "not supported" detection below gets.
     return { outcome: 'fail', name: `GET ${endpoint} → 401 Unauthorized (FAIL)`, message: 'Expected 200, got 401 Unauthorized — check access token', log: `[ERROR] GET ${endpoint} → 401 Unauthorized — check access token` };
   }
-  if (statusCode === 403) {
-    return { outcome: 'fail', name: `GET ${endpoint} → 403 Forbidden (FAIL)`, message: 'Expected 200, got 403 Forbidden — insufficient permissions', log: `[ERROR] GET ${endpoint} → 403 Forbidden — insufficient permissions` };
-  }
 
-  // Provider explicitly declares the operation unsupported — either via the
-  // clean OSDM signal (HTTP 501) or via a Problem body whose code says so.
-  // #353: this is a SKIP, like out-of-version endpoints — not a failure.
-  // A clean 501 is exactly how OSDM says "optional endpoint not implemented";
-  // the provider did nothing wrong, so no assertion is registered. The 501
-  // response itself stays visible in the HTTP traffic and the report. Only
-  // a WRONG signal (e.g. 400 + OPERATION_NOT_PERMITTED) earns a [WARNING]
-  // with the conformance note; the right signal logs one [INFO] line.
+  // Provider declares (or, per field evidence below, effectively signals)
+  // the operation unsupported. #353: this is a SKIP, like out-of-version
+  // endpoints — not a failure.
+  //
+  // #488/#489 field review (Farruggia + Heuguet, OTST, 2026-07/08): this
+  // ORIGINALLY auto-skipped only on an unambiguous, self-describing signal —
+  // HTTP 501, or a Problem body whose `code` says the operation is not
+  // permitted. Real testing against SBB showed that bar is too strict: SBB
+  // (and evidently other providers) answer an unimplemented optional
+  // endpoint with a bare 403/404/405/500 and NO Problem body at all — the
+  // original design still hard-failed every one of those. Widened to trust
+  // the STATUS ALONE for the specific codes providers actually use for "not
+  // supported" in practice, still preferring the Problem-body-confirmed
+  // wording when one IS present. This only ever applies to the read-only,
+  // non-mandatory endpoints that call this classifier (System-Info catalog
+  // lookups, GET Passenger, GET Refund/Exchange Offer) — never a
+  // booking/refund/exchange MUTATION, which keeps its own strict, bespoke
+  // 200-equality assertion.
+  //
+  // Standards check (Heuguet, 2026-09-03 — osdm.io/spec/errors-problems and
+  // RFC 9110 §15): OSDM defines NO endpoint-level "not implemented" signal
+  // of its own; it adopts the standard HTTP status codes and leaves their
+  // meaning to RFC 9110. By that standard only 501 ("does not support the
+  // functionality required"), 404 ("cannot find the requested resource")
+  // and 405 ("target resource doesn't support this method") genuinely mean
+  // "not implemented/supported here". 403 is an authorization refusal and
+  // 500 a generic server error — neither means "not implemented"; both are
+  // trusted here purely on the SBB field evidence, hence WARNING-tier below.
+  // 406 was dropped from the list in that review: it is not even among
+  // OSDM's prescribed statuses, and its RFC meaning (content negotiation
+  // failed) most plausibly signals an unsupported OSDM VERSION / media type
+  // — a different problem a tester should see, not have auto-skipped. A
+  // provider that genuinely answers 406 can still be baselined per company
+  // via the known-deviation mechanism (#430 path in handleSystemInfoStatus).
   const _problem = extractOsdmProblem(body);
   const _problemCode = _problem && typeof _problem.code === 'string' ? _problem.code : '';
-  const _saysUnsupported = /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
-  if (statusCode === 501 || _saysUnsupported) {
+  // OSDM's problem registry has exactly one on-point code for this,
+  // OPERATION_NOT_PERMITTED. The other tokens are kept only as tolerance for
+  // vendor-extension codes (OSDM enums are extensible by design). But two
+  // REAL OSDM codes contain "NOT_SUPPORTED" and describe a problem with the
+  // REQUEST, not the endpoint — PARAMETER_NOT_SUPPORTED (a required request
+  // parameter the provider doesn't support) and VALUE_NOT_SUPPORTED (a
+  // warning about a sent value) — so they must NOT read as "endpoint not
+  // implemented"; those fall through to the normal failure path.
+  const _requestLevelCode = /PARAMETER_NOT_SUPPORTED|VALUE_NOT_SUPPORTED/i.test(_problemCode);
+  const _saysUnsupported = !_requestLevelCode &&
+    /OPERATION_NOT_PERMITTED|NOT_IMPLEMENTED|NOT_SUPPORTED|UNSUPPORTED/i.test(_problemCode);
+  const _bareNotSupportedStatus = [403, 404, 405, 500].includes(statusCode);
+  if (statusCode === 501 || _saysUnsupported || _bareNotSupportedStatus) {
     const _title = _problem && _problem.title ? ` ("${_problem.title}")` : '';
     const _via = _saysUnsupported
       ? `HTTP ${statusCode} with OSDM Problem code ${_problemCode}${_title}`
-      : 'HTTP 501 Not Implemented';
-    const _rightSignal = statusCode === 501 || statusCode === 404;
+      : (statusCode === 501 ? 'HTTP 501 Not Implemented' : `HTTP ${statusCode}`);
+    // A clean, unambiguous signal (501, 404, or a confirming Problem body)
+    // is INFO — the provider told us clearly. A bare 403/405/500 with no
+    // confirming body is a WARNING — accepted as "not supported" per this
+    // baseline, but the provider should say so explicitly: per RFC 9110
+    // (whose status semantics OSDM adopts) a resource or functionality the
+    // server does not provide answers 404 or 501, ideally with an OSDM
+    // Problem body; 403 means "authorization refused", 405 "method not
+    // allowed on this resource" and 500 "server error", so on their own
+    // they are ambiguous. (OSDM itself prescribes nothing here — do not
+    // word this line as "OSDM expects"; vendors read it.)
+    const _rightSignal = statusCode === 501 || statusCode === 404 || _saysUnsupported;
     return {
       outcome: 'skip',
       log: _rightSignal
-        ? `[INFO] GET ${endpoint} → not implemented by this provider (${_via}) — endpoint out of scope, skipped (OSDM allows 501/404 for unimplemented optional endpoints)`
-        : `[WARNING] GET ${endpoint} → not supported by this provider — ${_via}. Endpoint skipped. Note for the provider: OSDM expects HTTP 501 (or 404) for an unimplemented endpoint — ${statusCode} is the wrong status for "operation not supported".`,
+        ? `[INFO] GET ${endpoint} → not implemented by this provider (${_via}) — endpoint out of scope, skipped (404/501 are the RFC 9110 codes for a resource or functionality the server does not provide; both are OSDM-listed statuses)`
+        : `[WARNING] GET ${endpoint} → treated as not supported by this provider (${_via}, no confirming OSDM Problem body) — endpoint skipped. Note for the provider: per RFC 9110 (the HTTP status semantics OSDM adopts), an endpoint the server does not provide should answer 404 Not Found or 501 Not Implemented, ideally with an OSDM Problem body — a bare ${statusCode} is ambiguous (403 = authorization refused, 405 = method not allowed on the resource, 500 = server error).`,
     };
   }
 
-  if (statusCode === 404) {
-    return { outcome: 'fail', name: `GET ${endpoint} → 404 Not Found (FAIL)`, message: `Expected 200, got 404 — endpoint expected in OSDM ${getComplianceVersion()} but not implemented by this vendor`, log: `[ERROR] GET ${endpoint} → 404 Not Found — endpoint not implemented by this vendor` };
-  }
   if (statusCode >= 500) {
     return { outcome: 'fail', name: `GET ${endpoint} → ${statusCode} Server Error (FAIL)`, message: `Expected 200, got ${statusCode} server error`, log: `[ERROR] GET ${endpoint} → ${statusCode} Server Error` };
   }

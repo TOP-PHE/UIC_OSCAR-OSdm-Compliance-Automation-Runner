@@ -48,18 +48,48 @@ runtime:
     - type: after-response
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");
+        const { validationLogger } = require(bru.getEnvVar("library_base") + "displays.js");
 
         // #398: known-deviation baseline. If the provider returns a status
         // documented in the datafile's knownDeviations (e.g. GET Passenger →
         // 501 on ÖBB), report it as a PASSING "known deviation" row + WARNING
         // instead of a failure, so a clean run is not dragged to FAILED by an
-        // already-reported provider gap. Any other non-200 is a real failure.
+        // already-reported provider gap.
         const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar("library_base") + "loopback.js");
         const _kdStatus = res.getStatus();
         const _kdMatch  = _kdStatus !== 200 ? knownDeviationFor("04. GET Passenger", _kdStatus) : null;
+
+        // OTST review (Farruggia, 2026-07-29 → #488/#489): stop failing GET
+        // Passenger when a provider legitimately doesn't implement it. Reuses
+        // the Problem-body-aware classifier already proven on System-Info
+        // endpoints (#353, osdmCompliance.js classifySystemInfoStatus).
+        // Round 1 auto-skipped only on HTTP 501 or a Problem body whose code
+        // says OPERATION_NOT_PERMITTED (the one on-point OSDM code). Round 2,
+        // after live SBB testing showed providers answer unimplemented
+        // endpoints with a bare status and no body, also trusts a bare
+        // 403/404/405/500 — 404/501 as a clean INFO signal, 403/405/500 as a
+        // WARNING (per RFC 9110 those don't mean "not implemented"; accepted
+        // on field evidence only). Knowingly accepted trade-off: a 404 from a
+        // genuinely wrong passengerId would now read as "not implemented" —
+        // unlikely, since the id comes straight from the booking response,
+        // and the row is clearly labelled. 401 and anything else (incl. 406,
+        // dropped in the 2026-09-03 standards review) still FAIL, unless
+        // baselined per company as a Known Deviation above.
+        let _niSkip = null;
+        if (_kdStatus !== 200 && !_kdMatch) {
+          const { classifySystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          let _body = null;
+          try { _body = res.getBody(); } catch (_e) {}
+          const _cls = classifySystemInfoStatus(_kdStatus, "Passenger", _body);
+          if (_cls.outcome === "skip") _niSkip = _cls;
+        }
+
         if (_kdMatch) {
             test(`HTTP response status — known deviation (documented): 04. GET Passenger returns ${_kdStatus}`, () => {});
             noteKnownDeviation("04. GET Passenger", _kdStatus, _kdMatch);
+        } else if (_niSkip) {
+            if (_niSkip.log) validationLogger(_niSkip.log);
+            test(`HTTP response status — not implemented by this provider (auto-detected): 04. GET Passenger returns ${_kdStatus}`, () => {});
         } else {
             test(`HTTP response status — expected 200, actual: ${_kdStatus}`, () => {
                 if (_kdStatus !== 200) throw new Error("HTTP " + _kdStatus + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
@@ -81,10 +111,12 @@ runtime:
         })();
 
         if (_kdStatus !== 200) {
-          // #398: a documented known deviation is NOT a failure — route on
-          // (GET Passenger yields no usable body either way) WITHOUT recording
-          // a step failure. A real (undocumented) non-200 keeps the #361 path.
-          if (_kdMatch) {
+          // #398 / Farruggia: a documented known deviation OR an
+          // auto-detected "not implemented" response is NOT a failure —
+          // route on (GET Passenger yields no usable body either way)
+          // WITHOUT recording a step failure. A real (undocumented,
+          // unexplained) non-200 keeps the #361 path.
+          if (_kdMatch || _niSkip) {
             bru.runner.setNextRequest(_policyNext);
             return;
           }

@@ -368,21 +368,70 @@ describe('osdmCompliance.classifySystemInfoStatus (version-aware status)', () =>
     expect(c.log).toMatch(/3\.8\.0/);
   });
 
-  test('404 on an in-version endpoint → fail', () => {
+  // #488/#489 field review: a bare 404 used to hard-fail once the endpoint
+  // was in-version (only an out-of-version 404 skipped). Field testing (SBB)
+  // showed providers routinely leave optional catalog endpoints unimplemented
+  // and just answer 404/403/etc with no confirming Problem body — so a bare
+  // 404 is now trusted as a "not implemented" signal regardless of version
+  // applicability. It still logs INFO (404 is one of OSDM's own recommended
+  // "not implemented" codes), same as the out-of-version case above, but with
+  // different wording so the two skip *reasons* stay distinguishable in logs.
+  test('404 on an in-version endpoint → skip + INFO log (provider likely doesn\'t implement it)', () => {
     store.osdmVersion = '3.8';
-    expect(classifySystemInfoStatus(404, '/promotion-codes').outcome).toBe('fail');
+    const c = classifySystemInfoStatus(404, '/promotion-codes');
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/not implemented by this provider/);
+    expect(c.log).toMatch(/HTTP 404/);
   });
 
-  test('404 on an always-present endpoint → fail regardless of version', () => {
+  test('404 on an always-present (ungated) endpoint → skip + INFO log', () => {
     store.osdmVersion = '3.4';
-    expect(classifySystemInfoStatus(404, '/products').outcome).toBe('fail');
+    const c = classifySystemInfoStatus(404, '/products');
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/not implemented by this provider/);
   });
 
-  test('401 / 403 / 5xx / unexpected → fail', () => {
+  test('401 → fail (never treated as a "not supported" signal)', () => {
     expect(classifySystemInfoStatus(401, '/products').outcome).toBe('fail');
-    expect(classifySystemInfoStatus(403, '/products').outcome).toBe('fail');
+  });
+
+  test('403 → skip + WARNING log (bare status, no confirming Problem body)', () => {
+    const c = classifySystemInfoStatus(403, '/products');
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/\[WARNING\]/);
+    expect(c.log).toMatch(/treated as not supported by this provider/);
+  });
+
+  test('503 / unexpected status → fail (not one of the recognized "not supported" codes)', () => {
     expect(classifySystemInfoStatus(503, '/products').outcome).toBe('fail');
     expect(classifySystemInfoStatus(418, '/products').outcome).toBe('fail');
+  });
+
+  test('406 → fail (dropped in the 2026-09-03 standards review: not an OSDM-listed status; RFC 9110 = content negotiation failed, i.e. most likely an unsupported OSDM version, not a missing endpoint)', () => {
+    expect(classifySystemInfoStatus(406, '/products').outcome).toBe('fail');
+  });
+
+  test('501 → skip + INFO regardless of body', () => {
+    const c = classifySystemInfoStatus(501, '/products');
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/\[INFO\]/);
+    expect(c.log).toMatch(/HTTP 501 Not Implemented/);
+  });
+
+  // Problem-body path — OSDM's registry (osdm.io/spec/errors-problems) has one
+  // on-point code, OPERATION_NOT_PERMITTED; PARAMETER_NOT_SUPPORTED and
+  // VALUE_NOT_SUPPORTED describe the REQUEST, not the endpoint.
+  test('400 + OPERATION_NOT_PERMITTED Problem body → skip + INFO naming the code', () => {
+    const c = classifySystemInfoStatus(400, '/products', { code: 'urn:uic:problem:OPERATION_NOT_PERMITTED', title: 'Not permitted' });
+    expect(c.outcome).toBe('skip');
+    expect(c.log).toMatch(/\[INFO\]/);
+    expect(c.log).toMatch(/OPERATION_NOT_PERMITTED/);
+  });
+  test('400 + PARAMETER_NOT_SUPPORTED Problem body → fail (request-level code, not "endpoint unimplemented")', () => {
+    expect(classifySystemInfoStatus(400, '/products', { code: 'urn:uic:problem:PARAMETER_NOT_SUPPORTED' }).outcome).toBe('fail');
+  });
+  test('400 + VALUE_NOT_SUPPORTED in a problems[] envelope → fail (request-level code)', () => {
+    expect(classifySystemInfoStatus(400, '/products', { problems: [{ code: 'urn:uic:problem:VALUE_NOT_SUPPORTED' }] }).outcome).toBe('fail');
   });
 });
 

@@ -56,12 +56,41 @@ describe('classifyVendorCapability', () => {
     expect(classifyVendorCapability('404', 1, 1)).toBe('NOT_IMPLEMENTED');
   });
 
-  // ERROR — 5xx other than 501
+  // ERROR — 5xx other than 501 (no reqName, or a name outside the known
+  // optional-endpoint allowlist — see the NOT_IMPLEMENTED block below)
   test('httpStatus 500 → ERROR', () => {
     expect(classifyVendorCapability(500, 0, 0)).toBe('ERROR');
   });
   test('httpStatus 503 → ERROR', () => {
     expect(classifyVendorCapability(503, 2, 1)).toBe('ERROR');
+  });
+  test('httpStatus 500 on an unrelated request name → still ERROR (not a capability probe)', () => {
+    expect(classifyVendorCapability(500, 0, 0, '07. POST Book')).toBe('ERROR');
+  });
+
+  // NOT_IMPLEMENTED (#488/#489 field review) — a bare 403/405/500 is
+  // ONLY trusted as "not implemented" on the exact, known optional/read-only
+  // capability-probe endpoints (mirrors osdmCompliance.js's
+  // classifySystemInfoStatus, which no longer requires a confirming OSDM
+  // Problem body either — SBB and other providers answer these with a bare
+  // status and nothing else). Every other request keeps its normal
+  // ERROR/null classification, so an unrelated NHF (negative-test) probe
+  // that deliberately expects one of these same codes is never
+  // reclassified as "not implemented" just because the code matches.
+  test('httpStatus 500 on GET Refund Offer → NOT_IMPLEMENTED', () => {
+    expect(classifyVendorCapability(500, 0, 0, '11. GET Refund Offer')).toBe('NOT_IMPLEMENTED');
+  });
+  test('httpStatus 403 on GET Exchange Offer → NOT_IMPLEMENTED', () => {
+    expect(classifyVendorCapability(403, 0, 0, '12. GET Exchange Offer')).toBe('NOT_IMPLEMENTED');
+  });
+  test('httpStatus 405 on GET Passenger → NOT_IMPLEMENTED', () => {
+    expect(classifyVendorCapability(405, 0, 0, '04. GET Passenger')).toBe('NOT_IMPLEMENTED');
+  });
+  test('httpStatus 406 on a System-Info endpoint → null (deliberately NOT a "not supported" signal: not an OSDM-listed status; RFC 9110 = content negotiation / version mismatch)', () => {
+    expect(classifyVendorCapability(406, 0, 0, '08. GET Products')).toBeNull();
+  });
+  test('httpStatus 404 on an unrelated request name → still NOT_IMPLEMENTED (404 rule is endpoint-independent)', () => {
+    expect(classifyVendorCapability(404, 0, 0, '07. POST Book')).toBe('NOT_IMPLEMENTED');
   });
 
   // IMPLEMENTED — 2xx with all assertions passing (or none)
@@ -98,6 +127,12 @@ describe('classifyVendorCapability', () => {
   });
   test('httpStatus 401 → null', () => {
     expect(classifyVendorCapability(401, 0, 0)).toBeNull();
+  });
+  test('httpStatus 403 with no reqName → null (allowlist match required)', () => {
+    expect(classifyVendorCapability(403, 0, 0)).toBeNull();
+  });
+  test('httpStatus 403 on an unrelated request name → null (not a capability probe)', () => {
+    expect(classifyVendorCapability(403, 0, 0, '07. POST Book')).toBeNull();
   });
   test('httpStatus 302 → null (redirect)', () => {
     expect(classifyVendorCapability(302, 0, 0)).toBeNull();

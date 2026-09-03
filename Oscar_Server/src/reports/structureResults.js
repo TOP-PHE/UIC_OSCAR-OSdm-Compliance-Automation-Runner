@@ -213,13 +213,58 @@ function inferParentRequestId(url, runId, scenarioName) {
 const AUTH_URL_RE = /\/(token|login|auth|logon|oauth)/i;
 const AUTH_NAME_RE = /access.?token/i;
 
+// #488/#489 field review (Farruggia + Heuguet, OTST, 2026-07/08 + 2026-09):
+// the SAME optional, read-only GET requests that osdmCompliance.js's
+// classifySystemInfoStatus (Bruno_Collection/library-bruno/) now treats as
+// "not implemented" on a bare 403/404/405/500 — no confirming OSDM
+// Problem body required, since field testing against SBB showed providers
+// routinely just answer with a bare status and nothing else. Mirrored here,
+// by exact Bruno request name (entry.name / reqName), so this report-level
+// Vendor Capability Matrix agrees with the per-run assertion it's
+// summarizing instead of showing a stale "ERROR" for the same response the
+// live run already accepted as a documented capability gap.
+//
+// Deliberately an EXACT-NAME allowlist, not a blanket status-code rule: a
+// blind "403/404/405/500 anywhere = NOT_IMPLEMENTED" would also
+// reclassify an unrelated NHF (negative-test) probe elsewhere in the
+// collection that deliberately sends a bad request and asserts one of these
+// same codes as its correct, passing outcome — that request DOES implement
+// the endpoint; it correctly rejected bad input. Scoping to these exact
+// names (kept in sync with every call site of classifySystemInfoStatus /
+// handleSystemInfoStatus) makes that cross-contamination impossible.
+//
+// 406 is deliberately NOT in the accepted list (2026-09-03 standards review,
+// osdm.io/spec/errors-problems + RFC 9110): it is not among OSDM's prescribed
+// statuses, and per RFC 9110 it means content negotiation failed — in OSDM
+// most plausibly an unsupported version/media type, a different problem the
+// certifier should see, not a missing endpoint. 403/500 are likewise NOT
+// "not implemented" per the standard (authorization refusal / generic server
+// error) and are accepted purely on the SBB field evidence.
+const CAPABILITY_PROBE_ENDPOINTS = new Set([
+  '00. GET System Version Check',
+  '01. GET Coach',
+  '02. GET Coach By Id',
+  '04. GET Passenger Categories',
+  '05. GET Promotion Codes',
+  '06. GET Reduction Cards',
+  '07. GET Zones',
+  '08. GET Products',
+  '09. GET Product By ProductId',
+  '10. GET Product Tags',
+  '04. GET Passenger',
+  '11. GET Refund Offer',
+  '12. GET Exchange Offer',
+]);
+
 /**
  * Classify a request's vendor capability status based on HTTP status and
  * assertion outcomes. This is deliberately independent of the PASS/FAIL
  * aggregate so certifiers can see "endpoint not implemented" at a glance
  * without decoding a sea of failed assertions.
  *
- *   NOT_IMPLEMENTED — 501, or 404 on an endpoint defined in the OSDM spec
+ *   NOT_IMPLEMENTED — 501, 404 on an endpoint defined in the OSDM spec, or a
+ *                      bare 403/405/500 on one of the known optional
+ *                      capability-probe endpoints (CAPABILITY_PROBE_ENDPOINTS)
  *   NOT_APPLICABLE  — attempted by the runner but inapplicable to this offer
  *                      (e.g. Add ancillary on an offer with no ancillaryOfferParts,
  *                       Place selection on a non-reservable leg). Emitted by
@@ -229,7 +274,7 @@ const AUTH_NAME_RE = /access.?token/i;
  *   PARTIAL         — 2xx but some assertions failed
  *   null            — no response captured / inconclusive
  */
-function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions) {
+function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions, reqName) {
   const s = typeof httpStatus === 'number' ? httpStatus : parseInt(httpStatus, 10);
   // library-bruno signals "attempted but inapplicable" by writing an entry
   // with httpStatus === 0 (no real network call, but a bookkeeping row so the
@@ -238,6 +283,7 @@ function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions)
   if (!s || Number.isNaN(s)) return null;
   if (s === 501) return 'NOT_IMPLEMENTED';
   if (s === 404) return 'NOT_IMPLEMENTED';   // OSDM endpoints we're hitting are spec-defined
+  if ([403, 405, 500].includes(s) && CAPABILITY_PROBE_ENDPOINTS.has(reqName)) return 'NOT_IMPLEMENTED';
   if (s >= 500) return 'ERROR';
   if (s >= 200 && s < 300) {
     if (totalAssertions === 0) return 'IMPLEMENTED';
@@ -479,7 +525,7 @@ function extractStructuredResults(runId, companyId) {
 
         // Update request totals + vendor capability classification
         const reqStatus = reqTotals.failed > 0 ? 'FAIL' : (reqTotals.total > 0 ? 'PASS' : 'SKIP');
-        const capability = classifyVendorCapability(httpStatus, reqTotals.total, reqTotals.failed);
+        const capability = classifyVendorCapability(httpStatus, reqTotals.total, reqTotals.failed, reqName);
         dbRun(
           `UPDATE run_requests SET total=?, passed=?, failed=?, result=?, vendor_capability=? WHERE id=?`,
           [reqTotals.total, reqTotals.passed, reqTotals.failed, reqStatus, capability, requestId]

@@ -14,6 +14,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.98] — 2026-08-11
+
+### Fixed
+
+- **Optional, read-only GET endpoints no longer hard-fail when a provider
+  legitimately doesn't implement them** (OTST review request — Farruggia,
+  2026-07-29; widened after live field testing against SBB — Farruggia +
+  Heuguet, 2026-08). Previously any non-200/non-known-deviation status
+  FAILed outright.
+  - **Round 1** (`04. GET Passenger` only): auto-skip only on HTTP 501, or
+    a non-2xx carrying an OSDM Problem body whose `code` explicitly says
+    `OPERATION_NOT_PERMITTED`/`NOT_IMPLEMENTED`/`NOT_SUPPORTED`/
+    `UNSUPPORTED` — reusing the classifier already proven safe on
+    System-Info endpoints (#353,
+    `osdmCompliance.js#classifySystemInfoStatus`).
+  - **Round 2** (this entry — a real SBB run showed round 1 only partially
+    worked: SBB answers unimplemented endpoints with a bare 403/404/500
+    and no confirming Problem body): the shared classifier now **also**
+    auto-skips on a bare 403/404/405/500 — INFO when the signal is
+    unambiguous (501, 404, or a confirming body), WARNING (accepted, but
+    flags the ambiguity to the provider) otherwise. `401` stays a hard
+    FAIL unconditionally — a token problem, never an availability signal.
+    Because the widening lives in the one shared function, it applies
+    automatically to everywhere that already calls it — all 10
+    `01-System Infos Requests/` files and `04. GET Passenger` — with no
+    further changes to those files. Newly wired into `11. GET Refund
+    Offer.yml` and `12. GET Exchange Offer.yml`, which previously had
+    only a manual per-company Known Deviation escape hatch. **Not**
+    applied to any booking/refund/exchange mutation endpoint
+    (POST/PATCH/DELETE) — those keep their existing strict assertions.
+  - Fixed a pre-existing #383-class double-registration bug in `11.`/`12.`
+    while restructuring their status handling (both registered the same
+    failure as two separate `test()` calls on every non-200).
+  - **Originally deliberately deferred, later resolved** (see
+    `server-v1.11.187` below): Report Builder's separate "Vendor
+    Capability Matrix" (`structureResults.js#classifyVendorCapability`)
+    is the natural home for a "supported vs. not-supported endpoints"
+    summary, but it classifies from raw HTTP status + assertion counts
+    alone, with no per-endpoint context — a blind widening there risks
+    silently reclassifying an unrelated negative-test probe elsewhere in
+    the collection. Initially flagged for the team rather than patched
+    blind, on the reasoning that the live per-run report already showed
+    this via each auto-skip's own clearly-labelled passing assertion
+    row — reconsidered once it became clear the Capability Matrix is
+    exactly the "list of supported/not-supported endpoints" view this PR
+    was asked to add, and it was still showing `ERROR` for these same
+    responses. Resolved with an exact-endpoint-name allowlist instead of
+    a blanket rule, closing the NHF-mislabeling risk that motivated the
+    original deferral.
+  - **Standards check** (Heuguet, 2026-09-03 — OSDM `spec/errors-problems`
+    + RFC 9110): OSDM defines no endpoint-level "not implemented" signal of
+    its own; it adopts the standard HTTP codes and leaves their meaning to
+    RFC 9110, by which only 501/404/405 genuinely mean "not
+    implemented/supported here". 403 (authorization refused) and 500
+    (generic server error) are kept purely on the SBB field evidence,
+    WARNING-tier. Three corrections from the review: **406 dropped** from
+    the accepted list in both classifiers (not an OSDM-listed status; its
+    RFC meaning — content negotiation failed — most plausibly signals an
+    unsupported OSDM version, a different problem a tester should see, and
+    it was never in the field evidence; a provider that really answers 406
+    can still be baselined per company via Known Deviations); the
+    provider-facing WARNING now attributes the 404/501 expectation to
+    RFC 9110 rather than claiming OSDM "expects" it (OSDM does not say so);
+    and the Problem-code match now excludes OSDM's `PARAMETER_NOT_SUPPORTED`
+    / `VALUE_NOT_SUPPORTED`, which describe the request, not the endpoint
+    (`OPERATION_NOT_PERMITTED` is the only on-point OSDM code).
+
+### Tests
+
+- `Bruno_Collection` has no Jest harness (documented gap) — verified via
+  YAML parse + JS syntax-check on all three edited files, plus a full
+  manual trace of every branch across all three.
+
+---
+
+## [server-v1.11.187] — 2026-09-03
+
+### Fixed
+
+- **Three pre-existing unit tests still asserted the pre-widening policy**
+  (a bare 403/404 on an in-version or ungated System-Info endpoint = hard
+  fail), so `Lint, audit, test` and `SonarCloud Code Analysis` both
+  regressed the moment the round-2 widening above shipped. Updated the
+  three tests to assert the new skip+INFO/WARNING behavior, split the
+  combined `401/403/5xx` test apart so each status's outcome stays
+  independently readable, and added assertions on the log wording so the
+  two skip *reasons* (out-of-version vs. provider-doesn't-implement-it)
+  stay distinguishable in coverage.
+- **Docker image — corrected the nanoid CVE fix + patched a newly-flagged
+  `@faker-js/faker` CVE.** The `nanoid@3.3.17` target picked when
+  CVE-2026-67213/-67214 was first patched (`server-v1.11.186` below) turned
+  out to still be vulnerable — Trivy kept flagging it on this PR's
+  Container image scan; the real fix landed one patch release later, in
+  `3.3.18`. Corrected the tarball-unpack target accordingly. Also newly
+  patched, same technique: `@faker-js/faker` CVE-2026-73231 (HIGH,
+  arbitrary code execution via attacker-controlled fake templates),
+  bundled inside `@usebruno/cli` to power its `{{$faker.*}}` templating
+  helper, `9.9.0` → `10.5.0`. `Bruno_Collection` never uses
+  `{{$faker...}}`, so the major-version bump has no call surface in this
+  project to break.
+
+### Added
+
+- **Vendor Capability Matrix now agrees with the "not implemented"
+  detection above** (OTST review request — Heuguet, 2026-09-03),
+  resolving the "deliberately deferred" note further up this entry.
+  `structureResults.js#classifyVendorCapability` — which drives
+  `public/report-builder.html`'s certifier-facing "list of
+  supported/not-supported endpoints" — now also classifies a bare
+  403/405/500 as `NOT_IMPLEMENTED`, but **only** on the exact, known
+  optional/read-only capability-probe endpoints (the same request names
+  already wired to `classifySystemInfoStatus`). An exact-name allowlist,
+  not a blanket status-code rule — a blind rule would also reclassify an
+  unrelated NHF (negative-test) probe elsewhere that deliberately expects
+  one of these same codes as its correct, passing outcome. Without this,
+  the matrix still showed `ERROR` (or `null`, for 403/405) for the
+  exact same responses the live per-run assertion already accepts as a
+  documented capability gap — e.g. a bare 500 on `GET Refund Offer`.
+  `classifyVendorCapability` gained an optional 4th `reqName` parameter;
+  every existing call/test omitting it keeps its prior `ERROR`/`null`
+  behavior unchanged, and the 404 rule stays endpoint-independent as
+  before.
+
+---
+
 ## [server-v1.11.186] — 2026-08-11
 
 ### Fixed
@@ -27,7 +152,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can't budge it. Fixed the same way — unpack the patched `nanoid@3.3.17`
   tarball directly over every nested copy in the Docker build, with a
   verification step that fails the build if any copy is still unpatched.
-  Dockerfile-only change; no application runtime behaviour change.
+- **`ip-address` 10.2.0 → 10.5.0** (lockfile only), folded into the same
+  PR after discovering it broke a circular CI dependency with the
+  then-open `ip-address` Dependabot PR (#484, closed as redundant once
+  main carried the identical change) — Trivy blocked #484 until nanoid
+  was patched here, while this PR's own audit step was blocked by the
+  same pre-existing `ip-address` findings #484 fixed.
 
 ---
 
