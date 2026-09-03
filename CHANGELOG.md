@@ -14,6 +14,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.99] — 2026-09-03
+
+### Fixed
+
+- **`14. GET Booking after Patch Refund` no longer demands `provisionalPrice`
+  at booking stage REFUNDED** (#496 — OTST review, Farruggia/SBB, relayed
+  2026-09-03). After a confirmed refund the booking carries `confirmedPrice`
+  (OSDM: "sum of all prices of confirmed parts … minus the sum of all
+  confirmed refund amounts"); `provisionalPrice` ("price of all unconfirmed
+  pre-booked parts") is legitimately absent, and the step FAILed two
+  assertions on SBB INT. Root cause: `bookings.js#postCreateBookingResponse`
+  keyed the lifecycle-scoped price member (#375) on `FULFILLED|CONFIRMED`
+  only. The mapping now lives in `isPostConfirmationStage()`:
+  CONFIRMED / FULFILLED / REFUNDED / EXCHANGED → `confirmedPrice`;
+  PREBOOKED / ON_HOLD → `provisionalPrice`. `EXCHANGED` (exchange flow,
+  `15. GET Booking after Fulfillment`) is corrected on the same principle;
+  `EXCHANGE_ONGOING` (`13. GET Booking before Fulfillment`) deliberately
+  stays on `provisionalPrice` — the exchange operation creates new
+  pre-booked parts, which OSDM says `provisionalPrice` includes. No step
+  file changed; the call sites already pass the right stage.
+- New `[INFO]` line at REFUNDED/EXCHANGED stages showing `confirmedPrice`
+  before vs. after the after-sales operation — logged, not asserted. OSDM
+  defines `confirmedPrice` net of confirmed refunds, but SBB INT still
+  showed the pre-refund amount after REFUNDED; open point for OTST in #496.
+
+---
+
+## [server-v1.11.188] — 2026-09-03
+
+### Tests
+
+- `tests/unit/bruno-bookings-stage-price.test.js` — covers
+  `isPostConfirmationStage()` for every status combination the collection
+  actually passes (all nine GET-Booking call sites) plus edge cases (empty /
+  bare string / lowercase / `EXCHANGE_ONGOING` not leak-matching
+  `EXCHANGED`). Test-only `Oscar_Server` change; version bumped per the §4
+  rule.
+
+---
+
 ## [collection-OTST_V2.0.98] — 2026-08-11
 
 ### Fixed
