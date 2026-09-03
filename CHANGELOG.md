@@ -65,6 +65,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.187] — 2026-09-03
+
+### Fixed
+
+- **Three pre-existing unit tests still asserted the pre-widening policy**
+  (a bare 403/404 on an in-version or ungated System-Info endpoint = hard
+  fail), so `Lint, audit, test` and `SonarCloud Code Analysis` both
+  regressed the moment the round-2 widening above shipped. Updated the
+  three tests to assert the new skip+INFO/WARNING behavior, split the
+  combined `401/403/5xx` test apart so each status's outcome stays
+  independently readable, and added assertions on the log wording so the
+  two skip *reasons* (out-of-version vs. provider-doesn't-implement-it)
+  stay distinguishable in coverage.
+- **Docker image — corrected the nanoid CVE fix + patched a newly-flagged
+  `@faker-js/faker` CVE.** The `nanoid@3.3.17` target picked when
+  CVE-2026-67213/-67214 was first patched (`server-v1.11.186` below) turned
+  out to still be vulnerable — Trivy kept flagging it on this PR's
+  Container image scan; the real fix landed one patch release later, in
+  `3.3.18`. Corrected the tarball-unpack target accordingly. Also newly
+  patched, same technique: `@faker-js/faker` CVE-2026-73231 (HIGH,
+  arbitrary code execution via attacker-controlled fake templates),
+  bundled inside `@usebruno/cli` to power its `{{$faker.*}}` templating
+  helper, `9.9.0` → `10.5.0`. `Bruno_Collection` never uses
+  `{{$faker...}}`, so the major-version bump has no call surface in this
+  project to break.
+
+---
+
 ## [server-v1.11.186] — 2026-08-11
 
 ### Fixed
