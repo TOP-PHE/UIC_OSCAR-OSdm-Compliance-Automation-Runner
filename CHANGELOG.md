@@ -47,15 +47,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed a pre-existing #383-class double-registration bug in `11.`/`12.`
     while restructuring their status handling (both registered the same
     failure as two separate `test()` calls on every non-200).
-  - **Deliberately deferred**: Report Builder's separate "Vendor
+  - **Originally deliberately deferred, later resolved** (see
+    `server-v1.11.187` below): Report Builder's separate "Vendor
     Capability Matrix" (`structureResults.js#classifyVendorCapability`)
     is the natural home for a "supported vs. not-supported endpoints"
     summary, but it classifies from raw HTTP status + assertion counts
-    alone, with no per-endpoint context — the same widening there risks
+    alone, with no per-endpoint context — a blind widening there risks
     silently reclassifying an unrelated negative-test probe elsewhere in
-    the collection. Flagged for the team rather than patched blind; the
-    live per-run report already shows this today via each auto-skip's
-    own clearly-labelled passing assertion row.
+    the collection. Initially flagged for the team rather than patched
+    blind, on the reasoning that the live per-run report already showed
+    this via each auto-skip's own clearly-labelled passing assertion
+    row — reconsidered once it became clear the Capability Matrix is
+    exactly the "list of supported/not-supported endpoints" view this PR
+    was asked to add, and it was still showing `ERROR` for these same
+    responses. Resolved with an exact-endpoint-name allowlist instead of
+    a blanket rule, closing the NHF-mislabeling risk that motivated the
+    original deferral.
 
 ### Tests
 
@@ -90,6 +97,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helper, `9.9.0` → `10.5.0`. `Bruno_Collection` never uses
   `{{$faker...}}`, so the major-version bump has no call surface in this
   project to break.
+
+### Added
+
+- **Vendor Capability Matrix now agrees with the "not implemented"
+  detection above** (OTST review request — Heuguet, 2026-09-03),
+  resolving the "deliberately deferred" note further up this entry.
+  `structureResults.js#classifyVendorCapability` — which drives
+  `public/report-builder.html`'s certifier-facing "list of
+  supported/not-supported endpoints" — now also classifies a bare
+  403/405/406/500 as `NOT_IMPLEMENTED`, but **only** on the exact, known
+  optional/read-only capability-probe endpoints (the same request names
+  already wired to `classifySystemInfoStatus`). An exact-name allowlist,
+  not a blanket status-code rule — a blind rule would also reclassify an
+  unrelated NHF (negative-test) probe elsewhere that deliberately expects
+  one of these same codes as its correct, passing outcome. Without this,
+  the matrix still showed `ERROR` (or `null`, for 403/405/406) for the
+  exact same responses the live per-run assertion already accepts as a
+  documented capability gap — e.g. a bare 500 on `GET Refund Offer`.
+  `classifyVendorCapability` gained an optional 4th `reqName` parameter;
+  every existing call/test omitting it keeps its prior `ERROR`/`null`
+  behavior unchanged, and the 404 rule stays endpoint-independent as
+  before.
 
 ---
 
