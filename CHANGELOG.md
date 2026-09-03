@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.189] — 2026-09-03
+
+### Documentation
+
+- **Welcome-page news** (`public/news/index.json`) — two entries for the
+  2026-09-03 releases: optional OSDM endpoints a provider hasn't implemented
+  no longer fail the run and the Vendor Capability Matrix shows them as
+  `NOT_IMPLEMENTED` (#488/#489); `confirmedPrice`, not `provisionalPrice`,
+  after a confirmed refund or completed exchange (#496).
+- **Test Coverage Map** brought in line with both changes: the
+  System-Information status classification (§1.2), the shared
+  not-implemented classifier on `04. GET Passenger` / `11. GET Refund Offer`
+  / `12. GET Exchange Offer`, the stage-scoped price member on every
+  GET-Booking step in the refund and exchange tables, and the failure
+  catalogue rows that still claimed 403/404/5xx "all generate FAILING
+  assertions".
+- **Tester User Guide** §6 (reading the report) and §8 (troubleshooting):
+  what a passing `not implemented by this provider (auto-detected)` row
+  means, the INFO vs. WARNING distinction, how to read the Capability
+  Matrix, and the confirmed-price expectation after refund/exchange.
+- **CLAUDE.md** §2: the not-implemented policy (standards basis + allowlist
+  rationale) and the lifecycle-scoped price rule; §6: the open OTST point on
+  `confirmedPrice` net of refunds (#496).
+
+---
+
 ## [collection-OTST_V2.0.99] — 2026-09-03
 
 ### Fixed

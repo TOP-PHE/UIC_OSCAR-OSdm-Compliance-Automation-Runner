@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.216",
+  "current_release": "2026.217",
   "releases": [
+    {
+      "release": "2026.217",
+      "date": "2026-09-03",
+      "server": "1.11.189",
+      "collection": "OTST_V2.0.99",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "docs+news (Heuguet request, 2026-09-03: check that documentation and the OSCAR news include the 2026.215/2026.216 changes -- they did not). Welcome-page news (Oscar_Server/public/news/index.json): two new entries dated September 3, 2026 -- (1) Improvement: optional OSDM endpoints a provider has not implemented no longer fail the run (System-Info catalogs, GET Passenger, GET Refund Offer, GET Exchange Offer; 501 / OPERATION_NOT_PERMITTED / bare 404 -> INFO, bare 403/405/500 -> WARNING, 401 still fails) and the Report Builder Vendor Capability Matrix shows them as NOT_IMPLEMENTED (#488/#489); (2) Bug Fix: confirmedPrice, not provisionalPrice, after a confirmed refund (REFUNDED) or completed exchange (EXCHANGED), with the before/after INFO line and the open OTST point (#496).",
+        "Documentation/Test_Coverage/OSCAR_Test_Coverage_Map.md brought in line with both changes: s1.2 System-Information status classification (was still described as version-gating 404s only), the shared not-implemented classifier on 04. GET Passenger / 11. GET Refund Offer / 12. GET Exchange Offer, the stage-scoped price member on every GET-Booking row of the refund and exchange tables (steps 12/14, 13/15/17), and the two failure-catalogue rows that still claimed 401/403/404/5xx all generate FAILING assertions and cited stale line numbers.",
+        "Documentation/User_Guides/OSCAR - Tester User Guide.md s6 Reading the report + s8 Troubleshooting: what a passing not-implemented-by-this-provider (auto-detected) row means, INFO vs WARNING, reading the Vendor Capability Matrix, and the confirmedPrice expectation after refund/exchange (two new troubleshooting rows).",
+        "CLAUDE.md s2: two new architecture bullets (the not-implemented policy with its RFC 9110 / osdm.io standards basis and the exact-request-name allowlist rationale; the lifecycle-scoped price member rule) and a s6 next-steps entry for the open OTST point on confirmedPrice net of refunds (#496). Server bumped to 1.11.189 for the Oscar_Server/public news change (same precedent as the #470/#473 news PRs); no collection change."
+      ]
+    },
     {
       "release": "2026.216",
       "date": "2026-09-03",

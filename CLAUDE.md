@@ -169,6 +169,34 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     separately from the check-run status, if branch protection has "all
     conversations must be resolved" — an unused-import note is exactly the
     kind of thing that silently blocks merge behind a green checklist.
+- **"Not implemented" is a skip, not a failure — but only on the optional,
+  read-only GETs** (#488/#489, 2026-09-03). `osdmCompliance.js`
+  `classifySystemInfoStatus()` (all 10 `01-System Infos Requests` files via
+  `handleSystemInfoStatus()`, plus `04. GET Passenger`, `11. GET Refund
+  Offer`, `12. GET Exchange Offer`) treats HTTP 501, an OSDM Problem body
+  with `OPERATION_NOT_PERMITTED`, or a bare 404 as "not implemented by this
+  provider" (INFO, passing row), and a bare 403/405/500 the same way at
+  WARNING level; 401 always fails; 406 and anything else fail unless
+  baselined as a Known Deviation. Standards basis (verified 2026-09-03
+  against osdm.io/spec/errors-problems + RFC 9110): OSDM defines no
+  endpoint-level not-implemented signal of its own — only 501/404/405 mean
+  it per HTTP; 403/500 are accepted on SBB field evidence only, which is why
+  they are WARNING-tier and the provider-facing text cites RFC 9110, never
+  "OSDM expects". The Report Builder's Vendor Capability Matrix
+  (`reports/structureResults.js` `classifyVendorCapability`) mirrors this
+  through an **exact-request-name allowlist** (`CAPABILITY_PROBE_ENDPOINTS`)
+  — never a blanket status-code rule, which would relabel NHF probes that
+  deliberately expect those codes. Mutation endpoints (POST/PATCH/DELETE)
+  keep their strict checks.
+- **Booking price members are lifecycle-scoped** (#375, #496).
+  `bookings.js` `isPostConfirmationStage()` decides which member a
+  GET-Booking step asserts: PREBOOKED/ON_HOLD → `provisionalPrice`
+  ("unconfirmed pre-booked parts"); CONFIRMED/FULFILLED/REFUNDED/EXCHANGED →
+  `confirmedPrice` ("confirmed parts minus confirmed refund amounts");
+  EXCHANGE_ONGOING deliberately stays provisional (the exchange creates new
+  pre-booked parts). The other member is optional at every stage. At
+  REFUNDED/EXCHANGED an `[INFO]` line shows confirmedPrice before/after —
+  logged, not asserted (open OTST point, see §6).
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.
@@ -249,6 +277,11 @@ checkout ever lands in a path with a space again, the workaround is
 
 ## 6. Next steps
 
+- **Open OTST point (#496, 2026-09-03):** OSDM defines `confirmedPrice` as
+  net of confirmed refund amounts, but SBB INT still showed the pre-refund
+  amount after REFUNDED. OSCAR only logs before/after at INFO; turning it
+  into an assertion (or a per-company Known Deviation) waits for OTST/SBB to
+  say whether that run was a partial refund or a deviation.
 - **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
   **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
   both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open
