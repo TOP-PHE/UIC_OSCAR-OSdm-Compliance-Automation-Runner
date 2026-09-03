@@ -31,25 +31,44 @@ runtime:
         // Exchange Offers but does not allow GET retrieval) is reported as a
         // PASSING "known deviation" + WARNING and the flow proceeds — the
         // operation id came from 11. POST Exchange Operations. Any UNdocumented
-        // non-200 still hard-stops below.
+        // non-200 is checked next against the OSDM "not implemented" signal
+        // before falling through to a real failure.
         const { knownDeviationFor, noteKnownDeviation } = require(bru.getEnvVar("library_base") + "loopback.js");
         const _kdStatus = res.getStatus();
         const _kdMatch  = _kdStatus !== 200 ? knownDeviationFor("12. GET Exchange Offer", _kdStatus) : null;
+
+        // #488/#489 field review: this GET is optional/read-only — reuse the
+        // same "not implemented" classifier as System-Info endpoints and GET
+        // Passenger (osdmCompliance.js), which now also trusts a bare
+        // 403/404/405/406/500 (no confirming OSDM Problem body required).
+        let _niSkip = null;
+        if (_kdStatus !== 200 && !_kdMatch) {
+          const { classifySystemInfoStatus } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
+          let _body = null;
+          try { _body = res.getBody(); } catch (_e) {}
+          const _cls = classifySystemInfoStatus(_kdStatus, "Exchange Offer", _body);
+          if (_cls.outcome === "skip") _niSkip = _cls;
+        }
+
         if (_kdMatch) {
             test(`HTTP response status — known deviation (documented): 12. GET Exchange Offer returns ${_kdStatus}`, () => {});
             noteKnownDeviation("12. GET Exchange Offer", _kdStatus, _kdMatch);
             return;   // proceed to 13. GET Booking before Fulfillment (natural file order)
         }
+        if (_niSkip) {
+            if (_niSkip.log) validationLogger(_niSkip.log);
+            test(`HTTP response status — not implemented by this provider (auto-detected): 12. GET Exchange Offer returns ${_kdStatus}`, () => {});
+            return;   // proceed to 13. GET Booking before Fulfillment (natural file order)
+        }
 
         // Validate HTTP response status
-        test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
+        test(`HTTP response status — expected 200, actual: ${_kdStatus}`, () => {
+            if (_kdStatus !== 200) throw new Error("HTTP " + _kdStatus + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
         });
 
-        if (res.getStatus() !== 200) {
-          test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
-            throw new Error(`[ERROR] Wrong response status: ${res.getStatus()}`);
-          });
+        if (_kdStatus !== 200) {
+          // #383: the status test above already recorded this failure once —
+          // a second identical registration only double-counted it.
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("GET Exchange Offer");
           return;

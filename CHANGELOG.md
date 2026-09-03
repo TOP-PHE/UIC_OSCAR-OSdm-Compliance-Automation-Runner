@@ -18,28 +18,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`04. GET Passenger` no longer hard-fails when a provider legitimately
-  doesn't implement the endpoint** (OTST review request — Farruggia,
-  2026-07-29). Previously any non-200/non-known-deviation status FAILed
-  outright. Now reuses the Problem-body-aware classifier already proven
-  safe on System-Info endpoints (#353,
-  `osdmCompliance.js#classifySystemInfoStatus`) instead of a blanket
-  accept-list of statuses — a blanket list would mask a genuinely broken
-  403/404 unrelated to "not implemented" (e.g. a wrong `passengerId`).
-  Auto-skips (passing assertion, routes on exactly like a known deviation)
-  **only** on HTTP 501, or a non-2xx carrying an OSDM Problem body whose
-  `code` explicitly says `OPERATION_NOT_PERMITTED`/`NOT_IMPLEMENTED`/
-  `NOT_SUPPORTED`/`UNSUPPORTED`. A bare 403/404/405/406 with no such
-  signal still fails, exactly as before. The existing #398 known-deviation
-  baseline still takes priority when both would apply.
+- **Optional, read-only GET endpoints no longer hard-fail when a provider
+  legitimately doesn't implement them** (OTST review request — Farruggia,
+  2026-07-29; widened after live field testing against SBB — Farruggia +
+  Heuguet, 2026-08). Previously any non-200/non-known-deviation status
+  FAILed outright.
+  - **Round 1** (`04. GET Passenger` only): auto-skip only on HTTP 501, or
+    a non-2xx carrying an OSDM Problem body whose `code` explicitly says
+    `OPERATION_NOT_PERMITTED`/`NOT_IMPLEMENTED`/`NOT_SUPPORTED`/
+    `UNSUPPORTED` — reusing the classifier already proven safe on
+    System-Info endpoints (#353,
+    `osdmCompliance.js#classifySystemInfoStatus`).
+  - **Round 2** (this entry — a real SBB run showed round 1 only partially
+    worked: SBB answers unimplemented endpoints with a bare 403/404/500
+    and no confirming Problem body): the shared classifier now **also**
+    auto-skips on a bare 403/404/405/406/500 — INFO when the signal is
+    unambiguous (501, 404, or a confirming body), WARNING (accepted, but
+    flags the ambiguity to the provider) otherwise. `401` stays a hard
+    FAIL unconditionally — a token problem, never an availability signal.
+    Because the widening lives in the one shared function, it applies
+    automatically to everywhere that already calls it — all 10
+    `01-System Infos Requests/` files and `04. GET Passenger` — with no
+    further changes to those files. Newly wired into `11. GET Refund
+    Offer.yml` and `12. GET Exchange Offer.yml`, which previously had
+    only a manual per-company Known Deviation escape hatch. **Not**
+    applied to any booking/refund/exchange mutation endpoint
+    (POST/PATCH/DELETE) — those keep their existing strict assertions.
+  - Fixed a pre-existing #383-class double-registration bug in `11.`/`12.`
+    while restructuring their status handling (both registered the same
+    failure as two separate `test()` calls on every non-200).
+  - **Deliberately deferred**: Report Builder's separate "Vendor
+    Capability Matrix" (`structureResults.js#classifyVendorCapability`)
+    is the natural home for a "supported vs. not-supported endpoints"
+    summary, but it classifies from raw HTTP status + assertion counts
+    alone, with no per-endpoint context — the same widening there risks
+    silently reclassifying an unrelated negative-test probe elsewhere in
+    the collection. Flagged for the team rather than patched blind; the
+    live per-run report already shows this today via each auto-skip's
+    own clearly-labelled passing assertion row.
 
 ### Tests
 
 - `Bruno_Collection` has no Jest harness (documented gap) — verified via
-  YAML parse + JS syntax-check on both scripts, plus a full manual trace
-  of every branch (200 / known-deviation / auto-skip via 501 / auto-skip
-  via Problem body / bare 403-or-404 still fails / multi-passenger loop
-  continuation / step-failure-policy routing).
+  YAML parse + JS syntax-check on all three edited files, plus a full
+  manual trace of every branch across all three.
 
 ---
 
