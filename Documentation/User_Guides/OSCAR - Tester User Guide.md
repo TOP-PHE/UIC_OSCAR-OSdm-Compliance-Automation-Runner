@@ -665,6 +665,27 @@ failed only.
   so you can filter the report for "what this vendor can't do." A matching
   `⚠️ [VENDOR GAP]` line appears in the execution log. The flow still completes
   via the adaptive fallback.
+- A **passing** row named `… not implemented by this provider (auto-detected)`
+  on one of the optional, read-only steps — the System-Information catalogs
+  (`01-System Infos Requests`), `04. GET Passenger`, `11. GET Refund Offer`,
+  `12. GET Exchange Offer` — means the vendor answered that endpoint with a
+  "not implemented" signal (501, an OSDM Problem `OPERATION_NOT_PERMITTED`, or
+  a bare 404) or with a bare 403/405/500. That is **not a failure**: OSDM makes
+  those endpoints optional. The execution log carries the detail — an `[INFO]`
+  line for the clean signals, a `[WARNING]` line for a bare 403/405/500 (by the
+  HTTP standard those codes mean something else; the line asks the vendor to
+  answer 404 or 501 with a Problem body instead). A `401` on the same step is a
+  token problem and still fails. In **Report Builder**, the Vendor Capability
+  Matrix shows these same steps as `NOT_IMPLEMENTED` rather than `ERROR` — read
+  it as the list of what the vendor supports and what it doesn't.
+- After a **confirmed refund** (`14. GET Booking after Patch Refund`) or a
+  **completed exchange** (`15. GET Booking after Fulfillment`), the booking
+  check looks for `confirmedPrice`, not `provisionalPrice` — OSDM defines the
+  confirmed price as the confirmed parts minus the confirmed refunds, and
+  nothing is pre-booked any more at that point. An `[INFO]` line shows the
+  confirmed price before and after the operation; whether it *should* drop by
+  the refunded amount is still being clarified with the OSDM test-scenario
+  team, so it is shown, not asserted.
 
 ### HTTP Traffic — Request & Response
 Same suite → endpoint structure. Click any endpoint to lazily load its full
@@ -742,6 +763,8 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `400 "Invalid request content"` on `POST /bookings` after a seat pick | Malformed `placeSelections.places[]` | Should be fixed (OSDM `SelectedPlace = {coachNumber, placeNumber, passengerRef}`). If it recurs, capture the booking body and report it. |
 | Intermittent `500`, same request sometimes works | Vendor **fragile under parallel load** | Lower the company **concurrency limit** to 1. |
 | `501 parameter_not_supported` | Vendor conformantly **declines an optional capability** (e.g. no BOOKING‑context map) | Expected; the adaptive fallback continues. It's a capability finding, not a bug. |
+| A step **passes** with `… not implemented by this provider (auto-detected)` plus an `[INFO]` or `[WARNING]` line | The vendor doesn't implement an **optional** endpoint (System-Info catalogs, GET Passenger, GET Refund/Exchange Offer) | Expected — nothing to fix in OSCAR. If the line is a `[WARNING]` (bare 403/405/500), ask the vendor to answer 404 or 501 with an OSDM Problem body. A `401` on the same step is a token problem and still fails. |
+| `confirmedPrice missing` at booking stage REFUNDED / EXCHANGED | The vendor's booking omits `confirmedPrice` after a refund or exchange | A conformance finding: OSDM keeps `confirmedPrice` (confirmed parts minus confirmed refunds) on the booking at that stage; `provisionalPrice` is no longer expected there. |
 | Seat map step (`08`) **missing** from the report on a `SEATMAP_AT_OFFER` scenario | The scenario's **mode wasn't actually saved** (stale value), so it ran `ADD_TO_BOOKING` | Open the scenario, click the **Seat map at offer** pill, save, re‑run. |
 | Many "failed" assertions on `200` responses | OSDM **compliance** deviations in the vendor's responses | These are the conformance findings — review them; they're the point of the tool. |
 
