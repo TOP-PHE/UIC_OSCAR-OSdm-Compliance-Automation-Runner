@@ -206,6 +206,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - Peer deps were already Express-5-ready at their existing pins:
     express-rate-limit 8, express-validator 7, helmet 8, multer 2.3,
     swagger-ui-express 5.
+  - **Touching the fallback line re-opened a dormant CodeQL alert.** The
+    handler's `fs.existsSync`/`res.sendFile` had always been there, but
+    CodeQL scopes to the PR's diff — editing line 573 made the whole handler
+    "changed code" and `js/missing-rate-limiting` fired high-severity. Same
+    trap as the §2 coverage-push notes: a one-line edit can inherit an alert
+    for code you didn't write. Fixed per this repo's standing convention (a
+    real limiter, never a suppression) with a dedicated `spaShellLimiter` —
+    its own bucket, not `fileDownloadLimiter`'s, because the SPA shell is the
+    unauthenticated entry point for every navigation and must not consume the
+    report-download budget.
 - **"Not implemented" is a skip, not a failure — but only on the optional,
   read-only GETs** (#488/#489, 2026-09-03). `osdmCompliance.js`
   `classifySystemInfoStatus()` (all 10 `01-System Infos Requests` files via
