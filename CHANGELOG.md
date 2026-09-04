@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.191] — 2026-09-05
+
+### Fixed
+
+- **`spaShellLimiter` — rate-limit the SPA shell route** (`src/server.js`),
+  closing CodeQL `js/missing-rate-limiting` (alert #419, high severity) on
+  `main`. Direct fallout of v1.11.190: retouching the fallback's route line
+  for Express 5 pulled the surrounding handler into that PR's diff, and
+  CodeQL scopes to changed code — so the handler's `fs.existsSync` +
+  `res.sendFile`, unflagged since the route was first written, surfaced as a
+  *new* alert. The alert landed on `main` because #492 was merged while the
+  follow-up was still in flight.
+  - Fixed per this repo's standing convention — a real limiter, never a
+    suppression comment (precedent: `fileDownloadLimiter` in the same file,
+    plus `auth.js`, `company.js`, `company-test-framework.js`).
+  - Its **own** bucket, not `fileDownloadLimiter`'s: that one is a 300/min
+    budget for authenticated report and datafile downloads, whereas the SPA
+    shell is the unauthenticated entry point every browser navigation lands
+    on, shared by every tenant, and must not draw that budget down.
+  - Cap is deliberately generous — 1200/min/IP, i.e. 20 page loads a second
+    — because whole vendor teams reach OSCAR from a single NATed office IP.
+    It bounds a scripted flood; it does not shape normal use. Only the HTML
+    shell passes through the handler; static assets are served by the
+    `express.static` mount above and never reach it.
+
+### Notes
+
+- Worth remembering as a general trap, not a one-off: a **one-line edit can
+  inherit a CodeQL alert for code you did not write**, because the analysis
+  is scoped to the PR's diff rather than to authorship. Same class as the
+  `js/insecure-temporary-file` and `js/incomplete-url-substring-sanitization`
+  notes already in `CLAUDE.md` §2.
+
+---
+
 ## [server-v1.11.190] — 2026-09-05
 
 ### Changed
