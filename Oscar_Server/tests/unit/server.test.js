@@ -28,8 +28,10 @@
  *    ALERTMANAGER_CONFIG_PATH, which tests/setup.js does not set, so it
  *    naturally never runs (matches real dev/CI behaviour with that env
  *    var unset).
- *  - Static UI file serving (express.static) and the SPA index.html
- *    fallback — Express's own well-tested behaviour, not ours.
+ *  - Static UI file serving (express.static) — Express's own well-tested
+ *    behaviour, not ours. The SPA index.html fallback used to be listed
+ *    here too, on the same reasoning; the Express 5 upgrade disproved that
+ *    for the fallback's *route pattern*, which is now covered below.
  *  - The global error handler — no non-invasive way to force an unhandled
  *    throw through a real mounted route without modifying source.
  *
@@ -365,6 +367,61 @@ describe('mounted routers', () => {
   test('unauthenticated GET /v1/runs is rejected (runs router mounted + auth-gated)', async () => {
     const res = await request(app).get('/v1/runs');
     expect(res.status).toBe(401);
+  });
+});
+
+// ── SPA fallback (Express 5 named-wildcard regression guard) ─────────────────
+// server.js ends with `app.get('/{*splat}', …)` serving public/index.html for
+// any unmatched GET. Express 4 spelled this `'*'`; Express 5 ships
+// path-to-regexp v8, where a bare `'*'` is a hard parse error at require-time
+// ("Missing parameter name at index 1: *") and wildcards must be NAMED. That
+// error is already caught by this whole file — it throws on `require`, so
+// every test here fails at once. What follows guards the subtler half.
+//
+// The subtle half: the Express 5 migration guide's headline suggestion,
+// `/*splat`, is NOT equivalent to Express 4's `'*'` — it matches every path
+// EXCEPT the root `/`. Only the braced `/{*splat}` matches the root as well.
+//
+// Crucially, NO HTTP-level test can tell the two spellings apart in this app,
+// and it is worth being explicit about why so nobody "strengthens" these
+// tests back into a false sense of security: `express.static(PUBLIC_DIR)` is
+// mounted BEFORE the fallback and answers `GET /` out of index.html itself,
+// so `/` returns 200 text/html under either spelling. (Verified by mutating
+// server.js to `/*splat` and re-running: all request-level assertions below
+// still passed.) The only place the difference is observable is the route
+// pattern, so the guard asserts on that directly.
+describe('SPA fallback', () => {
+  test('an unmatched deep GET falls back to the SPA shell rather than 404ing', async () => {
+    const res = await request(app).get('/servertest-no-such-page/deep/path');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/html/);
+  });
+
+  test('the fallback does not swallow unmatched API routes (mounted routers win)', async () => {
+    const res = await request(app).get('/v1/runs');
+    expect(res.status).toBe(401);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+  });
+
+  test('GET / serves the SPA shell (via express.static, not the fallback)', async () => {
+    const res = await request(app).get('/');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/html/);
+  });
+
+  // Deliberately couples to `app.router.stack`, an Express internal: it is
+  // the ONLY way to distinguish `/{*splat}` from `/*splat`, per the note
+  // above. If a future Express release changes that shape this test breaks
+  // loudly, which is the correct outcome — re-derive the guard, do not
+  // delete it. Mutation-checked: flipping server.js to `/*splat` fails this
+  // test and only this one.
+  test('the fallback route pattern also matches the root path (braced /{*splat}, not /*splat)', () => {
+    const routed = (app.router && app.router.stack || []).filter((l) => l.route);
+    const fallback = routed[routed.length - 1];
+    expect(fallback).toBeDefined();
+    expect(fallback.route.path).toBe('/{*splat}');
+    expect(fallback.match('/')).toBeTruthy();
+    expect(fallback.match('/deep/unmatched/path')).toBeTruthy();
   });
 });
 

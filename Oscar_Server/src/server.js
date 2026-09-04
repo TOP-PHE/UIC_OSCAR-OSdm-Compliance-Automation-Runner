@@ -570,7 +570,7 @@ const PUBLIC_DIR = path.resolve(__dirname, '../public');
 app.use(express.static(PUBLIC_DIR));
 
 // SPA fallback — any unmatched GET returns index.html
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   const indexPath = path.join(PUBLIC_DIR, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);

@@ -40,6 +40,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   They version independently (see §4) but are released as tested-together
   pairs recorded in `compatibility.json`.
 - **Stack:** Node 22+, built-in `node:sqlite` (no native compile step),
+  **Express 5** (since 2026-09-05, #492 — see the migration bullet below),
   `@usebruno/cli` as the actual HTTP-execution engine (spawned as a child
   process by `worker/runner.js`). Vanilla JS + template-literal HTML on the
   frontend — no framework, event delegation keyed on `data-action`.
@@ -169,6 +170,42 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     separately from the check-run status, if branch protection has "all
     conversations must be resolved" — an unused-import note is exactly the
     kind of thing that silently blocks merge behind a green checklist.
+  - **Mutation-check any test written as a regression guard** — assert it
+    actually fails against the bug it claims to catch, before trusting it.
+    Live example (#492): a `GET /` test written to catch the wrong SPA
+    wildcard passed under *both* spellings, because `express.static` is
+    mounted first and answers `/` out of `index.html` before the fallback
+    route is ever consulted. The guard looked right, ran green, and proved
+    nothing. The real discriminator was the route pattern itself
+    (`app.router.stack` → `layer.route.path` / `layer.match('/')`) — a
+    deliberate, documented coupling to an Express internal, because it is
+    the only place the difference is observable.
+- **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
+  express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
+  could not move to 6.16.0 without it. The whole migration was **one line**:
+  the SPA fallback in `src/server.js`. Express 5 ships path-to-regexp v8,
+  where a bare `'*'` route is a hard **parse error at require-time**
+  (`TypeError: Missing parameter name at index 1: *`) — it does not fail a
+  request, it fails `require('src/server.js')`, so `tests/unit/server.test.js`
+  died as "Test suite failed to run" with **0 failed tests**, and CI reported
+  `1343 passed` while silently never running that file's 30 tests. A suite
+  count that drops while the test count stays green is the signature.
+  - **Use `/{*splat}`, not `/*splat`.** The Express 5 migration guide's
+    headline suggestion, `/*splat`, is *not* equivalent to Express 4's
+    `'*'`: it matches every path **except** the root `/`. Only the braced
+    `/{*splat}` matches the root too. Both load without error.
+  - Nothing else needed changing — swept and verified: no other wildcard or
+    regex route paths, no `:param?` optionals, no `req.query` assignment, no
+    `req.param()`, no `res.send(<status>)`, no `res.redirect('back')`, no
+    `app.del()`, no `req.host`. All 21 `req.body` destructuring sites already
+    used `req.body || {}`, which matters because **Express 5 leaves
+    `req.body` `undefined`** (not `{}`) when there is no body or the
+    Content-Type doesn't match — verified empirically. The two unguarded
+    `req.body.<prop>` reads (`admin.js:756`, `auth.js:357`) sit behind
+    `express-validator` `validate([...])`, which 400s before the handler.
+  - Peer deps were already Express-5-ready at their existing pins:
+    express-rate-limit 8, express-validator 7, helmet 8, multer 2.3,
+    swagger-ui-express 5.
 - **"Not implemented" is a skip, not a failure — but only on the optional,
   read-only GETs** (#488/#489, 2026-09-03). `osdmCompliance.js`
   `classifySystemInfoStatus()` (all 10 `01-System Infos Requests` files via
@@ -272,7 +309,7 @@ checkout ever lands in a path with a space again, the workaround is
 | `sonar-project.properties` | SonarCloud scope/exclusions + the custom "OSCAR Gate" thresholds (ratcheted 35%→83% new-coverage / <4% duplication as the coverage push landed — see §2) |
 | `tests/unit/db-migrations.test.js` | runs the **real** migration path against throwaway DBs — the #208 regression-class guard |
 | `tests/unit/runner.test.js` | `worker/runner.js` coverage — `child_process.spawn` fully mocked via a `makeFakeProc()` EventEmitter + `waitForSpawnCalls()` polling helper (never a fixed sleep) |
-| `tests/unit/server.test.js` | `src/server.js` coverage — supertest against the real exported `app`; one isolated `NODE_ENV=production` re-require covers the HTTPS-redirect middleware |
+| `tests/unit/server.test.js` | `src/server.js` coverage — supertest against the real exported `app`; one isolated `NODE_ENV=production` re-require covers the HTTPS-redirect middleware; the `SPA fallback` block guards the Express 5 `/{*splat}` route pattern (#492) |
 | `tests/integration/company-places.test.js` | Places API: refresh pagination/dedupe (stubbed `fetch`), ranked `?q=` search, role gating |
 
 ## 6. Next steps

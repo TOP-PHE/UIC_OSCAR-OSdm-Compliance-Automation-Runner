@@ -14,6 +14,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.190] — 2026-09-05
+
+### Changed
+
+- **Express 4.22.2 → 5.2.1** (#492, via Dependabot). The nominal target was
+  `qs` 6.15.2 → 6.16.0, but express 4 pins `qs: ~6.15.1`, so qs could not
+  move without the express major going with it. Not security-driven — the
+  `npm audit` CI step passes on both — but express 4 is in maintenance and
+  the migration cost turned out to be a single line, so it was taken rather
+  than deferred behind a Dependabot `ignore`.
+
+### Fixed
+
+- **SPA fallback route made Express 5 compatible** (`src/server.js`). Express
+  5 ships path-to-regexp v8, where wildcards must be *named*: the previous
+  `app.get('*', …)` is a hard parse error at require-time
+  (`TypeError: Missing parameter name at index 1: *`). This is what broke CI
+  on #492 — it failed `require('src/server.js')` rather than any request, so
+  `tests/unit/server.test.js` reported "Test suite failed to run" with **0
+  failed tests** and the run showed `1343 passed` while quietly never
+  executing that file's 30 tests.
+  - The replacement is `app.get('/{*splat}', …)`, **not** the Express 5
+    migration guide's headline `/*splat`: the unbraced form matches every
+    path *except* the root `/`. Both spellings load without error, so only
+    the braced form is behaviour-identical to Express 4's `'*'`.
+
+### Added
+
+- **`SPA fallback` regression guard** in `tests/unit/server.test.js` — four
+  tests covering deep-path fallback, API routes not being swallowed, the
+  root path still serving the shell, and the fallback's route pattern.
+  - The pattern assertion deliberately couples to `app.router.stack`
+    (`layer.route.path` + `layer.match('/')`). An HTTP-level test *cannot*
+    distinguish `/{*splat}` from `/*splat` in this application, because
+    `express.static(PUBLIC_DIR)` is mounted first and answers `GET /` out of
+    `index.html` before the fallback route is reached — a first draft of
+    this guard asserted on `GET /` and passed under both spellings. The
+    final guard was mutation-checked: flipping `server.js` to `/*splat`
+    fails that test and only that test.
+
+### Notes
+
+- No other Express 5 breaking change applies to this codebase — swept and
+  verified: no other wildcard/regex route paths, no `:param?` optionals, no
+  `req.query` assignment, no `req.param()`, no `res.send(<status>)`, no
+  `res.redirect('back')`, no `app.del()`, no `req.host`. All 21 `req.body`
+  destructuring sites already used `req.body || {}`, which matters because
+  Express 5 leaves `req.body` `undefined` (not `{}`) when there is no body
+  or the Content-Type does not match; the two unguarded `req.body.<prop>`
+  reads sit behind `express-validator`, which 400s before the handler runs.
+- Peer dependencies were already Express-5-compatible at their existing
+  pins: express-rate-limit 8, express-validator 7, helmet 8, multer 2.3,
+  swagger-ui-express 5.
+- `Bruno_Collection/VERSION` and `compatibility.json` are untouched — this
+  release changes `Oscar_Server/` only.
+
+---
+
 ## [server-v1.11.189] — 2026-09-03
 
 ### Documentation
