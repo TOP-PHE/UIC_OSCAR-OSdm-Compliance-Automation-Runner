@@ -64,3 +64,6 @@ Bruno_Collection/Dev working documents/
 *.bak
 *.tmp
 ~$*
+
+# Claude Code — personal, per-machine project settings (e.g. autoMemoryDirectory). Never commit.
+.claude/settings.local.json
