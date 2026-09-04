@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-v1.11.192] — 2026-09-05
+
+### Security
+
+- **`js-yaml` override raised `4.2.0` → `^4.3.1`** (`Oscar_Server/package.json`),
+  closing Dependabot alerts **#7** and **#18**, both high severity:
+  - #7 — YAML merge-key chains can force quadratic CPU consumption
+    (patched in 4.3.0)
+  - #18 — quadratic CPU consumption in `!!omap` resolution (patched in 4.3.1)
+  - Resolves to js-yaml 4.3.2. `npm audit --audit-level=high` — the exact
+    command CI runs — now reports **0 vulnerabilities**.
+
+### Notes
+
+- **The override was the blocker, not a stale transitive dependency.** This
+  is worth recording because it is a failure mode that looks like Dependabot
+  being broken: `overrides` in `package.json` outrank every dependency's own
+  range, so pinning `js-yaml` to the exact version `4.2.0` held the whole
+  tree there and Dependabot could not raise it no matter how many PRs it
+  opened. An exact-version override is a *ceiling* as well as a floor. It is
+  now a caret range (`^4.3.1`), which keeps the original intent — a single
+  deduped js-yaml, floored at a patched version — without freezing it again.
+  If an override ever needs to pin an exact version, it needs a comment
+  saying why, and it needs revisiting whenever an advisory names that
+  package.
+- **Dev-only exposure.** js-yaml reaches this project solely through
+  `eslint` → `@eslint/eslintrc` and `jest` → `babel-plugin-istanbul` →
+  `@istanbuljs/load-nyc-config`. It is not in the server's production
+  dependency path, so the practical risk was confined to CI and local
+  development runs; the fix is still worth taking, and is free.
+- `Bruno_Collection/VERSION` and `compatibility.json` untouched — this
+  release changes `Oscar_Server/` only.
+
+---
+
 ## [server-v1.11.191] — 2026-09-05
 
 ### Fixed
