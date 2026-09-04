@@ -126,6 +126,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `main`'s gate red was cleared — it's live, required, and green now).
   Dependabot-triggered runs skip steps needing secrets (GitHub withholds
   secrets from bot PRs) but still report the job green.
+- **An exact-version `overrides` entry is a ceiling, and will silently block
+  Dependabot** (2026-09-05, #492 follow-up). `Oscar_Server/package.json`
+  pinned `overrides: { "js-yaml": "4.2.0" }`; overrides outrank every
+  dependency's own range, so two high-severity js-yaml advisories (#7 merge-key
+  quadratic CPU, #18 `!!omap` quadratic CPU — patched in 4.3.0/4.3.1) could
+  not be cleared no matter what Dependabot opened. Now `^4.3.1`, which keeps
+  the original intent (one deduped js-yaml, floored at a patched version)
+  without re-freezing it. If an override must pin an exact version, comment
+  why, and revisit it whenever an advisory names that package. Symptom to
+  recognise: a Dependabot alert that stays open with no PR, or a PR that
+  changes nothing in the lockfile.
 - **SonarQube Cloud GitHub App is installed** (2026-07-02) — the repo was
   previously wired via the CI-token upload path only (`SONAR_TOKEN` +
   `sonarcloud-github-action`), which posts a plain pass/fail check but no PR

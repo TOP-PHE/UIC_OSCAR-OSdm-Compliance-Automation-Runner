@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.191",
+  "version": "1.11.192",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
@@ -46,7 +46,7 @@
   },
   "_notes": "SQLite via built-in node:sqlite (Node.js 22+) — no native compilation needed",
   "overrides": {
-    "js-yaml": "4.2.0",
+    "js-yaml": "^4.3.1",
     "@babel/core": "^7.29.6"
   }
 }
