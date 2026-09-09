@@ -335,7 +335,9 @@ async function getScenarioData() {
   // would WIPE the queue state we just carefully advanced.
   if (bru.getEnvVar('__expiredFlowSubRunPending') === 'true') {
     bru.deleteEnvVar('__expiredFlowSubRunPending');
-    const _q = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]');
+    let _q = [];
+    try { _q = JSON.parse(bru.getEnvVar('__expiredFlowQueue') || '[]'); }
+    catch (_e) { _q = []; }
     const _i = parseInt(bru.getEnvVar('__expiredFlowQueueIndex') || '0', 10) || 0;
     const _cur = _q[_i] || {};
     validationLogger(`[INFO] expiredFlow sub-run continuation: scenario "${bru.getEnvVar('scenarioCode') || '?'}" pass ${_i + 1}/${_q.length} — ${_cur.code || '?'} (${_cur.label || '?'}). Skipping full scenario re-init.`);

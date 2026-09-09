@@ -192,6 +192,9 @@ app.use(helmet({
 
 // ── Security: CORS — restrict to allowed origins in production ───────────────
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
+  log.warn('ALLOWED_ORIGINS is not set in production — CORS is wide open (any origin accepted).');
+}
 app.use(cors({
   origin: ALLOWED_ORIGINS.length > 0
     ? (origin, cb) => (!origin || ALLOWED_ORIGINS.includes(origin)) ? cb(null, true) : cb(new Error('CORS blocked'))

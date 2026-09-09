@@ -48,7 +48,7 @@ function withPaxoneOfferSearchCriteriaDefaults(osc) {
 // scope — there's no return train spec in the test data.)
 function returnInwardDateFromOutbound() {
   try {
-    const tsc = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+    const tsc = parseEnvJson("offerTripSearchCriteria", {});
     const d = tsc && tsc.returnSearchParameters && tsc.returnSearchParameters.inwardReturnDate;
     return (typeof d === "string" && d) ? d : null;
   } catch (_) { return null; }
@@ -69,7 +69,7 @@ function buildReturnOfferCollectionRequest() {
     return false;
   }
 
-  const outboundTsc = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
+  const outboundTsc = parseEnvJson("offerTripSearchCriteria", {});
   // Swap O&D for the return leg; drop the outbound's vehicle/carrier filter
   // (the return is an open search) and the inwardReturnDate.
   const inboundTsc = {

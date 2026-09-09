@@ -20,7 +20,8 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const { randomUUID: uuidv4 } = require('node:crypto');
+const crypto  = require('node:crypto');
+const { randomUUID: uuidv4 } = crypto;
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole } = require('../middleware/auth');
 const { sendVerificationEmail, sendPendingApprovalEmail, sendPasswordResetEmail, isSmtpConfigured } = require('../../utils/mailer');
@@ -508,7 +509,11 @@ router.post('/bootstrap/platform-user',
   if (!expected) {
     return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: 'PLATFORM_BOOTSTRAP_TOKEN is not configured on server.' });
   }
-  if (!provided || provided !== expected) {
+  // Constant-time compare — avoids leaking token length/content via timing.
+  const providedBuf = Buffer.from(String(provided || ''));
+  const expectedBuf = Buffer.from(expected);
+  const tokenValid = providedBuf.length === expectedBuf.length && crypto.timingSafeEqual(providedBuf, expectedBuf);
+  if (!provided || !tokenValid) {
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid bootstrap token.' });
   }
 

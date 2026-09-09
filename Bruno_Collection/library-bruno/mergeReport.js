@@ -36,10 +36,21 @@ if (!fs.existsSync(BRU_JSON)) {
   process.exit(1);
 }
 
-const bruRaw  = JSON.parse(fs.readFileSync(BRU_JSON, 'utf8'));
-const tmpData = fs.existsSync(TMP_JSON)
-  ? JSON.parse(fs.readFileSync(TMP_JSON, 'utf8'))
-  : { meta: {}, requests: [] };
+let bruRaw, tmpData;
+try {
+  bruRaw = JSON.parse(fs.readFileSync(BRU_JSON, 'utf8'));
+} catch (e) {
+  console.error(`[ERROR] [mergeReport] Failed to parse Bruno JSON report "${BRU_JSON}": ${(e && e.message) || e}`);
+  process.exit(1);
+}
+try {
+  tmpData = fs.existsSync(TMP_JSON)
+    ? JSON.parse(fs.readFileSync(TMP_JSON, 'utf8'))
+    : { meta: {}, requests: [] };
+} catch (e) {
+  console.error(`[ERROR] [mergeReport] Failed to parse request/response capture "${TMP_JSON}": ${(e && e.message) || e}`);
+  process.exit(1);
+}
 
 // ─── Parse Bruno JSON reporter (handle iteration wrapper + v1/v2 shapes) ─────
 // Bruno CLI shapes seen in the wild, in order of precedence:
@@ -501,7 +512,12 @@ ${osdmSection}
 </html>`;
 
 // ─── Write ─────────────────────────────────────────────────────────────────────
-if (!fs.existsSync(VAL_DIR)) fs.mkdirSync(VAL_DIR, { recursive: true });
-fs.writeFileSync(htmlPath, html, 'utf8');
+try {
+  if (!fs.existsSync(VAL_DIR)) fs.mkdirSync(VAL_DIR, { recursive: true });
+  fs.writeFileSync(htmlPath, html, 'utf8');
+} catch (e) {
+  console.error(`[ERROR] [mergeReport] Failed to write report to "${htmlPath}": ${(e && e.message) || e}`);
+  throw e;
+}
 console.log(`[INFO] [mergeReport] ✅ Report written → ${htmlPath}`);
 console.log(`[INFO] [mergeReport]    ${mergedRequests.length} requests | ${totalTests} assertions | ${passTests} passed | ${failTests} failed`);

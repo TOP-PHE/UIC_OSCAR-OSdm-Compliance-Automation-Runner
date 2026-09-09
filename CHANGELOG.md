@@ -14,6 +14,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.100] — 2026-09-09
+
+### Fixed
+
+- **Defensive JSON parsing across the Bruno library** (PR #506, contributed
+  by AnthoEvoks). Three files, all the same class of change — a malformed
+  input now produces a named, actionable error instead of a raw stack trace:
+  - `mergeReport.js` wraps both `JSON.parse` calls (the Bruno JSON report and
+    the request/response capture) and the report write in `try/catch`, each
+    naming the file that failed. Failure behaviour is unchanged — the script
+    still exits non-zero, and its output is only used as a fallback when
+    `reportGenerator.js` produced nothing — so a bad capture degrades the
+    same way it always did, just legibly.
+  - `requestsBuilder.js` routes its last two raw
+    `JSON.parse(bru.getEnvVar("offerTripSearchCriteria"))` calls through the
+    shared `parseEnvJson()` helper, which the file already imports and uses
+    on about twenty other lines. This is consistency, not new behaviour.
+  - `scenarioParser.js` guards the `__expiredFlowQueue` parse so a corrupt
+    queue falls back to an empty array rather than aborting the expired-flow
+    sub-run continuation.
+
+  Partially addresses the long-open **#84** (unguarded `JSON.parse` across
+  the Bruno engine).
+
+---
+
+## [server-v1.11.193] — 2026-09-09
+
+### Security
+
+- **Constant-time bootstrap-token comparison**
+  (`src/api/routes/auth.js`, `POST /bootstrap/platform-user`). The platform
+  bootstrap token was compared with a plain `!==`, which leaks token content
+  through response timing. Now `crypto.timingSafeEqual`, length-guarded
+  first so the call cannot throw on a length mismatch. (Length itself is
+  still distinguishable via the short-circuit; content is not.)
+- **`esc()` now escapes the single quote** (`public/js/findings.js`),
+  closing the one gap in an otherwise complete escape set.
+- **Startup warning when `ALLOWED_ORIGINS` is unset in production**
+  (`src/server.js`). With the variable empty, CORS reflects any origin. This
+  is a partial mitigation of finding **S7** in the external readiness
+  assessment of 2026-09-05, which recommends refusing to boot in that state;
+  that stronger check remains open.
+
+### Notes
+
+- **The PR arrived with no release bookkeeping**, and it was added during
+  review rather than after merge. It changed three `Oscar_Server/` files and
+  three `Bruno_Collection/` files without bumping either version, and
+  without a `compatibility.json` or changelog entry. That is worth more than
+  a process note here: `Bruno_Collection/` is bind-mounted and `git pull`-ed
+  onto the cloud instance by `refresh-collection.yml` on every merge, so
+  merging as-is would have silently changed the assertions every tenant runs
+  while the reported collection version stayed `OTST_V2.0.99`. This is
+  finding **N1** of the external assessment, reproduced live. Bumped to
+  server `1.11.193` / collection `OTST_V2.0.100` before merge.
+- **Reproducing the test suite locally requires `npm ci` first.** A
+  `node_modules` still holding express `4.22.2` against the locked `5.2.1`
+  makes the two Express-5 SPA-route guards in `tests/unit/server.test.js`
+  fail locally while CI is green — the tests are right and the install is
+  stale. Verified: 55 suites / 1377 tests pass, eslint clean, `node --check`
+  clean on all three edited `library-bruno` files.
+
+---
+
 ## [server-v1.11.192] — 2026-09-05
 
 ### Security

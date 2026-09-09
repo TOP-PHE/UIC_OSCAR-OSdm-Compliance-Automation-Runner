@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.217",
+  "current_release": "2026.218",
   "releases": [
+    {
+      "release": "2026.218",
+      "date": "2026-09-09",
+      "server": "1.11.193",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(collection): defensive JSON parsing in the Bruno library (PR #506, contributed by AnthoEvoks). mergeReport.js now wraps both JSON.parse calls (the Bruno JSON report and the request/response capture) and the report write in try/catch with an actionable [ERROR] line naming the file that failed, instead of terminating on a raw stack trace; requestsBuilder.js routes its last two raw JSON.parse(bru.getEnvVar(...)) calls for offerTripSearchCriteria through the shared parseEnvJson() helper already used ~20 times elsewhere in the file; scenarioParser.js guards the __expiredFlowQueue parse so a corrupt queue falls back to an empty array rather than aborting the sub-run continuation. Behaviour on failure is unchanged (mergeReport still exits non-zero, and its output is only a fallback when reportGenerator produced nothing) — what changes is that the operator is told which file is malformed. Partially addresses the long-open issue #84 (unguarded JSON.parse across the Bruno engine).",
+        "fix(server): three small hardening changes in the same PR. auth.js POST /bootstrap/platform-user now compares the platform bootstrap token with crypto.timingSafeEqual, length-guarded first so the call cannot throw on a mismatched length, replacing a plain !== that leaked token content through timing. public/js/findings.js esc() now also escapes the single quote. server.js emits a startup [WARN] when ALLOWED_ORIGINS is unset under NODE_ENV=production, where CORS otherwise reflects any origin — a partial mitigation of the CORS default flagged as S7 in the 2026-09-05 external readiness assessment, which recommends refusing to boot in that state (still open).",
+        "Release bookkeeping added during review (Heuguet, 2026-09-09): PR #506 arrived with none of the four conventions in CLAUDE.md section 4 met — no server version bump despite three Oscar_Server files changing, no Bruno_Collection/VERSION bump despite three collection files changing, and no compatibility.json or CHANGELOG entry. That matters here because Bruno_Collection is bind-mounted and git-pulled onto the cloud instance by refresh-collection.yml on every merge, so merging as-is would have changed the assertions every tenant runs while the reported collection version stayed OTST_V2.0.99. This is exactly finding N1 of the external assessment. Bumped to server 1.11.193 / collection OTST_V2.0.100 before merge.",
+        "Verification: CI green on all ten required checks. Locally 55 suites / 1377 tests pass, eslint clean, and node --check passes on all three edited library-bruno files. Note for anyone reproducing this: a local node_modules holding express 4.22.2 against the locked 5.2.1 makes the two Express-5 SPA-route guards in tests/unit/server.test.js fail locally while CI is green — run npm ci first."
+      ]
+    },
     {
       "release": "2026.217",
       "date": "2026-09-03",
