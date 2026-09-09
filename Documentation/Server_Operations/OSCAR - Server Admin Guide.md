@@ -848,19 +848,26 @@ cannot defend against.
 | API credentials (per-tester) | The owning tester only — encrypted at rest | Everyone else, including admins, even on the database |
 | Audit log | Administrator only | Everyone else |
 
-### 15.2 The two share gates for certifiers
+### 15.2 The certifier share gate
 
-Certifier visibility of a run requires **both** to be true:
+Certifier visibility of a run requires exactly one thing:
 
-1. **Per-run share** — `runs.shared_with_certifier_at` is set. The Test
-   Manager flips this with the **Share with certifiers** button on the
-   run-detail page. Audit-logged.
-2. **Master kill switch** — `companies.share_reports_with_certifier`
-   (the legacy v15 toggle) is `1`. Setting it to `0` overrides every
-   per-run share, instantly revoking all certifier access to the
-   company's runs. Useful for emergency lockout.
+- **Per-run share** — `runs.shared_with_certifier_at` is set. The Test
+  Manager flips this with the **Share with certifiers** button on the
+  run-detail page. Audit-logged. Default is unshared: a certifier sees
+  nothing until someone deliberately shares it.
 
-Both gates can be flipped by a Test Manager of the company. Neither can
+> **Corrected in v1.11.194.** This section previously described a second,
+> company-wide gate — `companies.share_reports_with_certifier`, the legacy
+> v15 master kill switch. **That toggle was removed in v1.11.15**; per-run
+> sharing has been the sole gate ever since, and `PATCH /v1/company`
+> rejects the field with an explanatory 400 if an old client still sends
+> it. The column remains in the schema, unread, and migration 19's backfill
+> used it once to seed per-run shares for companies that had it on. If you
+> need an emergency lockout today, un-share the runs — there is no
+> company-wide switch.
+
+The share gate can be flipped by a Test Manager of the company. It cannot
 be flipped by an Administrator, a Certifier, or another company.
 
 ### 15.3 What the Administrator role can and cannot do (v1.10+)
@@ -897,7 +904,7 @@ admin-override with extra audit logging — not implemented in Phase 1.)
 | Administrator browsing the UI sees a vendor's reports | `canUserSeeRun()` returns null for admin role; LIST endpoint short-circuits to data-lifecycle queue only |
 | Anonymous user downloads `/artifacts/<uuid>/report.html` | Static-serve replaced with authenticated handler that calls `canUserSeeRun()` |
 | Anonymous user downloads `/data/<slug>-datafile.json` | Static-serve replaced with handler that requires authenticated session matching the slug, OR a true-loopback request from Bruno |
-| Certifier sees a run the Test Manager didn't share | Two-gate check: per-run flag AND master kill switch |
+| Certifier sees a run the Test Manager didn't share | Per-run share check (`runs.shared_with_certifier_at`) in `canUserSeeRun()`. Was a two-gate check until v1.11.15 removed the company-wide toggle — see §15.2. |
 | Certifier from one company sees another company's data they shouldn't | Tenant scoping at the database query layer; certifier requests targeting opted-out companies return 404 (existence not disclosed) |
 | Tester from company A reads company B's runs | Tenant middleware hard-pins `req.companyId` to the user's own company; cross-company query parameters are ignored for non-platform roles |
 
@@ -1012,3 +1019,44 @@ sudo docker exec -it oscar /opt/OSCAR/OSCAR_Deploy/scripts/encrypt-existing-arti
 If all six behave as expected, Phase 1 + Phase 2 of issue #60 are in
 effect. The remaining gap is the running-process memory threat — Phase 3
 (operational policy).
+
+### 15.7 v1.11.194 — the reporting endpoints joined the shared gate
+
+The model above was implemented in `runs.js` in v1.10.0 and has been
+accurate for the run list, artifact downloads and the datafile ever
+since. It was **not** accurate for `reports.js`, which carried its own,
+older role logic: five handlers branched on `isPlatformRole()` or on a
+literal `req.user.role === 'certification_user'`, and in each case a
+platform role skipped the per-run check entirely. Findings **S1** and
+**S4** of the 2026-09-05 external readiness assessment.
+
+What was reachable before this release, by a logged-in administrator or
+certifier, without any run being shared:
+
+| Endpoint | What it disclosed |
+|---|---|
+| `GET /v1/reports/requests/:id/messages` | Decrypted request/response bodies and headers of any run. `run_requests.id` is a plain `AUTOINCREMENT` integer, so the whole table was enumerable by counting. |
+| `POST /v1/reports/compare` | Either run by id; the company-scope check under it defaulted to run A's own company, so it could not fail for a platform caller. |
+| `GET /v1/reports/comparisons/:id` | The stored diff — the certifier privacy guard tested for the `certification_user` string, so an administrator fell through it. |
+| `POST /v1/reports/configured` | Full assertion set, `run_events` log and capability-matrix context for any `run_ids` passed in the body. |
+| `GET /v1/reports/trends[/summary]` | Assertion trend data for a company named in `x-company-id`, including `error_msg` — assertion text from the tenant's run. |
+| `GET /v1/runs/batch/:batchId[/reports.zip]` | The batch's run ids, and the complete decrypted report artifacts as a ZIP. |
+
+All of these now call `canUserSeeRun()`, the same function §15.4 credits.
+Two consequences worth knowing before you field a support call:
+
+- **A foreign-tenant caller on `/requests/:id/messages` now gets 404, not
+  403.** 403 confirmed the row existed, which is what made the integer id
+  space worth walking. Any client asserting on 403 there needs updating.
+- **The Administrator's Report Builder, comparison list and trends are
+  empty.** This is the intended end state of issue #60, not a fault. The
+  menu entries remain reachable and will show nothing; the support
+  procedure in §15.3 is unchanged — ask the company's Test Manager to
+  share the run with a certifier-role account.
+
+Fixed in the same change: `run_events.message` is encrypted at rest from
+migration 19 on, and the `POST /configured` path returned it without
+decrypting, so the Report Builder rendered every log line of a
+post-migration run as `enc:v1:…`. The data was never wrong on disk — only
+the read path.
+

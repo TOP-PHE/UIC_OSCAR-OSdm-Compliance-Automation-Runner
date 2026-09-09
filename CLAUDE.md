@@ -112,6 +112,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `[data-place-lookup]`) drives a typeahead on every origin/destination URN
   field — selecting fills the field with the place's URN; manual typing
   still always works, this is a pure assist.
+- **`canUserSeeRun()` is the only run-visibility rule — route every new
+  run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
+  enforced everywhere as of v1.11.194). It returns the run row or `null`;
+  `null` means answer **404**, never 403 — several run id spaces are guessable
+  (`run_requests.id` is a plain `AUTOINCREMENT` integer), so a 403 confirms
+  existence and makes enumeration worth doing. Policy: administrator → always
+  `null` (operations role, no test-data read); `certification_user` → only runs
+  with `shared_with_certifier_at` set (the company-wide
+  `share_reports_with_certifier` toggle was removed in v1.11.15 and is dead
+  schema); tester/test_manager → own company; unknown role → fail closed.
+  **The failure mode to watch for is a second copy of the policy.** `reports.js`
+  grew its own — five handlers branching on `isPlatformRole()` or on the literal
+  string `'certification_user'` — and each one was a bypass: findings S1/S4 of
+  the 2026-09-05 external assessment, fixed in v1.11.194 (PR-01). A literal role
+  comparison in a data-read path is the smell; `isPlatformRole()` is for
+  *routing* decisions (which query shape to run), never for *authorisation*.
+  Note that `canUserSeeRun` returns `SELECT *`, so project the row before
+  returning it or the response silently widens.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already

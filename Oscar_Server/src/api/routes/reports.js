@@ -19,6 +19,15 @@ const express = require('express');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run: dbRun, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
+// S1/S4 (v1.11.194): every run-scoped read in this file goes through the same
+// gate the rest of the API uses. Before this, platform roles skipped the tenant
+// check entirely — an administrator or a certifier could read any tenant's
+// decrypted traffic by walking the sequential run_requests.id, regardless of
+// per-run sharing, and regardless of issue #60 having removed admin access to
+// test data everywhere else. canUserSeeRun() encodes the whole policy:
+// administrator → null (operations role only), certifier → only runs the
+// test_manager explicitly shared, tester/test_manager → own company.
+const { canUserSeeRun } = require('../helpers/run-access');
 const { enforceTenant } = require('../middleware/tenant');
 const { compareRuns } = require('../../reports/diff');
 
@@ -41,15 +50,13 @@ router.post('/compare', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'run_a_id and run_b_id must be different.' });
   }
 
-  const isPlatform = isPlatformRole(req.user.role);
-
-  // Verify both runs are accessible and are COMPLETED
-  const runA = isPlatform
-    ? get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [run_a_id])
-    : get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [run_a_id, req.companyId]);
-  const runB = isPlatform
-    ? get("SELECT * FROM runs WHERE id = ? AND status != 'DELETED'", [run_b_id])
-    : get("SELECT * FROM runs WHERE id = ? AND company_id = ? AND status != 'DELETED'", [run_b_id, req.companyId]);
+  // S4: both runs must pass the per-run gate for THIS caller. The previous
+  // platform-role branch read any run by id, and the company-scope check below
+  // it was self-satisfying for a platform caller (targetCompanyId defaulted to
+  // runA's own company), so a certifier could diff two runs neither of which
+  // had been shared. 404 rather than 403 so we don't disclose existence.
+  const runA = canUserSeeRun(run_a_id, req.user);
+  const runB = canUserSeeRun(run_b_id, req.user);
 
   if (!runA) return res.status(404).json({ status: 404, title: 'Run A not found.' });
   if (!runB) return res.status(404).json({ status: 404, title: 'Run B not found.' });
@@ -57,10 +64,9 @@ router.post('/compare', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Runs must belong to the same company.' });
   }
 
-  const targetCompanyId = isPlatform ? (req.companyId || runA.company_id) : req.companyId;
-  if (targetCompanyId !== runA.company_id) {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Runs do not match requested company scope.' });
-  }
+  // The comparison is stored against the runs' own company — never against a
+  // caller-supplied ?company_id=.
+  const targetCompanyId = runA.company_id;
 
   if (runA.status !== 'COMPLETED') return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run A status is ${runA.status}. Only COMPLETED runs can be compared.` });
   if (runB.status !== 'COMPLETED') return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run B status is ${runB.status}. Only COMPLETED runs can be compared.` });
@@ -102,6 +108,12 @@ router.post('/compare', (req, res) => {
 router.get('/comparisons', (req, res) => {
   const isPlatform = isPlatformRole(req.user.role);
   let rows;
+
+  // S4: an administrator has no test-data read (issue #60) — the cross-company
+  // listing below is for the certifier only.
+  if (req.user.role === 'administrator') {
+    return res.json({ comparisons: [] });
+  }
 
   if (isPlatform && !req.companyId) {
     // v1.11.15: per-report sharing is the sole certifier gate (the
@@ -147,16 +159,23 @@ router.get('/comparisons/:id', (req, res) => {
     : get(`SELECT * FROM report_comparisons WHERE id = ? AND company_id = ?`, [req.params.id, req.companyId]);
   if (!row) return res.status(404).json({ status: 404, title: 'Comparison not found.' });
 
-  const runA = get('SELECT id, queued_at, api_base_used, status, shared_with_certifier_at FROM runs WHERE id = ?', [row.run_a_id]);
-  const runB = get('SELECT id, queued_at, api_base_used, status, shared_with_certifier_at FROM runs WHERE id = ?', [row.run_b_id]);
-
-  // v1.11.15: certifier privacy guard — per-report sharing is the sole gate.
-  // A comparison is visible to a certifier only when BOTH runs are shared.
+  // S4: the guard below used to test for `certification_user` literally, so an
+  // administrator fell straight through it. Gate on the shared run-access
+  // policy instead — it covers every role, including any added later.
   // Return 404 (not 403) so we don't disclose the comparison's existence.
-  if (req.user.role === 'certification_user' &&
-      (!runA || !runA.shared_with_certifier_at || !runB || !runB.shared_with_certifier_at)) {
+  const runAFull = canUserSeeRun(row.run_a_id, req.user);
+  const runBFull = canUserSeeRun(row.run_b_id, req.user);
+  if (!runAFull || !runBFull) {
     return res.status(404).json({ status: 404, title: 'Comparison not found.' });
   }
+  // canUserSeeRun returns the whole runs row; project back to the same shape
+  // this endpoint has always returned rather than widening the payload.
+  const pickRun = r => ({
+    id: r.id, queued_at: r.queued_at, api_base_used: r.api_base_used,
+    status: r.status, shared_with_certifier_at: r.shared_with_certifier_at,
+  });
+  const runA = pickRun(runAFull);
+  const runB = pickRun(runBFull);
 
   return res.json({
     id:         row.id,
@@ -177,25 +196,19 @@ router.post('/configured', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'run_ids array is required.' });
   }
 
-  // Tenant scope: non-platform users (tester, test_manager) may only request
-  // reports for runs in their own company. Reject foreign run_ids early so we
-  // never leak another company's assertion data via a crafted request body.
-  if (!isPlatformRole(req.user.role)) {
-    const placeholdersScope = run_ids.map(() => '?').join(',');
-    const ownedRows = all(
-      `SELECT id FROM runs WHERE id IN (${placeholdersScope}) AND company_id = ?`,
-      [...run_ids, req.user.companyId]
-    );
-    const ownedSet = new Set(ownedRows.map(r => r.id));
-    const foreign = run_ids.filter(id => !ownedSet.has(id));
-    if (foreign.length > 0) {
-      return res.status(403).json({
-        status: 403,
-        title: 'Forbidden',
-        detail: 'One or more run_ids are not in your company.',
-        foreign_run_ids: foreign
-      });
-    }
+  // S4: run scope. This check previously ran only for non-platform callers, so
+  // an administrator or a certifier could pass arbitrary run_ids in the body
+  // and receive the full assertion set, the run_events log and the decrypted
+  // capability-matrix context for runs that were never shared with them.
+  // Every caller now goes through the same per-run gate.
+  const foreign = run_ids.filter(id => !canUserSeeRun(id, req.user));
+  if (foreign.length > 0) {
+    return res.status(403).json({
+      status: 403,
+      title: 'Forbidden',
+      detail: 'One or more run_ids are not accessible to you.',
+      foreign_run_ids: foreign
+    });
   }
 
   const { categories, domains, status, severities } = filters || {};
@@ -341,11 +354,17 @@ router.post('/configured', (req, res) => {
       return surviving.has(passKey) || surviving.has(failKey);
     })
     .map(e => {
+      // V11b: run_events.message is encrypted at rest from migration 19 on
+      // (written by runner.js logEvent). runs.js decrypts it on read; this
+      // path did not, so every log line rendered as ciphertext in Report
+      // Builder for any run created after that migration. colDecrypt passes
+      // legacy plaintext through unchanged.
+      const decrypted = { ...e, message: colDecrypt(e.message) };
       if (e.event_kind && e.event_kind !== 'log') {
-        return { ...e, request_result: null };
+        return { ...decrypted, request_result: null };
       }
       const failKey = `${e.suite_name}||${e.request_name}||FAIL`;
-      return { ...e, request_result: surviving.has(failKey) ? 'FAIL' : 'PASS' };
+      return { ...decrypted, request_result: surviving.has(failKey) ? 'FAIL' : 'PASS' };
     });
 
   // ── Vendor capability matrix ──────────────────────────────────────────────
@@ -430,8 +449,6 @@ router.get('/requests/:id/messages', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid request id.' });
   }
 
-  const isPlatform = isPlatformRole(req.user.role);
-
   // Fetch the target row together with its suite's scenario_name and the run's
   // company_id so we can enforce tenant ownership in one query.
   // NOTE: real column names are request_body / request_headers / response_body
@@ -455,9 +472,14 @@ router.get('/requests/:id/messages', (req, res) => {
 
   if (!row) return res.status(404).json({ status: 404, title: 'Request not found.' });
 
-  // Tenant check — non-platform users may only access their own company's data.
-  if (!isPlatform && row.company_id !== req.companyId) {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Request does not belong to your company.' });
+  // S1: per-run access check. This was `if (!isPlatform && ...)`, so an
+  // administrator or a certifier skipped it entirely — and because
+  // run_requests.id is a plain AUTOINCREMENT integer, either role could walk
+  // 1..N and read every tenant's decrypted request and response bodies,
+  // whether or not the run had been shared. Gate on the run, not on the role.
+  // 404 rather than 403 so the id space cannot be probed for existence.
+  if (!canUserSeeRun(row.run_id, req.user)) {
+    return res.status(404).json({ status: 404, title: 'Request not found.' });
   }
 
   // ── Chain navigation: prev / next IDs within the same run ────────────────
@@ -572,6 +594,15 @@ router.delete('/templates/:id', (req, res) => {
 router.get('/trends/summary', (req, res) => {
   const companyId = req.companyId || req.user.companyId;
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
+  // S4: req.companyId is caller-supplied for platform roles (?company_id=),
+  // so these aggregates were readable for any tenant. An administrator has no
+  // test-data read at all; a certifier only aggregates over shared runs.
+  if (req.user.role === 'administrator') {
+    return res.json({ company_id: companyId, top_failures: [] });
+  }
+  const certifierOnlyShared = req.user.role === 'certification_user'
+    ? 'AND r.shared_with_certifier_at IS NOT NULL'
+    : '';
 
   const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
 
@@ -585,6 +616,7 @@ router.get('/trends/summary', (req, res) => {
     WHERE ra.company_id = ?
       AND r.status IN ('COMPLETED', 'FAILED')
       AND r.queued_at >= datetime('now', '-30 days')
+      ${certifierOnlyShared}
     GROUP BY ra.assertion_key
     HAVING fail_count > 0
     ORDER BY fail_count DESC, pass_rate ASC
@@ -604,6 +636,15 @@ router.get('/trends', (req, res) => {
   const limit = Math.min(parseInt(limitStr || '20', 10), 100);
   const companyId = req.companyId || req.user.companyId;
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
+  // S4: same caller-supplied company scope as /trends/summary — apply the
+  // same role rules. error_msg here is assertion text from another tenant's
+  // run, so this is not just a count.
+  if (req.user.role === 'administrator') {
+    return res.json({ assertion_key, points: [] });
+  }
+  const certifierOnlyShared = req.user.role === 'certification_user'
+    ? 'AND r.shared_with_certifier_at IS NOT NULL'
+    : '';
 
   const rows = all(`
     SELECT ra.run_id, ra.passed, ra.error_msg, ra.category, ra.severity,
@@ -611,6 +652,7 @@ router.get('/trends', (req, res) => {
     FROM run_assertions ra
     JOIN runs r ON r.id = ra.run_id
     WHERE ra.company_id = ? AND ra.assertion_key = ? AND r.status IN ('COMPLETED', 'FAILED')
+      ${certifierOnlyShared}
     ORDER BY r.queued_at DESC
     LIMIT ?
   `, [companyId, assertion_key, limit]);

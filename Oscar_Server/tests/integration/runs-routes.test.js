@@ -1012,6 +1012,36 @@ describe('GET /v1/runs/batch/:batchId', () => {
     expect(res.body.failed).toBe(1);
     expect(res.body.runs.length).toBe(3);
   });
+
+  // S4 (v1.11.194). Both batch reads scope on a caller-supplied company id and
+  // had no per-run share predicate, so a platform role naming a tenant got the
+  // whole batch — run ids here, and the decrypted report artifacts in the ZIP
+  // below — regardless of what the test_manager had shared.
+  test('404 for a platform administrator naming the company', async () => {
+    const token = covToken('administrator', covAdminId);
+    const res = await request(app).get(`/v1/runs/batch/${covBatchId}`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', covCompanyId);
+    expect(res.status).toBe(404);
+  });
+
+  test('a certifier sees only the runs shared with it', async () => {
+    const token = covToken('certification_user', covCertifierId, covCompanyId);
+    const before = await request(app).get(`/v1/runs/batch/${covBatchId}`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', covCompanyId);
+    expect(before.status).toBe(404);
+
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [covBatchRunA]);
+    try {
+      const after = await request(app).get(`/v1/runs/batch/${covBatchId}`)
+        .set('Authorization', `Bearer ${token}`).set('x-company-id', covCompanyId);
+      expect(after.status).toBe(200);
+      // Only the shared run — not the other two runs in the same batch.
+      expect(after.body.runs.map(r => r.id)).toEqual([covBatchRunA]);
+      expect(after.body.total).toBe(1);
+    } finally {
+      run('UPDATE runs SET shared_with_certifier_at = NULL WHERE id = ?', [covBatchRunA]);
+    }
+  });
 });
 
 describe('GET /v1/runs/batch/:batchId/reports.zip', () => {
@@ -1037,6 +1067,20 @@ describe('GET /v1/runs/batch/:batchId/reports.zip', () => {
     expect(res.headers['content-disposition']).toMatch(/attachment; filename=/);
     // Local file header signature 'PK\x03\x04' at the very start of a zip.
     expect(res.body.slice(0, 4).toString('hex')).toBe('504b0304');
+  });
+
+  test('404 for a platform administrator naming the company', async () => {
+    const token = covToken('administrator', covAdminId);
+    const res = await request(app).get(`/v1/runs/batch/${covBatchId}/reports.zip`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', covCompanyId);
+    expect(res.status).toBe(404);
+  });
+
+  test('404 for a certifier while no run in the batch is shared', async () => {
+    const token = covToken('certification_user', covCertifierId, covCompanyId);
+    const res = await request(app).get(`/v1/runs/batch/${covBatchId}/reports.zip`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', covCompanyId);
+    expect(res.status).toBe(404);
   });
 });
 

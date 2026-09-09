@@ -36,7 +36,7 @@ const path    = require('path');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
-const { run, get } = require('../../src/db/db');
+const { run, get, colEncrypt } = require('../../src/db/db');
 const { encryptToFile } = require('../../src/utils/at-rest');
 
 const app = buildAppWithRoute('/v1/reports', '../../src/api/routes/reports');
@@ -252,6 +252,48 @@ describe('reports — trends', () => {
     expect(res.body.points[0].passed).toBe(false);
     expect(res.body.points[0].severity).toBe('critical');
   });
+
+  // S4 (v1.11.194). Both trends queries scope on a caller-supplied
+  // x-company-id and previously ran it for any role. /trends returns
+  // error_msg — assertion text from the tenant's run — so this is disclosure,
+  // not just an aggregate count.
+  const KEY = 'Suite1|Book Offer|status 201';
+  const ENC_KEY = 'Suite1%7CBook%20Offer%7Cstatus%20201';
+
+  test('a platform administrator gets no trend data for a company it names', async () => {
+    const token = makeToken('administrator', adminId);
+    const summary = await request(app).get('/v1/reports/trends/summary')
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
+    expect(summary.status).toBe(200);
+    expect(summary.body.top_failures).toEqual([]);
+
+    const points = await request(app).get(`/v1/reports/trends?assertion_key=${ENC_KEY}`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
+    expect(points.status).toBe(200);
+    expect(points.body.points).toEqual([]);
+  });
+
+  test('a certifier sees trend data only from runs shared with it', async () => {
+    const token = makeToken('certification_user', adminId);
+    const before = await request(app).get(`/v1/reports/trends?assertion_key=${ENC_KEY}`)
+      .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
+    expect(before.status).toBe(200);
+    expect(before.body.points).toEqual([]);
+
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runA]);
+    try {
+      const after = await request(app).get(`/v1/reports/trends?assertion_key=${ENC_KEY}`)
+        .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
+      expect(after.status).toBe(200);
+      expect(after.body.points.length).toBeGreaterThanOrEqual(1);
+
+      const summary = await request(app).get('/v1/reports/trends/summary')
+        .set('Authorization', `Bearer ${token}`).set('x-company-id', companyId);
+      expect(summary.body.top_failures.some(r => r.assertion_key === KEY)).toBe(true);
+    } finally {
+      run('UPDATE runs SET shared_with_certifier_at = NULL WHERE id = ?', [runA]);
+    }
+  });
 });
 
 // ── Compare ─────────────────────────────────────────────────────────────────
@@ -316,6 +358,26 @@ describe('reports — POST /compare', () => {
     expect(res.body.cached).toBe(true);
     expect(res.body.id).toBe(comparisonId);
   });
+
+  // S4 (v1.11.194). The platform branch read either run by id, and the company
+  // check underneath defaulted targetCompanyId to run A's own company — so it
+  // could never fail for a platform caller. Both roles now get 404: existence
+  // is not disclosed.
+  test('404 for a platform administrator naming the company', async () => {
+    const res = await request(app).post('/v1/reports/compare')
+      .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`)
+      .set('x-company-id', companyId)
+      .send({ run_a_id: runA, run_b_id: runB });
+    expect(res.status).toBe(404);
+  });
+
+  test('404 for a certifier while the runs are unshared', async () => {
+    const res = await request(app).post('/v1/reports/compare')
+      .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+      .set('x-company-id', companyId)
+      .send({ run_a_id: runA, run_b_id: runB });
+    expect(res.status).toBe(404);
+  });
 });
 
 // ── Comparisons listing / retrieval ───────────────────────────────────────────
@@ -328,10 +390,38 @@ describe('reports — comparisons', () => {
     expect(hit).toBeTruthy();
   });
 
-  test('GET /comparisons as a platform admin (no company scope) lists across companies', async () => {
+  // S4 (v1.11.194). Was "lists across companies" and asserted only that the
+  // body was an array — so it stayed green while the endpoint handed an
+  // administrator every tenant's comparison metadata. Issue #60 makes that an
+  // empty list; the assertion now pins the count, not just the type.
+  test('GET /comparisons returns nothing for a platform administrator', async () => {
     const res = await request(app).get('/v1/reports/comparisons').set('Authorization', `Bearer ${makeToken('administrator', adminId)}`);
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.comparisons)).toBe(true);
+    expect(res.body.comparisons).toEqual([]);
+  });
+
+  test('GET /comparisons/:id is 404 for a certifier until both runs are shared', async () => {
+    const list = await request(app).get('/v1/reports/comparisons').set('Authorization', `Bearer ${makeToken('company_user')}`);
+    const id = list.body.comparisons.find(c => c.run_a_id === runA && c.run_b_id === runB).id;
+    const token = makeToken('certification_user', adminId);
+
+    const before = await request(app).get(`/v1/reports/comparisons/${id}`).set('Authorization', `Bearer ${token}`);
+    expect(before.status).toBe(404);
+
+    // Sharing only run A is not enough — the diff discloses both sides.
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runA]);
+    try {
+      const half = await request(app).get(`/v1/reports/comparisons/${id}`).set('Authorization', `Bearer ${token}`);
+      expect(half.status).toBe(404);
+
+      run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runB]);
+      const after = await request(app).get(`/v1/reports/comparisons/${id}`).set('Authorization', `Bearer ${token}`);
+      expect(after.status).toBe(200);
+      expect(after.body.run_a.id).toBe(runA);
+      expect(Object.keys(after.body.run_a).sort()).toEqual(['api_base_used', 'id', 'queued_at', 'shared_with_certifier_at', 'status']);
+    } finally {
+      run('UPDATE runs SET shared_with_certifier_at = NULL WHERE id IN (?, ?)', [runA, runB]);
+    }
   });
 
   test('404 GET /comparisons/:id for an unknown id', async () => {
@@ -415,14 +505,62 @@ describe('reports — POST /configured', () => {
     expect(res.body.summary.failed).toBe(0);
   });
 
-  test('200 for a platform admin scoped to the company (skips ownership pre-check)', async () => {
+  // S4 (v1.11.194). These three replace a test that asserted the opposite —
+  // "200 for a platform admin ... (skips ownership pre-check)" — which encoded
+  // the bypass as intended behaviour. Platform roles no longer skip the run
+  // gate: an administrator has no test-data read at all (issue #60), and a
+  // certifier sees a run only once the test_manager has shared it.
+  test('403 for a platform administrator — issue #60 removes admin test-data reads', async () => {
     const res = await request(app).post('/v1/reports/configured')
       .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`)
       .set('x-company-id', companyId)
       .send({ run_ids: [runA], filters: { status: 'failed' } });
-    expect(res.status).toBe(200);
-    expect(res.body.summary.failed).toBe(1);
-    expect(res.body.summary.passed).toBe(0);
+    expect(res.status).toBe(403);
+    expect(res.body.foreign_run_ids).toContain(runA);
+  });
+
+  test('403 for a certifier while the run is unshared', async () => {
+    const res = await request(app).post('/v1/reports/configured')
+      .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+      .set('x-company-id', companyId)
+      .send({ run_ids: [runA], filters: { status: 'failed' } });
+    expect(res.status).toBe(403);
+    expect(res.body.foreign_run_ids).toContain(runA);
+  });
+
+  test('200 for a certifier once the test_manager shares the run', async () => {
+    run(`UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?`, [runA]);
+    try {
+      const res = await request(app).post('/v1/reports/configured')
+        .set('Authorization', `Bearer ${makeToken('certification_user', adminId)}`)
+        .set('x-company-id', companyId)
+        .send({ run_ids: [runA], filters: { status: 'failed' } });
+      expect(res.status).toBe(200);
+      expect(res.body.summary.failed).toBe(1);
+    } finally {
+      run(`UPDATE runs SET shared_with_certifier_at = NULL WHERE id = ?`, [runA]);
+    }
+  });
+
+  // V11b: run_events.message is encrypted at rest from migration 19 onward.
+  // This path returned it without colDecrypt, so Report Builder rendered every
+  // log line of a post-migration run as ciphertext.
+  test('log lines are decrypted, not returned as ciphertext', async () => {
+    const secret = 'offer request failed with 500';
+    run(`INSERT INTO run_events (run_id, level, message, category, phase, suite_name, request_name, event_kind)
+         VALUES (?, 'error', ?, 'http', 'execution', '01-Common', 'Get Offers', 'log')`,
+    [runA, colEncrypt(secret)]);
+    try {
+      const res = await request(app).post('/v1/reports/configured')
+        .set('Authorization', `Bearer ${makeToken('company_user')}`)
+        .send({ run_ids: [runA], filters: {} });
+      expect(res.status).toBe(200);
+      const messages = (res.body.events || []).map(e => e.message);
+      expect(messages).toContain(secret);
+      expect(messages.some(m => String(m || '').startsWith('enc:'))).toBe(false);
+    } finally {
+      run(`DELETE FROM run_events WHERE run_id = ? AND level = 'error'`, [runA]);
+    }
   });
 });
 
@@ -463,10 +601,39 @@ describe('reports — GET /requests/:id/messages', () => {
     expect(res.body.failed_only).toBe(true);
   });
 
-  test('403 when a non-platform user requests another company\'s request', async () => {
+  // S1 (v1.11.194). Was asserted as 403 — which itself confirmed the request
+  // exists. The gate now answers 404 for anything the caller may not see, so a
+  // foreign tenant cannot enumerate request ids by reading the status code.
+  test('404 when a user from another company requests it', async () => {
     const res = await request(app).get(`/v1/reports/requests/${requestPassId}/messages`)
       .set('Authorization', `Bearer ${makeToken('company_user', otherUserId, otherCompanyId)}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
+  });
+
+  test('404 for a platform administrator — issue #60 removes admin test-data reads', async () => {
+    const res = await request(app).get(`/v1/reports/requests/${requestPassId}/messages`)
+      .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`)
+      .set('x-company-id', companyId);
+    expect(res.status).toBe(404);
+  });
+
+  test('404 for a certifier while unshared, 200 once the run is shared', async () => {
+    const token = makeToken('certification_user', adminId);
+    const before = await request(app).get(`/v1/reports/requests/${requestPassId}/messages`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('x-company-id', companyId);
+    expect(before.status).toBe(404);
+
+    run("UPDATE runs SET shared_with_certifier_at = datetime('now') WHERE id = ?", [runA]);
+    try {
+      const after = await request(app).get(`/v1/reports/requests/${requestPassId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('x-company-id', companyId);
+      expect(after.status).toBe(200);
+      expect(after.body.id).toBe(requestPassId);
+    } finally {
+      run('UPDATE runs SET shared_with_certifier_at = NULL WHERE id = ?', [runA]);
+    }
   });
 });
 

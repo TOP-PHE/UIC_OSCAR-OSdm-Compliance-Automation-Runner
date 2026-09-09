@@ -1,8 +1,25 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.218",
+  "current_release": "2026.219",
   "releases": [
+    {
+      "release": "2026.219",
+      "date": "2026-09-09",
+      "server": "1.11.194",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): every run-scoped read in Oscar_Server/src/api/routes/reports.js now goes through canUserSeeRun() (src/api/helpers/run-access.js), the same gate runs.js has used since v1.10.0. reports.js had its own role logic: five handlers branched on isPlatformRole() or on a literal req.user.role === 'certification_user', which meant a platform role skipped the tenant check entirely. Addresses findings S1 and S4 of the 2026-09-05 external readiness assessment (Bileto / Petrak), bundled as PR-01 in Audits/2026095 Bileto Audit/OSCAR_Audit_Remediation_Tracker.xlsx.",
+        "S1 — GET /v1/reports/requests/:id/messages skipped the ownership check for administrator and certification_user. run_requests.id is a plain AUTOINCREMENT integer, so either role could walk 1..N and read every tenant's decrypted request/response bodies and headers, whether or not the run was shared. Now gated on the run; answers 404 rather than 403 so the id space cannot be probed for existence (this changes the documented status for a foreign-tenant caller from 403 to 404).",
+        "S4 — the same bypass in four more places. POST /compare read either run by id for a platform caller, and the company-scope check under it defaulted targetCompanyId to run A's own company, so it could never fail; the comparison is now stored against the runs' own company, never a caller-supplied ?company_id=. GET /comparisons/:id tested for 'certification_user' literally, so an administrator fell straight through the certifier privacy guard. POST /configured ran its foreign-run_ids check only for non-platform callers, so a platform role could pass arbitrary run_ids and receive the full assertion set, the run_events log and the capability-matrix context. GET /trends and /trends/summary scope on a caller-supplied x-company-id and ran for any role — /trends returns error_msg, which is assertion text from the tenant's run. GET /v1/runs/batch/:batchId and its reports.zip had no per-run share predicate, so a platform caller naming a company received the batch's run ids and the complete decrypted report artifacts, including runs the test_manager had deliberately not shared.",
+        "V11b — the same handler that fixed S4 in POST /configured also fixes a live display bug: run_events.message is encrypted at rest from migration 19 on (written by runner.js logEvent) and this path returned it without colDecrypt(), so Report Builder rendered every log line of any run created after that migration as 'enc:v1:...' ciphertext. runs.js already decrypted it; reports.js did not.",
+        "User-visible consequence, by design: an administrator now gets an empty Report Builder, an empty comparison list and empty trends rather than another tenant's data (issue #60 already removed admin test-data reads everywhere else — reports.js was the hole). A certifier sees a run only once its test_manager has shared it, in the Report Builder and trends as well as the run list. Testers and test managers are unaffected.",
+        "Tests: +14 integration tests across tests/integration/reports-routes.test.js and runs-routes.test.js — administrator denied, certifier denied while unshared, certifier allowed once shared, and the V11b decryption regression (seeds a genuinely colEncrypt-ed run_events row and asserts the plaintext comes back). Two existing tests that encoded the vulnerable behaviour were rewritten, not deleted, with a comment saying what they used to assert: 'skips ownership pre-check' (asserted the bypass) and a comparisons test that checked only Array.isArray, so it stayed green while the endpoint handed an administrator every tenant's comparison metadata. Every new guard was mutation-checked against the un-fixed code per the CLAUDE.md rule. 55 suites / 1391 tests pass, eslint clean.",
+        "Docs: Server Admin Guide s15.2 corrected (it still described a two-gate certifier model with the companies.share_reports_with_certifier master kill switch, removed in v1.11.15 — per-run sharing has been the sole gate since) and a new s15.7 recording this hardening; welcome-page news entry; CLAUDE.md s2 bullet."
+      ]
+    },
     {
       "release": "2026.218",
       "date": "2026-09-09",

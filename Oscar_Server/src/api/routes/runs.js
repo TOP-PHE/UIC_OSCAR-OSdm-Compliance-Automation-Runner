@@ -691,11 +691,16 @@ router.get('/batch/:batchId', (req, res) => {
     : 'WHERE batch_id = ?';
   const params = companyId ? [req.params.batchId, companyId] : [req.params.batchId];
 
-  const runs = all(`
+  const allBatchRuns = all(`
     SELECT id, status, scenario_code, queued_at, started_at, completed_at, exit_code
     FROM runs ${batchFilter}
     ORDER BY queued_at ASC
   `, params);
+  // S4: companyId is caller-supplied for platform roles (?company_id=), and
+  // this listing had no per-run share predicate — so a certifier could read
+  // the ids of a tenant's unshared runs and then feed them to the report
+  // endpoints. Filter through the same gate every other run read uses.
+  const runs = allBatchRuns.filter(r => canUserSeeRun(r.id, req.user));
 
   if (runs.length === 0) {
     return res.status(404).json({ status: 404, title: 'Batch not found.' });
@@ -730,11 +735,16 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'A company context is required to download batch reports.' });
   }
 
-  const runs = all(
+  const batchRuns = all(
     `SELECT id, scenario_code, env_name_used, queued_at, started_at
        FROM runs WHERE batch_id = ? AND company_id = ? ORDER BY queued_at ASC`,
     [req.params.batchId, companyId]
   );
+  // S4: the ZIP had no share predicate, so a platform caller supplying
+  // ?company_id= received the complete decrypted report artifacts for every run
+  // in the batch — including the ones the test_manager had deliberately not
+  // shared. Same gate as everywhere else.
+  const runs = batchRuns.filter(r => canUserSeeRun(r.id, req.user));
   if (!runs.length) return res.status(404).json({ status: 404, title: 'Batch not found.' });
 
   const { decryptFromFile } = require('../../utils/at-rest');

@@ -14,6 +14,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.194] — 2026-09-09
+
+### Security
+
+- **Every run-scoped read in `reports.js` now goes through `canUserSeeRun()`**
+  — the single run-access policy in `src/api/helpers/run-access.js` that
+  `runs.js` has used since v1.10.0 (issue #60). `reports.js` had grown its own
+  role logic instead: five handlers branched on `isPlatformRole()` or on a
+  literal `req.user.role === 'certification_user'`, and in each case a platform
+  role skipped the tenant check entirely. Findings **S1** and **S4** of the
+  2026-09-05 external readiness assessment; PR-01 in the remediation tracker.
+
+  - **S1 — `GET /v1/reports/requests/:id/messages`.** The ownership check ran
+    only for non-platform callers. `run_requests.id` is a plain `AUTOINCREMENT`
+    integer, so an administrator or a certifier could walk `1..N` and read every
+    tenant's decrypted request and response bodies and headers, whether or not
+    the run had been shared. **Behaviour change:** a caller who may not see the
+    request now gets **404, not 403**, so the id space cannot be probed for
+    existence.
+  - **S4 — `POST /compare`.** The platform branch fetched either run by id, and
+    the company-scope check beneath it defaulted `targetCompanyId` to run A's
+    own company — so it could never fail for a platform caller. Both runs now
+    pass the per-run gate, and the comparison is stored against the runs' own
+    company rather than a caller-supplied `?company_id=`.
+  - **S4 — `GET /comparisons` and `/comparisons/:id`.** The privacy guard tested
+    for `certification_user` literally, so an administrator fell straight through
+    it. Both runs of a comparison now pass the gate; administrators get an empty
+    list. The `/comparisons/:id` response keeps its original five-field run
+    projection (`canUserSeeRun` returns the whole row).
+  - **S4 — `POST /configured`.** The foreign-`run_ids` check ran only for
+    non-platform callers, so a platform role could pass arbitrary ids in the body
+    and receive the full assertion set, the `run_events` log and the
+    capability-matrix context for runs never shared with them.
+  - **S4 — `GET /trends` and `/trends/summary`.** Both scope on a caller-supplied
+    `x-company-id` and previously ran for any role. `/trends` returns `error_msg`
+    — assertion text from the tenant's run — so this was disclosure, not just an
+    aggregate count. Administrators get an empty result; certifiers see only runs
+    shared with them.
+  - **S4 — `GET /v1/runs/batch/:batchId` and `/batch/:batchId/reports.zip`.**
+    Neither had a per-run share predicate, so a platform caller naming a company
+    received the batch's run ids and the complete decrypted report artifacts —
+    including the runs the test manager had deliberately not shared.
+
+  **User-visible consequence, by design:** an administrator now sees an empty
+  Report Builder, comparison list and trends instead of another tenant's data
+  (issue #60 had already removed admin test-data reads everywhere else —
+  `reports.js` was the remaining hole). A certifier sees a run only once its test
+  manager has shared it, in the Report Builder and trends as well as the run
+  list. Testers and test managers are unaffected.
+
+### Fixed
+
+- **Report Builder showed ciphertext instead of log lines** (V11b). Since
+  migration 19, `run_events.message` is encrypted at rest by `runner.js`'s
+  `logEvent`. `runs.js` decrypted it on read; the `POST /configured` path did
+  not, so every log line of any run created after that migration rendered as
+  `enc:v1:…`. Now routed through `colDecrypt()`, which passes legacy plaintext
+  through unchanged.
+
+### Changed
+
+- `Documentation/Server_Operations/OSCAR - Server Admin Guide.md` §15.2 no longer
+  describes a two-gate certifier model. The company-wide
+  `share_reports_with_certifier` master kill switch was removed in **v1.11.15**;
+  per-run sharing has been the sole gate since, and the guide had not caught up.
+  A new §15.7 records this release's hardening.
+
+### Tests
+
+- +14 integration tests in `tests/integration/reports-routes.test.js` and
+  `runs-routes.test.js`: administrator denied, certifier denied while the run is
+  unshared, certifier allowed once it is shared, and a V11b regression that seeds
+  a genuinely `colEncrypt`-ed `run_events` row and asserts the plaintext comes
+  back. Two existing tests that encoded the vulnerable behaviour were rewritten
+  rather than deleted, each carrying a comment saying what it used to assert —
+  one was literally named "skips ownership pre-check"; the other asserted only
+  `Array.isArray`, so it stayed green while the endpoint handed an administrator
+  every tenant's comparison metadata. Every new guard was mutation-checked
+  against the un-fixed code, per the rule in CLAUDE.md §2.
+
+---
+
 ## [collection-OTST_V2.0.100] — 2026-09-09
 
 ### Fixed
