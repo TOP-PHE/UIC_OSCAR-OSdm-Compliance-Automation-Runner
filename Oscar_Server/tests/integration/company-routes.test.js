@@ -278,15 +278,24 @@ describe('POST /v1/company/datafile', () => {
   });
 
   test('403 for a non-test_manager (tester)', async () => {
-    // NOTE: certification_user is deliberately NOT used here. It's a platform
-    // role (isPlatformRole), so multer's filename callback looks for an
-    // explicit company_id (header/query/body) instead of req.user.companyId —
-    // without one it throws inside the upload middleware (a pre-existing
-    // ordering quirk: multer runs before this route's own requireTestManager
-    // check), surfacing as 500 rather than the clean 403 this test wants. A
-    // tester is not a platform role, so the upload succeeds and the route's
-    // own guard is what returns 403 — the actual branch this test targets.
     const token = makeToken('company_user', testerId);
+    const res = await request(app)
+      .post('/v1/company/datafile')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('datafile', jsonBuffer, 'datafile.json');
+    expect(res.status).toBe(403);
+  });
+
+  // S2 (v1.11.195). This used to be a NOTE explaining why the test above
+  // avoided certification_user: multer ran before the role guard, so for a
+  // platform role with no company id the upload middleware threw and the
+  // caller got a 500. The note called that an "ordering quirk". It was the
+  // symptom of the vulnerability — the same ordering let multer write the
+  // upload over a company's live datafile before anyone checked the role.
+  // The guard now runs first, so the case the note steered around is a clean
+  // 403 like any other.
+  test('403, not 500, for a certification_user with no company id', async () => {
+    const token = makeToken('certification_user', certUserId);
     const res = await request(app)
       .post('/v1/company/datafile')
       .set('Authorization', `Bearer ${token}`)

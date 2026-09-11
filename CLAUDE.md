@@ -130,6 +130,25 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   *routing* decisions (which query shape to run), never for *authorisation*.
   Note that `canUserSeeRun` returns `SELECT *`, so project the row before
   returning it or the response silently widens.
+- **Authorise before you parse — and testers keep the datafile save, on
+  purpose** (S2/S3, v1.11.195). `company.js` `authorizeDatafileWrite(policy)`
+  runs as middleware *ahead of* any body parser. For the multipart upload that
+  ordering is the fix: multer used to run first with a `diskStorage` whose
+  filename was the live `{slug}-datafile.json`, so a refused upload had already
+  replaced the file (and a failed validation then deleted it). Uploads now use
+  `memoryStorage`; nothing reaches disk until authorised and validated. Any
+  future upload route: guard first, parse second, never let a parser's storage
+  target be the live artifact. Two policies — `uploadPolicy` (POST, whole-file
+  replace) is Test-Manager-only; `savePolicy` (`PUT /datafile/json`, the Test
+  Config **Save & Apply**) refuses administrators and certifiers but **admits
+  testers**, because Test Config is on the tester menu and it is how testers
+  author scenarios and set `scenariosToRun`, which `POST /v1/runs` reads. The
+  2026-09-05 audit and our own remediation tracker both said "make PUT
+  Test-Manager-only"; that would have stopped every tester from running
+  anything but the Test Manager's selection. Do not "fix" it that way. The real
+  remaining gap is intra-tenant: a tester's save replaces the whole file, so it
+  can alter shared and other testers' private scenarios (read-only only in the
+  browser) — needs a server-side per-scenario merge (§6).
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -372,6 +391,15 @@ checkout ever lands in a path with a space again, the workaround is
   amount after REFUNDED. OSCAR only logs before/after at INFO; turning it
   into an assertion (or a per-company Known Deviation) waits for OTST/SBB to
   say whether that run was a partial refund or a deviation.
+- **Remaining half of S3 (2026-09-11, needs a design decision):** a tester's
+  `PUT /datafile/json` replaces the whole company datafile, so it can alter
+  shared scenarios and other testers' private ones; `scenarios.js` marks them
+  read-only (`readOnly = isTester && sc.shared`) but only client-side. Options:
+  a server-side merge that accepts a tester's own non-shared scenarios plus
+  `scenariosToRun` and takes everything else from the stored file, or a
+  per-tester run-list. `scenariosToRun` is also one company-wide list today,
+  so two testers overwrite each other's selection. See §2 "Authorise before
+  you parse".
 - **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
   **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
   both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open
