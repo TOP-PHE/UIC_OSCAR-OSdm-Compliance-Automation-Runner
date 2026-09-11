@@ -20,10 +20,11 @@ const isTester = user.role === 'company_user';
 // v1.11.197 — the server keeps a tester's changes to their OWN, non-shared
 // scenarios only; shared scenarios, and company scenarios with no owner, are
 // read-only for testers and other testers' private ones are not sent at all.
-// Same rule as isOwnedBy() in src/utils/datafileOwnership.js — keep in step.
-const sameEmail = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
-function isMine(sc) { return !!sc && !sc.shared && !!sc.created_by && sameEmail(sc.created_by, user.email); }
-function isReadOnlyForMe(sc) { return isTester && !isMine(sc); }
+// The rule lives in js/scenario-access.js, pinned by a test to isOwnedBy() in
+// src/utils/datafileOwnership.js. #515: a read-only card is rendered locked
+// (renderScenarioDetail) and its controls are refused (isLockedControl).
+function isMine(sc) { return OscarScenarioAccess.isOwnedBy(sc, user.email); }
+function isReadOnlyForMe(sc) { return OscarScenarioAccess.isReadOnlyFor(sc, user); }
 // logout() provided by nav.js
 
 // ── Version helper ──────────────────────────────────────────────────────────
@@ -1207,8 +1208,8 @@ function renderAll() {
       ownerBadge = `<span class="badge" style="background:#eceff1;color:#546e7a;border:1px solid #cfd8dc" title="A company scenario with no owner — read-only for testers. Duplicate it to get an editable copy.">🔒 Company</span>`;
     }
     const versionBadge = sc.version ? `<span style="font-size:10px;color:#78909c;margin-left:4px">v${esc(sc.version)}</span>` : '';
-    // Delete button: hide for testers on shared scenarios or scenarios owned by others
-    const canDelete = !isTester || isMine(sc);
+    // Delete button: hidden on a scenario that is read-only for this tester
+    const canDelete = !isReadOnlyForMe(sc);
     // Duplicate button: visible on every scenario the user can meaningfully
     // act on — previously this was gated to "tester + shared scenario" only,
     // which hid the feature from test-managers and owners duplicating their
@@ -1216,8 +1217,9 @@ function renderAll() {
     // AND the viewer is a tester — in that case a 📋 pill is shown in its
     // own spot (template-duplicate usage was the original use-case).
     const showDuplicate = true;
+    // data-sc-card ties every control on the card to its scenario (isLockedControl).
     return `
-    <div class="scenario-item">
+    <div class="scenario-item" data-sc-card="${esc(idx)}">
       <div class="scenario-toggle" style="display:flex;align-items:center;gap:10px">
         <input type="checkbox" ${inRun ? 'checked' : ''}
           data-action="toggle-scenario" data-code="${esc(sc.code)}"
@@ -1276,18 +1278,8 @@ function toggleDetail(idx) {
   if (!isOpen) {
     // Lazy-render detail content
     if (!detail.dataset.rendered) {
-      detail.innerHTML = buildDetailHTML(idx);
+      renderScenarioDetail(detail, idx);
       detail.dataset.rendered = '1';
-      // Read-only mode for testers viewing shared scenarios
-      const sc = state.scenarios[idx];
-      if (isTester && sc && sc.shared) {
-        const banner = document.createElement('div');
-        banner.innerHTML = '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100">🔒 This scenario is managed by your Test Manager and cannot be modified.</div>';
-        detail.prepend(banner.firstChild);
-        detail.querySelectorAll('input, select, textarea').forEach(el => el.disabled = true);
-        detail.querySelectorAll('.pill').forEach(el => el.style.pointerEvents = 'none');
-        detail.querySelectorAll('[data-action="delete-scenario"]').forEach(el => el.style.display = 'none');
-      }
     }
     detail.classList.add('open');
     arrow.classList.add('open');
@@ -1297,7 +1289,62 @@ function toggleDetail(idx) {
   }
 }
 
+// ── Read-only scenario cards (#515) ──────────────────────────────────────────
+// A tester may change only their own scenarios; the server discards the rest
+// (mergeTesterSave). Two layers keep the editor honest about that:
+//   1. renderScenarioDetail() — the ONLY way a card's detail is drawn. On a
+//      read-only card it disables every control whose data-action is not on
+//      the view-only allowlist (OscarScenarioAccess.READ_ONLY_CARD_ACTIONS).
+//   2. isLockedControl() — the click / change / input delegates refuse such a
+//      control before dispatching, whatever the rendering says.
+// Both are default-deny: a control added to the card later is locked on
+// read-only cards without anyone having to remember to gate it.
+
+// The index of the scenario whose card `el` is on, or -1 (renderAll stamps
+// data-sc-card on each .scenario-item).
+function cardScenarioIndex(el) {
+  const card = el?.closest('[data-sc-card]');
+  return card ? Number.parseInt(card.dataset.scCard, 10) : -1;
+}
+
+// The element with this id on the same card as `el`. Ids inside a card repeat
+// when two open cards show the same passenger list (older datafiles share
+// entries), and document.getElementById would pick the first — possibly a
+// read-only card.
+function cardElementById(el, id) {
+  const detail = el.closest('.scenario-detail');
+  return detail ? detail.querySelector(`[id="${id}"]`) : document.getElementById(id);
+}
+
+// True when `el` is a control, on a scenario card, that this user may not use.
+function isLockedControl(el) {
+  const idx = cardScenarioIndex(el);
+  if (idx < 0 || !state) return false;
+  return OscarScenarioAccess.isCardActionLocked(el.dataset.action, (state.scenarios || [])[idx], user);
+}
+
+function readOnlyBannerHTML(sc) {
+  let whose = 'A company scenario with no owner';
+  if (sc?.shared) whose = 'Shared by your Test Manager';
+  else if (sc?.created_by) whose = `Created by ${esc(sc.created_by)}`;
+  return `<div class="ro-banner" role="note">🔒 ${whose} — read-only for testers. Use <strong>📋 Duplicate</strong> to get an editable copy of your own.</div>`;
+}
+
+function renderScenarioDetail(detail, idx) {
+  detail.innerHTML = buildDetailHTML(idx);
+  const sc = state.scenarios[idx];
+  if (!isReadOnlyForMe(sc)) return;
+  detail.insertAdjacentHTML('afterbegin', readOnlyBannerHTML(sc));
+  detail.querySelectorAll('[data-action]').forEach(c => {
+    if (OscarScenarioAccess.isAllowedOnReadOnlyCard(c.dataset.action)) return;
+    if ('disabled' in c) c.disabled = true;   // input, select, textarea, button
+    else c.classList.add('ro-locked');       // pills and other clickable elements
+    c.setAttribute('aria-disabled', 'true');
+  });
+}
+
 // ── Build the detail HTML for one scenario ────────────────────────────────────
+// Draw it with renderScenarioDetail(), never by assigning this to innerHTML.
 function buildDetailHTML(idx) {
   const sc = state.scenarios[idx];
   const trip = getTrip(sc.tripRequirementId);
@@ -1305,8 +1352,7 @@ function buildDetailHTML(idx) {
   const fulfGroup = getFulfillment(sc.requestedFulfillmentOptionsListId);
   const purchGroup = getPurchaser(sc.purchaserListId);
 
-  // Read-only for testers when the scenario is shared by a test-manager.
-  const codeReadOnly = isTester && sc.shared;
+  const codeReadOnly = isReadOnlyForMe(sc);
   return `
   <!-- Scenario params -->
   <div class="param-section">
@@ -1789,7 +1835,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-body${placeProbesOpenClass}" style="padding:10px 14px">
             ${PLACE_PROBE_ITEMS.map((p, i) => {
               const on = ppSel[p.key] === true;
-              const style = (isTester && sc0.shared) ? ' style="pointer-events:none;opacity:.6"' : '';
+              const style = isReadOnlyForMe(sc0) ? ' style="pointer-events:none;opacity:.6"' : '';
               return `
             <div style="${i === 0 ? '' : 'margin-top:10px;'}padding:10px;border:1px dashed #b0bec5;border-radius:6px">
               <div class="pill${on ? ' selected' : ''}" data-action="toggle-place-probe" data-idx="${esc(idx)}" data-key="${esc(p.key)}" title="${esc(p.label)}"${style}>${p.icon} ${esc(p.label)}</div>
@@ -2257,7 +2303,7 @@ function reRenderScenarioDetail(scIdx) {
     }
   });
   const _savedScrollY = window.scrollY;
-  detail.innerHTML = buildDetailHTML(scIdx);
+  renderScenarioDetail(detail, scIdx);
   detail.querySelectorAll('.param-section-head').forEach(h => {
     const label = (h.textContent || '').trim();
     const isOpen = openSections.has(label);
@@ -2316,6 +2362,8 @@ function buildPassengersSection(idx, sc, paxGroup) {
   const passengers = paxGroup.passengers || [];
 
   const readOnly = isReadOnlyForMe(sc);
+  // A read-only passenger can still be opened, to read its details.
+  const paxVerb = readOnly ? 'View' : 'Edit';
   // Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
   function inferCategory(p) {
     if (p.category) return p.category;
@@ -2448,7 +2496,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
     <span style="font-size:12px;color:#78909c" data-pax-display="${esc(pIdx)}-${esc(pi)}">${esc(p.firstName||'')} ${esc(p.lastName||'')}</span>
     ${famN != null ? `<span data-pax-family-badge="${esc(pIdx)}-${esc(pi)}" title="Part of Family ${famN} — shares last name with other family members" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8">👪 F${famN}</span>` : `<span data-pax-family-badge="${esc(pIdx)}-${esc(pi)}"></span>`}
     ${ageRange ? `<span style="font-size:11px;color:#90a4ae">age ${ageRange.min}-${ageRange.max}</span>` : ''}
-    <button class="btn btn-sm btn-secondary" data-action="toggle-pax-edit" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;padding:2px 8px;margin-left:auto" title="Edit full details, reduction cards, loyalty cards">${isEditOpen ? 'Edit ▴' : 'Edit ▾'}</button>
+    <button class="btn btn-sm btn-secondary" data-action="toggle-pax-edit" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-verb="${paxVerb}" style="font-size:11px;padding:2px 8px;margin-left:auto" title="${paxVerb} full details, reduction cards, loyalty cards">${paxVerb} ${isEditOpen ? '▴' : '▾'}</button>
     ${!readOnly && passengers.length > 1 ? `<button class="btn btn-sm" data-action="remove-pax" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;padding:2px 6px;color:#c62828;background:#ffebee;border:1px solid #ef9a9a" title="Remove">✕</button>` : ''}
   </div>
   ${editPanel}`;
@@ -2483,27 +2531,35 @@ function isDefaultPurchaserValue(s) {
   return typeof s === 'string' && s.indexOf(PURCHASER_DEFAULT_PREFIX) === 0;
 }
 
-function buildPurchaserSection(idx, sc, purchGroup) {
-  // Ensure the purchaser list entry exists. Legacy data files, imports, or
-  // in-place edits can leave sc.purchaserListId pointing at nothing; the
-  // previous render just showed empty inputs and the link-checkbox handler
-  // silently bailed out because state.purchaserList[-1] was undefined.
+// The purchaser a scenario's card shows, and the index of its entry in
+// state.purchaserList (-1 when there is none). For an editable scenario the
+// entry is created when missing: legacy data files, imports, or in-place edits
+// can leave sc.purchaserListId pointing at nothing; the previous render just
+// showed empty inputs and the link-checkbox handler silently bailed out
+// because state.purchaserList[-1] was undefined. #515: never for a read-only
+// scenario — drawing it must not change the model (the edit could not be
+// saved, and it marked the page dirty).
+function purchaserEntryForCard(sc, purchGroup, readOnly) {
   let prIdx = (state.purchaserList || []).findIndex(p => p.id === sc.purchaserListId);
+  if (readOnly) return { prIdx, purch: purchGroup.purchaser?.[0] || {} };
+  let entry = purchGroup;
   if (prIdx === -1) {
     state.purchaserList = state.purchaserList || [];
     const newPurchId = sc.purchaserListId || (Math.max(0, ...state.purchaserList.map(p => p.id || 0)) + 1);
     sc.purchaserListId = newPurchId;
-    const newEntry = { id: newPurchId, purchaser: [{}] };
-    state.purchaserList.push(newEntry);
+    entry = { id: newPurchId, purchaser: [{}] };
+    state.purchaserList.push(entry);
     prIdx = state.purchaserList.length - 1;
-    purchGroup = newEntry;
     markDirty();
   }
-  purchGroup.purchaser = purchGroup.purchaser || [{}];
-  if (!purchGroup.purchaser[0]) purchGroup.purchaser[0] = {};
-  const purch = purchGroup.purchaser[0];
+  entry.purchaser = entry.purchaser || [{}];
+  if (!entry.purchaser[0]) entry.purchaser[0] = {};
+  return { prIdx, purch: entry.purchaser[0] };
+}
 
+function buildPurchaserSection(idx, sc, purchGroup) {
   const readOnly = isReadOnlyForMe(sc);
+  const { prIdx, purch } = purchaserEntryForCard(sc, purchGroup, readOnly);
 
   // Seed default purchaser values if the record is completely empty. The
   // "Purchaser_" prefix makes it obvious the field is purchaser-specific,
@@ -6037,6 +6093,10 @@ function findAction(target) {
 document.body.addEventListener('click', function(e) {
   const el = findAction(e.target);
   if (!el) return;
+  // #515: a control on a read-only scenario card does nothing. It is drawn
+  // disabled too; this catches anything that still gets a click through
+  // (preventDefault also undoes a checkbox tick before its change event).
+  if (isLockedControl(el)) { e.preventDefault(); return; }
   const action = el.dataset.action;
 
   switch (action) {
@@ -6117,7 +6177,7 @@ document.body.addEventListener('click', function(e) {
       // Re-render the detail for this scenario
       const detail = document.getElementById(`detail-${esc(scIdx)}`);
       if (detail && detail.innerHTML) {
-        detail.innerHTML = buildDetailHTML(scIdx);
+        renderScenarioDetail(detail, scIdx);
         // Re-open the passengers section
         detail.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
         detail.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
@@ -6140,12 +6200,12 @@ document.body.addEventListener('click', function(e) {
       const tpIdx = parseInt(el.dataset.pidx);
       const tpPi  = parseInt(el.dataset.pi);
       const key   = tpIdx + ':' + tpPi;
-      const panel = document.getElementById('pax-edit-' + tpIdx + '-' + tpPi);
+      const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
       const row   = panel && panel.previousElementSibling;
       const nowOpen = _paxEditOpen.has(key) ? false : true;
       if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
       if (panel) panel.style.display = nowOpen ? 'block' : 'none';
-      if (el)    el.textContent = nowOpen ? 'Edit ▴' : 'Edit ▾';
+      if (el)    el.textContent = (el.dataset.verb || 'Edit') + (nowOpen ? ' ▴' : ' ▾');
       if (row)   row.style.borderBottom = nowOpen ? 'none' : '1px solid #f0f0f0';
       break;
     }
@@ -6160,7 +6220,9 @@ document.body.addEventListener('click', function(e) {
       arPax.reductionCards.push('');
       markDirty();
       // Append the new row just before the "+ Add" button so indexes stay contiguous.
-      const container = document.getElementById('pax-reductions-' + arIdx + '-' + arPi);
+      // The rows below are editable (readOnly false): isLockedControl has
+      // already refused this action on a read-only card.
+      const container = cardElementById(el, 'pax-reductions-' + arIdx + '-' + arPi);
       if (container) {
         const tmp = document.createElement('div');
         tmp.innerHTML = buildReductionCardRow(arIdx, arPi, arPax.reductionCards.length - 1, '', false);
@@ -6185,7 +6247,7 @@ document.body.addEventListener('click', function(e) {
       markDirty();
       // Rebuild the card list for this passenger to keep data-cidx values
       // contiguous with the underlying array indices.
-      const container = document.getElementById('pax-reductions-' + rrIdx + '-' + rrPi);
+      const container = cardElementById(el, 'pax-reductions-' + rrIdx + '-' + rrPi);
       if (container) {
         container.innerHTML = rrPax.reductionCards.map((code, ci) =>
           buildReductionCardRow(rrIdx, rrPi, ci, code, false)
@@ -6203,7 +6265,7 @@ document.body.addEventListener('click', function(e) {
       if (!Array.isArray(alPax.loyaltyCards)) alPax.loyaltyCards = [];
       alPax.loyaltyCards.push({ carrierCode: '', cardReference: '' });
       markDirty();
-      const container = document.getElementById('pax-loyalties-' + alIdx + '-' + alPi);
+      const container = cardElementById(el, 'pax-loyalties-' + alIdx + '-' + alPi);
       if (container) {
         const tmp = document.createElement('div');
         tmp.innerHTML = buildLoyaltyCardRow(alIdx, alPi, alPax.loyaltyCards.length - 1, {}, false);
@@ -6225,7 +6287,7 @@ document.body.addEventListener('click', function(e) {
       if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) break;
       rlPax.loyaltyCards.splice(rlCi, 1);
       markDirty();
-      const container = document.getElementById('pax-loyalties-' + rlIdx + '-' + rlPi);
+      const container = cardElementById(el, 'pax-loyalties-' + rlIdx + '-' + rlPi);
       if (container) {
         container.innerHTML = rlPax.loyaltyCards.map((card, ci) =>
           buildLoyaltyCardRow(rlIdx, rlPi, ci, card, false)
@@ -6253,7 +6315,7 @@ document.body.addEventListener('click', function(e) {
           const sIdx = parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
           if (sc && sc.passengersListId === rpList.id) {
-            det.innerHTML = buildDetailHTML(sIdx);
+            renderScenarioDetail(det, sIdx);
             det.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
             det.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
             det.querySelectorAll('.param-section-head').forEach(h => {
@@ -6541,6 +6603,9 @@ document.body.addEventListener('click', function(e) {
 document.body.addEventListener('change', function(e) {
   const el = findAction(e.target);
   if (!el) return;
+  // #515: refuse, and redraw the card from the unchanged model so the screen
+  // shows nothing the save would not keep.
+  if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
 
   switch (action) {
@@ -6658,7 +6723,7 @@ document.body.addEventListener('change', function(e) {
               openSections.add((h.textContent || '').trim());
             }
           });
-          detail.innerHTML = buildDetailHTML(scIdx);
+          renderScenarioDetail(detail, scIdx);
           detail.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             if (openSections.has(label)) {
@@ -6699,7 +6764,7 @@ document.body.addEventListener('change', function(e) {
               openSections.add((h.textContent || '').trim());
             }
           });
-          det.innerHTML = buildDetailHTML(sIdx);
+          renderScenarioDetail(det, sIdx);
           det.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             const isOpen = openSections.has(label);
@@ -6991,6 +7056,7 @@ document.body.addEventListener('change', function(e) {
 document.body.addEventListener('input', function(e) {
   const el = findAction(e.target);
   if (!el) return;
+  if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
 
   switch (action) {
