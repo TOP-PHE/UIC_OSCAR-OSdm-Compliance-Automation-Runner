@@ -420,7 +420,7 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
       }
       let stored = {};
       const current = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
-      if (current && current.datafile_path && fs.existsSync(current.datafile_path)) {
+      if (current?.datafile_path && fs.existsSync(current.datafile_path)) {
         try {
           stored = JSON.parse((await decryptFromFileAsync(current.datafile_path)).toString('utf8'));
         } catch (err) {

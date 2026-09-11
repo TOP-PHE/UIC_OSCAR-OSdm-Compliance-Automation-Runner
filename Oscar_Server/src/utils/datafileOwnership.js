@@ -83,7 +83,9 @@ function canonical(value) {
     if (Array.isArray(v)) return v.map(walk);
     if (!isObj(v)) return v;
     const out = {};
-    for (const k of Object.keys(v).sort()) {
+    // Code-unit order, deliberately not localeCompare: the result must not
+    // depend on the server's locale. Keys are unique, so a tie never occurs.
+    for (const k of Object.keys(v).sort((a, b) => (a < b ? -1 : 1))) {
       if (!k.startsWith('__')) out[k] = walk(v[k]);
     }
     return out;
@@ -152,7 +154,7 @@ function orderedUnique(codes) {
 
 /** The codes a tester sees, in file order. */
 function visibleCodes(datafile, email) {
-  return orderedUnique(arr(datafile && datafile.scenarios).filter(s => isVisibleTo(s, email)).map(s => s.code));
+  return orderedUnique(arr(datafile?.scenarios).filter(s => isVisibleTo(s, email)).map(s => s.code));
 }
 
 /**

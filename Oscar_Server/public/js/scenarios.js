@@ -2938,7 +2938,10 @@ function showSaveConfirm(data) {
   const renamed = Array.isArray(data.renamed) ? data.renamed : [];
   const lines = [];
   if (ignored.length) lines.push(`Not changed — read-only for testers: ${ignored.join(', ')}. Duplicate a scenario to get your own editable copy.`);
-  if (renamed.length) lines.push(`Saved under a new code, because the code was already used by another scenario: ${renamed.map(r => `${r.from} → ${r.to}`).join(', ')}.`);
+  if (renamed.length) {
+    const pairs = renamed.map(r => `${r.from} → ${r.to}`).join(', ');
+    lines.push(`Saved under a new code, because the code was already used by another scenario: ${pairs}.`);
+  }
   if (data.run_list_saved === false) lines.push('Your scenarios were saved, but your run list could not be — tick your scenarios again and save.');
   note.textContent = lines.join(' ');
   note.style.display = lines.length ? '' : 'none';
@@ -6004,8 +6007,9 @@ async function wizGenerateScenario() {
     await refreshAllSections();
 
     if (statusEl) {
+      const renameNote = rename ? ` (<code>${esc(code)}</code> was already used)` : '';
       statusEl.innerHTML =
-        `<span style="color:#2e7d32;font-weight:700">✅ Scenario <code>${esc(storedCode)}</code> added and saved!${rename ? ` (<code>${esc(code)}</code> was already used)` : ''}</span>
+        `<span style="color:#2e7d32;font-weight:700">✅ Scenario <code>${esc(storedCode)}</code> added and saved!${renameNote}</span>
         &nbsp;·&nbsp;
         <a href="#" data-action="create-another" style="color:#0090D4;font-size:12px">
           ➕ Create another</a>`;
