@@ -70,6 +70,10 @@ function makeToken(role, uid, cid = companyId) {
 
 const BASELINE = { scenarios: [{ code: 'OTST_BASELINE_SENTINEL' }], scenariosToRun: ['OTST_BASELINE_SENTINEL'] };
 const HOSTILE  = { scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE' }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] };
+// What the editor sends for a tester's own new scenario: it always stamps their
+// email. Since v1.11.197 a tester's save is merged, not a whole-file replace, and
+// a scenario that does not carry their ownership is not stored as theirs.
+const TESTER_OWN = { scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE', created_by: 'company_user@datafile-authz.test', shared: false }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] };
 const hostileFile = Buffer.from(JSON.stringify(HOSTILE), 'utf8');
 
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -193,7 +197,7 @@ describe('PUT /v1/company/datafile/json by a tester', () => {
     const res = await request(app)
       .put('/v1/company/datafile/json')
       .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`)
-      .send(HOSTILE);
+      .send(TESTER_OWN);
     expect(res.status).toBe(200);
     const after = liveDatafile();
     expect(after.plain).toContain('OTST_HOSTILE_OVERWRITE');
@@ -206,7 +210,7 @@ describe('PUT /v1/company/datafile/json by a tester', () => {
       .put(`/v1/company/datafile/json?company_id=${otherCoId}`)
       .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`)
       .set('x-company-id', otherCoId)
-      .send(HOSTILE);
+      .send(TESTER_OWN);
     // The save lands on the tester's own company, never the one named.
     expect(res.status).toBe(200);
     expect(res.body.filename).toBe(liveName);

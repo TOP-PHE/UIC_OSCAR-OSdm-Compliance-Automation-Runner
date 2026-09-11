@@ -17,6 +17,13 @@ const token = localStorage.getItem('oscar_token');
 const authHeaders = token ? { Authorization: 'Bearer ' + token } : {};
 const isTestManager = user.role === 'test_manager' || user.role === 'administrator';
 const isTester = user.role === 'company_user';
+// v1.11.197 — the server keeps a tester's changes to their OWN, non-shared
+// scenarios only; shared scenarios, and company scenarios with no owner, are
+// read-only for testers and other testers' private ones are not sent at all.
+// Same rule as isOwnedBy() in src/utils/datafileOwnership.js — keep in step.
+const sameEmail = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function isMine(sc) { return !!sc && !sc.shared && !!sc.created_by && sameEmail(sc.created_by, user.email); }
+function isReadOnlyForMe(sc) { return isTester && !isMine(sc); }
 // logout() provided by nav.js
 
 // ── Version helper ──────────────────────────────────────────────────────────
@@ -1192,14 +1199,16 @@ function renderAll() {
     if (sc.shared) {
       ownerBadge = `<span class="badge" style="background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8">🔒 Shared</span>`;
       if (sc.created_by) ownerBadge += `<span style="font-size:10px;color:#90a4ae;margin-left:4px">by: ${esc(sc.created_by)}</span>`;
-    } else if (sc.created_by === user.email) {
+    } else if (isMine(sc)) {
       ownerBadge = `<span class="badge" style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7">✏️ Yours</span>`;
     } else if (sc.created_by) {
       ownerBadge = `<span style="font-size:10px;color:#90a4ae">by: ${esc(sc.created_by)}</span>`;
+    } else if (isTester) {
+      ownerBadge = `<span class="badge" style="background:#eceff1;color:#546e7a;border:1px solid #cfd8dc" title="A company scenario with no owner — read-only for testers. Duplicate it to get an editable copy.">🔒 Company</span>`;
     }
     const versionBadge = sc.version ? `<span style="font-size:10px;color:#78909c;margin-left:4px">v${esc(sc.version)}</span>` : '';
     // Delete button: hide for testers on shared scenarios or scenarios owned by others
-    const canDelete = !isTester || (!sc.shared && sc.created_by === user.email);
+    const canDelete = !isTester || isMine(sc);
     // Duplicate button: visible on every scenario the user can meaningfully
     // act on — previously this was gated to "tester + shared scenario" only,
     // which hid the feature from test-managers and owners duplicating their
@@ -1878,7 +1887,7 @@ function buildNonHappyFlowSection(idx, sc) {
 
 function buildSalesFlowActionsSection(idx, sc) {
   if (!sc.scenarioType) return '';
-  const readOnly = isTester && sc.shared;
+  const readOnly = isReadOnlyForMe(sc);
   const current = (sc && typeof sc.salesFlowActions === 'object' && sc.salesFlowActions)
     ? sc.salesFlowActions : defaultSalesFlowActions();
 
@@ -2306,7 +2315,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
   const pIdx = (state.passengersList || []).findIndex(p => p.id === sc.passengersListId);
   const passengers = paxGroup.passengers || [];
 
-  const readOnly = isTester && sc.shared;
+  const readOnly = isReadOnlyForMe(sc);
   // Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
   function inferCategory(p) {
     if (p.category) return p.category;
@@ -2494,7 +2503,7 @@ function buildPurchaserSection(idx, sc, purchGroup) {
   if (!purchGroup.purchaser[0]) purchGroup.purchaser[0] = {};
   const purch = purchGroup.purchaser[0];
 
-  const readOnly = isTester && sc.shared;
+  const readOnly = isReadOnlyForMe(sc);
 
   // Seed default purchaser values if the record is completely empty. The
   // "Purchaser_" prefix makes it obvious the field is purchaser-specific,
@@ -2915,8 +2924,26 @@ function showSaveConfirm(data) {
   // v1.11.7 — parseServerTs (nav.js) normalises SQLite's TZ-less UTC strings.
   document.getElementById('sc-saved-at').textContent = parseServerTs(data.saved_at).toLocaleString();
   document.getElementById('sc-hash').textContent = (data.hash || '').slice(0, 16) + '…';
-  document.getElementById('save-confirm').style.display = 'block';
-  document.getElementById('save-confirm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // v1.11.197 — edits a tester made to read-only (shared or company) scenarios
+  // are not kept by the server; say so rather than let them silently revert.
+  const box = document.getElementById('save-confirm');
+  let note = document.getElementById('sc-readonly-note');
+  if (!note) {
+    note = document.createElement('p');
+    note.id = 'sc-readonly-note';
+    note.style.cssText = 'margin:8px 0 0;padding:8px 10px;border-radius:6px;background:#fff3e0;border:1px solid #ffcc80;color:#e65100;font-size:12px';
+    box.appendChild(note);
+  }
+  const ignored = Array.isArray(data.read_only_ignored) ? data.read_only_ignored : [];
+  const renamed = Array.isArray(data.renamed) ? data.renamed : [];
+  const lines = [];
+  if (ignored.length) lines.push(`Not changed — read-only for testers: ${ignored.join(', ')}. Duplicate a scenario to get your own editable copy.`);
+  if (renamed.length) lines.push(`Saved under a new code, because the code was already used by another scenario: ${renamed.map(r => `${r.from} → ${r.to}`).join(', ')}.`);
+  if (data.run_list_saved === false) lines.push('Your scenarios were saved, but your run list could not be — tick your scenarios again and save.');
+  note.textContent = lines.join(' ');
+  note.style.display = lines.length ? '' : 'none';
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function saveDatafile() {
@@ -2956,16 +2983,21 @@ async function saveDatafile() {
     }
     const verified = await verifyRes.json();
 
-    // Check scenariosToRun matches what we sent
+    // Check the stored run list matches what the server says it stored
+    // (data.to_run). v1.11.197: compare with the server's answer, not with what
+    // the editor sent — a tester's save is merged, so the server may normalise
+    // the list (duplicate codes from Select All, a new scenario renamed because
+    // its code was taken), and comparing with what was sent raised a false
+    // "Mismatch" on a save that had in fact succeeded.
     // Explicit string compare silences Sonar S2871 (missing compare fn);
     // semantically identical to the default sort for this string-array equality check.
     const byCode = (a, b) => String(a).localeCompare(String(b));
-    const sentCodes     = JSON.stringify([...(state.scenariosToRun || [])].sort(byCode));
+    const storedCodes   = JSON.stringify([...(data.to_run || [])].sort(byCode));
     const receivedCodes = JSON.stringify([...(verified.scenariosToRun || [])].sort(byCode));
-    if (sentCodes !== receivedCodes) {
+    if (storedCodes !== receivedCodes) {
       showSaveError(
-        `Mismatch after save! Sent ${state.scenariosToRun.length} scenario(s) to run, ` +
-        `but server has ${verified.scenariosToRun.length}. ` +
+        `Mismatch after save! The server stored ${(data.to_run || []).length} scenario(s) to run, ` +
+        `but reads back ${(verified.scenariosToRun || []).length}. ` +
         `Please reload and try again.`
       );
       return;
@@ -5962,13 +5994,18 @@ async function wizGenerateScenario() {
       const err = await saveRes.json().catch(() => ({}));
       throw new Error(err.detail || err.title || `HTTP ${saveRes.status}`);
     }
+    // v1.11.197 — a tester's new scenario whose code is already used by someone
+    // else's is stored under a free code; report the code it actually has.
+    const saved = await saveRes.json().catch(() => ({}));
+    const rename = (Array.isArray(saved.renamed) ? saved.renamed : []).find(r => r.from === code);
+    const storedCode = rename ? rename.to : code;
 
     // ── 10. Success — auto-refresh so the new scenario appears immediately ─────
     await refreshAllSections();
 
     if (statusEl) {
       statusEl.innerHTML =
-        `<span style="color:#2e7d32;font-weight:700">✅ Scenario <code>${esc(code)}</code> added and saved!</span>
+        `<span style="color:#2e7d32;font-weight:700">✅ Scenario <code>${esc(storedCode)}</code> added and saved!${rename ? ` (<code>${esc(code)}</code> was already used)` : ''}</span>
         &nbsp;·&nbsp;
         <a href="#" data-action="create-another" style="color:#0090D4;font-size:12px">
           ➕ Create another</a>`;

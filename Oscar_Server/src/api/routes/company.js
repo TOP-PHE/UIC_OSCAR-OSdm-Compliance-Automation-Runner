@@ -29,6 +29,9 @@ const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier } = require('../helpers/shared');
+const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
+const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
+const { withDatafileLock } = require('../../utils/datafileLock');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -347,17 +350,19 @@ router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadP
   const livePath = liveDatafilePath(company.slug);
   // Atomic temp+rename inside the helper: a crash mid-write leaves the
   // previous datafile intact, which matters because Bruno reads it during runs.
+  // Under the per-company lock so it cannot interleave with a tester's merge.
   try {
-    await encryptToFileAsync(plaintext, livePath);
+    await withDatafileLock(company.id, async () => {
+      await encryptToFileAsync(plaintext, livePath);
+      run(
+        `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+        [livePath, hash, company.id]
+      );
+    });
   } catch (err) {
     log.error({ err, companyId: company.id }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
   }
-
-  run(
-    `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    [livePath, hash, company.id]
-  );
 
   auditLog(req.user.id, company.id, req.user.email, 'datafile_uploaded');
 
@@ -396,71 +401,123 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
 
   fs.mkdirSync(DATAFILES_DIR, { recursive: true });
   const filePath = liveDatafilePath(slug);
+  const isTester = req.user.role === 'company_user';
 
-  // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
-  // is server-managed — derived from the findings the test team has baselined
-  // for runs — never hand-authored in the wizard. Overwrite whatever the client
-  // sent so a datafile save can't wipe or tamper with it. Soft: a failure here
-  // leaves the rest of the save intact.
-  try {
-    const { buildProjection } = require('../../utils/knownDeviationProjection');
-    body.knownDeviations = buildProjection(targetCompanyId);
-  } catch (err) {
-    log.warn({ err: err.message, companyId: targetCompanyId }, 'datafile save: knownDeviations projection failed');
-  }
+  return withDatafileLock(targetCompanyId, async () => {
+    // S3, second half (v1.11.197): a tester's save is merged into the stored
+    // file rather than replacing it — only their own scenarios change, shared
+    // and other people's scenarios stay exactly as stored, and what they tick
+    // becomes their personal run list. See utils/datafileOwnership. A Test
+    // Manager still saves the whole file.
+    let toStore = body;
+    let merge = null;
+    if (isTester) {
+      // The personal run list is keyed on the users row. A tester deleted while
+      // their session is still open would otherwise have their save written
+      // and then fail on that key — reported as "NOT saved" after the fact.
+      if (!get('SELECT 1 AS ok FROM users WHERE id = ?', [req.user.id])) {
+        return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This account no longer exists. Sign in again.' });
+      }
+      let stored = {};
+      const current = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
+      if (current && current.datafile_path && fs.existsSync(current.datafile_path)) {
+        try {
+          stored = JSON.parse((await decryptFromFileAsync(current.datafile_path)).toString('utf8'));
+        } catch (err) {
+          log.error({ err, companyId: targetCompanyId }, 'tester save: stored datafile unreadable — refusing to merge');
+          return res.status(409).json({ status: 409, title: 'Conflict',
+            detail: 'The stored data file cannot be read, so saving now could overwrite other people\'s scenarios. Ask your Test Manager to check it.' });
+        }
+      }
+      merge = mergeTesterSave(stored, body, req.user.email);
+      toStore = merge.datafile;
+    }
 
-  const content  = JSON.stringify(body, null, 4);
-  // Hash the plaintext (so the hash matches the user-visible file content),
-  // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
-  // helper guarantees that a crash mid-write leaves the previous datafile
-  // intact (matters because Bruno reads it during runs).
-  try {
-    await encryptToFileAsync(content, filePath);
-  } catch (err) {
-    log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
-    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
-  }
+    // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
+    // is server-managed — derived from the findings the test team has baselined
+    // for runs — never hand-authored in the wizard. Overwrite whatever the client
+    // sent so a datafile save can't wipe or tamper with it. Soft: a failure here
+    // leaves the rest of the save intact.
+    try {
+      const { buildProjection } = require('../../utils/knownDeviationProjection');
+      toStore.knownDeviations = buildProjection(targetCompanyId);
+    } catch (err) {
+      log.warn({ err: err.message, companyId: targetCompanyId }, 'datafile save: knownDeviations projection failed');
+    }
 
-  const hash = crypto.createHash('sha256').update(content).digest('hex');
-  run(
-    `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    [filePath, hash, targetCompanyId]
-  );
+    const content  = JSON.stringify(toStore, null, 4);
+    // Hash the plaintext (so the hash matches the user-visible file content),
+    // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
+    // helper guarantees that a crash mid-write leaves the previous datafile
+    // intact (matters because Bruno reads it during runs).
+    try {
+      await encryptToFileAsync(content, filePath);
+    } catch (err) {
+      log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
+      return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
+    }
 
-  // Return a summary so the UI can verify what was actually stored
-  return res.json({
-    filename:        path.basename(filePath),
-    hash,
-    saved_at:        new Date().toISOString(),
-    scenarios_count: body.scenarios.length,
-    to_run_count:    body.scenariosToRun.length,
-    to_run:          body.scenariosToRun
+    const hash = crypto.createHash('sha256').update(content).digest('hex');
+    run(
+      `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+      [filePath, hash, targetCompanyId]
+    );
+    // The file is saved at this point. A failure storing the run list must not
+    // be reported as a failed save; the tester sees their previous list instead.
+    let runListSaved = true;
+    if (merge) {
+      try { setRunSelection(targetCompanyId, req.user.id, merge.selection); }
+      catch (err) {
+        runListSaved = false;
+        log.error({ err, companyId: targetCompanyId }, 'tester save: data file saved, personal run list not');
+      }
+    }
+
+    // Return a summary so the UI can verify what was actually stored. For a
+    // tester the counts describe their view and to_run is their own run list.
+    const scenariosCount = merge ? viewForTester(toStore, req.user.email, merge.selection).scenarios.length : body.scenarios.length;
+    const toRun = merge ? merge.selection : body.scenariosToRun;
+    return res.json({
+      filename:        path.basename(filePath),
+      hash,
+      saved_at:        new Date().toISOString(),
+      scenarios_count: scenariosCount,
+      to_run_count:    toRun.length,
+      to_run:          toRun,
+      ...(merge ? {
+        // Shared scenarios a tester cannot change; the editor tells them their
+        // edits to these were not kept.
+        read_only_ignored: merge.ignoredReadOnly,
+        // New scenarios of theirs whose code someone else's already used,
+        // stored under a free code; the editor tells them the new name.
+        renamed:           merge.renamed,
+        resources_copied:  merge.forked.length,
+        run_list_saved:    runListSaved,
+      } : {}),
+    });
   });
 });
 
 // ── DELETE /v1/company/datafile ───────────────────────────────────────────────
-router.delete('/datafile', (req, res) => {
-  if (!requireTestManager(req, res)) return;
-  const targetCompanyId = resolveCompanyScope(req, res);
-  if (targetCompanyId === null) return;
+// v1.11.197: under the per-company lock like every other datafile writer. A
+// tester's save or a findings re-projection already in flight would otherwise
+// finish after the delete and write the whole old file back.
+router.delete('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
+  const { id: targetCompanyId } = req.datafileCompany;
+  await withDatafileLock(targetCompanyId, async () => {
+    const company = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
 
-  if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required.' });
-  }
+    // Remove file from disk if it exists
+    if (company.datafile_path && fs.existsSync(company.datafile_path)) {
+      try { fs.unlinkSync(company.datafile_path); } catch (_) { /* ignore */ }
+    }
 
-  const company = get('SELECT slug, datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
-
-  // Remove file from disk if it exists
-  if (company.datafile_path && fs.existsSync(company.datafile_path)) {
-    try { fs.unlinkSync(company.datafile_path); } catch (_) { /* ignore */ }
-  }
-
-  // Clear DB columns
-  run(
-    `UPDATE companies SET datafile_path = NULL, datafile_hash = NULL, datafile_updated_at = NULL, updated_at = datetime('now') WHERE id = ?`,
-    [targetCompanyId]
-  );
+    // Clear DB columns
+    run(
+      `UPDATE companies SET datafile_path = NULL, datafile_hash = NULL, datafile_updated_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+      [targetCompanyId]
+    );
+  });
 
   auditLog(req.user.id, targetCompanyId, req.user.email, 'datafile_deleted');
   return res.json({ deleted: true, message: 'Test configuration data file deleted.' });
@@ -501,13 +558,29 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
   // framework can't be read for any reason we serve the raw datafile —
   // soft validation: the warning is best-effort, never blocks the run.
   let serveBytes = plaintext;
+
+  // S3, second half (v1.11.197): a tester sees their own scenarios and the
+  // shared ones — not other people's private scenarios — and their personal run
+  // list in place of the company's scenariosToRun. See utils/datafileOwnership.
+  // Test Managers get the whole file, as before. Bruno never comes through here:
+  // it reads the unfiltered file from /data/:filename (server.js).
+  let testerView = null;
+  if (req.user.role === 'company_user') {
+    let parsed = null;
+    try { parsed = JSON.parse(plaintext.toString('utf8')); } catch (_) { /* not JSON: nothing to filter */ }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      testerView = viewForTester(parsed, req.user.email, getRunSelection(targetCompanyId, req.user.id));
+      serveBytes = Buffer.from(JSON.stringify(testerView), 'utf8');
+    }
+  }
+
   try {
     const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
     if (fwRow && fwRow.config) {
       let fwConfig = null;
       try { fwConfig = JSON.parse(colDecrypt(fwRow.config)); } catch (_) {}
       if (fwConfig) {
-        const df = JSON.parse(plaintext.toString('utf8'));
+        const df = testerView || JSON.parse(plaintext.toString('utf8'));
         const { annotatedCount } = annotateDatafile(df, fwConfig);
         if (annotatedCount > 0) {
           log.info({ companyId: targetCompanyId, annotatedCount }, 'datafile: annotated scenarios with feature-not-declared warnings');
@@ -517,7 +590,9 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
     }
   } catch (err) {
     log.warn({ err, companyId: targetCompanyId }, 'datafile annotator failed — serving unannotated bytes');
-    serveBytes = plaintext;
+    // Never fall back to the raw file for a tester: it holds the scenarios
+    // their view leaves out.
+    serveBytes = testerView ? Buffer.from(JSON.stringify(testerView), 'utf8') : plaintext;
   }
 
   res.setHeader('Content-Disposition', `attachment; filename="${company.slug}-datafile.json"`);
