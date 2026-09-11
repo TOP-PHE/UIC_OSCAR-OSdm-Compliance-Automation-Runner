@@ -424,8 +424,11 @@ does a positional path filter: use
 path containing a dot-segment, so `res.sendFile(public/index.html)` 404s
 internally. That one failure is the path, not the code: it passes in CI and in
 the main checkout. Run the full suite from a dot-free path before calling a PR
-green. One way: `git worktree add` somewhere dot-free, with a directory
-junction to the worktree's `node_modules`.
+green. What works:
+`git archive <commit> | tar -x -C <short dir>`, then `npm ci && npx jest` in its
+`Oscar_Server/`. Don't `git worktree add` into the session scratchpad: its path
+is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
+`node_modules` too.
 
 **Version bookkeeping — bump per functional PR:**
 - `Oscar_Server/package.json` (`version`) — server semver, bump on any
