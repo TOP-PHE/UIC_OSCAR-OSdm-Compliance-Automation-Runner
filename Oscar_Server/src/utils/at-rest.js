@@ -152,9 +152,65 @@ function _assertWritablePath(dstPath) {
 }
 
 /**
+ * Retry on a file Windows is briefly holding.
+ *
+ * On Windows, OneDrive, Defender and the search indexer open freshly written
+ * files for a moment. A rename over such a file — or an unlink of it — fails
+ * with EPERM, EBUSY or EACCES until they let go. Measured 2026-09-11 on a
+ * checkout inside OneDrive: 14 of 400 back-to-back rewrites of one datafile hit
+ * EPERM. The write failed outright, and its `<dst>.tmp.<hex>` file was left
+ * behind. graceful-fs handles the same problem on win32 with a backoff retry.
+ *
+ * The retry applies on every platform, not just win32. On Linux these codes
+ * mean a real permission or mount problem that retrying will not fix, so the
+ * only cost is failing about a second later — and keeping one code path means
+ * Linux CI exercises it too. The schedule is 10 attempts, waiting 940 ms in
+ * total, most of it in the last few waits.
+ */
+const RENAME_RETRY_CODES     = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_RETRY_DELAYS_MS = Object.freeze([10, 20, 30, 50, 80, 100, 150, 200, 300]);
+
+// Blocks the thread without spinning, so the sync writer stays synchronous.
+const _SLEEP_CELL = new Int32Array(new SharedArrayBuffer(4));
+function _sleepSync(ms) { Atomics.wait(_SLEEP_CELL, 0, 0, ms); }
+
+function _retryOnLockSync(op) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return op();
+    } catch (err) {
+      if (!RENAME_RETRY_CODES.has(err.code) || attempt >= RENAME_RETRY_DELAYS_MS.length) throw err;
+      _sleepSync(RENAME_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
+async function _retryOnLock(op) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await op();
+    } catch (err) {
+      if (!RENAME_RETRY_CODES.has(err.code) || attempt >= RENAME_RETRY_DELAYS_MS.length) throw err;
+      await new Promise(resolve => setTimeout(resolve, RENAME_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
+// Best effort, and retried too: the file that blocked the rename may be the
+// temp file itself. Never throws — the caller rethrows the original error.
+function _discardTempSync(tmp) {
+  try { _retryOnLockSync(() => fs.unlinkSync(tmp)); } catch (_) { /* nothing more we can do */ }
+}
+async function _discardTemp(tmp) {
+  try { await _retryOnLock(() => fs.promises.unlink(tmp)); } catch (_) { /* nothing more we can do */ }
+}
+
+/**
  * Convenience: encrypt a Buffer/string and write it to a file. Atomic via
  * temp+rename so a crash mid-write leaves the previous version intact
  * (matters for the datafile path which is read by Bruno during runs).
+ * The rename is retried while Windows holds the file (see _retryOnLock), and
+ * on failure the temp file is removed, so a failed write leaves nothing behind.
  *
  * dstPath must be an absolute path under one of OSCAR's writable
  * directories (data/artifacts, data/datafiles). Caller is responsible
@@ -166,8 +222,13 @@ function encryptToFile(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
-  fs.writeFileSync(tmp, enc, { mode: 0o640 });
-  fs.renameSync(tmp, safe);
+  try {
+    fs.writeFileSync(tmp, enc, { mode: 0o640 });
+    _retryOnLockSync(() => fs.renameSync(tmp, safe));
+  } catch (err) {
+    _discardTempSync(tmp);
+    throw err;
+  }
 }
 
 /**
@@ -180,16 +241,22 @@ function decryptFromFile(srcPath) {
 }
 
 /**
- * Async variant of encryptToFile. Same atomic temp+rename guarantee.
- * Preferred from inside async code paths (runner.js does parallel writes
- * for multi-scenario runs — sync I/O would serialize them on the event loop).
+ * Async variant of encryptToFile. Same atomic temp+rename guarantee, same
+ * retry and cleanup. Preferred from inside async code paths (runner.js does
+ * parallel writes for multi-scenario runs — sync I/O would serialize them on
+ * the event loop).
  */
 async function encryptToFileAsync(plaintext, dstPath) {
   const safe = _assertWritablePath(dstPath);
   const enc = encryptBuffer(plaintext);
   const tmp = safe + _tmpSuffix();
-  await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
-  await fs.promises.rename(tmp, safe);
+  try {
+    await fs.promises.writeFile(tmp, enc, { mode: 0o640 });
+    await _retryOnLock(() => fs.promises.rename(tmp, safe));
+  } catch (err) {
+    await _discardTemp(tmp);
+    throw err;
+  }
 }
 
 /** Async variant of decryptFromFile. */
@@ -217,6 +284,7 @@ module.exports = {
   decryptFromFileAsync,
   copyAndEncryptFileAsync,
   isEncryptedBuffer,
-  HEADER_LEN,   // exported for tests
-  MAGIC,        // exported for tests
+  HEADER_LEN,               // exported for tests
+  MAGIC,                    // exported for tests
+  RENAME_RETRY_DELAYS_MS,   // exported for tests (frozen)
 };

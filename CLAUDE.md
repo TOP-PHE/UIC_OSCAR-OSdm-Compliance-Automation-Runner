@@ -218,14 +218,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     separately from the check-run status, if branch protection has "all
     conversations must be resolved" — an unused-import note is exactly the
     kind of thing that silently blocks merge behind a green checklist.
-  - **On this Windows/OneDrive checkout, a rare full-suite failure is usually
-    `EPERM` on rename, not your code.** OneDrive briefly locks a freshly written
-    file under `Oscar_Server/data/`, and `at-rest.js`'s atomic temp+rename over
-    it fails (measured 2026-09-11: 14 of 400 back-to-back rewrites). The
-    signature is `EPERM: operation not permitted, rename '…datafile.json.tmp.<hex>'`
-    and a stray `*.tmp.<hex>` left in `data/datafiles/`, which then trips any
-    "no stray files" assertion. Linux CI and production cannot hit it. Re-run;
-    the fix (retry the rename on EPERM/EBUSY/EACCES) is tracked separately.
+  - **`at-rest.js` retries its rename, and a test that writes files should not
+    need to** (v1.11.196). On Windows, OneDrive, Defender and the indexer
+    briefly lock a freshly written file. The atomic temp+rename in
+    `encryptToFile` / `encryptToFileAsync` then failed with `EPERM` and left a
+    `*.tmp.<hex>` behind: 14 of 400 back-to-back rewrites on this
+    OneDrive-hosted checkout, which is why the local full suite used to flake.
+    Both writers now retry the rename, and the cleanup `unlink`, on
+    `EPERM`/`EBUSY`/`EACCES`: 10 attempts, 940 ms total. They remove the temp on
+    final failure. This is on every platform, so Linux CI exercises the path.
+    If a local full-suite failure still shows `EPERM`, the lock lasted over a
+    second — that is new information, not the old flake. Tests that need to
+    inject it mock `fs.renameSync` / `fs.promises.rename` (see
+    `tests/unit/at-rest-rename-retry.test.js`), and read the schedule from the
+    exported `RENAME_RETRY_DELAYS_MS` rather than restating it.
   - **Mutation-check any test written as a regression guard** — assert it
     actually fails against the bug it claims to catch, before trusting it.
     Live example (#492): a `GET /` test written to catch the wrong SPA

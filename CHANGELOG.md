@@ -14,6 +14,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.196] — 2026-09-11
+
+### Fixed
+
+- **Atomic file writes survive a file Windows is briefly holding.**
+  `encryptToFile()` / `encryptToFileAsync()` in
+  `Oscar_Server/src/utils/at-rest.js` write `<dst>.tmp.<hex>` and rename it over
+  `<dst>`. On Windows, OneDrive, Defender and the search indexer briefly open a
+  freshly written file, and the rename then fails with `EPERM` (or `EBUSY` /
+  `EACCES`). On a checkout inside OneDrive this hit **14 of 400** back-to-back
+  rewrites of one datafile; each failure also left its temp file behind. For a
+  Windows-local OSCAR run from a OneDrive folder — the layout Admin Guide §1
+  and §11.1 describe — that was an occasional 500 "Failed to save data file" on
+  Save & Apply or upload. Locally it was the recurring full-suite test flake.
+  The Linux VPS is not affected.
+
+  Both writers now retry the rename on those three codes: 10 attempts,
+  10 → 300 ms apart, 940 ms in total. This is the approach graceful-fs takes on
+  win32. On final failure — or if writing the temp file fails — the temp file
+  is removed. The `unlink` is retried the same way, because the file being held
+  may be the temp file itself. The original error is always the one rethrown.
+  The sync writer stays synchronous: it waits with `Atomics.wait` rather than
+  spinning. The retry runs on every platform. On Linux these codes are genuine
+  permission or mount failures, so the only cost is failing about a second
+  later, and Linux CI exercises the same path. `copyAndEncryptFileAsync`
+  (runner.js artifacts) inherits it.
+
+### Tests
+
+- New `tests/unit/at-rest-rename-retry.test.js` (13 tests). It mocks
+  `fs.renameSync` / `fs.promises.rename` to throw `EPERM` / `EBUSY` / `EACCES`
+  N times, then succeed, and checks each outcome:
+  - the write lands and no temp file is left;
+  - a lock that never clears surfaces the error after exactly 10 attempts and
+    at least 0.8 × 940 ms, with the temp file removed and the previous file
+    intact;
+  - a non-lock error (`EXDEV`) is not retried but still cleans up;
+  - the cleanup `unlink` is itself retried;
+  - `copyAndEncryptFileAsync` inherits the retry.
+
+  **All 13 fail on the original code.** Seven mutations are each caught by the
+  tests aimed at them: no cleanup, no backoff wait, retrying every error code,
+  cleanup not retried, sync writer unfixed, async writer unfixed, and `EBUSY`
+  dropped.
+- Against the real OneDrive folder: 800 back-to-back rewrites hit **7 genuine
+  lock errors, all absorbed — 0 failed writes, 0 stray files.** 8 of 8 local
+  full-suite runs green (56 suites / 1404 tests), where 3 of 6 had failed the
+  same day. After merging `main` (#510): 57 suites / 1416 tests, 6 of 6 full
+  runs green, and #510's `company-datafile-authz.test.js` — which had cascaded
+  on `EPERM` — green in 6 of 6 concurrent runs.
+
+### Docs
+
+- Admin Guide **§9.9** troubleshooting entry; CLAUDE.md §2 test-writing note.
+  No welcome-page news: nothing changes for users of the Linux service.
+
+---
+
 ## [server-1.11.195] — 2026-09-11
 
 ### Security
