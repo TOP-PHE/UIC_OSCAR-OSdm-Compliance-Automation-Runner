@@ -10,10 +10,12 @@
 /**
  * company.js — Company profile management routes
  *
- * GET    /v1/company           — get company profile (sanitised — no secrets)
- * PATCH  /v1/company           — update endpoint, auth mode, credentials, requestor
- * POST   /v1/company/datafile  — upload / replace the company data file (multipart)
- * GET    /v1/company/datafile  — serve data file download for browser
+ * GET    /v1/company                — get company profile (sanitised — no secrets)
+ * PATCH  /v1/company                — update endpoint, auth mode, credentials, requestor
+ * POST   /v1/company/datafile       — upload / replace the company data file (multipart)
+ * PUT    /v1/company/datafile/json  — save the data file from the scenario editor
+ * DELETE /v1/company/datafile       — remove the data file
+ * GET    /v1/company/datafile       — serve data file download for browser
  */
 
 const express   = require('express');
@@ -26,7 +28,7 @@ const { get, all, run, colDecrypt } = require('../../db/db');
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
-const { auditLog, resolveCompanyScope } = require('../helpers/shared');
+const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier } = require('../helpers/shared');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -56,29 +58,84 @@ const datafileReadLimiter = rateLimit({
              detail: 'Too many datafile downloads in a short window.' }
 });
 
-// ── Multer — datafile upload ───────────────────────────────────────────────────
-// Files are stored as {slug}-datafile.json in data/datafiles/
-function getRequestedCompanyId(req) {
-  return req.query.company_id || req.headers['x-company-id'] || (req.body && req.body.company_id) || null;
+// ── Datafile location ─────────────────────────────────────────────────────────
+// One live file per company, data/datafiles/{slug}-datafile.json, always the
+// OSCAR1 encrypted envelope. The slug comes from the companies row, never from
+// the request; the prefix check keeps that property local to this function.
+const DATAFILES_DIR = path.resolve(__dirname, '../../../data/datafiles');
+
+function liveDatafilePath(slug) {
+  const p = path.resolve(DATAFILES_DIR, `${slug}-datafile.json`);
+  if (!p.startsWith(DATAFILES_DIR + path.sep)) {
+    throw new Error('Datafile path escaped the datafiles directory.');
+  }
+  return p;
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.resolve(__dirname, '../../../data/datafiles');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const companyId = isPlatformRole(req.user.role) ? getRequestedCompanyId(req) : req.user.companyId;
-    const company = companyId ? get('SELECT slug FROM companies WHERE id = ?', [companyId]) : null;
-    if (!company) return cb(new Error('Valid company_id is required for datafile upload.'));
-    cb(null, `${company.slug}-datafile.json`);
-  }
-});
+// ── Datafile write authorisation (S2 / S3, v1.11.195) ─────────────────────────
+// Who may write a company's datafile, mounted as middleware so it runs BEFORE
+// any body parsing. That ordering is the whole point for the multipart upload:
+// multer used to run first, with a diskStorage whose filename WAS the live
+// datafile, so the upload overwrote {slug}-datafile.json in plaintext before
+// the role check ever ran. A tester, an administrator naming any company in
+// ?company_id=, or a read-only certifier all got their 403 after the damage.
+//
+// Both policies below resolve to the caller's OWN company: they only admit
+// non-platform roles, and resolveCompanyScope() ignores ?company_id= /
+// X-Company-Id for those. Administrators and certifiers never write test data
+// (issue #60), whichever route they try.
+//
+//   uploadPolicy — POST /datafile replaces the whole file with an arbitrary
+//                  upload: Test Managers only, as it has always been.
+//   savePolicy   — PUT /datafile/json is the scenario editor's Save & Apply.
+//                  Testers need it: the Test Config page is on the tester menu,
+//                  and it is how they author their own scenarios and choose
+//                  scenariosToRun, which POST /v1/runs reads to decide what to
+//                  run (Tester User Guide §4-5; Admin Guide §15.1 lists the
+//                  datafile as "Tester + Test Manager of the owning company").
+//                  Test-Manager-only here would stop every tester from
+//                  running anything but the Test Manager's own selection.
+//
+// Not closed here, and deliberately so: a tester's save still replaces the
+// whole file, so it can alter shared scenarios and other testers' private ones.
+// The editor makes those read-only, but only in the browser. Enforcing it means
+// merging per scenario on the server, which is a design change of its own.
+const uploadPolicy = (req, res) => requireTestManager(req, res);
+const savePolicy   = (req, res) => !denyAdminAndCertifier(req, res);
+
+function authorizeDatafileWrite(policy) {
+  return (req, res, next) => {
+    if (!policy(req, res)) return;
+    const targetCompanyId = resolveCompanyScope(req, res);
+    if (targetCompanyId === null) return;
+    if (!targetCompanyId) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No company context resolved.' });
+    }
+    const company = get('SELECT id, slug FROM companies WHERE id = ?', [targetCompanyId]);
+    if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
+    req.datafileCompany = company;
+    next();
+  };
+}
+
+// ── Multer — datafile upload ──────────────────────────────────────────────────
+// Memory storage, not disk: the upload is held in req.file.buffer until it has
+// been authorised AND validated, and the only disk write is the atomic
+// encrypted one in the handler. With diskStorage the upload landed on the live
+// path first, so a rejected upload still replaced the file — and a failed
+// validation then unlinked it, leaving the company with no datafile at all
+// while companies.datafile_path still pointed at one. 5 MB is small enough to
+// buffer; the limit still aborts before the whole body is read.
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },  // 5 MB max
   fileFilter: (req, file, cb) => {
+    // Belt-and-braces: authorizeDatafileWrite must already have run. If this
+    // parser is ever mounted without it, refuse rather than accept an upload
+    // nobody has authorised.
+    if (!req.datafileCompany || req.user.role !== 'test_manager') {
+      return cb(new Error('Datafile upload reached the parser without authorisation.'));
+    }
     if (file.mimetype === 'application/json' || file.originalname.endsWith('.json')) {
       cb(null, true);
     } else {
@@ -262,83 +319,50 @@ router.patch('/', (req, res) => {
   return res.json(safeCompany(updated));
 });
 
-// ── Role guards (issue #60, v1.10.0) ──────────────────────────────────────────
-// Datafile is test data. Tightened from "test_manager OR isPlatformRole" to
-// strict test_manager only — administrators no longer have read or write
-// access to a vendor's test configuration.
-function requireTestManager(req, res) {
-  if (req.user.role !== 'test_manager') {
-    res.status(403).json({ status: 403, title: 'Forbidden',
-      detail: 'Only Test Managers can modify the data file.' });
-    return false;
-  }
-  return true;
-}
-
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
-router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), async (req, res) => {
-  if (!requireTestManager(req, res)) return;
-  const targetCompanyId = resolveCompanyScope(req, res);
-  if (targetCompanyId === null) return;
-
-  if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'company_id is required for platform users.' });
-  }
+// Order matters: authorizeDatafileWrite runs before upload.single, so nothing
+// is parsed, buffered or written for a caller who may not write (S2).
+router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), upload.single('datafile'), async (req, res) => {
+  const company = req.datafileCompany;
 
   if (!req.file) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No file uploaded. Use field name "datafile".' });
-  }
-
-  // Defence in depth (CodeQL js/path-injection): re-validate that
-  // multer's req.file.path is a child of our managed datafiles directory.
-  // multer's filename callback already restricts to {slug}-datafile.json
-  // where the slug comes from a DB lookup, so this should always hold —
-  // but the check makes the safety property local to this handler rather
-  // than relying on multer config knowledge.
-  const DATAFILES_DIR = path.resolve(__dirname, '../../../data/datafiles');
-  const safeUploadPath = path.resolve(req.file.path);
-  if (!safeUploadPath.startsWith(DATAFILES_DIR + path.sep)) {
-    // Don't unlink anything — we cannot trust a path that failed the
-    // allowlist check, so we deliberately do NOT clean it up here (a
-    // periodic janitor on the datafiles dir handles stray files). This
-    // also closes CodeQL js/path-injection on the cleanup unlink site.
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Upload landed outside the datafiles directory.' });
   }
 
   // Validate it's parseable JSON, hash the plaintext, then encrypt-and-store.
   // The hash is computed on plaintext so testers can independently verify
   // the contents (sha256 of the file they uploaded — the encryption is
   // transparent to them). The file on disk is the OSCAR1 envelope.
-  let plaintext;
+  const plaintext = req.file.buffer;
   try {
-    plaintext = fs.readFileSync(safeUploadPath);
     JSON.parse(plaintext.toString('utf8'));
   } catch (_e) {
-    try { fs.unlinkSync(safeUploadPath); } catch (_) { /* best effort */ }
+    // Nothing was written, so there is nothing to clean up — the previous
+    // datafile is still the live one.
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Uploaded file is not valid JSON.' });
   }
 
   const hash = crypto.createHash('sha256').update(plaintext).digest('hex');
-  // multer stored the upload under a random temp name in the multer dir.
-  // We re-write the encrypted version under the same path so the existing
-  // companies.datafile_path column doesn't need to change shape, and remove
-  // the plaintext temp by overwriting it.
+  fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+  const livePath = liveDatafilePath(company.slug);
+  // Atomic temp+rename inside the helper: a crash mid-write leaves the
+  // previous datafile intact, which matters because Bruno reads it during runs.
   try {
-    await encryptToFileAsync(plaintext, safeUploadPath);
+    await encryptToFileAsync(plaintext, livePath);
   } catch (err) {
-    log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
+    log.error({ err, companyId: company.id }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
   }
 
   run(
     `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-    [safeUploadPath, hash, targetCompanyId]
+    [livePath, hash, company.id]
   );
 
-  auditLog(req.user.id, targetCompanyId, req.user.email, 'datafile_uploaded');
+  auditLog(req.user.id, company.id, req.user.email, 'datafile_uploaded');
 
   return res.json({
-    filename:   req.file.filename,
+    filename:   path.basename(livePath),
     size:       plaintext.length,
     hash,
     uploaded_at: new Date().toISOString()
@@ -349,29 +373,14 @@ router.post('/datafile', datafileMutationLimiter, upload.single('datafile'), asy
 // NOTE: body is already parsed by the global express.json({limit:'5mb'}) in
 // server.js.  Do NOT add a second express.json() here — it would try to parse
 // an already-consumed stream.
-router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
-  // Resolve company scope — same pattern as other routes
-  if (req.user.role === 'certification_user') {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot modify the data file.' });
-  }
-
-  let targetCompanyId;
-  if (isPlatformRole(req.user.role)) {
-    // Admin must pass ?company_id= or X-Company-Id header
-    targetCompanyId = req.companyId;  // set by enforceTenant
-    if (!targetCompanyId) {
-      return res.status(400).json({
-        status: 400, title: 'Bad Request',
-        detail: 'Administrators must supply company_id (query param or X-Company-Id header) to save a data file.'
-      });
-    }
-  } else {
-    targetCompanyId = req.user.companyId;
-  }
-
-  if (!targetCompanyId) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No company context resolved.' });
-  }
+// S3 (v1.11.195): this route blocked certification_user and nobody else, so an
+// administrator could rewrite ANY company's datafile by naming it in
+// ?company_id= / X-Company-Id — a cross-tenant write, and a breach of issue #60.
+// Now savePolicy: administrators and certifiers are refused, and testers and
+// Test Managers write their own company only. See authorizeDatafileWrite for
+// why testers keep this route and what that still leaves open.
+router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(savePolicy), async (req, res) => {
+  const { id: targetCompanyId, slug } = req.datafileCompany;
 
   // Validate body
   const body = req.body;
@@ -385,13 +394,8 @@ router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'datafile must contain a "scenariosToRun" array.' });
   }
 
-  const company = get('SELECT slug, datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
-
-  const dir = path.resolve(__dirname, '../../../data/datafiles');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  const filePath = path.join(dir, `${company.slug}-datafile.json`);
+  fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+  const filePath = liveDatafilePath(slug);
 
   // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
   // is server-managed — derived from the findings the test team has baselined
@@ -425,7 +429,7 @@ router.put('/datafile/json', datafileMutationLimiter, async (req, res) => {
 
   // Return a summary so the UI can verify what was actually stored
   return res.json({
-    filename:        `${company.slug}-datafile.json`,
+    filename:        path.basename(filePath),
     hash,
     saved_at:        new Date().toISOString(),
     scenarios_count: body.scenarios.length,
