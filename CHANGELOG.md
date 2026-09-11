@@ -61,9 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Against the real OneDrive folder: 800 back-to-back rewrites hit **7 genuine
   lock errors, all absorbed — 0 failed writes, 0 stray files.** 8 of 8 local
   full-suite runs green (56 suites / 1404 tests), where 3 of 6 had failed the
-  same day. After merging  (#510): 57 suites / 1416 tests, 6 of 6 full runs
-  green, and #510's  — which had cascaded on
-   — green in 6 of 6 concurrent runs.
+  same day. After merging `main` (#510): 57 suites / 1416 tests, 6 of 6 full
+  runs green, and #510's `company-datafile-authz.test.js` — which had cascaded
+  on `EPERM` — green in 6 of 6 concurrent runs.
 
 ### Docs
 
