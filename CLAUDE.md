@@ -199,6 +199,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     separately from the check-run status, if branch protection has "all
     conversations must be resolved" — an unused-import note is exactly the
     kind of thing that silently blocks merge behind a green checklist.
+  - **`at-rest.js` retries its rename, and a test that writes files should not
+    need to** (v1.11.196). On Windows, OneDrive, Defender and the indexer
+    briefly lock a freshly written file. The atomic temp+rename in
+    `encryptToFile` / `encryptToFileAsync` then failed with `EPERM` and left a
+    `*.tmp.<hex>` behind: 14 of 400 back-to-back rewrites on this
+    OneDrive-hosted checkout, which is why the local full suite used to flake.
+    Both writers now retry the rename, and the cleanup `unlink`, on
+    `EPERM`/`EBUSY`/`EACCES`: 10 attempts, 940 ms total. They remove the temp on
+    final failure. This is on every platform, so Linux CI exercises the path.
+    If a local full-suite failure still shows `EPERM`, the lock lasted over a
+    second — that is new information, not the old flake. Tests that need to
+    inject it mock `fs.renameSync` / `fs.promises.rename` (see
+    `tests/unit/at-rest-rename-retry.test.js`), and read the schedule from the
+    exported `RENAME_RETRY_DELAYS_MS` rather than restating it.
   - **Mutation-check any test written as a regression guard** — assert it
     actually fails against the bug it claims to catch, before trusting it.
     Live example (#492): a `GET /` test written to catch the wrong SPA

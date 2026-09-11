@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.219",
+  "current_release": "2026.221",
   "releases": [
+    {
+      "release": "2026.221",
+      "date": "2026-09-11",
+      "server": "1.11.196",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(at-rest): retry the atomic rename while Windows holds the file. Oscar_Server/src/utils/at-rest.js only. encryptToFile() and encryptToFileAsync() write <dst>.tmp.<hex> and rename it over <dst>. On Windows, OneDrive, Defender and the search indexer briefly open a freshly written file, and the rename then fails with EPERM (also EBUSY / EACCES). Measured 2026-09-11 on a checkout inside OneDrive: 14 of 400 back-to-back rewrites of one datafile. The write failed and left its temp file behind. For a Windows-local OSCAR run from a OneDrive folder - the layout the Admin Guide s1 and s11.1 still describe - that meant an occasional 500 'Failed to save data file' on Save & Apply or upload; for the local test suite it was the recurring full-suite flake. The Linux VPS is not affected.",
+        "Both writers now retry the rename on EPERM/EBUSY/EACCES with a bounded backoff: 10 attempts, delays 10-20-30-50-80-100-150-200-300 ms, 940 ms in total. This is the approach graceful-fs takes on win32. On a final failure, or if the temp write itself fails, the temp file is removed; the unlink is retried the same way, since the file being held may be the temp file. The original error is always the one rethrown. The sync writer stays synchronous: it waits with Atomics.wait on a SharedArrayBuffer rather than spinning. The retry applies on every platform, not only win32. On Linux those codes are real permission or mount failures that retrying won't fix, so the only cost is failing about a second later - and one code path means Linux CI exercises it. copyAndEncryptFileAsync (runner.js artifacts) inherits it.",
+        "Verification: new tests/unit/at-rest-rename-retry.test.js (13 tests) mocks fs.renameSync / fs.promises.rename to throw EPERM, EBUSY or EACCES N times, then succeed. It checks: the final content lands and no temp file is left; a lock that never clears surfaces the error after exactly 10 attempts and at least 0.8 x 940 ms, with the temp removed and the previous file intact; a non-lock error (EXDEV) is not retried but still cleans up; the cleanup unlink is itself retried; copyAndEncryptFileAsync inherits the retry. All 13 fail on the original code. Seven mutations are each caught by the tests aimed at them: no cleanup, no backoff wait, retrying every error code, cleanup not retried, sync writer unfixed, async writer unfixed, EBUSY dropped. Against the real OneDrive folder, 800 back-to-back rewrites hit 7 genuine lock errors, all absorbed, with 0 failed writes and 0 stray files. 8 of 8 local full-suite runs green (56 suites / 1404 tests), where 3 of 6 had failed earlier the same day. eslint clean.",
+        "Docs: Admin Guide s9.9 (troubleshooting entry for the Windows/OneDrive EPERM); CLAUDE.md s2 test-writing note. No welcome-page news entry: nothing changes for users of the Linux production service.",
+        "Numbered to follow PR #510 (1.11.195 / 2026.220), which was opened first. If this merges first, the second of the two takes the next number, per the parallel-PR convention."
+      ]
+    },
     {
       "release": "2026.219",
       "date": "2026-09-09",
