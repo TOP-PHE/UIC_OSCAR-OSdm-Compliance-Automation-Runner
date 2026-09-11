@@ -14,6 +14,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.197] — 2026-09-11
+
+### Security
+
+- **A tester's save only touches their own scenarios** — the second half of
+  finding **S3**, decided by the maintainer: *a tester saves their own tests
+  without affecting any other stored test; they see their own tests and the
+  shared ones, the shared ones read-only.* Closes #513. Until now a tester's
+  Save & Apply replaced the whole company datafile. It could change or delete
+  shared scenarios and other testers' private ones; the editor's read-only
+  marking was browser-only. New `Oscar_Server/src/utils/datafileOwnership.js`,
+  pure:
+  - **Owned** = not shared and `created_by` is the tester's email. **Visible** =
+    owned, shared, or no `created_by` (older company scenarios).
+  - `GET /v1/company/datafile` gives a tester their view: other people's
+    private scenarios, and the resource entries only they use, are removed.
+  - `PUT /v1/company/datafile/json` merges a tester's save into the stored
+    file. Owned scenarios are replaced, added or deleted; every other scenario,
+    resource entry and company-level key is kept as stored. A tester cannot
+    share a scenario or reassign its owner. Edits to read-only scenarios come
+    back as `read_only_ignored`.
+  - A new scenario whose code someone else's already uses is stored under the
+    next free code (`renamed`); it is never dropped and never refused. A stale
+    copy of a scenario the Test Manager has since deleted or un-shared is
+    discarded, not revived as the tester's.
+  - Resource ids are minted in the browser from what the tester sees, so a
+    tester's entry can clash with a hidden scenario's. The merge copies it to a
+    fresh, unique, safe-integer id rather than overwrite (copy-on-write). The
+    same rule untangles old files where a tester's scenario and a shared one
+    share an entry. An unchanged save rewrites nothing.
+  - **A tester never writes company configuration**, including on the first
+    save into an empty company. Bruno turns every key of
+    `systemInfoParameters` into an environment variable for every run, so a
+    planted `api_base` would have sent colleagues' runs, bearer token included,
+    to a host of the tester's choosing. Only the editor's own first-save
+    skeleton strings (`osdmVersion`, `collection`) are accepted, and only while
+    the file has none.
+  - **`purchaserList[0]` is protected**: Bruno uses the first purchaser entry for
+    every scenario, whatever its `purchaserListId` says.
+  - A tester cannot newly point their scenario at an entry that only hidden
+    scenarios use, which would reveal it in their view.
+- **`/data/:filename` is Test-Manager-only for logged-in sessions.** It serves
+  the raw decrypted file, and until now handed it to any tester of the company,
+  undoing the filtered view. Bruno's loopback read is unchanged.
+
+  Test Managers are unaffected: they see and save the whole file.
+
+### Added
+
+- **Personal run lists.** What a tester ticks **✓ In run** is stored per user
+  (new table `run_selections`, migration 26), and `POST /v1/runs` expands a
+  tester's batch from it, limited to scenarios they can see. The datafile's
+  `scenariosToRun` becomes the Test Manager's company default — a tester's
+  starting point. Until now one tester unticking a scenario changed every other
+  tester's next run. Bruno is unaffected: each run still gets its one
+  `scenario_override`.
+
+### Fixed
+
+- **No datafile write can lose another.** The tester merge is read-modify-write
+  across `await`s, and so is the findings re-projection. Every writer — save,
+  upload, delete, `reprojectDatafile` — now takes a per-company lock
+  (`utils/datafileLock.js`). It is in-process, which is correct for OSCAR's
+  single container. `DELETE /v1/company/datafile` also gains the datafile
+  mutation rate limiter.
+- A comma-separated company `scenariosToRun` is pruned like an array when a
+  tester deletes or renames their scenario. Kept verbatim, a list naming only
+  deleted codes made Bruno abort every run in the company.
+- A tester whose account was deleted while their session was still open is
+  refused before anything is written, instead of their save being written and
+  then reported as "NOT saved".
+
+### Changed
+
+- `scenarios.js`: editability for testers follows the server's rule
+  (`isReadOnlyForMe`); company scenarios with no owner get a 🔒 **Company**
+  badge. The save confirmation lists read-only scenarios whose edits were not
+  kept, and new scenarios that were renamed. The wizard reports the code a
+  scenario was actually stored under. After saving, the editor checks the
+  stored run list against the server's answer (`to_run`), not against what it
+  sent — a normalised list (duplicate codes from Select All, a renamed code)
+  raised a false "Mismatch after save!".
+
+### Review
+
+- **An independent review** — four lenses (integrity, confidentiality, data
+  loss, concurrency), every finding re-verified by reproduction — **broke the
+  first version of this change in 16 ways**. Its one high-severity finding was
+  the `systemInfoParameters` path above. Every accepted finding is fixed and
+  pinned as a lettered test in `tests/unit/datafile-ownership.test.js`,
+  red before its fix. Left out, and recorded in CLAUDE.md §6:
+  - a Test Manager renaming a shared scenario drops it from testers' personal
+    lists, because codes are the only identity;
+  - some editor controls were never read-only-gated; the server is the
+    authority;
+  - two pre-existing items already covered by tracker **PR-03**: unescaped
+    scenario codes in the Bruno env YAML, and the run log listing codes.
+
+### Tests
+
+- **+75 tests.**
+  - `tests/unit/datafile-ownership.test.js` (55): visibility, the view, the
+    merge, and the 11 review findings, each red before its fix.
+  - `tests/unit/datafile-lock.test.js` (4): serialisation and no lost update.
+  - `tests/integration/company-datafile-tester-merge.test.js` (14): two testers
+    and a Test Manager through the real routes, including concurrent saves,
+    DELETE waiting for the lock, personal run lists through `POST /v1/runs`,
+    and the editor's save-verify round trip.
+  - Migration 26 on an already-versioned DB, and `/data` refusing a tester, in
+    `server.test.js`.
+- **25 mutations**, each caught by the tests aimed at it: 12 before the review
+  and 13 after. The source was restored byte-identical after each run.
+- 60 suites / 1491 tests; 3 of 3 full local runs green; eslint clean.
+
+---
+
 ## [server-1.11.196] — 2026-09-11
 
 ### Fixed

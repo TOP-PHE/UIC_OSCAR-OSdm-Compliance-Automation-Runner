@@ -168,9 +168,9 @@ describe('GET /data/:filename', () => {
     expect(res.status).toBe(403);
   });
 
-  test('200 + decrypted content for the owning, authenticated company', async () => {
+  test('200 + decrypted content for a Test Manager of the owning company', async () => {
     const { companyId, userId, slug } = seedCompanyUser();
-    const token = makeToken('company_user', userId, companyId);
+    const token = makeToken('test_manager', userId, companyId);
     fs.mkdirSync(DATAFILES_DIR, { recursive: true });
     const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
     const plaintext = Buffer.from(JSON.stringify({ scenarios: [] }));
@@ -181,6 +181,28 @@ describe('GET /data/:filename', () => {
         .set('Cookie', `oscar_session=${token}`);
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ scenarios: [] });
+    } finally {
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
+  // v1.11.197: this returned the whole unfiltered file — every tester's private
+  // scenarios included — to any tester of the company, undoing the filtered
+  // view GET /v1/company/datafile gives them. It used to be this test's 200.
+  test('403 for a tester of the owning company — they get their filtered view from /v1/company/datafile', async () => {
+    const { companyId, userId, slug } = seedCompanyUser();
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: [{ code: 'SOMEONE_ELSES_PRIVATE' }] })), filePath);
+    try {
+      for (const auth of [['Cookie', `oscar_session=${makeToken('company_user', userId, companyId)}`],
+                          ['Authorization', `Bearer ${makeToken('company_user', userId, companyId)}`]]) {
+        const res = await request(app).get(`/data/${slug}-datafile.json`)
+          .set('X-Forwarded-For', '1.2.3.4')
+          .set(...auth);
+        expect(res.status).toBe(403);
+        expect(res.text).not.toContain('SOMEONE_ELSES_PRIVATE');
+      }
     } finally {
       fs.rmSync(filePath, { force: true });
     }

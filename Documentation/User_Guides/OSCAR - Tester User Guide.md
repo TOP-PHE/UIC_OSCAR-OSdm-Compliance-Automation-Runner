@@ -172,6 +172,29 @@ A scenario is built in the **Scenarios** section. The good news (issue #172):
 **only three things are required** — everything else is optional and defaults
 sensibly.
 
+### Your scenarios and shared scenarios
+
+The badge on each scenario card in Test Config tells you whose it is, and what you can do with it:
+
+| Badge | Whose it is | What you can do |
+|---|---|---|
+| ✏️ **Yours** | You created it | Edit, rename, delete it, and tick it for your runs |
+| 🔒 **Shared** | Your Test Manager shared it with every tester | Read it and run it. You cannot edit or delete it; **🗐 Duplicate** gives you an editable copy of your own |
+| 🔒 **Company** | An older scenario that has no owner | The same as a shared one |
+
+You don't see other testers' private scenarios, and they don't see yours.
+**Save & Apply** saves only your own scenarios. Nothing you do can change or
+delete a shared scenario, a company scenario, or another tester's. If you had
+edited a read-only one anyway, the save confirmation lists it under
+*"Not changed — read-only for testers"*.
+
+If a new scenario's code is already used by someone else's scenario (for
+example when two testers duplicate the same shared scenario), yours is saved
+under the next free code, such as `…_COPY_2`. The save confirmation tells you
+the new code.
+
+Your Test Manager sees and manages every scenario in the company.
+
 ### 4.1 The minimal scenario
 
 | Required | Notes |
@@ -633,9 +656,13 @@ log volume only — never assertion outcomes.
 
 ## 5. Running tests
 
-- **Run one scenario** or **Run the collection** (all scenarios in
-  `scenariosToRun`, from the top). A run starts at `GET /versions`, which also
-  resets all per‑run state.
+- **Run one scenario** or **Run the collection** (every scenario in *your* run
+  list, from the top). A run starts at `GET /versions`, which also resets all
+  per‑run state.
+- **Your run list is yours.** The scenarios you tick **✓ In run** in Test Config
+  are your own selection, taken from your scenarios and the shared ones. Another
+  tester's ticks never change what you run, and yours never change theirs. Until
+  you tick anything, you start from your Test Manager's selection.
 - **Concurrency** — OSCAR can run several sessions in parallel up to the global
   limit **and** the per‑company limit (the lower wins). If a vendor misbehaves
   under parallel load, set that company's limit to **1** to serialise.

@@ -51,6 +51,8 @@ const REQUIRED_COLUMNS = {
   ],
   // #450 — per-company OSDM /places cache (migration 25).
   places_cache: ['company_id', 'places_json', 'place_count', 'cached_at'],
+  // v1.11.197 — a tester's personal run list (migration 26).
+  run_selections: ['company_id', 'user_id', 'codes_json', 'updated_at'],
 };
 
 let _tmpFiles = [];
@@ -168,5 +170,24 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
     bootDbAgainst(dbFile);
 
     expect(columnsOf(dbFile, 'places_cache')).toContain('places_json');
+  });
+
+  // v1.11.197 — run_selections (migration 26). Same shape as the places_cache
+  // case: a DB already at version 25 without the table must gain it on boot.
+  test('run_selections (added in migration 26) is created on an already-versioned DB', () => {
+    const dbFile = tempDbPath();
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(fs.readFileSync(SCHEMA_SQL, 'utf8'));
+      try { d.exec('DROP TABLE IF EXISTS run_selections'); } catch (_e) { /* already absent */ }
+      d.exec('DELETE FROM schema_version WHERE version >= 26');
+      d.exec('INSERT OR IGNORE INTO schema_version (version) VALUES (25)');
+      d.close();
+    }
+    expect(columnsOf(dbFile, 'run_selections')).toEqual([]); // table gone
+
+    bootDbAgainst(dbFile);
+
+    expect(columnsOf(dbFile, 'run_selections')).toEqual(expect.arrayContaining(['company_id', 'user_id', 'codes_json']));
   });
 });

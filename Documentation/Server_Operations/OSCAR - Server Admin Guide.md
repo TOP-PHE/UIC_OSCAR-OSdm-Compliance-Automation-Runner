@@ -865,8 +865,9 @@ cannot defend against.
 | Test framework configuration (Wizard Step 1) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
 | Data file (`{slug}-datafile.json`) | Tester + Test Manager of the owning company; Bruno subprocess on loopback | Other companies, Certifiers, Administrators |
 | Test resources (Wizard Step 2) | Tester + Test Manager of the owning company | Other companies, Certifiers, Administrators |
-| Scenarios (personal) | The tester who created them | Everyone else |
-| Scenarios (shared) | All testers + Test Managers of the owning company | Other companies, Certifiers, Administrators |
+| Scenarios (personal) | The tester who created them (edit); Test Managers of the owning company | Other testers, other companies, Certifiers, Administrators |
+| Scenarios (shared, or with no owner) | All testers (read-only) + Test Managers (edit) of the owning company | Other companies, Certifiers, Administrators |
+| Run list — what "Run the collection" runs | Each tester their own; Test Managers the company default | Other testers |
 | Run results, artifacts, HTTP traffic | Tester + Test Manager of the owning company | Other companies, Administrators |
 |  | **Plus** Certifiers — but ONLY for runs where the Test Manager has clicked "Share with certifiers" on that specific run | Certifiers without explicit per-run share |
 | API credentials (per-tester) | The owning tester only — encrypted at rest | Everyone else, including admins, even on the database |
@@ -1105,11 +1106,52 @@ Apply is how testers author their own scenarios and choose `scenariosToRun`,
 which `POST /v1/runs` reads to decide what to run. Removing testers from this
 route would stop them running anything but the Test Manager's selection.
 
-**What is still open.** A tester's save replaces the whole company file, so it
-can alter shared scenarios and other testers' private ones. The scenario editor
-marks those read-only, but that is enforced only in the browser. Closing it
-needs a per-scenario merge on the server; it is not done yet. Until it is,
-treat the company's testers as trusted with each other's scenarios.
+**Closed in v1.11.197 — testers only change their own scenarios.** Until then a
+tester's save replaced the whole company file, so it could alter shared scenarios
+and other testers' private ones; the editor's read-only marking was browser-only.
+Now the server merges a tester's save into the stored file
+(`utils/datafileOwnership.js`):
+
+- **Owned** = not shared, and `created_by` is the tester's email. A tester can
+  create, change and delete only those.
+- **Visible** = owned, shared, or with no `created_by` at all (older company
+  scenarios). Other people's private scenarios are removed from what
+  `GET /datafile` returns to a tester, together with the resource entries only
+  they use.
+- Everything else in the stored file is kept exactly as stored, including other
+  scenarios, their resource entries, and company-level keys such as
+  `systemInfoParameters`. A tester's edit to a read-only scenario is
+  not kept, and the save response lists it (`read_only_ignored`). A new
+  scenario whose code someone else's already uses is stored under the next free
+  code (`renamed` in the response), never dropped or overwritten. A stale copy
+  of a scenario the Test Manager has since deleted or un-shared is discarded,
+  not revived as the tester's.
+- **Company configuration is never writable by a tester.** This includes the
+  first save into an empty company. Bruno turns every key of
+  `systemInfoParameters` into an environment variable for every run, so a
+  planted `api_base` would have sent colleagues' runs, bearer token included,
+  to a host of the tester's choosing.
+- **`purchaserList[0]` is protected.** Bruno uses the first purchaser entry for
+  every scenario, whatever the scenario's `purchaserListId` says. A tester
+  cannot change or remove it, even when only their own scenario references it.
+- A tester cannot newly point one of their scenarios at an entry that only
+  hidden scenarios use; that would make it appear in their view.
+- `/data/:filename` answers a logged-in session only for a Test Manager. It
+  used to hand any tester of the company the whole unfiltered file. Bruno's
+  loopback read is unchanged.
+- Resource ids are allocated by the browser from what the tester can see, so
+  one can clash with a hidden scenario's entry. The merge never lets a tester's
+  entry replace one that another scenario references: it copies the tester's
+  version to a fresh id (copy-on-write).
+- Every datafile write — save, upload, findings re-projection — runs under a
+  per-company lock, so two saves at once cannot lose either one.
+- **Run lists are personal**: what a tester ticks is stored per user (table
+  `run_selections`, migration 26), and `POST /v1/runs` expands a tester's
+  batch from it. The datafile's `scenariosToRun` is the Test Manager's company
+  default. Bruno is unaffected: each run is still handed its one scenario.
+
+Test Managers still see and save the whole file. The unfiltered file Bruno
+reads (`/data/:filename`) is unchanged.
 
 A side effect worth knowing when you field a support call: before this release,
 a Test Manager who uploaded an invalid or oversized file lost the company's

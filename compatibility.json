@@ -1,8 +1,27 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.221",
+  "current_release": "2026.222",
   "releases": [
+    {
+      "release": "2026.222",
+      "date": "2026-09-11",
+      "server": "1.11.197",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(security): a tester's save only touches their own scenarios, and each tester has a personal run list - the second half of audit finding S3, decided by the maintainer 2026-09-11 ('a tester saves their own tests without affecting any other stored test; they see their own tests and the shared ones, the shared ones read-only'; run list: personal). Closes #513.",
+        "New Oscar_Server/src/utils/datafileOwnership.js, pure. owned = not shared and created_by is the tester's email; visible = owned, shared, or no created_by (older company scenarios, kept visible so old datafiles do not empty out for testers). GET /v1/company/datafile gives a tester viewForTester: other people's private scenarios, and the resource entries only they use, are removed, and scenariosToRun becomes their personal list. PUT /v1/company/datafile/json runs mergeTesterSave: owned scenarios are replaced, added or deleted; every other scenario, resource entry and company-level key is kept as stored. Edits to read-only scenarios come back as read_only_ignored. A new scenario whose code someone else's already uses is stored under the next free code (renamed), never dropped or refused; a stale copy of a scenario the TM deleted or un-shared is discarded, not revived as the tester's. Resource ids are minted in the browser from what the tester sees, so a clash with a hidden scenario's entry is copied to a fresh, unique, safe-integer id (copy-on-write). An unchanged save rewrites nothing. Test Managers still see and save the whole file.",
+        "Personal run lists: new table run_selections (migration 26, also in schema.sql). POST /v1/runs expands a tester's batch from their list, limited to what they can see; without one they start from the company default. Bruno is unaffected - each run still gets its one scenario_override.",
+        "Every datafile writer - save, upload, delete, findings reprojectDatafile - takes a per-company in-process lock (utils/datafileLock.js); without it two overlapping saves lose one. DELETE /v1/company/datafile also gains the mutation rate limiter.",
+        "An adversarial review (four lenses - integrity, confidentiality, data loss, concurrency - with every finding re-verified by reproduction) broke the first version 16 ways; all accepted findings are fixed and pinned as lettered tests. HIGH: a tester could add a company-level key the file lacked; Bruno's setSystemInfoParameters turns every systemInfoParameters key into an env var for every run and every request is {{api_base}}/..., so a planted api_base would have redirected colleagues' runs and bearer tokens. Testers now never write company configuration, first save included (only the editor's osdmVersion/collection skeleton strings). Also: /data/:filename handed any logged-in tester the whole unfiltered file - now Test-Manager-only for sessions (Bruno's loopback read unchanged); purchaserList[0] is protected because Bruno uses it for every scenario; a new link from an own scenario to an entry only hidden scenarios use is cut; a comma-separated company run list is pruned (kept verbatim it made Bruno abort every run); a deleted account's save is refused before writing; the editor verifies against the server's to_run (false 'Mismatch after save!' on Select All duplicates or renames); read-only comparison tolerates exactly the editor's two backfills.",
+        "scenarios.js: editability follows the server rule (isReadOnlyForMe); Company badge; save confirmation lists read-only scenarios not kept and renamed ones; the wizard reports the code actually stored.",
+        "Verification: +75 tests - tests/unit/datafile-ownership.test.js (55, incl. 11 pinned review findings, each red before its fix), tests/unit/datafile-lock.test.js (4), tests/integration/company-datafile-tester-merge.test.js (14), migration 26 already-versioned-DB case, /data tester 403 in server.test.js. 25 mutations (12 before the review, 13 after) each caught by the tests aimed at it; sources restored byte-identical. 60 suites / 1491 tests, 3 of 3 full local runs green; eslint clean.",
+        "Left open, in CLAUDE.md s6: a TM renaming a shared scenario drops it from personal lists (codes are the only identity); Bruno should resolve purchaserListId instead of entry 0; unescaped scenario codes in the Bruno env YAML are pre-existing and covered by tracker PR-03; some editor controls were never read-only-gated (the server is the authority).",
+        "Docs: Tester User Guide ('Your scenarios and shared scenarios'; s5 personal run list); Admin Guide s15.1 trust model and s15.8; CLAUDE.md s2 rules and gotchas, s5 key files, s6 known gaps; welcome-page news entry."
+      ]
+    },
     {
       "release": "2026.221",
       "date": "2026-09-11",

@@ -252,6 +252,20 @@ CREATE TABLE IF NOT EXISTS places_cache (
   cached_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ── Personal run lists (v1.11.197) ──────────────────────────────────────────
+-- What a tester ticks in Test Config, per (company, user). The datafile's own
+-- scenariosToRun stays the Test Manager's company default; before v1.11.197 it
+-- was the only list, so one tester's ticks changed every other tester's run.
+-- Kept out of the datafile so a Test Manager's whole-file upload cannot wipe
+-- it, and so the file Bruno reads carries no per-user state.
+CREATE TABLE IF NOT EXISTS run_selections (
+  company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  user_id    TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+  codes_json TEXT NOT NULL DEFAULT '[]',           -- JSON array of scenario codes, in run order
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (company_id, user_id)
+);
+
 -- ── Server config — runtime-editable key-value settings ─────────────────────
 -- Stores server configuration that can be changed by administrators at runtime
 -- without requiring a server restart. On first startup, values are seeded from
