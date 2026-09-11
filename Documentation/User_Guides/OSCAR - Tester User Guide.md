@@ -179,14 +179,24 @@ The badge on each scenario card in Test Config tells you whose it is, and what y
 | Badge | Whose it is | What you can do |
 |---|---|---|
 | ✏️ **Yours** | You created it | Edit, rename, delete it, and tick it for your runs |
-| 🔒 **Shared** | Your Test Manager shared it with every tester | Read it and run it. You cannot edit or delete it; **🗐 Duplicate** gives you an editable copy of your own |
+| 🔒 **Shared** | Your Test Manager shared it with every tester | Read it and run it. You cannot edit or delete it; **📋 Duplicate** gives you an editable copy of your own |
 | 🔒 **Company** | An older scenario that has no owner | The same as a shared one |
 
 You don't see other testers' private scenarios, and they don't see yours.
-**Save & Apply** saves only your own scenarios. Nothing you do can change or
-delete a shared scenario, a company scenario, or another tester's. If you had
-edited a read-only one anyway, the save confirmation lists it under
-*"Not changed — read-only for testers"*.
+
+When you open a 🔒 Shared or 🔒 Company scenario, a banner at the top says it
+is read-only and every field on the card is greyed out. You can still expand its
+sections, open a passenger's details with **View ▾**, tick it for your runs, and
+**📋 Duplicate** it. Nothing else on the card responds. To change it, duplicate
+it and edit your copy.
+
+**Save & Apply** saves only your own scenarios. The server enforces this as
+well, so nothing you do can change or delete a shared scenario, a company
+scenario, or another tester's. If the save confirmation ever lists a scenario
+under *"Not changed — read-only for testers"*, your copy of that read-only
+scenario no longer matched the stored one. The most likely reason is that your
+Test Manager changed it after you opened Test Config. Reload the page to see the
+current version.
 
 If a new scenario's code is already used by someone else's scenario (for
 example when two testers duplicate the same shared scenario), yours is saved

@@ -14,6 +14,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.198] — 2026-09-11
+
+### Fixed
+
+- **Test Config no longer lets a tester edit a scenario the save would
+  discard.** Closes #515. Since 1.11.197 the server keeps a tester's changes to
+  their own, non-shared scenarios only. The editor still offered edits on
+  🔒 Shared and 🔒 Company scenarios: the edit looked accepted, then the save
+  dropped it. An edit to a read-only scenario's trip, fulfillment options,
+  passengers or purchaser was dropped **silently**. Those are resource entries,
+  and `read_only_ignored` reports only changes to the scenario object. Reproduced
+  in a browser before the fix:
+  - **Company scenarios were fully editable.** The old lock tested `sc.shared`,
+    so it never fired for them.
+  - The lock on a shared card disappeared after any in-place re-render (0 of 88
+    fields enabled on first open, 63 of 88 after one re-render).
+  - No handler checked. Scenario Parameters, the expiry timers, trip,
+    offer-criteria ticks and fulfillment selects were never gated at all.
+  - **Opening** a Company scenario with no purchaser entry was enough: drawing it
+    created an entry, re-pointed the scenario and marked the page dirty. The next
+    save reported that scenario as *"Not changed — read-only"*, though the tester
+    had not touched it.
+
+  The rule now lives in one new file, `Oscar_Server/public/js/scenario-access.js`
+  (`OscarScenarioAccess`). Its `isOwnedBy` / `isVisibleTo` match the server's
+  functions of the same name, and a test holds them to it. It is enforced in
+  two layers, both default-deny:
+  - **Rendering:** every draw of a card's detail goes through
+    `renderScenarioDetail()`. On a read-only card it disables every control
+    whose `data-action` is not on a five-action view-only allowlist:
+    open the card, expand a section, show a passenger's details (the button now
+    reads **View**), 📋 Duplicate, and the personal run-list tick. It also shows
+    the read-only banner for Shared and Company alike.
+  - **Handlers:** the click / change / input delegates refuse such a control
+    before dispatching and redraw the card from the unchanged model
+    (`isLockedControl`).
+
+  A control added later is locked on read-only cards until someone adds it to
+  the allowlist. The purchaser section no longer writes to the model for a
+  read-only scenario. Reduction- and loyalty-card rows, and the passenger details
+  panel, now open on the card you clicked, even when another open card shows the
+  same passenger list (older datafiles share entries).
+  Disabled fields are styled as disabled. Test Managers are unaffected, and no
+  server code changed.
+
+### Tests
+
+- New `tests/unit/scenario-access.test.js` (71 tests).
+  - **Parity:** client `isOwnedBy` / `isVisibleTo` against the server's over
+    20 scenario shapes × 8 emails (case, whitespace, missing or non-string
+    owner, truthy `shared` values, non-objects).
+  - **Default-deny:** every `data-action` that `scenarios.js` renders is refused
+    on a read-only card unless it is allowlisted, and so is an unclassified
+    action. Each of the controls #515 listed is checked individually.
+  - **Wiring:** the load order in `scenarios.html`, a single draw path through
+    `renderScenarioDetail`, the guard in all three delegates, no `shared`-only
+    gate left, and no render-time purchaser write for read-only scenarios.
+  - **17 mutations**, each caught, with the sources restored byte-identical.
+    Examples: dropping `trim()` or the no-owner rule from the client copy,
+    widening the allowlist, removing any one delegate guard, bypassing
+    `renderScenarioDetail`, reverting to the `shared`-only rule, swapping the
+    script order.
+- **Browser check** on a throwaway instance (tester, Test Manager, and shared,
+  company, own and hidden scenarios):
+  - 107 controls locked on each read-only card, 0 on the tester's own card, 0
+    anywhere for the Test Manager.
+  - Eight edits forced on a shared card (controls re-enabled first, as devtools
+    could) all refused: offer tick, scenario type, trip origin, fulfillment,
+    booking-flow pill, passenger name, probe pill, delete. The model stayed
+    byte-identical, the page stayed clean, and the card redrew locked.
+  - Save & Apply after editing the tester's own scenario stored exactly those
+    edits, with no read-only note.
+- Full suite: 61 suites / 1562 tests; `npm run lint` clean.
+
+### Docs
+
+- Tester User Guide §4 "Your scenarios and shared scenarios"; CLAUDE.md §4
+  (running from a `.claude/worktrees/` checkout) and §6 (gap closed);
+  welcome-page news entry.
+
+---
+
 ## [server-1.11.197] — 2026-09-11
 
 ### Security

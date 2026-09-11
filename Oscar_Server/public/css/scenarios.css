@@ -88,6 +88,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .toggle-arrow.open{transform:rotate(90deg)}
 .scenario-detail{display:none;padding:0 16px 16px 42px}
 .scenario-detail.open{display:block}
+/* #515: a scenario card that is read-only for this tester (renderScenarioDetail) */
+.ro-banner{background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100}
+.ro-locked{pointer-events:none;opacity:.6;cursor:default}
 
 /* ── Train resource rows (expand/collapse, mirrors scenario-item) ─────── */
 .train-item{border-bottom:1px solid #f0f0f0}
@@ -115,6 +118,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .param-label .param-hint{font-weight:400;text-transform:none;font-size:10px;color:#b0bec5;margin-left:4px;letter-spacing:0}
 .param-input{padding:7px 9px;border:1px solid #cfd8dc;border-radius:5px;font-size:12px;background:#fff;color:#1a2e40;width:100%}
 .param-input:focus{outline:none;border-color:#0090D4}
+/* The white background and dark text above would otherwise hide that a field is disabled. */
+.param-input:disabled{background:#f5f7f8;color:#546e7a;cursor:not-allowed}
 /* #363: proposals must not read as values — placeholders are clearly
    lighter and italic (the builders also prefix them with "e.g. "). */
 .param-input::placeholder{color:#c5cfd8;font-style:italic;opacity:1}
@@ -126,6 +131,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .multi-check label:hover{background:#e8f4fb;border-color:#90caf9}
 .multi-check label input{accent-color:#0090D4}
 .multi-check label.checked{background:#e3f2fd;border-color:#1976d2;color:#1565c0}
+.multi-check label:has(input:disabled){pointer-events:none;opacity:.75}
 
 /* ── Passenger / leg cards ─────────────────────────────────────────────── */
 .sub-card{background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:12px;margin-bottom:8px}

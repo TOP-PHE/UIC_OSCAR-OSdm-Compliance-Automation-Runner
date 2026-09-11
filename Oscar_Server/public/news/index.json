@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-09-11-read-only-scenarios-locked",
+    "date": "September 11, 2026",
+    "tag": "Bug Fix",
+    "title": "Read-only scenarios are now locked in Test Config — no more edits that quietly disappear",
+    "summary": "Since the last update, a tester's Save & Apply keeps changes to their own scenarios only. The Test Config editor had not caught up: on a shared or company scenario it still let a tester change many fields, and the save then threw those changes away, some of them without any message. Those scenario cards are now clearly read-only.",
+    "content": "Since the September 11 update, the server keeps a tester's changes to their own scenarios only. Shared scenarios, and older company scenarios with no recorded owner, are read-only for testers. The Test Config editor had not fully caught up. On a shared scenario many fields could still be changed, among them the scenario parameters, the expiry timers, the trip, the offer-criteria ticks and the fulfillment options; on a company scenario almost everything could. The change looked accepted, and Save & Apply then discarded it. Changes to a read-only scenario's trip, passengers, purchaser or fulfillment options were discarded without any message at all.\n\nNow a 🔒 **Shared** or 🔒 **Company** scenario opens with a banner saying it is read-only, and every field on the card is greyed out. You can still read everything, expand the sections, open a passenger's details with **View**, tick the scenario for your runs, and **📋 Duplicate** it to get an editable copy of your own. Nothing else on the card responds.\n\nA related glitch is gone too. Simply opening certain older company scenarios could make the page believe you had changed them, and the next save then reported them as not changed, although you had not touched them.\n\n**Test Managers:** nothing changes. You still see and edit every scenario in the company.\n\nNo action is required. If you had been editing a shared scenario and expected the changes to stick, duplicate it and make them on your copy."
+  },
+  {
     "id": "2026-09-11-testers-own-scenarios-personal-run-list",
     "date": "September 11, 2026",
     "tag": "Improvement",

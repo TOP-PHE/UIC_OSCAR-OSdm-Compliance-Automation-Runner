@@ -1121,7 +1121,12 @@ Now the server merges a tester's save into the stored file
 - Everything else in the stored file is kept exactly as stored, including other
   scenarios, their resource entries, and company-level keys such as
   `systemInfoParameters`. A tester's edit to a read-only scenario is
-  not kept, and the save response lists it (`read_only_ignored`). A new
+  not kept, and the save response lists it (`read_only_ignored`). An edit to
+  the resource entries a read-only scenario uses (its trip, passengers,
+  purchaser, fulfillment options) is not kept either, and is not listed, because
+  the scenario itself is unchanged. Since v1.11.198 the editor locks read-only
+  scenario cards, so a tester is no longer offered either kind of edit
+  (`public/js/scenario-access.js`, the same rule as `isOwnedBy`). A new
   scenario whose code someone else's already uses is stored under the next free
   code (`renamed` in the response), never dropped or overwritten. A stale copy
   of a scenario the Test Manager has since deleted or un-shared is discarded,

@@ -200,10 +200,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     limited to what they can see; Test Managers use the file's
     `scenariosToRun`, which is now only the company default. Bruno still gets
     one `scenario_override` per run, and `/data/:filename` stays unfiltered.
-  - **`scenarios.js` `isMine()` must match `isOwnedBy()`.** Editability in the
-    browser is now `isReadOnlyForMe(sc)`. Some editor controls were never gated
-    at all (e.g. the offer-criteria ticks), so the server is the authority, and
-    the save confirmation tells the tester what it did not keep.
+  - **The editor applies the same rule, from one file** (v1.11.198, #515).
+    `public/js/scenario-access.js` (`OscarScenarioAccess`, loaded before
+    `scenarios.js`) holds `isOwnedBy` / `isVisibleTo`, and
+    `tests/unit/scenario-access.test.js` pins them to the server's, so change
+    both or neither. `isMine` / `isReadOnlyForMe` in `scenarios.js` just
+    delegate. A read-only card is locked by two default-deny layers:
+    `renderScenarioDetail()` disables every control whose `data-action` is not
+    on the view-only allowlist (`READ_ONLY_CARD_ACTIONS`), and
+    `isLockedControl()` makes the click/change/input delegates refuse such a
+    control. **Draw a card only through `renderScenarioDetail()`**: the pre-#515
+    lock lived in `toggleDetail()` and vanished on the first in-place re-render.
+    **Add to the allowlist only an action that changes neither the scenario nor
+    its resource entries.** A resource-entry edit to a read-only scenario is
+    dropped by the merge *without* a `read_only_ignored` line, so the editor
+    lock is the only feedback a tester gets. **Drawing must not write to the
+    model:** `buildPurchaserSection` used to create an entry for a dangling
+    `purchaserListId`, which made the next save report an untouched scenario
+    as not kept.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -401,6 +415,18 @@ the space broke `npx jest`'s default glob resolution — "0 tests found". If a
 checkout ever lands in a path with a space again, the workaround is
 `npx jest --rootDir="$(pwd)" --testMatch="**/*.test.js"`.)
 
+**Claude Code worktrees (`…/oscar-monorepo/.claude/worktrees/<name>/`)** trip
+over the `.claude` dot-directory twice. First, `npx jest` finds 0 tests, and so
+does a positional path filter: use
+`npx jest --rootDir="$(pwd)" --testMatch="**/tests/**/*.test.js"`, and
+`--testPathPatterns=<name>` to narrow. Second, `server.test.js` › *SPA fallback
+› an unmatched deep GET…* fails with 500. Express's `send` refuses any absolute
+path containing a dot-segment, so `res.sendFile(public/index.html)` 404s
+internally. That one failure is the path, not the code: it passes in CI and in
+the main checkout. Run the full suite from a dot-free path before calling a PR
+green. One way: `git worktree add` somewhere dot-free, with a directory
+junction to the worktree's `node_modules`.
+
 **Version bookkeeping — bump per functional PR:**
 - `Oscar_Server/package.json` (`version`) — server semver, bump on any
   `Oscar_Server/` change.
@@ -432,6 +458,8 @@ checkout ever lands in a path with a space again, the workaround is
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |
 | `Oscar_Server/src/api/routes/company-places.js` | Places API cache: `POST /places/refresh` (paginated download) + `GET /places?q=` (ranked search), #450 |
 | `Oscar_Server/public/js/scenarios.js` | **the big one** (7000+ lines) — Test Config + Test Framework wizard SPA, incl. `attachPlaceAutocomplete()` |
+| `Oscar_Server/public/js/scenario-access.js` | the editor's read-only rule (`OscarScenarioAccess`): ownership pinned to `datafileOwnership.js`, plus the view-only allowlist for read-only cards — browser global and CommonJS, v1.11.198 (#515) |
+| `tests/unit/scenario-access.test.js` | client/server ownership parity + default-deny lock + `scenarios.js` wiring checks (no DOM harness exists for `public/`) |
 | `Oscar_Server/public/js/findings.js` | Test Findings & Open Points page |
 | `Bruno_Collection/library-bruno/*.js` | shared validators run inside Bruno: `scenarioParser`, `requestsBuilder`, `offers`, `bookings`, `refunds`, `exchanges`, `testCapture` (`bruTest()` assertion capture), `displays` (masked logging), `reportGenerator`/`mergeReport`, `loopback`, `osdmEnums` |
 | `Bruno_Collection/json_validator/datafile.schema.json` | datafile JSON-schema contract |
@@ -460,12 +488,6 @@ checkout ever lands in a path with a space again, the workaround is
   - *Scenario codes reach the Bruno env YAML unescaped* (the YAML-injection
     path reviewers found), and the run log can list codes. Both are
     pre-existing, and both are covered by tracker **PR-03** (NEW-02).
-- **Editor read-only gating is incomplete (known, 2026-09-11).** Since v1.11.197
-  the server keeps only a tester's own scenarios (§2), but several
-  `scenarios.js` controls were never gated by `readOnly` — e.g. the
-  offer-criteria ticks (`toggle-offer-array`) — so a tester can still *make* an
-  edit to a shared scenario that the save then reports as not kept. The fix is
-  UI only: gate every scenario-card control on `isReadOnlyForMe(sc)`.
 - **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
   **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
   both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open
