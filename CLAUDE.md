@@ -145,10 +145,65 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   author scenarios and set `scenariosToRun`, which `POST /v1/runs` reads. The
   2026-09-05 audit and our own remediation tracker both said "make PUT
   Test-Manager-only"; that would have stopped every tester from running
-  anything but the Test Manager's selection. Do not "fix" it that way. The real
-  remaining gap is intra-tenant: a tester's save replaces the whole file, so it
-  can alter shared and other testers' private scenarios (read-only only in the
-  browser) — needs a server-side per-scenario merge (§6).
+  anything but the Test Manager's selection. Do not "fix" it that way. What
+  testers may change *within* that save is the next bullet.
+- **A tester's save only touches their own scenarios; run lists are personal**
+  (v1.11.197; maintainer decision 2026-09-11). `utils/datafileOwnership.js`,
+  pure functions: **owned** = not shared and `created_by` is the tester's email;
+  **visible** = owned, shared, or no `created_by` (old company scenarios —
+  hiding those would empty old datafiles for testers). `GET /datafile` gives a
+  tester `viewForTester`: others' private scenarios and the resource entries
+  only they use are removed, and `scenariosToRun` is replaced by the tester's
+  personal list. `PUT` runs `mergeTesterSave`: owned scenarios are replaced,
+  added or deleted; everything else, including every company-level key, is kept
+  as stored. Edits to read-only scenarios come back as `read_only_ignored`.
+  A new scenario whose code someone else's already uses gets the next free
+  code (`renamed`), so it is never dropped and never a 409. A stale copy of a
+  scenario the TM deleted or un-shared is discarded, never revived as the
+  tester's. **An independent review (4 lenses, every finding reproduced)
+  broke the first version 16 ways; the fixes are pinned as lettered tests in
+  `tests/unit/datafile-ownership.test.js`.** Things that will bite if
+  forgotten:
+  - **A tester never writes a company-level key**, first save included; only
+    `osdmVersion`/`collection` strings from the editor's skeleton get through.
+    Bruno's `setSystemInfoParameters` turns *every* `systemInfoParameters` key
+    into an env var for every run, and every request is `{{api_base}}/…`, so a
+    planted key sends colleagues' runs, and their bearer tokens, anywhere.
+  - **`/data/:filename` is Test-Manager-only for sessions.** It serves the raw
+    file. Bruno takes the loopback branch; nothing in `public/` calls it.
+  - **Bruno reads `purchaserList[0]` for every scenario** and ignores
+    `purchaserListId`, so entry 0 is everyone's and a tester cannot change or
+    remove it. The real fix is in the collection (honour `purchaserListId`).
+  - **A new link from an own scenario to an entry only hidden scenarios use
+    is cut**; otherwise pointing at an id would reveal the entry in the view.
+    Links a tester's stored scenario already had are kept, because they come
+    from old aliasing, from before anything was hidden.
+  - **Read-only comparison tolerates exactly the editor's two backfills**
+    (`salesFlowActions` all-true, `offerSearchCriteria` `{}`). Anything wider
+    hides real edits; anything narrower makes every save report false edits.
+  - **Resource ids are minted in the browser** as max+1 over what the tester
+    *sees*, so they can clash with a hidden scenario's entry. The merge never
+    lets a tester's entry replace one another scenario references: it
+    copies it to a fresh id (copy-on-write). Don't "simplify" this to an id
+    match.
+  - **Compare scenarios with `canonical()`**, which sorts keys and drops `__`
+    keys: `GET` annotates `__featureNotDeclaredWarnings`, so an untouched
+    scenario echoed back is not byte-equal.
+  - **Every datafile writer takes `withDatafileLock(companyId)`**
+    (`utils/datafileLock.js`): save, upload, and `reprojectDatafile`. The merge
+    is read-modify-write across `await`s; without the lock, two overlapping
+    saves lose one. It is in-process — correct for the single container, not
+    for more than one.
+  - **Personal run lists live in `run_selections`** (migration 26), not in the
+    file: a Test Manager upload must not wipe them, and Bruno's file must not
+    carry per-user state. `POST /v1/runs` expands a tester's batch from it,
+    limited to what they can see; Test Managers use the file's
+    `scenariosToRun`, which is now only the company default. Bruno still gets
+    one `scenario_override` per run, and `/data/:filename` stays unfiltered.
+  - **`scenarios.js` `isMine()` must match `isOwnedBy()`.** Editability in the
+    browser is now `isReadOnlyForMe(sc)`. Some editor controls were never gated
+    at all (e.g. the offer-criteria ticks), so the server is the authority, and
+    the save confirmation tells the tester what it did not keep.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -372,6 +427,9 @@ checkout ever lands in a path with a space again, the workaround is
 | `Oscar_Server/src/utils/frameworkGating.js` | golden-rule rule engine + datafile annotator |
 | `Oscar_Server/src/utils/knownDeviationProjection.js` | projects baselined findings into `knownDeviations[]` |
 | `Oscar_Server/src/utils/osdm-client.js` | shared vendor-call helper (`osdmGet` + `buildTesterHeaders`), #450 |
+| `Oscar_Server/src/utils/datafileOwnership.js` | what a tester sees (`viewForTester`) and may change (`mergeTesterSave`) in the company datafile — pure, v1.11.197 |
+| `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
+| `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |
 | `Oscar_Server/src/api/routes/company-places.js` | Places API cache: `POST /places/refresh` (paginated download) + `GET /places?q=` (ranked search), #450 |
 | `Oscar_Server/public/js/scenarios.js` | **the big one** (7000+ lines) — Test Config + Test Framework wizard SPA, incl. `attachPlaceAutocomplete()` |
 | `Oscar_Server/public/js/findings.js` | Test Findings & Open Points page |
@@ -391,15 +449,23 @@ checkout ever lands in a path with a space again, the workaround is
   amount after REFUNDED. OSCAR only logs before/after at INFO; turning it
   into an assertion (or a per-company Known Deviation) waits for OTST/SBB to
   say whether that run was a partial refund or a deviation.
-- **Remaining half of S3 (2026-09-11, needs a design decision):** a tester's
-  `PUT /datafile/json` replaces the whole company datafile, so it can alter
-  shared scenarios and other testers' private ones; `scenarios.js` marks them
-  read-only (`readOnly = isTester && sc.shared`) but only client-side. Options:
-  a server-side merge that accepts a tester's own non-shared scenarios plus
-  `scenariosToRun` and takes everything else from the stored file, or a
-  per-tester run-list. `scenariosToRun` is also one company-wide list today,
-  so two testers overwrite each other's selection. See §2 "Authorise before
-  you parse".
+- **Left open by the v1.11.197 review (known, 2026-09-11):**
+  - *Personal run lists are keyed by scenario code.* A Test Manager renaming a
+    shared scenario drops it from every tester's personal list, and they must
+    tick it again. There is no stable scenario id to key on; adding one is the
+    real fix.
+  - *Bruno ignores `purchaserListId`* and uses `purchaserList[0]` for every
+    scenario (`library-bruno/scenarioParser.js`). The merge protects entry 0,
+    but the collection should resolve the purchaser by id like the other lists.
+  - *Scenario codes reach the Bruno env YAML unescaped* (the YAML-injection
+    path reviewers found), and the run log can list codes. Both are
+    pre-existing, and both are covered by tracker **PR-03** (NEW-02).
+- **Editor read-only gating is incomplete (known, 2026-09-11).** Since v1.11.197
+  the server keeps only a tester's own scenarios (§2), but several
+  `scenarios.js` controls were never gated by `readOnly` — e.g. the
+  offer-criteria ticks (`toggle-offer-array`) — so a tester can still *make* an
+  edit to a shared scenario that the save then reports as not kept. The fix is
+  UI only: gate every scenario-card control on `isReadOnlyForMe(sc)`.
 - **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
   **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
   both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open

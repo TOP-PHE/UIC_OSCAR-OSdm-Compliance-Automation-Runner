@@ -558,6 +558,20 @@ const MIGRATIONS = [
         )`);
       } catch (_e) { /* benign if already exists */ }
   }},
+  { version: 26, name: 'run-selections', up: () => {
+      // v1.11.197 — a tester's personal run list, per (company, user). The
+      // datafile's scenariosToRun stays the Test Manager's company default.
+      // See utils/runSelections.js.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS run_selections (
+          company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          user_id    TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+          codes_json TEXT NOT NULL DEFAULT '[]',
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (company_id, user_id)
+        )`);
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

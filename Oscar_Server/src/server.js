@@ -308,6 +308,11 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
     } catch (_e) { /* fall through to 401 */ }
     if (!user) return res.status(401).send('Unauthorized');
     if (user.companyId !== company.id) return res.status(403).send('Forbidden');
+    // v1.11.197: the raw file holds every scenario of the company, other
+    // testers' private ones included. A tester reads their filtered view from
+    // GET /v1/company/datafile; serving them this file would undo it. Nothing
+    // in the UI calls this path, and Bruno takes the loopback branch above.
+    if (user.role !== 'test_manager') return res.status(403).send('Forbidden');
   }
 
   // Resolve, traversal-guard, decrypt, send.

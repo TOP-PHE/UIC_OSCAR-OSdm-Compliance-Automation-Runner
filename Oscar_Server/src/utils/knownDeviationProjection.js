@@ -35,6 +35,7 @@ const fs     = require('fs');
 const crypto = require('crypto');
 const { get, all, run } = require('../db/db');
 const { decryptFromFileAsync, encryptToFileAsync } = require('./at-rest');
+const { withDatafileLock } = require('./datafileLock');
 const log = require('./logger').child({ module: 'known-deviation-projection' });
 
 /**
@@ -76,7 +77,14 @@ function buildProjection(companyId) {
  * refresh the stored plaintext hash so the dashboard reflects the change.
  * Returns true if the datafile was rewritten, false on any soft no-op.
  */
-async function reprojectDatafile(companyId) {
+// Read-modify-write, so it takes the same per-company lock as every other
+// datafile writer (utils/datafileLock) — otherwise it could interleave with a
+// tester's merge and one of the two changes would be lost.
+function reprojectDatafile(companyId) {
+  return withDatafileLock(companyId, () => _reprojectDatafile(companyId));
+}
+
+async function _reprojectDatafile(companyId) {
   const company = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
   if (!company || !company.datafile_path || !fs.existsSync(company.datafile_path)) {
     return false;   // no datafile uploaded yet — nothing to project into

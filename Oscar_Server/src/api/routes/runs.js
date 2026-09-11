@@ -43,6 +43,8 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
+const { resolveRunList, visibleCodes } = require('../../utils/datafileOwnership');
+const { getRunSelection } = require('../../utils/runSelections');
 const runner = require('../../worker/runner');
 
 const router = express.Router();
@@ -202,7 +204,16 @@ router.post('/', runSubmitLimiter, (req, res) => {
   // Resolve scenariosToRun list
   const allCodes = (datafile.scenarios || []).map(s => s.code);
   let scenarioList;
-  if (datafile.scenariosToRun === 'ALL') {
+  if (req.user.role === 'company_user') {
+    // v1.11.197: a tester runs their personal run list (what they ticked in Test
+    // Config), limited to scenarios they can see — their own and the shared
+    // ones. Until they tick anything, the Test Manager's company list is the
+    // default. Another tester's ticks never change this. See
+    // utils/runSelections.js and utils/datafileOwnership.js.
+    const selection = getRunSelection(targetCompanyId, req.user.id);
+    const fallback = datafile.scenariosToRun == null ? 'ALL' : datafile.scenariosToRun;
+    scenarioList = resolveRunList(selection == null ? fallback : selection, visibleCodes(datafile, req.user.email));
+  } else if (datafile.scenariosToRun === 'ALL') {
     scenarioList = allCodes;
   } else if (Array.isArray(datafile.scenariosToRun)) {
     scenarioList = datafile.scenariosToRun.filter(c => allCodes.includes(c));
