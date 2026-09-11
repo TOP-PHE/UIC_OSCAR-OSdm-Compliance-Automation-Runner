@@ -907,6 +907,7 @@ admin-override with extra audit logging — not implemented in Phase 1.)
 | Certifier sees a run the Test Manager didn't share | Per-run share check (`runs.shared_with_certifier_at`) in `canUserSeeRun()`. Was a two-gate check until v1.11.15 removed the company-wide toggle — see §15.2. |
 | Certifier from one company sees another company's data they shouldn't | Tenant scoping at the database query layer; certifier requests targeting opted-out companies return 404 (existence not disclosed) |
 | Tester from company A reads company B's runs | Tenant middleware hard-pins `req.companyId` to the user's own company; cross-company query parameters are ignored for non-platform roles |
+| Administrator or Certifier overwrites a vendor's datafile | **v1.11.195.** Role and company are checked as middleware before the upload is parsed; uploads are held in memory until authorised and valid; `PUT /datafile/json` refuses both roles (see §15.8) |
 
 #### Defended in code (since earlier releases)
 
@@ -1060,3 +1061,36 @@ decrypting, so the Report Builder rendered every log line of a
 post-migration run as `enc:v1:…`. The data was never wrong on disk — only
 the read path.
 
+### 15.8 v1.11.195 — datafile writes are authorised before anything touches disk
+
+The trust model's datafile row — writable by "Tester + Test Manager of the
+owning company", never by Certifiers or Administrators — was true for reads
+and false for writes. Findings **S2** and **S3** of the 2026-09-05 external
+readiness assessment:
+
+| Route | What was reachable | Now |
+|---|---|---|
+| `POST /v1/company/datafile` (upload) | multer stored the upload **as the live `{slug}-datafile.json`, in plaintext, before the role check ran**. A tester on their own company, or an Administrator or Certifier naming any company in `?company_id=`, got a 403 — after their file had replaced the company's. | Role and company are checked first, and the upload is held in memory until it is authorised and valid. The only disk write is the atomic encrypted one. Test Managers only, as before. |
+| `PUT /v1/company/datafile/json` (the scenario editor's Save & Apply) | Refused Certifiers only. An Administrator could rewrite **any** company's datafile by naming it. | Administrators and Certifiers refused. Testers and Test Managers write their own company only. |
+
+Both routes ignore `?company_id=` / `X-Company-Id` for the roles they admit,
+so a tester or Test Manager cannot reach another company's file.
+
+**Why testers can still save.** Test Config is on the tester menu. Its Save &
+Apply is how testers author their own scenarios and choose `scenariosToRun`,
+which `POST /v1/runs` reads to decide what to run. Removing testers from this
+route would stop them running anything but the Test Manager's selection.
+
+**What is still open.** A tester's save replaces the whole company file, so it
+can alter shared scenarios and other testers' private ones. The scenario editor
+marks those read-only, but that is enforced only in the browser. Closing it
+needs a per-scenario merge on the server; it is not done yet. Until it is,
+treat the company's testers as trusted with each other's scenarios.
+
+A side effect worth knowing when you field a support call: before this release,
+a Test Manager who uploaded an invalid or oversized file lost the company's
+datafile altogether. The upload had already replaced it, and the failure path
+then deleted it, while `companies.datafile_path` still pointed at the old file.
+If a company reports "our data file vanished after a failed upload" from
+before v1.11.195, that is the cause. The Test Manager needs to upload or rebuild
+it once. The fixed release leaves the previous file untouched.

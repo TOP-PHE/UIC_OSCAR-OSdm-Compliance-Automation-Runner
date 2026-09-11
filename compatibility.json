@@ -1,8 +1,26 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.219",
+  "current_release": "2026.220",
   "releases": [
+    {
+      "release": "2026.220",
+      "date": "2026-09-11",
+      "server": "1.11.195",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): datafile writes are authorised before anything touches disk - findings S2 and S3 of the 2026-09-05 external readiness assessment, PR-02 of the remediation tracker. Oscar_Server/src/api/routes/company.js only.",
+        "S2 - POST /v1/company/datafile ran multer before its role check, with a diskStorage whose filename WAS the company's live datafile ({slug}-datafile.json). The upload therefore overwrote the live file, in plaintext, before requireTestManager ran: a tester on their own company, an administrator naming any company in ?company_id=, or a read-only certifier all received their 403 after the damage, and companies.datafile_hash no longer described the file. Authorisation now runs as middleware before upload.single; multer uses memoryStorage, so nothing is written until the upload is authorised and validated, and the only disk write is the existing atomic encrypted one; the multer fileFilter refuses any upload that reaches it unauthorised (belt-and-braces). The in-repo test that called the ordering a cosmetic 500-vs-403 'quirk' is replaced by an assertion of the clean 403.",
+        "Same root cause, found while fixing S2 and not in the audit: the legitimate Test Manager lost data too. An upload that failed JSON validation had already replaced the live file, and the handler then unlinked it - leaving the company with no datafile on disk while companies.datafile_path and datafile_hash still pointed at one. An oversized upload (over 5 MB) did the same through multer's own abort cleanup. Both now leave the previous datafile untouched.",
+        "S3 - PUT /v1/company/datafile/json blocked certification_user only, so an administrator could rewrite any company's datafile by naming it (cross-tenant, and a breach of issue #60). Now refused for administrators and certifiers. Deliberately NOT made Test-Manager-only as the remediation tracker proposed: that proposal was wrong. The Test Config page is on the tester menu and its Save & Apply is this route; it is how testers author their own scenarios and set scenariosToRun, which POST /v1/runs reads to decide what to run (Tester User Guide s4-5; Admin Guide s15.1 lists the datafile as writable by 'Tester + Test Manager of the owning company'). Test-Manager-only would have stopped every tester from running anything but the Test Manager's selection. Both write routes are pinned to the caller's own company whatever ?company_id= / X-Company-Id says.",
+        "Known and not fixed here: a tester's save still replaces the whole company datafile, so it can alter shared scenarios and other testers' private ones - the editor shows those read-only, but only in the browser. Closing that needs a per-scenario server-side merge; recorded as the remaining half of S3 for a design decision.",
+        "Also: company.js's local copy of requireTestManager is removed in favour of the one in api/helpers/shared.js (the same check; 403 detail now reads 'Only Test Managers can modify test data.'). DELETE /v1/company/datafile is unchanged.",
+        "Tests: new tests/integration/company-datafile-authz.test.js (11 tests, its own file so datafileMutationLimiter's 20-per-15-min bucket is not shared) asserts that every refused write leaves the live file byte-identical, still decrypting to the baseline, with datafile_hash still matching its sha256 - a status code alone proved nothing here. Against the original code 7 fail, exactly the defects above; the two tester-save tests pass on it, confirming the tester workflow is unchanged. Six mutations (parse before authorise, disk storage on the live path, PUT without policy, upload admitting testers, PUT Test-Manager-only, scope taken from the header) are each caught. 56 suites / 1403 tests, eslint clean.",
+        "Local-only test flake, not introduced here: on Windows with the checkout inside OneDrive, OneDrive briefly locks a freshly written file and at-rest.js's atomic rename fails with EPERM (measured 14 of 400 back-to-back rewrites) - one full run in ten on this machine. Linux CI and the production VPS cannot hit it. A retry-on-EPERM for at-rest.js is proposed separately."
+      ]
+    },
     {
       "release": "2026.219",
       "date": "2026-09-09",
