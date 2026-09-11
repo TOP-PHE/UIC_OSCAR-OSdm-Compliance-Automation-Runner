@@ -1303,8 +1303,8 @@ function toggleDetail(idx) {
 // The index of the scenario whose card `el` is on, or -1 (renderAll stamps
 // data-sc-card on each .scenario-item).
 function cardScenarioIndex(el) {
-  const card = el && el.closest('[data-sc-card]');
-  return card ? parseInt(card.dataset.scCard, 10) : -1;
+  const card = el?.closest('[data-sc-card]');
+  return card ? Number.parseInt(card.dataset.scCard, 10) : -1;
 }
 
 // The element with this id on the same card as `el`. Ids inside a card repeat
@@ -1325,8 +1325,8 @@ function isLockedControl(el) {
 
 function readOnlyBannerHTML(sc) {
   let whose = 'A company scenario with no owner';
-  if (sc && sc.shared) whose = 'Shared by your Test Manager';
-  else if (sc && sc.created_by) whose = `Created by ${esc(sc.created_by)}`;
+  if (sc?.shared) whose = 'Shared by your Test Manager';
+  else if (sc?.created_by) whose = `Created by ${esc(sc.created_by)}`;
   return `<div class="ro-banner" role="note">🔒 ${whose} — read-only for testers. Use <strong>📋 Duplicate</strong> to get an editable copy of your own.</div>`;
 }
 
@@ -2531,30 +2531,35 @@ function isDefaultPurchaserValue(s) {
   return typeof s === 'string' && s.indexOf(PURCHASER_DEFAULT_PREFIX) === 0;
 }
 
-function buildPurchaserSection(idx, sc, purchGroup) {
-  const readOnly = isReadOnlyForMe(sc);
-  // Ensure the purchaser list entry exists. Legacy data files, imports, or
-  // in-place edits can leave sc.purchaserListId pointing at nothing; the
-  // previous render just showed empty inputs and the link-checkbox handler
-  // silently bailed out because state.purchaserList[-1] was undefined.
-  // #515: never for a read-only scenario — drawing it must not change the
-  // model (the edit could not be saved, and it marked the page dirty).
+// The purchaser a scenario's card shows, and the index of its entry in
+// state.purchaserList (-1 when there is none). For an editable scenario the
+// entry is created when missing: legacy data files, imports, or in-place edits
+// can leave sc.purchaserListId pointing at nothing; the previous render just
+// showed empty inputs and the link-checkbox handler silently bailed out
+// because state.purchaserList[-1] was undefined. #515: never for a read-only
+// scenario — drawing it must not change the model (the edit could not be
+// saved, and it marked the page dirty).
+function purchaserEntryForCard(sc, purchGroup, readOnly) {
   let prIdx = (state.purchaserList || []).findIndex(p => p.id === sc.purchaserListId);
-  if (prIdx === -1 && !readOnly) {
+  if (readOnly) return { prIdx, purch: purchGroup.purchaser?.[0] || {} };
+  let entry = purchGroup;
+  if (prIdx === -1) {
     state.purchaserList = state.purchaserList || [];
     const newPurchId = sc.purchaserListId || (Math.max(0, ...state.purchaserList.map(p => p.id || 0)) + 1);
     sc.purchaserListId = newPurchId;
-    const newEntry = { id: newPurchId, purchaser: [{}] };
-    state.purchaserList.push(newEntry);
+    entry = { id: newPurchId, purchaser: [{}] };
+    state.purchaserList.push(entry);
     prIdx = state.purchaserList.length - 1;
-    purchGroup = newEntry;
     markDirty();
   }
-  if (!readOnly) {
-    purchGroup.purchaser = purchGroup.purchaser || [{}];
-    if (!purchGroup.purchaser[0]) purchGroup.purchaser[0] = {};
-  }
-  const purch = (Array.isArray(purchGroup.purchaser) && purchGroup.purchaser[0]) || {};
+  entry.purchaser = entry.purchaser || [{}];
+  if (!entry.purchaser[0]) entry.purchaser[0] = {};
+  return { prIdx, purch: entry.purchaser[0] };
+}
+
+function buildPurchaserSection(idx, sc, purchGroup) {
+  const readOnly = isReadOnlyForMe(sc);
+  const { prIdx, purch } = purchaserEntryForCard(sc, purchGroup, readOnly);
 
   // Seed default purchaser values if the record is completely empty. The
   // "Purchaser_" prefix makes it obvious the field is purchaser-specific,

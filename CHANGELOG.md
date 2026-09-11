@@ -53,11 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   A control added later is locked on read-only cards until someone adds it to
   the allowlist. The purchaser section no longer writes to the model for a
-  read-only scenario. Reduction- and loyalty-card rows, and the passenger details
-  panel, now open on the card you clicked, even when another open card shows the
-  same passenger list (older datafiles share entries).
-  Disabled fields are styled as disabled. Test Managers are unaffected, and no
-  server code changed.
+  read-only scenario: finding or creating its entry moved into
+  `purchaserEntryForCard()`, which returns before any write. For an editable
+  scenario it behaves exactly as before, and moving it out also brought
+  `buildPurchaserSection` back under Sonar's complexity limit.
+  Reduction- and loyalty-card rows, and the passenger details panel, now open
+  on the card you clicked, even when another open card shows the same passenger
+  list (older datafiles share entries). Disabled fields are styled as disabled.
+  Test Managers are unaffected, and no server code changed.
 
 ### Tests
 
@@ -71,11 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Wiring:** the load order in `scenarios.html`, a single draw path through
     `renderScenarioDetail`, the guard in all three delegates, no `shared`-only
     gate left, and no render-time purchaser write for read-only scenarios.
-  - **17 mutations**, each caught, with the sources restored byte-identical.
+  - **19 mutations**, each caught, with the sources restored byte-identical.
     Examples: dropping `trim()` or the no-owner rule from the client copy,
     widening the allowlist, removing any one delegate guard, bypassing
-    `renderScenarioDetail`, reverting to the `shared`-only rule, swapping the
-    script order.
+    `renderScenarioDetail`, reverting to the `shared`-only rule, letting the
+    purchaser helper write for a read-only scenario, swapping the script order.
 - **Browser check** on a throwaway instance (tester, Test Manager, and shared,
   company, own and hidden scenarios):
   - 107 controls locked on each read-only card, 0 on the tester's own card, 0
@@ -86,7 +89,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     byte-identical, the page stayed clean, and the card redrew locked.
   - Save & Apply after editing the tester's own scenario stored exactly those
     edits, with no read-only note.
-- Full suite: 61 suites / 1562 tests; `npm run lint` clean.
+  - After the purchaser extraction, re-checked: opening every card as the
+    tester left the model untouched. A dangling purchaser on the tester's own
+    scenario, or on any scenario for the Test Manager, is still re-created and
+    seeded with defaults.
+- Full suite: 61 suites / 1562 tests; `npm run lint` clean. SonarCloud Quality
+  Gate passed; the six new code smells it listed on the first push were fixed:
+  banner contrast, optional chains, `Number.parseInt`, and the complexity of
+  `buildPurchaserSection`.
 
 ### Docs
 

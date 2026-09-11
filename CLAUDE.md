@@ -217,7 +217,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     lock is the only feedback a tester gets. **Drawing must not write to the
     model:** `buildPurchaserSection` used to create an entry for a dangling
     `purchaserListId`, which made the next save report an untouched scenario
-    as not kept.
+    as not kept. That lookup now lives in `purchaserEntryForCard()`, which
+    returns before any write for a read-only scenario.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already

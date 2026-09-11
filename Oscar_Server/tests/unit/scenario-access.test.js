@@ -207,9 +207,18 @@ describe('scenarios.js wiring', () => {
     expect(SCENARIOS_JS).not.toMatch(/isTester\s*&&\s*[\w.]+\.shared/);
   });
 
+  // It used to create an entry for a dangling purchaserListId and re-point the
+  // scenario, so the next save reported an untouched scenario as not kept.
   test('drawing a read-only purchaser section writes nothing to the model', () => {
-    const fn = topLevelFunction('buildPurchaserSection');
-    expect(fn).toContain('if (prIdx === -1 && !readOnly) {');
-    expect(fn.indexOf('const readOnly = isReadOnlyForMe(sc);')).toBeLessThan(fn.indexOf('if (prIdx === -1'));
+    const entry = topLevelFunction('purchaserEntryForCard');
+    const bail = entry.indexOf('if (readOnly) return ');
+    expect(bail).toBeGreaterThan(-1);
+    for (const write of ['state.purchaserList.push(', 'sc.purchaserListId =', 'markDirty()', 'entry.purchaser =']) {
+      expect([write, entry.indexOf(write) > bail]).toEqual([write, true]);
+    }
+    const build = topLevelFunction('buildPurchaserSection');
+    expect(build).toContain('const readOnly = isReadOnlyForMe(sc);');
+    expect(build).toContain('purchaserEntryForCard(sc, purchGroup, readOnly)');
+    expect(build).toContain('if (!readOnly && !purch.purchaserFirstName');     // no default seeding either
   });
 });

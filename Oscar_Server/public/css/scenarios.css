@@ -89,7 +89,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .scenario-detail{display:none;padding:0 16px 16px 42px}
 .scenario-detail.open{display:block}
 /* #515: a scenario card that is read-only for this tester (renderScenarioDetail) */
-.ro-banner{background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#e65100}
+.ro-banner{background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#bf360c}
 .ro-locked{pointer-events:none;opacity:.6;cursor:default}
 
 /* ── Train resource rows (expand/collapse, mirrors scenario-item) ─────── */
