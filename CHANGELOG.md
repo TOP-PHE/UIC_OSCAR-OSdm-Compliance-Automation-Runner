@@ -14,6 +14,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.195] — 2026-09-11
+
+### Security
+
+- **Datafile writes are authorised before anything touches disk** — findings
+  **S2** and **S3** of the 2026-09-05 external readiness assessment; PR-02 in
+  the remediation tracker. `Oscar_Server/src/api/routes/company.js` only.
+
+  - **S2 — `POST /v1/company/datafile`.** multer ran before the role check, and
+    its `diskStorage` filename *was* the company's live datafile
+    (`{slug}-datafile.json`). The upload therefore overwrote the live file, in
+    plaintext, before `requireTestManager` ran: a tester on their own company,
+    an administrator naming any company in `?company_id=`, or a read-only
+    certifier all got their 403 *after* the damage, and
+    `companies.datafile_hash` no longer described the file. Authorisation now
+    runs as middleware ahead of `upload.single`; multer uses `memoryStorage`,
+    so nothing is written until the upload is authorised **and** validated and
+    the only disk write is the existing atomic encrypted one; and multer's
+    `fileFilter` refuses anything that reaches it unauthorised
+    (belt-and-braces). The test that described the ordering as a cosmetic
+    500-vs-403 "quirk" now asserts the clean 403 instead.
+  - **S3 — `PUT /v1/company/datafile/json`.** Refused `certification_user` and
+    nobody else, so an administrator could rewrite any company's datafile by
+    naming it — a cross-tenant write, against issue #60. Administrators and
+    certifiers are now refused.
+
+  **Testers keep `PUT /datafile/json`, deliberately.** The remediation tracker
+  proposed making it Test-Manager-only, and that proposal was wrong. Test
+  Config is on the tester menu and its **Save & Apply** is this route. It is how
+  testers author their own scenarios and set `scenariosToRun`, which
+  `POST /v1/runs` reads to decide what to run (Tester User Guide §4–5; Admin
+  Guide §15.1 lists the datafile as "Tester + Test Manager of the owning
+  company"). Making it Test-Manager-only would have stopped every tester from
+  running anything but the Test Manager's own selection. Both write routes are
+  pinned to the caller's own company whatever `?company_id=` / `X-Company-Id`
+  says.
+
+  **Still open:** a tester's save replaces the whole company file, so it can
+  alter shared scenarios and other testers' private ones. The editor shows those
+  read-only, but only in the browser. Closing that needs a per-scenario merge on
+  the server and is left for a design decision.
+
+### Fixed
+
+- **A rejected upload no longer deletes the company's datafile.** The same
+  write-before-validate ordering hurt the legitimate Test Manager too. An upload
+  that failed JSON validation had already replaced the live file, and the
+  handler then unlinked it. The company was left with no datafile on disk while
+  `companies.datafile_path` and `datafile_hash` still pointed at one. An upload
+  over 5 MB did the same through multer's own abort cleanup. Both now leave the
+  previous datafile untouched. This was not in the audit — it surfaced while
+  writing the S2 tests.
+
+### Changed
+
+- `company.js` no longer keeps its own copy of `requireTestManager`; it uses the
+  one in `api/helpers/shared.js`. The check is the same, and the 403 detail now
+  reads "Only Test Managers can modify test data." `DELETE /v1/company/datafile`
+  is unchanged.
+
+### Tests
+
+- New `tests/integration/company-datafile-authz.test.js` (11 tests). Every
+  refused write must leave the live file **byte-identical**, still decrypting to
+  the baseline, with `datafile_hash` still matching its sha256. A status code
+  alone proved nothing here. The file is separate from `company-routes.test.js`
+  so it doesn't share `datafileMutationLimiter`'s 20-per-15-minute bucket.
+  Against the original code **7 fail — exactly the defects above**. Both
+  tester-save tests *pass* there, confirming the tester workflow is unchanged.
+  Six mutations are each caught: parse before authorise, disk storage on the
+  live path, PUT with no policy, upload admitting testers, PUT
+  Test-Manager-only, and scope taken from the header.
+
+---
+
 ## [server-1.11.194] — 2026-09-09
 
 ### Security
