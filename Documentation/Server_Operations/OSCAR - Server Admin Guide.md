@@ -437,6 +437,30 @@ Will install uuid@14.0.0, which is a breaking change
 
 **Current status (April 2026):** the only outstanding advisory is the uuid v3/v5/v6 buffer-bounds issue (GHSA-w5hq-g745-h8pq). OSCAR is not exposed — all eight call sites use `v4` without a `buf` argument. No action required.
 
+### 9.9 Intermittent "Failed to save data file" on Windows (OneDrive folder)
+
+```
+EPERM: operation not permitted, rename '...\data\datafiles\<slug>-datafile.json.tmp.<hex>' -> '...\data\datafiles\<slug>-datafile.json'
+```
+
+Seen only when OSCAR runs on Windows from a folder that OneDrive syncs,
+which is how the local install in §1 is laid out. OSCAR writes datafiles and
+report artifacts atomically. It writes a temp file, then renames it over the
+real one. OneDrive, Defender and the search indexer briefly open any file
+that was just written. A rename over such a file fails until they let go.
+Before v1.11.196 that surfaced as an occasional 500 on **Save & Apply** or on
+a datafile upload. It also left a stray `*.tmp.<hex>` file in `data/datafiles/`
+or `data/artifacts/`. A measured rate was 14 of 400 back-to-back saves.
+
+**Fix:** upgrade to v1.11.196 or later. The rename is now retried on
+`EPERM` / `EBUSY` / `EACCES`: up to 10 attempts over about one second. If it
+still fails, the temp file is removed. Stray `*.tmp.<hex>` files left by older
+versions are safe to delete while the server is stopped.
+
+If it still happens after upgrading, the lock is lasting longer than a second.
+Exclude `data\` from OneDrive, or move the install outside the synced folder.
+The Linux VPS deployment is not affected.
+
 ---
 
 ## 10. Verifying the Full Installation
