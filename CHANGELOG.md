@@ -14,6 +14,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.200] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 2 of 5: "possible defect" findings in the
+  browser UI.** Closes #525 together with the collection entry below; the
+  series is tracked in #523. 36 findings in `Oscar_Server/public`, each read.
+  - **22 `catch` blocks no longer discard the error.** The 11 that tell the
+    user something failed (sign-in, registration, password reset, e-mail
+    verification, admin load, report builder, message load) keep their
+    message and now also log the error to the browser console: a bug inside
+    the `try` block used to be indistinguishable from a network fault. The
+    other 11 are intended fallbacks or optional panels; the unused binding is
+    dropped and the reason is written down.
+  - **8 regular expressions that could backtrack super-linearly** are
+    rewritten or replaced by a loop: the admin slug, the wizard and ancillary
+    codes, two file-name sanitisers, the run-artifact name, and the report
+    builder's JSON label. Each gives identical results to the old code on
+    every string over a small alphabet (1.4 to 6.7 million inputs each).
+  - **6 small logic findings:** an unused variable in `run.html` removed; two
+    correct loops and a one-line helper in `scenarios.js` restyled.
+
+### Found, not fixed here
+
+- **#534: Test Config treats any failed datafile load as "no datafile yet"**
+  (network error, 500, 429, 403), and the scenario wizard then saves a fresh
+  file over the stored one. Found while reading the `catch` blocks; it needs
+  its own change. The three blocks involved are labelled with the issue number.
+
+### Tests
+
+- New `tests/unit/ui-scripts.test.js`: every inline script and every
+  `public/js` file is compiled, which nothing in CI did before, and the
+  rewritten page helpers run in a bare `vm` context. 62 new tests (1,608
+  total); 13 deliberate breakages each fail at least one.
+
+### Not verified
+
+- The pages were not opened in a browser. Worth a look after deployment: Test
+  Config, the run page and the Report Builder.
+
+---
+
+## [collection-OTST_V2.0.101] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 2 of 5: "possible defect" findings in the
+  Bruno library.** Closes #525 together with the server entry above. 14
+  findings in `library-bruno`, each read; no `.yml` request changed.
+  - `offers.js`: three places add an after-sales fee when the condition is for
+    the scenario's own kind, with identical REFUND and EXCHANGE branches. The
+    two tests are joined; same outcome on every combination.
+  - 7 `catch` blocks in `bookings.js`, `refunds.js` and
+    `requestsBuilder.js` parse a value from the Bruno environment and fall
+    back. The unused binding is dropped; handling is unchanged.
+  - `mergeReport.js` `normUrl` and `osdmVersion.js` `parseVersion`:
+    rewritten so they cannot backtrack over a long run; identical results on
+    1.4 and 2.4 million generated inputs.
+  - **The one place results can differ:** the `{{var}}` substitution in
+    `offers.js` and the `{param}` path match in `validators.js` now exclude
+    `{` as well as `}` from the name. That changes the outcome only for a
+    malformed token with a `{` between the braces. All 60 paths of the bundled
+    OpenAPI document and all 283 `{{...}}` tokens in the collection give
+    identical results.
+
+### Not verified
+
+- No run against a vendor sandbox was made: there are no vendor credentials on
+  the development machine. The library's 12 unit-test files (345 tests) pass.
+  One sale and one refund scenario after deployment are worth running.
+
+---
+
 ## [server-1.11.199] — 2026-10-05
 
 ### Changed
