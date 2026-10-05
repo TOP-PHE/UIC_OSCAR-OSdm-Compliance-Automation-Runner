@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.224",
+  "current_release": "2026.226",
   "releases": [
+    {
+      "release": "2026.226",
+      "date": "2026-10-05",
+      "server": "1.11.201",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(test-config): a failed load is no longer treated as \"nothing configured yet\". Closes #534. Test Config read the datafile, the Test Framework and the test data with \"if the answer is OK, use it; otherwise assume there is none\". Only a 404 means none; a network fault, a 403, a 429 from the read rate limiter or a 500 looked exactly the same. The scenario wizard then built an empty datafile, added the new scenario and saved it over the stored one.",
+        "Reproduced before fixing, on a throwaway server with the previous page code: 16 scenarios stored, one 429 injected on GET /v1/company/datafile, \"Generate & Add Scenario\" pressed - the page reported success and the stored datafile held 1 scenario. For a Test Manager the save replaces the whole file.",
+        "Now: one loader, loadForEdit(), used for all three reads. 404 = none, 401 = signed out, anything else = failed with a sentence the page can show. The page refresh checks every load before it replaces anything and stops with that sentence, so the editor is not shown empty; the wizard does not generate; the upload import adds no trains when it cannot tell which already exist, and says so.",
+        "Verified in a browser against the same throwaway server with the fixed code: with a 429 on the datafile the page shows the error and keeps what it had in memory; with a 429, a 500 and a network failure the wizard sends the one GET and no write; with a healthy load it still adds the scenario (15 -> 16 stored).",
+        "Tests: 47 new in tests/unit/scenarios-load-guard.test.js (1,593 total). They run the real functions from public/js/scenarios.js in a vm context against a fake server. Putting back any of 8 pieces of the old behaviour fails them.",
+        "User-visible: a news entry and a Troubleshooting row in the Tester User Guide. Server-only (Oscar_Server/public); Bruno collection unchanged."
+      ]
+    },
     {
       "release": "2026.224",
       "date": "2026-10-05",

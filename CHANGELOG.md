@@ -14,6 +14,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.201] — 2026-10-05
+
+### Fixed
+
+- **Test Config no longer treats a failed load as "nothing configured yet".**
+  Closes #534. The page read the datafile, the Test Framework and the test
+  data with "if the answer is OK, use it; otherwise assume there is none".
+  Only a 404 means none. A network fault, a 403, a 429 from the read rate
+  limiter or a 500 looked exactly the same, and the scenario wizard then built
+  an empty datafile, added the new scenario and saved it over the stored one.
+  For a Test Manager that save replaces the whole file.
+  - **Reproduced before fixing**, on a throwaway server with the previous page
+    code: 16 scenarios stored, one 429 injected on `GET /v1/company/datafile`,
+    *Generate & Add Scenario* pressed. The page reported success and the stored
+    datafile held 1 scenario.
+  - **One loader, `loadForEdit()`, for all three reads:** 404 is "none", 401
+    is "signed out", anything else is "failed" with a sentence the page shows.
+  - **Page load and every refresh** check all three loads before replacing
+    anything. On a failure the editor is not shown empty: the page stops with
+    the reason and keeps what it had.
+  - **The scenario wizard** does not generate after a failed load.
+  - **Upload import:** when the existing test data cannot be loaded, no train
+    is added (duplicates could not be told apart) and the user is told.
+
+### Verified
+
+- In a browser, against the same throwaway server with the fixed code: with a
+  429 on the datafile the page shows the error and keeps what it had in
+  memory; with a 429, a 500 and a network failure the wizard sends the one
+  `GET` and no write; with a healthy load it still adds the scenario.
+- 47 new tests in `tests/unit/scenarios-load-guard.test.js` (1,593 total).
+  They run the real functions from `public/js/scenarios.js` in a `vm` context
+  against a fake server. Putting back any of 8 pieces of the old behaviour
+  fails them.
+
+### Not covered
+
+- `run.html` still shows "File missing on server" for any failed read of the
+  datafile. It only displays; it does not write.
+- The server accepts the write as before. A check on the server that the
+  client saw the current file would be the stronger guard; it is not part of
+  this change.
+
+---
+
 ## [server-1.11.199] — 2026-10-05
 
 ### Changed
