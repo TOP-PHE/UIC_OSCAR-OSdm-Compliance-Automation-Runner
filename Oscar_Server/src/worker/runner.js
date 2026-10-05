@@ -157,6 +157,16 @@ function logEvent(runId, level, message, meta) {
 //   "⚠  No offers (attempt 2/3) — retrying..."
 // We parse these and surface them as event_kind='scenario_*' / 'log' with
 // attempt_index/attempt_total/scenario_name populated.
+// "at fn (file:line:col)" stack frame. The two alternatives are the two ways the
+// function token can end, at a "(" inside it or at whitespace before the "(",
+// so the pattern has one way to match a line instead of many.
+const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s*$/;
+
+// Bruno CLI request row: "<folder>/<request name> (<status text>)", with either
+// slash. The request name is everything up to the whitespace before the first
+// "(", written so the pattern cannot backtrack over that whitespace.
+const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
+
 class LogParser {
   constructor() {
     this.currentSuite = null;
@@ -178,9 +188,9 @@ class LogParser {
     // Scenario boundary detection — check before other patterns since these
     // lines can otherwise be misclassified as generic bruno output.
     // Match shape: "Skipping to next scenario [2/8]: OTST_FOO"
-    const skipMatch = trimmed.match(/Skipping to next scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([A-Za-z0-9_\-]+)/i);
-    const startMatch = !skipMatch && trimmed.match(/(?:Starting|Running)\s+scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([A-Za-z0-9_\-]+)/i);
-    const endMatch = !skipMatch && !startMatch && trimmed.match(/scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*(?:completed|finished|done)\s*:\s*([A-Za-z0-9_\-]+)/i);
+    const skipMatch = trimmed.match(/Skipping to next scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([\w-]+)/i);
+    const startMatch = !skipMatch && trimmed.match(/(?:Starting|Running)\s+scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([\w-]+)/i);
+    const endMatch = !skipMatch && !startMatch && trimmed.match(/scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*(?:completed|finished|done)\s*:\s*([\w-]+)/i);
     const attemptMatch = trimmed.match(/\(attempt\s+(\d+)\s*\/\s*(\d+)\)/i);
 
     if (skipMatch) {
@@ -238,7 +248,7 @@ class LogParser {
       // Bruno CLI prints request execution lines like:
       //   "01-System Infos Requests\00. GET System Version Check (404 Not Found) - 302 ms"
       const folderReqMatch = !hasLevelTag && !isAssertionRow
-        && trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
+        && trimmed.match(FOLDER_REQUEST_ROW);
       if (isAssertionRow) {
         category = 'assertion';
       } else if (folderReqMatch) {
@@ -858,7 +868,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       //    developer detail that tripled the visual size of each failure in
       //    the dashboard. They remain one debug-filter click away.
       if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
-      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'debug';
+      if (STACK_FRAME_WITH_PARENS.test(line))                     return 'debug';
       if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
       if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
       // 4) Known platform noise

@@ -23,7 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { mergeDedicatedHeaders } = require('../../utils/osdm-client');
+const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
 const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
@@ -99,7 +99,7 @@ function _discoveryBody(endpoint, date, origin, destination, apiBase) {
 // POST {api_base}/{path}. Returns { ok, status, json, text } and never throws
 // on a non-2xx — the caller records per-day outcomes.
 async function _postJson(apiBase, path, token, body, extraHeaders) {
-  const url = `${String(apiBase).replace(/\/+$/, '')}/${path}`;
+  const url = `${stripTrailingSlashes(String(apiBase))}/${path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRIPS_FETCH_TIMEOUT_MS);
   try {

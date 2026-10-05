@@ -74,9 +74,18 @@ const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 // Paris-local — making a run that started minutes ago look 1–2h old and
 // wrongly flagging it stale (auto-cancelled on delete). Append 'Z' when the
 // string carries no TZ marker so it parses as UTC regardless of container TZ.
+// Strip leading and trailing '-' and '.' in one pass each.
+function trimDashDot(s) {
+  let start = 0;
+  let end = s.length;
+  while (start < end && (s[start] === '-' || s[start] === '.')) start++;
+  while (end > start && (s[end - 1] === '-' || s[end - 1] === '.')) end--;
+  return s.slice(start, end);
+}
+
 function parseUtcTs(s) {
   if (!s) return Number.NaN;
-  if (/[Z]$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
+  if (/Z$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
   return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
 }
 function isRunStale(runRow) {
@@ -761,7 +770,7 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
   const { decryptFromFile } = require('../../utils/at-rest');
   const { buildZip }        = require('../../utils/zip');
   const SAFE_ARTIFACTS_DIR  = path.resolve(__dirname, '../../../data/artifacts');
-  const sanitize = s => String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+  const sanitize = s => trimDashDot(String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-'));
 
   const entries = [];
   const used = new Set();
