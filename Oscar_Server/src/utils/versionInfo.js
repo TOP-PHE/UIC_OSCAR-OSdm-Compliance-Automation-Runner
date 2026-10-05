@@ -115,15 +115,18 @@ if (!compat) {
   );
 }
 
+function compatibilityStatus() {
+  if (matchedRelease) return 'tested';
+  return compat ? 'untested_combination' : 'matrix_missing';
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 function getVersionInfo() {
   return {
     server_version:     serverVersion,
     collection_version: collectionVersion,
     release_label:      matchedRelease ? matchedRelease.release : null,
-    compatibility_status: matchedRelease
-      ? 'tested'
-      : (compat ? 'untested_combination' : 'matrix_missing'),
+    compatibility_status: compatibilityStatus(),
     compatibility_file: COMPAT_FILE,
   };
 }

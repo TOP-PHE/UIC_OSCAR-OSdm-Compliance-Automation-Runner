@@ -604,11 +604,11 @@ router.post('/logout', requireAuth, (req, res) => {
   const rawCookie = (req.headers.cookie || '').split(';')
     .map(c => c.trim().split('='))
     .find(([k]) => k === 'oscar_session');
+  const authHeader = req.headers['authorization'] || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const rawToken = rawCookie
     ? decodeURIComponent(rawCookie.slice(1).join('='))
-    : ((req.headers['authorization'] || '').startsWith('Bearer ')
-        ? req.headers['authorization'].slice(7)
-        : null);
+    : bearerToken;
 
   if (rawToken) {
     try {

@@ -317,10 +317,13 @@ function classifyOfferProbe(resp) {
     const echo = []
       .concat(Array.isArray(resp.warnings) ? resp.warnings : [], Array.isArray(resp.problems) ? resp.problems : [])
       .map(w => w && (w.code || w.title)).filter(Boolean).slice(0, 3);
+    const explanation = echo.length
+      ? ' (provider says: ' + echo.join('; ') + ')'
+      : ', no warning/problem explains why';
     return {
       offers: 0, trips, classes: [], flexibilities: [],
       finding: trips > 0
-        ? ('trip(s) found but offers[] empty' + (echo.length ? ' (provider says: ' + echo.join('; ') + ')' : ', no warning/problem explains why'))
+        ? 'trip(s) found but offers[] empty' + explanation
         : 'no trip and no offer on this date'
     };
   }

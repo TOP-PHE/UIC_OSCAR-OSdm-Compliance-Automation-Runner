@@ -66,6 +66,12 @@ const runSubmitLimiter = rateLimit({
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DELETION_STATUSES = ['DELETION_REQUESTED', 'DELETED_BY_ADMIN'];
+
+// The status a delete leaves a run in depends on who deletes it.
+function deletionStatusFor(isAdmin, isTestManager) {
+  if (isAdmin) return 'DELETED_BY_ADMIN';
+  return isTestManager ? 'DELETED' : 'DELETION_REQUESTED';
+}
 const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 
 // v1.11.13 — parse started_at as UTC. SQLite's datetime('now') returns a
@@ -131,9 +137,9 @@ router.post('/', runSubmitLimiter, (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot start runs.' });
   }
 
-  const targetCompanyId = isPlatformRole(req.user.role)
-    ? (req.body?.company_id ? req.body.company_id : req.companyId)
-    : req.companyId;
+  // A platform role may name the company in the body; everyone else gets their own.
+  const requestedCompanyId = isPlatformRole(req.user.role) ? req.body?.company_id : null;
+  const targetCompanyId = requestedCompanyId || req.companyId;
 
   if (!targetCompanyId) {
     return res.status(400).json({
@@ -428,11 +434,7 @@ router.post('/bulk-delete', (req, res) => {
   // soft-deletion-requested. Testers keep the soft-delete safety net
   // (DELETION_REQUESTED) since they may delete by accident; their
   // test_manager will pick up the pending queue and confirm or restore.
-  const newStatus = isAdmin
-    ? 'DELETED_BY_ADMIN'
-    : isTestManager
-      ? 'DELETED'
-      : 'DELETION_REQUESTED';
+  const newStatus = deletionStatusFor(isAdmin, isTestManager);
 
   const deleted  = [];
   const skipped  = [];
@@ -1233,11 +1235,7 @@ router.delete('/:id', (req, res) => {
   // soft-deletes admin can't see is a stale workflow. Test_manager is the
   // data owner — their delete is permanent. Testers keep DELETION_REQUESTED
   // (their test_manager picks up the queue and confirms / restores).
-  const newStatus = isAdmin
-    ? 'DELETED_BY_ADMIN'
-    : isTestManager
-      ? 'DELETED'
-      : 'DELETION_REQUESTED';
+  const newStatus = deletionStatusFor(isAdmin, isTestManager);
   dbRun(
     `UPDATE runs SET status = ?, deleted_by = ?, previous_status = ? WHERE id = ?`,
     [newStatus, req.user.email, runRow.status, req.params.id]

@@ -524,7 +524,9 @@ function extractStructuredResults(runId, companyId) {
         }
 
         // Update request totals + vendor capability classification
-        const reqStatus = reqTotals.failed > 0 ? 'FAIL' : (reqTotals.total > 0 ? 'PASS' : 'SKIP');
+        let reqStatus = 'SKIP';
+        if (reqTotals.failed > 0)     reqStatus = 'FAIL';
+        else if (reqTotals.total > 0) reqStatus = 'PASS';
         const capability = classifyVendorCapability(httpStatus, reqTotals.total, reqTotals.failed, reqName);
         dbRun(
           `UPDATE run_requests SET total=?, passed=?, failed=?, result=?, vendor_capability=? WHERE id=?`,

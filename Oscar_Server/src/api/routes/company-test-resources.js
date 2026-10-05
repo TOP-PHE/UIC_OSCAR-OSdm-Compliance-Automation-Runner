@@ -339,7 +339,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
       // offers>0 but trips==0 means the provider returned offers we couldn't
       // harvest as a timetable (parse/shape issue), vs offers==0 meaning no
       // service for that day/time — so a future "0 trips" is self-diagnosing.
-      const dayOffers = pc ? pc.offers : (dayJson && Array.isArray(dayJson.offers) ? dayJson.offers.length : 0);
+      const jsonOffers = Array.isArray(dayJson?.offers) ? dayJson.offers.length : 0;
+      const dayOffers = pc ? pc.offers : jsonOffers;
       dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length, offers: dayOffers });
     } else {
       dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, offers: 0, error: lastError });

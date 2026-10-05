@@ -57,10 +57,10 @@ function parseResults(runId) {
   const raw = JSON.parse(decryptFromFile(jsonPath).toString('utf8'));
 
   // Handle Bruno CLI v1 / v2 output format variations
-  const results = Array.isArray(raw)             ? raw
-                : Array.isArray(raw.results)     ? raw.results
-                : Array.isArray(raw.testResults) ? raw.testResults
-                : [];
+  let results = [];
+  if (Array.isArray(raw))                  results = raw;
+  else if (Array.isArray(raw.results))     results = raw.results;
+  else if (Array.isArray(raw.testResults)) results = raw.testResults;
 
   const map = {};
 
