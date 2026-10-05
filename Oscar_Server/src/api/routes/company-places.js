@@ -69,7 +69,7 @@ router.post('/places/refresh', async (req, res) => {
   if (companyId === null) return;
 
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [companyId]);
-  if (!company || !company.api_base) {
+  if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
   const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);

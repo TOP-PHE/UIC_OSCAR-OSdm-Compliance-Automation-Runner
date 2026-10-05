@@ -133,7 +133,7 @@ router.post('/',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').isString().withMessage('role is required'),
   ]),
   async (req, res) => {
@@ -297,7 +297,7 @@ router.post('/:id/reset-password', async (req, res) => {
   if (!new_password || new_password.length < 12) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'new_password is required (min 12 chars).' });
   }
-  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password)) {
+  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/\d/.test(new_password)) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Password must contain uppercase, lowercase, and a digit.' });
   }
 

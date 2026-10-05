@@ -18,12 +18,12 @@ const { isPlatformRole } = require('./auth');
 const { get } = require('../../db/db');
 
 function enforceTenant(req, res, next) {
-  if (!req.user || !req.user.companyId) {
+  if (!req.user?.companyId) {
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'No company context.' });
   }
 
   if (isPlatformRole(req.user.role)) {
-    const bodyCompanyId = req.body && req.body.company_id ? req.body.company_id : null;
+    const bodyCompanyId = req.body?.company_id ? req.body.company_id : null;
     req.companyId = req.query.company_id || req.headers['x-company-id'] || bodyCompanyId || null;
     // Validate that the specified company actually exists.
     // v1.11.15: the company-wide certifier-sharing refusal was removed.

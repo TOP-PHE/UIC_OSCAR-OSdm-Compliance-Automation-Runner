@@ -32,6 +32,7 @@ module.exports = [
         URLSearchParams: 'readonly',
         AbortController: 'readonly',
         fetch: 'readonly',
+        structuredClone: 'readonly',
       },
     },
     rules: {

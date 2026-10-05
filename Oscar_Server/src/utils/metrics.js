@@ -93,7 +93,7 @@ const smtpSends = new promClient.Counter({
 function httpDurationMiddleware(req, res, next) {
   const endTimer = httpDuration.startTimer();
   res.on('finish', () => {
-    const route = (req.route && req.route.path) || req.baseUrl || req.path || 'unknown';
+    const route = req.route?.path || req.baseUrl || req.path || 'unknown';
     endTimer({
       method:      req.method,
       route,

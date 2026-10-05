@@ -64,7 +64,7 @@ function setSessionCookie(res, token) {
 // v1.11.14: a conformance-testing platform invites rapid user-switching across
 // vendor accounts, and 20/15min was tripping legitimate testers (each switch is
 // a login). 50/15min is still far below a useful brute-force rate.
-const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '50', 10);
+const AUTH_RATE_LIMIT_MAX = Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX || '50', 10);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15-minute window
   max: AUTH_RATE_LIMIT_MAX,
@@ -205,7 +205,7 @@ router.post('/register/request',
     const result = await sendVerificationEmail({ to: lowerEmail, companyName: targetCompany.name, verificationUrl });
 
     // Dev mode: return the URL directly so it can be tested without SMTP
-    if (result && result.devMode) {
+    if (result?.devMode) {
       log.info({ email: lowerEmail }, 'Dev mode — returning verification URL directly (no email sent)');
       return res.json({
         message: 'DEV MODE — SMTP not configured. Verification URL returned directly.',
@@ -234,7 +234,7 @@ router.post('/register/confirm',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
   ]),
   async (req, res) => {
   const { token, password } = req.body || {};
@@ -389,7 +389,7 @@ router.post('/password-reset/request',
       logAuthEvent({ userId: user.id, companyId: null, email: user.email, eventType: 'password_reset_requested' });
 
       // Dev-mode passthrough mirrors the registration flow.
-      if (result && result.devMode) {
+      if (result?.devMode) {
         log.info({ email: user.email }, 'Dev mode — returning password-reset URL directly (no email sent)');
         return res.json({
           message: 'DEV MODE — SMTP not configured. Reset URL returned directly.',
@@ -438,7 +438,7 @@ router.post('/password-reset/confirm',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
   ]),
   async (req, res) => {
     const { token, password } = req.body || {};
@@ -498,7 +498,7 @@ router.post('/bootstrap/platform-user',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').optional().isString()
       .isIn(['administrator', 'certification_user']).withMessage('role must be administrator or certification_user'),
   ]),
@@ -604,16 +604,16 @@ router.post('/logout', requireAuth, (req, res) => {
   const rawCookie = (req.headers.cookie || '').split(';')
     .map(c => c.trim().split('='))
     .find(([k]) => k === 'oscar_session');
+  const authHeader = req.headers['authorization'] || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   const rawToken = rawCookie
     ? decodeURIComponent(rawCookie.slice(1).join('='))
-    : ((req.headers['authorization'] || '').startsWith('Bearer ')
-        ? req.headers['authorization'].slice(7)
-        : null);
+    : bearerToken;
 
   if (rawToken) {
     try {
       const payload = jwt.decode(rawToken);
-      if (payload && payload.jti) {
+      if (payload?.jti) {
         // exp is a Unix timestamp (seconds); convert to ISO-8601
         const expiresAt = new Date((payload.exp || 0) * 1000).toISOString();
         run(
@@ -667,7 +667,7 @@ const ssoCheckLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'SSO check rate limit exceeded.' }
 });
 router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
-  const role = normalizeRole(req.user && req.user.role);
+  const role = normalizeRole(req.user?.role);
   if (role !== 'administrator') {
     return res.status(401).set('Cache-Control', 'no-store').json({
       status: 401, title: 'Unauthorized',

@@ -28,7 +28,7 @@
  */
 
 const express = require('express');
-const crypto  = require('crypto');
+const crypto  = require('node:crypto');
 const { get, all, run } = require('../../db/db');
 const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
@@ -40,9 +40,9 @@ const router = express.Router();
 router.use(requireAuth, enforceTenant);
 
 // ── Whitelists (anything else is coerced to a safe default) ───────────────────
-const CATEGORIES = ['open', 'provider_deviation', 'oscar_issue', 'not_supported', 'spec_question'];
-const SEVERITIES = ['major', 'minor', 'not_supported'];
-const STATUSES   = ['open', 'discussing', 'resolved'];
+const CATEGORIES = new Set(['open', 'provider_deviation', 'oscar_issue', 'not_supported', 'spec_question']);
+const SEVERITIES = new Set(['major', 'minor', 'not_supported']);
+const STATUSES   = new Set(['open', 'discussing', 'resolved']);
 
 // ── Scope + role guards ───────────────────────────────────────────────────────
 // Findings are vendor test data. Like GET /v1/company/datafile, administrators
@@ -142,8 +142,8 @@ router.post('/findings', async (req, res) => {
   if (!title) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'A finding needs a title.' });
 
   const id             = crypto.randomUUID();
-  const category       = CATEGORIES.includes(b.category) ? b.category : 'open';
-  const severity       = SEVERITIES.includes(b.severity) ? b.severity : null;
+  const category       = CATEGORIES.has(b.category) ? b.category : 'open';
+  const severity       = SEVERITIES.has(b.severity) ? b.severity : null;
   const expectedStatus = asStatus(b.expectedStatus);
   const step           = b.step ? String(b.step).trim() : null;
   const scenarioCode   = b.scenarioCode ? String(b.scenarioCode).trim() : null;
@@ -187,9 +187,9 @@ router.patch('/findings/:id', async (req, res) => {
   if ('expectedStatus' in b)  setCol('expected_status', asStatus(b.expectedStatus));
   if ('observed' in b)        setCol('observed', asStr(b.observed));
   if ('interpretation' in b)  setCol('interpretation', asStr(b.interpretation));
-  if (CATEGORIES.includes(b.category)) setCol('category', b.category);
-  if ('severity' in b)        setCol('severity', SEVERITIES.includes(b.severity) ? b.severity : null);
-  if (STATUSES.includes(b.status))     setCol('status', b.status);
+  if (CATEGORIES.has(b.category)) setCol('category', b.category);
+  if ('severity' in b)        setCol('severity', SEVERITIES.has(b.severity) ? b.severity : null);
+  if (STATUSES.has(b.status))     setCol('status', b.status);
   if ('baselineInRun' in b)   setCol('baseline_in_run', b.baselineInRun ? 1 : 0);
   if ('raiseToOsdm' in b)     setCol('raise_to_osdm', b.raiseToOsdm ? 1 : 0);
   if ('evidence' in b)        setCol('evidence', asStr(b.evidence));
@@ -244,7 +244,7 @@ router.post('/findings/:id/comments', (req, res) => {
   const f = get('SELECT id, status FROM finding WHERE id = ? AND company_id = ?', [req.params.id, companyId]);
   if (!f) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Finding not found.' });
 
-  const body = String((req.body || {}).body || '').trim();
+  const body = String(req.body?.body || '').trim();
   if (!body) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'A reply needs a body.' });
 
   const id = crypto.randomUUID();

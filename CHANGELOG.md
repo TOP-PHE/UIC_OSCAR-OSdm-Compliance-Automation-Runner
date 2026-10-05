@@ -14,6 +14,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.199] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 1 of 5: server code** (`Oscar_Server/src`).
+  Closes #524; the series is tracked in #523. **No behaviour change.** 202 of
+  the 209 findings in scope are fixed, one Sonar rule or one small group of
+  related rules per commit:
+  - `node:` prefix on 34 built-in imports; `Number.parseInt` /
+    `Number.isNaN` / `Number.NaN` (29); optional chaining (63);
+    `replaceAll` (9); `\d` / `\w` character classes (8).
+  - 13 `catch` blocks that ignore the exception now say why, and drop the
+    unused binding. Each was read; none hides a defect.
+  - 11 nested ternaries and 6 nested template literals unnested; four
+    membership lists become `Set`s; 12 one-off findings.
+- **Rewrites that only look mechanical were checked one by one.**
+  `Number.isNaN` does not convert its argument, so the cached-token expiry
+  test in `access-token.js` now tests `date.getTime()`;
+  `Number.isNaN(date)` would always have been false. All 63
+  optional-chaining sites were read: 50 sit in a condition or fallback where
+  `a && a.b` and `a?.b` cannot differ; in the other 13 the receiver
+  treats every falsy value alike, or the left side is only ever an object or
+  `undefined`.
+- **Five regular expressions that could backtrack super-linearly are
+  replaced** (Sonar S8786), along with 8 needless escapes and duplicate
+  ranges in the same expressions. The Bruno folder/request row and the stack-frame
+  test in `runner.js` are rewritten so each has one way to match;
+  trailing-slash and dash/dot trimming become single-pass helpers. Old and
+  new were compared on every string over a small alphabet up to 7–10
+  characters, about 40 million inputs: identical matches and capture groups.
+  On a 20,000-character worst case the old patterns took about 600 ms each;
+  the new ones take under 1 ms.
+
+### Tests
+
+- 55 new tests (1,546 total). `LogParser`, `inferLevel` and
+  `buildEnvYml` are exported from `runner.js` for tests, as
+  `computeEffectiveRunTimeoutMs` already was; `classifyOfferProbe` gets its
+  first tests. 15 deliberate breakages each fail at least one of them.
+  96.9 % of the executable lines this change touches are covered.
+
+### Not changed, on purpose
+
+- 5 findings inside already-applied migrations in `db.js`: those are never
+  edited.
+- `withRenames` in `datafileOwnership.js` returns `'ALL'` or a list by
+  design (S3800).
+- The CRC loop in `zip.js`: the `for…of` form Sonar asks for measured 5
+  times slower on a 32 MB buffer (S4138).
+
+---
+
 ## [server-1.11.198] — 2026-10-05
 
 ### Security

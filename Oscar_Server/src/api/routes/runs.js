@@ -33,8 +33,8 @@
  */
 
 const express = require('express');
-const fs      = require('fs');
-const path    = require('path');
+const fs      = require('node:fs');
+const path    = require('node:path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
@@ -60,12 +60,18 @@ const runSubmitLimiter = rateLimit({
   legacyHeaders: false,
   // Key by user ID (from JWT) so different users don't share the limit.
   // Fallback to ipKeyGenerator() which handles IPv6 properly per express-rate-limit docs.
-  keyGenerator: (req, res) => (req.user && req.user.id) || ipKeyGenerator(req, res),
+  keyGenerator: (req, res) => req.user?.id || ipKeyGenerator(req, res),
   message: { status: 429, title: 'Too Many Requests', detail: 'Rate limit: max 30 run submissions per hour. Wait or contact admin.' }
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const DELETION_STATUSES = ['DELETION_REQUESTED', 'DELETED_BY_ADMIN'];
+const DELETION_STATUSES = new Set(['DELETION_REQUESTED', 'DELETED_BY_ADMIN']);
+
+// The status a delete leaves a run in depends on who deletes it.
+function deletionStatusFor(isAdmin, isTestManager) {
+  if (isAdmin) return 'DELETED_BY_ADMIN';
+  return isTestManager ? 'DELETED' : 'DELETION_REQUESTED';
+}
 const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 
 // v1.11.13 — parse started_at as UTC. SQLite's datetime('now') returns a
@@ -74,9 +80,18 @@ const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 // Paris-local — making a run that started minutes ago look 1–2h old and
 // wrongly flagging it stale (auto-cancelled on delete). Append 'Z' when the
 // string carries no TZ marker so it parses as UTC regardless of container TZ.
+// Strip leading and trailing '-' and '.' in one pass each.
+function trimDashDot(s) {
+  let start = 0;
+  let end = s.length;
+  while (start < end && (s[start] === '-' || s[start] === '.')) start++;
+  while (end > start && (s[end - 1] === '-' || s[end - 1] === '.')) end--;
+  return s.slice(start, end);
+}
+
 function parseUtcTs(s) {
-  if (!s) return NaN;
-  if (/[Z]$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
+  if (!s) return Number.NaN;
+  if (String(s).endsWith('Z') || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
   return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
 }
 function isRunStale(runRow) {
@@ -101,7 +116,7 @@ function isRunStale(runRow) {
  */
 const { canUserSeeRun } = require('../helpers/run-access');
 function validateRunOwnership(runId, _companyId, req) {
-  if (!req || !req.user) return null;
+  if (!req?.user) return null;
   return canUserSeeRun(runId, req.user);
 }
 
@@ -122,9 +137,9 @@ router.post('/', runSubmitLimiter, (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot start runs.' });
   }
 
-  const targetCompanyId = isPlatformRole(req.user.role)
-    ? (req.body && req.body.company_id ? req.body.company_id : req.companyId)
-    : req.companyId;
+  // A platform role may name the company in the body; everyone else gets their own.
+  const requestedCompanyId = isPlatformRole(req.user.role) ? req.body?.company_id : null;
+  const targetCompanyId = requestedCompanyId || req.companyId;
 
   if (!targetCompanyId) {
     return res.status(400).json({
@@ -263,8 +278,8 @@ router.post('/', runSubmitLimiter, (req, res) => {
 
 // ── GET /v1/runs ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
-  const limit  = Math.min(parseInt(req.query.limit  || '50',  10), 200);
-  const offset = parseInt(req.query.offset || '0',  10);
+  const limit  = Math.min(Number.parseInt(req.query.limit  || '50',  10), 200);
+  const offset = Number.parseInt(req.query.offset || '0',  10);
 
   // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
   // ONE narrow exception: the operational data-lifecycle queue. Admins must
@@ -419,11 +434,7 @@ router.post('/bulk-delete', (req, res) => {
   // soft-deletion-requested. Testers keep the soft-delete safety net
   // (DELETION_REQUESTED) since they may delete by accident; their
   // test_manager will pick up the pending queue and confirm or restore.
-  const newStatus = isAdmin
-    ? 'DELETED_BY_ADMIN'
-    : isTestManager
-      ? 'DELETED'
-      : 'DELETION_REQUESTED';
+  const newStatus = deletionStatusFor(isAdmin, isTestManager);
 
   const deleted  = [];
   const skipped  = [];
@@ -450,7 +461,7 @@ router.post('/bulk-delete', (req, res) => {
         continue;
       }
     }
-    if (DELETION_STATUSES.includes(runRow.status)) {
+    if (DELETION_STATUSES.has(runRow.status)) {
       skipped.push({ id, reason: `Run is already in deletion state (${runRow.status})` });
       continue;
     }
@@ -497,7 +508,7 @@ const ADMIN_ACTION_HANDLERS = {
     return { newStatus: 'DELETED', previousStatus: runRow.status };
   },
   restore: (runRow) => {
-    if (!DELETION_STATUSES.includes(runRow.status)) return { skip: true, reason: `Run is ${runRow.status} — only DELETION_REQUESTED or DELETED_BY_ADMIN can be restored` };
+    if (!DELETION_STATUSES.has(runRow.status)) return { skip: true, reason: `Run is ${runRow.status} — only DELETION_REQUESTED or DELETED_BY_ADMIN can be restored` };
     return { newStatus: inferRestoreStatus(runRow), previousStatus: runRow.status };
   },
 };
@@ -543,7 +554,7 @@ router.post('/bulk-admin-action', (req, res) => {
           // Permanent — also clean up comparisons
           dbRun('DELETE FROM report_comparisons WHERE run_a_id = ? OR run_b_id = ?', [id, id]);
           dbRun(`UPDATE runs SET status = 'DELETED' WHERE id = ?`, [id]);
-        } else if (DELETION_STATUSES.includes(previousStatus)) {
+        } else if (DELETION_STATUSES.has(previousStatus)) {
           // Restore: clear deletion tracking fields
           dbRun(
             `UPDATE runs SET status = ?, deleted_by = NULL, previous_status = NULL WHERE id = ?`,
@@ -761,7 +772,7 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
   const { decryptFromFile } = require('../../utils/at-rest');
   const { buildZip }        = require('../../utils/zip');
   const SAFE_ARTIFACTS_DIR  = path.resolve(__dirname, '../../../data/artifacts');
-  const sanitize = s => String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+  const sanitize = s => trimDashDot(String(s || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-'));
 
   const entries = [];
   const used = new Set();
@@ -773,7 +784,7 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
       let plaintext;
       try { plaintext = decryptFromFile(safePath); } catch (_e) { continue; }   // skip an unreadable artifact, keep the rest
       const scenario = sanitize(r.scenario_code) || ('run-' + String(r.id).slice(0, 8));
-      const ext = ((a.filename && a.filename.match(/\.([A-Za-z0-9]+)$/)) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
+      const ext = (a.filename?.match(/\.([A-Za-z0-9]+)$/) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
       let name = `${scenario}.${ext}`;
       if (used.has(name)) {
         const short = String(r.id).slice(0, 8);
@@ -814,7 +825,7 @@ router.get('/:id/logs', (req, res) => {
   const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
-  const since  = req.query.since_id ? parseInt(req.query.since_id, 10) : 0;
+  const since  = req.query.since_id ? Number.parseInt(req.query.since_id, 10) : 0;
 
   // Build query with optional filters (backward-compatible).
   // NOTE (Phase 2 of issue #60, v1.11.0): the `message` column is now
@@ -1213,7 +1224,7 @@ router.delete('/:id', (req, res) => {
     }
     dbRun(`UPDATE runs SET status = 'CANCELLED', completed_at = datetime('now') WHERE id = ?`, [req.params.id]);
   }
-  if (DELETION_STATUSES.includes(runRow.status)) {
+  if (DELETION_STATUSES.has(runRow.status)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run is already in deletion state (${runRow.status}).` });
   }
   if (!isElevated && runRow.user_id !== req.user.id) {
@@ -1224,11 +1235,7 @@ router.delete('/:id', (req, res) => {
   // soft-deletes admin can't see is a stale workflow. Test_manager is the
   // data owner — their delete is permanent. Testers keep DELETION_REQUESTED
   // (their test_manager picks up the queue and confirms / restores).
-  const newStatus = isAdmin
-    ? 'DELETED_BY_ADMIN'
-    : isTestManager
-      ? 'DELETED'
-      : 'DELETION_REQUESTED';
+  const newStatus = deletionStatusFor(isAdmin, isTestManager);
   dbRun(
     `UPDATE runs SET status = ?, deleted_by = ?, previous_status = ? WHERE id = ?`,
     [newStatus, req.user.email, runRow.status, req.params.id]

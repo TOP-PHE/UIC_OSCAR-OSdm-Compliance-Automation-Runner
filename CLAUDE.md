@@ -297,6 +297,35 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`app.router.stack` → `layer.route.path` / `layer.match('/')`) — a
     deliberate, documented coupling to an Express internal, because it is
     the only place the difference is observable.
+- **Sonar code-smell backlog: five behaviour-neutral PRs, tracked in #523**
+  (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
+  server code, is #524 (v1.11.199). The gate only judges new code, so none of
+  this blocks a release. What PR 1 established, for the four that follow:
+  - **The findings are public.** No token is needed:
+    `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
+    (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an
+    exact `textRange`, so a rename-type rule can be applied by range and
+    asserted against the text it expects.
+  - **`isNaN(x)` → `Number.isNaN(x)` is not a rename.** `Number.isNaN` does
+    not convert its argument: on a `Date` it is always false. Test
+    `date.getTime()`. `parseInt` and `NaN`, by contrast, are the same objects
+    under `Number`.
+  - **`a && a.b` → `a?.b` only differs when `a` is `0`, `''` or `false`**, and
+    then only if the value is stored or passed on. Read those sites; the ones
+    in a condition, a `||` fallback or a `!!` need no thought.
+  - **What Sonar accepts for an ignored exception (S2486)**, worked out from
+    which catches it flags: it only looks at a `try` with two or more
+    statements whose catch parameter is unused. `catch { … }` with no binding
+    passes; so does an empty block that holds a comment. A comment next to a
+    statement, with an unused `(_)`, does not.
+  - **A super-linear regex (S8786) is fixed by leaving one way to match**, not
+    by tuning quantifiers, and proved by running old and new over every string
+    on a small alphabet (7–10 characters, a few million inputs, seconds in
+    Node). Trailing-run trims (`/x+$/`) become a loop.
+  - **Not everything Sonar asks for is taken.** `for…of` over a `Buffer`
+    measured 5× slower than the indexed loop (`zip.js`, S4138), so it stays.
+    Code inside an already-applied migration is not restyled either. A finding
+    left open on purpose is named in the CHANGELOG entry with its reason.
 - **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
   express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
   could not move to 6.16.0 without it. The whole migration was **one line**:
@@ -476,8 +505,11 @@ checkout ever lands in a path with a space again, the workaround is
   remaining gaps are both deliberately excluded from the coverage metric
   (`public/**`, `library-bruno/**` — see `sonar-project.properties`), not
   because anything is left half-done. If coverage work resumes, that's where
-  it resumes — `library-bruno/` in particular has real logic
-  (`requestsBuilder`, `offers`, `reportGenerator`) and zero Jest harness.
+  it resumes. `library-bruno/` is only partly tested: twelve
+  `tests/unit/bruno-*.test.js` files reach about half of its 28 modules
+  (`requestsBuilder`, `scenarioParser`, `osdmCompliance`, `partialRefund`…);
+  `reportGenerator`, `mergeReport`, `refunds`, `exchanges`, `fulfillments`
+  and `validators` have none (checked 2026-10-05).
 - **Issue backlog was swept and cross-checked against the code 2026-07-02**
   (the list below is freshly verified, not inherited guesswork — re-check
   with `gh issue list --state open` if much time has passed):

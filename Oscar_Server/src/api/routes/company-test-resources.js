@@ -23,7 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
-const { mergeDedicatedHeaders } = require('../../utils/osdm-client');
+const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
 const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
 
@@ -99,7 +99,7 @@ function _discoveryBody(endpoint, date, origin, destination, apiBase) {
 // POST {api_base}/{path}. Returns { ok, status, json, text } and never throws
 // on a non-2xx — the caller records per-day outcomes.
 async function _postJson(apiBase, path, token, body, extraHeaders) {
-  const url = `${String(apiBase).replace(/\/+$/, '')}/${path}`;
+  const url = `${stripTrailingSlashes(String(apiBase))}/${path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TRIPS_FETCH_TIMEOUT_MS);
   try {
@@ -160,7 +160,7 @@ router.post('/test-resources', (req, res) => {
   if (!resource_type || !['TRAIN', 'JOURNEY', 'MULTIMODAL'].includes(resource_type)) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'resource_type must be TRAIN, JOURNEY or MULTIMODAL.' });
   }
-  if (!label || !label.trim()) {
+  if (!label?.trim()) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'label is required.' });
   }
 
@@ -229,18 +229,18 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 
-  const origin = _stnUrn(req.body && req.body.originURN);
-  const destination = _stnUrn(req.body && req.body.destinationURN);
+  const origin = _stnUrn(req.body?.originURN);
+  const destination = _stnUrn(req.body?.destinationURN);
   if (!origin || !destination) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'originURN and destinationURN are required.' });
   }
-  let days = Number.parseInt(req.body && req.body.days, 10);
+  let days = Number.parseInt(req.body?.days, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
 
   // api_base lives on the company; OSDM credentials live on the tester.
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company || !company.api_base) {
+  if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
   const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
@@ -258,8 +258,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
   // Optional per-tester headers (mirror the Bruno run path).
   const extraHeaders = {};
-  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
-  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Discovery silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);
@@ -339,7 +339,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
       // offers>0 but trips==0 means the provider returned offers we couldn't
       // harvest as a timetable (parse/shape issue), vs offers==0 meaning no
       // service for that day/time — so a future "0 trips" is self-diagnosing.
-      const dayOffers = pc ? pc.offers : (dayJson && Array.isArray(dayJson.offers) ? dayJson.offers.length : 0);
+      const jsonOffers = Array.isArray(dayJson?.offers) ? dayJson.offers.length : 0;
+      const dayOffers = pc ? pc.offers : jsonOffers;
       dayResults.push({ date, status: lastStatus, via, trips: dayTrips, legs: dayRecs.length, offers: dayOffers });
     } else {
       dayResults.push({ date, status: lastStatus, trips: 0, legs: 0, offers: 0, error: lastError });
@@ -410,7 +411,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   if (targetCompanyId === null) return;
 
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company || !company.api_base) {
+  if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
   const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
@@ -422,8 +423,8 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
     return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
   }
   const extraHeaders = {};
-  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
-  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Re-probe silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);
@@ -433,7 +434,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
     let data = {};
     try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
     return { id: r.id, label: r.label, data };
-  }).filter(t => t.data && t.data.originURN && t.data.destinationURN);
+  }).filter(t => t.data?.originURN && t.data.destinationURN);
   if (!trains.length) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No TRAIN resources with an origin/destination to probe.' });
   }

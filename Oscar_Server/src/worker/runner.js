@@ -21,9 +21,9 @@
  *  8. Updates run status and cleans up temp env file
  */
 
-const path        = require('path');
-const fs          = require('fs');
-const { spawn }   = require('child_process');
+const path        = require('node:path');
+const fs          = require('node:fs');
+const { spawn }   = require('node:child_process');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
@@ -89,7 +89,8 @@ function killRun(runId) {
         try { proc.kill('SIGKILL'); } catch (_) { /* already gone */ }
       }
     }, 3000).unref();
-  } catch (_) {
+  } catch {
+    // kill() threw, so nothing was signalled.
     return false;
   }
   return true;
@@ -146,6 +147,61 @@ function logEvent(runId, level, message, meta) {
   } catch (_) { /* never block execution on log errors */ }
 }
 
+// "at fn (file:line:col)" stack frame. The two alternatives are the two ways the
+// function token can end, at a "(" inside it or at whitespace before the "(",
+// so the pattern has one way to match a line instead of many.
+const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s*$/;
+
+// Bruno CLI request row: "<folder>/<request name> (<status text>)", with either
+// slash. The request name is everything up to the whitespace before the first
+// "(", written so the pattern cannot backtrack over that whitespace.
+const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
+
+// #336 (v1.11.113): infer the actual log level from the line content
+// instead of storing the literal stream name as the level. The
+// dashboard's level filter (Info / Warn / Error) and the per-level
+// CSS colouring rely on event.level — previously every Bruno line had
+// level='stdout' so the filter was a no-op on Bruno output.
+//
+// Inference order:
+//   1) explicit [LEVEL] tag from library-bruno emitters → that level
+//   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
+//   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
+//   4) Known harmless platform noise (OpenSSL warn-once) → warn
+//   5) stderr stream with no other signal → error (Bruno emits real
+//      failures there; "stderr" alone is not a useful level)
+//   6) stdout stream with no other signal → info (sensible default —
+//      keeps the level-filter working without spamming "debug")
+function inferLevel(line, streamFallback) {
+  // 1) explicit tag
+  if (/\[ERROR]/i.test(line))                                 return 'error';
+  if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
+  if (/\[INFO]/i.test(line))                                  return 'info';
+  if (/\[DEBUG]/i.test(line))                                 return 'debug';
+  // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
+  if (/^\s*✕\s/.test(line))                                   return 'error';
+  if (/^\s*✓\s/.test(line))                                   return 'info';
+  // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
+  //    that's the content. The "at …" STACK FRAMES are demoted to debug
+  //    (log-audit round 2): Bruno prints ~10 frames after every failed
+  //    assertion (testCapture.js → @usebruno internals → node:vm), pure
+  //    developer detail that tripled the visual size of each failure in
+  //    the dashboard. They remain one debug-filter click away.
+  if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
+  if (STACK_FRAME_WITH_PARENS.test(line))                     return 'debug';
+  if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
+  if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
+  // 4) Known platform noise
+  if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
+  // 4b) Bruno CLI's own skip echo (one per request the smart run filter
+  //     skips — e.g. the 6 vendor token requests at the top of every
+  //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
+  //     matching the [DEBUG] tag on the library's own skip line.
+  if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
+  // 5/6) stream-based fallback
+  return streamFallback;
+}
+
 // ── Log parser — classifies Bruno stdout lines into structured metadata ───────
 //
 // Also detects scenario boundary milestones and retry attempts so the report
@@ -157,14 +213,12 @@ function logEvent(runId, level, message, meta) {
 // We parse these and surface them as event_kind='scenario_*' / 'log' with
 // attempt_index/attempt_total/scenario_name populated.
 class LogParser {
-  constructor() {
-    this.currentSuite = null;
-    this.currentRequest = null;
-    this.currentScenario = null;
-    this.attemptIndex = null;
-    this.attemptTotal = null;
-    this.phase = 'setup';
-  }
+  currentSuite = null;
+  currentRequest = null;
+  currentScenario = null;
+  attemptIndex = null;
+  attemptTotal = null;
+  phase = 'setup';
 
   parse(line) {
     const trimmed = (line || '').trim();
@@ -177,22 +231,22 @@ class LogParser {
     // Scenario boundary detection — check before other patterns since these
     // lines can otherwise be misclassified as generic bruno output.
     // Match shape: "Skipping to next scenario [2/8]: OTST_FOO"
-    const skipMatch = trimmed.match(/Skipping to next scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([A-Za-z0-9_\-]+)/i);
-    const startMatch = !skipMatch && trimmed.match(/(?:Starting|Running)\s+scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([A-Za-z0-9_\-]+)/i);
-    const endMatch = !skipMatch && !startMatch && trimmed.match(/scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*(?:completed|finished|done)\s*:\s*([A-Za-z0-9_\-]+)/i);
+    const skipMatch = trimmed.match(/Skipping to next scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([\w-]+)/i);
+    const startMatch = !skipMatch && trimmed.match(/(?:Starting|Running)\s+scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*:\s*([\w-]+)/i);
+    const endMatch = !skipMatch && !startMatch && trimmed.match(/scenario\s*\[(\d+)\s*\/\s*(\d+)\]\s*(?:completed|finished|done)\s*:\s*([\w-]+)/i);
     const attemptMatch = trimmed.match(/\(attempt\s+(\d+)\s*\/\s*(\d+)\)/i);
 
     if (skipMatch) {
-      this.attemptIndex = parseInt(skipMatch[1], 10);
-      this.attemptTotal = parseInt(skipMatch[2], 10);
+      this.attemptIndex = Number.parseInt(skipMatch[1], 10);
+      this.attemptTotal = Number.parseInt(skipMatch[2], 10);
       this.currentScenario = skipMatch[3];
       this.currentSuite = null;
       this.currentRequest = null;
       eventKind = 'scenario_skipped';
       category = 'system';
     } else if (startMatch) {
-      this.attemptIndex = parseInt(startMatch[1], 10);
-      this.attemptTotal = parseInt(startMatch[2], 10);
+      this.attemptIndex = Number.parseInt(startMatch[1], 10);
+      this.attemptTotal = Number.parseInt(startMatch[2], 10);
       this.currentScenario = startMatch[3];
       this.currentSuite = null;
       this.currentRequest = null;
@@ -207,8 +261,8 @@ class LogParser {
       // Retry marker on a scenario that was started earlier. We stamp the
       // attempt number onto this line AND every subsequent line until the
       // next attempt/scenario change, so the UI can group retries.
-      this.attemptIndex = parseInt(attemptMatch[1], 10);
-      this.attemptTotal = parseInt(attemptMatch[2], 10);
+      this.attemptIndex = Number.parseInt(attemptMatch[1], 10);
+      this.attemptTotal = Number.parseInt(attemptMatch[2], 10);
       eventKind = 'scenario_retry';
       category = 'system';
     }
@@ -237,7 +291,7 @@ class LogParser {
       // Bruno CLI prints request execution lines like:
       //   "01-System Infos Requests\00. GET System Version Check (404 Not Found) - 302 ms"
       const folderReqMatch = !hasLevelTag && !isAssertionRow
-        && trimmed.match(/^([^()\\\/]+)[\\/]([^()]+?)\s+\(([^)]+)\)/);
+        && trimmed.match(FOLDER_REQUEST_ROW);
       if (isAssertionRow) {
         category = 'assertion';
       } else if (folderReqMatch) {
@@ -246,7 +300,7 @@ class LogParser {
         this.phase = 'execution';
         category = 'system';
         const httpInParen = folderReqMatch[3].match(/\b([1-5]\d{2})\b/);
-        if (httpInParen) httpStatus = parseInt(httpInParen[1], 10);
+        if (httpInParen) httpStatus = Number.parseInt(httpInParen[1], 10);
       } else if (/^Running Folder\s+/i.test(trimmed)) {
         this.currentSuite = trimmed.replace(/^Running Folder\s+/i, '').trim();
         this.currentRequest = null;
@@ -258,7 +312,7 @@ class LogParser {
       } else if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+https?:\/\//i.test(trimmed)) {
         category = 'http';
         const m = trimmed.match(/\b([1-5]\d{2})\b/);
-        if (m) httpStatus = parseInt(m[1], 10);
+        if (m) httpStatus = Number.parseInt(m[1], 10);
       } else if (/^\[runner\]/i.test(trimmed)) {
         category = 'system';
       } else if (/401|token|auth|oauth|login/i.test(trimmed)) {
@@ -294,8 +348,8 @@ class LogParser {
 function _authLogger(runId) {
   const base = { category: 'auth', phase: 'setup' };
   return {
-    info:  (msg, meta) => logEvent(runId, 'info',  msg, { ...base, ...(meta || {}) }),
-    error: (msg, meta) => logEvent(runId, 'error', msg, { ...base, ...(meta || {}) })
+    info:  (msg, meta) => logEvent(runId, 'info',  msg, { ...base, ...meta }),
+    error: (msg, meta) => logEvent(runId, 'error', msg, { ...base, ...meta })
   };
 }
 
@@ -341,8 +395,8 @@ const EXPIRED_FLOW_TIMERS = [
   { flag: 'expiredExchangeOfferTest',       wait: 'expiredExchangeOfferMaxWaitMinutes',       label: 'expiredExchangeOfferMaxWaitMinutes'       },
 ];
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
-  const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
-  const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
+  const baseMs    = Number.parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
+  const hardMaxMs = Number.parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
   let requestedMs = 0;
   let triggeringScenario = null;
   let triggeringTimer    = null;   // which expired-X timer drove the extension
@@ -405,7 +459,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   } catch (err) {
     // Capture (don't swallow) — the caller logs this so the operator can tell
     // why an expected extension didn't fire.
-    helperError = err && err.message ? err.message : String(err);
+    helperError = err?.message ? err.message : String(err);
   }
   const desired   = Math.max(baseMs, requestedMs);
   const effective = Math.min(desired, hardMaxMs);
@@ -446,12 +500,10 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     `    value: "0"`,
   ];
   if (requestor) {
-    lines.push(`  - name: requestor`);
-    lines.push(`    value: "${requestor}"`);
+    lines.push(`  - name: requestor`, `    value: "${requestor}"`);
   }
   if (scenarioOverride) {
-    lines.push(`  - name: scenario_override`);
-    lines.push(`    value: "${scenarioOverride}"`);
+    lines.push(`  - name: scenario_override`, `    value: "${scenarioOverride}"`);
   }
   if (Array.isArray(extraHeaders) && extraHeaders.length > 0) {
     // Issue #426 — company-wide dedicated headers. Passed through as a JSON
@@ -459,9 +511,8 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     // hook resolves any {{var}} templates in the values). Escape backslashes
     // then double-quotes so the JSON survives inside a YAML double-quoted
     // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
-    const safeEh = JSON.stringify(extraHeaders).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    lines.push(`  - name: __extraHeaders`);
-    lines.push(`    value: "${safeEh}"`);
+    const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', String.raw`\"`);
+    lines.push(`  - name: __extraHeaders`, `    value: "${safeEh}"`);
   }
   return lines.join('\n') + '\n';
 }
@@ -541,7 +592,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const companyRow = get('SELECT * FROM companies WHERE id = ?', [companyId]);
   // Prefer the userId from the queue job; fall back to the run's recorded
   // user_id (set at POST /v1/runs time) so legacy queue items still resolve.
-  const effectiveUserId = userId || (runRow && runRow.user_id) || null;
+  const effectiveUserId = userId || runRow?.user_id || null;
   const userRow = effectiveUserId ? get('SELECT * FROM users WHERE id = ?', [effectiveUserId]) : null;
 
   if (!runRow || !companyRow) throw new Error('Run or company not found in DB.');
@@ -791,8 +842,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
     // default 300000 (5 min).
     let tokenWatchdog = null;
-    if (userRow && userRow.auth_mode === 'oauth2') {
-      const tickMs = parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
+    if (userRow?.auth_mode === 'oauth2') {
+      const tickMs = Number.parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
       // Disabled when set to 0 (operator opt-out).
       if (tickMs > 0) {
         tokenWatchdog = setInterval(async () => {
@@ -805,7 +856,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
             );
           } catch (err) {
             logEvent(runId, 'warn',
-              `[token-watchdog] tick failed: ${err && err.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
+              `[token-watchdog] tick failed: ${err?.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
           }
         }, tickMs);
         logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
@@ -822,53 +873,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // before Bruno emits its first scenario banner.
     if (scenarioOverride) {
       logParser.currentScenario = scenarioOverride;
-    } else if (runRow && runRow.scenario_code) {
+    } else if (runRow?.scenario_code) {
       logParser.currentScenario = runRow.scenario_code;
-    }
-
-    // #336 (v1.11.113): infer the actual log level from the line content
-    // instead of storing the literal stream name as the level. The
-    // dashboard's level filter (Info / Warn / Error) and the per-level
-    // CSS colouring rely on event.level — previously every Bruno line had
-    // level='stdout' so the filter was a no-op on Bruno output.
-    //
-    // Inference order:
-    //   1) explicit [LEVEL] tag from library-bruno emitters → that level
-    //   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
-    //   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
-    //   4) Known harmless platform noise (OpenSSL warn-once) → warn
-    //   5) stderr stream with no other signal → error (Bruno emits real
-    //      failures there; "stderr" alone is not a useful level)
-    //   6) stdout stream with no other signal → info (sensible default —
-    //      keeps the level-filter working without spamming "debug")
-    function inferLevel(line, streamFallback) {
-      // 1) explicit tag
-      if (/\[ERROR]/i.test(line))                                 return 'error';
-      if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
-      if (/\[INFO]/i.test(line))                                  return 'info';
-      if (/\[DEBUG]/i.test(line))                                 return 'debug';
-      // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
-      if (/^\s*✕\s/.test(line))                                   return 'error';
-      if (/^\s*✓\s/.test(line))                                   return 'info';
-      // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
-      //    that's the content. The "at …" STACK FRAMES are demoted to debug
-      //    (log-audit round 2): Bruno prints ~10 frames after every failed
-      //    assertion (testCapture.js → @usebruno internals → node:vm), pure
-      //    developer detail that tripled the visual size of each failure in
-      //    the dashboard. They remain one debug-filter click away.
-      if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
-      if (/^\s*at\s+\S+\s*\(.*:\d+:\d+\)\s*$/.test(line))         return 'debug';
-      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
-      if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
-      // 4) Known platform noise
-      if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
-      // 4b) Bruno CLI's own skip echo (one per request the smart run filter
-      //     skips — e.g. the 6 vendor token requests at the top of every
-      //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
-      //     matching the [DEBUG] tag on the library's own skip line.
-      if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
-      // 5/6) stream-based fallback
-      return streamFallback;
     }
 
     proc.stdout.on('data', chunk => {
@@ -942,7 +948,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // We always prefer (A) — it is the rich incremental report. We identify it by
   // excluding the exact {prefix}_Report.html name (which is mergeReport.js output).
 
-  const dateStr  = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr  = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const envShort = envName.replace(/^OTST_/i, '').replace(/_Env$/i, '');
   const prefix   = `${dateStr}_${envShort}`;
   const mergeReportName = `${prefix}_Report.html`;   // mergeReport.js exact output name
@@ -1097,4 +1103,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs };
+module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml };
