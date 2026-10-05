@@ -387,3 +387,56 @@ describe('groupAndMerge — offer catalog prefill', () => {
     expect(toUpdate[0].data.ancillaries).toEqual(['WIFI']);        // filled
   });
 });
+
+// ── classifyOfferProbe ───────────────────────────────────────────────────────
+// Had no test. #524 restyled its finding text and class/flexibility reads, so
+// the three outcomes are pinned here.
+describe('classifyOfferProbe', () => {
+  const { classifyOfferProbe } = require('../../src/services/timetable-discovery');
+
+  test('a response with no offers[] member is not an offers response', () => {
+    expect(classifyOfferProbe({ trips: [{}] })).toBeNull();
+    expect(classifyOfferProbe(null)).toBeNull();
+  });
+
+  test('trips but no offers: the finding quotes up to three provider codes or titles', () => {
+    const r = classifyOfferProbe({
+      trips: [{}, {}],
+      offers: [],
+      warnings: [{ code: 'NO_FARE' }, null, { title: 'Sold out' }],
+      problems: [{ code: 'P3' }, { code: 'P4' }],
+    });
+    expect(r).toEqual({
+      offers: 0, trips: 2, classes: [], flexibilities: [],
+      finding: 'trip(s) found but offers[] empty (provider says: NO_FARE; Sold out; P3)',
+    });
+  });
+
+  test('trips but no offers and nothing from the provider', () => {
+    const r = classifyOfferProbe({ trips: [{}], offers: [] });
+    expect(r.finding).toBe('trip(s) found but offers[] empty, no warning/problem explains why');
+  });
+
+  test('neither trips nor offers', () => {
+    expect(classifyOfferProbe({ offers: [] }).finding).toBe('no trip and no offer on this date');
+  });
+
+  test('offers: classes and flexibilities come from the offer or its summary, upper-cased and de-duplicated', () => {
+    const r = classifyOfferProbe({
+      trips: [{}],
+      offers: [
+        { travelClass: 'second', flexibility: 'full_flexible' },
+        { offerSummary: { overallTravelClass: 'FIRST', overallFlexibility: 'NON_FLEXIBLE' } },
+        { travelClass: 'SECOND', offerSummary: { overallTravelClass: 'FIRST', overallFlexibility: 'semi_flexible' }, flexibility: 'FULL_FLEXIBLE' },
+        { offerSummary: null },
+        {},
+      ],
+    });
+    expect(r).toEqual({
+      offers: 5, trips: 1,
+      classes: ['SECOND', 'FIRST'],
+      flexibilities: ['FULL_FLEXIBLE', 'NON_FLEXIBLE', 'SEMI_FLEXIBLE'],
+      finding: null,
+    });
+  });
+});

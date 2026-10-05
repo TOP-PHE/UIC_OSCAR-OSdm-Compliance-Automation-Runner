@@ -1103,4 +1103,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs };
+module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml };

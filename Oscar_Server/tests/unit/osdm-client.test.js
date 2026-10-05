@@ -18,7 +18,7 @@
  * merge/template-resolution logic and its edge cases.
  */
 
-const { mergeDedicatedHeaders } = require('../../src/utils/osdm-client');
+const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../src/utils/osdm-client');
 
 describe('mergeDedicatedHeaders', () => {
   test('merges a literal-value dedicated header', () => {
@@ -91,5 +91,33 @@ describe('mergeDedicatedHeaders', () => {
     const headers = {};
     const result = mergeDedicatedHeaders(headers, { extra_headers: JSON.stringify([{ name: 'a', value: 'b' }]) });
     expect(result).toBe(headers);
+  });
+});
+
+// #524: replaces String.replace(/\/+$/, ''), which Sonar reports as able to
+// backtrack quadratically on a long run of slashes that is not at the end.
+describe('stripTrailingSlashes', () => {
+  test.each([
+    ['https://api.example.test/osdm', 'https://api.example.test/osdm'],
+    ['https://api.example.test/osdm/', 'https://api.example.test/osdm'],
+    ['https://api.example.test/osdm///', 'https://api.example.test/osdm'],
+    ['a//b/', 'a//b'],
+    ['///', ''],
+    ['', ''],
+  ])('%j → %j', (input, expected) => {
+    expect(stripTrailingSlashes(input)).toBe(expected);
+  });
+
+  test('agrees with the regular expression it replaces', () => {
+    for (const s of ['x', 'x/', '/x', '/x/', 'x//y//', '//', 'http://h/p/?q=/', 'a/b/c///']) {
+      expect(stripTrailingSlashes(s)).toBe(s.replace(/\/+$/, ''));
+    }
+  });
+
+  test('a long run of slashes that is not at the end costs one pass', () => {
+    const s = '/'.repeat(200000) + 'x';
+    const t = process.hrtime.bigint();
+    expect(stripTrailingSlashes(s)).toBe(s);
+    expect(Number(process.hrtime.bigint() - t) / 1e6).toBeLessThan(500);
   });
 });
