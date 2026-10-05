@@ -27,8 +27,8 @@
  * so the admin endpoint can surface the verbatim outcome to the UI.
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { getConfig } = require('../db/db');
 
 // Defaults match the values shipped in the example file (and the production

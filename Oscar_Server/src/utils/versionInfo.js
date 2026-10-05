@@ -28,8 +28,8 @@
  *   COLLECTION_PATH     — already used elsewhere; we read VERSION from there
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const log  = require('./logger');
 
 function readJsonSafe(filePath) {

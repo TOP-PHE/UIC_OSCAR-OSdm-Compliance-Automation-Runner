@@ -23,7 +23,7 @@
  * Job object: { runId, companyId, concurrentLimit, scenarioOverride?, batchId?, scenarioCode?, userId? }
  */
 
-const EventEmitter = require('events');
+const EventEmitter = require('node:events');
 const { executeRun } = require('./runner');
 const { getConfig }  = require('../db/db');
 const log = require('../utils/logger').child({ module: 'queue' });

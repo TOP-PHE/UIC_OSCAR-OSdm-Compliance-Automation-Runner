@@ -21,9 +21,9 @@
  *  8. Updates run status and cleans up temp env file
  */
 
-const path        = require('path');
-const fs          = require('fs');
-const { spawn }   = require('child_process');
+const path        = require('node:path');
+const fs          = require('node:fs');
+const { spawn }   = require('node:child_process');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');

@@ -23,8 +23,8 @@
  *   UNCHANGED_FAIL    — same result (fail) in both
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { safeJoinUuid } = require('../utils/paths');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');

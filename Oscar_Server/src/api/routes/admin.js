@@ -709,7 +709,7 @@ router.post('/alertmanager/apply', async (req, res) => {
 // ── POST /v1/admin/rotate-jwt-secret — invalidate all sessions ───────────────
 // Generates a new JWT secret in the DB. All currently issued tokens become
 // invalid immediately. Use after suspected token leak or scheduled rotation.
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 router.post('/rotate-jwt-secret', (req, res) => {
   const newSecret = crypto.randomBytes(32).toString('hex');
   run(

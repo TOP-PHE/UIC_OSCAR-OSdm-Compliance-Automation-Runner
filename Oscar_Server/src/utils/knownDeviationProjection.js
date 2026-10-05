@@ -31,8 +31,8 @@
  * logged no-op — projection never throws to its caller and never blocks a save.
  */
 
-const fs     = require('fs');
-const crypto = require('crypto');
+const fs     = require('node:fs');
+const crypto = require('node:crypto');
 const { get, all, run } = require('../db/db');
 const { decryptFromFileAsync, encryptToFileAsync } = require('./at-rest');
 const { withDatafileLock } = require('./datafileLock');

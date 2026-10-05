@@ -19,9 +19,9 @@
  */
 
 const express   = require('express');
-const path      = require('path');
-const fs        = require('fs');
-const crypto    = require('crypto');
+const path      = require('node:path');
+const fs        = require('node:fs');
+const crypto    = require('node:crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
 const { get, all, run, colDecrypt } = require('../../db/db');

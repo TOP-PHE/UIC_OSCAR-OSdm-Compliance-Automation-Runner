@@ -33,8 +33,8 @@
  */
 
 const express = require('express');
-const fs      = require('fs');
-const path    = require('path');
+const fs      = require('node:fs');
+const path    = require('node:path');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');

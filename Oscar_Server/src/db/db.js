@@ -13,9 +13,9 @@
  * No native compilation required — works on any platform with Node 22+.
  */
 
-const path   = require('path');
-const fs     = require('fs');
-const crypto = require('crypto');
+const path   = require('node:path');
+const fs     = require('node:fs');
+const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────

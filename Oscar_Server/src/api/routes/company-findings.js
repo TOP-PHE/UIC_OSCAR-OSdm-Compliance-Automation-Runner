@@ -28,7 +28,7 @@
  */
 
 const express = require('express');
-const crypto  = require('crypto');
+const crypto  = require('node:crypto');
 const { get, all, run } = require('../../db/db');
 const { requireAuth }   = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');

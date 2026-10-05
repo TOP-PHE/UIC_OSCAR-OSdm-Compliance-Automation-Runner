@@ -19,8 +19,8 @@
  * Returns: { suites: N, requests: N, assertions: N }
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { safeJoinUuid } = require('../utils/paths');
 const { run: dbRun, get, transaction, colEncrypt } = require('../db/db');
 
