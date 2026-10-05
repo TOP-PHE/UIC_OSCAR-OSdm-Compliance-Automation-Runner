@@ -32,15 +32,31 @@ const vm = require('node:vm');
 const PUBLIC_DIR = path.resolve(__dirname, '..', '..', 'public');
 const read = (rel) => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
 
+// Walks the page the way the HTML parser does, as dashboard-pages.test.js does:
+// a script element ends at the first "</script" followed by whitespace, "/" or ">".
 function inlineScripts(html) {
   const blocks = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const attrs = m[1];
+  const openRe = /<script\b([^>]*)>/gi;
+  let position = 0;
+  while (position < html.length) {
+    openRe.lastIndex = position;
+    const open = openRe.exec(html);
+    if (!open) break;
+    const attrs = open[1] || '';
+    const start = open.index + open[0].length;
+    const closeRe = /<\/script[\s/>]/gi;
+    closeRe.lastIndex = start;
+    const close = closeRe.exec(html);
+    const end = close ? close.index : html.length;
+    const tagEnd = close ? html.indexOf('>', end) : -1;
+    position = tagEnd === -1 ? html.length : tagEnd + 1;
     if (/\bsrc\s*=/i.test(attrs)) continue;                                  // external file
     if (/\btype\s*=\s*["']?(?!text\/javascript|module)[\w/+-]+/i.test(attrs)) continue; // data block, not code
-    blocks.push({ code: m[2], line: html.slice(0, m.index).split('\n').length, module: /\btype\s*=\s*["']?module/i.test(attrs) });
+    blocks.push({
+      code: html.slice(start, end),
+      line: html.slice(0, open.index).split('\n').length,
+      module: /\btype\s*=\s*["']?module/i.test(attrs),
+    });
   }
   return blocks;
 }
@@ -69,6 +85,8 @@ describe('every script under public/ compiles', () => {
   test('there is something to check', () => {
     expect(htmlFiles.length).toBeGreaterThan(10);
     expect(jsFiles).toContain('js/scenarios.js');
+    // The walker must actually find the inline scripts, or the checks below pass on nothing.
+    expect(htmlFiles.flatMap(f => inlineScripts(read(f))).length).toBeGreaterThan(10);
   });
 
   test.each(htmlFiles)('%s: inline scripts', (file) => {
