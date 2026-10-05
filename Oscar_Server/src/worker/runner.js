@@ -168,14 +168,12 @@ const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s
 const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
 
 class LogParser {
-  constructor() {
-    this.currentSuite = null;
-    this.currentRequest = null;
-    this.currentScenario = null;
-    this.attemptIndex = null;
-    this.attemptTotal = null;
-    this.phase = 'setup';
-  }
+  currentSuite = null;
+  currentRequest = null;
+  currentScenario = null;
+  attemptIndex = null;
+  attemptTotal = null;
+  phase = 'setup';
 
   parse(line) {
     const trimmed = (line || '').trim();
@@ -305,8 +303,8 @@ class LogParser {
 function _authLogger(runId) {
   const base = { category: 'auth', phase: 'setup' };
   return {
-    info:  (msg, meta) => logEvent(runId, 'info',  msg, { ...base, ...(meta || {}) }),
-    error: (msg, meta) => logEvent(runId, 'error', msg, { ...base, ...(meta || {}) })
+    info:  (msg, meta) => logEvent(runId, 'info',  msg, { ...base, ...meta }),
+    error: (msg, meta) => logEvent(runId, 'error', msg, { ...base, ...meta })
   };
 }
 
@@ -457,12 +455,10 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     `    value: "0"`,
   ];
   if (requestor) {
-    lines.push(`  - name: requestor`);
-    lines.push(`    value: "${requestor}"`);
+    lines.push(`  - name: requestor`, `    value: "${requestor}"`);
   }
   if (scenarioOverride) {
-    lines.push(`  - name: scenario_override`);
-    lines.push(`    value: "${scenarioOverride}"`);
+    lines.push(`  - name: scenario_override`, `    value: "${scenarioOverride}"`);
   }
   if (Array.isArray(extraHeaders) && extraHeaders.length > 0) {
     // Issue #426 — company-wide dedicated headers. Passed through as a JSON
@@ -471,8 +467,7 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     // then double-quotes so the JSON survives inside a YAML double-quoted
     // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
     const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', '\\"');
-    lines.push(`  - name: __extraHeaders`);
-    lines.push(`    value: "${safeEh}"`);
+    lines.push(`  - name: __extraHeaders`, `    value: "${safeEh}"`);
   }
   return lines.join('\n') + '\n';
 }
