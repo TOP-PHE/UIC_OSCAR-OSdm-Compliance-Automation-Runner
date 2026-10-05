@@ -131,7 +131,8 @@ async function _doFetch({ method, url, headers, body }, label, log) {
       try {
         const parsed = JSON.parse(text);
         if (parsed && (parsed.error || parsed.error_description)) {
-          summary = `${parsed.error || 'unknown_error'}${parsed.error_description ? ` — ${parsed.error_description}` : ''}`;
+          const description = parsed.error_description ? ` — ${parsed.error_description}` : '';
+          summary = `${parsed.error || 'unknown_error'}${description}`;
         } else {
           summary = text;
         }
@@ -142,7 +143,8 @@ async function _doFetch({ method, url, headers, body }, label, log) {
       summary = summary.slice(0, 500);
     } catch (_) { /* body read failed; status alone */ }
 
-    const msg = `${label} request failed — HTTP ${res.status}${summary ? `: ${summary}` : ''}`;
+    const detail = summary ? `: ${summary}` : '';
+    const msg = `${label} request failed — HTTP ${res.status}${detail}`;
     log.error(`[runner] ${msg}`, { http_status: res.status });
     throw new Error(msg);
   }
@@ -229,8 +231,9 @@ async function _oauth2Basic(ctx, log) {
   const { tokenUrl, clientId, clientSecret, scope } = ctx;
   const body = new URLSearchParams({ grant_type: 'client_credentials' });
   if (scope) body.set('scope', scope);
+  const basicCredentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   const headers = {
-    'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+    'Authorization': `Basic ${basicCredentials}`,
     'Content-Type':  'application/x-www-form-urlencoded',
     'Accept':        'application/json'
   };
@@ -314,7 +317,8 @@ async function _custom(ctx, log) {
   // opaque 401 as a wrong secret. Names only; never values. (#440)
   const unknown = _unknownPlaceholders(typeof customTemplate === 'string' ? customTemplate : JSON.stringify(customTemplate));
   if (unknown.length && log && typeof log.info === 'function') {
-    log.info(`[runner] Custom template — ${unknown.length} unrecognised placeholder(s) will be sent literally: ${unknown.map(u => `{{${u}}}`).join(', ')}. Supported (case-insensitive): {{client_id}}, {{client_secret}}, {{scope}}, {{extra}}.`);
+    const unknownList = unknown.map(u => `{{${u}}}`).join(', ');
+    log.info(`[runner] Custom template — ${unknown.length} unrecognised placeholder(s) will be sent literally: ${unknownList}. Supported (case-insensitive): {{client_id}}, {{client_secret}}, {{scope}}, {{extra}}.`);
   }
   const method = (tpl.method || 'POST').toUpperCase();
   const headers = _substituteDeep(tpl.headers || {}, ctx);
@@ -386,7 +390,8 @@ async function fetchToken(profile, ctx, log) {
   if (!isValidProfile(profile)) {
     throw new Error(`Unknown OAuth profile: "${profile}". Expected one of: ${PROFILES.join(', ')}.`);
   }
-  log.info(`[runner] Auth — profile=${profile}${ctx.scope ? `, scope=${ctx.scope}` : ''}`);
+  const scopeNote = ctx.scope ? `, scope=${ctx.scope}` : '';
+  log.info(`[runner] Auth — profile=${profile}${scopeNote}`);
   const result = await ADAPTERS[profile](ctx, log);
   if (result?.expiresIn) {
     log.info(`[runner] Auth — token obtained successfully (expires_in=${result.expiresIn}s).`);

@@ -679,7 +679,8 @@ router.patch('/config', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: errors.join('; ') });
   }
 
-  auditLog(req.user.id, null, req.user.email, `config_updated:${updated.map(u => `${u.key}=${u.value}`).join(',')}`);
+  const changes = updated.map(u => `${u.key}=${u.value}`).join(',');
+  auditLog(req.user.id, null, req.user.email, `config_updated:${changes}`);
 
   // Return the full config after update
   const config = {};
