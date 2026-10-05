@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-05-test-config-failed-load",
+    "date": "October 5, 2026",
+    "tag": "Bug Fix",
+    "title": "Test Config no longer mistakes a failed load for an empty configuration",
+    "summary": "If Test Config could not read your company's test configuration, it used to open as if nothing had been set up, and generating a scenario from there could replace everything that was stored. It now tells you the load failed and writes nothing.",
+    "content": "Test Config reads three things when it opens: the test configuration (your scenarios), the Test Framework and the test data. Until now it treated any failure to read one of them as \"there is none yet\". A dropped connection, a busy server or a rate limit therefore looked exactly like a brand-new company, and the page opened empty without a word.\n\nThe scenario wizard reads the test configuration again before it adds a scenario. After a failed read it started from an empty file, added the new scenario and saved the result. For a Test Manager that save replaces the company's whole configuration, so every other scenario was gone. We reproduced this on a test server: sixteen scenarios stored, one failed read, one click on Generate & Add Scenario, one scenario left.\n\nFrom this release, only the server's explicit \"nothing stored yet\" answer is treated that way. After any other failure Test Config stops and says so: the page shows \"could not be loaded\" with the reason instead of an empty editor, and the wizard answers \"The scenario was not generated\". Nothing is written. Reloading the page is enough once the server answers again.\n\nWhen you upload a datafile, OSCAR also copies its trains into Test Data, skipping the ones you already have. If it cannot read the existing list it now adds none and tells you, instead of adding them all again.\n\nNo action is required. If you remember Test Config opening empty when your company already had scenarios, and you generated a scenario at that moment, check your scenario list. A Test Manager can restore a configuration by uploading a saved copy of the datafile."
+  },
+  {
     "id": "2026-09-11-testers-own-scenarios-personal-run-list",
     "date": "September 11, 2026",
     "tag": "Improvement",
