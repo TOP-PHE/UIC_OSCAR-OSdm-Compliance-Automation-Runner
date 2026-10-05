@@ -179,7 +179,7 @@ function _substitute(str, ctx) {
 const _KNOWN_PLACEHOLDERS = new Set(['client_id', 'client_secret', 'scope', 'extra']);
 function _unknownPlaceholders(str) {
   const out = new Set();
-  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  const re = /\{\{\s*(\w+)\s*\}\}/g;
   let m;
   while ((m = re.exec(String(str == null ? '' : str))) !== null) {
     if (!_KNOWN_PLACEHOLDERS.has(m[1].toLowerCase())) out.add(m[1]);

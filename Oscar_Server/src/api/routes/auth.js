@@ -234,7 +234,7 @@ router.post('/register/confirm',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
   ]),
   async (req, res) => {
   const { token, password } = req.body || {};
@@ -438,7 +438,7 @@ router.post('/password-reset/confirm',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
   ]),
   async (req, res) => {
     const { token, password } = req.body || {};
@@ -498,7 +498,7 @@ router.post('/bootstrap/platform-user',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').optional().isString()
       .isIn(['administrator', 'certification_user']).withMessage('role must be administrator or certification_user'),
   ]),
