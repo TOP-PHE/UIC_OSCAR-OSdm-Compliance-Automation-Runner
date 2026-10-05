@@ -44,7 +44,7 @@ const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 // Maximum size (bytes) of a single request or response body persisted to DB.
 // Bodies larger than this are truncated with a marker. Default 100 KB which
 // covers ~99% of OSDM payloads while keeping per-run storage bounded.
-const MAX_BODY_SIZE = parseInt(process.env.MAX_BODY_SIZE || '102400', 10);
+const MAX_BODY_SIZE = Number.parseInt(process.env.MAX_BODY_SIZE || '102400', 10);
 
 /**
  * Serialize an object/string to a JSON string of bounded size. Returns NULL
@@ -275,7 +275,7 @@ const CAPABILITY_PROBE_ENDPOINTS = new Set([
  *   null            — no response captured / inconclusive
  */
 function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions, reqName) {
-  const s = typeof httpStatus === 'number' ? httpStatus : parseInt(httpStatus, 10);
+  const s = typeof httpStatus === 'number' ? httpStatus : Number.parseInt(httpStatus, 10);
   // library-bruno signals "attempted but inapplicable" by writing an entry
   // with httpStatus === 0 (no real network call, but a bookkeeping row so the
   // certifier sees the step was considered). Treat as a distinct class.
@@ -385,7 +385,7 @@ function extractStructuredResults(runId, companyId) {
         const method = (entry.request && entry.request.method) || null;
         const url = (entry.request && entry.request.url) || null;
         const status = entry.response ? (entry.response.status || entry.response.statusCode) : null;
-        const httpStatus = typeof status === 'number' ? status : (parseInt(status, 10) || null);
+        const httpStatus = typeof status === 'number' ? status : (Number.parseInt(status, 10) || null);
         // Bruno CLI writes runDuration in SECONDS (fractional), not ms.
         // E.g. a 2780ms request appears as runDuration: 2.78 — rounding the
         // raw value gives "3ms" in the UI which contradicts the log line.

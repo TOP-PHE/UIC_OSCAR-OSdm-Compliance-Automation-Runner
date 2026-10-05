@@ -29,7 +29,7 @@ function isSmtpConfigured() {
 function createTransport() {
   return nodemailer.createTransport({
     host:   getConfig('SMTP_HOST', ''),
-    port:   parseInt(getConfig('SMTP_PORT', '587'), 10),
+    port:   Number.parseInt(getConfig('SMTP_PORT', '587'), 10),
     secure: getConfig('SMTP_SECURE', 'false') === 'true',
     auth: {
       user: getConfig('SMTP_USER', ''),

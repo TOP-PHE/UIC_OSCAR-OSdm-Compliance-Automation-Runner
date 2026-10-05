@@ -444,7 +444,7 @@ router.post('/configured', (req, res) => {
 //   failed_only=true   — when navigating, skip PASS requests so the certifier
 //                        can jump straight from one failure to the next
 router.get('/requests/:id/messages', (req, res) => {
-  const requestId = parseInt(req.params.id, 10);
+  const requestId = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(requestId) || requestId <= 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid request id.' });
   }
@@ -604,7 +604,7 @@ router.get('/trends/summary', (req, res) => {
     ? 'AND r.shared_with_certifier_at IS NOT NULL'
     : '';
 
-  const limit = Math.min(parseInt(req.query.limit || '20', 10), 50);
+  const limit = Math.min(Number.parseInt(req.query.limit || '20', 10), 50);
 
   const rows = all(`
     SELECT ra.assertion_key, ra.assertion_name, ra.category, ra.domain, ra.severity,
@@ -633,7 +633,7 @@ router.get('/trends', (req, res) => {
   if (!assertion_key) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'assertion_key query param is required.' });
   }
-  const limit = Math.min(parseInt(limitStr || '20', 10), 100);
+  const limit = Math.min(Number.parseInt(limitStr || '20', 10), 100);
   const companyId = req.companyId || req.user.companyId;
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
   // S4: same caller-supplied company scope as /trends/summary — apply the

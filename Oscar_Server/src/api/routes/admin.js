@@ -637,7 +637,7 @@ router.patch('/config', (req, res) => {
     let value;
     if (schema.type === 'number') {
       value = Number(rawValue);
-      if (isNaN(value)) {
+      if (Number.isNaN(value)) {
         errors.push(`${key}: must be a number`);
         continue;
       }

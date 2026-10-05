@@ -215,7 +215,7 @@ function _expiresIn(json) {
     const v = json[k];
     if (typeof v === 'number' && v > 0 && Number.isFinite(v)) return Math.floor(v);
     if (typeof v === 'string' && /^\d+$/.test(v)) {
-      const n = parseInt(v, 10);
+      const n = Number.parseInt(v, 10);
       if (n > 0) return n;
     }
   }

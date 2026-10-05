@@ -75,7 +75,7 @@ const STALE_RUN_MS = 15 * 60 * 1000; // 15 minutes
 // wrongly flagging it stale (auto-cancelled on delete). Append 'Z' when the
 // string carries no TZ marker so it parses as UTC regardless of container TZ.
 function parseUtcTs(s) {
-  if (!s) return NaN;
+  if (!s) return Number.NaN;
   if (/[Z]$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
   return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
 }
@@ -263,8 +263,8 @@ router.post('/', runSubmitLimiter, (req, res) => {
 
 // ── GET /v1/runs ──────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
-  const limit  = Math.min(parseInt(req.query.limit  || '50',  10), 200);
-  const offset = parseInt(req.query.offset || '0',  10);
+  const limit  = Math.min(Number.parseInt(req.query.limit  || '50',  10), 200);
+  const offset = Number.parseInt(req.query.offset || '0',  10);
 
   // Issue #60 (v1.10.0) — administrator role no longer reads test data, with
   // ONE narrow exception: the operational data-lifecycle queue. Admins must
@@ -814,7 +814,7 @@ router.get('/:id/logs', (req, res) => {
   const runRow = validateRunOwnership(req.params.id, req.companyId, req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
-  const since  = req.query.since_id ? parseInt(req.query.since_id, 10) : 0;
+  const since  = req.query.since_id ? Number.parseInt(req.query.since_id, 10) : 0;
 
   // Build query with optional filters (backward-compatible).
   // NOTE (Phase 2 of issue #60, v1.11.0): the `message` column is now

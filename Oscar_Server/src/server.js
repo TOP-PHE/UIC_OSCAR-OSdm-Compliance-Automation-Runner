@@ -618,7 +618,7 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = Number.parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, () => {
   log.info({ port: PORT, collection: process.env.COLLECTION_PATH, bru: process.env.BRU_CMD, dataDir: DATAFILES_DIR },
     'OSCAR — OSDM Conformance Automation Runner started');

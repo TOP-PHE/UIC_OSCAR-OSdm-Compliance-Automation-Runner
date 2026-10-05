@@ -64,7 +64,7 @@ function setSessionCookie(res, token) {
 // v1.11.14: a conformance-testing platform invites rapid user-switching across
 // vendor accounts, and 20/15min was tripping legitimate testers (each switch is
 // a login). 50/15min is still far below a useful brute-force rate.
-const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '50', 10);
+const AUTH_RATE_LIMIT_MAX = Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX || '50', 10);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15-minute window
   max: AUTH_RATE_LIMIT_MAX,

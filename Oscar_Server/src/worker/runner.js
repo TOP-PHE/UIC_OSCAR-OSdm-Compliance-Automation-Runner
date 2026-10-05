@@ -183,16 +183,16 @@ class LogParser {
     const attemptMatch = trimmed.match(/\(attempt\s+(\d+)\s*\/\s*(\d+)\)/i);
 
     if (skipMatch) {
-      this.attemptIndex = parseInt(skipMatch[1], 10);
-      this.attemptTotal = parseInt(skipMatch[2], 10);
+      this.attemptIndex = Number.parseInt(skipMatch[1], 10);
+      this.attemptTotal = Number.parseInt(skipMatch[2], 10);
       this.currentScenario = skipMatch[3];
       this.currentSuite = null;
       this.currentRequest = null;
       eventKind = 'scenario_skipped';
       category = 'system';
     } else if (startMatch) {
-      this.attemptIndex = parseInt(startMatch[1], 10);
-      this.attemptTotal = parseInt(startMatch[2], 10);
+      this.attemptIndex = Number.parseInt(startMatch[1], 10);
+      this.attemptTotal = Number.parseInt(startMatch[2], 10);
       this.currentScenario = startMatch[3];
       this.currentSuite = null;
       this.currentRequest = null;
@@ -207,8 +207,8 @@ class LogParser {
       // Retry marker on a scenario that was started earlier. We stamp the
       // attempt number onto this line AND every subsequent line until the
       // next attempt/scenario change, so the UI can group retries.
-      this.attemptIndex = parseInt(attemptMatch[1], 10);
-      this.attemptTotal = parseInt(attemptMatch[2], 10);
+      this.attemptIndex = Number.parseInt(attemptMatch[1], 10);
+      this.attemptTotal = Number.parseInt(attemptMatch[2], 10);
       eventKind = 'scenario_retry';
       category = 'system';
     }
@@ -246,7 +246,7 @@ class LogParser {
         this.phase = 'execution';
         category = 'system';
         const httpInParen = folderReqMatch[3].match(/\b([1-5]\d{2})\b/);
-        if (httpInParen) httpStatus = parseInt(httpInParen[1], 10);
+        if (httpInParen) httpStatus = Number.parseInt(httpInParen[1], 10);
       } else if (/^Running Folder\s+/i.test(trimmed)) {
         this.currentSuite = trimmed.replace(/^Running Folder\s+/i, '').trim();
         this.currentRequest = null;
@@ -258,7 +258,7 @@ class LogParser {
       } else if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+https?:\/\//i.test(trimmed)) {
         category = 'http';
         const m = trimmed.match(/\b([1-5]\d{2})\b/);
-        if (m) httpStatus = parseInt(m[1], 10);
+        if (m) httpStatus = Number.parseInt(m[1], 10);
       } else if (/^\[runner\]/i.test(trimmed)) {
         category = 'system';
       } else if (/401|token|auth|oauth|login/i.test(trimmed)) {
@@ -341,8 +341,8 @@ const EXPIRED_FLOW_TIMERS = [
   { flag: 'expiredExchangeOfferTest',       wait: 'expiredExchangeOfferMaxWaitMinutes',       label: 'expiredExchangeOfferMaxWaitMinutes'       },
 ];
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
-  const baseMs    = parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
-  const hardMaxMs = parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
+  const baseMs    = Number.parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
+  const hardMaxMs = Number.parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
   let requestedMs = 0;
   let triggeringScenario = null;
   let triggeringTimer    = null;   // which expired-X timer drove the extension
@@ -792,7 +792,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // default 300000 (5 min).
     let tokenWatchdog = null;
     if (userRow && userRow.auth_mode === 'oauth2') {
-      const tickMs = parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
+      const tickMs = Number.parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
       // Disabled when set to 0 (operator opt-out).
       if (tickMs > 0) {
         tokenWatchdog = setInterval(async () => {
