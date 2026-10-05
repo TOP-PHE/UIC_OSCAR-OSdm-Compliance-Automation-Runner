@@ -39,6 +39,12 @@ function safeJsonParse(s) {
   try { return JSON.parse(s); } catch (_) { return null; }
 }
 
+// Deserialise a stored headers blob defensively; an empty value is no headers.
+function safeParseHeaders(s) {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch (_) { return null; }
+}
+
 // ── POST /v1/reports/compare ──────────────────────────────────────────────────
 router.post('/compare', (req, res) => {
   const { run_a_id, run_b_id } = req.body || {};
@@ -512,12 +518,6 @@ router.get('/requests/:id/messages', (req, res) => {
      WHERE rq2.run_id = ? ${resultFilter}`,
     [row.run_id]
   );
-
-  // Deserialise stored JSON blobs defensively.
-  function safeParseHeaders(s) {
-    if (!s) return null;
-    try { return JSON.parse(s); } catch (_) { return null; }
-  }
 
   return res.json({
     id:            row.id,

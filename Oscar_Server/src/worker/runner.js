@@ -147,16 +147,6 @@ function logEvent(runId, level, message, meta) {
   } catch (_) { /* never block execution on log errors */ }
 }
 
-// ── Log parser — classifies Bruno stdout lines into structured metadata ───────
-//
-// Also detects scenario boundary milestones and retry attempts so the report
-// UI can render explicit section dividers rather than inferring them from the
-// message text. Bruno library scripts emit lines like:
-//   "⏭  Skipping to next scenario [2/8]: OTST_EXCH_SRCH_CRIT_1ADT_1LEG"
-//   "▶  Starting scenario [1/8]: OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG"
-//   "⚠  No offers (attempt 2/3) — retrying..."
-// We parse these and surface them as event_kind='scenario_*' / 'log' with
-// attempt_index/attempt_total/scenario_name populated.
 // "at fn (file:line:col)" stack frame. The two alternatives are the two ways the
 // function token can end, at a "(" inside it or at whitespace before the "(",
 // so the pattern has one way to match a line instead of many.
@@ -167,6 +157,61 @@ const STACK_FRAME_WITH_PARENS = /^\s*at\s+(?:\S[^\s(]*\(|\S+\s+\().*:\d+:\d+\)\s
 // "(", written so the pattern cannot backtrack over that whitespace.
 const FOLDER_REQUEST_ROW = /^([^()\\/]+)[\\/]([^()]*[^()\s]|\s)\s+\(([^)]+)\)/;
 
+// #336 (v1.11.113): infer the actual log level from the line content
+// instead of storing the literal stream name as the level. The
+// dashboard's level filter (Info / Warn / Error) and the per-level
+// CSS colouring rely on event.level — previously every Bruno line had
+// level='stdout' so the filter was a no-op on Bruno output.
+//
+// Inference order:
+//   1) explicit [LEVEL] tag from library-bruno emitters → that level
+//   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
+//   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
+//   4) Known harmless platform noise (OpenSSL warn-once) → warn
+//   5) stderr stream with no other signal → error (Bruno emits real
+//      failures there; "stderr" alone is not a useful level)
+//   6) stdout stream with no other signal → info (sensible default —
+//      keeps the level-filter working without spamming "debug")
+function inferLevel(line, streamFallback) {
+  // 1) explicit tag
+  if (/\[ERROR]/i.test(line))                                 return 'error';
+  if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
+  if (/\[INFO]/i.test(line))                                  return 'info';
+  if (/\[DEBUG]/i.test(line))                                 return 'debug';
+  // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
+  if (/^\s*✕\s/.test(line))                                   return 'error';
+  if (/^\s*✓\s/.test(line))                                   return 'info';
+  // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
+  //    that's the content. The "at …" STACK FRAMES are demoted to debug
+  //    (log-audit round 2): Bruno prints ~10 frames after every failed
+  //    assertion (testCapture.js → @usebruno internals → node:vm), pure
+  //    developer detail that tripled the visual size of each failure in
+  //    the dashboard. They remain one debug-filter click away.
+  if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
+  if (STACK_FRAME_WITH_PARENS.test(line))                     return 'debug';
+  if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
+  if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
+  // 4) Known platform noise
+  if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
+  // 4b) Bruno CLI's own skip echo (one per request the smart run filter
+  //     skips — e.g. the 6 vendor token requests at the top of every
+  //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
+  //     matching the [DEBUG] tag on the library's own skip line.
+  if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
+  // 5/6) stream-based fallback
+  return streamFallback;
+}
+
+// ── Log parser — classifies Bruno stdout lines into structured metadata ───────
+//
+// Also detects scenario boundary milestones and retry attempts so the report
+// UI can render explicit section dividers rather than inferring them from the
+// message text. Bruno library scripts emit lines like:
+//   "⏭  Skipping to next scenario [2/8]: OTST_EXCH_SRCH_CRIT_1ADT_1LEG"
+//   "▶  Starting scenario [1/8]: OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG"
+//   "⚠  No offers (attempt 2/3) — retrying..."
+// We parse these and surface them as event_kind='scenario_*' / 'log' with
+// attempt_index/attempt_total/scenario_name populated.
 class LogParser {
   currentSuite = null;
   currentRequest = null;
@@ -830,51 +875,6 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       logParser.currentScenario = scenarioOverride;
     } else if (runRow?.scenario_code) {
       logParser.currentScenario = runRow.scenario_code;
-    }
-
-    // #336 (v1.11.113): infer the actual log level from the line content
-    // instead of storing the literal stream name as the level. The
-    // dashboard's level filter (Info / Warn / Error) and the per-level
-    // CSS colouring rely on event.level — previously every Bruno line had
-    // level='stdout' so the filter was a no-op on Bruno output.
-    //
-    // Inference order:
-    //   1) explicit [LEVEL] tag from library-bruno emitters → that level
-    //   2) Bruno CLI native test markers (✓ pass / ✕ fail) → info / error
-    //   3) JS stack-trace shapes (AssertionError, "Error: ", "at /…:N:N") → error
-    //   4) Known harmless platform noise (OpenSSL warn-once) → warn
-    //   5) stderr stream with no other signal → error (Bruno emits real
-    //      failures there; "stderr" alone is not a useful level)
-    //   6) stdout stream with no other signal → info (sensible default —
-    //      keeps the level-filter working without spamming "debug")
-    function inferLevel(line, streamFallback) {
-      // 1) explicit tag
-      if (/\[ERROR]/i.test(line))                                 return 'error';
-      if (/\[WARN(?:ING)?]/i.test(line))                          return 'warn';
-      if (/\[INFO]/i.test(line))                                  return 'info';
-      if (/\[DEBUG]/i.test(line))                                 return 'debug';
-      // 2) Bruno CLI markers (assertion pass/fail rows in stdout)
-      if (/^\s*✕\s/.test(line))                                   return 'error';
-      if (/^\s*✓\s/.test(line))                                   return 'info';
-      // 3) JS stack-trace shapes. The "Error:" MESSAGE line stays error —
-      //    that's the content. The "at …" STACK FRAMES are demoted to debug
-      //    (log-audit round 2): Bruno prints ~10 frames after every failed
-      //    assertion (testCapture.js → @usebruno internals → node:vm), pure
-      //    developer detail that tripled the visual size of each failure in
-      //    the dashboard. They remain one debug-filter click away.
-      if (/^\s*(?:Error|AssertionError|TypeError|ReferenceError):/i.test(line)) return 'error';
-      if (STACK_FRAME_WITH_PARENS.test(line))                     return 'debug';
-      if (/^\s*at\s+\/.*:\d+:\d+\s*$/.test(line))                 return 'debug';
-      if (/^\s*at\s+Array\.forEach\b/.test(line))                 return 'debug';
-      // 4) Known platform noise
-      if (/Cannot open directory \/etc\/ssl\/certs/.test(line))   return 'warn';
-      // 4b) Bruno CLI's own skip echo (one per request the smart run filter
-      //     skips — e.g. the 6 vendor token requests at the top of every
-      //     OSCAR run). Routine plumbing the tester doesn't act on → debug,
-      //     matching the [DEBUG] tag on the library's own skip line.
-      if (/\(request skipped via pre-request script\)\s*$/.test(line)) return 'debug';
-      // 5/6) stream-based fallback
-      return streamFallback;
     }
 
     proc.stdout.on('data', chunk => {
