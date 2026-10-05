@@ -185,7 +185,8 @@ function parseExtraHeaders(raw) {
   try {
     const v = JSON.parse(raw);
     return Array.isArray(v) ? v : [];
-  } catch (_) {
+  } catch {
+    // Not valid JSON: treated as no extra headers.
     return [];
   }
 }

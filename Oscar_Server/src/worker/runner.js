@@ -89,7 +89,8 @@ function killRun(runId) {
         try { proc.kill('SIGKILL'); } catch (_) { /* already gone */ }
       }
     }, 3000).unref();
-  } catch (_) {
+  } catch {
+    // kill() threw, so nothing was signalled.
     return false;
   }
   return true;

@@ -258,8 +258,8 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
 
   // Optional per-tester headers (mirror the Bruno run path).
   const extraHeaders = {};
-  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
-  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Discovery silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);
@@ -422,8 +422,8 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
     return res.status(502).json({ status: 502, title: 'Auth Failed', detail: `Could not obtain an access token: ${err.message}` });
   }
   const extraHeaders = {};
-  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch (_) {}
-  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) extraHeaders.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) extraHeaders['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   // #477: company-wide Dedicated Headers (API Config) — previously only the
   // Bruno run path applied these; Re-probe silently ignored them.
   mergeDedicatedHeaders(extraHeaders, company, token);

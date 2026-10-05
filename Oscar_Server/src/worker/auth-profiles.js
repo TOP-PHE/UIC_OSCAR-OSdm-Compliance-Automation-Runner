@@ -135,7 +135,8 @@ async function _doFetch({ method, url, headers, body }, label, log) {
         } else {
           summary = text;
         }
-      } catch (_) {
+      } catch {
+        // Not JSON: report the raw response text.
         summary = text;
       }
       summary = summary.slice(0, 500);

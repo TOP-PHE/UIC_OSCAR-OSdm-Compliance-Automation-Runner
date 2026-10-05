@@ -58,8 +58,8 @@ async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFA
  */
 function buildTesterHeaders(userRow) {
   const headers = {};
-  try { const r = userRow && userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) headers.Requestor = r; } catch (_) {}
-  try { const k = userRow && userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) headers['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow && userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) headers.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow && userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) headers['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   return headers;
 }
 

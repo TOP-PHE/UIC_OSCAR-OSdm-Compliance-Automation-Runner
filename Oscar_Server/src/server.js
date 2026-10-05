@@ -541,7 +541,8 @@ app.get('/health', (req, res) => {
     } else {
       checks.disk = { ok: true, status: 'not_checked' };
     }
-  } catch (_e) {
+  } catch {
+    // A failed disk check is reported, but it does not fail the health check.
     checks.disk = { ok: true, status: 'check_failed_non_critical' };
   }
 
