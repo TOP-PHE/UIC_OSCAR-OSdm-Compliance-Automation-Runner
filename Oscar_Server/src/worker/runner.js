@@ -416,7 +416,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   } catch (err) {
     // Capture (don't swallow) — the caller logs this so the operator can tell
     // why an expected extension didn't fire.
-    helperError = err && err.message ? err.message : String(err);
+    helperError = err?.message ? err.message : String(err);
   }
   const desired   = Math.max(baseMs, requestedMs);
   const effective = Math.min(desired, hardMaxMs);
@@ -552,7 +552,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const companyRow = get('SELECT * FROM companies WHERE id = ?', [companyId]);
   // Prefer the userId from the queue job; fall back to the run's recorded
   // user_id (set at POST /v1/runs time) so legacy queue items still resolve.
-  const effectiveUserId = userId || (runRow && runRow.user_id) || null;
+  const effectiveUserId = userId || runRow?.user_id || null;
   const userRow = effectiveUserId ? get('SELECT * FROM users WHERE id = ?', [effectiveUserId]) : null;
 
   if (!runRow || !companyRow) throw new Error('Run or company not found in DB.');
@@ -802,7 +802,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
     // default 300000 (5 min).
     let tokenWatchdog = null;
-    if (userRow && userRow.auth_mode === 'oauth2') {
+    if (userRow?.auth_mode === 'oauth2') {
       const tickMs = Number.parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
       // Disabled when set to 0 (operator opt-out).
       if (tickMs > 0) {
@@ -816,7 +816,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
             );
           } catch (err) {
             logEvent(runId, 'warn',
-              `[token-watchdog] tick failed: ${err && err.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
+              `[token-watchdog] tick failed: ${err?.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
           }
         }, tickMs);
         logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
@@ -833,7 +833,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // before Bruno emits its first scenario banner.
     if (scenarioOverride) {
       logParser.currentScenario = scenarioOverride;
-    } else if (runRow && runRow.scenario_code) {
+    } else if (runRow?.scenario_code) {
       logParser.currentScenario = runRow.scenario_code;
     }
 

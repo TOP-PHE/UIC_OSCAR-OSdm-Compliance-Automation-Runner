@@ -645,7 +645,7 @@ router.patch('/config', (req, res) => {
       if (schema.max != null && value > schema.max) { errors.push(`${key}: maximum is ${schema.max}`); continue; }
     } else if (schema.type === 'enum') {
       value = String(rawValue || '');
-      if (!schema.options || !schema.options.includes(value)) {
+      if (!schema.options?.includes(value)) {
         errors.push(`${key}: must be one of ${(schema.options || []).join(', ')}`);
         continue;
       }
@@ -737,7 +737,7 @@ const testEmailLimiter = rateLimit({
   max: 6,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `test-email:${req.user && req.user.id}`,
+  keyGenerator: (req) => `test-email:${req.user?.id}`,
   message: { status: 429, title: 'Too Many Requests', detail: 'Test-email rate limit: 6 per 5 minutes per admin.' }
 });
 

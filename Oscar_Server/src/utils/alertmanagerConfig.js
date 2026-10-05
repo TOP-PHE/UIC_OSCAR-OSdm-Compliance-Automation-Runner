@@ -160,7 +160,7 @@ async function reload() {
     const body = await res.text();
     return { ok: res.ok, status: res.status, body };
   } catch (err) {
-    return { ok: false, status: 0, body: String(err && err.message || err) };
+    return { ok: false, status: 0, body: String(err?.message || err) };
   }
 }
 

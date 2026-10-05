@@ -60,7 +60,7 @@ const runSubmitLimiter = rateLimit({
   legacyHeaders: false,
   // Key by user ID (from JWT) so different users don't share the limit.
   // Fallback to ipKeyGenerator() which handles IPv6 properly per express-rate-limit docs.
-  keyGenerator: (req, res) => (req.user && req.user.id) || ipKeyGenerator(req, res),
+  keyGenerator: (req, res) => req.user?.id || ipKeyGenerator(req, res),
   message: { status: 429, title: 'Too Many Requests', detail: 'Rate limit: max 30 run submissions per hour. Wait or contact admin.' }
 });
 
@@ -110,7 +110,7 @@ function isRunStale(runRow) {
  */
 const { canUserSeeRun } = require('../helpers/run-access');
 function validateRunOwnership(runId, _companyId, req) {
-  if (!req || !req.user) return null;
+  if (!req?.user) return null;
   return canUserSeeRun(runId, req.user);
 }
 
@@ -132,7 +132,7 @@ router.post('/', runSubmitLimiter, (req, res) => {
   }
 
   const targetCompanyId = isPlatformRole(req.user.role)
-    ? (req.body && req.body.company_id ? req.body.company_id : req.companyId)
+    ? (req.body?.company_id ? req.body.company_id : req.companyId)
     : req.companyId;
 
   if (!targetCompanyId) {
@@ -782,7 +782,7 @@ router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
       let plaintext;
       try { plaintext = decryptFromFile(safePath); } catch (_e) { continue; }   // skip an unreadable artifact, keep the rest
       const scenario = sanitize(r.scenario_code) || ('run-' + String(r.id).slice(0, 8));
-      const ext = ((a.filename && a.filename.match(/\.([A-Za-z0-9]+)$/)) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
+      const ext = (a.filename?.match(/\.([A-Za-z0-9]+)$/) || [])[1] || (a.type === 'html_report' ? 'html' : 'json');
       let name = `${scenario}.${ext}`;
       if (used.has(name)) {
         const short = String(r.id).slice(0, 8);

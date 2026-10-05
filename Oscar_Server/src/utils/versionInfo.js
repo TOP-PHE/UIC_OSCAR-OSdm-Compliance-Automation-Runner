@@ -81,7 +81,7 @@ function findMatchingRelease(matrix, serverV, collV) {
     // Wildcard pattern (e.g. "OTST_V2.0.x" matches "OTST_V2.0.1")
     if (typeof r.max_collection === 'string' && r.max_collection.endsWith('.x')) {
       const prefix = r.max_collection.slice(0, -1); // "OTST_V2.0."
-      if (collV && collV.startsWith(prefix)) return true;
+      if (collV?.startsWith(prefix)) return true;
     }
     return false;
   });

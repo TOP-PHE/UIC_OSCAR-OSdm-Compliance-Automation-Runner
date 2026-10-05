@@ -537,7 +537,7 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
   if (targetCompanyId === null) return;
 
   const company = get('SELECT datafile_path, slug FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company || !company.datafile_path || !fs.existsSync(company.datafile_path)) {
+  if (!company?.datafile_path || !fs.existsSync(company.datafile_path)) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No data file uploaded yet.' });
   }
   // Datafile is encrypted at rest (Phase 2 of issue #60). Decrypt before
@@ -577,7 +577,7 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
 
   try {
     const fwRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [targetCompanyId]);
-    if (fwRow && fwRow.config) {
+    if (fwRow?.config) {
       let fwConfig = null;
       try { fwConfig = JSON.parse(colDecrypt(fwRow.config)); } catch (_) {}
       if (fwConfig) {

@@ -160,7 +160,7 @@ router.post('/test-resources', (req, res) => {
   if (!resource_type || !['TRAIN', 'JOURNEY', 'MULTIMODAL'].includes(resource_type)) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'resource_type must be TRAIN, JOURNEY or MULTIMODAL.' });
   }
-  if (!label || !label.trim()) {
+  if (!label?.trim()) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'label is required.' });
   }
 
@@ -229,18 +229,18 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   const targetCompanyId = resolveCompanyScope(req, res);
   if (targetCompanyId === null) return;
 
-  const origin = _stnUrn(req.body && req.body.originURN);
-  const destination = _stnUrn(req.body && req.body.destinationURN);
+  const origin = _stnUrn(req.body?.originURN);
+  const destination = _stnUrn(req.body?.destinationURN);
   if (!origin || !destination) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'originURN and destinationURN are required.' });
   }
-  let days = Number.parseInt(req.body && req.body.days, 10);
+  let days = Number.parseInt(req.body?.days, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
 
   // api_base lives on the company; OSDM credentials live on the tester.
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company || !company.api_base) {
+  if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
   const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
@@ -410,7 +410,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   if (targetCompanyId === null) return;
 
   const company = get('SELECT id, slug, api_base, extra_headers FROM companies WHERE id = ?', [targetCompanyId]);
-  if (!company || !company.api_base) {
+  if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
   const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
@@ -433,7 +433,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
     let data = {};
     try { data = JSON.parse(colDecrypt(r.data)); } catch (_) {}
     return { id: r.id, label: r.label, data };
-  }).filter(t => t.data && t.data.originURN && t.data.destinationURN);
+  }).filter(t => t.data?.originURN && t.data.destinationURN);
   if (!trains.length) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No TRAIN resources with an origin/destination to probe.' });
   }

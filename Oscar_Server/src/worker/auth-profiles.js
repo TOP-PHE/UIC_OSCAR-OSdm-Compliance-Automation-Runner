@@ -388,7 +388,7 @@ async function fetchToken(profile, ctx, log) {
   }
   log.info(`[runner] Auth — profile=${profile}${ctx.scope ? `, scope=${ctx.scope}` : ''}`);
   const result = await ADAPTERS[profile](ctx, log);
-  if (result && result.expiresIn) {
+  if (result?.expiresIn) {
     log.info(`[runner] Auth — token obtained successfully (expires_in=${result.expiresIn}s).`);
   } else {
     log.info('[runner] Auth — token obtained successfully (no expires_in returned — will not be cached).');

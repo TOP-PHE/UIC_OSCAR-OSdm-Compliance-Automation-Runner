@@ -580,7 +580,7 @@ const MIGRATIONS = [
 function _safeAlter(sql) {
   try { db.exec(sql); }
   catch (e) {
-    const msg = String(e && e.message || '');
+    const msg = String(e?.message || '');
     const benign = /duplicate column name|already exists/i.test(msg);
     if (!benign) throw e;
   }
@@ -590,7 +590,7 @@ function _safeAlter(sql) {
   // Read the highest version already applied. The bare schema.sql seeds
   // version=1 (base tables present), so a brand-new DB starts there.
   const row = db.prepare('SELECT MAX(version) AS v FROM schema_version').get();
-  const current = (row && row.v) || 0;
+  const current = row?.v || 0;
   const insertVersion = db.prepare(
     "INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (?, datetime('now'))"
   );

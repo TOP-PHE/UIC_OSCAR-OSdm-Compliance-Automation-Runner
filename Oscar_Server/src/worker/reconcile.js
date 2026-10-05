@@ -66,15 +66,15 @@ function reconcileOrphanedRuns(deps = {}) {
       `UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE status = 'RUNNING'`,
       [RUNNING_MSG]
     );
-    running = Number((r1 && r1.changes) || 0);
+    running = Number(r1?.changes || 0);
 
     const r2 = run(
       `UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE status = 'QUEUED'`,
       [QUEUED_MSG]
     );
-    queued = Number((r2 && r2.changes) || 0);
+    queued = Number(r2?.changes || 0);
   } catch (err) {
-    const msg = err && err.message ? err.message : String(err);
+    const msg = err?.message ? err.message : String(err);
     log.error({ err: msg }, 'Startup run reconciliation failed');
     return { running, queued, error: msg };
   }

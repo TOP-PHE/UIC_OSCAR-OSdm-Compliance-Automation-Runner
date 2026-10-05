@@ -244,7 +244,7 @@ router.post('/findings/:id/comments', (req, res) => {
   const f = get('SELECT id, status FROM finding WHERE id = ? AND company_id = ?', [req.params.id, companyId]);
   if (!f) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Finding not found.' });
 
-  const body = String((req.body || {}).body || '').trim();
+  const body = String(req.body?.body || '').trim();
   if (!body) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'A reply needs a body.' });
 
   const id = crypto.randomUUID();

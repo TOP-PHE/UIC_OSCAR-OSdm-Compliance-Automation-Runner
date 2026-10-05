@@ -70,7 +70,7 @@ function parseResults(runId) {
     const reqKey = `${suite}|${file}`;
 
     // Skip auth/token requests
-    const url  = ((entry.request && entry.request.url) || '').toLowerCase();
+    const url  = (entry.request?.url || '').toLowerCase();
     const name = reqKey.toLowerCase();
     if (/\/(token|login|auth|logon|oauth)/.test(url) || /access.?token/i.test(name)) return;
 

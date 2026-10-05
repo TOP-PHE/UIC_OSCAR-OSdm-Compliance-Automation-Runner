@@ -69,24 +69,24 @@ function serializeBounded(value) {
  * across versions / endpoints — try common shapes in order.
  */
 function getResponseBody(entry) {
-  const r = entry && entry.response;
+  const r = entry?.response;
   if (!r) return null;
   return r.data ?? r.body ?? r.json ?? r.text ?? null;
 }
 
 function getRequestBody(entry) {
-  const r = entry && entry.request;
+  const r = entry?.request;
   if (!r) return null;
   return r.data ?? r.body ?? r.json ?? null;
 }
 
 function getHeaders(obj) {
-  if (!obj || !obj.headers) return null;
+  if (!obj?.headers) return null;
   // Bruno headers can be: array of {name,value}, plain object, or Map-like
   if (Array.isArray(obj.headers)) {
     const out = {};
     for (const h of obj.headers) {
-      if (h && h.name && !h.disabled) out[h.name] = h.value;
+      if (h?.name && !h.disabled) out[h.name] = h.value;
     }
     return out;
   }
@@ -314,7 +314,7 @@ function extractStructuredResults(runId, companyId) {
   // The scenario name lives on the run row (runs.scenario_code), set by the
   // worker before launching Bruno. Use it as the canonical scenario_name.
   const runRow = get('SELECT scenario_code FROM runs WHERE id = ?', [runId]);
-  const runScenarioCode = (runRow && runRow.scenario_code) || null;
+  const runScenarioCode = runRow?.scenario_code || null;
 
   // v1.11.5 — artifact files are OSCAR1-encrypted since v1.11.0. The
   // helper handles both encrypted and legacy plaintext files transparently.
@@ -355,7 +355,7 @@ function extractStructuredResults(runId, companyId) {
       pathStr.replace(/\.yml$|\.bru$/i, '').split('/').pop() || '(unnamed)';
 
     // Skip auth/token requests
-    const url = ((entry.request && entry.request.url) || '').toLowerCase();
+    const url = (entry.request?.url || '').toLowerCase();
     const nameLower = reqName.toLowerCase();
     if (AUTH_URL_RE.test(url) || AUTH_NAME_RE.test(nameLower)) continue;
     if (entry.skipped || entry.status === 'skipped') continue;
@@ -382,8 +382,8 @@ function extractStructuredResults(runId, companyId) {
 
       for (const { entry, suite, reqName } of entries) {
         // Extract request-level data
-        const method = (entry.request && entry.request.method) || null;
-        const url = (entry.request && entry.request.url) || null;
+        const method = entry.request?.method || null;
+        const url = entry.request?.url || null;
         const status = entry.response ? (entry.response.status || entry.response.statusCode) : null;
         const httpStatus = typeof status === 'number' ? status : (Number.parseInt(status, 10) || null);
         // Bruno CLI writes runDuration in SECONDS (fractional), not ms.

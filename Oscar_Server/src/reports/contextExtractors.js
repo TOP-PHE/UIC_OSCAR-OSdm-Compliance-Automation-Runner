@@ -25,7 +25,7 @@
  */
 
 function parseBody(entry) {
-  const data = entry && entry.request && entry.request.data;
+  const data = entry?.request?.data;
   if (data == null) return null;
   if (typeof data === 'object') return data;           // already parsed
   if (typeof data === 'string') {
@@ -69,9 +69,9 @@ function offerContext(entry) {
   const ctx = {};
   // OSDM offer-request criteria we care about for certifier context
   const crit = body.tripSearchCriteria || body.offerSearchCriteria || body;
-  if (crit && crit.flexibility)        ctx.flexibility = crit.flexibility;
-  if (crit && crit.desiredFlexibility) ctx.flexibility = crit.desiredFlexibility;
-  if (Array.isArray(crit && crit.anonymousPassengerSpecifications)) {
+  if (crit?.flexibility)        ctx.flexibility = crit.flexibility;
+  if (crit?.desiredFlexibility) ctx.flexibility = crit.desiredFlexibility;
+  if (Array.isArray(crit?.anonymousPassengerSpecifications)) {
     ctx.paxCount = crit.anonymousPassengerSpecifications.length;
   } else if (Array.isArray(body.passengerSpecifications)) {
     ctx.paxCount = body.passengerSpecifications.length;
@@ -103,7 +103,7 @@ const DISPATCH = [
  * extractor returned nothing useful.
  */
 function extractRequestContext(entry) {
-  const url = (entry && entry.request && entry.request.url) || '';
+  const url = entry?.request?.url || '';
   if (!url) return null;
   for (const { re, fn } of DISPATCH) {
     if (re.test(url)) {

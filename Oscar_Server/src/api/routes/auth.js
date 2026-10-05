@@ -205,7 +205,7 @@ router.post('/register/request',
     const result = await sendVerificationEmail({ to: lowerEmail, companyName: targetCompany.name, verificationUrl });
 
     // Dev mode: return the URL directly so it can be tested without SMTP
-    if (result && result.devMode) {
+    if (result?.devMode) {
       log.info({ email: lowerEmail }, 'Dev mode — returning verification URL directly (no email sent)');
       return res.json({
         message: 'DEV MODE — SMTP not configured. Verification URL returned directly.',
@@ -389,7 +389,7 @@ router.post('/password-reset/request',
       logAuthEvent({ userId: user.id, companyId: null, email: user.email, eventType: 'password_reset_requested' });
 
       // Dev-mode passthrough mirrors the registration flow.
-      if (result && result.devMode) {
+      if (result?.devMode) {
         log.info({ email: user.email }, 'Dev mode — returning password-reset URL directly (no email sent)');
         return res.json({
           message: 'DEV MODE — SMTP not configured. Reset URL returned directly.',
@@ -613,7 +613,7 @@ router.post('/logout', requireAuth, (req, res) => {
   if (rawToken) {
     try {
       const payload = jwt.decode(rawToken);
-      if (payload && payload.jti) {
+      if (payload?.jti) {
         // exp is a Unix timestamp (seconds); convert to ISO-8601
         const expiresAt = new Date((payload.exp || 0) * 1000).toISOString();
         run(
@@ -667,7 +667,7 @@ const ssoCheckLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'SSO check rate limit exceeded.' }
 });
 router.get('/sso-check', ssoCheckLimiter, requireAuth, (req, res) => {
-  const role = normalizeRole(req.user && req.user.role);
+  const role = normalizeRole(req.user?.role);
   if (role !== 'administrator') {
     return res.status(401).set('Cache-Control', 'no-store').json({
       status: 401, title: 'Unauthorized',
