@@ -217,19 +217,16 @@ async function loadProfile() {
         const df = await dfRes.json();
         const totalCount = (df.scenarios || []).length;
         const toRun = df.scenariosToRun;
-        let toRunCount, toRunDesc, toRunBadgeClass;
+        let toRunDesc, toRunBadgeClass;
 
         if (toRun === 'ALL' || !Array.isArray(toRun)) {
-          toRunCount    = totalCount;
           toRunDesc     = `All ${totalCount} scenario(s) — <a href="/scenarios.html">use Test Config to narrow this down</a>`;
           toRunBadgeClass = 'badge-warn';
         } else if (toRun.length === 0) {
-          toRunCount    = 0;
           toRunDesc     = '⚠ 0 scenarios selected — run will fall back to ALL. <a href="/scenarios.html">Fix in Test Config</a>';
           toRunBadgeClass = 'badge-warn';
           warnings.push('scenariosToRun is empty — the runner will fall back to running ALL scenarios. <a href="/scenarios.html">Update Test Config</a>.');
         } else {
-          toRunCount    = toRun.length;
           toRunDesc     = toRun.length + ' of ' + totalCount + ' scenario(s) selected';
           toRunBadgeClass = 'badge-ok';
           testReady = true;

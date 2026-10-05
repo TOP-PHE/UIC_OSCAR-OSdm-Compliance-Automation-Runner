@@ -4623,7 +4623,8 @@ function wizDuplicateTrain(tidx) {
   const existing = new Set(trains.map(t => t.label).filter(Boolean));
   const base = `${src.label || 'Train'} (copy)`;
   let newLabel = base;
-  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  let suffix = 2;
+  while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
 
   const copy = {
     id: null,
@@ -4731,7 +4732,10 @@ function journeyToTripLegs(j) {
 // shared trip date, so a fixed-date parse compares them correctly.
 function journeyContinuityWarnings(j) {
   const legs = journeyData(j).legs;
-  const ms = (t) => { if (!t) return NaN; const d = new Date('2000-01-01T' + t); return d.getTime(); };
+  const ms = (t) => {
+    if (!t) return Number.NaN;
+    return new Date('2000-01-01T' + t).getTime();
+  };
   const warns = [];
   for (let i = 1; i < legs.length; i++) {
     const prev = journeyResolveLeg(legs[i - 1]);
@@ -4870,7 +4874,8 @@ function wizDuplicateJourney(jidx) {
   const existing = new Set(journeys.map(x => x.label).filter(Boolean));
   const base = `${src.label || 'Journey'} (copy)`;
   let newLabel = base;
-  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  let suffix = 2;
+  while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
   wizData.resources.push({
     id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
     data: JSON.parse(JSON.stringify(journeyData(src)))
