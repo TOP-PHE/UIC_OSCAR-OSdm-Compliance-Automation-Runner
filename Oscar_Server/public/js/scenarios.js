@@ -361,7 +361,7 @@ async function refreshAllSections() {
   try {
     const dfRes = await fetch('/v1/company/datafile', {});
     if (dfRes.ok) datafile = await dfRes.json();
-  } catch(e) {}
+  } catch { /* known gap, #534: a failed load is treated like "no datafile yet" */ }
 
   if (datafile) {
     state = datafile;
@@ -1133,7 +1133,7 @@ async function extractFromDatafile(datafile) {
     try {
       const exRes = await fetch('/v1/company/test-resources', {});
       if (exRes.ok) existingResources = await exRes.json();
-    } catch(_) {}
+    } catch { /* known gap, #534: on a failed load no train is treated as existing */ }
 
     const existingTrains = existingResources.filter(r => r.resource_type === 'TRAIN').map(r => {
       const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
@@ -3700,7 +3700,7 @@ function renderWizardStep2() {
     try {
       const raw = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
       return (raw.offerProbe && Array.isArray(raw.offerProbe.findings)) ? raw.offerProbe : null;
-    } catch (_e) { return null; }
+    } catch { return null; }
   };
   const probeWarnings = [];
   trains.forEach(t => {
@@ -4455,7 +4455,7 @@ async function refreshPlacesStatus() {
       el.textContent = `${b.place_count} place(s) cached${b.cached_at ? ' · ' + placesAgo(b.cached_at) : ''}`;
       el.style.color = '#90a4ae';
     }
-  } catch (_) { el.textContent = ''; }
+  } catch { el.textContent = ''; }
 }
 
 // Compact "x ago" for the cache timestamp. Server stores UTC "YYYY-MM-DD HH:MM:SS".
@@ -4568,7 +4568,7 @@ function attachPlaceAutocomplete(input) {
       items = Array.isArray(b.places) ? b.places : [];
       active = -1;
       render();
-    } catch (_) { removeBox(); }
+    } catch { removeBox(); }
   }
 
   input.addEventListener('input', () => {
@@ -5732,7 +5732,7 @@ async function wizGenerateScenario() {
     try {
       const dfRes = await fetch('/v1/company/datafile', {});
       if (dfRes.ok) dataFile = await dfRes.json();
-    } catch(_) {}
+    } catch { /* known gap, #534: a failed load is treated like "no datafile yet" */ }
 
     if (!dataFile) {
       dataFile = {

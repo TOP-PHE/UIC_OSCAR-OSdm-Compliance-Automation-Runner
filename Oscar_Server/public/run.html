@@ -244,7 +244,9 @@ async function loadProfile() {
         dfEl.innerHTML = '<span class="badge badge-warn">⚠ File missing on server</span>';
         warnings.push('Test Configuration file is missing on the server — go to <a href="/scenarios.html">Test Config</a> to re-upload.');
       }
-    } catch(_) {
+    } catch {
+      // The file exists but could not be read from here. The server reads it
+      // itself at run time, so the run is not blocked.
       dfEl.innerHTML = `<span class="badge badge-warn">Uploaded ${parseServerTs(c.datafile_updated_at).toLocaleString()}</span>`;
       dfEl.classList.remove('missing');
       testReady = true;

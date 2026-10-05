@@ -566,6 +566,7 @@ async function loadRuns() {
     applyDefaultSelection();
     renderRunsList();
   } catch (e) {
+    console.error('Loading the run list failed:', e);
     document.getElementById('runs-list').innerHTML = '<div class="empty">Failed to load runs.</div>';
   }
 }
@@ -735,6 +736,7 @@ async function generateReport() {
     reportData = await res.json();
     renderReport();
   } catch (e) {
+    console.error('Generating the report failed:', e);
     alert('Network error generating report.');
   }
   btn.disabled = false;

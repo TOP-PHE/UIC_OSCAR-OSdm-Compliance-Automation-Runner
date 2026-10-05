@@ -209,7 +209,7 @@ async function doLogin(e) {
     localStorage.setItem('oscar_company', JSON.stringify(data.company));
     localStorage.setItem('oscar_user', JSON.stringify(data.user));
     window.location.href = '/welcome.html';
-  } catch(err) { showError('Server unreachable. Is OSCAR running?'); }
+  } catch(err) { console.error('Sign-in failed:', err); showError('Server unreachable. Is OSCAR running?'); }
   finally { btn.disabled = false; btn.textContent = 'Sign In'; }
 }
 
@@ -244,7 +244,7 @@ async function doRegister(e) {
       devLink.textContent = data.verificationUrl;
       devBlock.style.display = 'block';
     }
-  } catch(err) { showError('Server unreachable. Is OSCAR running?'); }
+  } catch(err) { console.error('Registration request failed:', err); showError('Server unreachable. Is OSCAR running?'); }
   finally { btn.disabled = false; btn.textContent = 'Send Confirmation Email'; }
 }
 

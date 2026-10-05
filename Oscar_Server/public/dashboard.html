@@ -796,7 +796,7 @@ async function pollQueueInfo() {
       </div>`;
     }).join('');
     document.getElementById('qi-runs').innerHTML = rows;
-  } catch(_) {}
+  } catch { /* optional panel: a failure here is not shown to the user */ }
 }
 setInterval(pollQueueInfo, 3000);
 pollQueueInfo();

@@ -758,7 +758,7 @@ async function loadAssertions() {
       domSel.appendChild(o);
     });
     renderAssertions();
-  } catch(_) {}
+  } catch { /* optional card: a failure to load it is not shown to the user */ }
 }
 
 // Two-level collapse: suite (main area) → request (endpoint) → assertions.
@@ -901,7 +901,7 @@ async function loadRequests() {
     }
     document.getElementById('requests-card').style.display = 'block';
     renderRequests();
-  } catch (_) {}
+  } catch { /* optional card: a failure here is not shown to the user */ }
 }
 
 function renderRequests() {
@@ -989,7 +989,8 @@ function renderMessage(label, meta, body, opts) {
       const parsed = JSON.parse(body);
       pretty = JSON.stringify(parsed, null, 2);
       parsedOk = true;
-    } catch (_) {
+    } catch {
+      // Not JSON: show the body as received.
       pretty = body;
     }
   }
@@ -1123,7 +1124,8 @@ async function loadRequestBodies(reqId, bodyEl) {
           Object.assign({ kind: 'response',
             headersHtml: renderHeadersBlock('Response headers', r.response_headers) }, msgOpts))
       + '</div>';
-  } catch (_) {
+  } catch (e) {
+    console.error('Loading the message failed:', e);
     bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';
   }
 }
