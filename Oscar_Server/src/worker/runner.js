@@ -459,7 +459,7 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     // hook resolves any {{var}} templates in the values). Escape backslashes
     // then double-quotes so the JSON survives inside a YAML double-quoted
     // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
-    const safeEh = JSON.stringify(extraHeaders).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', '\\"');
     lines.push(`  - name: __extraHeaders`);
     lines.push(`    value: "${safeEh}"`);
   }
@@ -942,7 +942,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // We always prefer (A) — it is the rich incremental report. We identify it by
   // excluding the exact {prefix}_Report.html name (which is mergeReport.js output).
 
-  const dateStr  = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const dateStr  = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const envShort = envName.replace(/^OTST_/i, '').replace(/_Env$/i, '');
   const prefix   = `${dateStr}_${envShort}`;
   const mergeReportName = `${prefix}_Report.html`;   // mergeReport.js exact output name

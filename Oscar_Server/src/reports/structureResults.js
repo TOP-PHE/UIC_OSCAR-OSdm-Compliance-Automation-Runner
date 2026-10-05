@@ -345,7 +345,7 @@ function extractStructuredResults(runId, companyId) {
   const suiteMap = new Map(); // "<scenario>||<suite>" → { scenario, suite, entries: [] }
 
   for (const entry of results) {
-    const pathStr = (entry.path || entry.test?.filename || '').replace(/\\/g, '/');
+    const pathStr = (entry.path || entry.test?.filename || '').replaceAll('\\', '/');
     const parts = pathStr.split('/').filter(Boolean);
     const suite    = parts.length >= 2 ? parts[parts.length - 2] : '(root)';
     // Prefer a real grandparent folder (rare for OSDM) but fall back to the

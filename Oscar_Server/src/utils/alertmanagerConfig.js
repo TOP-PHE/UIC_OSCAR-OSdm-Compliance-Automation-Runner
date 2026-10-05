@@ -43,7 +43,7 @@ const RELOAD_URL  = process.env.ALERTMANAGER_RELOAD_URL  || 'http://alertmanager
  * Safe for arbitrary user input — no template injection possible.
  */
 function yq(s) {
-  return "'" + String(s == null ? '' : s).replace(/'/g, "''") + "'";
+  return "'" + String(s == null ? '' : s).replaceAll("'", "''") + "'";
 }
 
 /**
