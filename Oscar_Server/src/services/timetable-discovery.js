@@ -483,7 +483,7 @@ function groupAndMerge(harvested, existing, catalog) {
     }
 
     // Existing set with the SAME route + calendar — merge non-destructively.
-    const data = JSON.parse(JSON.stringify(existingRes.data || {}));
+    const data = structuredClone(existingRes.data || {});
     if (!Array.isArray(data.services)) data.services = [];
     const seen = new Set(data.services.map(serviceKey));
     let addedHere = 0;

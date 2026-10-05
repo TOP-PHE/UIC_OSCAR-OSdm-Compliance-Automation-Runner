@@ -53,14 +53,9 @@ function refundContext(entry) {
   };
 }
 
+// An exchange-offer request carries the same overrule fields as a refund one.
 function exchangeContext(entry) {
-  const body = parseBody(entry);
-  if (!body) return null;
-  const overrule = body.overruleCode || body.reasonCode || null;
-  return {
-    mode: overrule ? 'reason-code' : 'voluntary',
-    overruleCode: overrule || null,
-  };
+  return refundContext(entry);
 }
 
 function offerContext(entry) {

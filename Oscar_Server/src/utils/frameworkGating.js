@@ -194,7 +194,7 @@ function annotateDatafile(datafile, framework) {
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
       count++;
-    } else if (Object.prototype.hasOwnProperty.call(sc, '__featureNotDeclaredWarnings')) {
+    } else if (Object.hasOwn(sc, '__featureNotDeclaredWarnings')) {
       delete sc.__featureNotDeclaredWarnings;
     }
   }

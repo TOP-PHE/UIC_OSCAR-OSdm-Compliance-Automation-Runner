@@ -608,7 +608,7 @@ function _safeAlter(sql) {
     }
   }
   if (applied === 0) {
-    const top = MIGRATIONS.length > 0 ? MIGRATIONS[MIGRATIONS.length - 1].version : current;
+    const top = MIGRATIONS.length > 0 ? MIGRATIONS.at(-1).version : current;
     console.log(`[db] schema up to date (version ${Math.max(current, top)})`);
   }
 })();
