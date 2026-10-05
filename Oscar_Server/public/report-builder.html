@@ -860,10 +860,10 @@ function coalesceJsonBlocks(events) {
 function jsonBlockLabel(opener) {
   var s = (opener.message || '').trim();
   // Explicit marker wins.
-  var m = s.match(/^\[JSON:([^\]]+)\]\s*(.*)$/);
+  var m = /^\[JSON:([^\]]+)\]\s*(?:\S.*)?$/.exec(s);
   if (m) return m[1];
   // Otherwise take the text before the colon/brace as the label.
-  m = s.match(/^([^:\{\[]+)[:=]?\s*[\{\[]/);
+  m = /^([^:{[]+)(?::\s*)?[{[]/.exec(s);
   if (m) return m[1].trim();
   return 'object';
 }
@@ -1693,7 +1693,7 @@ function _rbSanitiseFilename(s) {
   return String(s == null ? '' : s)
     .replace(/[\\\/:*?"<>|\s]+/g, '_')
     .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/^_|_$/g, '');   // one at most after the collapse above
 }
 function downloadJsonContent(btn) {
   var targetId = btn.getAttribute('data-download-target');

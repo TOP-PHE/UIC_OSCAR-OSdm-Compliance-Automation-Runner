@@ -3650,7 +3650,7 @@ function fwAddCustomAncillary() {
   const input = document.getElementById('fw-custom-ancillary');
   if (!input) return;
   // Normalise to an UPPER_SNAKE code (OSDM AncillaryType is a string code list).
-  const code = (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  const code = trimUnderscores((input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_'));
   if (!code) return;
   const fw = wizData.framework;
   if (!Array.isArray(fw.ancillaries)) fw.ancillaries = [];
@@ -5573,7 +5573,16 @@ function wizNormaliseCustomCode(raw) {
     .toUpperCase()
     .replace(/[^A-Z0-9_]+/g, '_')
     .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/^_|_$/g, '');   // one at most after the collapse above
+}
+
+// Strip leading and trailing underscores in one pass each.
+function trimUnderscores(s) {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === '_') start++;
+  while (end > start && s[end - 1] === '_') end--;
+  return s.slice(start, end);
 }
 
 function wizGenCode() {
