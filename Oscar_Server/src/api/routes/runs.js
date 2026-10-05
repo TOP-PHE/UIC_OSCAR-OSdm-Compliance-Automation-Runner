@@ -65,7 +65,7 @@ const runSubmitLimiter = rateLimit({
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const DELETION_STATUSES = ['DELETION_REQUESTED', 'DELETED_BY_ADMIN'];
+const DELETION_STATUSES = new Set(['DELETION_REQUESTED', 'DELETED_BY_ADMIN']);
 
 // The status a delete leaves a run in depends on who deletes it.
 function deletionStatusFor(isAdmin, isTestManager) {
@@ -461,7 +461,7 @@ router.post('/bulk-delete', (req, res) => {
         continue;
       }
     }
-    if (DELETION_STATUSES.includes(runRow.status)) {
+    if (DELETION_STATUSES.has(runRow.status)) {
       skipped.push({ id, reason: `Run is already in deletion state (${runRow.status})` });
       continue;
     }
@@ -508,7 +508,7 @@ const ADMIN_ACTION_HANDLERS = {
     return { newStatus: 'DELETED', previousStatus: runRow.status };
   },
   restore: (runRow) => {
-    if (!DELETION_STATUSES.includes(runRow.status)) return { skip: true, reason: `Run is ${runRow.status} — only DELETION_REQUESTED or DELETED_BY_ADMIN can be restored` };
+    if (!DELETION_STATUSES.has(runRow.status)) return { skip: true, reason: `Run is ${runRow.status} — only DELETION_REQUESTED or DELETED_BY_ADMIN can be restored` };
     return { newStatus: inferRestoreStatus(runRow), previousStatus: runRow.status };
   },
 };
@@ -554,7 +554,7 @@ router.post('/bulk-admin-action', (req, res) => {
           // Permanent — also clean up comparisons
           dbRun('DELETE FROM report_comparisons WHERE run_a_id = ? OR run_b_id = ?', [id, id]);
           dbRun(`UPDATE runs SET status = 'DELETED' WHERE id = ?`, [id]);
-        } else if (DELETION_STATUSES.includes(previousStatus)) {
+        } else if (DELETION_STATUSES.has(previousStatus)) {
           // Restore: clear deletion tracking fields
           dbRun(
             `UPDATE runs SET status = ?, deleted_by = NULL, previous_status = NULL WHERE id = ?`,
@@ -1224,7 +1224,7 @@ router.delete('/:id', (req, res) => {
     }
     dbRun(`UPDATE runs SET status = 'CANCELLED', completed_at = datetime('now') WHERE id = ?`, [req.params.id]);
   }
-  if (DELETION_STATUSES.includes(runRow.status)) {
+  if (DELETION_STATUSES.has(runRow.status)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: `Run is already in deletion state (${runRow.status}).` });
   }
   if (!isElevated && runRow.user_id !== req.user.id) {
