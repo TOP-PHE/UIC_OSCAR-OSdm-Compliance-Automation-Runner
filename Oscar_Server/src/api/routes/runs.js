@@ -91,7 +91,7 @@ function trimDashDot(s) {
 
 function parseUtcTs(s) {
   if (!s) return Number.NaN;
-  if (/Z$/.test(s) || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
+  if (String(s).endsWith('Z') || /[+-]\d\d:?\d\d$/.test(s)) return new Date(s).getTime();
   return new Date(String(s).replace(' ', 'T') + 'Z').getTime();
 }
 function isRunStale(runRow) {

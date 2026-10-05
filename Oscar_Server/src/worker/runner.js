@@ -511,7 +511,7 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
     // hook resolves any {{var}} templates in the values). Escape backslashes
     // then double-quotes so the JSON survives inside a YAML double-quoted
     // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
-    const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', '\\"');
+    const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', String.raw`\"`);
     lines.push(`  - name: __extraHeaders`, `    value: "${safeEh}"`);
   }
   return lines.join('\n') + '\n';
