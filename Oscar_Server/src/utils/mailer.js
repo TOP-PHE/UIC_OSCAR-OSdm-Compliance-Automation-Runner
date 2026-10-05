@@ -29,7 +29,7 @@ function isSmtpConfigured() {
 function createTransport() {
   return nodemailer.createTransport({
     host:   getConfig('SMTP_HOST', ''),
-    port:   parseInt(getConfig('SMTP_PORT', '587'), 10),
+    port:   Number.parseInt(getConfig('SMTP_PORT', '587'), 10),
     secure: getConfig('SMTP_SECURE', 'false') === 'true',
     auth: {
       user: getConfig('SMTP_USER', ''),
@@ -122,7 +122,7 @@ async function sendVerificationEmail({ to, companyName, verificationUrl }) {
 }
 
 function escHtml(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 /**

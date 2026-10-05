@@ -21,13 +21,20 @@ const log = require('./logger').child({ module: 'osdm-client' });
 
 const DEFAULT_TIMEOUT_MS = 20000;
 
+/** Remove every trailing "/" in a single pass. */
+function stripTrailingSlashes(s) {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+}
+
 /**
  * GET {apiBase}/{path}. Returns { ok, status, json, text } and never throws on
  * a non-2xx — the caller decides how to handle it. Throws only on
  * network/timeout errors (AbortError on timeout), same as fetch.
  */
 async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
-  const base = String(apiBase).replace(/\/+$/, '');
+  const base = stripTrailingSlashes(String(apiBase));
   const rel  = String(path).replace(/^\/+/, '');
   const url  = `${base}/${rel}`;
   const controller = new AbortController();
@@ -58,8 +65,8 @@ async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFA
  */
 function buildTesterHeaders(userRow) {
   const headers = {};
-  try { const r = userRow && userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) headers.Requestor = r; } catch (_) {}
-  try { const k = userRow && userRow.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) headers['Ocp-Apim-Subscription-Key'] = k; } catch (_) {}
+  try { const r = userRow?.requestor_enc ? decrypt(userRow.requestor_enc) : null; if (r) headers.Requestor = r; } catch { /* optional header: a value that will not decrypt is left out */ }
+  try { const k = userRow?.subscription_key_enc ? decrypt(userRow.subscription_key_enc) : null; if (k) headers['Ocp-Apim-Subscription-Key'] = k; } catch { /* optional header: a value that will not decrypt is left out */ }
   return headers;
 }
 
@@ -101,4 +108,4 @@ function mergeDedicatedHeaders(headers, companyRow, accessToken) {
   return headers;
 }
 
-module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, DEFAULT_TIMEOUT_MS };
+module.exports = { osdmGet, buildTesterHeaders, mergeDedicatedHeaders, stripTrailingSlashes, DEFAULT_TIMEOUT_MS };

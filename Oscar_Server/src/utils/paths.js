@@ -18,7 +18,7 @@
  * helpers makes that proof local and explicit.
  */
 
-const path = require('path');
+const path = require('node:path');
 
 // UUID v4 in the canonical 8-4-4-4-12 hex layout. We don't accept braces,
 // upper/lower mixing in the hyphens, or trailing garbage. Run IDs and

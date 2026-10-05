@@ -108,7 +108,7 @@ router.post('/users',
       .isLength({ min: 12, max: 200 }).withMessage('password must be 12–200 chars')
       .matches(/[A-Z]/).withMessage('password must include an uppercase letter')
       .matches(/[a-z]/).withMessage('password must include a lowercase letter')
-      .matches(/[0-9]/).withMessage('password must include a digit'),
+      .matches(/\d/).withMessage('password must include a digit'),
     v.body('role').isString().withMessage('role is required')
       .isIn([...ALLOWED_ROLES, 'admin', 'member']).withMessage('role must be a recognised value'),
     v.body('company_id').optional({ values: 'falsy' }).isString()
@@ -298,7 +298,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
   if (!new_password || new_password.length < 12) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'new_password is required (min 12 chars).' });
   }
-  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password)) {
+  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/\d/.test(new_password)) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Password must contain uppercase, lowercase, and a digit.' });
   }
 
@@ -637,7 +637,7 @@ router.patch('/config', (req, res) => {
     let value;
     if (schema.type === 'number') {
       value = Number(rawValue);
-      if (isNaN(value)) {
+      if (Number.isNaN(value)) {
         errors.push(`${key}: must be a number`);
         continue;
       }
@@ -645,7 +645,7 @@ router.patch('/config', (req, res) => {
       if (schema.max != null && value > schema.max) { errors.push(`${key}: maximum is ${schema.max}`); continue; }
     } else if (schema.type === 'enum') {
       value = String(rawValue || '');
-      if (!schema.options || !schema.options.includes(value)) {
+      if (!schema.options?.includes(value)) {
         errors.push(`${key}: must be one of ${(schema.options || []).join(', ')}`);
         continue;
       }
@@ -679,7 +679,8 @@ router.patch('/config', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: errors.join('; ') });
   }
 
-  auditLog(req.user.id, null, req.user.email, `config_updated:${updated.map(u => `${u.key}=${u.value}`).join(',')}`);
+  const changes = updated.map(u => `${u.key}=${u.value}`).join(',');
+  auditLog(req.user.id, null, req.user.email, `config_updated:${changes}`);
 
   // Return the full config after update
   const config = {};
@@ -709,7 +710,7 @@ router.post('/alertmanager/apply', async (req, res) => {
 // ── POST /v1/admin/rotate-jwt-secret — invalidate all sessions ───────────────
 // Generates a new JWT secret in the DB. All currently issued tokens become
 // invalid immediately. Use after suspected token leak or scheduled rotation.
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 router.post('/rotate-jwt-secret', (req, res) => {
   const newSecret = crypto.randomBytes(32).toString('hex');
   run(
@@ -737,7 +738,7 @@ const testEmailLimiter = rateLimit({
   max: 6,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `test-email:${req.user && req.user.id}`,
+  keyGenerator: (req) => `test-email:${req.user?.id}`,
   message: { status: 429, title: 'Too Many Requests', detail: 'Test-email rate limit: 6 per 5 minutes per admin.' }
 });
 

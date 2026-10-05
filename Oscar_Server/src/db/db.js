@@ -13,9 +13,9 @@
  * No native compilation required — works on any platform with Node 22+.
  */
 
-const path   = require('path');
-const fs     = require('fs');
-const crypto = require('crypto');
+const path   = require('node:path');
+const fs     = require('node:fs');
+const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
@@ -580,7 +580,7 @@ const MIGRATIONS = [
 function _safeAlter(sql) {
   try { db.exec(sql); }
   catch (e) {
-    const msg = String(e && e.message || '');
+    const msg = String(e?.message || '');
     const benign = /duplicate column name|already exists/i.test(msg);
     if (!benign) throw e;
   }
@@ -590,7 +590,7 @@ function _safeAlter(sql) {
   // Read the highest version already applied. The bare schema.sql seeds
   // version=1 (base tables present), so a brand-new DB starts there.
   const row = db.prepare('SELECT MAX(version) AS v FROM schema_version').get();
-  const current = (row && row.v) || 0;
+  const current = row?.v || 0;
   const insertVersion = db.prepare(
     "INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (?, datetime('now'))"
   );
@@ -608,7 +608,7 @@ function _safeAlter(sql) {
     }
   }
   if (applied === 0) {
-    const top = MIGRATIONS.length > 0 ? MIGRATIONS[MIGRATIONS.length - 1].version : current;
+    const top = MIGRATIONS.length > 0 ? MIGRATIONS.at(-1).version : current;
     console.log(`[db] schema up to date (version ${Math.max(current, top)})`);
   }
 })();

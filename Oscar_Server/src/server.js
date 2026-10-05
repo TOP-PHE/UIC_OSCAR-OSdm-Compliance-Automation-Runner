@@ -18,9 +18,9 @@
 const express = require('express');
 const cors    = require('cors');
 const helmet  = require('helmet');
-const path    = require('path');
-const fs      = require('fs');
-const crypto  = require('crypto');
+const path    = require('node:path');
+const fs      = require('node:fs');
+const crypto  = require('node:crypto');
 const dotenv  = require('dotenv');
 
 const ENV_PRIMARY  = path.resolve(__dirname, '../oscar-server.env');
@@ -324,7 +324,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   if (!filePath.startsWith(DATAFILES_DIR + path.sep)) {
     return res.status(400).send('Bad request');
   }
-  const fs = require('fs');
+  const fs = require('node:fs');
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
   let plaintext;
   try {
@@ -387,7 +387,7 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ access_token: accessToken, forced: force });
   } catch (err) {
-    const detail = err && err.message ? err.message : String(err);
+    const detail = err?.message ? err.message : String(err);
     log.error({ runId, err: detail }, '[refresh-access-token] resolveAccessToken failed');
     return res.status(502).json({ status: 502, title: 'Bad Gateway', detail: `Token refresh failed: ${detail}` });
   }
@@ -431,7 +431,7 @@ app.get('/artifacts/:runId/:filename', fileDownloadLimiter, (req, res) => {
   if (!filePath.startsWith(ARTIFACTS_DIR + path.sep)) {
     return res.status(400).send('Bad request');
   }
-  const fs = require('fs');
+  const fs = require('node:fs');
   if (!fs.existsSync(filePath)) return res.status(404).send('Not found');
 
   // Phase 2 of issue #60 (v1.11.0): files are encrypted at rest with the
@@ -504,7 +504,7 @@ app.use('/v1/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
 // Useful for Docker/k8s liveness/readiness probes.
 app.get('/health', (req, res) => {
   const queue_ = require('./worker/queue');
-  const fs2 = require('fs');
+  const fs2 = require('node:fs');
   const checks = {};
   let overallOk = true;
 
@@ -541,7 +541,8 @@ app.get('/health', (req, res) => {
     } else {
       checks.disk = { ok: true, status: 'not_checked' };
     }
-  } catch (_e) {
+  } catch {
+    // A failed disk check is reported, but it does not fail the health check.
     checks.disk = { ok: true, status: 'check_failed_non_critical' };
   }
 
@@ -618,7 +619,7 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-const PORT = parseInt(process.env.PORT || '3001', 10);
+const PORT = Number.parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, () => {
   log.info({ port: PORT, collection: process.env.COLLECTION_PATH, bru: process.env.BRU_CMD, dataDir: DATAFILES_DIR },
     'OSCAR — OSDM Conformance Automation Runner started');

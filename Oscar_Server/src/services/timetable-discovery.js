@@ -122,7 +122,7 @@ function harvestTrips(resp, opts) {
   const trips = (resp && Array.isArray(resp.trips)) ? resp.trips : [];
   for (const trip of trips) {
     const legs = (trip && Array.isArray(trip.legs)) ? trip.legs : [];
-    const timed = legs.map(l => l && l.timedLeg).filter(Boolean);
+    const timed = legs.map(l => l?.timedLeg).filter(Boolean);
     timed.forEach((tl, idx) => {
       const svc = tl.service || {};
       const pc = svc.productCategory || {};
@@ -130,8 +130,8 @@ function harvestTrips(resp, opts) {
       const carrier = (Array.isArray(svc.carriers) && svc.carriers.length) ? svc.carriers[0] : null;
       const start = tl.start || {};
       const end = tl.end || {};
-      const dep = start.serviceDeparture && start.serviceDeparture.timetabledTime;
-      const arr = end.serviceArrival && end.serviceArrival.timetabledTime;
+      const dep = start.serviceDeparture?.timetabledTime;
+      const arr = end.serviceArrival?.timetabledTime;
       let originURN = _stopRef(start);
       let destinationURN = _stopRef(end);
       // Substitute the searched O&D at the route endpoints (first/last leg).
@@ -317,18 +317,21 @@ function classifyOfferProbe(resp) {
     const echo = []
       .concat(Array.isArray(resp.warnings) ? resp.warnings : [], Array.isArray(resp.problems) ? resp.problems : [])
       .map(w => w && (w.code || w.title)).filter(Boolean).slice(0, 3);
+    const explanation = echo.length
+      ? ' (provider says: ' + echo.join('; ') + ')'
+      : ', no warning/problem explains why';
     return {
       offers: 0, trips, classes: [], flexibilities: [],
       finding: trips > 0
-        ? ('trip(s) found but offers[] empty' + (echo.length ? ' (provider says: ' + echo.join('; ') + ')' : ', no warning/problem explains why'))
+        ? 'trip(s) found but offers[] empty' + explanation
         : 'no trip and no offer on this date'
     };
   }
   const classes = new Set(); const flex = new Set();
   for (const o of resp.offers) {
-    const tc = o.travelClass || (o.offerSummary && o.offerSummary.overallTravelClass);
+    const tc = o.travelClass || o.offerSummary?.overallTravelClass;
     if (typeof tc === 'string' && tc) classes.add(tc.toUpperCase());
-    const fl = (o.offerSummary && o.offerSummary.overallFlexibility) || o.flexibility;
+    const fl = o.offerSummary?.overallFlexibility || o.flexibility;
     if (typeof fl === 'string' && fl) flex.add(fl.toUpperCase());
   }
   return { offers: resp.offers.length, trips, classes: [...classes], flexibilities: [...flex], finding: null };
@@ -480,7 +483,7 @@ function groupAndMerge(harvested, existing, catalog) {
     }
 
     // Existing set with the SAME route + calendar — merge non-destructively.
-    const data = JSON.parse(JSON.stringify(existingRes.data || {}));
+    const data = structuredClone(existingRes.data || {});
     if (!Array.isArray(data.services)) data.services = [];
     const seen = new Set(data.services.map(serviceKey));
     let addedHere = 0;

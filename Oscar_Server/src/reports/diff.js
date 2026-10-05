@@ -23,8 +23,8 @@
  *   UNCHANGED_FAIL    — same result (fail) in both
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { safeJoinUuid } = require('../utils/paths');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
@@ -57,10 +57,10 @@ function parseResults(runId) {
   const raw = JSON.parse(decryptFromFile(jsonPath).toString('utf8'));
 
   // Handle Bruno CLI v1 / v2 output format variations
-  const results = Array.isArray(raw)             ? raw
-                : Array.isArray(raw.results)     ? raw.results
-                : Array.isArray(raw.testResults) ? raw.testResults
-                : [];
+  let results = [];
+  if (Array.isArray(raw))                  results = raw;
+  else if (Array.isArray(raw.results))     results = raw.results;
+  else if (Array.isArray(raw.testResults)) results = raw.testResults;
 
   const map = {};
 
@@ -70,7 +70,7 @@ function parseResults(runId) {
     const reqKey = `${suite}|${file}`;
 
     // Skip auth/token requests
-    const url  = ((entry.request && entry.request.url) || '').toLowerCase();
+    const url  = (entry.request?.url || '').toLowerCase();
     const name = reqKey.toLowerCase();
     if (/\/(token|login|auth|logon|oauth)/.test(url) || /access.?token/i.test(name)) return;
 

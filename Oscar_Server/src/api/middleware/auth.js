@@ -97,7 +97,9 @@ function requireAuth(req, res, next) {
       role:      normalizedRole
     };
     next();
-  } catch (_err) {
+  } catch {
+    // Fail closed: a bad signature, an expired token or a failed blacklist
+    // lookup all end as 401.
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid or expired token.' });
   }
 }
@@ -158,7 +160,8 @@ function userFromRequest(req) {
       companyId: payload.companyId,
       role:      normalizeRole(payload.role),
     };
-  } catch (_err) {
+  } catch {
+    // Fail closed, like requireAuth: a token that cannot be verified is no user.
     return null;
   }
 }
