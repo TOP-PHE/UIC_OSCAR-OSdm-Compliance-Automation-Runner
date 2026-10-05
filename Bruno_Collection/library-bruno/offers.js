@@ -153,7 +153,7 @@ function ensureAuthorizationOr403() {
 
   function resolveVars(str) {
     if (!str) return str;
-    return String(str).replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+    return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
       const v = bru.getEnvVar(varName);
       return v == null ? '' : String(v);
     });

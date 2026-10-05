@@ -162,7 +162,7 @@ function swaggerSchemaValidator({ schema, requestHeaders, requestBody, responseH
 
     let matchedPath = null;
     for (let path of pathList) {
-      const regex = new RegExp("^" + path.replace(/{[^}]+}/g, "[^/]+") + "$");
+      const regex = new RegExp("^" + path.replace(/{[^{}]+}/g, "[^/]+") + "$");
       if (regex.test(urlParts)) {
         matchedPath = path;
         break;
