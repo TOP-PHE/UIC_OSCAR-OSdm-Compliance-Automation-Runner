@@ -324,22 +324,59 @@ async function loadDatafile() {
   }
 }
 
+// ── Loading what a save could overwrite (#534) ───────────────────────────────
+// A failed load must never look like "nothing there yet": whatever the page
+// then lets the user save would replace what the server holds. Only a 404 means
+// the company really has none; the datafile and the Test Framework answer that.
+// Every other outcome (no network, 403, 429, 500, an unreadable body) is
+// reported as failed, with a sentence the caller can show as it is.
+async function loadForEdit(url, what) {
+  let res;
+  try {
+    res = await fetch(url, {});
+  } catch (e) {
+    return { state: 'failed', reason: `${what} could not be loaded: the server could not be reached (${e.message}).` };
+  }
+  if (res.status === 404) return { state: 'none' };
+  if (res.status === 401) return { state: 'signedOut' };
+  if (!res.ok) return { state: 'failed', reason: `${what} could not be loaded: the server answered ${res.status}.` };
+  let value;
+  try {
+    value = await res.json();
+  } catch (e) {
+    return { state: 'failed', reason: `${what} could not be loaded: the answer could not be read (${e.message}).` };
+  }
+  if (value === null || typeof value !== 'object') {
+    return { state: 'failed', reason: `${what} could not be loaded: the answer was not what was expected.` };
+  }
+  return { state: 'loaded', value };
+}
+
 // ── Refresh all three sections from server ───────────────────────────────────
 async function refreshAllSections() {
-  // Fetch framework, resources, company profile in parallel
-  const [fwRes, resRes, companyRes] = await Promise.all([
-    fetch('/v1/company/test-framework', {}).catch(()=>null),
-    fetch('/v1/company/test-resources',  {}).catch(()=>null),
+  // Framework, resources and company profile in parallel, then the datafile.
+  // #534: every load is checked before anything on the page is replaced.
+  const [fwLoad, resLoad, companyRes] = await Promise.all([
+    loadForEdit('/v1/company/test-framework', 'The Test Framework'),
+    loadForEdit('/v1/company/test-resources', 'The test data'),
     fetch('/v1/company',                 {}).catch(()=>null)
   ]);
 
   // Check for auth failure
-  if (fwRes && fwRes.status === 401) { logout(); return; }
+  if (fwLoad.state === 'signedOut' || resLoad.state === 'signedOut') { logout(); return; }
+
+  const dfLoad = await loadForEdit('/v1/company/datafile', 'The test configuration');
+  if (dfLoad.state === 'signedOut') { logout(); return; }
+
+  const failedLoad = [fwLoad, resLoad, dfLoad].find(l => l.state === 'failed');
+  if (failedLoad) {
+    throw new Error(`${failedLoad.reason} The page was not refreshed, so that a save cannot overwrite what the server holds. Reload the page to try again.`);
+  }
 
   // Framework
   let framework = null;
-  if (fwRes && fwRes.ok) {
-    const fwBody = await fwRes.json();
+  if (fwLoad.state === 'loaded') {
+    const fwBody = fwLoad.value;
     let cfg = fwBody && fwBody.config;
     if (cfg && cfg.config && typeof cfg.config === 'object' && !Array.isArray(cfg.config)) {
       cfg = cfg.config;
@@ -349,19 +386,14 @@ async function refreshAllSections() {
   wizData.framework = framework || emptyFramework();
 
   // Resources
-  let resources = [];
-  if (resRes && resRes.ok) resources = await resRes.json();
+  const resources = resLoad.state === 'loaded' ? resLoad.value : [];
   wizData.resources = resources;
 
   // Company profile
   if (companyRes && companyRes.ok) wizProfile = await companyRes.json();
 
   // Datafile
-  let datafile = null;
-  try {
-    const dfRes = await fetch('/v1/company/datafile', {});
-    if (dfRes.ok) datafile = await dfRes.json();
-  } catch { /* known gap, #534: a failed load is treated like "no datafile yet" */ }
+  const datafile = dfLoad.state === 'loaded' ? dfLoad.value : null;
 
   if (datafile) {
     state = datafile;
@@ -1128,12 +1160,15 @@ async function extractFromDatafile(datafile) {
     }).catch(() => {});
 
     // d) Save each train resource — skip duplicates
-    // Fetch existing resources to compare
-    let existingResources = [];
-    try {
-      const exRes = await fetch('/v1/company/test-resources', {});
-      if (exRes.ok) existingResources = await exRes.json();
-    } catch { /* known gap, #534: on a failed load no train is treated as existing */ }
+    // Fetch existing resources to compare. #534: if that list cannot be loaded,
+    // duplicates cannot be told apart, so no train is added and the user is told.
+    const exLoad = await loadForEdit('/v1/company/test-resources', 'The existing test data');
+    if (exLoad.state === 'failed' || exLoad.state === 'signedOut') {
+      const why = exLoad.state === 'failed' ? exLoad.reason : 'The session has expired.';
+      oscarToast(`${why} The trains in the uploaded file were not added to Test Data. Upload the file again to add them.`, 'warning');
+      return;
+    }
+    const existingResources = exLoad.state === 'loaded' ? exLoad.value : [];
 
     const existingTrains = existingResources.filter(r => r.resource_type === 'TRAIN').map(r => {
       const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
@@ -5733,11 +5768,15 @@ async function wizGenerateScenario() {
     const code = wizGenCode();
 
     // ── 1. Load existing data file first (needed to compute sequential integer IDs) ──
-    let dataFile = null;
-    try {
-      const dfRes = await fetch('/v1/company/datafile', {});
-      if (dfRes.ok) dataFile = await dfRes.json();
-    } catch { /* known gap, #534: a failed load is treated like "no datafile yet" */ }
+    // #534: a fresh file is started only when the server says there is none (404).
+    // After any other failure the scenario is not generated: saving it would
+    // replace the stored file with one that holds this scenario alone.
+    const dfLoad = await loadForEdit('/v1/company/datafile', 'The test configuration');
+    if (dfLoad.state === 'signedOut') { logout(); return; }
+    if (dfLoad.state === 'failed') {
+      throw new Error(`${dfLoad.reason} The scenario was not generated, so that the stored configuration is not overwritten. Reload the page and try again.`);
+    }
+    let dataFile = dfLoad.state === 'loaded' ? dfLoad.value : null;
 
     if (!dataFile) {
       dataFile = {

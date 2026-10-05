@@ -14,20 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.200] — 2026-10-05
+## [server-1.11.202] — 2026-10-05
 
 ### Changed
 
 - **Sonar code-smell clean-up, part 2 of 5: "possible defect" findings in the
   browser UI.** Closes #525 together with the collection entry below; the
   series is tracked in #523. 36 findings in `Oscar_Server/public`, each read.
-  - **22 `catch` blocks no longer discard the error.** The 11 that tell the
-    user something failed (sign-in, registration, password reset, e-mail
+  - **22 `catch` blocks were read; 19 no longer discard the error.** The 11
+    that tell the user something failed (sign-in, registration, password reset, e-mail
     verification, admin load, report builder, message load) keep their
     message and now also log the error to the browser console: a bug inside
     the `try` block used to be indistinguishable from a network fault. The
-    other 11 are intended fallbacks or optional panels; the unused binding is
-    dropped and the reason is written down.
+    next 8 are intended fallbacks or optional panels; the unused binding is
+    dropped and the reason is written down. The last 3 are the failed-load
+    blocks rewritten in 1.11.201 (#534); this release does not touch them.
   - **8 regular expressions that could backtrack super-linearly** are
     rewritten or replaced by a loop: the admin slug, the wizard and ancillary
     codes, two file-name sanitisers, the run-artifact name, and the report
@@ -36,18 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **6 small logic findings:** an unused variable in `run.html` removed; two
     correct loops and a one-line helper in `scenarios.js` restyled.
 
-### Found, not fixed here
+### Found on the way
 
-- **#534: Test Config treats any failed datafile load as "no datafile yet"**
-  (network error, 500, 429, 403), and the scenario wizard then saves a fresh
-  file over the stored one. Found while reading the `catch` blocks; it needs
-  its own change. The three blocks involved are labelled with the issue number.
+- **#534: Test Config treated any failed datafile load as "no datafile yet"**
+  (network error, 500, 429, 403), and the scenario wizard then saved a fresh
+  file over the stored one. Found while reading the `catch` blocks, and fixed
+  separately in 1.11.201.
 
 ### Tests
 
 - New `tests/unit/ui-scripts.test.js`: every inline script and every
   `public/js` file is compiled, which nothing in CI did before, and the
-  rewritten page helpers run in a bare `vm` context. 62 new tests (1,608
+  rewritten page helpers run in a bare `vm` context. 62 new tests (1,655
   total); 13 deliberate breakages each fail at least one.
 
 ### Not verified
@@ -85,6 +86,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No run against a vendor sandbox was made: there are no vendor credentials on
   the development machine. The library's 12 unit-test files (345 tests) pass.
   One sale and one refund scenario after deployment are worth running.
+
+---
+
+## [server-1.11.201] — 2026-10-05
+
+### Fixed
+
+- **Test Config no longer treats a failed load as "nothing configured yet".**
+  Closes #534. The page read the datafile, the Test Framework and the test
+  data with "if the answer is OK, use it; otherwise assume there is none".
+  Only a 404 means none. A network fault, a 403, a 429 from the read rate
+  limiter or a 500 looked exactly the same, and the scenario wizard then built
+  an empty datafile, added the new scenario and saved it over the stored one.
+  For a Test Manager that save replaces the whole file.
+  - **Reproduced before fixing**, on a throwaway server with the previous page
+    code: 16 scenarios stored, one 429 injected on `GET /v1/company/datafile`,
+    *Generate & Add Scenario* pressed. The page reported success and the stored
+    datafile held 1 scenario.
+  - **One loader, `loadForEdit()`, for all three reads:** 404 is "none", 401
+    is "signed out", anything else is "failed" with a sentence the page shows.
+  - **Page load and every refresh** check all three loads before replacing
+    anything. On a failure the editor is not shown empty: the page stops with
+    the reason and keeps what it had.
+  - **The scenario wizard** does not generate after a failed load.
+  - **Upload import:** when the existing test data cannot be loaded, no train
+    is added (duplicates could not be told apart) and the user is told.
+
+### Verified
+
+- In a browser, against the same throwaway server with the fixed code: with a
+  429 on the datafile the page shows the error and keeps what it had in
+  memory; with a 429, a 500 and a network failure the wizard sends the one
+  `GET` and no write; with a healthy load it still adds the scenario.
+- 47 new tests in `tests/unit/scenarios-load-guard.test.js` (1,593 total).
+  They run the real functions from `public/js/scenarios.js` in a `vm` context
+  against a fake server. Putting back any of 8 pieces of the old behaviour
+  fails them.
+
+### Not covered
+
+- `run.html` still shows "File missing on server" for any failed read of the
+  datafile. It only displays; it does not write.
+- The server accepts the write as before. A check on the server that the
+  client saw the current file would be the stronger guard; it is not part of
+  this change.
 
 ---
 

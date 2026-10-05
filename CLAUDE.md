@@ -204,6 +204,29 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     browser is now `isReadOnlyForMe(sc)`. Some editor controls were never gated
     at all (e.g. the offer-criteria ticks), so the server is the authority, and
     the save confirmation tells the tester what it did not keep.
+- **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
+  Test Config read the datafile, the Test Framework and the test data with
+  `if (res.ok) use it`, and treated every other outcome as "none". A network
+  fault, a 429 from the read limiter or a 500 then looked like a new company,
+  and the scenario wizard saved a fresh file over the stored one: reproduced
+  on a throwaway server, 16 scenarios → 1 after a single injected 429. Rules
+  that came out of it:
+  - **Load through `loadForEdit(url, what)`** in `scenarios.js`. It returns
+    `loaded`, `none` (404), `signedOut` (401) or `failed` with a sentence the
+    page can show. Never write `if (res.ok) x = await res.json()` in front of
+    code that can save.
+  - **Check every load before replacing anything.** `refreshAllSections()`
+    throws on a failed load, before it touches `state` or `wizData`; all its
+    callers already show `e.message`. Keep that order when adding a read.
+  - **Anything that reads-then-writes must stop on `failed`**, as
+    `wizGenerateScenario()` now does. The server still accepts the write; a
+    server-side "the client saw the current file" check would be the stronger
+    guard and has not been built.
+  - **Page functions can be tested without a browser.**
+    `tests/unit/scenarios-load-guard.test.js` lifts the real functions out of
+    `scenarios.js` and runs them in a `vm` context with a fake `fetch` and
+    `document`. It only works for top-level functions laid out with `}` at
+    column 0, which is how the file is written.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -300,7 +323,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
 - **Sonar code-smell backlog: five behaviour-neutral PRs, tracked in #523**
   (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
   server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
-  findings in the UI and the Bruno library, is #525 (v1.11.200 /
+  findings in the UI and the Bruno library, is #525 (v1.11.202 /
   OTST_V2.0.101). The gate only judges new code, so none of this blocks a
   release. What the first two established, for the three that follow:
   - **The findings are public.** No token is needed:
@@ -347,9 +370,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     fails the gate. Their line numbers are in the issue list; stay off them
     until they are fixed (#526).
   - **Reading "ignored exception" findings found a real defect, #534:** Test
-    Config treats any failed datafile load as "no datafile yet", and the
-    scenario wizard then saves a fresh file over the stored one. The clean-up
-    PR only labels the three `catch` blocks; the fix is its own change.
+    Config treated any failed datafile load as "no datafile yet", and the
+    scenario wizard then saved a fresh file over the stored one. It was fixed
+    on its own (v1.11.201, the `loadForEdit` bullet above), not inside the
+    clean-up PR. Reading a finding is worth more than clearing it.
   - **A linear-time test should fail in seconds, not minutes.** Size the input
     so the old pattern takes a few seconds (60,000 digits for `parseVersion`).
     At 100,000 a regression would have held CI for minutes before failing.
