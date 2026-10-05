@@ -75,9 +75,11 @@ RUN npm install -g @usebruno/cli && \
     # in BRUNO's deps, not OSCAR's):
     #   axios     1.13.6 -> 1.18.0  (CVE-2026-42033/-42035/-42043/-42264 +
     #                                -44486/-44487/-44488/-44492/-44494/-44495/-44496)
+    #             1.18.0 -> 1.20.0  (#532: CVE-2026-101898/-101901/-101903/-101905/
+    #                                -101906/-101907/-101909, raised against 1.18.0)
     #   form-data 4.0.4  -> 4.0.6   (CVE-2026-12143)
     cd /tmp && \
-    npm pack axios@1.18.0 form-data@4.0.6 --silent && \
+    npm pack axios@1.20.0 form-data@4.0.6 --silent && \
     AXIOS_TGZ="$(ls axios-*.tgz)" && FORMDATA_TGZ="$(ls form-data-*.tgz)" && \
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
       rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$AXIOS_TGZ" -C "$d" --strip-components=1; \
@@ -89,13 +91,13 @@ RUN npm install -g @usebruno/cli && \
     # Fail the build immediately if any nested copy is still on the old version.
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
       v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "1.18.0" ] || { echo "UNPATCHED axios@$v at $d"; exit 1; }; \
+      [ "$v" = "1.20.0" ] || { echo "UNPATCHED axios@$v at $d"; exit 1; }; \
     done && \
     for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/form-data"); do \
       v="$(node -p "require('$d/package.json').version")"; \
       [ "$v" = "4.0.6" ] || { echo "UNPATCHED form-data@$v at $d"; exit 1; }; \
     done && \
-    echo "Bruno CLI deps patched: axios=1.18.0, form-data=4.0.6 in all nested copies" && \
+    echo "Bruno CLI deps patched: axios=1.20.0, form-data=4.0.6 in all nested copies" && \
     # ── Same shape, different day: nanoid (CVE-2026-67213/-67214, infinite loop
     # in customAlphabet, both HIGH) is exact-pinned "3.3.8" as a DIRECT dep of
     # FOUR Bruno sub-packages (@usebruno/converters, @usebruno/filestore,
@@ -138,6 +140,26 @@ RUN npm install -g @usebruno/cli && \
       [ "$v" = "10.5.0" ] || { echo "UNPATCHED @faker-js/faker@$v at $d"; exit 1; }; \
     done && \
     echo "Bruno CLI deps patched: @faker-js/faker=10.5.0 in all nested copies" && \
+    # ── js-yaml (#532: CVE-2026-84375, HIGH, denial of service in YAML
+    # parsing). Bruno CLI carries its own copy, 4.3.1 when this was written;
+    # 4.3.2 is the patched release on the same line. OSCAR's own js-yaml is
+    # handled by the lockfile, not here. Only a 4.x copy older than 4.3.2 is
+    # replaced. A 3.x copy is left alone, because js-yaml 4 removed safeLoad()
+    # and is not a drop-in for it; a newer copy is left alone too, so a Bruno
+    # release that ships 4.3.3 or 5.x is neither downgraded nor fails the build.
+    npm pack js-yaml@4.3.2 --silent && \
+    JSYAML_TGZ="$(ls js-yaml-*.tgz)" && \
+    JSYAML_CHECK="const [a,b,c]=require(process.argv[1]+'/package.json').version.split('.').map(Number);process.stdout.write(a===4&&(b<3||(b===3&&c<2))?'stale':'ok')" && \
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/js-yaml"); do \
+      [ "$(node -e "$JSYAML_CHECK" "$d")" = "ok" ] || { rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$JSYAML_TGZ" -C "$d" --strip-components=1; }; \
+    done && \
+    rm -f /tmp/js-yaml-*.tgz && \
+    # Fail the build if any copy is still a 4.x older than 4.3.2, or unreadable.
+    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/js-yaml"); do \
+      [ "$(node -e "$JSYAML_CHECK" "$d")" = "ok" ] || { echo "UNPATCHED js-yaml at $d"; exit 1; }; \
+      echo "js-yaml@$(node -p "require('$d/package.json').version") at $d"; \
+    done && \
+    echo "Bruno CLI deps patched: js-yaml >= 4.3.2 in all nested 4.x copies" && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \

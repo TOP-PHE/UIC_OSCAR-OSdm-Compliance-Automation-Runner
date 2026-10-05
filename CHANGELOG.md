@@ -66,6 +66,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.198] — 2026-10-05
+
+### Security
+
+- **The image scan passes again.** The required *Container image scan
+  (Trivy)* check had started failing on PRs that build the image (seen on
+  #529, #520 and #521), on 8 HIGH findings inside the Bruno CLI the image
+  installs. Closes #532. None is in OSCAR's own dependencies.
+  - `axios` inside Bruno CLI: 1.18.0 → 1.20.0 (CVE-2026-101898, -101901,
+    -101903, -101905, -101906, -101907, -101909). 1.18.0 was the version the
+    Dockerfile itself unpacks over Bruno's pinned copy (#428); the new
+    advisories are against it.
+  - `js-yaml` inside Bruno CLI: 4.3.1 → 4.3.2 (CVE-2026-84375). New
+    Dockerfile step. Only a 4.x copy older than 4.3.2 is replaced; a 3.x copy
+    and a newer copy are left alone, and a copy that is still stale or
+    unreadable afterwards fails the build.
+- Both are patch-level moves on the same major line, but they change the HTTP
+  and YAML libraries Bruno runs with. A run against one vendor sandbox after
+  deployment is worth doing.
+- `Oscar_Server/Dockerfile` only. No application code and no Bruno
+  collection change.
+
+---
+
 ## [server-1.11.197] — 2026-09-11
 
 ### Security
