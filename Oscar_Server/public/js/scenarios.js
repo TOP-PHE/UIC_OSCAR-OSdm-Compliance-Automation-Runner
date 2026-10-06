@@ -222,7 +222,7 @@ function decodeCode(code) {
   // returned as-is so the human-readable label doesn't silently mislabel
   // them as "Sale" by falling through the default branch. The scenarioType
   // badge displayed alongside the code already conveys the actual type.
-  const hadOtstPrefix = /^OTST_/.test(code);
+  const hadOtstPrefix = code.startsWith('OTST_');
   const parts = code.replace(/^OTST_/, '').split('_');
   if (!hadOtstPrefix && !/^(RFND|EXCH|SALE)$/.test(parts[0])) {
     return code;
@@ -2291,7 +2291,7 @@ function buildTripSection(idx, sc, trip) {
 // as filled values (the CSS also renders them lighter + italic).
 function egPlaceholder(placeholder) {
   const p = String(placeholder || '');
-  return p && !/^e\.g\. /.test(p) ? 'e.g. ' + p : p;
+  return p && !p.startsWith('e.g. ') ? 'e.g. ' + p : p;
 }
 
 function buildTripTimeField(tIdx, path, label, val, placeholder) {
@@ -2562,7 +2562,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
 // something custom, we leave it alone.
 const PURCHASER_DEFAULT_PREFIX = 'Purchaser_';
 function isDefaultPurchaserValue(s) {
-  return typeof s === 'string' && s.indexOf(PURCHASER_DEFAULT_PREFIX) === 0;
+  return typeof s === 'string' && s.startsWith(PURCHASER_DEFAULT_PREFIX);
 }
 
 // The purchaser a scenario's card shows, and the index of its entry in
