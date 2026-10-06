@@ -30,11 +30,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     "refresh" link (it throws on a failed load by design, #534),
     `wizDeleteResource()` and `wizSaveAllTrains()`.
 
+### Security
+
+- **Random test data comes from the cryptographic generator.** Closes #542.
+  Generated passengers get a random first name, phone number and date of
+  birth. `randomPick()`, `genPhone()` and `genDateOfBirth()` took them from
+  `Math.random()`; CodeQL reads such field names as personal data and has had
+  12 high `js/insecure-randomness` alerts open on this file since May. Nothing
+  was at risk, the values are test data. A new `randomInt(n)` draws from
+  `crypto.getRandomValues()` and the three generators use it. No suppression
+  and no dismissal.
+
 ### Changed
 
 - **Sonar clean-up 3/5: `Oscar_Server/public/js/scenarios.js`.** Closes #526
-  (tracking #523). 345 of the 373 findings Sonar had on this file, one rule per
-  commit. Apart from the fix above, none of it is meant to change behaviour.
+  (tracking #523). 340 of the 373 findings Sonar had on this file, one rule per
+  commit. Apart from the two fixes above, none of it is meant to change
+  behaviour.
 
   | Rule | What | Findings |
   |---|---|---|
@@ -42,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | S7773 | `Number.parseInt`, `Number.isNaN` | 125 |
   | S6582 | optional chaining | 97 |
   | S3358 | a condition inside a condition | 37 |
-  | S7781 | `replaceAll` with a string pattern | 28 |
+  | S7781 | `replaceAll` with a string pattern | 23 of 28 |
   | S1121 | an assignment inside an expression | 9 |
   | S4624 | a template inside a one-line template | 4 |
   | S7784 | `structuredClone` | 4 |
@@ -70,6 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Left open on purpose
 
+- **S7781 (5), in `esc()`:** the page's HTML encoder keeps `replace()` with a
+  global regex. With `replaceAll('<', ...)`, as Sonar asks, CodeQL no longer
+  recognised it as an encoder and reported three escaped values reaching
+  `innerHTML` as XSS on the pull request. The two lines are identical to the
+  previous release again; a comment in the function says why and a test fails
+  if the form changes.
 - **S3776 (20) and S1479 (1):** functions over the complexity limit and the
   72-case switch. Structural, not planned; to be done when a function is next
   changed.
@@ -94,7 +112,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The failure path:** with the datafile answering 500, the refresh link
   shows the reason, there is no unhandled rejection, and the page keeps what
   it had.
-- 79 new tests in `tests/unit/ui-scripts.test.js` (1,806 total). One of them
+- **CodeQL on the pull request.** Its first analysis failed with 16 alerts:
+  the 3 caused by the `esc()` rewrite, and 13 that were already open on `main`
+  (the 12 above and a medium one in `setTripFieldByPath()`), reported because
+  the diff of this file is large. The first two groups are fixed here; the
+  medium alert is left as it is and does not fail the check.
+- 89 new tests in `tests/unit/ui-scripts.test.js` (1,816 total). One of them
   reads the source for a top-level async function called as a bare statement;
   it finds the 19 named calls in the previous file and none now.
 

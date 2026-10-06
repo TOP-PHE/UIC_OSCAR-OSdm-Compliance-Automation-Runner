@@ -339,7 +339,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
   server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
   findings in the UI and the Bruno library, is #525 (v1.11.202 /
-  OTST_V2.0.101). PR 3, `public/js/scenarios.js`, is #526 (v1.11.204): 345 of
+  OTST_V2.0.101). PR 3, `public/js/scenarios.js`, is #526 (v1.11.204): 340 of
   that file's 373 findings. The gate only judges new code, so none of this
   blocks a release. What the first three established, for the two that follow:
   - **The findings are public.** No token is needed:
@@ -416,7 +416,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A commit that only renames can be proved.** Undo the rename in both the
     old and the new text with the same regex and compare: any other change
     shows. Used for `Number.parseInt` and `replaceAll`.
-  - **Left open in `scenarios.js` on purpose (28):** 20 functions over the
+  - **`esc()` keeps `replace()` with a global regex, in every page.** Sonar
+    (S7781) asks for `replaceAll('<', ...)`. #526 did that in `scenarios.js`
+    and CodeQL stopped recognising the encoder: it reported three escaped
+    values reaching `innerHTML` as XSS. The data-flow paths in the SARIF
+    (`gh api repos/.../code-scanning/analyses/<id>` with
+    `Accept: application/sarif+json`) run straight through the `replaceAll`
+    chain. The security scanner wins; the five findings stay open. PR 4 will
+    meet the same encoder copied into the HTML pages: leave it alone there
+    too.
+  - **A large diff in a file makes CodeQL report that file's old alerts as
+    new.** #541's check failed with 16 alerts, 13 of them open on `main`
+    since May. `gh api .../code-scanning/alerts?ref=refs/heads/main` tells
+    old from new. The 12 high ones (`Math.random()` feeding fields CodeQL
+    reads as personal data) were fixed for real with `randomInt()` on
+    `crypto.getRandomValues()` (#542). The `CodeQL` results check is not in
+    the required list (`Analyze (javascript-typescript)` is), so GitHub would
+    have merged with it red: read the checks, not only the merge state.
+  - **Left open in `scenarios.js` on purpose (33):** the 5 in `esc()`; 20 functions over the
     complexity limit (S3776) and the 72-case switch (S1479), not planned; 4
     sequential `await`s in a loop (S9382); 2 TODO comments (S1135);
     `e.returnValue` in the unsaved-changes prompt (S1874), which older
