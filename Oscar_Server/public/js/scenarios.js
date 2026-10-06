@@ -4235,7 +4235,7 @@ function wizValidateTrain(tidx) {
   // urn:<scheme>:stn:<id> so discovered/real refs validate (#161 follow-up).
   const URN_RE  = /^urn:[a-z0-9_]+:stn:[a-z0-9_.-]+$/i;
   const RICS_RE = /^urn:uic:rics:\d+$/i;
-  const TIME_RE = /^\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/;
+  const TIME_RE = /^\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/;
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return false;
   const urnMsg = 'Must be a station URN, e.g. urn:uic:stn:8400058 (or a vendor ref like urn:x_bileto:stn:…).';
