@@ -6262,7 +6262,7 @@ document.body.addEventListener('click', function(e) {
       const key   = tpIdx + ':' + tpPi;
       const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
       const row   = panel?.previousElementSibling;
-      const nowOpen = _paxEditOpen.has(key) ? false : true;
+      const nowOpen = !_paxEditOpen.has(key);
       if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
       if (panel) panel.style.display = nowOpen ? 'block' : 'none';
       if (el)    el.textContent = (el.dataset.verb || 'Edit') + (nowOpen ? ' ▴' : ' ▾');
