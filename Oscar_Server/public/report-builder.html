@@ -494,7 +494,7 @@ const STATUS_OPTIONS = [
 ];
 
 /* ── State ─────────────────────────────────────────────────────────────────── */
-const FINISHED_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'DELETED_BY_ADMIN'];
+const FINISHED_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'DELETED_BY_ADMIN']);
 const userRole = (user && user.role) || 'company_user';
 const isPlatformUser = userRole === 'administrator' || userRole === 'certification_user';
 const canPickAnyUser = isPlatformUser || userRole === 'test_manager';
@@ -561,7 +561,7 @@ async function loadRuns() {
     var res = await fetch('/v1/runs?limit=200', {});
     if (res.status === 401) { logout(); return; }
     var data = await res.json();
-    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.includes(r.status); });
+    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.has(r.status); });
     populateFilterDropdowns();
     applyDefaultSelection();
     renderRunsList();

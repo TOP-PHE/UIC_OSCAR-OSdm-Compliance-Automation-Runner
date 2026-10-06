@@ -71,8 +71,11 @@ Do these once before your first run.
    own client id / secret (or token). OSCAR requests the access token for you at
    run time when the sandbox needs one — you don't paste a token by hand.
 3. **Confirm the company `api_base`** points at the right sandbox (e.g.
-   `https://osdm-5.platform.bileto.zone/api`). This is company‑level config; a
-   `test_manager`/admin sets it.
+   `https://osdm-5.platform.bileto.zone/api`). It is shown on the API config
+   page as **OSDM API Endpoint**. This is company‑level config, shared by every
+   tester of the company: only a **Test Manager** can change it. As a tester
+   you see it read‑only, and saving the page saves your own credentials only.
+   If the address is wrong, ask your Test Manager to correct it.
 4. **Pick the environment / sandbox** for the run (e.g. Bileto, Sqills,
    Benerail, …). The collection auto‑selects the matching access‑token request
    for that sandbox.

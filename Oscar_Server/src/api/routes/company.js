@@ -28,7 +28,7 @@ const { get, all, run, colDecrypt } = require('../../db/db');
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
-const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier } = require('../helpers/shared');
+const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
@@ -280,6 +280,17 @@ router.patch('/', (req, res) => {
     });
   }
 
+  // The endpoint (#544) — only a Test Manager changes it; decided before
+  // anything is written. The rule is companyEndpointChange() in shared.js.
+  const endpoint = companyEndpointChange(req.user.role, api_base, company.api_base);
+  if (endpoint.status) {
+    return res.status(endpoint.status).json({
+      status: endpoint.status,
+      title: endpoint.status === 403 ? 'Forbidden' : 'Bad Request',
+      detail: endpoint.detail
+    });
+  }
+
   // Dedicated headers (issue #426) — company-wide config, Test-Manager-only.
   // Validate before touching the row so a bad payload changes nothing.
   let normalizedExtra = null;
@@ -299,7 +310,7 @@ router.patch('/', (req, res) => {
 
   const updates = [];
   const values  = [];
-  if (api_base) { updates.push('api_base = ?'); values.push(api_base.trim()); }
+  if (endpoint.write !== null) { updates.push('api_base = ?'); values.push(endpoint.write); }
   if (extra_headers !== undefined) {
     // Store null (not "[]") when the list is emptied so the column reads clean.
     updates.push('extra_headers = ?');
@@ -307,6 +318,8 @@ router.patch('/', (req, res) => {
   }
 
   if (updates.length === 0) {
+    // A tester who only sent back the stored endpoint asked for no change.
+    if (endpoint.echoed) return res.json(safeCompany(company));
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No fields to update.' });
   }
 

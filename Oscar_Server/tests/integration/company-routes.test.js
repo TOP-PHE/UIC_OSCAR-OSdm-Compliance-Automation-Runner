@@ -134,6 +134,97 @@ describe('PATCH /v1/company', () => {
 });
 
 // ── PATCH /v1/company — extra_headers (issue #426) ────────────────────────────
+describe('PATCH /v1/company — only a Test Manager changes the API endpoint (#544)', () => {
+  // api_base is shared by the whole company: every request of every run goes
+  // to it with the bearer token of the tester who started the run. A tester who
+  // could change it would send colleagues' runs, and their tokens, anywhere.
+  const STORED = 'https://provider.example/osdm';
+  const ELSEWHERE = 'https://elsewhere.example/collect';
+  const storedEndpoint = () => get('SELECT api_base FROM companies WHERE id = ?', [companyId]).api_base;
+  const auditCount = () => get(
+    `SELECT COUNT(*) AS n FROM auth_events WHERE company_id = ? AND event_type LIKE 'company_update%'`, [companyId]).n;
+  const patchAs = (role, uid, body, query = '') => request(app)
+    .patch(`/v1/company${query}`)
+    .set('Authorization', `Bearer ${makeToken(role, uid)}`)
+    .send(body);
+
+  beforeEach(() => {
+    run('UPDATE companies SET api_base = ? WHERE id = ?', [STORED, companyId]);
+  });
+
+  test('403 for a tester who sends another endpoint, and nothing is stored', async () => {
+    const before = auditCount();
+    const res = await patchAs('company_user', testerId, { api_base: ELSEWHERE });
+    expect(res.status).toBe(403);
+    expect(res.body.detail).toMatch(/Test Manager/);
+    expect(storedEndpoint()).toBe(STORED);
+    expect(auditCount()).toBe(before);
+  });
+
+  test('403 for a tester when the company has no endpoint yet', async () => {
+    run('UPDATE companies SET api_base = NULL WHERE id = ?', [companyId]);
+    const res = await patchAs('company_user', testerId, { api_base: ELSEWHERE });
+    expect(res.status).toBe(403);
+    expect(storedEndpoint()).toBeNull();
+  });
+
+  test('403 for a tester whose endpoint differs only in case, scheme or path', async () => {
+    for (const other of ['https://PROVIDER.example/osdm', `${STORED}/v2`, 'http://provider.example/osdm']) {
+      const res = await patchAs('company_user', testerId, { api_base: other });
+      expect([other, res.status]).toEqual([other, 403]);
+    }
+    expect(storedEndpoint()).toBe(STORED);
+  });
+
+  // The API Config page sent the endpoint it had loaded with every save, by
+  // every role, until 1.11.207. A page left open across the upgrade still
+  // does; that must not stop a tester from saving their own credentials.
+  test('200 and no write when a tester sends back the endpoint that is stored', async () => {
+    const before = auditCount();
+    for (const echo of [STORED, `  ${STORED}  `]) {
+      const res = await patchAs('company_user', testerId, { api_base: echo });
+      expect(res.status).toBe(200);
+      expect(res.body.api_base).toBe(STORED);
+    }
+    expect(storedEndpoint()).toBe(STORED);
+    expect(auditCount()).toBe(before);
+  });
+
+  test('200 for the Test Manager, with an audit entry', async () => {
+    const before = auditCount();
+    const res = await patchAs('test_manager', testMgrId, { api_base: ELSEWHERE });
+    expect(res.status).toBe(200);
+    expect(storedEndpoint()).toBe(ELSEWHERE);
+    expect(auditCount()).toBe(before + 1);
+  });
+
+  test('the Test Manager\'s endpoint is stored trimmed', async () => {
+    const res = await patchAs('test_manager', testMgrId, { api_base: `  ${ELSEWHERE}\n` });
+    expect(res.status).toBe(200);
+    expect(storedEndpoint()).toBe(ELSEWHERE);
+  });
+
+  test('400, not a crash, when the endpoint is not a string', async () => {
+    for (const bad of [42, { url: ELSEWHERE }, [ELSEWHERE], true]) {
+      const res = await patchAs('test_manager', testMgrId, { api_base: bad });
+      expect([JSON.stringify(bad), res.status]).toEqual([JSON.stringify(bad), 400]);
+    }
+    expect(storedEndpoint()).toBe(STORED);
+  });
+
+  test('200 for an administrator who names the company, as before', async () => {
+    const res = await patchAs('administrator', uuidv4(), { api_base: ELSEWHERE }, `?company_id=${companyId}`);
+    expect(res.status).toBe(200);
+    expect(storedEndpoint()).toBe(ELSEWHERE);
+  });
+
+  test('403 for a certifier, as before', async () => {
+    const res = await patchAs('certification_user', certUserId, { api_base: ELSEWHERE }, `?company_id=${companyId}`);
+    expect(res.status).toBe(403);
+    expect(storedEndpoint()).toBe(STORED);
+  });
+});
+
 describe('PATCH /v1/company — extra_headers', () => {
   test('403 for a non-test_manager (certification_user)', async () => {
     const token = makeToken('certification_user', certUserId);
