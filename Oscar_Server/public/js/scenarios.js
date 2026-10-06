@@ -528,7 +528,7 @@ function restoreFwOpenState(openSet) {
 function captureFwFocus() {
   const a = document.activeElement;
   if (!a || !document.getElementById('body-framework')?.contains(a)) return null;
-  const action = a.getAttribute && a.getAttribute('data-action');
+  const action = a.dataset?.action;
   if (!action) return null;
   const state = { action, tag: a.tagName };
   if (typeof a.selectionStart === 'number') {
