@@ -114,7 +114,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 /* Full error message on its own line — wraps instead of being truncated to
    180px / 60 chars, so the certifier can read the expected-vs-actual detail
    without scrolling the log or hovering for a tooltip. */
-.assertion-error{padding:2px 16px 8px 42px;border-bottom:1px solid #f5f5f5;font-size:11px;color:#c62828;font-family:'Consolas','Monaco','Courier New',monospace;white-space:pre-wrap;word-break:break-word;line-height:1.5;background:#fff7f7}
+.assertion-error{padding:2px 16px 8px 42px;border-bottom:1px solid #f5f5f5;font-size:11px;color:#c62828;font-family:'Consolas','Monaco','Courier New',monospace;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;background:#fff7f7}
 .a-pass{color:#2e7d32}
 .a-fail{color:#c62828;font-weight:700}
 .a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
@@ -143,7 +143,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
    chip rendered without its badge colors. */
 .log-level.l-debug{background:#eceff1;color:#78909c}
 .log-cat{font-size:10px;color:#1565c0;background:#e3f2fd;border-radius:3px;padding:1px 6px;text-align:center;align-self:center}
-.log-msg{color:#37474f;white-space:pre-wrap;word-break:break-word}
+.log-msg{color:#37474f;white-space:pre-wrap;overflow-wrap:anywhere}
 .log-empty{padding:20px;text-align:center;color:#90a4ae;font-size:13px}
 
 /* Scenario milestone banners — full-width dividers in the log stream so the
@@ -173,7 +173,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-json-toggle .caret{transition:transform .15s;display:inline-block}
 .log-json-toggle.expanded .caret{transform:rotate(90deg)}
 .log-json-summary{color:#546e7a;font-size:11px;margin-left:4px;font-family:'Segoe UI',Arial,sans-serif}
-.log-json-body{display:none;padding:8px 16px 8px 80px;background:#fafbfc;border-bottom:1px solid #f5f5f5;font-family:'Consolas','Monaco','Courier New',monospace;font-size:11px;color:#37474f;white-space:pre-wrap;word-break:break-word;line-height:1.45;max-height:400px;overflow:auto}
+.log-json-body{display:none;padding:8px 16px 8px 80px;background:#fafbfc;border-bottom:1px solid #f5f5f5;font-family:'Consolas','Monaco','Courier New',monospace;font-size:11px;color:#37474f;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;max-height:400px;overflow:auto}
 .log-json-body.expanded{display:block}
 
 /* Vendor capability matrix */
@@ -248,7 +248,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .http-detail .tab-body{background:#fff;border:1px solid #eceff1;border-radius:0 6px 6px 6px;padding:12px;max-height:520px;overflow:auto}
 .http-detail .copy-btn{float:right;font-size:11px;background:#eceff1;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;color:#546e7a;font-family:inherit}
 .http-detail .copy-btn:hover{background:#cfd8dc}
-.http-detail .raw-text{font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#37474f;line-height:1.5}
+.http-detail .raw-text{font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;color:#37474f;line-height:1.5}
 
 /* JSON tree viewer */
 .json-tree{font-family:'Courier New',monospace;font-size:12px;line-height:1.35;color:#37474f}
@@ -269,8 +269,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .json-tree-empty{color:#90a4ae;font-style:italic;padding:8px;text-align:center}
 .headers-table{width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:12px}
 .headers-table td{padding:4px 8px;border-bottom:1px solid #f0f4f7;vertical-align:top}
-.headers-table td:first-child{color:#6a1b9a;font-weight:600;width:30%;word-break:break-word}
-.headers-table td:last-child{color:#37474f;word-break:break-word}
+.headers-table td:first-child{color:#6a1b9a;font-weight:600;width:30%;overflow-wrap:anywhere}
+.headers-table td:last-child{color:#37474f;overflow-wrap:anywhere}
 .site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
 
 @media print{
