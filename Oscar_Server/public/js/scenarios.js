@@ -5790,10 +5790,12 @@ function wizGenCode() {
 // for that, but CodeQL reads those field names as personal data and reports
 // a weak generator feeding them (js/insecure-randomness, #542).
 function randomInt(n) {
-  if (!(n > 0)) return 0;
-  const one = new Uint32Array(1);
-  crypto.getRandomValues(one);
-  return one[0] % n;
+  if (n > 0) {
+    const one = new Uint32Array(1);
+    crypto.getRandomValues(one);
+    return one[0] % n;
+  }
+  return 0;   // also when n is undefined or NaN
 }
 function randomPick(arr) {
   return arr[randomInt(arr.length)];
