@@ -1124,7 +1124,7 @@ Now the server merges a tester's save into the stored file
   not kept, and the save response lists it (`read_only_ignored`). An edit to
   the resource entries a read-only scenario uses (its trip, passengers,
   purchaser, fulfillment options) is not kept either, and is not listed, because
-  the scenario itself is unchanged. Since v1.11.198 the editor locks read-only
+  the scenario itself is unchanged. Since v1.11.203 the editor locks read-only
   scenario cards, so a tester is no longer offered either kind of edit
   (`public/js/scenario-access.js`, the same rule as `isOwnedBy`). A new
   scenario whose code someone else's already uses is stored under the next free

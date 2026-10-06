@@ -31,8 +31,8 @@
  * logged no-op — projection never throws to its caller and never blocks a save.
  */
 
-const fs     = require('fs');
-const crypto = require('crypto');
+const fs     = require('node:fs');
+const crypto = require('node:crypto');
 const { get, all, run } = require('../db/db');
 const { decryptFromFileAsync, encryptToFileAsync } = require('./at-rest');
 const { withDatafileLock } = require('./datafileLock');
@@ -86,7 +86,7 @@ function reprojectDatafile(companyId) {
 
 async function _reprojectDatafile(companyId) {
   const company = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
-  if (!company || !company.datafile_path || !fs.existsSync(company.datafile_path)) {
+  if (!company?.datafile_path || !fs.existsSync(company.datafile_path)) {
     return false;   // no datafile uploaded yet — nothing to project into
   }
 

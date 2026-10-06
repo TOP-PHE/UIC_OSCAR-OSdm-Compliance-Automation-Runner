@@ -19,8 +19,8 @@
  * Returns: { suites: N, requests: N, assertions: N }
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { safeJoinUuid } = require('../utils/paths');
 const { run: dbRun, get, transaction, colEncrypt } = require('../db/db');
 
@@ -44,7 +44,7 @@ const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 // Maximum size (bytes) of a single request or response body persisted to DB.
 // Bodies larger than this are truncated with a marker. Default 100 KB which
 // covers ~99% of OSDM payloads while keeping per-run storage bounded.
-const MAX_BODY_SIZE = parseInt(process.env.MAX_BODY_SIZE || '102400', 10);
+const MAX_BODY_SIZE = Number.parseInt(process.env.MAX_BODY_SIZE || '102400', 10);
 
 /**
  * Serialize an object/string to a JSON string of bounded size. Returns NULL
@@ -69,24 +69,24 @@ function serializeBounded(value) {
  * across versions / endpoints — try common shapes in order.
  */
 function getResponseBody(entry) {
-  const r = entry && entry.response;
+  const r = entry?.response;
   if (!r) return null;
   return r.data ?? r.body ?? r.json ?? r.text ?? null;
 }
 
 function getRequestBody(entry) {
-  const r = entry && entry.request;
+  const r = entry?.request;
   if (!r) return null;
   return r.data ?? r.body ?? r.json ?? null;
 }
 
 function getHeaders(obj) {
-  if (!obj || !obj.headers) return null;
+  if (!obj?.headers) return null;
   // Bruno headers can be: array of {name,value}, plain object, or Map-like
   if (Array.isArray(obj.headers)) {
     const out = {};
     for (const h of obj.headers) {
-      if (h && h.name && !h.disabled) out[h.name] = h.value;
+      if (h?.name && !h.disabled) out[h.name] = h.value;
     }
     return out;
   }
@@ -275,7 +275,7 @@ const CAPABILITY_PROBE_ENDPOINTS = new Set([
  *   null            — no response captured / inconclusive
  */
 function classifyVendorCapability(httpStatus, totalAssertions, failedAssertions, reqName) {
-  const s = typeof httpStatus === 'number' ? httpStatus : parseInt(httpStatus, 10);
+  const s = typeof httpStatus === 'number' ? httpStatus : Number.parseInt(httpStatus, 10);
   // library-bruno signals "attempted but inapplicable" by writing an entry
   // with httpStatus === 0 (no real network call, but a bookkeeping row so the
   // certifier sees the step was considered). Treat as a distinct class.
@@ -314,7 +314,7 @@ function extractStructuredResults(runId, companyId) {
   // The scenario name lives on the run row (runs.scenario_code), set by the
   // worker before launching Bruno. Use it as the canonical scenario_name.
   const runRow = get('SELECT scenario_code FROM runs WHERE id = ?', [runId]);
-  const runScenarioCode = (runRow && runRow.scenario_code) || null;
+  const runScenarioCode = runRow?.scenario_code || null;
 
   // v1.11.5 — artifact files are OSCAR1-encrypted since v1.11.0. The
   // helper handles both encrypted and legacy plaintext files transparently.
@@ -345,7 +345,7 @@ function extractStructuredResults(runId, companyId) {
   const suiteMap = new Map(); // "<scenario>||<suite>" → { scenario, suite, entries: [] }
 
   for (const entry of results) {
-    const pathStr = (entry.path || entry.test?.filename || '').replace(/\\/g, '/');
+    const pathStr = (entry.path || entry.test?.filename || '').replaceAll('\\', '/');
     const parts = pathStr.split('/').filter(Boolean);
     const suite    = parts.length >= 2 ? parts[parts.length - 2] : '(root)';
     // Prefer a real grandparent folder (rare for OSDM) but fall back to the
@@ -355,7 +355,7 @@ function extractStructuredResults(runId, companyId) {
       pathStr.replace(/\.yml$|\.bru$/i, '').split('/').pop() || '(unnamed)';
 
     // Skip auth/token requests
-    const url = ((entry.request && entry.request.url) || '').toLowerCase();
+    const url = (entry.request?.url || '').toLowerCase();
     const nameLower = reqName.toLowerCase();
     if (AUTH_URL_RE.test(url) || AUTH_NAME_RE.test(nameLower)) continue;
     if (entry.skipped || entry.status === 'skipped') continue;
@@ -382,10 +382,10 @@ function extractStructuredResults(runId, companyId) {
 
       for (const { entry, suite, reqName } of entries) {
         // Extract request-level data
-        const method = (entry.request && entry.request.method) || null;
-        const url = (entry.request && entry.request.url) || null;
+        const method = entry.request?.method || null;
+        const url = entry.request?.url || null;
         const status = entry.response ? (entry.response.status || entry.response.statusCode) : null;
-        const httpStatus = typeof status === 'number' ? status : (parseInt(status, 10) || null);
+        const httpStatus = typeof status === 'number' ? status : (Number.parseInt(status, 10) || null);
         // Bruno CLI writes runDuration in SECONDS (fractional), not ms.
         // E.g. a 2780ms request appears as runDuration: 2.78 — rounding the
         // raw value gives "3ms" in the UI which contradicts the log line.
@@ -524,7 +524,9 @@ function extractStructuredResults(runId, companyId) {
         }
 
         // Update request totals + vendor capability classification
-        const reqStatus = reqTotals.failed > 0 ? 'FAIL' : (reqTotals.total > 0 ? 'PASS' : 'SKIP');
+        let reqStatus = 'SKIP';
+        if (reqTotals.failed > 0)     reqStatus = 'FAIL';
+        else if (reqTotals.total > 0) reqStatus = 'PASS';
         const capability = classifyVendorCapability(httpStatus, reqTotals.total, reqTotals.failed, reqName);
         dbRun(
           `UPDATE run_requests SET total=?, passed=?, failed=?, result=?, vendor_capability=? WHERE id=?`,

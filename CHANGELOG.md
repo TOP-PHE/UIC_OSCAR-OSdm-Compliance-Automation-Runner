@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.198] — 2026-09-11
+## [server-1.11.203] — 2026-10-06
 
 ### Fixed
 
@@ -93,16 +93,216 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     tester left the model untouched. A dangling purchaser on the tester's own
     scenario, or on any scenario for the Test Manager, is still re-created and
     seeded with defaults.
-- Full suite: 61 suites / 1562 tests; `npm run lint` clean. SonarCloud Quality
+- Full suite: 65 suites / 1727 tests; `npm run lint` clean. SonarCloud Quality
   Gate passed; the six new code smells it listed on the first push were fixed:
   banner contrast, optional chains, `Number.parseInt`, and the complexity of
   `buildPurchaserSection`.
+- **Written on 2026-09-11 as 1.11.198; released as 1.11.203.** Merged with
+  1.11.198 to 1.11.202 on 2026-10-06. `scenarios.js` merged without conflict,
+  and the lines this change adds and removes there are the same as before the
+  merge. The browser check above was made on the September code.
 
 ### Docs
 
 - Tester User Guide §4 "Your scenarios and shared scenarios"; CLAUDE.md §4
   (running from a `.claude/worktrees/` checkout) and §6 (gap closed);
   welcome-page news entry.
+
+---
+
+## [server-1.11.202] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 2 of 5: "possible defect" findings in the
+  browser UI.** Closes #525 together with the collection entry below; the
+  series is tracked in #523. 36 findings in `Oscar_Server/public`, each read.
+  - **22 `catch` blocks were read; 19 no longer discard the error.** The 11
+    that tell the user something failed (sign-in, registration, password reset, e-mail
+    verification, admin load, report builder, message load) keep their
+    message and now also log the error to the browser console: a bug inside
+    the `try` block used to be indistinguishable from a network fault. The
+    next 8 are intended fallbacks or optional panels; the unused binding is
+    dropped and the reason is written down. The last 3 are the failed-load
+    blocks rewritten in 1.11.201 (#534); this release does not touch them.
+  - **8 regular expressions that could backtrack super-linearly** are
+    rewritten or replaced by a loop: the admin slug, the wizard and ancillary
+    codes, two file-name sanitisers, the run-artifact name, and the report
+    builder's JSON label. Each gives identical results to the old code on
+    every string over a small alphabet (1.4 to 6.7 million inputs each).
+  - **6 small logic findings:** an unused variable in `run.html` removed; two
+    correct loops and a one-line helper in `scenarios.js` restyled.
+
+### Found on the way
+
+- **#534: Test Config treated any failed datafile load as "no datafile yet"**
+  (network error, 500, 429, 403), and the scenario wizard then saved a fresh
+  file over the stored one. Found while reading the `catch` blocks, and fixed
+  separately in 1.11.201.
+
+### Tests
+
+- New `tests/unit/ui-scripts.test.js`: every inline script and every
+  `public/js` file is compiled, which nothing in CI did before, and the
+  rewritten page helpers run in a bare `vm` context. 62 new tests (1,655
+  total); 13 deliberate breakages each fail at least one.
+
+### Not verified
+
+- The pages were not opened in a browser. Worth a look after deployment: Test
+  Config, the run page and the Report Builder.
+
+---
+
+## [collection-OTST_V2.0.101] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 2 of 5: "possible defect" findings in the
+  Bruno library.** Closes #525 together with the server entry above. 14
+  findings in `library-bruno`, each read; no `.yml` request changed.
+  - `offers.js`: three places add an after-sales fee when the condition is for
+    the scenario's own kind, with identical REFUND and EXCHANGE branches. The
+    two tests are joined; same outcome on every combination.
+  - 7 `catch` blocks in `bookings.js`, `refunds.js` and
+    `requestsBuilder.js` parse a value from the Bruno environment and fall
+    back. The unused binding is dropped; handling is unchanged.
+  - `mergeReport.js` `normUrl` and `osdmVersion.js` `parseVersion`:
+    rewritten so they cannot backtrack over a long run; identical results on
+    1.4 and 2.4 million generated inputs.
+  - **The one place results can differ:** the `{{var}}` substitution in
+    `offers.js` and the `{param}` path match in `validators.js` now exclude
+    `{` as well as `}` from the name. That changes the outcome only for a
+    malformed token with a `{` between the braces. All 60 paths of the bundled
+    OpenAPI document and all 283 `{{...}}` tokens in the collection give
+    identical results.
+
+### Not verified
+
+- No run against a vendor sandbox was made: there are no vendor credentials on
+  the development machine. The library's 12 unit-test files (345 tests) pass.
+  One sale and one refund scenario after deployment are worth running.
+
+---
+
+## [server-1.11.201] — 2026-10-05
+
+### Fixed
+
+- **Test Config no longer treats a failed load as "nothing configured yet".**
+  Closes #534. The page read the datafile, the Test Framework and the test
+  data with "if the answer is OK, use it; otherwise assume there is none".
+  Only a 404 means none. A network fault, a 403, a 429 from the read rate
+  limiter or a 500 looked exactly the same, and the scenario wizard then built
+  an empty datafile, added the new scenario and saved it over the stored one.
+  For a Test Manager that save replaces the whole file.
+  - **Reproduced before fixing**, on a throwaway server with the previous page
+    code: 16 scenarios stored, one 429 injected on `GET /v1/company/datafile`,
+    *Generate & Add Scenario* pressed. The page reported success and the stored
+    datafile held 1 scenario.
+  - **One loader, `loadForEdit()`, for all three reads:** 404 is "none", 401
+    is "signed out", anything else is "failed" with a sentence the page shows.
+  - **Page load and every refresh** check all three loads before replacing
+    anything. On a failure the editor is not shown empty: the page stops with
+    the reason and keeps what it had.
+  - **The scenario wizard** does not generate after a failed load.
+  - **Upload import:** when the existing test data cannot be loaded, no train
+    is added (duplicates could not be told apart) and the user is told.
+
+### Verified
+
+- In a browser, against the same throwaway server with the fixed code: with a
+  429 on the datafile the page shows the error and keeps what it had in
+  memory; with a 429, a 500 and a network failure the wizard sends the one
+  `GET` and no write; with a healthy load it still adds the scenario.
+- 47 new tests in `tests/unit/scenarios-load-guard.test.js` (1,593 total).
+  They run the real functions from `public/js/scenarios.js` in a `vm` context
+  against a fake server. Putting back any of 8 pieces of the old behaviour
+  fails them.
+
+### Not covered
+
+- `run.html` still shows "File missing on server" for any failed read of the
+  datafile. It only displays; it does not write.
+- The server accepts the write as before. A check on the server that the
+  client saw the current file would be the stronger guard; it is not part of
+  this change.
+
+---
+
+## [server-1.11.199] — 2026-10-05
+
+### Changed
+
+- **Sonar code-smell clean-up, part 1 of 5: server code** (`Oscar_Server/src`).
+  Closes #524; the series is tracked in #523. **No behaviour change.** 202 of
+  the 209 findings in scope are fixed, one Sonar rule or one small group of
+  related rules per commit:
+  - `node:` prefix on 34 built-in imports; `Number.parseInt` /
+    `Number.isNaN` / `Number.NaN` (29); optional chaining (63);
+    `replaceAll` (9); `\d` / `\w` character classes (8).
+  - 13 `catch` blocks that ignore the exception now say why, and drop the
+    unused binding. Each was read; none hides a defect.
+  - 11 nested ternaries and 6 nested template literals unnested; four
+    membership lists become `Set`s; 12 one-off findings.
+- **Rewrites that only look mechanical were checked one by one.**
+  `Number.isNaN` does not convert its argument, so the cached-token expiry
+  test in `access-token.js` now tests `date.getTime()`;
+  `Number.isNaN(date)` would always have been false. All 63
+  optional-chaining sites were read: 50 sit in a condition or fallback where
+  `a && a.b` and `a?.b` cannot differ; in the other 13 the receiver
+  treats every falsy value alike, or the left side is only ever an object or
+  `undefined`.
+- **Five regular expressions that could backtrack super-linearly are
+  replaced** (Sonar S8786), along with 8 needless escapes and duplicate
+  ranges in the same expressions. The Bruno folder/request row and the stack-frame
+  test in `runner.js` are rewritten so each has one way to match;
+  trailing-slash and dash/dot trimming become single-pass helpers. Old and
+  new were compared on every string over a small alphabet up to 7–10
+  characters, about 40 million inputs: identical matches and capture groups.
+  On a 20,000-character worst case the old patterns took about 600 ms each;
+  the new ones take under 1 ms.
+
+### Tests
+
+- 55 new tests (1,546 total). `LogParser`, `inferLevel` and
+  `buildEnvYml` are exported from `runner.js` for tests, as
+  `computeEffectiveRunTimeoutMs` already was; `classifyOfferProbe` gets its
+  first tests. 15 deliberate breakages each fail at least one of them.
+  96.9 % of the executable lines this change touches are covered.
+
+### Not changed, on purpose
+
+- 5 findings inside already-applied migrations in `db.js`: those are never
+  edited.
+- `withRenames` in `datafileOwnership.js` returns `'ALL'` or a list by
+  design (S3800).
+- The CRC loop in `zip.js`: the `for…of` form Sonar asks for measured 5
+  times slower on a 32 MB buffer (S4138).
+
+---
+
+## [server-1.11.198] — 2026-10-05
+
+### Security
+
+- **The image scan passes again.** The required *Container image scan
+  (Trivy)* check had started failing on PRs that build the image (seen on
+  #529, #520 and #521), on 8 HIGH findings inside the Bruno CLI the image
+  installs. Closes #532. None is in OSCAR's own dependencies.
+  - `axios` inside Bruno CLI: 1.18.0 → 1.20.0 (CVE-2026-101898, -101901,
+    -101903, -101905, -101906, -101907, -101909). 1.18.0 was the version the
+    Dockerfile itself unpacks over Bruno's pinned copy (#428); the new
+    advisories are against it.
+  - `js-yaml` inside Bruno CLI: 4.3.1 → 4.3.2 (CVE-2026-84375). New
+    Dockerfile step. Only a 4.x copy older than 4.3.2 is replaced; a 3.x copy
+    and a newer copy are left alone, and a copy that is still stale or
+    unreadable afterwards fails the build.
+- Both are patch-level moves on the same major line, but they change the HTTP
+  and YAML libraries Bruno runs with. A run against one vendor sandbox after
+  deployment is worth doing.
+- `Oscar_Server/Dockerfile` only. No application code and no Bruno
+  collection change.
 
 ---
 

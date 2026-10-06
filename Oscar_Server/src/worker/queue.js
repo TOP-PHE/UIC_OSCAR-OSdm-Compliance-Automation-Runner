@@ -23,7 +23,7 @@
  * Job object: { runId, companyId, concurrentLimit, scenarioOverride?, batchId?, scenarioCode?, userId? }
  */
 
-const EventEmitter = require('events');
+const EventEmitter = require('node:events');
 const { executeRun } = require('./runner');
 const { getConfig }  = require('../db/db');
 const log = require('../utils/logger').child({ module: 'queue' });
@@ -37,8 +37,8 @@ class RunQueue extends EventEmitter {
   }
 
   // Read config dynamically from DB on every drain — admin changes take effect immediately
-  get maxConcurrent() { return parseInt(getConfig('MAX_CONCURRENT_RUNS', '10'), 10); }
-  get staggerMs()     { return parseInt(getConfig('PARALLEL_STAGGER_MS', '2000'), 10); }
+  get maxConcurrent() { return Number.parseInt(getConfig('MAX_CONCURRENT_RUNS', '10'), 10); }
+  get staggerMs()     { return Number.parseInt(getConfig('PARALLEL_STAGGER_MS', '2000'), 10); }
 
   enqueue(job) {
     this._queue.push(job);

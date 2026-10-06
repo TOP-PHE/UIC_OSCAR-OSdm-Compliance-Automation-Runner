@@ -200,7 +200,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     limited to what they can see; Test Managers use the file's
     `scenariosToRun`, which is now only the company default. Bruno still gets
     one `scenario_override` per run, and `/data/:filename` stays unfiltered.
-  - **The editor applies the same rule, from one file** (v1.11.198, #515).
+  - **The editor applies the same rule, from one file** (v1.11.203, #515).
     `public/js/scenario-access.js` (`OscarScenarioAccess`, loaded before
     `scenarios.js`) holds `isOwnedBy` / `isVisibleTo`, and
     `tests/unit/scenario-access.test.js` pins them to the server's, so change
@@ -219,6 +219,29 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `purchaserListId`, which made the next save report an untouched scenario
     as not kept. That lookup now lives in `purchaserEntryForCard()`, which
     returns before any write for a read-only scenario.
+- **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
+  Test Config read the datafile, the Test Framework and the test data with
+  `if (res.ok) use it`, and treated every other outcome as "none". A network
+  fault, a 429 from the read limiter or a 500 then looked like a new company,
+  and the scenario wizard saved a fresh file over the stored one: reproduced
+  on a throwaway server, 16 scenarios → 1 after a single injected 429. Rules
+  that came out of it:
+  - **Load through `loadForEdit(url, what)`** in `scenarios.js`. It returns
+    `loaded`, `none` (404), `signedOut` (401) or `failed` with a sentence the
+    page can show. Never write `if (res.ok) x = await res.json()` in front of
+    code that can save.
+  - **Check every load before replacing anything.** `refreshAllSections()`
+    throws on a failed load, before it touches `state` or `wizData`; all its
+    callers already show `e.message`. Keep that order when adding a read.
+  - **Anything that reads-then-writes must stop on `failed`**, as
+    `wizGenerateScenario()` now does. The server still accepts the write; a
+    server-side "the client saw the current file" check would be the stronger
+    guard and has not been built.
+  - **Page functions can be tested without a browser.**
+    `tests/unit/scenarios-load-guard.test.js` lifts the real functions out of
+    `scenarios.js` and runs them in a `vm` context with a fake `fetch` and
+    `document`. It only works for top-level functions laid out with `}` at
+    column 0, which is how the file is written.
 - **Versioned SQLite migrations** (`db/db.js`): each migration is
   `{version, name, up()}`, applied once, tracked in `schema_version`. **Never
   edit an already-applied migration** — a column added inside one that already
@@ -312,6 +335,63 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (`app.router.stack` → `layer.route.path` / `layer.match('/')`) — a
     deliberate, documented coupling to an Express internal, because it is
     the only place the difference is observable.
+- **Sonar code-smell backlog: five behaviour-neutral PRs, tracked in #523**
+  (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
+  server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
+  findings in the UI and the Bruno library, is #525 (v1.11.202 /
+  OTST_V2.0.101). The gate only judges new code, so none of this blocks a
+  release. What the first two established, for the three that follow:
+  - **The findings are public.** No token is needed:
+    `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
+    (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an
+    exact `textRange`, so a rename-type rule can be applied by range and
+    asserted against the text it expects.
+  - **`isNaN(x)` → `Number.isNaN(x)` is not a rename.** `Number.isNaN` does
+    not convert its argument: on a `Date` it is always false. Test
+    `date.getTime()`. `parseInt` and `NaN`, by contrast, are the same objects
+    under `Number`.
+  - **`a && a.b` → `a?.b` only differs when `a` is `0`, `''` or `false`**, and
+    then only if the value is stored or passed on. Read those sites; the ones
+    in a condition, a `||` fallback or a `!!` need no thought.
+  - **What Sonar accepts for an ignored exception (S2486)**, worked out from
+    which catches it flags: it only looks at a `try` with two or more
+    statements whose catch parameter is unused. `catch { … }` with no binding
+    passes; so does an empty block that holds a comment. A comment next to a
+    statement, with an unused `(_)`, does not.
+  - **A super-linear regex (S8786) is fixed by leaving one way to match**, not
+    by tuning quantifiers, and proved by running old and new over every string
+    on a small alphabet (7–10 characters, a few million inputs, seconds in
+    Node). Trailing-run trims (`/x+$/`) become a loop.
+  - **Not everything Sonar asks for is taken.** `for…of` over a `Buffer`
+    measured 5× slower than the indexed loop (`zip.js`, S4138), so it stays.
+    Code inside an already-applied migration is not restyled either. A finding
+    left open on purpose is named in the CHANGELOG entry with its reason.
+  - **The pages have a compile check now** (`tests/unit/ui-scripts.test.js`,
+    #525). ESLint ignores `public/` and the inline-script lint only looks for
+    a stray closing script tag, so a syntax error in a page used to reach
+    `main` unnoticed. The same file runs page helpers in a bare `vm` context:
+    `loadFunction(file, name)` lifts a top-level function out of a page by its
+    `function name(` line and the next `}` at column 0. Use it for any pure
+    helper touched in PRs 3 and 4.
+  - **A trim after a collapse needs no quantifier.** `/^_+|_+$/g` right after
+    `.replace(/_+/g, '_')` only ever meets one character at each end, so
+    `/^_|_$/g` is the same thing and cannot backtrack. It is not the same
+    where underscores the user typed survive (the ancillary code in
+    `scenarios.js`): that one needs a real trim.
+  - **Check the lines you touch for other findings first.** A pre-existing
+    smell on a line you rewrite is reported on the PR as new. Sonar's
+    newer rules also matter here: 20 un-awaited promises in `scenarios.js`
+    (S9383) are typed as *bugs*, and a PR that rewrites one of those lines
+    fails the gate. Their line numbers are in the issue list; stay off them
+    until they are fixed (#526).
+  - **Reading "ignored exception" findings found a real defect, #534:** Test
+    Config treated any failed datafile load as "no datafile yet", and the
+    scenario wizard then saved a fresh file over the stored one. It was fixed
+    on its own (v1.11.201, the `loadForEdit` bullet above), not inside the
+    clean-up PR. Reading a finding is worth more than clearing it.
+  - **A linear-time test should fail in seconds, not minutes.** Size the input
+    so the old pattern takes a few seconds (60,000 digits for `parseVersion`).
+    At 100,000 a regression would have held CI for minutes before failing.
 - **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
   express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
   could not move to 6.16.0 without it. The whole migration was **one line**:
@@ -462,7 +542,7 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |
 | `Oscar_Server/src/api/routes/company-places.js` | Places API cache: `POST /places/refresh` (paginated download) + `GET /places?q=` (ranked search), #450 |
 | `Oscar_Server/public/js/scenarios.js` | **the big one** (7000+ lines) — Test Config + Test Framework wizard SPA, incl. `attachPlaceAutocomplete()` |
-| `Oscar_Server/public/js/scenario-access.js` | the editor's read-only rule (`OscarScenarioAccess`): ownership pinned to `datafileOwnership.js`, plus the view-only allowlist for read-only cards — browser global and CommonJS, v1.11.198 (#515) |
+| `Oscar_Server/public/js/scenario-access.js` | the editor's read-only rule (`OscarScenarioAccess`): ownership pinned to `datafileOwnership.js`, plus the view-only allowlist for read-only cards — browser global and CommonJS, v1.11.203 (#515) |
 | `tests/unit/scenario-access.test.js` | client/server ownership parity + default-deny lock + `scenarios.js` wiring checks (no DOM harness exists for `public/`) |
 | `Oscar_Server/public/js/findings.js` | Test Findings & Open Points page |
 | `Bruno_Collection/library-bruno/*.js` | shared validators run inside Bruno: `scenarioParser`, `requestsBuilder`, `offers`, `bookings`, `refunds`, `exchanges`, `testCapture` (`bruTest()` assertion capture), `displays` (masked logging), `reportGenerator`/`mergeReport`, `loopback`, `osdmEnums` |
@@ -502,8 +582,11 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
   remaining gaps are both deliberately excluded from the coverage metric
   (`public/**`, `library-bruno/**` — see `sonar-project.properties`), not
   because anything is left half-done. If coverage work resumes, that's where
-  it resumes — `library-bruno/` in particular has real logic
-  (`requestsBuilder`, `offers`, `reportGenerator`) and zero Jest harness.
+  it resumes. `library-bruno/` is only partly tested: twelve
+  `tests/unit/bruno-*.test.js` files reach about half of its 28 modules
+  (`requestsBuilder`, `scenarioParser`, `osdmCompliance`, `partialRefund`…);
+  `reportGenerator`, `mergeReport`, `refunds`, `exchanges`, `fulfillments`
+  and `validators` have none (checked 2026-10-05).
 - **Issue backlog was swept and cross-checked against the code 2026-07-02**
   (the list below is freshly verified, not inherited guesswork — re-check
   with `gh issue list --state open` if much time has passed):

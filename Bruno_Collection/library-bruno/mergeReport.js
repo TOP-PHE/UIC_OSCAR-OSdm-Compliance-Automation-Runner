@@ -79,7 +79,12 @@ const bruResults = _isIterWrap                        ? bruRaw[0].results
 const bruSummary = (_isIterWrap ? bruRaw[0].summary : null) || bruRaw.summary || {};
 
 // ─── Build lookup of captured bodies by request URL (normalized) ──────────────
-function normUrl(u) { return (u || '').split('?')[0].replace(/\/+$/, '').toLowerCase(); }
+function stripTrailingSlashes(s) {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+}
+function normUrl(u) { return stripTrailingSlashes((u || '').split('?')[0]).toLowerCase(); }
 
 const bodyLookup = {};
 (tmpData.requests || []).forEach(r => {

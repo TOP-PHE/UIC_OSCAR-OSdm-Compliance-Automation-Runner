@@ -55,7 +55,7 @@ function buildZip(entries) {
 
   for (const e of entries) {
     const nameBuf = Buffer.from(String(e.name), 'utf8');
-    const data    = Buffer.isBuffer(e.data) ? e.data : Buffer.from(String(e.data == null ? '' : e.data), 'utf8');
+    const data    = Buffer.isBuffer(e.data) ? e.data : Buffer.from(String(e.data ?? ''), 'utf8');
     const crc     = _crc32(data);
     const size    = data.length;
 

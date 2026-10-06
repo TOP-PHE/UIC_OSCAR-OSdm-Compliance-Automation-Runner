@@ -74,7 +74,7 @@ router.get('/test-framework', frameworkReadLimiter, async (req, res) => {
     let scenarios = [];
     try {
       const company = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
-      if (company && company.datafile_path && fs.existsSync(company.datafile_path)) {
+      if (company?.datafile_path && fs.existsSync(company.datafile_path)) {
         const buf = await decryptFromFileAsync(company.datafile_path);
         const df  = JSON.parse(buf.toString('utf8'));
         scenarios = Array.isArray(df.scenarios) ? df.scenarios : [];

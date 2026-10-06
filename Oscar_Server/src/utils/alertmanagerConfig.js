@@ -27,8 +27,8 @@
  * so the admin endpoint can surface the verbatim outcome to the UI.
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const { getConfig } = require('../db/db');
 
 // Defaults match the values shipped in the example file (and the production
@@ -43,7 +43,7 @@ const RELOAD_URL  = process.env.ALERTMANAGER_RELOAD_URL  || 'http://alertmanager
  * Safe for arbitrary user input — no template injection possible.
  */
 function yq(s) {
-  return "'" + String(s == null ? '' : s).replace(/'/g, "''") + "'";
+  return "'" + String(s == null ? '' : s).replaceAll("'", "''") + "'";
 }
 
 /**
@@ -160,7 +160,7 @@ async function reload() {
     const body = await res.text();
     return { ok: res.ok, status: res.status, body };
   } catch (err) {
-    return { ok: false, status: 0, body: String(err && err.message || err) };
+    return { ok: false, status: 0, body: String(err?.message || err) };
   }
 }
 

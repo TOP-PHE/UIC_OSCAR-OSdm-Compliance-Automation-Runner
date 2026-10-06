@@ -29,7 +29,7 @@ function getRunSelection(companyId, userId) {
   try {
     const codes = JSON.parse(row.codes_json);
     return Array.isArray(codes) ? codes.filter(c => typeof c === 'string') : null;
-  } catch (_) {
+  } catch {
     // A corrupt row is treated as "no personal list yet": the tester falls
     // back to the company default, and their next save overwrites the row.
     return null;

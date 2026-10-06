@@ -38,8 +38,8 @@
  *   buffering the whole file is safe and the code stays simple.
  */
 
-const crypto = require('crypto');
-const fs     = require('fs');
+const crypto = require('node:crypto');
+const fs     = require('node:fs');
 
 const ALGO   = 'aes-256-gcm';
 const MAGIC  = Buffer.from('OSCAR1', 'utf8');   // 6 bytes — file format marker
@@ -135,7 +135,7 @@ function _tmpSuffix() {
  * Tests use a sub-path under data/artifacts (already in the allowlist)
  * with a random per-suite component, so they don't need an extension.
  */
-const path = require('path');
+const path = require('node:path');
 const _DATA_ROOT = path.resolve(__dirname, '../../data');
 const _ALLOWED_WRITE_DIRS = [
   path.join(_DATA_ROOT, 'artifacts'),

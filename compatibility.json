@@ -1,20 +1,87 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.223",
+  "current_release": "2026.228",
   "releases": [
     {
-      "release": "2026.223",
-      "date": "2026-09-11",
-      "server": "1.11.198",
-      "collection": "OTST_V2.0.100",
+      "release": "2026.228",
+      "date": "2026-10-06",
+      "server": "1.11.203",
+      "collection": "OTST_V2.0.101",
       "min_collection": "OTST_V2.0.95",
       "max_collection": "OTST_V2.0.x",
       "notes": [
         "fix(test-config): the editor no longer lets a tester edit a scenario the save would discard. Closes #515. Since 1.11.197 the server keeps a tester's changes to their own, non-shared scenarios only; the editor still offered edits on Shared and Company scenarios, which looked accepted and were then dropped - silently for a read-only scenario's trip, fulfillment, passengers or purchaser (resource entries; read_only_ignored reports only the scenario object). Reproduced before the fix: Company scenarios fully editable (the old lock tested sc.shared); a shared card's lock lost on any in-place re-render (0 of 88 fields enabled, 63 of 88 after one re-render); no handler checked; merely opening a Company scenario without a purchaser entry wrote to the model and made the next save report it as not changed.",
         "New Oscar_Server/public/js/scenario-access.js (OscarScenarioAccess, loaded before scenarios.js): isOwnedBy / isVisibleTo match the server functions of the same name, pinned by a test. Two default-deny layers in scenarios.js: renderScenarioDetail() is the only draw path for a card and, on a read-only card, disables every control whose data-action is not on a five-action view-only allowlist (open card, expand section, show passenger details - button now reads View -, Duplicate, personal run-list tick) and shows the read-only banner for Shared and Company alike; isLockedControl() makes the click/change/input delegates refuse such a control and redraw the card from the unchanged model. The purchaser section no longer writes to the model for a read-only scenario. Test Managers unaffected; no server code changed.",
         "Verification: new tests/unit/scenario-access.test.js (71 tests: client/server ownership parity over 20 scenario shapes x 8 emails; every data-action scenarios.js renders refused on a read-only card unless allowlisted; wiring checks) - 19 mutations each caught, sources restored byte-identical. Browser check on a throwaway instance: 107 controls locked per read-only card, 0 on the tester's own card and 0 for the Test Manager; eight forced edits on a shared card all refused with the model byte-identical; a tester save after editing their own scenario stored exactly those edits with no read-only note. SonarCloud Quality Gate passed; the six new code smells from the first push (banner contrast, optional chains, Number.parseInt, buildPurchaserSection complexity - its entry lookup moved into purchaserEntryForCard(), which returns before any write for a read-only scenario) are fixed, and the purchaser behaviour was re-checked in the browser for tester and Test Manager.",
-        "Docs: Tester User Guide s4 (Your scenarios and shared scenarios); CLAUDE.md s4 (running from a .claude/worktrees checkout) and s6 (gap closed); welcome-page news entry."
+        "Docs: Tester User Guide s4 (Your scenarios and shared scenarios); CLAUDE.md s4 (running from a .claude/worktrees checkout) and s6 (gap closed); welcome-page news entry.",
+        "Written on 2026-09-11 as server 1.11.198 / release 2026.223, numbers main has used since; released as 1.11.203 / 2026.228. Merged with 1.11.198 to 1.11.202 on 2026-10-06: scenarios.js merged without conflict and the lines this change adds and removes there are the same as before the merge. Full suite after the merge: 65 suites / 1727 tests, lint clean. The browser check was made on the September code. Server-only; collection unchanged at OTST_V2.0.101."
+      ]
+    },
+    {
+      "release": "2026.227",
+      "date": "2026-10-05",
+      "server": "1.11.202",
+      "collection": "OTST_V2.0.101",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor: Sonar code-smell clean-up, part 2 of 5 - the \"possible defect\" findings in the browser UI (Oscar_Server/public) and the Bruno library (Bruno_Collection/library-bruno). Closes #525; the series is tracked in #523. All 50 findings were read and addressed. Reading them found one real defect, #534 (next note); the other findings are not defects.",
+        "One real defect was found on the way: Test Config treated any failed datafile load (network error, 500, 429, 403) as \"no datafile yet\", and the scenario wizard then saved a fresh file over the stored one. It was fixed separately in release 2026.226 (server 1.11.201, #534), which rewrote the three catch blocks involved; this release does not touch them.",
+        "Browser UI (36): 22 catch blocks were read. 3 are the failed-load blocks fixed in 1.11.201. The other 19 no longer discard the error: the 11 that tell the user something failed (sign-in, registration, password reset, e-mail verification, admin load, report builder, message load) keep their message and now also log the error to the browser console - a bug inside the try block used to be indistinguishable from a network fault. The other 8 are intended fallbacks or optional panels: the unused binding is dropped and the reason written down. 8 regular expressions that could backtrack super-linearly are rewritten or replaced by a loop. 6 small logic findings: an unused variable in run.html removed, two correct loops and a one-line helper in scenarios.js restyled.",
+        "Bruno library (14): the unused binding is dropped on 7 catch blocks that parse a value from the Bruno environment and fall back; three identical REFUND / EXCHANGE branches in offers.js are merged; 4 regular expressions are rewritten (mergeReport normUrl, osdmVersion parseVersion, the {{var}} substitution in offers.js, the {param} path match in validators.js).",
+        "Equivalence: 10 of the 12 pattern rewrites give identical results on every string over a small alphabet (1.4 to 6.7 million inputs each). The other 2 - {{var}} in offers.js and {param} in validators.js, which now exclude \"{\" as well as \"}\" from the name - differ only on a malformed token with a \"{\" between the braces; all 60 paths of the bundled OpenAPI document and all 283 {{...}} tokens in the collection give identical results.",
+        "Tests: 62 new (1,655 total). New tests/unit/ui-scripts.test.js compiles every inline script and every public/js file - until now nothing in CI would notice a syntax error in a page - and runs the rewritten page helpers in a bare vm context. 13 deliberate breakages each fail at least one new test. The Bruno library's 12 existing test files (345 tests) pass.",
+        "Not verified: no run against a vendor sandbox was made (no vendor credentials on the development machine), and the pages were not opened in a browser. Worth doing after deployment: one sale and one refund scenario, and a look at Test Config, the run page and the Report Builder.",
+        "Collection OTST_V2.0.100 -> OTST_V2.0.101 (library-bruno only; no .yml request changed). Server 1.11.201 -> 1.11.202."
+      ]
+    },
+    {
+      "release": "2026.226",
+      "date": "2026-10-05",
+      "server": "1.11.201",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(test-config): a failed load is no longer treated as \"nothing configured yet\". Closes #534. Test Config read the datafile, the Test Framework and the test data with \"if the answer is OK, use it; otherwise assume there is none\". Only a 404 means none; a network fault, a 403, a 429 from the read rate limiter or a 500 looked exactly the same. The scenario wizard then built an empty datafile, added the new scenario and saved it over the stored one.",
+        "Reproduced before fixing, on a throwaway server with the previous page code: 16 scenarios stored, one 429 injected on GET /v1/company/datafile, \"Generate & Add Scenario\" pressed - the page reported success and the stored datafile held 1 scenario. For a Test Manager the save replaces the whole file.",
+        "Now: one loader, loadForEdit(), used for all three reads. 404 = none, 401 = signed out, anything else = failed with a sentence the page can show. The page refresh checks every load before it replaces anything and stops with that sentence, so the editor is not shown empty; the wizard does not generate; the upload import adds no trains when it cannot tell which already exist, and says so.",
+        "Verified in a browser against the same throwaway server with the fixed code: with a 429 on the datafile the page shows the error and keeps what it had in memory; with a 429, a 500 and a network failure the wizard sends the one GET and no write; with a healthy load it still adds the scenario (15 -> 16 stored).",
+        "Tests: 47 new in tests/unit/scenarios-load-guard.test.js (1,593 total). They run the real functions from public/js/scenarios.js in a vm context against a fake server. Putting back any of 8 pieces of the old behaviour fails them.",
+        "User-visible: a news entry and a Troubleshooting row in the Tester User Guide. Server-only (Oscar_Server/public); Bruno collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.224",
+      "date": "2026-10-05",
+      "server": "1.11.199",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor(server): Sonar code-smell clean-up, part 1 of 5 - server code (Oscar_Server/src). Closes #524; the series is tracked in #523. No behaviour change: nothing a tester, Test Manager, certifier or administrator can see or call is different.",
+        "202 of the 209 findings in scope are fixed, one Sonar rule or one small group of related rules per commit: node: prefix on 34 built-in imports (S7772); Number.parseInt / Number.isNaN / Number.NaN (S7773, 29); optional chaining (S6582, 63); replaceAll (S7781/S7780, 9); \\d and \\w character classes (S6353, 8); 13 catch blocks that ignore the exception now say why and drop the unused binding (S2486); 11 nested ternaries (S3358) and 6 nested template literals (S4624) unnested; membership lists as Sets (S7776, 4); 12 one-off findings; and 13 regular-expression findings, described below.",
+        "Not-quite-mechanical rewrites were checked one by one. Number.isNaN does not convert its argument, so the cached-token expiry test in access-token.js now tests date.getTime() - Number.isNaN(date) would always have been false. All 63 optional-chaining sites were read: 50 sit in a condition or fallback where a && a.b and a?.b cannot differ; in the other 13 the receiver treats every falsy value alike or the left side is only ever an object or undefined.",
+        "Five regular expressions Sonar reports as able to backtrack super-linearly (S8786) are replaced, along with 8 needless escapes and duplicate ranges in the same expressions (S6535, S5869, S6397): the Bruno folder/request row and the stack-frame test in runner.js are rewritten so each has one way to match, and trailing-slash / dash-dot trimming become single-pass helpers (stripTrailingSlashes in osdm-client.js, trimDashDot in runs.js). Old and new were compared on every string over a small alphabet up to 7-10 characters, about 40 million inputs: identical matches and capture groups. On a 20,000-character worst case the old patterns took about 600 ms each; the new ones take under 1 ms.",
+        "Tests: 55 new (1,546 total). LogParser, inferLevel and buildEnvYml in runner.js are exported for tests, as computeEffectiveRunTimeoutMs already was; classifyOfferProbe gets its first tests. 15 deliberate breakages (old patterns restored, an alternative removed, escaping dropped, precedence swapped) each fail at least one of them. 96.9 % of the executable lines this change touches are covered.",
+        "Left as they are, 7 findings: 5 inside already-applied migrations in db.js (the repo rule is never to edit those); withRenames in datafileOwnership.js, which returns \"ALL\" or a list by design (S3800); and the CRC loop in zip.js, where the for-of form Sonar asks for measured 5 times slower on a 32 MB buffer (S4138).",
+        "ESLint: structuredClone added to the declared globals. Server-only; Bruno collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.223",
+      "date": "2026-10-05",
+      "server": "1.11.198",
+      "collection": "OTST_V2.0.100",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(docker): clear 8 HIGH findings that made the required Container image scan (Trivy) fail on PRs that build the image (seen on #529, #520 and #521). Closes #532. All 8 are inside the Bruno CLI the image installs globally, none in OSCAR's own dependencies.",
+        "axios inside Bruno CLI: 1.18.0 -> 1.20.0 (CVE-2026-101898, -101901, -101903, -101905, -101906, -101907, -101909). 1.18.0 was the version the Dockerfile itself unpacks over Bruno's pinned copy (#428); the new advisories are against it. Same unpack-and-verify step, new version.",
+        "js-yaml inside Bruno CLI: 4.3.1 -> 4.3.2 (CVE-2026-84375). New Dockerfile step with the same pattern. Only a 4.x copy older than 4.3.2 is replaced: a 3.x copy is left alone (js-yaml 4 removed safeLoad and is not a drop-in), and a newer copy is neither downgraded nor fails the build. A copy that is still stale or unreadable after the step fails the build.",
+        "Verification: no Docker on the development machine, so the new shell step was dry-run against a fake package tree (copies at 4.3.1, 4.1.0, 3.14.1, 4.3.2, 4.4.0 and 5.4.2: the first two become 4.3.2, the rest are untouched; a failing unpack exits non-zero). The image build and the Trivy scan on the PR are the real check.",
+        "Both moves are patch-level on the same major line, but they change the HTTP and YAML libraries Bruno runs with: a run against one vendor sandbox after deployment is worth doing. Oscar_Server/Dockerfile only; no application code, no Bruno collection change."
       ]
     },
     {

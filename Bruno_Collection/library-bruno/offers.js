@@ -153,7 +153,7 @@ function ensureAuthorizationOr403() {
 
   function resolveVars(str) {
     if (!str) return str;
-    return String(str).replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+    return String(str).replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
       const v = bru.getEnvVar(varName);
       return v == null ? '' : String(v);
     });
@@ -1181,10 +1181,9 @@ function validateAdmissions(selectedOffer) {
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
-              if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-                admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
-                bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
-              } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
+              // The fee counts when the condition is for the scenario's own after-sales kind.
+              if ((scenarioType.includes("REFUND") && condition.condition === "REFUND") ||
+                  (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE")) {
                 admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
                 bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
               }
@@ -1417,10 +1416,9 @@ function validateReservations(selectedOffer) {
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
-              if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-                admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
-                bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
-              } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
+              // The fee counts when the condition is for the scenario's own after-sales kind.
+              if ((scenarioType.includes("REFUND") && condition.condition === "REFUND") ||
+                  (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE")) {
                 admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
                 bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
               }
@@ -1507,10 +1505,9 @@ function validateAncillaries(selectedOffer) {
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
-              if (scenarioType.includes("REFUND") && condition.condition === "REFUND") {
-                admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
-                bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
-              } else if (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE") {
+              // The fee counts when the condition is for the scenario's own after-sales kind.
+              if ((scenarioType.includes("REFUND") && condition.condition === "REFUND") ||
+                  (scenarioType.includes("EXCHANGE") && condition.condition === "EXCHANGE")) {
                 admissionReservationAncillaryOfferPartsAftersalesConditions += condition.afterSaleFee.amount;
                 bru.setEnvVar("admissionReservationAncillaryOfferPartsAftersalesConditions", admissionReservationAncillaryOfferPartsAftersalesConditions);
               }

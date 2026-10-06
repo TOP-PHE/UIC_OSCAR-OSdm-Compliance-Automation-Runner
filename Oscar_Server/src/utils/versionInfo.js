@@ -28,8 +28,8 @@
  *   COLLECTION_PATH     — already used elsewhere; we read VERSION from there
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs   = require('node:fs');
+const path = require('node:path');
 const log  = require('./logger');
 
 function readJsonSafe(filePath) {
@@ -81,7 +81,7 @@ function findMatchingRelease(matrix, serverV, collV) {
     // Wildcard pattern (e.g. "OTST_V2.0.x" matches "OTST_V2.0.1")
     if (typeof r.max_collection === 'string' && r.max_collection.endsWith('.x')) {
       const prefix = r.max_collection.slice(0, -1); // "OTST_V2.0."
-      if (collV && collV.startsWith(prefix)) return true;
+      if (collV?.startsWith(prefix)) return true;
     }
     return false;
   });
@@ -115,15 +115,18 @@ if (!compat) {
   );
 }
 
+function compatibilityStatus() {
+  if (matchedRelease) return 'tested';
+  return compat ? 'untested_combination' : 'matrix_missing';
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 function getVersionInfo() {
   return {
     server_version:     serverVersion,
     collection_version: collectionVersion,
     release_label:      matchedRelease ? matchedRelease.release : null,
-    compatibility_status: matchedRelease
-      ? 'tested'
-      : (compat ? 'untested_combination' : 'matrix_missing'),
+    compatibility_status: compatibilityStatus(),
     compatibility_file: COMPAT_FILE,
   };
 }

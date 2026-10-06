@@ -685,7 +685,7 @@ function autoSlug() {
   const slug = name.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-|-$/g, '');   // one at most: the step above never leaves two together
   document.getElementById('new-co-slug').value = slug;
 }
 
@@ -1451,6 +1451,7 @@ document.getElementById('btn-emergency-stop-all').addEventListener('click', emer
     // Activate the tab after companies are ready
     switchTab(_initTab);
   } catch (e) {
+    console.error('Admin page failed to load:', e);
     showMsg('Failed to load admin data.', false);
   }
 })();

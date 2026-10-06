@@ -40,7 +40,7 @@ const DEFAULT_OSDM_VERSION = '3.9.0';
 // "3.8" / "3.8.1" / " v3.5.0 " → { major, minor, patch }; otherwise null.
 function parseVersion(v) {
   if (v == null) return null;
-  const m = String(v).trim().match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  const m = /(?:^|\D)(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(v).trim());
   if (!m) return null;
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3] || 0) };
 }
