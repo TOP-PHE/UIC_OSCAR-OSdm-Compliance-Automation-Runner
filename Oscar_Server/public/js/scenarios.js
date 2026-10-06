@@ -6288,7 +6288,7 @@ document.body.addEventListener('click', function(e) {
         tmp.innerHTML = buildReductionCardRow(arIdx, arPi, arPax.reductionCards.length - 1, '', false);
         const newRow = tmp.firstElementChild;
         const addBtn = container.querySelector('[data-action="add-pax-reduction"]');
-        container.insertBefore(newRow, addBtn);
+        if (addBtn) addBtn.before(newRow); else container.append(newRow);
         // Focus the new input so the user can start typing immediately.
         const input = newRow.querySelector('input[data-action="set-pax-reduction"]');
         if (input) input.focus();
@@ -6331,7 +6331,7 @@ document.body.addEventListener('click', function(e) {
         tmp.innerHTML = buildLoyaltyCardRow(alIdx, alPi, alPax.loyaltyCards.length - 1, {}, false);
         const newRow = tmp.firstElementChild;
         const addBtn = container.querySelector('[data-action="add-pax-loyalty"]');
-        container.insertBefore(newRow, addBtn);
+        if (addBtn) addBtn.before(newRow); else container.append(newRow);
         const input = newRow.querySelector('input[data-field="carrierCode"]');
         if (input) input.focus();
       }
