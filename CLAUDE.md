@@ -234,6 +234,57 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `tests/unit/profile-endpoint.test.js` runs an HTML page's own functions and
   `const` lines in a `vm`, the way `scenarios-load-guard.test.js` does for a
   script file.
+- **Nothing reaches a run's child processes or its environment file
+  unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
+  `worker/runner.js` starts two children: the Bruno CLI, and the collection's
+  `mergeReport.js`. A `spawn` with no `env` option inherits `process.env`,
+  which is how `mergeReport.js` was handed `ENCRYPTION_KEY`. Values were pasted
+  into the Bruno env yml between quotes; a scenario code is free text a tester
+  stores, and one with a quote and a line break added a second `api_base`.
+  Bruno uses the last one, so the run went there with the token of whoever ran
+  it, and a Test Manager's "ALL" includes testers' private scenarios. Rules:
+  - **Any child process gets `env: childBaseEnv()`** (`CHILD_ENV_ALLOWLIST`),
+    plus what it must have. `runner.test.js` fails if a child receives a
+    variable that is not on the list, so a new server secret is not passed on.
+    This stops inheritance; it is not isolation. Collection code runs as the
+    server's OS user and could read `/proc/<ppid>/environ` or the data
+    directory. Do not describe the allowlist as protecting against a hostile
+    collection.
+  - **Write a variable with `envVar(name, value)`, a scalar with
+    `yamlQuoted()`. Never interpolate into that file**, not even a number or a
+    server-side value. `yamlQuoted` gives a one-line double-quoted scalar of
+    printable ASCII: JSON escapes, plus `\uXXXX` from DEL upwards because some
+    YAML parsers break lines on U+0085, U+2028 and U+2029.
+  - **`tests/helpers/env-yml.js` is a strict reader** that accepts the four
+    line shapes and nothing else. `runner.test.js` reads the file `executeRun`
+    writes through it; a line pasted by hand fails there.
+  - **The proof that Bruno reads back the same value** is `js-yaml` in the unit
+    tests (the parser Bruno 4.2.1 uses), and a scratch run of Bruno's own
+    loader, `parseEnvironment` in `@usebruno/filestore`, over generated files.
+    Running the real `bru` on a three-file collection with two local listeners
+    is what showed "the last `api_base` wins".
+  - **`js-yaml` is a devDependency and the override is `"$js-yaml"`.** npm
+    refuses a direct dependency whose range differs from its override
+    (`EOVERRIDE`), so the override follows the dependency.
+  - **Escaping is not the end of it: Bruno expands `{{...}}` in a value when a
+    script reads it** (`bru.getEnvVar`), and `{{process.env.OSCAR_ACCESS_TOKEN}}`
+    is the run's token. Checked with the real CLI. A scenario code holding
+    `{{` is therefore refused in `executeRun` before the token is resolved (a
+    FAILED run, nothing spawned). Bruno has no literal form for `{{`. The
+    dedicated headers keep their templates on purpose (Test Manager only).
+    The rule is `refusedScenarioCode()`; it also refuses a code that is not
+    text. `POST /v1/runs` leaves non-text codes out of a batch: an object
+    cannot be bound to the runs table, and one tester's scenario used to turn
+    the Test Manager's "ALL" into a 500. **A run whose `executeRun` throws is
+    never marked FAILED** (the queue only logs it), so refuse, do not throw.
+    **This covers the scenario code only.** How Bruno treats templates in the
+    rest of a scenario's text is a separate subject, not part of this change.
+    It is recorded outside the repository; ask the maintainer.
+  - A base URL or requestor holding a `"` no longer fails the run with
+    `TOKEN_FORMAT_ERROR`. The detection stays as a safety net.
+  - The collection counts the datafile's codes instead of listing them when a
+    `scenario_override` is missing: the run log belongs to whoever started the
+    run, and the file holds everyone's scenarios.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
@@ -681,9 +732,9 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
   - *Bruno ignores `purchaserListId`* and uses `purchaserList[0]` for every
     scenario (`library-bruno/scenarioParser.js`). The merge protects entry 0,
     but the collection should resolve the purchaser by id like the other lists.
-  - *Scenario codes reach the Bruno env YAML unescaped* (the YAML-injection
-    path reviewers found), and the run log can list codes. Both are
-    pre-existing, and both are covered by tracker **PR-03** (NEW-02).
+  - (*Scenario codes reaching the Bruno env YAML unescaped*, and the run log
+    listing codes, were fixed by tracker PR-03 in v1.11.208 / OTST_V2.0.102;
+    see the §2 bullet on a run's child processes and environment file.)
 - **#447–#450 (the prior batch) are all done.** #447/#448 merged earlier;
   **#449** (Test-Manager-gated registration) and **#450** (Places API lookup)
   both shipped 2026-07-01/02 — see the §2 bullets above. Nothing left open

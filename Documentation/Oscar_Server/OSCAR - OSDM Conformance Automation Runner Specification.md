@@ -454,18 +454,71 @@ JWT tokens are stored in `localStorage`. To mitigate XSS risk:
 - Token format is validated on read — if it doesn't match the `header.payload.signature` Base64url pattern, `localStorage` is cleared and the user is redirected to login
 - `JSON.parse` of stored user/company data is wrapped in `try/catch` to handle corrupted localStorage gracefully
 
+### 9.16 Child Process Environment
+
+A run starts two child processes: the Bruno CLI, and `library-bruno/mergeReport.js`,
+a script of the bind-mounted collection. Neither is handed the server's environment,
+which holds `ENCRYPTION_KEY`, `JWT_SECRET` and the SMTP credentials. Both start from
+one allowlist, `CHILD_ENV_ALLOWLIST` in `worker/runner.js`: the path and profile
+variables a process needs to start, plus `NODE_ENV` and `NODE_PATH`. Bruno gets the
+run's three credentials on top (§9.9). The report script gets nothing more.
+
+Until v1.11.207 only the Bruno spawn used the allowlist. The report script was
+started with no environment option and inherited everything (audit tracker NEW-01,
+fixed in v1.11.208). A test fails if either child receives a variable that is not on
+the list, so a secret added to the server later is not passed on by default.
+
+The allowlist stops inheritance. It is not isolation: collection code runs as the
+same operating-system user as the server, so a script written to do harm could still
+read the server's files, and on Linux the environment of the server process itself.
+The integrity of the collection (who can push to `main`) remains the control for that.
+
 ---
 
 ## 10. Execution Worker — Credential Handling and Error Detection
 
-### 10.1 Token YAML Safety
+### 10.1 YAML Safety of the Environment File
 
 Since #306 the token never enters the environment `.yml` at all (it travels via the
 child process environment, §9.9), so a malformed token can no longer break YAML parsing.
-The escaping rule survives for the values that are still written to the file as
-double-quoted YAML scalars (e.g. the `__extraHeaders` JSON): backslashes then
-double-quotes are escaped so a stray `"` cannot produce invalid YAML (`Unexpected
-scalar`) that would make Bruno fail before running any tests.
+
+Since v1.11.208 (audit tracker NEW-02) every value that does enter the file is written
+by one function, `yamlQuoted()` in `worker/runner.js`: the environment name, the API
+base URL, the datafile URL, the requestor, the scenario override, the dedicated
+headers and the three variables the runner adds itself. It writes a YAML double-quoted
+scalar on one line that holds printable ASCII only. The quote, the backslash and the
+control characters are escaped as in JSON, and every character from DEL upwards is
+written as `\uXXXX`, because some YAML parsers treat U+0085, U+2028 and U+2029 as line
+breaks. Bruno reads back exactly the value given. A value with nothing to escape is
+written byte for byte as before; the only line that differs for an ordinary run is
+the first, where the environment name is now quoted.
+
+Before that, values were pasted between two double quotes as they came, and only the
+dedicated headers were escaped. A value holding a `"` broke the file, and Bruno failed
+before running any test (`Unexpected scalar`). A value holding a `"` and a line break
+did worse: it added variables of its own. A scenario code is free text stored by a
+tester, so a crafted code could add a second `api_base`; Bruno uses the last one, and
+the run's requests, access token included, went to that address. The run could be the
+Test Manager's: a company run list of "ALL" includes testers' private scenarios. It
+could be a colleague's once the Test Manager had shared the scenario. Reproduced with
+Bruno 4.2.1 before the fix, and checked after it.
+
+Escaping does not cover one thing Bruno does with a value afterwards: it fills in
+`{{...}}` when a script reads the value. A scenario code written as
+`{{process.env.OSCAR_ACCESS_TOKEN}}` would be read by the collection as the access token
+of whoever started the run, and then reported as "not found" in a run log that every
+member of the company can read. Bruno has no way to write `{{` literally, so the runner
+refuses to start a run whose scenario code contains `{{`: the run is marked FAILED
+with a message asking for the scenario to be renamed, before a token is requested,
+before the file is written and before any process is started. The dedicated headers
+keep their `{{var}}` templates: that is their documented use, and only a Test Manager
+sets them.
+
+A scenario code that is not text (the datafile is JSON, so a code can be stored as an
+object, a list or a number) is not run either. `POST /v1/runs` leaves such scenarios
+out of the batch; before, an object or a list could not be written to the runs table,
+and the whole batch answered 500. The runner refuses a non-text code that reaches it,
+instead of throwing: a run that throws is not marked FAILED.
 
 ### 10.2 Authentication Error Detection
 
@@ -473,7 +526,7 @@ During Bruno execution, the runner monitors all stdout/stderr output for two cat
 
 | Sentinel written to DB | Detection pattern | Meaning |
 |---|---|---|
-| `TOKEN_FORMAT_ERROR` | `YAMLParseError`, `Unexpected scalar`, `Error parsing environment` | A configured value written to the env file (API base URL, requestor, extra headers — not the token, which no longer enters the file since #306) breaks YAML parsing — fix the API Config value |
+| `TOKEN_FORMAT_ERROR` | `YAMLParseError`, `Unexpected scalar`, `Error parsing environment` | Bruno could not parse the environment file. Until v1.11.207 a configured value holding a special character (API base URL, requestor) caused this. Since v1.11.208 every value is escaped (§10.1), so a value can no longer cause it; the detection is kept as a safety net |
 | `TOKEN_AUTH_ERROR` | `Wrong response status: 401`, `401 Unauthorized`, `HTTP 401` | The token is syntactically valid but rejected by the remote API — token expired or revoked |
 
 After the Bruno process exits, if either flag was set, the runner writes the sentinel string to `runs.error_message` and appends a human-readable error event to `run_events`.
@@ -510,7 +563,7 @@ This logic applies to all endpoint types that return offers (booking, refund sea
 The run detail page (`run-detail.html`) displays a warning banner when the `error_message` field of a completed run contains a recognised sentinel value:
 
 ### TOKEN_FORMAT_ERROR banner
-Displayed when a configured API value prevented Bruno from parsing the YAML environment file (since #306 the token itself no longer enters that file).
+Displayed when Bruno could not parse the YAML environment file. Until v1.11.207 a special character in an API setting caused it. Since v1.11.208 values are escaped (§10.1): a base URL or requestor holding a `"` is passed to Bruno as it is, and this banner should no longer appear.
 - Title: *"Invalid API configuration — Bruno could not parse the run environment"*
 - Message: explains that a special character (e.g. trailing `"`) was detected in an API setting (e.g. base URL or requestor) and instructs the user to correct it.
 - Action button: links to the Company Profile page to fix the API config.
