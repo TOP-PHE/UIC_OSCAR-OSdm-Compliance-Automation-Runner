@@ -247,10 +247,10 @@ function decodeCode(code) {
   // Passengers and legs
   while (i < parts.length) {
     const p = parts[i];
-    const n = parseInt(p, 10);
-    if (!isNaN(n) && p.endsWith('ADT')) { paxParts.push(`${n} Adult${n>1?'s':''}`); }
-    else if (!isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
-    else if (!isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
+    const n = Number.parseInt(p, 10);
+    if (!Number.isNaN(n) && p.endsWith('ADT')) { paxParts.push(`${n} Adult${n>1?'s':''}`); }
+    else if (!Number.isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
+    else if (!Number.isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
     else if (p === 'SEAT')   { special.push('Seat selection'); }
     else if (p === 'CCHTTE' || p === 'COUCHETTE') { special.push('Couchette'); }
     else { unrecognized++; }
@@ -1561,7 +1561,7 @@ function migrateMissingOfferSearchCriteria() {
 function previewExternalRef(pattern, n) {
   if (!pattern) return '';
   return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
-    const w = parseInt(width || '0', 10);
+    const w = Number.parseInt(width || '0', 10);
     return String(n).padStart(w, '0');
   });
 }
@@ -2127,7 +2127,7 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
   if (!trains.length) return '';
   const label = target === 'trip'
     ? 'Apply test data (single trip)'
-    : 'Apply to Leg ' + (parseInt(target.slice(5)) + 1);
+    : 'Apply to Leg ' + (Number.parseInt(target.slice(5)) + 1);
   return `
   <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#546e7a;margin-bottom:10px">
     <span style="font-weight:600">🚄 ${label}:</span>
@@ -2890,14 +2890,14 @@ function setTripFieldByPath(tIdx, path, value) {
   const parts = path.split('.');
   let obj = state.tripRequirements[tIdx];
   for (let i = 0; i < parts.length - 1; i++) {
-    const key = isNaN(parts[i]) ? parts[i] : parseInt(parts[i]);
+    const key = Number.isNaN(Number(parts[i])) ? parts[i] : Number.parseInt(parts[i]);
     // #359: autovivify missing intermediates so new optional sub-objects
     // (trip.searchCriteria.*) can be written into older datafiles that
     // don't have them yet. Next segment numeric → array, else object.
-    if (obj[key] == null) obj[key] = isNaN(parts[i + 1]) ? {} : [];
+    if (obj[key] == null) obj[key] = Number.isNaN(Number(parts[i + 1])) ? {} : [];
     obj = obj[key];
   }
-  const lastKey = isNaN(parts[parts.length-1]) ? parts[parts.length-1] : parseInt(parts[parts.length-1]);
+  const lastKey = Number.isNaN(Number(parts[parts.length-1])) ? parts[parts.length-1] : Number.parseInt(parts[parts.length-1]);
   obj[lastKey] = value;
   markDirty();
 }
@@ -3786,7 +3786,7 @@ function fwSetPaxAge(type, bound, value) {
   const fw = wizData.framework;
   if (!fw.passengerAgeRanges) fw.passengerAgeRanges = {};
   if (!fw.passengerAgeRanges[type]) fw.passengerAgeRanges[type] = { ...WIZ_PAX_DEFAULT_AGES[type] };
-  fw.passengerAgeRanges[type][bound] = parseInt(value, 10) || 0;
+  fw.passengerAgeRanges[type][bound] = Number.parseInt(value, 10) || 0;
 }
 
 // ── Step 2: Test Resources ────────────────────────────────────────────────────
@@ -4462,7 +4462,7 @@ async function runTimetableDiscovery() {
 
   const originURN = originEl.value.trim();
   const destinationURN = destEl.value.trim();
-  let days = parseInt(daysEl && daysEl.value, 10);
+  let days = Number.parseInt(daysEl && daysEl.value, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
 
@@ -4639,7 +4639,7 @@ function attachPlaceAutocomplete(input) {
     box.querySelectorAll('.place-lookup-item').forEach(it => {
       it.addEventListener('mousedown', (ev) => {
         ev.preventDefault();
-        choose(parseInt(it.dataset.i, 10));
+        choose(Number.parseInt(it.dataset.i, 10));
       });
     });
   }
@@ -4844,7 +4844,7 @@ function journeyContinuityWarnings(j) {
       warns.push(`Leg ${i + 1} starts at ${stnShort(cur.d.originURN)} but leg ${i} ends at ${stnShort(prev.d.destinationURN)} — the legs don't connect.`);
     }
     const arr = ms(prev.svc.arrivalTime), dep = ms(cur.svc.departureTime);
-    if (!isNaN(arr) && !isNaN(dep) && dep < arr) {
+    if (!Number.isNaN(arr) && !Number.isNaN(dep) && dep < arr) {
       warns.push(`Leg ${i + 1} departs ${cur.svc.departureTime} before leg ${i} arrives ${prev.svc.arrivalTime} — pick a later service (or ignore if it's an overnight connection).`);
     }
   }
@@ -5029,8 +5029,8 @@ function journeySetLeg(jidx, li, value) {
   const [trainResourceId, svcIdxStr] = String(value || '').split('::');
   if (!trainResourceId) { j.data.legs[li] = { trainResourceId: '', serviceIndex: 0 }; }
   else {
-    const parsedId = /^\d+$/.test(trainResourceId) ? parseInt(trainResourceId, 10) : trainResourceId;
-    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: parseInt(svcIdxStr, 10) || 0 };
+    const parsedId = /^\d+$/.test(trainResourceId) ? Number.parseInt(trainResourceId, 10) : trainResourceId;
+    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: Number.parseInt(svcIdxStr, 10) || 0 };
   }
   reRenderJourneyBody(jidx);
 }
@@ -5618,7 +5618,7 @@ function wizSetTripType(tripType) {
 function wizSelectTrain(id) {
   // HTML select values are always strings; parse to number for integer IDs so that
   // r.id === sc.trainResourceId strict equality works (SQLite IDs are numbers).
-  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  const parsed = id && /^\d+$/.test(id) ? Number.parseInt(id, 10) : (id || null);
   wizScenario.trainResourceId = parsed;
   // Update offer criteria arrays from train data if available
   if (parsed) {
@@ -5638,7 +5638,7 @@ function wizSelectTrain(id) {
 // #143 — pick a saved multi-leg Journey for a new scenario. A journey is always
 // a SPECIFICATION; selecting one supersedes the single-train selection.
 function wizSelectJourney(id) {
-  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  const parsed = id && /^\d+$/.test(id) ? Number.parseInt(id, 10) : (id || null);
   wizScenario.journeyResourceId = parsed;
   if (parsed) {
     wizScenario.tripType = 'SPECIFICATION';
@@ -5865,7 +5865,7 @@ async function wizGenerateScenario() {
         ...(dataFile.passengersList||[]).map(p => p.id),
         ...(dataFile.purchaserList||[]).map(p => p.id),
         ...(dataFile.requestedFulfillmentOptionsList||[]).map(f => f.id),
-      ].filter(id => typeof id === 'number' && !isNaN(id));
+      ].filter(id => typeof id === 'number' && !Number.isNaN(id));
       return (ids.length > 0 ? Math.max(...ids) : 0) + 1;
     })();
     const tripId      = nextId++;
@@ -6196,13 +6196,13 @@ document.body.addEventListener('click', function(e) {
 
     // ── Scenario list actions ─────────────────────────────────────────────────
     case 'toggle-detail':
-      toggleDetail(parseInt(el.dataset.idx)); break;
+      toggleDetail(Number.parseInt(el.dataset.idx)); break;
     case 'delete-scenario':
-      e.stopPropagation(); deleteScenario(parseInt(el.dataset.idx)); break;
+      e.stopPropagation(); deleteScenario(Number.parseInt(el.dataset.idx)); break;
     case 'add-pax': {
       e.stopPropagation();
-      const pIdx = parseInt(el.dataset.pidx);
-      const scIdx = parseInt(el.dataset.scenidx);
+      const pIdx = Number.parseInt(el.dataset.pidx);
+      const scIdx = Number.parseInt(el.dataset.scenidx);
       const typeSelect = document.getElementById(`add-pax-type-${esc(pIdx)}`);
       const category = typeSelect ? typeSelect.value : 'ADULT';
       const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
@@ -6258,8 +6258,8 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-pax-edit': {
       e.stopPropagation();
-      const tpIdx = parseInt(el.dataset.pidx);
-      const tpPi  = parseInt(el.dataset.pi);
+      const tpIdx = Number.parseInt(el.dataset.pidx);
+      const tpPi  = Number.parseInt(el.dataset.pi);
       const key   = tpIdx + ':' + tpPi;
       const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
       const row   = panel && panel.previousElementSibling;
@@ -6272,8 +6272,8 @@ document.body.addEventListener('click', function(e) {
     }
     case 'add-pax-reduction': {
       e.stopPropagation();
-      const arIdx = parseInt(el.dataset.pidx);
-      const arPi  = parseInt(el.dataset.pi);
+      const arIdx = Number.parseInt(el.dataset.pidx);
+      const arPi  = Number.parseInt(el.dataset.pi);
       const arList = state.passengersList[arIdx];
       const arPax  = arList && arList.passengers && arList.passengers[arPi];
       if (!arPax) break;
@@ -6298,9 +6298,9 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax-reduction': {
       e.stopPropagation();
-      const rrIdx = parseInt(el.dataset.pidx);
-      const rrPi  = parseInt(el.dataset.pi);
-      const rrCi  = parseInt(el.dataset.cidx);
+      const rrIdx = Number.parseInt(el.dataset.pidx);
+      const rrPi  = Number.parseInt(el.dataset.pi);
+      const rrCi  = Number.parseInt(el.dataset.cidx);
       const rrList = state.passengersList[rrIdx];
       const rrPax  = rrList && rrList.passengers && rrList.passengers[rrPi];
       if (!rrPax || !Array.isArray(rrPax.reductionCards)) break;
@@ -6318,8 +6318,8 @@ document.body.addEventListener('click', function(e) {
     }
     case 'add-pax-loyalty': {
       e.stopPropagation();
-      const alIdx = parseInt(el.dataset.pidx);
-      const alPi  = parseInt(el.dataset.pi);
+      const alIdx = Number.parseInt(el.dataset.pidx);
+      const alPi  = Number.parseInt(el.dataset.pi);
       const alList = state.passengersList[alIdx];
       const alPax  = alList && alList.passengers && alList.passengers[alPi];
       if (!alPax) break;
@@ -6340,9 +6340,9 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax-loyalty': {
       e.stopPropagation();
-      const rlIdx = parseInt(el.dataset.pidx);
-      const rlPi  = parseInt(el.dataset.pi);
-      const rlCi  = parseInt(el.dataset.cidx);
+      const rlIdx = Number.parseInt(el.dataset.pidx);
+      const rlPi  = Number.parseInt(el.dataset.pi);
+      const rlCi  = Number.parseInt(el.dataset.cidx);
       const rlList = state.passengersList[rlIdx];
       const rlPax  = rlList && rlList.passengers && rlList.passengers[rlPi];
       if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) break;
@@ -6358,8 +6358,8 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax': {
       e.stopPropagation();
-      const rpIdx = parseInt(el.dataset.pidx);
-      const rpPi = parseInt(el.dataset.pi);
+      const rpIdx = Number.parseInt(el.dataset.pidx);
+      const rpPi = Number.parseInt(el.dataset.pi);
       const rpList = state.passengersList[rpIdx];
       if (!rpList || !rpList.passengers || rpList.passengers.length <= 1) break;
       if (!confirm(`Remove passenger ${rpPi + 1}?`)) break;
@@ -6373,7 +6373,7 @@ document.body.addEventListener('click', function(e) {
       // Find which scenario detail is open and re-render
       document.querySelectorAll('.scenario-detail').forEach(det => {
         if (det.innerHTML && det.id.startsWith('detail-')) {
-          const sIdx = parseInt(det.id.replace('detail-', ''));
+          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
           if (sc && sc.passengersListId === rpList.id) {
             renderScenarioDetail(det, sIdx);
@@ -6392,7 +6392,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-shared': {
       e.stopPropagation();
-      const sIdx = parseInt(el.dataset.idx);
+      const sIdx = Number.parseInt(el.dataset.idx);
       const sc = state.scenarios[sIdx];
       if (sc) {
         sc.shared = !sc.shared;
@@ -6405,7 +6405,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-sales-action': {
       e.stopPropagation();
-      const tsaIdx = parseInt(el.dataset.idx);
+      const tsaIdx = Number.parseInt(el.dataset.idx);
       const key = el.dataset.key;
       const sc = state.scenarios[tsaIdx];
       if (!sc || !key) break;
@@ -6421,7 +6421,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-place-probe': {
       e.stopPropagation();
-      const ppIdx = parseInt(el.dataset.idx);
+      const ppIdx = Number.parseInt(el.dataset.idx);
       const ppKey = el.dataset.key;
       const ppSc = state.scenarios[ppIdx];
       if (!ppSc || !ppKey) break;
@@ -6439,7 +6439,7 @@ document.body.addEventListener('click', function(e) {
       // #373: single-select accommodation family (Seat/Couchette/Berth);
       // '' (— any —) clears the field → current default behaviour.
       e.stopPropagation();
-      const accIdx = parseInt(el.dataset.idx);
+      const accIdx = Number.parseInt(el.dataset.idx);
       const accSc = state.scenarios[accIdx];
       if (!accSc) break;
       accSc.accommodationSelection = el.dataset.val || null;
@@ -6452,7 +6452,7 @@ document.body.addEventListener('click', function(e) {
       // #211: single-select gender-segregation preference (MEN/LADIES/MIXED)
       // for night-train COUCHETTE/BERTH compartments; '' (— any —) clears it.
       e.stopPropagation();
-      const genIdx = parseInt(el.dataset.idx);
+      const genIdx = Number.parseInt(el.dataset.idx);
       const genSc = state.scenarios[genIdx];
       if (!genSc) break;
       genSc.accommodationGenderPreference = el.dataset.val || null;
@@ -6464,7 +6464,7 @@ document.body.addEventListener('click', function(e) {
     case 'toggle-book-mandatory-reservations': {
       // #239: single boolean toggle — book via optionalReservationSelections.
       e.stopPropagation();
-      const mrIdx = parseInt(el.dataset.idx);
+      const mrIdx = Number.parseInt(el.dataset.idx);
       const mrSc = state.scenarios[mrIdx];
       if (!mrSc) break;
       mrSc.bookMandatoryReservations = mrSc.bookMandatoryReservations !== true;
@@ -6477,7 +6477,7 @@ document.body.addEventListener('click', function(e) {
       // Single-select seat-selection mode (issue #107). Constrained at render
       // time to the framework's supported modes.
       e.stopPropagation();
-      const spmIdx = parseInt(el.dataset.idx);
+      const spmIdx = Number.parseInt(el.dataset.idx);
       const spmSc = state.scenarios[spmIdx];
       if (!spmSc) break;
       spmSc.placeSelectionMode = el.dataset.val;
@@ -6488,7 +6488,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'duplicate-scenario': {
       e.stopPropagation();
-      const dupIdx = parseInt(el.dataset.idx);
+      const dupIdx = Number.parseInt(el.dataset.idx);
       const original = state.scenarios[dupIdx];
       if (!original) break;
 
@@ -6571,15 +6571,15 @@ document.body.addEventListener('click', function(e) {
 
     // ── Train resource actions (Step 2) ───────────────────────────────────────
     case 'toggle-train-detail':
-      toggleTrainDetail(parseInt(el.dataset.tidx)); break;
+      toggleTrainDetail(Number.parseInt(el.dataset.tidx)); break;
     case 'wiz-delete-resource':
       e.stopPropagation(); wizDeleteResource(el.dataset.id).catch(reportActionError); break;
     case 'wiz-add-train':
       wizAddTrain(); break;
     case 'wiz-duplicate-train':
-      e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
+      e.stopPropagation(); wizDuplicateTrain(Number.parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
-      wizSaveTrain(parseInt(el.dataset.tidx)).catch(reportActionError); break;
+      wizSaveTrain(Number.parseInt(el.dataset.tidx)).catch(reportActionError); break;
     case 'wiz-save-all-trains':
       wizSaveAllTrains().catch(reportActionError); break;
     case 'wiz-discover-timetable':
@@ -6608,33 +6608,33 @@ document.body.addEventListener('click', function(e) {
     case 'tt-discover-close':
       closeTimetableDiscovery(); break;
     case 'train-add-service':
-      trainAddService(parseInt(el.dataset.tidx)); break;
+      trainAddService(Number.parseInt(el.dataset.tidx)); break;
     case 'train-remove-service': {
       const _tb = el.closest('tbody');
       const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
-      if (_m) trainRemoveService(parseInt(_m[1], 10), el);
+      if (_m) trainRemoveService(Number.parseInt(_m[1], 10), el);
       break;
     }
     case 'train-paste-service':
-      trainPasteServices(parseInt(el.dataset.tidx)); break;
+      trainPasteServices(Number.parseInt(el.dataset.tidx)); break;
 
     // ── Journey actions (Step 2, #137) ────────────────────────────────────────
     case 'toggle-journey-detail':
-      toggleJourneyDetail(parseInt(el.dataset.jidx)); break;
+      toggleJourneyDetail(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-add-journey':
       wizAddJourney(); break;
     case 'wiz-duplicate-journey':
-      e.stopPropagation(); wizDuplicateJourney(parseInt(el.dataset.jidx)); break;
+      e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-delete-journey':
       e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); break;
     case 'wiz-save-journey':
-      wizSaveJourney(parseInt(el.dataset.jidx)).catch(reportActionError); break;
+      wizSaveJourney(Number.parseInt(el.dataset.jidx)).catch(reportActionError); break;
     case 'journey-add-leg':
-      journeyAddLeg(parseInt(el.dataset.jidx)); break;
+      journeyAddLeg(Number.parseInt(el.dataset.jidx)); break;
     case 'journey-remove-leg':
-      journeyRemoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li)); break;
+      journeyRemoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li)); break;
     case 'journey-move-leg':
-      journeyMoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), parseInt(el.dataset.dir)); break;
+      journeyMoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), Number.parseInt(el.dataset.dir)); break;
 
     // ── Scenario creation (Step 3) ────────────────────────────────────────────
     case 'wiz-scen-type':
@@ -6646,7 +6646,7 @@ document.body.addEventListener('click', function(e) {
     case 'wiz-trip-type':
       wizSetTripType(el.dataset.val); break;
     case 'wiz-pax':
-      wizAdjustPax(el.dataset.type, parseInt(el.dataset.delta)); break;
+      wizAdjustPax(el.dataset.type, Number.parseInt(el.dataset.delta)); break;
     case 'wiz-scen-array':
       wizToggleScenArray(el.dataset.field, el.dataset.val, el); break;
     case 'wiz-generate':
@@ -6679,7 +6679,7 @@ document.body.addEventListener('change', function(e) {
       // empty / invalid state lingers. A valid value is left alone — it was
       // already saved (or will be by the debounced auto-save below).
       const raw = (el.value || '').trim();
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (raw === '' || !Number.isFinite(n) || n < 1 || n > 10) {
         el.value = wizData.framework.concurrentSessionLimit || 1;
       }
@@ -6688,7 +6688,7 @@ document.body.addEventListener('change', function(e) {
     case 'set-scenario-code': {
       // Rename an existing scenario. Fires on blur / Enter to avoid renaming
       // mid-keystroke (which would flash the list header and race with typing).
-      const sci = parseInt(el.dataset.idx);
+      const sci = Number.parseInt(el.dataset.idx);
       const scToRename = state.scenarios[sci];
       if (!scToRename) break;
       const origCode = el.dataset.orig || scToRename.code;
@@ -6748,7 +6748,7 @@ document.body.addEventListener('change', function(e) {
     case 'toggle-scenario':
       e.stopPropagation(); toggleScenario(el.dataset.code, el.checked); break;
     case 'set-scenario': {
-      const scIdx = parseInt(el.dataset.idx);
+      const scIdx = Number.parseInt(el.dataset.idx);
       const field = el.dataset.field;
       const newVal = el.dataset.nullable === 'true'
         ? (el.value === '' ? null : el.value)
@@ -6804,9 +6804,9 @@ document.body.addEventListener('change', function(e) {
     // #359: selects in the Trip Search Criteria sub-panel write via dot-path
     // like the text inputs do, but selects fire 'change', not 'input'.
     case 'set-trip-path':
-      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-field': {
-      const tIdxF = parseInt(el.dataset.tidx);
+      const tIdxF = Number.parseInt(el.dataset.tidx);
       setTripField(tIdxF, el.dataset.field, el.value);
       // tripType drives whether we render legs[] (SPECIFICATION) or a single
       // trip{} block (SEARCH). Switching between them leaves a stale UI
@@ -6815,7 +6815,7 @@ document.body.addEventListener('change', function(e) {
         const trip = state.tripRequirements[tIdxF];
         document.querySelectorAll('.scenario-detail').forEach(det => {
           if (!det.dataset.rendered) return;
-          const sIdx = parseInt(det.id.replace('detail-', ''));
+          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
           if (!sc || sc.tripRequirementId !== trip.id) return;
           // Preserve which param sections were open
@@ -6838,8 +6838,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-pax-family': {
-      const sfpIdx = parseInt(el.dataset.pidx);
-      const sfpPi  = parseInt(el.dataset.pi);
+      const sfpIdx = Number.parseInt(el.dataset.pidx);
+      const sfpPi  = Number.parseInt(el.dataset.pi);
       const sfpList = state.passengersList[sfpIdx];
       const sfpPax  = sfpList && sfpList.passengers && sfpList.passengers[sfpPi];
       if (!sfpPax) break;
@@ -6853,7 +6853,7 @@ document.body.addEventListener('change', function(e) {
           .filter(n => n != null);
         nextGroup = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
       } else {
-        const n = parseInt(raw, 10);
+        const n = Number.parseInt(raw, 10);
         nextGroup = Number.isInteger(n) ? n : null;
       }
       sfpPax.familyGroup = nextGroup;
@@ -6874,7 +6874,7 @@ document.body.addEventListener('change', function(e) {
       // member counts, and compact-row badges all reflect the new state.
       document.querySelectorAll('.scenario-detail').forEach(det => {
         if (!det.dataset.rendered) return;
-        const scIdx = parseInt(det.id.replace('detail-', ''));
+        const scIdx = Number.parseInt(det.id.replace('detail-', ''));
         const sc = state.scenarios[scIdx];
         if (sc && sc.passengersListId === sfpList.id) {
           reRenderScenarioDetail(scIdx);
@@ -6883,15 +6883,15 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'journey-leg-pick':
-      journeySetLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), el.value); break;
+      journeySetLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), el.value); break;
     case 'apply-trip-train': {
-      const atScIdx = parseInt(el.dataset.idx);
-      const atTIdx  = parseInt(el.dataset.tidx);
+      const atScIdx = Number.parseInt(el.dataset.idx);
+      const atTIdx  = Number.parseInt(el.dataset.tidx);
       const target  = el.dataset.target; // "trip" or "legs.<n>"
       const raw = el.value; // "<trainId>::<serviceIndex>"
       if (!raw) break;
       const [trainId, svcIdxStr] = String(raw).split('::');
-      const svcIdx = parseInt(svcIdxStr, 10) || 0;
+      const svcIdx = Number.parseInt(svcIdxStr, 10) || 0;
       const train = (wizData.resources || []).find(r => String(r.id) === String(trainId));
       if (!train) break;
       const data = normalizeTrainData(typeof train.data === 'string'
@@ -6907,7 +6907,7 @@ document.body.addEventListener('change', function(e) {
         tripReq.trip = tripReq.trip || {};
         t = tripReq.trip;
       } else {
-        const legIdx = parseInt(target.slice(5), 10); // "legs.3" → 3
+        const legIdx = Number.parseInt(target.slice(5), 10); // "legs.3" → 3
         tripReq.legs = tripReq.legs || [];
         tripReq.legs[legIdx] = tripReq.legs[legIdx] || {};
         t = tripReq.legs[legIdx];
@@ -6931,8 +6931,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'apply-trip-journey': {
-      const ajScIdx = parseInt(el.dataset.idx);
-      const ajTIdx  = parseInt(el.dataset.tidx);
+      const ajScIdx = Number.parseInt(el.dataset.idx);
+      const ajTIdx  = Number.parseInt(el.dataset.tidx);
       const jid = el.value;
       if (!jid) break;
       const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
@@ -6950,8 +6950,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'toggle-purchaser-is-pax': {
-      const tpScIdx = parseInt(el.dataset.idx);
-      const tpPrIdx = parseInt(el.dataset.purchIdx);
+      const tpScIdx = Number.parseInt(el.dataset.idx);
+      const tpPrIdx = Number.parseInt(el.dataset.purchIdx);
       const tpPurchList = state.purchaserList[tpPrIdx];
       if (!tpPurchList) break;
       const p0 = (tpPurchList.purchaser = tpPurchList.purchaser || [{}])[0];
@@ -6974,8 +6974,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-purchaser-passenger': {
-      const ppScIdx = parseInt(el.dataset.idx);
-      const ppPrIdx = parseInt(el.dataset.purchIdx);
+      const ppScIdx = Number.parseInt(el.dataset.idx);
+      const ppPrIdx = Number.parseInt(el.dataset.purchIdx);
       const ppPurchList = state.purchaserList[ppPrIdx];
       if (!ppPurchList) break;
       const pp0 = (ppPurchList.purchaser = ppPurchList.purchaser || [{}])[0];
@@ -6990,8 +6990,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-pax': {
-      const spxIdx = parseInt(el.dataset.pidx);
-      const spxPi  = parseInt(el.dataset.pi);
+      const spxIdx = Number.parseInt(el.dataset.pidx);
+      const spxPi  = Number.parseInt(el.dataset.pi);
       const spxField = el.dataset.field;
       // Gender 'None' (empty value) means the field is omitted from the
       // generated request — store null rather than "" so the data file
@@ -7027,9 +7027,9 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'change-pax-category': {
-      const cpIdx = parseInt(el.dataset.pidx);
-      const cpPi = parseInt(el.dataset.pi);
-      const cpScIdx = parseInt(el.dataset.scenidx);
+      const cpIdx = Number.parseInt(el.dataset.pidx);
+      const cpPi = Number.parseInt(el.dataset.pi);
+      const cpScIdx = Number.parseInt(el.dataset.scenidx);
       const newCat = el.value;
       const cpList = state.passengersList[cpIdx];
       if (!cpList || !cpList.passengers[cpPi]) break;
@@ -7060,11 +7060,11 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-offer':
-      setOfferField(parseInt(el.dataset.idx), el.dataset.field, el.value || null); break;
+      setOfferField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value || null); break;
     case 'toggle-offer-array':
-      toggleOfferArray(parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); break;
+      toggleOfferArray(Number.parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); break;
     case 'set-fulfill':
-      setFulfillField(parseInt(el.dataset.fidx), el.dataset.field, el.value); break;
+      setFulfillField(Number.parseInt(el.dataset.fidx), el.dataset.field, el.value); break;
 
     // ── Framework wizard change handlers ──────────────────────────────────────
     // Checkbox toggles save immediately (binary state, no mid-edit concern).
@@ -7079,7 +7079,7 @@ document.body.addEventListener('change', function(e) {
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
     case 'fw-pax-age': {
       const raw = (el.value || '').trim();
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (raw === '' || !Number.isFinite(n) || n < 0 || n > 120) {
         const ranges = wizData.framework && wizData.framework.passengerAgeRanges;
         const stored = ranges && ranges[el.dataset.paxtype] && ranges[el.dataset.paxtype][el.dataset.bound];
@@ -7122,7 +7122,7 @@ document.body.addEventListener('input', function(e) {
 
   switch (action) {
     case 'set-scenario-text':
-      setScenarioField(parseInt(el.dataset.idx), el.dataset.field, el.value); break;
+      setScenarioField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value); break;
     case 'set-scenario-max-wait-minutes': {
       // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
       // Empty input clears (null = use server default RUN_TIMEOUT_MS).
@@ -7130,11 +7130,11 @@ document.body.addEventListener('input', function(e) {
       // until the user types a valid value (no spurious saves mid-edit).
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
+        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
         }
       }
       break;
@@ -7146,11 +7146,11 @@ document.body.addEventListener('input', function(e) {
       // [1, 60] — anything else is ignored mid-edit.
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
+        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
+          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
         }
       }
       break;
@@ -7172,27 +7172,27 @@ document.body.addEventListener('input', function(e) {
       const _field = _maxWaitFieldByAction[action];
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), _field, null);
+        setScenarioField(Number.parseInt(el.dataset.idx), _field, null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), _field, n);
+          setScenarioField(Number.parseInt(el.dataset.idx), _field, n);
         }
       }
       break;
     }
     case 'set-trip-time':
-      setTripTimeFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripTimeFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-path':
-      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-pax-input':
-      setPaxField(parseInt(el.dataset.pidx), parseInt(el.dataset.pi), el.dataset.field, el.value); break;
+      setPaxField(Number.parseInt(el.dataset.pidx), Number.parseInt(el.dataset.pi), el.dataset.field, el.value); break;
     case 'set-pax-text': {
       // Free-text fields in the per-passenger editor (firstName, lastName,
       // dateOfBirth, email, phoneNumber). Updates the model on every
       // keystroke — no re-render, so focus/caret stay put while typing.
-      const sptIdx = parseInt(el.dataset.pidx);
-      const sptPi  = parseInt(el.dataset.pi);
+      const sptIdx = Number.parseInt(el.dataset.pidx);
+      const sptPi  = Number.parseInt(el.dataset.pi);
       const sptField = el.dataset.field;
       setPaxField(sptIdx, sptPi, sptField, el.value);
       // Keep the compact row-header display in sync when the user edits
@@ -7207,9 +7207,9 @@ document.body.addEventListener('input', function(e) {
       break;
     }
     case 'set-pax-reduction': {
-      const spIdx = parseInt(el.dataset.pidx);
-      const spPi  = parseInt(el.dataset.pi);
-      const spCi  = parseInt(el.dataset.cidx);
+      const spIdx = Number.parseInt(el.dataset.pidx);
+      const spPi  = Number.parseInt(el.dataset.pi);
+      const spCi  = Number.parseInt(el.dataset.cidx);
       const spList = state.passengersList[spIdx];
       const spPax  = spList && spList.passengers && spList.passengers[spPi];
       if (!spPax) break;
@@ -7219,9 +7219,9 @@ document.body.addEventListener('input', function(e) {
       break;
     }
     case 'set-pax-loyalty': {
-      const slIdx = parseInt(el.dataset.pidx);
-      const slPi  = parseInt(el.dataset.pi);
-      const slCi  = parseInt(el.dataset.cidx);
+      const slIdx = Number.parseInt(el.dataset.pidx);
+      const slPi  = Number.parseInt(el.dataset.pi);
+      const slCi  = Number.parseInt(el.dataset.cidx);
       const field = el.dataset.field;
       const slList = state.passengersList[slIdx];
       const slPax  = slList && slList.passengers && slList.passengers[slPi];
@@ -7236,30 +7236,30 @@ document.body.addEventListener('input', function(e) {
     }
     case 'set-offer-currency':
       el.value = el.value.toUpperCase();
-      setOfferField(parseInt(el.dataset.idx), 'currency', el.value); break;
+      setOfferField(Number.parseInt(el.dataset.idx), 'currency', el.value); break;
     case 'set-offer-tags': {
       const tags = el.value.split(',').map(t => t.trim()).filter(Boolean);
-      setOfferField(parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
+      setOfferField(Number.parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
       break;
     }
     case 'set-offer-return-offset': {
       const v = el.value.trim();
-      const n = parseInt(v, 10);
+      const n = Number.parseInt(v, 10);
       // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
-      setOfferField(parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
       break;
     }
     case 'set-offer-return-time':
-      setOfferField(parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
     case 'set-offer-selections': {
       try {
         const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;
-        setOfferField(parseInt(el.dataset.idx), 'productSelections', parsed);
+        setOfferField(Number.parseInt(el.dataset.idx), 'productSelections', parsed);
       } catch (_) { /* invalid JSON — don't save until valid */ }
       break;
     }
     case 'set-purchaser':
-      setPurchaserField(parseInt(el.dataset.purchIdx), el.dataset.field, el.value); break;
+      setPurchaserField(Number.parseInt(el.dataset.purchIdx), el.dataset.field, el.value); break;
 
     // ── Framework wizard input handlers ───────────────────────────────────────
     case 'wiz-osdm-version': {
@@ -7281,7 +7281,7 @@ document.body.addEventListener('input', function(e) {
       // finish typing — an endless loop from their perspective.
       const raw = (el.value || '').trim();
       if (raw === '' || !/^\d+$/.test(raw)) break;
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (!Number.isFinite(n) || n < 1 || n > 10) break;
       wizData.framework.concurrentSessionLimit = n;
       // Debounced auto-save: one PUT 500ms after the last keystroke rather

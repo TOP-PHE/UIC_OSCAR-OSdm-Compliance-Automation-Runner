@@ -166,6 +166,50 @@ describe('js/scenarios.js — actions that nothing awaits (#526)', () => {
   });
 });
 
+describe('js/scenarios.js — setTripFieldByPath', () => {
+  // The path segments are strings. isNaN() converts before it tests;
+  // Number.isNaN() does not, and would call every segment a number (#526).
+  function setter(trip) {
+    const context = { state: { tripRequirements: [trip] }, dirty: 0 };
+    context.markDirty = () => { context.dirty++; };
+    return { set: loadFunction('js/scenarios.js', 'setTripFieldByPath', context), context };
+  }
+
+  test('writes through names and numeric indexes', () => {
+    const trip = { trip: { legs: [{ timedLeg: { start: { stopPlaceRef: 'old' } } }, { timedLeg: {} }] } };
+    const { set, context } = setter(trip);
+    set(0, 'trip.legs.0.timedLeg.start.stopPlaceRef', 'urn:uic:stn:8507000');
+    set(0, 'trip.legs.1.timedLeg.service', 'IC 1');
+    expect(trip.trip.legs[0].timedLeg.start.stopPlaceRef).toBe('urn:uic:stn:8507000');
+    expect(trip.trip.legs[1].timedLeg.service).toBe('IC 1');
+    expect(trip.trip.legs).toHaveLength(2);
+    expect(context.dirty).toBe(2);
+  });
+
+  test('creates what is missing: an array before a number, an object before a name', () => {
+    const trip = {};
+    const { set } = setter(trip);
+    set(0, 'trip.searchCriteria.via.0.viaPlace.stopPlaceRef', 'urn:uic:stn:8500010');
+    expect(Array.isArray(trip.trip.searchCriteria.via)).toBe(true);
+    expect(trip).toEqual({ trip: { searchCriteria: { via: [{ viaPlace: { stopPlaceRef: 'urn:uic:stn:8500010' } }] } } });
+  });
+
+  test('a numeric last segment sets an array element', () => {
+    const trip = { tags: ['a', 'b'] };
+    const { set } = setter(trip);
+    set(0, 'tags.1', 'c');
+    expect(trip.tags).toEqual(['a', 'c']);
+  });
+
+  test('a negative index is ignored', () => {
+    const trip = { a: 1 };
+    const { set, context } = setter(trip);
+    set(-1, 'a', 2);
+    expect(trip).toEqual({ a: 1 });
+    expect(context.dirty).toBe(0);
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });
