@@ -1,8 +1,26 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.231",
+  "current_release": "2026.232",
   "releases": [
+    {
+      "release": "2026.232",
+      "date": "2026-10-06",
+      "server": "1.11.207",
+      "collection": "OTST_V2.0.101",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): only a Test Manager changes the company's OSDM API endpoint. Closes #544. The endpoint (companies.api_base) is company-wide: every request of every run goes to it, with the token of the tester who started the run. PATCH /v1/company accepted api_base from any signed-in member of the company, and the API Config page sent it with every save, whatever the role, so a tester could point the whole company at another address. The dedicated headers on the same route were already Test-Manager-only.",
+        "Server. The rule is one pure function, companyEndpointChange() in api/helpers/shared.js: a Test Manager, or an administrator naming the company, writes the endpoint as before; anyone else gets 403 \"Only Test Managers can change the OSDM API endpoint.\" and nothing is written. It names the two roles itself: isPlatformRole() also covers certifiers, who are stopped earlier on this route, and the rule does not rely on that. A value that is not a string is now a 400 instead of a 500.",
+        "One exception, on purpose: a tester who sends back exactly the stored endpoint (after trimming spaces) gets 200, with nothing written and no audit event. The page did that on every credential save until this release, and a page left open across the upgrade still does; refusing it would have broken the tester's save until a reload. A different case, scheme, path or query is a change and is refused.",
+        "Page (profile.html). For anyone who is not a Test Manager the endpoint field is read-only (still selectable, so it can be copied), with the line \"Only a Test Manager of your company can change this address.\", and Save Configuration sends the tester's own credentials and nothing to the company.",
+        "Tests: 9 on the route (tests/integration/company-routes.test.js), written first: 4 failed on the old code, the other 5 pin what must stay as it was. 14 on the rule (tests/unit/shared.test.js). 11 on the page, whose loadProfile and saveConfig are lifted out of profile.html and run with a fake document and fetch (tests/unit/profile-endpoint.test.js). 33 deliberate breakages of the rule, the route and the page each fail at least one test.",
+        "Not changed: who may read the endpoint (testers, Test Managers and administrators, as before); what address a Test Manager may enter; the audit event, which still names the fields sent and not their values, so the log cannot show whether an earlier save changed the address. Checked in a browser on a throwaway local instance. As a tester: the address is greyed and read-only with the note under it, it can still be selected, and Save Configuration sends the credentials only. A tester on the page from 1.11.206: saving credentials still works (the unchanged address is accepted), and changing the address shows the 403 message with nothing stored. As a Test Manager: the address is edited and saved as before. Not checked on production; worth a look at API Config after deployment.",
+        "Also in this release, unrelated and behaviour-neutral: FINISHED_STATUSES in report-builder.html becomes a Set read with has() (Sonar S7776, raised on #551 after it was merged; tracking #523). It has one use, a membership test on a run's status.",
+        "Docs: Tester User Guide (one-time setup, step 3), Server Admin Guide (trust model row and new section 15.9), a Security news entry on the welcome page. Server-only; collection unchanged at OTST_V2.0.101."
+      ]
+    },
     {
       "release": "2026.231",
       "date": "2026-10-06",

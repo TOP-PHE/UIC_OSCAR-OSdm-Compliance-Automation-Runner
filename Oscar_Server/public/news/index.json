@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-06-api-endpoint-test-manager-only",
+    "date": "October 6, 2026",
+    "tag": "Security",
+    "title": "Only a Test Manager can change the company's OSDM API address",
+    "summary": "The OSDM API Endpoint on the API Config page is shared by everyone in your company: every run goes to that address. Until now any tester could change it. From this release only a Test Manager can. Testers see the address read-only and keep saving their own credentials as before.",
+    "content": "On the API Config page, the first field is the **OSDM API Endpoint**: the address of your provider's OSDM API. There is one per company. Every run started by anyone in the company sends its requests to that address, with the access token of the person who started the run.\n\nUntil now, any tester of the company could change that address, and the change applied to everyone at once. A mistake by one person, a sandbox address pasted into the wrong field for example, sent every colleague's runs to the wrong place. The dedicated headers just below it were already reserved for the Test Manager; the address was not.\n\nFrom this release, only a Test Manager can change it.\n\nWhat you will notice depends on your role. **Testers:** the address is shown greyed out, with the line \"Only a Test Manager of your company can change this address.\" You can still read it and copy it. **Save Configuration** saves your own credentials, exactly as before. **Test Managers:** nothing changes; you edit the address and the dedicated headers as before.\n\nIf the page was already open in your browser when the release arrived, it keeps working: saving your credentials is accepted. Reload the page once to see the address as read-only.\n\nNo action is required. If the address shown for your company is not the one you expect, ask your Test Manager to check it."
+  },
+  {
     "id": "2026-10-06-test-config-action-failures",
     "date": "October 6, 2026",
     "tag": "Bug Fix",

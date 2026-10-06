@@ -219,6 +219,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `purchaserListId`, which made the next save report an untouched scenario
     as not kept. That lookup now lives in `purchaserEntryForCard()`, which
     returns before any write for a read-only scenario.
+- **The company's OSDM endpoint is the Test Manager's to change** (#544,
+  v1.11.207). `companies.api_base` is company-wide: every run of every tester
+  goes to it with that tester's token, and `PATCH /v1/company` used to take it
+  from any member. The rule is `companyEndpointChange()` in
+  `api/helpers/shared.js`, a pure function. It names `test_manager` and
+  `administrator` itself: `isPlatformRole()` is also true for a certifier, who
+  is only stopped earlier on that route by `resolveCompanyScope`. A tester who
+  sends back exactly the stored value gets 200 with nothing written, because
+  the page before 1.11.207 did that on every credential save and a page left
+  open across an upgrade still does; keep that when touching the route. The
+  audit event names the fields sent, not their values, and before this release
+  every save by any role wrote one, so the log cannot show a past change.
+  `tests/unit/profile-endpoint.test.js` runs an HTML page's own functions and
+  `const` lines in a `vm`, the way `scenarios-load-guard.test.js` does for a
+  script file.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
