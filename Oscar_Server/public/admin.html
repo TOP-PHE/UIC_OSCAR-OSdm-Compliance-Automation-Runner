@@ -1170,6 +1170,12 @@ const CONFIG_LABELS = {
   ALERT_REPEAT_WARNING:  'Re-page Warning Every',
 };
 
+// The <input> type of a Server Config value.
+function configInputType(isSensitive, isNum) {
+  if (isSensitive) return 'password';
+  return isNum ? 'number' : 'text';
+}
+
 async function loadConfig() {
   const res = await fetch('/v1/admin/config', { headers: authHeaders });
   if (!res.ok) { showMsg('Failed to load config', false); return; }
@@ -1208,7 +1214,7 @@ async function loadConfig() {
       ).join('');
       control = `<select id="cfg-${key}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
     } else {
-      const inputType = isSensitive ? 'password' : (isNum ? 'number' : 'text');
+      const inputType = configInputType(isSensitive, isNum);
       const attrs = isNum ? `min="${cfg.min}" max="${cfg.max}"` : '';
       control = `<input id="cfg-${key}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(cfg.description || '')}">`;
     }

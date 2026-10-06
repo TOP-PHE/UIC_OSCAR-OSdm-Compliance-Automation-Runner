@@ -178,12 +178,20 @@ function setFilter(f) {
   renderItems();
 }
 
+// The error line of a comparison item: run B's error, or run A's when the
+// item was removed.
+function diffErrorHtml(item) {
+  if (item.run_b?.error) return `<div class="diff-error">${esc(item.run_b.error)}</div>`;
+  if (item.run_a?.error && item.category === 'REMOVED') return `<div class="diff-error">${esc(item.run_a.error)}</div>`;
+  return '';
+}
+
 function renderItems() {
   const filtered = activeFilter === 'ALL' ? allItems : allItems.filter(i => i.category === activeFilter);
   const el = document.getElementById('diff-list');
   if (!filtered.length) { el.innerHTML = '<div class="empty">No items match this filter.</div>'; return; }
   el.innerHTML = filtered.map(item => {
-    const error = item.run_b && item.run_b.error ? `<div class="diff-error">${esc(item.run_b.error)}</div>` : (item.run_a && item.run_a.error && item.category === 'REMOVED' ? `<div class="diff-error">${esc(item.run_a.error)}</div>` : '');
+    const error = diffErrorHtml(item);
     return `<div class="diff-item">
       <div class="diff-header">
         <span class="cat-badge cat-${item.category}">${LABELS[item.category] || item.category}</span>

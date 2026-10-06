@@ -298,11 +298,13 @@ function renderRunRow(r, opts) {
   // already have canDelete=false at the column level.
   const isElevated = user.role === 'administrator' || user.role === 'test_manager';
   const canDeleteThisRow = canDelete && (isElevated || isOwnRun);
-  const checkboxCell = canDelete
-    ? (canDeleteThisRow
-        ? `<input type="checkbox" value="${r.id}" data-action="select" ${selected.has(r.id)?'checked':''}>`
-        : `<input type="checkbox" disabled title="Only ${r.submitted_by || 'the run owner'} or a test_manager can delete this run">`)
-    : '';
+  let checkboxCell = '';
+  if (canDeleteThisRow) {
+    const checkedAttr = selected.has(r.id) ? 'checked' : '';
+    checkboxCell = `<input type="checkbox" value="${r.id}" data-action="select" ${checkedAttr}>`;
+  } else if (canDelete) {
+    checkboxCell = `<input type="checkbox" disabled title="Only ${r.submitted_by || 'the run owner'} or a test_manager can delete this run">`;
+  }
 
   // ── Certifier sharing (v1.11.15) — per-report, test_manager-only ──────────
   // Built via shareLineFor() so a share/unshare can update just this row in
@@ -407,14 +409,17 @@ function renderRuns(runs) {
     const batchAllSelected  = batchCanDelete && batchChildIds.every(id => selected.has(id));
     const batchSomeSelected = batchCanDelete && !batchAllSelected && batchChildIds.some(id => selected.has(id));
     const batchSubmitterSuffix = batchIsOwn ? ' <span style="color:#0090D4">(you)</span>' : '';
-    const batchCheckboxCell = canDelete
-      ? (batchCanDelete
-          ? `<input type="checkbox" data-action="select-batch" data-batch-id="${batchId}"
-              ${batchAllSelected ? 'checked' : ''}
-              ${batchSomeSelected ? 'data-indeterminate="1"' : ''}
-              title="Select all ${batchRuns.length} scenarios in this batch">`
-          : `<input type="checkbox" disabled title="Only ${batchRuns[0].submitted_by || 'the batch owner'} or a test_manager can delete this batch">`)
-      : '';
+    const batchCheckedAttr = batchAllSelected ? 'checked' : '';
+    const batchIndeterminateAttr = batchSomeSelected ? 'data-indeterminate="1"' : '';
+    let batchCheckboxCell = '';
+    if (canDelete && batchCanDelete) {
+      batchCheckboxCell = `<input type="checkbox" data-action="select-batch" data-batch-id="${batchId}"
+              ${batchCheckedAttr}
+              ${batchIndeterminateAttr}
+              title="Select all ${batchRuns.length} scenarios in this batch">`;
+    } else if (canDelete) {
+      batchCheckboxCell = `<input type="checkbox" disabled title="Only ${batchRuns[0].submitted_by || 'the batch owner'} or a test_manager can delete this batch">`;
+    }
     html += `
     <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
       <div class="cb-cell" data-action="batch-cb-cell">${batchCheckboxCell}</div>
@@ -584,12 +589,17 @@ const DELETE_MODAL_TEXT = {
   },
 };
 
+// Which wording the delete dialog uses. Every role other than Test Manager
+// and administrator gets the tester wording.
+function deleteModalVariant(role) {
+  if (role === 'test_manager' || role === 'administrator') return role;
+  return 'tester';
+}
+
 function openDeleteModal() {
   if (selected.size === 0) return;
   // company_user is the legacy role name for "tester" in the JWT payload.
-  const variant = user.role === 'test_manager'  ? 'test_manager'
-                : user.role === 'administrator' ? 'administrator'
-                : 'tester';
+  const variant = deleteModalVariant(user.role);
   const t = DELETE_MODAL_TEXT[variant];
   document.getElementById('modal-title').textContent     = t.title;
   document.getElementById('modal-note').innerHTML        = t.note;

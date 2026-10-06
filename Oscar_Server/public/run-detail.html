@@ -761,6 +761,13 @@ async function loadAssertions() {
   } catch { /* optional card: a failure to load it is not shown to the user */ }
 }
 
+// The PASS / FAIL / SKIP badge of a request.
+function resultBadgeHtml(result) {
+  if (result === 'PASS') return '<span class="a-pass">PASS</span>';
+  if (result === 'FAIL') return '<span class="a-fail">FAIL</span>';
+  return '<span style="color:#90a4ae">SKIP</span>';
+}
+
 // Two-level collapse: suite (main area) → request (endpoint) → assertions.
 // Everything starts collapsed; clicking a suite reveals its endpoints (still
 // collapsed), clicking an endpoint reveals its assertions.
@@ -792,9 +799,7 @@ function renderAssertions() {
       const reqFailed = assertions.filter(a => !a.passed).length;
       suiteFailed += reqFailed;
 
-      const statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
-        : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
-        : '<span style="color:#90a4ae">SKIP</span>';
+      const statusBadge = resultBadgeHtml(req.result);
 
       let rowsHtml = '';
       for (const a of assertions) {
@@ -926,8 +931,9 @@ function renderRequests() {
     for (const r of group) {
       const st = r.http_status;
       const ok = typeof st === 'number' && st >= 200 && st < 300;
+      const badgeClass = ok ? 'a-pass' : 'a-fail';
       const badge = st == null ? '<span style="color:#90a4ae">—</span>'
-        : `<span class="${ok ? 'a-pass' : 'a-fail'}">${escHtml(st)}</span>`;
+        : `<span class="${badgeClass}">${escHtml(st)}</span>`;
       rowsHtml += `<div class="areq" data-req-id="${escHtml(r.id)}">
         <div class="req-header collapsible-head" data-action="toggle-rreq"><span class="chev">▶</span>
           ${badge} <span>${escHtml(r.request_name)}</span>
@@ -1010,11 +1016,9 @@ function renderMessage(label, meta, body, opts) {
     payloadScript = `<script type="application/json" id="${id}-payload">${safeJsonForInlineScript(pretty)}<\/script>`;
     treeDiv = `<div class="msg-tree" id="${id}-tree" style="display:none"></div>`;
   } else if (body) {
-    const reason = !parsedOk
-      ? 'Body is not JSON — tree view unavailable'
-      : payloadSize > MSG_TREE_MAX_BYTES
-        ? `Body > ${Math.round(MSG_TREE_MAX_BYTES/1024/1024)} MB — too large for tree view`
-        : '';
+    let reason = '';
+    if (!parsedOk) reason = 'Body is not JSON — tree view unavailable';
+    else if (payloadSize > MSG_TREE_MAX_BYTES) reason = `Body > ${Math.round(MSG_TREE_MAX_BYTES/1024/1024)} MB — too large for tree view`;
     if (reason) {
       toggleHtml =
         `<div class="msg-toggle-group disabled" title="${escHtml(reason)}">`
