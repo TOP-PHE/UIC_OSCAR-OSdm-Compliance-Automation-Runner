@@ -101,6 +101,71 @@ describe('every script under public/ compiles', () => {
   });
 });
 
+describe('js/scenarios.js — actions that nothing awaits (#526)', () => {
+  // The click, change and timer handlers start async functions without awaiting
+  // them. Sonar (S9383) types that as a bug: if the function rejects, the error
+  // is lost. Each such call now ends in .catch(reportActionError). This reads
+  // the source the way the rule does, for the named top-level async functions:
+  // a call that starts a statement and is closed by ";" right after its ")".
+  function bareAsyncCalls(source) {
+    const lines = source.split('\n');
+    const names = lines.map(l => /^async function ([\w$]+)\(/.exec(l)).filter(Boolean).map(m => m[1]);
+    const call = new RegExp(String.raw`(?:^\s*|[;{}]\s*|\)\s+|:\s+)(${names.join('|')})\((?:[^()]|\([^()]*\))*\)\s*;`, 'g');
+    const found = [];
+    lines.forEach((line, i) => {
+      if (/^\s*\/\//.test(line)) return;
+      for (const m of line.matchAll(call)) found.push(`L${i + 1} ${m[1]}`);
+    });
+    return { names, found };
+  }
+
+  test('the check itself sees a bare call, and only a bare call', () => {
+    const sample = [
+      'async function save() {',
+      '}',
+      'async function load(x) {',
+      '}',
+      'function handler(e) {',
+      '  save();',
+      "  switch (a) { case 'x': e.stopPropagation(); load(Number.parseInt(v)); break; }",
+      '  save().catch(report);',
+      '  await save();',
+      '  const p = load(1);',
+      '  return save();',
+      '  // save();',
+      '}',
+    ].join('\n');
+    expect(bareAsyncCalls(sample)).toEqual({ names: ['save', 'load'], found: ['L6 save', 'L7 load'] });
+  });
+
+  test('no top-level async function of the page is called and left on its own', () => {
+    const { names, found } = bareAsyncCalls(read('js/scenarios.js'));
+    expect(names.length).toBeGreaterThan(15);
+    expect(names).toEqual(expect.arrayContaining(['refreshAllSections', 'saveDatafile', 'wizGenerateScenario', 'loadDatafile']));
+    expect(found).toEqual([]);
+  });
+
+  test('reportActionError logs the error and shows its message', () => {
+    const toasts = [];
+    const logged = [];
+    const reportActionError = loadFunction('js/scenarios.js', 'reportActionError', {
+      console: { error: (...args) => logged.push(args) },
+      oscarToast: (message, kind) => toasts.push([message, kind]),
+    });
+    const failure = new Error('The test configuration could not be loaded: the server answered 500.');
+    reportActionError(failure);
+    reportActionError('plain text');
+    reportActionError(undefined);
+    expect(toasts).toEqual([
+      ['❌ The test configuration could not be loaded: the server answered 500.', 'error'],
+      ['❌ plain text', 'error'],
+      ['❌ undefined', 'error'],
+    ]);
+    expect(logged).toHaveLength(3);
+    expect(logged[0][1]).toBe(failure);
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });

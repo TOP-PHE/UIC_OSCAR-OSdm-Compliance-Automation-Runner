@@ -557,7 +557,7 @@ function saveFrameworkDebounced() {
   if (_saveFrameworkDebounce) clearTimeout(_saveFrameworkDebounce);
   _saveFrameworkDebounce = setTimeout(() => {
     _saveFrameworkDebounce = null;
-    saveFrameworkFromSection();
+    saveFrameworkFromSection().catch(reportActionError);
   }, 500);
 }
 
@@ -895,7 +895,7 @@ function renderWizardStep2InSection() {
 
   // #450 — show how many stop places are cached (drives the origin/destination
   // typeahead). Testers see the status too (read-only), just not the button.
-  refreshPlacesStatus();
+  refreshPlacesStatus().catch(reportActionError);
 }
 
 // ── Section 3: Test Scenarios ────────────────────────────────────────────────
@@ -2986,6 +2986,14 @@ function setFulfillField(fIdx, field, value) {
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
+// Actions started from a click, a change or a timer are not awaited by anything.
+// Most of them report their own failures; this is the net under the ones that do
+// not, so that an error is shown instead of being lost as an unhandled rejection.
+function reportActionError(e) {
+  console.error('Test Config: an action failed', e);
+  oscarToast(`❌ ${e?.message || e}`, 'error');
+}
+
 function showMsg(text, isOk) {
   const el = document.getElementById('msg');
   el.textContent = text;
@@ -6157,7 +6165,7 @@ document.body.addEventListener('click', function(e) {
     case 'download-json':
       downloadJson(); break;
     case 'save-datafile':
-      saveDatafile(); break;
+      saveDatafile().catch(reportActionError); break;
     case 'toggle-section':
       toggleSection(el.dataset.section); break;
     case 'toggle-param-section': {
@@ -6168,15 +6176,15 @@ document.body.addEventListener('click', function(e) {
       break;
     }
     case 'delete-framework':
-      e.stopPropagation(); deleteFramework(); break;
+      e.stopPropagation(); deleteFramework().catch(reportActionError); break;
     case 'delete-all-test-data':
-      e.stopPropagation(); deleteAllTestData(); break;
+      e.stopPropagation(); deleteAllTestData().catch(reportActionError); break;
     case 'delete-all-scenarios':
-      e.stopPropagation(); deleteAllScenarios(); break;
+      e.stopPropagation(); deleteAllScenarios().catch(reportActionError); break;
     case 'create-framework':
       wizData.framework = emptyFramework(); renderWizardStep1InSection(); toggleSection('framework'); break;
     case 'save-framework':
-      saveFrameworkFromSection(); break;
+      saveFrameworkFromSection().catch(reportActionError); break;
     case 'add-train-section':
       renderWizardStep2InSection(); toggleSection('data'); break;
     case 'open-scenario-creator':
@@ -6184,7 +6192,7 @@ document.body.addEventListener('click', function(e) {
     case 'select-all':
       selectAll(el.dataset.checked === 'true'); break;
     case 'delete-datafile':
-      deleteDatafile(); break;
+      deleteDatafile().catch(reportActionError); break;
 
     // ── Scenario list actions ─────────────────────────────────────────────────
     case 'toggle-detail':
@@ -6565,19 +6573,19 @@ document.body.addEventListener('click', function(e) {
     case 'toggle-train-detail':
       toggleTrainDetail(parseInt(el.dataset.tidx)); break;
     case 'wiz-delete-resource':
-      e.stopPropagation(); wizDeleteResource(el.dataset.id); break;
+      e.stopPropagation(); wizDeleteResource(el.dataset.id).catch(reportActionError); break;
     case 'wiz-add-train':
       wizAddTrain(); break;
     case 'wiz-duplicate-train':
       e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
-      wizSaveTrain(parseInt(el.dataset.tidx)); break;
+      wizSaveTrain(parseInt(el.dataset.tidx)).catch(reportActionError); break;
     case 'wiz-save-all-trains':
-      wizSaveAllTrains(); break;
+      wizSaveAllTrains().catch(reportActionError); break;
     case 'wiz-discover-timetable':
       openTimetableDiscovery(); break;
     case 'wiz-download-places':
-      downloadPlaces(el); break;
+      downloadPlaces(el).catch(reportActionError); break;
     case 'wiz-reprobe-offers': {
       // #369: manual refresh of the per-route offer-availability findings.
       el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
@@ -6592,11 +6600,11 @@ document.body.addEventListener('click', function(e) {
         } catch (e2) {
           oscarToast('Re-probe network error: ' + e2.message, 'error');
         } finally { el.disabled = false; el.textContent = _oldTxt; }
-      })();
+      })().catch(reportActionError);
       break;
     }
     case 'tt-discover-run':
-      runTimetableDiscovery(); break;
+      runTimetableDiscovery().catch(reportActionError); break;
     case 'tt-discover-close':
       closeTimetableDiscovery(); break;
     case 'train-add-service':
@@ -6618,9 +6626,9 @@ document.body.addEventListener('click', function(e) {
     case 'wiz-duplicate-journey':
       e.stopPropagation(); wizDuplicateJourney(parseInt(el.dataset.jidx)); break;
     case 'wiz-delete-journey':
-      e.stopPropagation(); wizDeleteJourney(el.dataset.id); break;
+      e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); break;
     case 'wiz-save-journey':
-      wizSaveJourney(parseInt(el.dataset.jidx)); break;
+      wizSaveJourney(parseInt(el.dataset.jidx)).catch(reportActionError); break;
     case 'journey-add-leg':
       journeyAddLeg(parseInt(el.dataset.jidx)); break;
     case 'journey-remove-leg':
@@ -6642,11 +6650,11 @@ document.body.addEventListener('click', function(e) {
     case 'wiz-scen-array':
       wizToggleScenArray(el.dataset.field, el.dataset.val, el); break;
     case 'wiz-generate':
-      wizGenerateScenario(); break;
+      wizGenerateScenario().catch(reportActionError); break;
     case 'goto-section2':
       e.preventDefault(); renderWizardStep2InSection(); toggleSection('data'); break;
     case 'refresh-sections':
-      e.preventDefault(); refreshAllSections(); break;
+      e.preventDefault(); refreshAllSections().catch(reportActionError); break;
     case 'create-another':
       e.preventDefault(); wizInitScenario(); reRenderStep3InSection(); break;
   }
@@ -6663,7 +6671,7 @@ document.body.addEventListener('change', function(e) {
 
   switch (action) {
     case 'file-upload':
-      handleFileUpload(el); break;
+      handleFileUpload(el).catch(reportActionError); break;
     case 'fw-concurrent-limit': {
       // Fires on blur / Enter / spinner click. If the user left the input
       // empty or out-of-range (allowed transiently by the input handler),
@@ -7303,4 +7311,4 @@ document.body.addEventListener('input', function(e) {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadDatafile();
+loadDatafile().catch(reportActionError);
