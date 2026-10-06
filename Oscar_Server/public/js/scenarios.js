@@ -1026,7 +1026,7 @@ async function handleFileUpload(input) {
     // First try to parse the JSON to extract framework/resources
     const fileText = await input.files[0].text();
     let parsed;
-    try { parsed = JSON.parse(fileText); } catch(pe) {
+    try { parsed = JSON.parse(fileText); } catch {
       // Not valid JSON — upload as-is via FormData
       parsed = null;
     }
@@ -6596,8 +6596,8 @@ document.body.addEventListener('click', function(e) {
           const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
           oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
           await refreshAllSections();
-        } catch (e2) {
-          oscarToast('Re-probe network error: ' + e2.message, 'error');
+        } catch (error_) {
+          oscarToast('Re-probe network error: ' + error_.message, 'error');
         } finally { el.disabled = false; el.textContent = _oldTxt; }
       })().catch(reportActionError);
       break;
