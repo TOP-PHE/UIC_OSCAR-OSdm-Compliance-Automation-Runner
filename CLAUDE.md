@@ -339,8 +339,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
   server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
   findings in the UI and the Bruno library, is #525 (v1.11.202 /
-  OTST_V2.0.101). The gate only judges new code, so none of this blocks a
-  release. What the first two established, for the three that follow:
+  OTST_V2.0.101). PR 3, `public/js/scenarios.js`, is #526 (v1.11.204): 340 of
+  that file's 373 findings. The gate only judges new code, so none of this
+  blocks a release. What the first three established, for the two that follow:
   - **The findings are public.** No token is needed:
     `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
     (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an
@@ -381,9 +382,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **Check the lines you touch for other findings first.** A pre-existing
     smell on a line you rewrite is reported on the PR as new. Sonar's
     newer rules also matter here: 20 un-awaited promises in `scenarios.js`
-    (S9383) are typed as *bugs*, and a PR that rewrites one of those lines
-    fails the gate. Their line numbers are in the issue list; stay off them
-    until they are fixed (#526).
+    (S9383) were typed as *bugs*, and a PR that rewrites such a line fails
+    the gate. #526 fixed them first, before any restyling. Check for a new
+    bug-typed rule the same way before PRs 4 and 5.
   - **Reading "ignored exception" findings found a real defect, #534:** Test
     Config treated any failed datafile load as "no datafile yet", and the
     scenario wizard then saved a fresh file over the stored one. It was fixed
@@ -392,6 +393,51 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A linear-time test should fail in seconds, not minutes.** Size the input
     so the old pattern takes a few seconds (60,000 digits for `parseVersion`).
     At 100,000 a regression would have held CI for minutes before failing.
+  - **An action nothing awaits ends in `.catch(reportActionError)`** (#526).
+    The click, change and timer handlers of `scenarios.js` are not async, so
+    a bare `saveDatafile();` loses any rejection. `reportActionError` logs it
+    and shows the reason as a toast. `ui-scripts.test.js` reads the source
+    for a top-level async function called as a bare statement; a new one
+    fails it.
+  - **Flatten a nested conditional without touching the template.** Either
+    `let x = ''; if (cond) { x = <the same template>; }`, or work the inner
+    piece out in a variable before the template. The text of the template
+    does not change, so neither does the HTML. Sonar does not look across a
+    function boundary: a condition inside an arrow function inside a template
+    is not "nested".
+  - **Compare the old and the new page in a browser, by hash.** With no DOM
+    harness for `public/`, this is the check that a restyling of a render
+    function changed nothing: on a throwaway server, capture what the page
+    builds and draws (every card, the framework editor, the wizard, the file
+    the wizard would save with `Math.random` fixed), put
+    `git show main:…/scenarios.js` over the file, reload, capture again,
+    compare. #526 compared 86 captures. Restore the file with
+    `git checkout --` and check `git status` straight after.
+  - **A commit that only renames can be proved.** Undo the rename in both the
+    old and the new text with the same regex and compare: any other change
+    shows. Used for `Number.parseInt` and `replaceAll`.
+  - **`esc()` keeps `replace()` with a global regex, in every page.** Sonar
+    (S7781) asks for `replaceAll('<', ...)`. #526 did that in `scenarios.js`
+    and CodeQL stopped recognising the encoder: it reported three escaped
+    values reaching `innerHTML` as XSS. The data-flow paths in the SARIF
+    (`gh api repos/.../code-scanning/analyses/<id>` with
+    `Accept: application/sarif+json`) run straight through the `replaceAll`
+    chain. The security scanner wins; the five findings stay open. PR 4 will
+    meet the same encoder copied into the HTML pages: leave it alone there
+    too.
+  - **A large diff in a file makes CodeQL report that file's old alerts as
+    new.** #541's check failed with 16 alerts, 13 of them open on `main`
+    since May. `gh api .../code-scanning/alerts?ref=refs/heads/main` tells
+    old from new. The 12 high ones (`Math.random()` feeding fields CodeQL
+    reads as personal data) were fixed for real with `randomInt()` on
+    `crypto.getRandomValues()` (#542). The `CodeQL` results check is not in
+    the required list (`Analyze (javascript-typescript)` is), so GitHub would
+    have merged with it red: read the checks, not only the merge state.
+  - **Left open in `scenarios.js` on purpose (33):** the 5 in `esc()`; 20 functions over the
+    complexity limit (S3776) and the 72-case switch (S1479), not planned; 4
+    sequential `await`s in a loop (S9382); 2 TODO comments (S1135);
+    `e.returnValue` in the unsaved-changes prompt (S1874), which older
+    browsers need.
 - **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
   express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
   could not move to 6.16.0 without it. The whole migration was **one line**:

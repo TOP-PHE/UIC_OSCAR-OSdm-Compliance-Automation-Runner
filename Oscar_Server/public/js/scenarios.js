@@ -12,7 +12,7 @@
 // dev / HTTP environments where the Secure cookie attribute would block the
 // cookie. Both paths are accepted by the auth middleware.
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-if (!user || !user.email) { window.location.href = '/'; }
+if (!user?.email) { window.location.href = '/'; }
 const token = localStorage.getItem('oscar_token');
 const authHeaders = token ? { Authorization: 'Bearer ' + token } : {};
 const isTestManager = user.role === 'test_manager' || user.role === 'administrator';
@@ -118,6 +118,10 @@ function esc(s) {
   // double- and single-quoted attributes and in text content. (Sonar S5696 may
   // still flag innerHTML sinks here — it doesn't recognise this custom encoder
   // as a sanitiser; those alerts are false positives, see issue #82.)
+  // Keep replace() with a global regex here. Sonar (S7781) asks for
+  // replaceAll('<', ...), but CodeQL recognises an encoder by this form only:
+  // with replaceAll and a string, it reported escaped values reaching innerHTML
+  // as XSS (#541).
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -169,15 +173,15 @@ function fwFilter(fullList, allowed) {
 function fwIropsCodesFor(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return [];
   const key = String(scenarioType).toLowerCase();
-  const fw = (wizData && wizData.framework) || {};
-  const codes = fw.iropsCodes && fw.iropsCodes[key];
+  const fw = wizData?.framework || {};
+  const codes = fw.iropsCodes?.[key];
   return Array.isArray(codes) ? codes : [];
 }
 // Is IROPS enabled for this scenario type in the framework's salesFlows?
 // The gate the wizard uses for the sub-type card (REFUND_IROPS / EXCHANGE_IROPS).
 function fwSupportsIrops(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return false;
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
   return flows.includes(String(scenarioType).toUpperCase() + '_IROPS');
 }
@@ -188,9 +192,14 @@ function fwSupportsIrops(scenarioType) {
 // flow in salesFlows[] (REFUND_PARTIAL / EXCHANGE_PARTIAL).
 function fwDeclaresPartialRefund(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return false;
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
   return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
+}
+
+// A scenario flag counts as armed in any of the spellings datafiles use.
+function isArmed(v) {
+  return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1;
 }
 
 // Count of scenarios in the current datafile whose armed feature is not
@@ -199,13 +208,12 @@ function fwDeclaresPartialRefund(scenarioType) {
 // (the server-side authority). Add new field/flow pairs as features land.
 function fwUndeclaredArmedCount() {
   const scenarios = (state && state.scenarios) || [];
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = new Set(Array.isArray(fw.salesFlows) ? fw.salesFlows : []);
-  function armed(v) { return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1; }
   let n = 0;
   for (const sc of scenarios) {
-    const t = String((sc && sc.scenarioType) || 'SALE').toUpperCase();
-    if (t === 'REFUND' && (armed(sc.partialRefundByLeg) || armed(sc.partialRefundByPax))
+    const t = String(sc?.scenarioType || 'SALE').toUpperCase();
+    if (t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax))
         && !flows.has('REFUND_PARTIAL')) {
       n++;
     }
@@ -222,7 +230,7 @@ function decodeCode(code) {
   // returned as-is so the human-readable label doesn't silently mislabel
   // them as "Sale" by falling through the default branch. The scenarioType
   // badge displayed alongside the code already conveys the actual type.
-  const hadOtstPrefix = /^OTST_/.test(code);
+  const hadOtstPrefix = code.startsWith('OTST_');
   const parts = code.replace(/^OTST_/, '').split('_');
   if (!hadOtstPrefix && !/^(RFND|EXCH|SALE)$/.test(parts[0])) {
     return code;
@@ -247,10 +255,10 @@ function decodeCode(code) {
   // Passengers and legs
   while (i < parts.length) {
     const p = parts[i];
-    const n = parseInt(p, 10);
-    if (!isNaN(n) && p.endsWith('ADT')) { paxParts.push(`${n} Adult${n>1?'s':''}`); }
-    else if (!isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
-    else if (!isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
+    const n = Number.parseInt(p, 10);
+    if (!Number.isNaN(n) && p.endsWith('ADT')) { paxParts.push(`${n} Adult${n>1?'s':''}`); }
+    else if (!Number.isNaN(n) && p.endsWith('CHD')) { paxParts.push(`${n} Child${n>1?'ren':''}`); }
+    else if (!Number.isNaN(n) && p.endsWith('LEG')) { legs = `${n} Leg${n>1?'s':''}`; }
     else if (p === 'SEAT')   { special.push('Seat selection'); }
     else if (p === 'CCHTTE' || p === 'COUCHETTE') { special.push('Couchette'); }
     else { unrecognized++; }
@@ -277,9 +285,9 @@ function decodeCode(code) {
 // making it look like the system had renamed the scenario.) A generated/decoded
 // default applies ONLY when there is no code at all.
 function scenarioTitle(sc) {
-  const code = (sc && sc.code != null) ? String(sc.code).trim() : '';
+  const code = (sc?.code != null) ? String(sc.code).trim() : '';
   if (code) return code;
-  return decodeCode((sc && sc.code) || '') || 'Untitled scenario';
+  return decodeCode(sc?.code || '') || 'Untitled scenario';
 }
 
 function scenarioTypeBadge(sc) {
@@ -378,8 +386,8 @@ async function refreshAllSections() {
   let framework = null;
   if (fwLoad.state === 'loaded') {
     const fwBody = fwLoad.value;
-    let cfg = fwBody && fwBody.config;
-    if (cfg && cfg.config && typeof cfg.config === 'object' && !Array.isArray(cfg.config)) {
+    let cfg = fwBody?.config;
+    if (cfg?.config && typeof cfg.config === 'object' && !Array.isArray(cfg.config)) {
       cfg = cfg.config;
     }
     framework = (cfg && typeof cfg === 'object') ? cfg : null;
@@ -391,7 +399,7 @@ async function refreshAllSections() {
   wizData.resources = resources;
 
   // Company profile
-  if (companyRes && companyRes.ok) wizProfile = await companyRes.json();
+  if (companyRes?.ok) wizProfile = await companyRes.json();
 
   // Datafile
   const datafile = dfLoad.state === 'loaded' ? dfLoad.value : null;
@@ -453,7 +461,7 @@ function renderFrameworkSection(framework) {
   // → renderFrameworkSection wipes body. Without capture here, every form
   // re-render resets the sub-section expand state and steals focus from the
   // input the user is typing into.
-  const wasOpen = !!(toggleEl && toggleEl.classList.contains('open'));
+  const wasOpen = !!toggleEl?.classList.contains('open');
   const _fwOpenBefore  = wasOpen ? captureFwOpenState() : null;
   const _fwFocusBefore = wasOpen ? captureFwFocus()     : null;
 
@@ -477,7 +485,7 @@ function renderFrameworkSection(framework) {
     badge.textContent = '✅ Configured';
     const fw = framework;
     const flows = (fw.salesFlows||[]).join(', ') || 'None';
-    const modes = [fw.rail&&fw.rail.enabled?'Rail':'',fw.pt&&fw.pt.enabled?'Urban':'',fw.shared&&fw.shared.enabled?'Shared':''].filter(Boolean).join(', ')||'None';
+    const modes = [fw.rail?.enabled?'Rail':'',fw.pt?.enabled?'Urban':'',fw.shared?.enabled?'Shared':''].filter(Boolean).join(', ')||'None';
     const paxTypes = (fw.passengerTypes||[]).length;
     summary.innerHTML = `OSDM v${esc(fw.osdmVersion||'?')} · Flows: ${esc(flows)} · Modes: ${esc(modes)} · ${esc(paxTypes)} passenger type(s)`;
     body.innerHTML = `<div id="framework-form-area"></div>`;
@@ -527,9 +535,8 @@ function restoreFwOpenState(openSet) {
 }
 function captureFwFocus() {
   const a = document.activeElement;
-  if (!a || !document.getElementById('body-framework') ||
-      !document.getElementById('body-framework').contains(a)) return null;
-  const action = a.getAttribute && a.getAttribute('data-action');
+  if (!a || !document.getElementById('body-framework')?.contains(a)) return null;
+  const action = a.dataset?.action;
   if (!action) return null;
   const state = { action, tag: a.tagName };
   if (typeof a.selectionStart === 'number') {
@@ -557,7 +564,7 @@ function saveFrameworkDebounced() {
   if (_saveFrameworkDebounce) clearTimeout(_saveFrameworkDebounce);
   _saveFrameworkDebounce = setTimeout(() => {
     _saveFrameworkDebounce = null;
-    saveFrameworkFromSection();
+    saveFrameworkFromSection().catch(reportActionError);
   }, 500);
 }
 
@@ -627,7 +634,7 @@ function renderWizardStep1InSection() {
     </div>`;
 
   // Clean up temp div
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 
   // Restore the open/collapse state captured at the top of this function.
   // Keeps the sub-section the user is currently editing expanded across the
@@ -735,7 +742,7 @@ async function deleteTrainResource(resourceId) {
   let impacted = [];
   if (state && state.scenarios && state.tripRequirements) {
     // Find tripRequirement IDs that match this train's data
-    const matchingTripIds = (state.tripRequirements || [])
+    const matchingTripIds = new Set((state.tripRequirements || [])
       .filter(tr => {
         if (tr.tripType === 'SEARCH' && tr.trip) {
           return vehicleNumbers.includes(tr.trip.vehicleNumber);
@@ -745,10 +752,10 @@ async function deleteTrainResource(resourceId) {
         }
         return false;
       })
-      .map(tr => tr.id);
+      .map(tr => tr.id));
 
     impacted = (state.scenarios || []).filter(sc =>
-      matchingTripIds.includes(sc.tripRequirementId)
+      matchingTripIds.has(sc.tripRequirementId)
     );
   }
 
@@ -792,7 +799,7 @@ async function deleteTrainResource(resourceId) {
 
 // 1) Delete a single scenario
 function deleteScenario(idx) {
-  if (!state || !state.scenarios || !state.scenarios[idx]) return;
+  if (!state || !state.scenarios?.[idx]) return;
   const sc = state.scenarios[idx];
   if (!confirm(`Delete scenario "${sc.code}"?`)) return;
 
@@ -882,7 +889,7 @@ function renderWizardStep2InSection() {
   renderWizardStep2();
 
   targetEl.innerHTML = tempDiv.innerHTML;
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 
   // Read-only mode for testers
   if (isTester) {
@@ -895,7 +902,7 @@ function renderWizardStep2InSection() {
 
   // #450 — show how many stop places are cached (drives the origin/destination
   // typeahead). Testers see the status too (read-only), just not the button.
-  refreshPlacesStatus();
+  refreshPlacesStatus().catch(reportActionError);
 }
 
 // ── Section 3: Test Scenarios ────────────────────────────────────────────────
@@ -1012,12 +1019,12 @@ function renderWizardStep3InSection(targetEl) {
   targetEl.innerHTML = '<div style="margin-top:14px;padding-top:14px;border-top:2px solid #e3eaf5">' +
     '<div style="font-size:14px;font-weight:800;color:#0090D4;margin-bottom:14px">⚡ Create New Scenario</div>' +
     tempDiv.innerHTML + '</div>';
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 }
 
 // ── Handle file upload ───────────────────────────────────────────────────────
 async function handleFileUpload(input) {
-  if (!input.files || !input.files[0]) return;
+  if (!input.files?.[0]) return;
   const loadEl = document.getElementById('loading');
   document.getElementById('sections-container').style.display = 'none';
   loadEl.textContent = '⏳ Uploading data file…';
@@ -1027,7 +1034,7 @@ async function handleFileUpload(input) {
     // First try to parse the JSON to extract framework/resources
     const fileText = await input.files[0].text();
     let parsed;
-    try { parsed = JSON.parse(fileText); } catch(pe) {
+    try { parsed = JSON.parse(fileText); } catch {
       // Not valid JSON — upload as-is via FormData
       parsed = null;
     }
@@ -1062,12 +1069,12 @@ async function handleFileUpload(input) {
 async function extractFromDatafile(datafile) {
   try {
     // a) Extract framework
-    const osdmVersion = datafile.osdmVersion || (datafile.scenarios && datafile.scenarios[0] && datafile.scenarios[0].osdmVersion) || '3.4';
-    const scenarioTypes = [...new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean))];
+    const osdmVersion = datafile.osdmVersion || datafile.scenarios?.[0]?.osdmVersion || '3.4';
+    const scenarioTypes = new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean));
     const salesFlows = [];
-    if (scenarioTypes.includes('SALE')) salesFlows.push('SALE');
-    if (scenarioTypes.includes('REFUND')) salesFlows.push('REFUND_FULL');
-    if (scenarioTypes.includes('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
+    if (scenarioTypes.has('SALE')) salesFlows.push('SALE');
+    if (scenarioTypes.has('REFUND')) salesFlows.push('REFUND_FULL');
+    if (scenarioTypes.has('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
 
     // Extract passenger types from passengersList
     const passengerTypes = [...new Set(
@@ -1252,6 +1259,12 @@ function renderAll() {
     // AND the viewer is a tester — in that case a 📋 pill is shown in its
     // own spot (template-duplicate usage was the original use-case).
     const showDuplicate = true;
+    let shareButton = '';
+    if (isTestManager) {
+      const shareTitle = sc.shared ? 'Make private (your use only)' : 'Share with all testers';
+      const shareColours = sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc';
+      shareButton = `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${esc(idx)}" title="${shareTitle}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${shareColours}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>`;
+    }
     // data-sc-card ties every control on the card to its scenario (isLockedControl).
     return `
     <div class="scenario-item" data-sc-card="${esc(idx)}">
@@ -1272,7 +1285,7 @@ function renderAll() {
             ${inRun ? '✓ In run' : 'Not in run'}
           </span>
           <span class="toggle-arrow" id="arrow-${esc(idx)}" data-action="toggle-detail" data-idx="${esc(idx)}" style="cursor:pointer;padding:4px">▶</span>
-          ${isTestManager ? `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${esc(idx)}" title="${sc.shared ? 'Make private (your use only)' : 'Share with all testers'}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc'}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>` : ''}
+          ${shareButton}
           ${showDuplicate ? `<button class="btn btn-sm btn-secondary" data-action="duplicate-scenario" data-idx="${esc(idx)}" title="Duplicate this shared scenario as your own">📋 Duplicate</button>` : ''}
           ${canDelete ? `<button class="row-delete-btn" data-action="delete-scenario" data-idx="${esc(idx)}" title="Delete this scenario">🗑</button>` : ''}
         </div>
@@ -1408,7 +1421,7 @@ function buildDetailHTML(idx) {
           // showing the dropdown there is confusing and lets users save
           // garbage values. Mirrors the wizard which gates wiz-action the
           // same way (see renderWizardStep3, 's3-action-row' section).
-          const scType = (state.scenarios[idx] || {}).scenarioType;
+          const scType = state.scenarios[idx]?.scenarioType;
           if (scType !== 'REFUND' && scType !== 'EXCHANGE') return '';
           return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction);
         })()}
@@ -1422,14 +1435,14 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'stepFailurePolicy',  'Step Failure Policy',  ENUMS.stepFailurePolicy,
           'What a failed non-critical step (passenger PATCH/GET) does. Hard stop (default): abandon the scenario, loop to the next one. Continue: record the failure, warn, and keep testing the remaining steps (fulfillment & co) — the scenario verdict stays FAILED. Offer/booking failures always hard-stop.')}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
-          [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
+          [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), wizData.framework?.offerCriteria?.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE
           // scenarios whose _IROPS flow is in salesFlows, and the codes
           // offered are intersected with fw.iropsCodes.<type>.
-          const scType = (state.scenarios[idx] || {}).scenarioType;
+          const scType = state.scenarios[idx]?.scenarioType;
           if (!fwSupportsIrops(scType)) return '';
           const codes = [null, ...fwIropsCodesFor(scType)];
           return buildSelect(idx, 'overruleCode', 'Overrule Code', codes,
@@ -1561,7 +1574,7 @@ function migrateMissingOfferSearchCriteria() {
 function previewExternalRef(pattern, n) {
   if (!pattern) return '';
   return String(pattern).replace(/%0?(\d*)d/, function (_, width) {
-    const w = parseInt(width || '0', 10);
+    const w = Number.parseInt(width || '0', 10);
     return String(n).padStart(w, '0');
   });
 }
@@ -1602,7 +1615,7 @@ function previewExternalRef(pattern, n) {
 // SEARCH-mode trips can't be statically checked for leg-count — the runtime
 // degradation in 10.yml handles that case with a WARNING.
 function buildPartialRefundFields(idx, sc) {
-  if (!sc || sc.scenarioType !== 'REFUND') return '';
+  if (sc?.scenarioType !== 'REFUND') return '';
 
   // Resolve passengersList + tripRequirement via the canonical state.* helpers
   // already defined at the top of this file (getPassengers / getTrip). The
@@ -1613,7 +1626,7 @@ function buildPartialRefundFields(idx, sc) {
   const paxGroup = getPassengers(sc.passengersListId);
   const resolvedPassengerCount = Array.isArray(paxGroup.passengers) ? paxGroup.passengers.length : 0;
   const tripRequirement = getTrip(sc.tripRequirementId);
-  const isSpec  = tripRequirement && tripRequirement.tripType === 'SPECIFICATION';
+  const isSpec  = tripRequirement?.tripType === 'SPECIFICATION';
   const specLegCount = isSpec && Array.isArray(tripRequirement.legs) ? tripRequirement.legs.length : 0;
   const isReturn = !!(tripRequirement && (tripRequirement.returnSearchParameters || tripRequirement.tripType === 'RETURN'));
 
@@ -1678,8 +1691,19 @@ function buildPartialRefundFields(idx, sc) {
     </div>`;
 }
 
+// ── Badge renderer ────────────────────────────────────────────────────────
+// One small inline-block pill; amber when anything is armed, neutral grey
+// when not. Same shape as the rest of the wizard's count badges so we don't
+// introduce a new visual vocabulary.
+function armedCountBadge(n, total, suffix) {
+  const armed = n > 0;
+  const bg    = armed ? '#FCC44D' : '#eceff1';
+  const fg    = armed ? '#005A8A' : '#90a4ae';
+  return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
+}
+
 function buildNonHappyFlowSection(idx, sc) {
-  const scType = (sc && sc.scenarioType) || '';
+  const scType = sc?.scenarioType || '';
   const showRefund   = (scType === 'REFUND');
   const showExchange = (scType === 'EXCHANGE');
 
@@ -1687,7 +1711,7 @@ function buildNonHappyFlowSection(idx, sc) {
   // `action` is the dataset.action of the Max-wait input (must be registered
   // in the input event-delegation switch below).
   function timerRow(testField, testLabel, testHint, waitField, waitHint, action) {
-    const val = (state.scenarios[idx] || {})[waitField];
+    const val = state.scenarios[idx]?.[waitField];
     return `
       ${buildSelect(idx, testField, testLabel, ENUMS[testField], testHint)}
       <div class="param-field">
@@ -1729,8 +1753,7 @@ function buildNonHappyFlowSection(idx, sc) {
     'expiredExchangeOfferTest',
   ];
   const sc0 = state.scenarios[idx] || {};
-  const totalTimers = (showRefund && showExchange) ? 6
-                    : (showRefund || showExchange) ? 5 : 4;
+  const totalTimers = 4 + (showRefund ? 1 : 0) + (showExchange ? 1 : 0);
   const armedTimers = TIMER_FIELDS.filter(f => sc0[f] === 'on').length;
 
   // Shape-probe armed when:
@@ -1761,17 +1784,6 @@ function buildNonHappyFlowSection(idx, sc) {
 
   const totalArmed = armedTimers + armedShapes + armedPlaceProbes;
 
-  // ── Badge renderer ────────────────────────────────────────────────────────
-  // One small inline-block pill; amber when anything is armed, neutral grey
-  // when not. Same shape as the rest of the wizard's count badges so we don't
-  // introduce a new visual vocabulary.
-  function badge(n, total, suffix) {
-    const armed = n > 0;
-    const bg    = armed ? '#FCC44D' : '#eceff1';
-    const fg    = armed ? '#005A8A' : '#90a4ae';
-    return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
-  }
-
   // Auto-expand a sub-group when anything inside it is armed; otherwise stay
   // collapsed. The user can still toggle manually via the standard
   // toggle-param-section handler — re-renders preserve the manual state by
@@ -1789,7 +1801,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             🪪 Field-shape &amp; payload probes
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">alter the request, document provider strictness</span>
-            ${badge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
+            ${armedCountBadge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
             <span class="ps-arrow${shapesOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${shapesOpenClass}" style="padding:10px 14px">
@@ -1805,7 +1817,7 @@ function buildNonHappyFlowSection(idx, sc) {
               const sc = state.scenarios[idx] || {};
               const current = sc.requestedInformationProbe;
               const opts = ENUMS.requestedInformationProbe.map(o =>
-                `<option value="${esc(o == null ? '' : o)}" ${(current == null ? '' : current) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+                `<option value="${esc(optionValue(o))}" ${optionValue(current) === optionValue(o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
               ).join('');
               return `
               <div style="padding:10px;border:1px dashed #b0bec5;border-radius:6px">
@@ -1864,7 +1876,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             🪑 Place-selection probes
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">corrupt the booking&#39;s placeSelections, document how the provider reacts</span>
-            ${badge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
+            ${armedCountBadge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
             <span class="ps-arrow${placeProbesOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${placeProbesOpenClass}" style="padding:10px 14px">
@@ -1894,7 +1906,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             ⏰ Expiry timers
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">wait past a deadline, assert next request is rejected</span>
-            ${badge(armedTimers, totalTimers, 'armed')}
+            ${armedCountBadge(armedTimers, totalTimers, 'armed')}
             <span class="ps-arrow${timersOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${timersOpenClass}" style="padding:10px 14px">
@@ -1955,7 +1967,7 @@ function buildNonHappyFlowSection(idx, sc) {
 
   return `
   <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${armedCountBadge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
     <div class="param-section-body${topOpenClass}">
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
         ${expiryTimersSubsection}
@@ -1975,10 +1987,10 @@ function buildSalesFlowActionsSection(idx, sc) {
   // Gate 0 — the Test Framework authorises which optional actions a scenario may
   // select (issue #107). An unsupported action is shown disabled with the reason;
   // it cannot be turned on here.
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const ticketTypes  = (fw.rail && Array.isArray(fw.rail.ticketTypes)) ? fw.rail.ticketTypes : [];
   const hasReservations = ticketTypes.includes('IRT') || ticketTypes.includes('NRT_OPTIONAL_RESERVATION');
-  const hasSeatMap      = !!(fw.placeSelection && fw.placeSelection.seatMap);
+  const hasSeatMap      = !!fw.placeSelection?.seatMap;
   const hasAncillaries  = Array.isArray(fw.ancillaries) && fw.ancillaries.length > 0;
   const blockedReasonFor = {
     placeSelection: (hasReservations && hasSeatMap) ? null
@@ -2090,11 +2102,16 @@ function buildSalesFlowActionsSection(idx, sc) {
   </div>`;
 }
 
+// The value of a <select> option: null and undefined stand for the empty option.
+function optionValue(v) {
+  return v == null ? '' : v;
+}
+
 function buildSelect(idx, field, label, options, hint) {
-  const val = (state.scenarios[idx] || {})[field];
+  const val = state.scenarios[idx]?.[field];
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   const opts = options.map(o =>
-    `<option value="${esc(o == null ? '' : o)}" ${(val == null ? '' : val) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+    `<option value="${esc(optionValue(o))}" ${optionValue(val) === optionValue(o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
   ).join('');
   return `
   <div class="param-field">
@@ -2107,7 +2124,7 @@ function buildSelect(idx, field, label, options, hint) {
 }
 
 function buildText(idx, field, label, placeholder, hint) {
-  const val = (state.scenarios[idx] || {})[field] || '';
+  const val = state.scenarios[idx]?.[field] || '';
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   return `
   <div class="param-field">
@@ -2127,7 +2144,7 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
   if (!trains.length) return '';
   const label = target === 'trip'
     ? 'Apply test data (single trip)'
-    : 'Apply to Leg ' + (parseInt(target.slice(5)) + 1);
+    : 'Apply to Leg ' + (Number.parseInt(target.slice(5)) + 1);
   return `
   <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#546e7a;margin-bottom:10px">
     <span style="font-weight:600">🚄 ${label}:</span>
@@ -2157,7 +2174,7 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
 // tripRequirement.trip.searchCriteria.* — scenarioParser builds the OSDM
 // objects from it.
 function buildTripSearchCriteriaPanel(tIdx, trip) {
-  const sc = (trip.trip && trip.trip.searchCriteria) || {};
+  const sc = trip.trip?.searchCriteria || {};
   const isSet = v => v != null && String(v).trim() !== '';
   const setCount =
     ['via1Place', 'via2Place', 'notVias', 'transferLimit', 'numberOfResults',
@@ -2292,11 +2309,11 @@ function buildTripSection(idx, sc, trip) {
 // as filled values (the CSS also renders them lighter + italic).
 function egPlaceholder(placeholder) {
   const p = String(placeholder || '');
-  return p && !/^e\.g\. /.test(p) ? 'e.g. ' + p : p;
+  return p && !p.startsWith('e.g. ') ? 'e.g. ' + p : p;
 }
 
 function buildTripTimeField(tIdx, path, label, val, placeholder) {
-  const displayVal = (val || '').replace(/%TRIP_DATE%T/g, '');
+  const displayVal = (val || '').replaceAll('%TRIP_DATE%T', '');
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
@@ -2330,10 +2347,10 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
 // we restore explicitly so it's not subject to that condition.
 function reRenderScenarioDetail(scIdx) {
   const detail = document.getElementById('detail-' + scIdx);
-  if (!detail || !detail.dataset.rendered) return;
+  if (!detail?.dataset.rendered) return;
   const openSections = new Set();
   detail.querySelectorAll('.param-section-head').forEach(h => {
-    if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+    if (h.nextElementSibling?.classList.contains('open')) {
       openSections.add((h.textContent || '').trim());
     }
   });
@@ -2392,6 +2409,16 @@ function buildLoyaltyCardRow(pIdx, pi, ci, card, readOnly) {
   </div>`;
 }
 
+// Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
+function inferCategory(p) {
+  if (p.category) return p.category;
+  if (p.firstName) {
+    const match = p.firstName.match(/^(ADULT|CHILD|YOUTH|SENIOR|YOUNG_CHILD|FAMILY_CHILD|PRM|ACCOMP_PRM)_/i);
+    if (match) return match[1].toUpperCase();
+  }
+  return 'ADULT';
+}
+
 function buildPassengersSection(idx, sc, paxGroup) {
   const pIdx = (state.passengersList || []).findIndex(p => p.id === sc.passengersListId);
   const passengers = paxGroup.passengers || [];
@@ -2399,22 +2426,12 @@ function buildPassengersSection(idx, sc, paxGroup) {
   const readOnly = isReadOnlyForMe(sc);
   // A read-only passenger can still be opened, to read its details.
   const paxVerb = readOnly ? 'View' : 'Edit';
-  // Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
-  function inferCategory(p) {
-    if (p.category) return p.category;
-    if (p.firstName) {
-      const match = p.firstName.match(/^(ADULT|CHILD|YOUTH|SENIOR|YOUNG_CHILD|FAMILY_CHILD|PRM|ACCOMP_PRM)_/i);
-      if (match) return match[1].toUpperCase();
-    }
-    return 'ADULT';
-  }
-
   // Passenger category dropdown is filtered by the framework's passengerTypes.
   // The current category is always preserved in the list even if the framework
   // later restricted it — editing must not silently coerce existing data.
   const FULL_PAX_CATS = ['ADULT','CHILD','YOUTH','SENIOR','YOUNG_CHILD','FAMILY_CHILD','PRM','ACCOMP_PRM',
     'DOG','PET','BICYCLE','LUGGAGE','PRAM','CAR','MOTORCYCLE','TRAILER','WHEELCHAIR'];
-  const fwPaxTypes = ((wizData && wizData.framework) || {}).passengerTypes;
+  const fwPaxTypes = wizData?.framework?.passengerTypes;
   const allowedPaxCats = fwFilter(FULL_PAX_CATS, fwPaxTypes);
   // Collect the current set of family groups in this passenger list, and
   // the canonical lastName for each — that's the lastName any member can
@@ -2450,14 +2467,17 @@ function buildPassengersSection(idx, sc, paxGroup) {
     // accept across the test corpus. "None" (empty value) means the gender
     // field is omitted from the offer / booking / PATCH requests entirely,
     // for vendors that treat gender as optional and reject synthetic values.
-    const genderSelect = isHuman ? `
+    let genderSelect = '';
+    if (isHuman) {
+      genderSelect = `
     <select class="param-input param-select" style="max-width:130px;font-size:12px"
       data-action="set-pax" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="gender" ${readOnly ? 'disabled' : ''}>
       <option value=""       ${!gender           ?'selected':''}>— None (omit) —</option>
       <option value="MALE"   ${gender==='MALE'   ?'selected':''}>Male</option>
       <option value="FEMALE" ${gender==='FEMALE' ?'selected':''}>Female</option>
       <option value="X"      ${gender==='X'      ?'selected':''}>X (legacy)</option>
-    </select>` : '';
+    </select>`;
+    }
     const editKey = pIdx + ':' + pi;
     const isEditOpen = _paxEditOpen.has(editKey);
     // Expandable editor — personal details + free-entry reduction cards +
@@ -2524,7 +2544,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
     <select class="param-input param-select" style="max-width:180px;font-size:12px"
       data-action="change-pax-category" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-scenidx="${esc(idx)}" ${readOnly ? 'disabled' : ''}>
       ${catOptions.map(c =>
-        `<option value="${esc(c)}" ${c===cat?'selected':''}>${c.replace(/_/g,' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
+        `<option value="${esc(c)}" ${c===cat?'selected':''}>${c.replaceAll('_',' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
       ).join('')}
     </select>
     ${genderSelect}
@@ -2537,20 +2557,25 @@ function buildPassengersSection(idx, sc, paxGroup) {
   ${editPanel}`;
   }).join('');
 
+  let addPassengerRow = '';
+  if (!readOnly) {
+    addPassengerRow = `
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eceff1;display:flex;gap:8px;align-items:center">
+          <select id="add-pax-type-${esc(pIdx)}" class="param-input param-select" style="max-width:180px;font-size:12px">
+            ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replaceAll('_',' ')}</option>`).join('')}
+          </select>
+          <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${esc(pIdx)}" data-scenidx="${esc(idx)}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
+          ${allowedPaxCats.length===0 ? '<span style="font-size:11px;color:#e65100">⚠ No passenger types in framework — configure Step 1 first.</span>' : ''}
+        </div>`;
+  }
+
   return `
   <div class="param-section">
     <div class="param-section-head" data-action="toggle-param-section">👥 Passengers (list #${sc.passengersListId} — ${passengers.length} passenger${passengers.length!==1?'s':''})<span class="ps-arrow">▶</span></div>
     <div class="param-section-body">
       <div style="padding:12px 14px">
         ${rows || '<div style="color:#90a4ae;font-size:13px">No passengers defined.</div>'}
-        ${!readOnly ? `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eceff1;display:flex;gap:8px;align-items:center">
-          <select id="add-pax-type-${esc(pIdx)}" class="param-input param-select" style="max-width:180px;font-size:12px">
-            ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replace(/_/g,' ')}</option>`).join('')}
-          </select>
-          <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${esc(pIdx)}" data-scenidx="${esc(idx)}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
-          ${allowedPaxCats.length===0 ? '<span style="font-size:11px;color:#e65100">⚠ No passenger types in framework — configure Step 1 first.</span>' : ''}
-        </div>` : ''}
+        ${addPassengerRow}
       </div>
     </div>
   </div>`;
@@ -2563,7 +2588,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
 // something custom, we leave it alone.
 const PURCHASER_DEFAULT_PREFIX = 'Purchaser_';
 function isDefaultPurchaserValue(s) {
-  return typeof s === 'string' && s.indexOf(PURCHASER_DEFAULT_PREFIX) === 0;
+  return typeof s === 'string' && s.startsWith(PURCHASER_DEFAULT_PREFIX);
 }
 
 // The purchaser a scenario's card shows, and the index of its entry in
@@ -2619,9 +2644,9 @@ function buildPurchaserSection(idx, sc, purchGroup) {
   // carries the materialised values, so downstream consumers don't need to
   // resolve the link.
   const paxList = (state.passengersList || []).find(p => p.id === sc.passengersListId);
-  const passengers = (paxList && paxList.passengers) || [];
+  const passengers = paxList?.passengers || [];
   const isLinked   = !!purch.isPassenger;
-  const linkedRef  = purch.passengerRef || (passengers[0] && passengers[0].reference) || '';
+  const linkedRef  = purch.passengerRef || passengers[0]?.reference || '';
 
   const linkToggle = `
   <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer">
@@ -2631,7 +2656,9 @@ function buildPurchaserSection(idx, sc, purchGroup) {
     <span>Purchaser is one of the passengers</span>
   </label>`;
 
-  const passengerPicker = isLinked ? `
+  let passengerPicker = '';
+  if (isLinked) {
+    passengerPicker = `
   <div class="param-field" style="max-width:320px;margin-top:8px">
     <span class="param-label">Which passenger?</span>
     <select class="param-input param-select"
@@ -2641,7 +2668,8 @@ function buildPurchaserSection(idx, sc, purchGroup) {
         return '<option value="' + esc(p.reference||'') + '"' + (p.reference===linkedRef?' selected':'') + '>' + esc(display) + '</option>';
       }).join('') || '<option disabled>No passengers defined</option>'}
     </select>
-  </div>` : '';
+  </div>`;
+  }
 
   // When linked, show the resolved values in disabled fields so the user sees
   // what the data file will contain. Edits are disabled — change the linked
@@ -2691,8 +2719,9 @@ function syncPurchaserFromPassenger(paxList, pax) {
     if (sc.passengersListId !== paxList.id) return;
     const purchList = (state.purchaserList || []).find(p => p.id === sc.purchaserListId);
     if (!purchList) return;
-    const p0 = (purchList.purchaser = purchList.purchaser || [{}])[0];
-    if (!p0 || !p0.isPassenger || p0.passengerRef !== pax.reference) return;
+    if (!purchList.purchaser) purchList.purchaser = [{}];
+    const p0 = purchList.purchaser[0];
+    if (!p0?.isPassenger || p0.passengerRef !== pax.reference) return;
     p0.purchaserFirstName    = pax.firstName    || '';
     p0.purchaserLastName     = pax.lastName     || '';
     p0.purchaserEmail        = pax.email        || '';
@@ -2881,7 +2910,7 @@ function setTripField(tIdx, field, value) {
 
 // Save time field: prepends %TRIP_DATE%T to the time-only value
 function setTripTimeFieldByPath(tIdx, path, value) {
-  const stored = value ? '%TRIP_DATE%T' + value.replace(/%TRIP_DATE%T/g, '') : '';
+  const stored = value ? '%TRIP_DATE%T' + value.replaceAll('%TRIP_DATE%T', '') : '';
   setTripFieldByPath(tIdx, path, stored);
 }
 
@@ -2890,14 +2919,14 @@ function setTripFieldByPath(tIdx, path, value) {
   const parts = path.split('.');
   let obj = state.tripRequirements[tIdx];
   for (let i = 0; i < parts.length - 1; i++) {
-    const key = isNaN(parts[i]) ? parts[i] : parseInt(parts[i]);
+    const key = Number.isNaN(Number(parts[i])) ? parts[i] : Number.parseInt(parts[i]);
     // #359: autovivify missing intermediates so new optional sub-objects
     // (trip.searchCriteria.*) can be written into older datafiles that
     // don't have them yet. Next segment numeric → array, else object.
-    if (obj[key] == null) obj[key] = isNaN(parts[i + 1]) ? {} : [];
+    if (obj[key] == null) obj[key] = Number.isNaN(Number(parts[i + 1])) ? {} : [];
     obj = obj[key];
   }
-  const lastKey = isNaN(parts[parts.length-1]) ? parts[parts.length-1] : parseInt(parts[parts.length-1]);
+  const lastKey = Number.isNaN(Number(parts[parts.length-1])) ? parts[parts.length-1] : Number.parseInt(parts[parts.length-1]);
   obj[lastKey] = value;
   markDirty();
 }
@@ -2905,7 +2934,7 @@ function setTripFieldByPath(tIdx, path, value) {
 function setPaxField(pIdx, paxIdx, field, value) {
   if (pIdx < 0) return;
   const paxList = state.passengersList[pIdx];
-  if (!paxList || !paxList.passengers || !paxList.passengers[paxIdx]) return;
+  if (!paxList?.passengers?.[paxIdx]) return;
   // null (from e.g. gender 'None') → delete the property so the data file
   // JSON omits the field entirely rather than carrying an explicit `null`.
   // Matches library-bruno's `!= null` request-builder guards.
@@ -2986,6 +3015,14 @@ function setFulfillField(fIdx, field, value) {
 }
 
 // ── Messages ─────────────────────────────────────────────────────────────────
+// Actions started from a click, a change or a timer are not awaited by anything.
+// Most of them report their own failures; this is the net under the ones that do
+// not, so that an error is shown instead of being lost as an unhandled rejection.
+function reportActionError(e) {
+  console.error('Test Config: an action failed', e);
+  oscarToast(String(e?.message || e), 'error');   // the toast adds its own icon
+}
+
 function showMsg(text, isOk) {
   const el = document.getElementById('msg');
   el.textContent = text;
@@ -3274,7 +3311,7 @@ function pickFirstNameForGender(gender) {
   return randomPick(WIZ_FIRST_NAMES_ANY);
 }
 function isAutoGeneratedFirstName(name) {
-  return !!name && WIZ_RANDOM_FIRST_NAMES.indexOf(name) !== -1;
+  return !!name && WIZ_RANDOM_FIRST_NAMES.includes(name);
 }
 // Map framework pax category → OSDM API passenger type
 // Human categories all map to PERSON; age is inferred from dateOfBirth by the API
@@ -3383,19 +3420,19 @@ function renderWizardStep1() {
   // Build IROPS panel HTML for one flow type
   function iropsPanelHtml(type) {
     const key   = type.toLowerCase(); // 'refund' | 'exchange'
-    const codes = (fw.iropsCodes && fw.iropsCodes[key]) ? fw.iropsCodes[key] : [...WIZ_IROPS_MANDATORY];
+    const codes = fw.iropsCodes?.[key] ? fw.iropsCodes[key] : [...WIZ_IROPS_MANDATORY];
     return `
     <div class="irops-panel${fw.salesFlows.includes(type+'_IROPS')?' open':''}" id="irops-${type}">
       <div class="irops-panel-title">⚡ IROPS Reason Codes — ${type[0]+type.slice(1).toLowerCase()}</div>
       <div style="margin-bottom:6px;font-size:11px;color:#f57f17">Mandatory (always included):</div>
       <div class="pill-group">
-        ${WIZ_IROPS_MANDATORY.map(c=>`<div class="pill mandatory">✓ ${c.replace(/_/g,' ')}</div>`).join('')}
+        ${WIZ_IROPS_MANDATORY.map(c=>`<div class="pill mandatory">✓ ${c.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div style="margin:10px 0 6px;font-size:11px;color:#78909c">Optional (tick if your system supports it):</div>
       <div class="pill-group">
         ${WIZ_IROPS_OPTIONAL.map(c=>`
           <div class="pill${codes.includes(c)?' selected':''}" data-action="fw-toggle-irops" data-type="${key}" data-code="${esc(c)}">
-            ${c.replace(/_/g,' ')}
+            ${c.replaceAll('_',' ')}
           </div>`).join('')}
       </div>
     </div>`;
@@ -3423,6 +3460,8 @@ function renderWizardStep1() {
     </div>`;
   }
 
+  const customAncillaryPills = (fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a))
+    .map(a => `<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('');
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
     Define the functional scope of your OSDM certification. These settings describe what
@@ -3485,7 +3524,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_RAIL_SUBMODES.map(m=>`<div class="pill${(fw.rail.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="rail" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_RAIL_SUBMODES.map(m=>`<div class="pill${(fw.rail.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="rail" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
           <div class="fw-subsection">
@@ -3506,7 +3545,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_PT_SUBMODES.map(m=>`<div class="pill${(fw.pt.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="pt" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_PT_SUBMODES.map(m=>`<div class="pill${(fw.pt.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="pt" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
         </div>
@@ -3521,7 +3560,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_SHARED_SUBMODES.map(m=>`<div class="pill${(fw.shared.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="shared" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_SHARED_SUBMODES.map(m=>`<div class="pill${(fw.shared.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="shared" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
         </div>
@@ -3563,7 +3602,7 @@ function renderWizardStep1() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Select supported passenger types</div>
       <div class="pill-group" style="margin-bottom:16px">
-        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${esc(p)}">${p.replace(/_/g,' ')}</div>`).join('')}
+        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${esc(p)}">${p.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">
@@ -3574,9 +3613,9 @@ function renderWizardStep1() {
           ${WIZ_HUMAN_PAX_TYPES.map(p => {
             const sel   = (fw.passengerTypes||[]).includes(p);
             const dflt  = WIZ_PAX_DEFAULT_AGES[p] || { min: 0, max: 99 };
-            const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[p]) ? fw.passengerAgeRanges[p] : dflt;
+            const range = fw.passengerAgeRanges?.[p] ? fw.passengerAgeRanges[p] : dflt;
             return `<div class="pax-age-row" id="pax-age-${esc(p)}" style="${sel?'':'display:none'}">
-              <span class="pax-age-label">${p.replace(/_/g,' ')}</span>
+              <span class="pax-age-label">${p.replaceAll('_',' ')}</span>
               <label class="pax-age-pair">Min age
                 <input type="number" min="0" max="120" value="${range.min}" data-action="fw-pax-age" data-paxtype="${esc(p)}" data-bound="min">
               </label>
@@ -3600,10 +3639,10 @@ function renderWizardStep1() {
       <div style="padding:12px 14px">
         <div class="fw-subsection-label" style="margin-bottom:8px">Ancillaries the platform supports — standard (OSDM) plus any custom ones. Train resources pick from this catalog.</div>
         <div class="pill-group">
-          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replace(/_/g,' '))}</div>`).join('')}
+          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replaceAll('_',' '))}</div>`).join('')}
         </div>
-        ${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).length
-          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).map(a=>`<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('')}</div></div>`
+        ${customAncillaryPills
+          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${customAncillaryPills}</div></div>`
           : ''}
         <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
           <input class="param-input" id="fw-custom-ancillary" placeholder="Add custom — e.g. BIKE" style="max-width:240px" maxlength="40">
@@ -3622,13 +3661,13 @@ function renderWizardStep1() {
         <div class="fw-subsection">
           <div class="fw-subsection-label">Fulfillment type — which delivery mechanisms does the system support?</div>
           <div class="pill-group">
-            ${WIZ_FULFIL_TYPES.map(t=>`<div class="pill${(fw.fulfillment.types||[]).includes(t)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="types" data-val="${esc(t)}">${t.replace(/_/g,' ')}</div>`).join('')}
+            ${WIZ_FULFIL_TYPES.map(t=>`<div class="pill${(fw.fulfillment.types||[]).includes(t)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="types" data-val="${esc(t)}">${t.replaceAll('_',' ')}</div>`).join('')}
           </div>
         </div>
         <div class="fw-subsection" style="margin-top:10px">
           <div class="fw-subsection-label">Fulfillment media — how is the document delivered?</div>
           <div class="pill-group">
-            ${WIZ_FULFIL_MEDIA.map(m=>`<div class="pill${(fw.fulfillment.media||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="media" data-val="${esc(m)}">${m.replace(/_/g,' ')}</div>`).join('')}
+            ${WIZ_FULFIL_MEDIA.map(m=>`<div class="pill${(fw.fulfillment.media||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="media" data-val="${esc(m)}">${m.replaceAll('_',' ')}</div>`).join('')}
           </div>
         </div>
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">Scenarios can only request the fulfillment type/media declared here — leave a category empty to allow the full OSDM set.</div>
@@ -3778,10 +3817,17 @@ function fwSetPaxAge(type, bound, value) {
   const fw = wizData.framework;
   if (!fw.passengerAgeRanges) fw.passengerAgeRanges = {};
   if (!fw.passengerAgeRanges[type]) fw.passengerAgeRanges[type] = { ...WIZ_PAX_DEFAULT_AGES[type] };
-  fw.passengerAgeRanges[type][bound] = parseInt(value, 10) || 0;
+  fw.passengerAgeRanges[type][bound] = Number.parseInt(value, 10) || 0;
 }
 
 // ── Step 2: Test Resources ────────────────────────────────────────────────────
+// One route's offer-availability findings, for the warning box above the train list.
+function probeWarningHTML(w) {
+  const probed = w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : '';
+  const findings = w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>');
+  return `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${probed}<br>${findings}</div>`;
+}
+
 function renderWizardStep2() {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
 
@@ -3796,20 +3842,20 @@ function renderWizardStep2() {
   const probeWarnings = [];
   trains.forEach(t => {
     const p = probeOf(t);
-    if (p && p.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
+    if (p?.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
   });
 
   const trainItems = trains.map((t, tidx) => {
     const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
     const probe = probeOf(t);
-    const probeChip = (probe && probe.findings.length)
+    const probeChip = probe?.findings.length
       ? `<span title="${esc(probe.findings.join('\n'))}" style="color:#ef6c00;font-size:12px;font-weight:700;flex-shrink:0;cursor:help">&#9888; ${probe.findings.length}</span>`
       : '';
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
     const svc = d.services || [];
-    const svcSummary = svc.length === 0 ? 'no services'
-      : svc.length === 1 ? (svc[0].vehicleNumber || '1 service')
-      : `${svc.length} services`;
+    let svcSummary = `${svc.length} services`;
+    if (svc.length === 0) svcSummary = 'no services';
+    else if (svc.length === 1) svcSummary = svc[0].vehicleNumber || '1 service';
     const classes = (d.travelClasses || []).join(', ') || '';
     const sub = [route, svcSummary, classes].filter(Boolean).join('  ·  ');
     return `
@@ -3857,7 +3903,7 @@ function renderWizardStep2() {
   <details style="margin:0 0 10px;background:#fff8f0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px">
     <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#ef6c00;user-select:none">&#9888; ${probeWarnings.reduce((n2, w) => n2 + w.findings.length, 0)} offer-availability warning(s) on discovered routes - a route in the timetable does not guarantee offers</summary>
     <div style="margin-top:8px;font-size:12.5px;color:#5d4037;line-height:1.6">
-      ${probeWarnings.map(w => `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : ''}<br>${w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>')}</div>`).join('')}
+      ${probeWarnings.map(w => probeWarningHTML(w)).join('')}
       <div style="color:#a1887f">Findings refresh on the next Discover timetable for the route (anonymous 1-adult offer request).</div>
     </div>
   </details>` : ''}
@@ -3916,9 +3962,9 @@ function normalizeTrainData(d) {
     d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
   }
   d.services = d.services.map(s => ({
-    vehicleNumber: (s && s.vehicleNumber) || '',
-    departureTime: (s && s.departureTime) || '',
-    arrivalTime:   (s && s.arrivalTime) || ''
+    vehicleNumber: s?.vehicleNumber || '',
+    departureTime: s?.departureTime || '',
+    arrivalTime:   s?.arrivalTime || ''
   }));
   // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
   // single `productCategory` text field into the ref so saved sets keep working.
@@ -3935,7 +3981,11 @@ function parseServiceToken(tok) {
   const p = String(tok || '').trim().split('|');
   if (p.length < 4 || !p[0].trim()) return null;
   const timeOf = (iso) => { const i = String(iso).indexOf('T'); return (i >= 0 ? iso.slice(i + 1) : iso).trim(); };
-  const stnUrn = (s) => { s = String(s || '').trim(); return s ? (/^urn:/i.test(s) ? s : `urn:uic:stn:${s}`) : ''; };
+  const stnUrn = (s) => {
+    s = String(s || '').trim();
+    if (!s) return '';
+    return /^urn:/i.test(s) ? s : `urn:uic:stn:${s}`;
+  };
   return {
     vehicleNumber: p[0].trim(),
     productCategory: (p[1] || '').trim(),
@@ -3989,7 +4039,7 @@ function trainAddService(tidx) {
 
 function trainRemoveService(tidx, rowEl) {
   const rows = readTrainServiceRows(tidx);
-  const tr = rowEl && rowEl.closest('tr.svc-row');
+  const tr = rowEl?.closest('tr.svc-row');
   const tbody = document.getElementById(`tf-${tidx}-services`);
   if (tr && tbody) {
     const i = [...tbody.querySelectorAll('tr.svc-row')].indexOf(tr);
@@ -4034,7 +4084,7 @@ function buildTrainDetailHTML(tidx) {
   function pills(items, field) {
     const vals = d[field] || [];
     return items.map(v => {
-      const label = typeof v === 'object' ? (v.label || v.value) : String(v).replace(/_/g, ' ');
+      const label = typeof v === 'object' ? (v.label || v.value) : String(v).replaceAll('_', ' ');
       const value = typeof v === 'object' ? v.value : v;
       const sel = vals.includes(value) ? ' selected' : '';
       return `<div class="pill${sel}" data-val="${esc(value)}" data-action="pill-toggle">${esc(label)}</div>`;
@@ -4228,7 +4278,7 @@ function wizValidateTrain(tidx) {
   // urn:<scheme>:stn:<id> so discovered/real refs validate (#161 follow-up).
   const URN_RE  = /^urn:[a-z0-9_]+:stn:[a-z0-9_.-]+$/i;
   const RICS_RE = /^urn:uic:rics:\d+$/i;
-  const TIME_RE = /^\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/;
+  const TIME_RE = /^\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/;
   const detail = document.getElementById('train-detail-' + tidx);
   if (!detail) return false;
   const urnMsg = 'Must be a station URN, e.g. urn:uic:stn:8400058 (or a vendor ref like urn:x_bileto:stn:…).';
@@ -4328,7 +4378,7 @@ async function wizSaveTrain(tidx, opts = {}) {
     // logic referenced an undeclared `wizEditingId` variable, which caused
     // a ReferenceError on every save — "Network error: wizEditingId is not
     // defined" — even though the actual HTTP call had succeeded.)
-    const targetIdx = wizData.resources.findIndex(r => r === t);
+    const targetIdx = wizData.resources.indexOf(t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
     // Save-all reads + persists several panels, then re-renders once itself.
@@ -4362,7 +4412,7 @@ async function wizSaveAllTrains() {
   const targets = [];
   trains.forEach((t, tidx) => {
     const detail = document.getElementById('train-detail-' + tidx);
-    if (detail && detail.dataset.rendered) targets.push(tidx);
+    if (detail?.dataset.rendered) targets.push(tidx);
   });
   if (targets.length === 0) { showMsg('Open the train(s) you want to save first (click a row to expand).', false); return; }
   for (const tidx of targets) {
@@ -4390,7 +4440,8 @@ async function wizSaveAllTrains() {
 // Seed the O&D from the first existing train set, as a convenience.
 function _ttSeedOD() {
   const t = (wizData.resources || []).find(r => r.resource_type === 'TRAIN');
-  const d = t ? normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {})) : {};
+  if (!t) return { origin: '', destination: '' };
+  const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
   return { origin: d.originURN || '', destination: d.destinationURN || '' };
 }
 
@@ -4454,7 +4505,7 @@ async function runTimetableDiscovery() {
 
   const originURN = originEl.value.trim();
   const destinationURN = destEl.value.trim();
-  let days = parseInt(daysEl && daysEl.value, 10);
+  let days = Number.parseInt(daysEl?.value, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
 
@@ -4505,10 +4556,12 @@ function renderDiscoveryResult(el, body) {
   if (!el) return;
   const created = body.created || [];
   const updated = body.updated || [];
-  const list = (title, arr) => arr.length
-    ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
-        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('')}</ul></div>`
-    : '';
+  const list = (title, arr) => {
+    if (!arr.length) return '';
+    const items = arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('');
+    return `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
+        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${items}</ul></div>`;
+  };
   el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated);
   renderDiscoveryDays(el, body.dayResults || []);
 }
@@ -4519,7 +4572,8 @@ function renderDiscoveryDays(el, dayResults) {
     const ok = d.status >= 200 && d.status < 300;
     const icon = ok ? '✅' : '⚠️';
     const via = d.via ? ` via ${esc(d.via)}` : '';
-    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : ''}`;
+    const errorText = d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : '';
+    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${errorText}`;
     return `<tr><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${icon} ${esc(d.date)}</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${detail}</td></tr>`;
   }).join('');
   el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
@@ -4585,7 +4639,7 @@ async function downloadPlaces(btn) {
 // every render path that produces these inputs.
 document.body.addEventListener('focusin', function(e) {
   const input = e.target;
-  if (input && input.matches && input.matches('input[data-place-lookup]')) {
+  if (input?.matches?.('input[data-place-lookup]')) {
     attachPlaceAutocomplete(input);
   }
 });
@@ -4631,7 +4685,7 @@ function attachPlaceAutocomplete(input) {
     box.querySelectorAll('.place-lookup-item').forEach(it => {
       it.addEventListener('mousedown', (ev) => {
         ev.preventDefault();
-        choose(parseInt(it.dataset.i, 10));
+        choose(Number.parseInt(it.dataset.i, 10));
       });
     });
   }
@@ -4722,7 +4776,7 @@ function wizDuplicateTrain(tidx) {
     _unsaved: true,
     label: newLabel,
     resource_type: 'TRAIN',
-    data: JSON.parse(JSON.stringify(srcData))
+    data: structuredClone(srcData)
   };
   wizData.resources.push(copy);
 
@@ -4836,7 +4890,7 @@ function journeyContinuityWarnings(j) {
       warns.push(`Leg ${i + 1} starts at ${stnShort(cur.d.originURN)} but leg ${i} ends at ${stnShort(prev.d.destinationURN)} — the legs don't connect.`);
     }
     const arr = ms(prev.svc.arrivalTime), dep = ms(cur.svc.departureTime);
-    if (!isNaN(arr) && !isNaN(dep) && dep < arr) {
+    if (!Number.isNaN(arr) && !Number.isNaN(dep) && dep < arr) {
       warns.push(`Leg ${i + 1} departs ${cur.svc.departureTime} before leg ${i} arrives ${prev.svc.arrivalTime} — pick a later service (or ignore if it's an overnight connection).`);
     }
   }
@@ -4969,7 +5023,7 @@ function wizDuplicateJourney(jidx) {
   while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
   wizData.resources.push({
     id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
-    data: JSON.parse(JSON.stringify(journeyData(src)))
+    data: structuredClone(journeyData(src))
   });
   renderWizardStep2InSection();
   const bodyData = document.getElementById('body-data');
@@ -5021,8 +5075,8 @@ function journeySetLeg(jidx, li, value) {
   const [trainResourceId, svcIdxStr] = String(value || '').split('::');
   if (!trainResourceId) { j.data.legs[li] = { trainResourceId: '', serviceIndex: 0 }; }
   else {
-    const parsedId = /^\d+$/.test(trainResourceId) ? parseInt(trainResourceId, 10) : trainResourceId;
-    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: parseInt(svcIdxStr, 10) || 0 };
+    const parsedId = /^\d+$/.test(trainResourceId) ? Number.parseInt(trainResourceId, 10) : trainResourceId;
+    j.data.legs[li] = { trainResourceId: parsedId, serviceIndex: Number.parseInt(svcIdxStr, 10) || 0 };
   }
   reRenderJourneyBody(jidx);
 }
@@ -5032,7 +5086,7 @@ async function wizSaveJourney(jidx) {
   const j = journeys[jidx];
   if (!j) return;
   const detail = document.getElementById('journey-detail-' + jidx);
-  const labelEl = detail && detail.querySelector('[data-action="journey-label"]');
+  const labelEl = detail?.querySelector('[data-action="journey-label"]');
   const label = labelEl ? labelEl.value.trim() : (j.label || '');
   const legs = journeyData(j).legs.filter(l => l && l.trainResourceId !== '' && l.trainResourceId != null);
 
@@ -5061,7 +5115,7 @@ async function wizSaveJourney(jidx) {
       return;
     }
     const saved = await res.json();
-    const idx = wizData.resources.findIndex(r => r === j);
+    const idx = wizData.resources.indexOf(j);
     if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
     showMsg(`✅ Journey "${label}" saved.`, true);
     // Local re-render + re-open (keep the panel expanded after save, #141).
@@ -5134,10 +5188,11 @@ function wizInitScenario() {
   const sf = fw.salesFlows || ['SALE'];
 
   // First available type
-  const firstType = sf.includes('SALE') ? 'SALE'
-    : sf.some(f => f.startsWith('REFUND'))   ? 'REFUND'
-    : sf.some(f => f.startsWith('EXCHANGE')) ? 'EXCHANGE'
-    : 'SALE';
+  let firstType = 'SALE';
+  if (!sf.includes('SALE')) {
+    if (sf.some(f => f.startsWith('REFUND'))) firstType = 'REFUND';
+    else if (sf.some(f => f.startsWith('EXCHANGE'))) firstType = 'EXCHANGE';
+  }
 
   // Initial pax counts
   const passengers = {};
@@ -5148,7 +5203,7 @@ function wizInitScenario() {
     type:               firstType,
     subType:            null,
     action:             'PATCH',
-    desiredFlexibility: (fw.offerCriteria && fw.offerCriteria.flexibilities && fw.offerCriteria.flexibilities[0]) || 'FULL_FLEXIBLE',
+    desiredFlexibility: fw.offerCriteria?.flexibilities?.[0] || 'FULL_FLEXIBLE',
     customCode:         '',    // optional user-typed name that overrides the auto-generated scenario code
     passengerGender:    {},    // per-type default gender applied at generation: { ADULT: 'X'|'MALE'|'FEMALE', ... }
     overruleCode:       null,
@@ -5170,8 +5225,8 @@ function wizInitScenario() {
     flexibilities:       [],
     offerMode:           '',
     currency:            '',
-    fulfillmentTypes:    (fw.fulfillment && fw.fulfillment.types) ? [...fw.fulfillment.types] : ['ETICKET'],
-    fulfillmentMedia:    (fw.fulfillment && fw.fulfillment.media) ? [...fw.fulfillment.media] : ['PDF_A4']
+    fulfillmentTypes:    fw.fulfillment?.types ? [...fw.fulfillment.types] : ['ETICKET'],
+    fulfillmentMedia:    fw.fulfillment?.media ? [...fw.fulfillment.media] : ['PDF_A4']
   };
 }
 
@@ -5269,7 +5324,7 @@ function renderWizardStep3() {
   const paxRows = Object.entries(sc.passengers).map(([type, count]) => {
     const isHuman = WIZ_HUMAN_PAX_TYPES.includes(type);
     const range = isHuman
-      ? ((fw.passengerAgeRanges && fw.passengerAgeRanges[type]) || WIZ_PAX_DEFAULT_AGES[type] || {min:18,max:99})
+      ? (fw.passengerAgeRanges?.[type] || WIZ_PAX_DEFAULT_AGES[type] || {min:18,max:99})
       : null;
     const ageHint = range ? `Age ${range.min}–${range.max}` : '&nbsp;';
     const abbr = WIZ_PAX_ABBREV[type] || type.slice(0,3);
@@ -5277,17 +5332,20 @@ function renderWizardStep3() {
     // value — the gender field is then omitted entirely from requests,
     // rather than sending an unvalidated default. Existing stored values
     // (MALE, FEMALE, X) still match their corresponding option.
-    const g = (sc.passengerGender && sc.passengerGender[type]) || '';
-    const genderSelect = isHuman ? `
+    const g = sc.passengerGender?.[type] || '';
+    let genderSelect = '';
+    if (isHuman) {
+      genderSelect = `
       <select class="param-input param-select" style="max-width:130px;font-size:12px;margin-right:6px"
-        data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replace(/_/g,' ')} generated — 'None' omits the field from offer requests">
+        data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replaceAll('_',' ')} generated — 'None' omits the field from offer requests">
         <option value=""       ${!g                ?'selected':''}>— None (omit) —</option>
         <option value="MALE"   ${g==='MALE'        ?'selected':''}>Male</option>
         <option value="FEMALE" ${g==='FEMALE'      ?'selected':''}>Female</option>
         <option value="X"      ${g==='X'           ?'selected':''}>X (legacy)</option>
-      </select>` : '';
+      </select>`;
+    }
     return `<div class="pax-counter-row">
-      <span class="pax-counter-label">${type.replace(/_/g,' ')} <small style="font-weight:400;color:#90a4ae;letter-spacing:0">(${abbr})</small></span>
+      <span class="pax-counter-label">${type.replaceAll('_',' ')} <small style="font-weight:400;color:#90a4ae;letter-spacing:0">(${abbr})</small></span>
       <span class="pax-counter-age">${ageHint}</span>
       <div class="pax-counter-ctrl">
         ${genderSelect}
@@ -5306,6 +5364,16 @@ function renderWizardStep3() {
   // whatever's already selected as a safety net.
   const availSC = [...new Set([...WIZ_SERVICE_CLASSES, ...(sc.serviceClasses || [])])];
   const availTC = [...new Set([...WIZ_TRAVEL_CLASSES,  ...(sc.travelClasses  || [])])];
+
+  // Pieces of the trip block below, worked out here so that the template has no condition inside a condition.
+  const specPill   = sc.tripType === 'SPECIFICATION' ? ' selected' : '';
+  const searchPill = sc.tripType === 'SEARCH' ? ' selected' : '';
+  const tripModeHint = sc.tripType === 'SPECIFICATION'
+    ? '📋 <b>SPECIFICATION</b>: exact trip (vehicle, route, times) sent to the API'
+    : '🔍 <b>SEARCH</b>: origin/destination/date criteria sent — API finds matching trips';
+  const noTrainsWarning = trains.length === 0
+    ? `<div style="margin-top:10px;font-size:12px;color:#e65100">⚠️ No trains defined. <a href="#" data-action="goto-section2" style="color:#0090D4">Go to Section 2</a> to add trains first.</div>`
+    : '';
 
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
@@ -5340,7 +5408,7 @@ function renderWizardStep3() {
         <div class="param-field" style="min-width:180px">
           <label class="param-label">Desired flexibility</label>
           <select class="param-input param-select" data-action="wiz-flexibility">
-            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replace(/_/g,' ')}</option>`).join('')}
+            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria?.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replaceAll('_',' ')}</option>`).join('')}
           </select>
         </div>
         ${(() => {
@@ -5356,7 +5424,7 @@ function renderWizardStep3() {
           <label class="param-label">Overrule code <span class="param-hint">(IROPS reason)</span></label>
           <select class="param-input param-select" data-action="wiz-overrule">
             <option value="">— none —</option>
-            ${codes.map(c => `<option value="${esc(c)}" ${sc.overruleCode===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
+            ${codes.map(c => `<option value="${esc(c)}" ${sc.overruleCode===c?'selected':''}>${c.replaceAll('_',' ')}</option>`).join('')}
           </select>
           ${codes.length === 0 ? '<div style="font-size:11px;color:#e65100;margin-top:4px">⚠ No IROPS codes configured in Framework Step 1.</div>' : ''}
         </div>`;
@@ -5395,14 +5463,12 @@ function renderWizardStep3() {
         <div>
           <div class="param-label" style="margin-bottom:4px">Trip search mode</div>
           <div style="display:flex;gap:6px">
-            <div class="pill${sc.tripType==='SPECIFICATION'?' selected':''}" data-action="wiz-trip-type" data-val="SPECIFICATION" title="Use exact train details (vehicle number, times, route)">📋 SPECIFICATION</div>
-            <div class="pill${sc.tripType==='SEARCH'?' selected':''}" data-action="wiz-trip-type" data-val="SEARCH" title="Search by origin/destination/date — train used for route data only">🔍 SEARCH</div>
+            <div class="pill${specPill}" data-action="wiz-trip-type" data-val="SPECIFICATION" title="Use exact train details (vehicle number, times, route)">📋 SPECIFICATION</div>
+            <div class="pill${searchPill}" data-action="wiz-trip-type" data-val="SEARCH" title="Search by origin/destination/date — train used for route data only">🔍 SEARCH</div>
           </div>
         </div>
         <div style="font-size:11px;color:#90a4ae;max-width:340px;line-height:1.5;align-self:flex-end;padding-bottom:2px">
-          ${sc.tripType==='SPECIFICATION'
-            ? '📋 <b>SPECIFICATION</b>: exact trip (vehicle, route, times) sent to the API'
-            : '🔍 <b>SEARCH</b>: origin/destination/date criteria sent — API finds matching trips'}
+          ${tripModeHint}
         </div>
       </div>
       <div class="param-field">
@@ -5412,12 +5478,13 @@ function renderWizardStep3() {
         </select>
       </div>
       ${trainDetail}
-      ${trains.length===0?`<div style="margin-top:10px;font-size:12px;color:#e65100">⚠️ No trains defined. <a href="#" data-action="goto-section2" style="color:#0090D4">Go to Section 2</a> to add trains first.</div>`:''}
+      ${noTrainsWarning}
 
       ${(() => {
         // Determine if the selected train already provides both URNs
         const selTrain = sc.trainResourceId ? trains.find(t => t.id === sc.trainResourceId) : null;
-        const td = selTrain ? (typeof selTrain.data==='string'?JSON.parse(selTrain.data):selTrain.data||{}) : {};
+        let td = {};
+        if (selTrain) td = typeof selTrain.data === 'string' ? JSON.parse(selTrain.data) : (selTrain.data || {});
         const trainHasOrigin      = !!(td.originURN);
         const trainHasDestination = !!(td.destinationURN);
         const trainHasRoute       = trainHasOrigin && trainHasDestination;
@@ -5431,6 +5498,10 @@ function renderWizardStep3() {
         const needsOrigin      = !trainHasOrigin;
         const needsDestination = !trainHasDestination;
         const isSearch         = sc.tripType === 'SEARCH';
+        const requiredMark     = isSearch ? ' <span style="color:#c62828">*</span>' : '';
+        const requiredNote     = '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>';
+        const originNote       = isSearch && !sc.originURN ? requiredNote : '';
+        const destinationNote  = isSearch && !sc.destinationURN ? requiredNote : '';
 
         return `<div style="margin-top:12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px">
           <div style="font-size:11px;color:#e65100;font-weight:700;margin-bottom:8px">
@@ -5438,20 +5509,20 @@ function renderWizardStep3() {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             ${needsOrigin ? `<div class="param-field">
-              <label class="param-label">Origin station URN${isSearch?' <span style="color:#c62828">*</span>':''}</label>
+              <label class="param-label">Origin station URN${requiredMark}</label>
               <input class="param-input" id="s3-originURN"
                 placeholder="urn:uic:stn:8500010"
                 value="${esc(sc.originURN||'')}"
                 data-action="wiz-origin-urn">
-              ${isSearch && !sc.originURN ? '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>' : ''}
+              ${originNote}
             </div>` : `<div></div>`}
             ${needsDestination ? `<div class="param-field">
-              <label class="param-label">Destination station URN${isSearch?' <span style="color:#c62828">*</span>':''}</label>
+              <label class="param-label">Destination station URN${requiredMark}</label>
               <input class="param-input" id="s3-destinationURN"
                 placeholder="urn:uic:stn:8400058"
                 value="${esc(sc.destinationURN||'')}"
                 data-action="wiz-dest-urn">
-              ${isSearch && !sc.destinationURN ? '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>' : ''}
+              ${destinationNote}
             </div>` : `<div></div>`}
           </div>
         </div>`;
@@ -5476,7 +5547,7 @@ function renderWizardStep3() {
         <div style="font-size:12px;color:#546e7a;background:#f5f8ff;border:1px solid #e3eaf5;border-radius:6px;padding:10px 12px">
           <strong>First name:</strong> Purchaser &nbsp;·&nbsp;
           <strong>Last name:</strong> ${esc(wizProfile.company_name||wizProfile.slug||'Company')} &nbsp;·&nbsp;
-          <strong>Email:</strong> ${esc(wizProfile.email||(user&&user.email)||'tester@example.com')}
+          <strong>Email:</strong> ${esc(wizProfile.email||user?.email||'tester@example.com')}
         </div>
       </div>
     </div>
@@ -5507,7 +5578,7 @@ function renderWizardStep3() {
       <div class="fw-subsection-label" style="margin-bottom:8px">Service class</div>
       <div class="pill-group" style="margin-bottom:14px">
         ${availSC.length
-          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${esc(c)}">${c.replace(/_/g,' ')}</div>`).join('')
+          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${esc(c)}">${c.replaceAll('_',' ')}</div>`).join('')
           : '<span style="font-size:12px;color:#b0bec5">No service classes available — define them in Step 1 or select a train.</span>'}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Travel class</div>
@@ -5516,7 +5587,7 @@ function renderWizardStep3() {
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities</div>
       <div class="pill-group">
-        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
+        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replaceAll('_',' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -5527,11 +5598,11 @@ function renderWizardStep3() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment type</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment && fw.fulfillment.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replace(/_/g,' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment?.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment media</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment && fw.fulfillment.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment?.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -5560,7 +5631,7 @@ function renderWizardStep3() {
 function reRenderStep3InSection() {
   // Re-render step 3 form into whichever section container it lives in
   const area = document.getElementById('scenario-creator-area');
-  if (area && area.innerHTML) {
+  if (area?.innerHTML) {
     renderWizardStep3InSection(area);
   } else {
     const bodyEl = document.getElementById('body-scenarios');
@@ -5610,15 +5681,15 @@ function wizSetTripType(tripType) {
 function wizSelectTrain(id) {
   // HTML select values are always strings; parse to number for integer IDs so that
   // r.id === sc.trainResourceId strict equality works (SQLite IDs are numbers).
-  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  const parsed = id && /^\d+$/.test(id) ? Number.parseInt(id, 10) : (id || null);
   wizScenario.trainResourceId = parsed;
   // Update offer criteria arrays from train data if available
   if (parsed) {
     const tr = (wizData.resources||[]).find(r => r.id === parsed);
     if (tr) {
       const d = typeof tr.data==='string' ? JSON.parse(tr.data) : (tr.data||{});
-      if (d.serviceClasses && d.serviceClasses.length) wizScenario.serviceClasses = [...d.serviceClasses];
-      if (d.travelClasses  && d.travelClasses.length)  wizScenario.travelClasses  = [...d.travelClasses];
+      if (d.serviceClasses?.length) wizScenario.serviceClasses = [...d.serviceClasses];
+      if (d.travelClasses?.length)  wizScenario.travelClasses  = [...d.travelClasses];
       // Pre-fill origin/destination URNs from train resource (user can still override)
       if (d.originURN)      wizScenario.originURN      = d.originURN;
       if (d.destinationURN) wizScenario.destinationURN = d.destinationURN;
@@ -5630,7 +5701,7 @@ function wizSelectTrain(id) {
 // #143 — pick a saved multi-leg Journey for a new scenario. A journey is always
 // a SPECIFICATION; selecting one supersedes the single-train selection.
 function wizSelectJourney(id) {
-  const parsed = id && /^\d+$/.test(id) ? parseInt(id, 10) : (id || null);
+  const parsed = id && /^\d+$/.test(id) ? Number.parseInt(id, 10) : (id || null);
   wizScenario.journeyResourceId = parsed;
   if (parsed) {
     wizScenario.tripType = 'SPECIFICATION';
@@ -5713,16 +5784,33 @@ function wizGenCode() {
   return [slug, typePart, actionPart, paxStr, legStr].filter(Boolean).join('_');
 }
 
-function randomPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function genPhone() { return '+' + Array.from({length:10}, () => Math.floor(Math.random()*10)).join(''); }
+// A whole number from 0 to n - 1, from the browser's cryptographic generator
+// (0 when n is not positive). The values built from it are test data: a
+// first name, a phone number, a date of birth. The plain generator would do
+// for that, but CodeQL reads those field names as personal data and reports
+// a weak generator feeding them (js/insecure-randomness, #542).
+function randomInt(n) {
+  if (n > 0) {
+    const one = new Uint32Array(1);
+    crypto.getRandomValues(one);
+    return one[0] % n;
+  }
+  return 0;   // also when n is undefined or NaN
+}
+function randomPick(arr) {
+  return arr[randomInt(arr.length)];
+}
+function genPhone() {
+  return '+' + Array.from({length:10}, () => randomInt(10)).join('');
+}
 
 function genDateOfBirth(minAge, maxAge) {
   const today   = new Date();
   const minYear = today.getFullYear() - maxAge;
   const maxYear = today.getFullYear() - minAge;
-  const year  = minYear + Math.floor(Math.random() * (maxYear - minYear + 1));
-  const month = 1 + Math.floor(Math.random() * 12);
-  const day   = 1 + Math.floor(Math.random() * 28); // safe for all months
+  const year  = minYear + randomInt(maxYear - minYear + 1);
+  const month = 1 + randomInt(12);
+  const day   = 1 + randomInt(28); // safe for all months
   return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 
@@ -5772,12 +5860,12 @@ function wizGenPassengers() {
         // via their existing `!= null` guards). Otherwise use the chosen
         // value for both gender and updateGender so aftersales PATCH flows
         // stay consistent.
-        const rawDefault = sc.passengerGender && sc.passengerGender[category];
+        const rawDefault = sc.passengerGender?.[category];
         const defaultGender = rawDefault || null;
         pax.firstName   = firstName;
         pax.lastName    = lastName;
         if (defaultGender) pax.gender = defaultGender;   // omitted when null
-        const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[category])
+        const range = fw.passengerAgeRanges?.[category]
           || WIZ_PAX_DEFAULT_AGES[category] || { min: 18, max: 99 };
         pax.dateOfBirth       = genDateOfBirth(range.min, range.max);
         // Update fields — needed for PATCH passenger requests in aftersales scenarios
@@ -5857,7 +5945,7 @@ async function wizGenerateScenario() {
         ...(dataFile.passengersList||[]).map(p => p.id),
         ...(dataFile.purchaserList||[]).map(p => p.id),
         ...(dataFile.requestedFulfillmentOptionsList||[]).map(f => f.id),
-      ].filter(id => typeof id === 'number' && !isNaN(id));
+      ].filter(id => typeof id === 'number' && !Number.isNaN(id));
       return (ids.length > 0 ? Math.max(...ids) : 0) + 1;
     })();
     const tripId      = nextId++;
@@ -5875,11 +5963,12 @@ async function wizGenerateScenario() {
     const trainRes = sc.trainResourceId
       ? (wizData.resources||[]).find(r => r.id === sc.trainResourceId)
       : null;
-    const d = trainRes ? normalizeTrainData(typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    let d = {};
+    if (trainRes) d = normalizeTrainData(typeof trainRes.data === 'string' ? JSON.parse(trainRes.data) : (trainRes.data || {}));
     // A train set may carry several services (timetable, #136); the wizard uses
     // the first one. Per-service selection is available in the trip editor's
     // "Apply test data" picker.
-    const svc0 = (d.services && d.services[0]) || {};
+    const svc0 = d.services?.[0] || {};
 
     // #143 — a selected Journey supersedes the single train: build a multi-leg
     // SPECIFICATION from its legs (origin/dest/times/vehicle/operator + product
@@ -6088,12 +6177,19 @@ async function wizGenerateScenario() {
     }
 
     // ── 8. Append ─────────────────────────────────────────────────────────────────
-    (dataFile.scenarios                       = dataFile.scenarios                       || []).push(scenario);
-    (dataFile.scenariosToRun                  = dataFile.scenariosToRun                  || []).push(code);
-    (dataFile.tripRequirements                = dataFile.tripRequirements                || []).push(tripReq);
-    (dataFile.passengersList                  = dataFile.passengersList                  || []).push(passengersList);
-    (dataFile.purchaserList                   = dataFile.purchaserList                   || []).push(purchaserList);
-    (dataFile.requestedFulfillmentOptionsList = dataFile.requestedFulfillmentOptionsList || []).push(requestedFulfillmentOptionsList);
+    // Same order as before: a list that is missing is created in this order, and that is the key order of the saved file.
+    const appended = [
+      ['scenarios', scenario],
+      ['scenariosToRun', code],
+      ['tripRequirements', tripReq],
+      ['passengersList', passengersList],
+      ['purchaserList', purchaserList],
+      ['requestedFulfillmentOptionsList', requestedFulfillmentOptionsList],
+    ];
+    for (const [listName, entry] of appended) {
+      if (!dataFile[listName]) dataFile[listName] = [];
+      dataFile[listName].push(entry);
+    }
 
     // ── 9. Save ───────────────────────────────────────────────────────────────────
     const saveRes = await fetch('/v1/company/datafile/json', {
@@ -6137,7 +6233,7 @@ async function wizGenerateScenario() {
 function findAction(target) {
   let el = target;
   while (el && el !== document.body) {
-    if (el.dataset && el.dataset.action) return el;
+    if (el.dataset?.action) return el;
     el = el.parentElement;
   }
   return null;
@@ -6157,7 +6253,7 @@ document.body.addEventListener('click', function(e) {
     case 'download-json':
       downloadJson(); break;
     case 'save-datafile':
-      saveDatafile(); break;
+      saveDatafile().catch(reportActionError); break;
     case 'toggle-section':
       toggleSection(el.dataset.section); break;
     case 'toggle-param-section': {
@@ -6168,15 +6264,15 @@ document.body.addEventListener('click', function(e) {
       break;
     }
     case 'delete-framework':
-      e.stopPropagation(); deleteFramework(); break;
+      e.stopPropagation(); deleteFramework().catch(reportActionError); break;
     case 'delete-all-test-data':
-      e.stopPropagation(); deleteAllTestData(); break;
+      e.stopPropagation(); deleteAllTestData().catch(reportActionError); break;
     case 'delete-all-scenarios':
-      e.stopPropagation(); deleteAllScenarios(); break;
+      e.stopPropagation(); deleteAllScenarios().catch(reportActionError); break;
     case 'create-framework':
       wizData.framework = emptyFramework(); renderWizardStep1InSection(); toggleSection('framework'); break;
     case 'save-framework':
-      saveFrameworkFromSection(); break;
+      saveFrameworkFromSection().catch(reportActionError); break;
     case 'add-train-section':
       renderWizardStep2InSection(); toggleSection('data'); break;
     case 'open-scenario-creator':
@@ -6184,23 +6280,23 @@ document.body.addEventListener('click', function(e) {
     case 'select-all':
       selectAll(el.dataset.checked === 'true'); break;
     case 'delete-datafile':
-      deleteDatafile(); break;
+      deleteDatafile().catch(reportActionError); break;
 
     // ── Scenario list actions ─────────────────────────────────────────────────
     case 'toggle-detail':
-      toggleDetail(parseInt(el.dataset.idx)); break;
+      toggleDetail(Number.parseInt(el.dataset.idx)); break;
     case 'delete-scenario':
-      e.stopPropagation(); deleteScenario(parseInt(el.dataset.idx)); break;
+      e.stopPropagation(); deleteScenario(Number.parseInt(el.dataset.idx)); break;
     case 'add-pax': {
       e.stopPropagation();
-      const pIdx = parseInt(el.dataset.pidx);
-      const scIdx = parseInt(el.dataset.scenidx);
+      const pIdx = Number.parseInt(el.dataset.pidx);
+      const scIdx = Number.parseInt(el.dataset.scenidx);
       const typeSelect = document.getElementById(`add-pax-type-${esc(pIdx)}`);
       const category = typeSelect ? typeSelect.value : 'ADULT';
       const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
       const isHuman = WIZ_HUMAN_PAX_TYPES.includes(category);
       const paxList = state.passengersList[pIdx];
-      if (!paxList || !paxList.passengers) break;
+      if (!paxList?.passengers) break;
       const companySlug = (wizProfile.slug || wizProfile.company_name || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
       const fn = randomPick(WIZ_RANDOM_FIRST_NAMES);
       const ln = randomPick(WIZ_RANDOM_LAST_NAMES);
@@ -6229,7 +6325,7 @@ document.body.addEventListener('click', function(e) {
       markDirty();
       // Re-render the detail for this scenario
       const detail = document.getElementById(`detail-${esc(scIdx)}`);
-      if (detail && detail.innerHTML) {
+      if (detail?.innerHTML) {
         renderScenarioDetail(detail, scIdx);
         // Re-open the passengers section
         detail.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
@@ -6250,12 +6346,12 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-pax-edit': {
       e.stopPropagation();
-      const tpIdx = parseInt(el.dataset.pidx);
-      const tpPi  = parseInt(el.dataset.pi);
+      const tpIdx = Number.parseInt(el.dataset.pidx);
+      const tpPi  = Number.parseInt(el.dataset.pi);
       const key   = tpIdx + ':' + tpPi;
       const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
-      const row   = panel && panel.previousElementSibling;
-      const nowOpen = _paxEditOpen.has(key) ? false : true;
+      const row   = panel?.previousElementSibling;
+      const nowOpen = !_paxEditOpen.has(key);
       if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
       if (panel) panel.style.display = nowOpen ? 'block' : 'none';
       if (el)    el.textContent = (el.dataset.verb || 'Edit') + (nowOpen ? ' ▴' : ' ▾');
@@ -6264,10 +6360,10 @@ document.body.addEventListener('click', function(e) {
     }
     case 'add-pax-reduction': {
       e.stopPropagation();
-      const arIdx = parseInt(el.dataset.pidx);
-      const arPi  = parseInt(el.dataset.pi);
+      const arIdx = Number.parseInt(el.dataset.pidx);
+      const arPi  = Number.parseInt(el.dataset.pi);
       const arList = state.passengersList[arIdx];
-      const arPax  = arList && arList.passengers && arList.passengers[arPi];
+      const arPax  = arList?.passengers?.[arPi];
       if (!arPax) break;
       if (!Array.isArray(arPax.reductionCards)) arPax.reductionCards = [];
       arPax.reductionCards.push('');
@@ -6281,7 +6377,7 @@ document.body.addEventListener('click', function(e) {
         tmp.innerHTML = buildReductionCardRow(arIdx, arPi, arPax.reductionCards.length - 1, '', false);
         const newRow = tmp.firstElementChild;
         const addBtn = container.querySelector('[data-action="add-pax-reduction"]');
-        container.insertBefore(newRow, addBtn);
+        if (addBtn) addBtn.before(newRow); else container.append(newRow);
         // Focus the new input so the user can start typing immediately.
         const input = newRow.querySelector('input[data-action="set-pax-reduction"]');
         if (input) input.focus();
@@ -6290,11 +6386,11 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax-reduction': {
       e.stopPropagation();
-      const rrIdx = parseInt(el.dataset.pidx);
-      const rrPi  = parseInt(el.dataset.pi);
-      const rrCi  = parseInt(el.dataset.cidx);
+      const rrIdx = Number.parseInt(el.dataset.pidx);
+      const rrPi  = Number.parseInt(el.dataset.pi);
+      const rrCi  = Number.parseInt(el.dataset.cidx);
       const rrList = state.passengersList[rrIdx];
-      const rrPax  = rrList && rrList.passengers && rrList.passengers[rrPi];
+      const rrPax  = rrList?.passengers?.[rrPi];
       if (!rrPax || !Array.isArray(rrPax.reductionCards)) break;
       rrPax.reductionCards.splice(rrCi, 1);
       markDirty();
@@ -6310,10 +6406,10 @@ document.body.addEventListener('click', function(e) {
     }
     case 'add-pax-loyalty': {
       e.stopPropagation();
-      const alIdx = parseInt(el.dataset.pidx);
-      const alPi  = parseInt(el.dataset.pi);
+      const alIdx = Number.parseInt(el.dataset.pidx);
+      const alPi  = Number.parseInt(el.dataset.pi);
       const alList = state.passengersList[alIdx];
-      const alPax  = alList && alList.passengers && alList.passengers[alPi];
+      const alPax  = alList?.passengers?.[alPi];
       if (!alPax) break;
       if (!Array.isArray(alPax.loyaltyCards)) alPax.loyaltyCards = [];
       alPax.loyaltyCards.push({ carrierCode: '', cardReference: '' });
@@ -6324,7 +6420,7 @@ document.body.addEventListener('click', function(e) {
         tmp.innerHTML = buildLoyaltyCardRow(alIdx, alPi, alPax.loyaltyCards.length - 1, {}, false);
         const newRow = tmp.firstElementChild;
         const addBtn = container.querySelector('[data-action="add-pax-loyalty"]');
-        container.insertBefore(newRow, addBtn);
+        if (addBtn) addBtn.before(newRow); else container.append(newRow);
         const input = newRow.querySelector('input[data-field="carrierCode"]');
         if (input) input.focus();
       }
@@ -6332,11 +6428,11 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax-loyalty': {
       e.stopPropagation();
-      const rlIdx = parseInt(el.dataset.pidx);
-      const rlPi  = parseInt(el.dataset.pi);
-      const rlCi  = parseInt(el.dataset.cidx);
+      const rlIdx = Number.parseInt(el.dataset.pidx);
+      const rlPi  = Number.parseInt(el.dataset.pi);
+      const rlCi  = Number.parseInt(el.dataset.cidx);
       const rlList = state.passengersList[rlIdx];
-      const rlPax  = rlList && rlList.passengers && rlList.passengers[rlPi];
+      const rlPax  = rlList?.passengers?.[rlPi];
       if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) break;
       rlPax.loyaltyCards.splice(rlCi, 1);
       markDirty();
@@ -6350,10 +6446,10 @@ document.body.addEventListener('click', function(e) {
     }
     case 'remove-pax': {
       e.stopPropagation();
-      const rpIdx = parseInt(el.dataset.pidx);
-      const rpPi = parseInt(el.dataset.pi);
+      const rpIdx = Number.parseInt(el.dataset.pidx);
+      const rpPi = Number.parseInt(el.dataset.pi);
       const rpList = state.passengersList[rpIdx];
-      if (!rpList || !rpList.passengers || rpList.passengers.length <= 1) break;
+      if (!rpList?.passengers || rpList.passengers.length <= 1) break;
       if (!confirm(`Remove passenger ${rpPi + 1}?`)) break;
       rpList.passengers.splice(rpPi, 1);
       // When a passenger is removed, drop its stale Edit-open entry so the
@@ -6365,7 +6461,7 @@ document.body.addEventListener('click', function(e) {
       // Find which scenario detail is open and re-render
       document.querySelectorAll('.scenario-detail').forEach(det => {
         if (det.innerHTML && det.id.startsWith('detail-')) {
-          const sIdx = parseInt(det.id.replace('detail-', ''));
+          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
           if (sc && sc.passengersListId === rpList.id) {
             renderScenarioDetail(det, sIdx);
@@ -6384,7 +6480,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-shared': {
       e.stopPropagation();
-      const sIdx = parseInt(el.dataset.idx);
+      const sIdx = Number.parseInt(el.dataset.idx);
       const sc = state.scenarios[sIdx];
       if (sc) {
         sc.shared = !sc.shared;
@@ -6397,7 +6493,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-sales-action': {
       e.stopPropagation();
-      const tsaIdx = parseInt(el.dataset.idx);
+      const tsaIdx = Number.parseInt(el.dataset.idx);
       const key = el.dataset.key;
       const sc = state.scenarios[tsaIdx];
       if (!sc || !key) break;
@@ -6413,7 +6509,7 @@ document.body.addEventListener('click', function(e) {
     }
     case 'toggle-place-probe': {
       e.stopPropagation();
-      const ppIdx = parseInt(el.dataset.idx);
+      const ppIdx = Number.parseInt(el.dataset.idx);
       const ppKey = el.dataset.key;
       const ppSc = state.scenarios[ppIdx];
       if (!ppSc || !ppKey) break;
@@ -6431,7 +6527,7 @@ document.body.addEventListener('click', function(e) {
       // #373: single-select accommodation family (Seat/Couchette/Berth);
       // '' (— any —) clears the field → current default behaviour.
       e.stopPropagation();
-      const accIdx = parseInt(el.dataset.idx);
+      const accIdx = Number.parseInt(el.dataset.idx);
       const accSc = state.scenarios[accIdx];
       if (!accSc) break;
       accSc.accommodationSelection = el.dataset.val || null;
@@ -6444,7 +6540,7 @@ document.body.addEventListener('click', function(e) {
       // #211: single-select gender-segregation preference (MEN/LADIES/MIXED)
       // for night-train COUCHETTE/BERTH compartments; '' (— any —) clears it.
       e.stopPropagation();
-      const genIdx = parseInt(el.dataset.idx);
+      const genIdx = Number.parseInt(el.dataset.idx);
       const genSc = state.scenarios[genIdx];
       if (!genSc) break;
       genSc.accommodationGenderPreference = el.dataset.val || null;
@@ -6456,7 +6552,7 @@ document.body.addEventListener('click', function(e) {
     case 'toggle-book-mandatory-reservations': {
       // #239: single boolean toggle — book via optionalReservationSelections.
       e.stopPropagation();
-      const mrIdx = parseInt(el.dataset.idx);
+      const mrIdx = Number.parseInt(el.dataset.idx);
       const mrSc = state.scenarios[mrIdx];
       if (!mrSc) break;
       mrSc.bookMandatoryReservations = mrSc.bookMandatoryReservations !== true;
@@ -6469,7 +6565,7 @@ document.body.addEventListener('click', function(e) {
       // Single-select seat-selection mode (issue #107). Constrained at render
       // time to the framework's supported modes.
       e.stopPropagation();
-      const spmIdx = parseInt(el.dataset.idx);
+      const spmIdx = Number.parseInt(el.dataset.idx);
       const spmSc = state.scenarios[spmIdx];
       if (!spmSc) break;
       spmSc.placeSelectionMode = el.dataset.val;
@@ -6480,11 +6576,11 @@ document.body.addEventListener('click', function(e) {
     }
     case 'duplicate-scenario': {
       e.stopPropagation();
-      const dupIdx = parseInt(el.dataset.idx);
+      const dupIdx = Number.parseInt(el.dataset.idx);
       const original = state.scenarios[dupIdx];
       if (!original) break;
 
-      const copy = JSON.parse(JSON.stringify(original));
+      const copy = structuredClone(original);
       // Unique scenario code — keep appending _COPY / _COPY_COPY until we
       // find one not already used. Prevents silent duplicate collisions
       // that would then break scenariosToRun indexing.
@@ -6500,7 +6596,7 @@ document.body.addEventListener('click', function(e) {
       // same trip / passengers / purchaser / fulfillment records as the
       // original, so editing one would silently mutate the other — a
       // classic aliasing bug in the earlier duplicate implementation.
-      const maxId = (arr) => (arr && arr.length)
+      const maxId = (arr) => arr?.length
         ? Math.max(...arr.map(x => x && typeof x.id === 'number' ? x.id : 0))
         : 0;
       let nextId = Math.max(
@@ -6514,7 +6610,7 @@ document.body.addEventListener('click', function(e) {
         const arr = state[arrName] = state[arrName] || [];
         const src = arr.find(x => x && x.id === sourceId);
         if (!src) return null;
-        const clone = JSON.parse(JSON.stringify(src));
+        const clone = structuredClone(src);
         clone.id = nextId++;
         arr.push(clone);
         return clone.id;
@@ -6563,21 +6659,21 @@ document.body.addEventListener('click', function(e) {
 
     // ── Train resource actions (Step 2) ───────────────────────────────────────
     case 'toggle-train-detail':
-      toggleTrainDetail(parseInt(el.dataset.tidx)); break;
+      toggleTrainDetail(Number.parseInt(el.dataset.tidx)); break;
     case 'wiz-delete-resource':
-      e.stopPropagation(); wizDeleteResource(el.dataset.id); break;
+      e.stopPropagation(); wizDeleteResource(el.dataset.id).catch(reportActionError); break;
     case 'wiz-add-train':
       wizAddTrain(); break;
     case 'wiz-duplicate-train':
-      e.stopPropagation(); wizDuplicateTrain(parseInt(el.dataset.tidx)); break;
+      e.stopPropagation(); wizDuplicateTrain(Number.parseInt(el.dataset.tidx)); break;
     case 'wiz-save-train':
-      wizSaveTrain(parseInt(el.dataset.tidx)); break;
+      wizSaveTrain(Number.parseInt(el.dataset.tidx)).catch(reportActionError); break;
     case 'wiz-save-all-trains':
-      wizSaveAllTrains(); break;
+      wizSaveAllTrains().catch(reportActionError); break;
     case 'wiz-discover-timetable':
       openTimetableDiscovery(); break;
     case 'wiz-download-places':
-      downloadPlaces(el); break;
+      downloadPlaces(el).catch(reportActionError); break;
     case 'wiz-reprobe-offers': {
       // #369: manual refresh of the per-route offer-availability findings.
       el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
@@ -6589,44 +6685,44 @@ document.body.addEventListener('click', function(e) {
           const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
           oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
           await refreshAllSections();
-        } catch (e2) {
-          oscarToast('Re-probe network error: ' + e2.message, 'error');
+        } catch (error_) {
+          oscarToast('Re-probe network error: ' + error_.message, 'error');
         } finally { el.disabled = false; el.textContent = _oldTxt; }
-      })();
+      })().catch(reportActionError);
       break;
     }
     case 'tt-discover-run':
-      runTimetableDiscovery(); break;
+      runTimetableDiscovery().catch(reportActionError); break;
     case 'tt-discover-close':
       closeTimetableDiscovery(); break;
     case 'train-add-service':
-      trainAddService(parseInt(el.dataset.tidx)); break;
+      trainAddService(Number.parseInt(el.dataset.tidx)); break;
     case 'train-remove-service': {
       const _tb = el.closest('tbody');
       const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
-      if (_m) trainRemoveService(parseInt(_m[1], 10), el);
+      if (_m) trainRemoveService(Number.parseInt(_m[1], 10), el);
       break;
     }
     case 'train-paste-service':
-      trainPasteServices(parseInt(el.dataset.tidx)); break;
+      trainPasteServices(Number.parseInt(el.dataset.tidx)); break;
 
     // ── Journey actions (Step 2, #137) ────────────────────────────────────────
     case 'toggle-journey-detail':
-      toggleJourneyDetail(parseInt(el.dataset.jidx)); break;
+      toggleJourneyDetail(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-add-journey':
       wizAddJourney(); break;
     case 'wiz-duplicate-journey':
-      e.stopPropagation(); wizDuplicateJourney(parseInt(el.dataset.jidx)); break;
+      e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); break;
     case 'wiz-delete-journey':
-      e.stopPropagation(); wizDeleteJourney(el.dataset.id); break;
+      e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); break;
     case 'wiz-save-journey':
-      wizSaveJourney(parseInt(el.dataset.jidx)); break;
+      wizSaveJourney(Number.parseInt(el.dataset.jidx)).catch(reportActionError); break;
     case 'journey-add-leg':
-      journeyAddLeg(parseInt(el.dataset.jidx)); break;
+      journeyAddLeg(Number.parseInt(el.dataset.jidx)); break;
     case 'journey-remove-leg':
-      journeyRemoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li)); break;
+      journeyRemoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li)); break;
     case 'journey-move-leg':
-      journeyMoveLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), parseInt(el.dataset.dir)); break;
+      journeyMoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), Number.parseInt(el.dataset.dir)); break;
 
     // ── Scenario creation (Step 3) ────────────────────────────────────────────
     case 'wiz-scen-type':
@@ -6638,15 +6734,15 @@ document.body.addEventListener('click', function(e) {
     case 'wiz-trip-type':
       wizSetTripType(el.dataset.val); break;
     case 'wiz-pax':
-      wizAdjustPax(el.dataset.type, parseInt(el.dataset.delta)); break;
+      wizAdjustPax(el.dataset.type, Number.parseInt(el.dataset.delta)); break;
     case 'wiz-scen-array':
       wizToggleScenArray(el.dataset.field, el.dataset.val, el); break;
     case 'wiz-generate':
-      wizGenerateScenario(); break;
+      wizGenerateScenario().catch(reportActionError); break;
     case 'goto-section2':
       e.preventDefault(); renderWizardStep2InSection(); toggleSection('data'); break;
     case 'refresh-sections':
-      e.preventDefault(); refreshAllSections(); break;
+      e.preventDefault(); refreshAllSections().catch(reportActionError); break;
     case 'create-another':
       e.preventDefault(); wizInitScenario(); reRenderStep3InSection(); break;
   }
@@ -6663,7 +6759,7 @@ document.body.addEventListener('change', function(e) {
 
   switch (action) {
     case 'file-upload':
-      handleFileUpload(el); break;
+      handleFileUpload(el).catch(reportActionError); break;
     case 'fw-concurrent-limit': {
       // Fires on blur / Enter / spinner click. If the user left the input
       // empty or out-of-range (allowed transiently by the input handler),
@@ -6671,7 +6767,7 @@ document.body.addEventListener('change', function(e) {
       // empty / invalid state lingers. A valid value is left alone — it was
       // already saved (or will be by the debounced auto-save below).
       const raw = (el.value || '').trim();
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (raw === '' || !Number.isFinite(n) || n < 1 || n > 10) {
         el.value = wizData.framework.concurrentSessionLimit || 1;
       }
@@ -6680,7 +6776,7 @@ document.body.addEventListener('change', function(e) {
     case 'set-scenario-code': {
       // Rename an existing scenario. Fires on blur / Enter to avoid renaming
       // mid-keystroke (which would flash the list header and race with typing).
-      const sci = parseInt(el.dataset.idx);
+      const sci = Number.parseInt(el.dataset.idx);
       const scToRename = state.scenarios[sci];
       if (!scToRename) break;
       const origCode = el.dataset.orig || scToRename.code;
@@ -6715,7 +6811,7 @@ document.body.addEventListener('change', function(e) {
       // Update just the header row's displayed code (human + raw) without
       // a full renderAll() that would collapse the detail panel.
       const detailWrap = document.getElementById('detail-' + sci);
-      const rowHeader = detailWrap && detailWrap.previousElementSibling;
+      const rowHeader = detailWrap?.previousElementSibling;
       if (rowHeader) {
         const human = rowHeader.querySelector('div[data-action="toggle-detail"] > div:first-child');
         const raw   = rowHeader.querySelector('div[data-action="toggle-detail"] > div:nth-child(2)');
@@ -6730,7 +6826,7 @@ document.body.addEventListener('change', function(e) {
       }
       // Toggle-scenario checkbox uses the code as identifier — refresh its
       // data-code so toggling the run flag after a rename still works.
-      const checkbox = rowHeader && rowHeader.querySelector('input[data-action="toggle-scenario"]');
+      const checkbox = rowHeader?.querySelector('input[data-action="toggle-scenario"]');
       if (checkbox) checkbox.dataset.code = normalised;
       // in-run badge element id includes the code — rename its id as well.
       const inrun = document.getElementById('inrun-' + origCode);
@@ -6740,11 +6836,9 @@ document.body.addEventListener('change', function(e) {
     case 'toggle-scenario':
       e.stopPropagation(); toggleScenario(el.dataset.code, el.checked); break;
     case 'set-scenario': {
-      const scIdx = parseInt(el.dataset.idx);
+      const scIdx = Number.parseInt(el.dataset.idx);
       const field = el.dataset.field;
-      const newVal = el.dataset.nullable === 'true'
-        ? (el.value === '' ? null : el.value)
-        : el.value;
+      const newVal = (el.dataset.nullable === 'true' && el.value === '') ? null : el.value;
       setScenarioField(scIdx, field, newVal);
       // scenarioType drives visibility of the Overrule Code field (IROPS),
       // and its allowed values. If the user flips REFUND → EXCHANGE (or the
@@ -6767,12 +6861,12 @@ document.body.addEventListener('change', function(e) {
           }
         }
         const detail = document.getElementById('detail-' + scIdx);
-        if (detail && detail.dataset.rendered) {
+        if (detail?.dataset.rendered) {
           // Preserve which param-section headers were open so the user isn't
           // bounced back to the default section layout.
           const openSections = new Set();
           detail.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+            if (h.nextElementSibling?.classList.contains('open')) {
               openSections.add((h.textContent || '').trim());
             }
           });
@@ -6780,11 +6874,11 @@ document.body.addEventListener('change', function(e) {
           detail.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             if (openSections.has(label)) {
-              h.nextElementSibling && h.nextElementSibling.classList.add('open');
+              h.nextElementSibling?.classList.add('open');
               const arrow = h.querySelector('.ps-arrow');
               if (arrow) arrow.classList.add('open');
             } else {
-              h.nextElementSibling && h.nextElementSibling.classList.remove('open');
+              h.nextElementSibling?.classList.remove('open');
               const arrow = h.querySelector('.ps-arrow');
               if (arrow) arrow.classList.remove('open');
             }
@@ -6796,9 +6890,9 @@ document.body.addEventListener('change', function(e) {
     // #359: selects in the Trip Search Criteria sub-panel write via dot-path
     // like the text inputs do, but selects fire 'change', not 'input'.
     case 'set-trip-path':
-      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-field': {
-      const tIdxF = parseInt(el.dataset.tidx);
+      const tIdxF = Number.parseInt(el.dataset.tidx);
       setTripField(tIdxF, el.dataset.field, el.value);
       // tripType drives whether we render legs[] (SPECIFICATION) or a single
       // trip{} block (SEARCH). Switching between them leaves a stale UI
@@ -6807,13 +6901,13 @@ document.body.addEventListener('change', function(e) {
         const trip = state.tripRequirements[tIdxF];
         document.querySelectorAll('.scenario-detail').forEach(det => {
           if (!det.dataset.rendered) return;
-          const sIdx = parseInt(det.id.replace('detail-', ''));
+          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
           const sc = state.scenarios[sIdx];
           if (!sc || sc.tripRequirementId !== trip.id) return;
           // Preserve which param sections were open
           const openSections = new Set();
           det.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+            if (h.nextElementSibling?.classList.contains('open')) {
               openSections.add((h.textContent || '').trim());
             }
           });
@@ -6821,7 +6915,7 @@ document.body.addEventListener('change', function(e) {
           det.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             const isOpen = openSections.has(label);
-            h.nextElementSibling && h.nextElementSibling.classList.toggle('open', isOpen);
+            h.nextElementSibling?.classList.toggle('open', isOpen);
             const arrow = h.querySelector('.ps-arrow');
             if (arrow) arrow.classList.toggle('open', isOpen);
           });
@@ -6830,10 +6924,10 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-pax-family': {
-      const sfpIdx = parseInt(el.dataset.pidx);
-      const sfpPi  = parseInt(el.dataset.pi);
+      const sfpIdx = Number.parseInt(el.dataset.pidx);
+      const sfpPi  = Number.parseInt(el.dataset.pi);
       const sfpList = state.passengersList[sfpIdx];
-      const sfpPax  = sfpList && sfpList.passengers && sfpList.passengers[sfpPi];
+      const sfpPax  = sfpList?.passengers?.[sfpPi];
       if (!sfpPax) break;
       const raw = el.value;
       let nextGroup;
@@ -6845,7 +6939,7 @@ document.body.addEventListener('change', function(e) {
           .filter(n => n != null);
         nextGroup = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
       } else {
-        const n = parseInt(raw, 10);
+        const n = Number.parseInt(raw, 10);
         nextGroup = Number.isInteger(n) ? n : null;
       }
       sfpPax.familyGroup = nextGroup;
@@ -6854,7 +6948,7 @@ document.body.addEventListener('change', function(e) {
       // name-sharing semantics visible immediately.
       if (nextGroup != null) {
         const sibling = sfpList.passengers.find((q, qi) =>
-          qi !== sfpPi && q && q.familyGroup === nextGroup && q.lastName);
+          qi !== sfpPi && q?.familyGroup === nextGroup && q.lastName);
         if (sibling && sibling.lastName !== sfpPax.lastName) {
           sfpPax.lastName = sibling.lastName;
         }
@@ -6866,7 +6960,7 @@ document.body.addEventListener('change', function(e) {
       // member counts, and compact-row badges all reflect the new state.
       document.querySelectorAll('.scenario-detail').forEach(det => {
         if (!det.dataset.rendered) return;
-        const scIdx = parseInt(det.id.replace('detail-', ''));
+        const scIdx = Number.parseInt(det.id.replace('detail-', ''));
         const sc = state.scenarios[scIdx];
         if (sc && sc.passengersListId === sfpList.id) {
           reRenderScenarioDetail(scIdx);
@@ -6875,15 +6969,15 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'journey-leg-pick':
-      journeySetLeg(parseInt(el.dataset.jidx), parseInt(el.dataset.li), el.value); break;
+      journeySetLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), el.value); break;
     case 'apply-trip-train': {
-      const atScIdx = parseInt(el.dataset.idx);
-      const atTIdx  = parseInt(el.dataset.tidx);
+      const atScIdx = Number.parseInt(el.dataset.idx);
+      const atTIdx  = Number.parseInt(el.dataset.tidx);
       const target  = el.dataset.target; // "trip" or "legs.<n>"
       const raw = el.value; // "<trainId>::<serviceIndex>"
       if (!raw) break;
       const [trainId, svcIdxStr] = String(raw).split('::');
-      const svcIdx = parseInt(svcIdxStr, 10) || 0;
+      const svcIdx = Number.parseInt(svcIdxStr, 10) || 0;
       const train = (wizData.resources || []).find(r => String(r.id) === String(trainId));
       if (!train) break;
       const data = normalizeTrainData(typeof train.data === 'string'
@@ -6899,7 +6993,7 @@ document.body.addEventListener('change', function(e) {
         tripReq.trip = tripReq.trip || {};
         t = tripReq.trip;
       } else {
-        const legIdx = parseInt(target.slice(5), 10); // "legs.3" → 3
+        const legIdx = Number.parseInt(target.slice(5), 10); // "legs.3" → 3
         tripReq.legs = tripReq.legs || [];
         tripReq.legs[legIdx] = tripReq.legs[legIdx] || {};
         t = tripReq.legs[legIdx];
@@ -6923,8 +7017,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'apply-trip-journey': {
-      const ajScIdx = parseInt(el.dataset.idx);
-      const ajTIdx  = parseInt(el.dataset.tidx);
+      const ajScIdx = Number.parseInt(el.dataset.idx);
+      const ajTIdx  = Number.parseInt(el.dataset.tidx);
       const jid = el.value;
       if (!jid) break;
       const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
@@ -6942,11 +7036,12 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'toggle-purchaser-is-pax': {
-      const tpScIdx = parseInt(el.dataset.idx);
-      const tpPrIdx = parseInt(el.dataset.purchIdx);
+      const tpScIdx = Number.parseInt(el.dataset.idx);
+      const tpPrIdx = Number.parseInt(el.dataset.purchIdx);
       const tpPurchList = state.purchaserList[tpPrIdx];
       if (!tpPurchList) break;
-      const p0 = (tpPurchList.purchaser = tpPurchList.purchaser || [{}])[0];
+      if (!tpPurchList.purchaser) tpPurchList.purchaser = [{}];
+      const p0 = tpPurchList.purchaser[0];
       p0.isPassenger = !!el.checked;
       if (p0.isPassenger) {
         // When turning the link ON, default the passengerRef to the first
@@ -6954,9 +7049,9 @@ document.body.addEventListener('change', function(e) {
         // purchaser fields so the UI shows the resolved values immediately.
         const sc = state.scenarios[tpScIdx];
         const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-        const passengers = (paxList && paxList.passengers) || [];
+        const passengers = paxList?.passengers || [];
         if (!p0.passengerRef || !passengers.some(p => p.reference === p0.passengerRef)) {
-          p0.passengerRef = (passengers[0] && passengers[0].reference) || '';
+          p0.passengerRef = passengers[0]?.reference || '';
         }
         const linked = passengers.find(p => p.reference === p0.passengerRef);
         if (linked) syncPurchaserFromPassenger(paxList, linked);
@@ -6966,15 +7061,16 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-purchaser-passenger': {
-      const ppScIdx = parseInt(el.dataset.idx);
-      const ppPrIdx = parseInt(el.dataset.purchIdx);
+      const ppScIdx = Number.parseInt(el.dataset.idx);
+      const ppPrIdx = Number.parseInt(el.dataset.purchIdx);
       const ppPurchList = state.purchaserList[ppPrIdx];
       if (!ppPurchList) break;
-      const pp0 = (ppPurchList.purchaser = ppPurchList.purchaser || [{}])[0];
+      if (!ppPurchList.purchaser) ppPurchList.purchaser = [{}];
+      const pp0 = ppPurchList.purchaser[0];
       pp0.passengerRef = el.value;
       const sc = state.scenarios[ppScIdx];
       const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-      const passengers = (paxList && paxList.passengers) || [];
+      const passengers = paxList?.passengers || [];
       const linked = passengers.find(p => p.reference === el.value);
       if (linked) syncPurchaserFromPassenger(paxList, linked);
       markDirty();
@@ -6982,8 +7078,8 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-pax': {
-      const spxIdx = parseInt(el.dataset.pidx);
-      const spxPi  = parseInt(el.dataset.pi);
+      const spxIdx = Number.parseInt(el.dataset.pidx);
+      const spxPi  = Number.parseInt(el.dataset.pi);
       const spxField = el.dataset.field;
       // Gender 'None' (empty value) means the field is omitted from the
       // generated request — store null rather than "" so the data file
@@ -6998,7 +7094,7 @@ document.body.addEventListener('change', function(e) {
       // pick from).
       if (spxField === 'gender' && rawValue) {
         const pxList = state.passengersList[spxIdx];
-        const pxPax  = pxList && pxList.passengers && pxList.passengers[spxPi];
+        const pxPax  = pxList?.passengers?.[spxPi];
         if (pxPax) {
           if (isAutoGeneratedFirstName(pxPax.firstName)) {
             pxPax.firstName = pickFirstNameForGender(rawValue);
@@ -7019,12 +7115,12 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'change-pax-category': {
-      const cpIdx = parseInt(el.dataset.pidx);
-      const cpPi = parseInt(el.dataset.pi);
-      const cpScIdx = parseInt(el.dataset.scenidx);
+      const cpIdx = Number.parseInt(el.dataset.pidx);
+      const cpPi = Number.parseInt(el.dataset.pi);
+      const cpScIdx = Number.parseInt(el.dataset.scenidx);
       const newCat = el.value;
       const cpList = state.passengersList[cpIdx];
-      if (!cpList || !cpList.passengers[cpPi]) break;
+      if (!cpList?.passengers[cpPi]) break;
       const pax = cpList.passengers[cpPi];
       pax.category = newCat;
       pax.type = WIZ_PAX_TO_OSDM_TYPE[newCat] || 'PERSON';
@@ -7052,11 +7148,11 @@ document.body.addEventListener('change', function(e) {
       break;
     }
     case 'set-offer':
-      setOfferField(parseInt(el.dataset.idx), el.dataset.field, el.value || null); break;
+      setOfferField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value || null); break;
     case 'toggle-offer-array':
-      toggleOfferArray(parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); break;
+      toggleOfferArray(Number.parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); break;
     case 'set-fulfill':
-      setFulfillField(parseInt(el.dataset.fidx), el.dataset.field, el.value); break;
+      setFulfillField(Number.parseInt(el.dataset.fidx), el.dataset.field, el.value); break;
 
     // ── Framework wizard change handlers ──────────────────────────────────────
     // Checkbox toggles save immediately (binary state, no mid-edit concern).
@@ -7071,10 +7167,10 @@ document.body.addEventListener('change', function(e) {
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
     case 'fw-pax-age': {
       const raw = (el.value || '').trim();
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (raw === '' || !Number.isFinite(n) || n < 0 || n > 120) {
         const ranges = wizData.framework && wizData.framework.passengerAgeRanges;
-        const stored = ranges && ranges[el.dataset.paxtype] && ranges[el.dataset.paxtype][el.dataset.bound];
+        const stored = ranges?.[el.dataset.paxtype]?.[el.dataset.bound];
         if (typeof stored === 'number') el.value = stored;
         break;
       }
@@ -7114,7 +7210,7 @@ document.body.addEventListener('input', function(e) {
 
   switch (action) {
     case 'set-scenario-text':
-      setScenarioField(parseInt(el.dataset.idx), el.dataset.field, el.value); break;
+      setScenarioField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value); break;
     case 'set-scenario-max-wait-minutes': {
       // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
       // Empty input clears (null = use server default RUN_TIMEOUT_MS).
@@ -7122,11 +7218,11 @@ document.body.addEventListener('input', function(e) {
       // until the user types a valid value (no spurious saves mid-edit).
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
+        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
         }
       }
       break;
@@ -7138,11 +7234,11 @@ document.body.addEventListener('input', function(e) {
       // [1, 60] — anything else is ignored mid-edit.
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
+        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
+          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
         }
       }
       break;
@@ -7164,27 +7260,27 @@ document.body.addEventListener('input', function(e) {
       const _field = _maxWaitFieldByAction[action];
       const v = el.value.trim();
       if (v === '') {
-        setScenarioField(parseInt(el.dataset.idx), _field, null);
+        setScenarioField(Number.parseInt(el.dataset.idx), _field, null);
       } else {
-        const n = parseInt(v, 10);
+        const n = Number.parseInt(v, 10);
         if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(parseInt(el.dataset.idx), _field, n);
+          setScenarioField(Number.parseInt(el.dataset.idx), _field, n);
         }
       }
       break;
     }
     case 'set-trip-time':
-      setTripTimeFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripTimeFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-trip-path':
-      setTripFieldByPath(parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
+      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
     case 'set-pax-input':
-      setPaxField(parseInt(el.dataset.pidx), parseInt(el.dataset.pi), el.dataset.field, el.value); break;
+      setPaxField(Number.parseInt(el.dataset.pidx), Number.parseInt(el.dataset.pi), el.dataset.field, el.value); break;
     case 'set-pax-text': {
       // Free-text fields in the per-passenger editor (firstName, lastName,
       // dateOfBirth, email, phoneNumber). Updates the model on every
       // keystroke — no re-render, so focus/caret stay put while typing.
-      const sptIdx = parseInt(el.dataset.pidx);
-      const sptPi  = parseInt(el.dataset.pi);
+      const sptIdx = Number.parseInt(el.dataset.pidx);
+      const sptPi  = Number.parseInt(el.dataset.pi);
       const sptField = el.dataset.field;
       setPaxField(sptIdx, sptPi, sptField, el.value);
       // Keep the compact row-header display in sync when the user edits
@@ -7192,18 +7288,18 @@ document.body.addEventListener('input', function(e) {
       // a re-render, so the change is immediately visible in the row above.
       if (sptField === 'firstName' || sptField === 'lastName') {
         const pxList = state.passengersList[sptIdx];
-        const pxPax  = pxList && pxList.passengers && pxList.passengers[sptPi];
+        const pxPax  = pxList?.passengers?.[sptPi];
         const disp = document.querySelector('[data-pax-display="' + sptIdx + '-' + sptPi + '"]');
         if (pxPax && disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
       }
       break;
     }
     case 'set-pax-reduction': {
-      const spIdx = parseInt(el.dataset.pidx);
-      const spPi  = parseInt(el.dataset.pi);
-      const spCi  = parseInt(el.dataset.cidx);
+      const spIdx = Number.parseInt(el.dataset.pidx);
+      const spPi  = Number.parseInt(el.dataset.pi);
+      const spCi  = Number.parseInt(el.dataset.cidx);
       const spList = state.passengersList[spIdx];
-      const spPax  = spList && spList.passengers && spList.passengers[spPi];
+      const spPax  = spList?.passengers?.[spPi];
       if (!spPax) break;
       if (!Array.isArray(spPax.reductionCards)) spPax.reductionCards = [];
       spPax.reductionCards[spCi] = el.value;
@@ -7211,12 +7307,12 @@ document.body.addEventListener('input', function(e) {
       break;
     }
     case 'set-pax-loyalty': {
-      const slIdx = parseInt(el.dataset.pidx);
-      const slPi  = parseInt(el.dataset.pi);
-      const slCi  = parseInt(el.dataset.cidx);
+      const slIdx = Number.parseInt(el.dataset.pidx);
+      const slPi  = Number.parseInt(el.dataset.pi);
+      const slCi  = Number.parseInt(el.dataset.cidx);
       const field = el.dataset.field;
       const slList = state.passengersList[slIdx];
-      const slPax  = slList && slList.passengers && slList.passengers[slPi];
+      const slPax  = slList?.passengers?.[slPi];
       if (!slPax) break;
       if (!Array.isArray(slPax.loyaltyCards)) slPax.loyaltyCards = [];
       if (!slPax.loyaltyCards[slCi] || typeof slPax.loyaltyCards[slCi] !== 'object') {
@@ -7228,30 +7324,30 @@ document.body.addEventListener('input', function(e) {
     }
     case 'set-offer-currency':
       el.value = el.value.toUpperCase();
-      setOfferField(parseInt(el.dataset.idx), 'currency', el.value); break;
+      setOfferField(Number.parseInt(el.dataset.idx), 'currency', el.value); break;
     case 'set-offer-tags': {
       const tags = el.value.split(',').map(t => t.trim()).filter(Boolean);
-      setOfferField(parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
+      setOfferField(Number.parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
       break;
     }
     case 'set-offer-return-offset': {
       const v = el.value.trim();
-      const n = parseInt(v, 10);
+      const n = Number.parseInt(v, 10);
       // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
-      setOfferField(parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
       break;
     }
     case 'set-offer-return-time':
-      setOfferField(parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
     case 'set-offer-selections': {
       try {
         const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;
-        setOfferField(parseInt(el.dataset.idx), 'productSelections', parsed);
+        setOfferField(Number.parseInt(el.dataset.idx), 'productSelections', parsed);
       } catch (_) { /* invalid JSON — don't save until valid */ }
       break;
     }
     case 'set-purchaser':
-      setPurchaserField(parseInt(el.dataset.purchIdx), el.dataset.field, el.value); break;
+      setPurchaserField(Number.parseInt(el.dataset.purchIdx), el.dataset.field, el.value); break;
 
     // ── Framework wizard input handlers ───────────────────────────────────────
     case 'wiz-osdm-version': {
@@ -7273,7 +7369,7 @@ document.body.addEventListener('input', function(e) {
       // finish typing — an endless loop from their perspective.
       const raw = (el.value || '').trim();
       if (raw === '' || !/^\d+$/.test(raw)) break;
-      const n = parseInt(raw, 10);
+      const n = Number.parseInt(raw, 10);
       if (!Number.isFinite(n) || n < 1 || n > 10) break;
       wizData.framework.concurrentSessionLimit = n;
       // Debounced auto-save: one PUT 500ms after the last keystroke rather
@@ -7303,4 +7399,4 @@ document.body.addEventListener('input', function(e) {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadDatafile();
+loadDatafile().catch(reportActionError);

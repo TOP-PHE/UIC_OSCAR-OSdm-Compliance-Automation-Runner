@@ -14,6 +14,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.204] — 2026-10-06
+
+### Fixed
+
+- **Test Config actions that nothing awaits now report a failure.** Part of
+  #526. The click, change and timer handlers in `scenarios.js` start 20 async
+  actions without awaiting them; Sonar types that as a bug (S9383). If such an
+  action rejected, the error was lost and the user saw nothing. Each call now
+  ends in `.catch(reportActionError)`, which logs the error and shows its
+  message as an error notification.
+  - 15 of the 18 functions involved already report their own failures, so for
+    them nothing changes in practice.
+  - Three could reject with nothing shown: `refreshAllSections()` from the
+    "refresh" link (it throws on a failed load by design, #534),
+    `wizDeleteResource()` and `wizSaveAllTrains()`.
+
+### Security
+
+- **Random test data comes from the cryptographic generator.** Closes #542.
+  Generated passengers get a random first name, phone number and date of
+  birth. `randomPick()`, `genPhone()` and `genDateOfBirth()` took them from
+  `Math.random()`; CodeQL reads such field names as personal data and has had
+  12 high `js/insecure-randomness` alerts open on this file since May. Nothing
+  was at risk, the values are test data. A new `randomInt(n)` draws from
+  `crypto.getRandomValues()` and the three generators use it. No suppression
+  and no dismissal.
+
+### Changed
+
+- **Sonar clean-up 3/5: `Oscar_Server/public/js/scenarios.js`.** Closes #526
+  (tracking #523). 340 of the 373 findings Sonar had on this file, one rule per
+  commit. Apart from the two fixes above, none of it is meant to change
+  behaviour.
+
+  | Rule | What | Findings |
+  |---|---|---|
+  | S9383 | un-awaited promises (the fix above) | 20 |
+  | S7773 | `Number.parseInt`, `Number.isNaN` | 125 |
+  | S6582 | optional chaining | 97 |
+  | S3358 | a condition inside a condition | 37 |
+  | S7781 | `replaceAll` with a string pattern | 23 of 28 |
+  | S1121 | an assignment inside an expression | 9 |
+  | S4624 | a template inside a one-line template | 4 |
+  | S7784 | `structuredClone` | 4 |
+  | S6557, S7721, S7762 | `startsWith`; inner functions moved out; `node.remove()` | 3 each |
+  | S7718, S7753, S7768, S7776 | catch names; `indexOf`; `before()`; Sets | 2 each |
+  | S7761, S7765, S6535, S6644 | `dataset`; `includes`; an escape; a boolean literal | 1 each |
+
+  What needed thought:
+  - **`isNaN` on a path segment.** `setTripFieldByPath()` tests strings.
+    `Number.isNaN` does not convert and would call every segment a number, so
+    the conversion is written out: `Number.isNaN(Number(segment))`.
+  - **Optional chaining.** `a && a.b` gives `a` itself when `a` is missing or
+    falsy; `a?.b` gives `undefined`. All 95 sites were read: 66 only test the
+    value, 29 keep or pass it, and in each of those what follows treats `null`
+    and `undefined` alike.
+  - **Nested conditionals in templates.** Flattened without touching the text
+    of a template: the template is assigned inside an `if`, or the inner
+    piece is worked out in a variable first.
+  - **`insertBefore(row, null)` appends**, and `null.before(row)` would throw,
+    so the fallback is written out.
+  - **`structuredClone`** keeps a property set to `undefined`, and `NaN`, where
+    the JSON round trip dropped or nulled them. The copies are saved through
+    `JSON.stringify` either way, so the stored file is the same. It needs a
+    2022 browser (Chrome 98, Firefox 94, Safari 15.4).
+
+### Left open on purpose
+
+- **S7781 (5), in `esc()`:** the page's HTML encoder keeps `replace()` with a
+  global regex. With `replaceAll('<', ...)`, as Sonar asks, CodeQL no longer
+  recognised it as an encoder and reported three escaped values reaching
+  `innerHTML` as XSS on the pull request. The two lines are identical to the
+  previous release again; a comment in the function says why and a test fails
+  if the form changes.
+- **S3776 (20) and S1479 (1):** functions over the complexity limit and the
+  72-case switch. Structural, not planned; to be done when a function is next
+  changed.
+- **S9382 (4):** `await` in a loop. The deletes and saves are sequential on
+  purpose.
+- **S1135 (2):** two TODO comments that describe real open work.
+- **S1874 (1):** `e.returnValue` in the unsaved-changes prompt. Deprecated, but
+  the only thing that raises the prompt in browsers older than Chrome 119.
+
+### Verified
+
+- **Renames:** with the rewrite undone in both versions, the file is identical
+  to the previous commit (S7773, S7781).
+- **Rewritten functions:** run from the old and the new file over 110 inputs,
+  identical results; four deliberate breakages each show up.
+- **In a browser, old page script against new** on the same throwaway
+  instance: every scenario card as built and as drawn, the framework editor,
+  the test data section, 7 variants of the scenario wizard, the datafile the
+  wizard generates, a nullable field, adding reduction and loyalty cards, the
+  purchaser link, duplicating a scenario. 52 captures as Test Manager, 34 as
+  tester: all identical.
+- **The failure path:** with the datafile answering 500, the refresh link
+  shows the reason, there is no unhandled rejection, and the page keeps what
+  it had.
+- **CodeQL on the pull request.** Its first analysis failed with 16 alerts:
+  the 3 caused by the `esc()` rewrite, and 13 that were already open on `main`
+  (the 12 above and a medium one in `setTripFieldByPath()`), reported because
+  the diff of this file is large. The first two groups are fixed here; the
+  medium alert is left as it is and does not fail the check.
+- 89 new tests in `tests/unit/ui-scripts.test.js` (1,816 total). One of them
+  reads the source for a top-level async function called as a bare statement;
+  it finds the 19 named calls in the previous file and none now.
+
+### Not covered
+
+- No run against a vendor sandbox. This change is in the browser page only.
+- Sonar's own count for the file is known after the merge: a pull-request
+  analysis only reports findings on changed lines.
+
+---
+
 ## [server-1.11.203] — 2026-10-06
 
 ### Fixed

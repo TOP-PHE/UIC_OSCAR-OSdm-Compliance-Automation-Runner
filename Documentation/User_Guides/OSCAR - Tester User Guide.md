@@ -805,6 +805,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Seat map step (`08`) **missing** from the report on a `SEATMAP_AT_OFFER` scenario | The scenario's **mode wasn't actually saved** (stale value), so it ran `ADD_TO_BOOKING` | Open the scenario, click the **Seat map at offer** pill, save, re‑run. |
 | Many "failed" assertions on `200` responses | OSDM **compliance** deviations in the vendor's responses | These are the conformance findings — review them; they're the point of the tool. |
 | Test Config shows **❌ Error: … could not be loaded …** instead of the editor, or the scenario wizard answers **The scenario was not generated** | OSCAR could not read what is stored (connection lost, server busy, rate limit). It stops there on purpose: carrying on from an empty page could replace the stored configuration | **Reload the page.** Nothing was changed. If it keeps happening, wait a minute and try again, and report the reason shown in the message. |
+| A red notification appears in Test Config after **Refresh**, deleting a train or **Save all trains** | The action failed, and the notification gives the reason (for example "The test configuration could not be loaded"). Before 1.11.204 such a failure showed nothing | **Reload the page and try again.** The page kept what it had. If it keeps happening, report the reason shown. |
 
 ---
 
