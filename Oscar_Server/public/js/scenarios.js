@@ -4729,7 +4729,7 @@ function wizDuplicateTrain(tidx) {
     _unsaved: true,
     label: newLabel,
     resource_type: 'TRAIN',
-    data: JSON.parse(JSON.stringify(srcData))
+    data: structuredClone(srcData)
   };
   wizData.resources.push(copy);
 
@@ -4976,7 +4976,7 @@ function wizDuplicateJourney(jidx) {
   while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
   wizData.resources.push({
     id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
-    data: JSON.parse(JSON.stringify(journeyData(src)))
+    data: structuredClone(journeyData(src))
   });
   renderWizardStep2InSection();
   const bodyData = document.getElementById('body-data');
@@ -6491,7 +6491,7 @@ document.body.addEventListener('click', function(e) {
       const original = state.scenarios[dupIdx];
       if (!original) break;
 
-      const copy = JSON.parse(JSON.stringify(original));
+      const copy = structuredClone(original);
       // Unique scenario code — keep appending _COPY / _COPY_COPY until we
       // find one not already used. Prevents silent duplicate collisions
       // that would then break scenariosToRun indexing.
@@ -6521,7 +6521,7 @@ document.body.addEventListener('click', function(e) {
         const arr = state[arrName] = state[arrName] || [];
         const src = arr.find(x => x && x.id === sourceId);
         if (!src) return null;
-        const clone = JSON.parse(JSON.stringify(src));
+        const clone = structuredClone(src);
         clone.id = nextId++;
         arr.push(clone);
         return clone.id;
