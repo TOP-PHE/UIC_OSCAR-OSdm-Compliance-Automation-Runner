@@ -3016,7 +3016,7 @@ function setFulfillField(fIdx, field, value) {
 // not, so that an error is shown instead of being lost as an unhandled rejection.
 function reportActionError(e) {
   console.error('Test Config: an action failed', e);
-  oscarToast(`❌ ${e?.message || e}`, 'error');
+  oscarToast(String(e?.message || e), 'error');   // the toast adds its own icon
 }
 
 function showMsg(text, isOk) {

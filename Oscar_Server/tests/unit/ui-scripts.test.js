@@ -157,9 +157,9 @@ describe('js/scenarios.js — actions that nothing awaits (#526)', () => {
     reportActionError('plain text');
     reportActionError(undefined);
     expect(toasts).toEqual([
-      ['❌ The test configuration could not be loaded: the server answered 500.', 'error'],
-      ['❌ plain text', 'error'],
-      ['❌ undefined', 'error'],
+      ['The test configuration could not be loaded: the server answered 500.', 'error'],
+      ['plain text', 'error'],
+      ['undefined', 'error'],
     ]);
     expect(logged).toHaveLength(3);
     expect(logged[0][1]).toBe(failure);
