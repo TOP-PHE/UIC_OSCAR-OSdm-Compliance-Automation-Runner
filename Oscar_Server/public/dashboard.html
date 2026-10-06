@@ -355,7 +355,8 @@ function renderRuns(runs) {
 
   normal.forEach(r => {
     if (r.batch_id) {
-      (batched[r.batch_id] = batched[r.batch_id] || []).push(r);
+      batched[r.batch_id] = batched[r.batch_id] || [];
+      batched[r.batch_id].push(r);
     } else {
       unbatched.push(r);
     }
