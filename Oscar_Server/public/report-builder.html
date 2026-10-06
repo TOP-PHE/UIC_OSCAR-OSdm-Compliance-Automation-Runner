@@ -819,14 +819,14 @@ function getFilteredLogs() {
 function looksLikeJsonOpener(msg) {
   var s = (msg || '').trimEnd();
   if (/^\s*\[JSON:[^\]]+\]/.test(s)) return true;          // explicit marker
-  if (/[:=]\s*[\{\[]\s*$/.test(s)) return true;             // "Selected Offer: {"
-  if (/^[A-Za-z_][\w\s]*:\s*[\{\[]\s*$/.test(s.trim())) return true;
+  if (/[:=]\s*[{[]\s*$/.test(s)) return true;             // "Selected Offer: {"
+  if (/^[A-Za-z_][\w\s]*:\s*[{[]\s*$/.test(s.trim())) return true;
   return false;
 }
 function looksLikeJsonContinuation(msg) {
   if (msg == null) return false;
   if (/^\s+\S/.test(msg)) return true;                      // indented line
-  if (/^[\}\]][,\s]*$/.test(msg.trim())) return true;       // closer
+  if (/^[}\]][,\s]*$/.test(msg.trim())) return true;       // closer
   return false;
 }
 function coalesceJsonBlocks(events) {
@@ -1693,7 +1693,7 @@ function copyJsonContent(btn) {
 // downloaded file from either view has the same name.
 function _rbSanitiseFilename(s) {
   return String(s == null ? '' : s)
-    .replace(/[\\\/:*?"<>|\s]+/g, '_')
+    .replace(/[\\/:*?"<>|\s]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');   // one at most after the collapse above
 }
