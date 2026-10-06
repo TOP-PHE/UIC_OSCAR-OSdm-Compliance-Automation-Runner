@@ -501,7 +501,7 @@ function onRoleChange(userId) {
   if (role === 'company_user' || role === 'certification_user' || role === 'test_manager') {
     // Tester, Test Manager and Certifier are assigned to a company. Preserve the
     // user's current company across the role change (issue #128) — preselect it.
-    const current = roleEl.getAttribute('data-company-id') || '';
+    const current = roleEl.dataset.companyId || '';
     // esc(userId) — userId originates from a data-* DOM attribute; escape it
     // before it reaches innerHTML (CodeQL js/xss-through-dom, defence-in-depth).
     cell.innerHTML = `<select id="company-${esc(userId)}">${companyOptions(current)}</select>`;
@@ -1098,56 +1098,56 @@ if (clearBtn) clearBtn.addEventListener('click', function() {
 document.getElementById('users-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  var action = el.getAttribute('data-action');
-  var userId = el.getAttribute('data-user-id');
+  var action = el.dataset.action;
+  var userId = el.dataset.userId;
   if (action === 'save-user') saveUser(userId);
-  else if (action === 'approve-user') approveUser(userId, el.getAttribute('data-email'));
-  else if (action === 'reset-pwd') resetPwd(userId, el.getAttribute('data-email'));
-  else if (action === 'reset-link') generateResetLink(userId, el.getAttribute('data-email'));
-  else if (action === 'delete-user') deleteUser(userId, el.getAttribute('data-email'));
+  else if (action === 'approve-user') approveUser(userId, el.dataset.email);
+  else if (action === 'reset-pwd') resetPwd(userId, el.dataset.email);
+  else if (action === 'reset-link') generateResetLink(userId, el.dataset.email);
+  else if (action === 'delete-user') deleteUser(userId, el.dataset.email);
 });
 document.getElementById('users-tbody').addEventListener('change', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.getAttribute('data-action') === 'role-change') onRoleChange(el.getAttribute('data-user-id'));
+  if (el.dataset.action === 'role-change') onRoleChange(el.dataset.userId);
 });
 
 // Companies table delegation
 document.getElementById('companies-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  var action = el.getAttribute('data-action');
-  var companyId = el.getAttribute('data-company-id');
+  var action = el.dataset.action;
+  var companyId = el.dataset.companyId;
   if (action === 'save-company') saveCompany(companyId);
-  else if (action === 'delete-company') deleteCompany(companyId, el.getAttribute('data-name'));
+  else if (action === 'delete-company') deleteCompany(companyId, el.dataset.name);
 });
 
 // Pending deletion table delegation (click + change)
 document.getElementById('pending-del-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.getAttribute('data-action') === 'single-admin') {
-    singleAdminAction(el.getAttribute('data-admin-action'), el.getAttribute('data-run-id'));
+  if (el.dataset.action === 'single-admin') {
+    singleAdminAction(el.dataset.adminAction, el.dataset.runId);
   }
 });
 document.getElementById('pending-del-tbody').addEventListener('change', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.getAttribute('data-action') === 'toggle-pending') togglePendingRow(el);
+  if (el.dataset.action === 'toggle-pending') togglePendingRow(el);
 });
 
 // Runs table delegation (click + change)
 document.getElementById('runs-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.getAttribute('data-action') === 'single-admin') {
-    singleAdminAction(el.getAttribute('data-admin-action'), el.getAttribute('data-run-id'));
+  if (el.dataset.action === 'single-admin') {
+    singleAdminAction(el.dataset.adminAction, el.dataset.runId);
   }
 });
 document.getElementById('runs-tbody').addEventListener('change', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
-  if (el.getAttribute('data-action') === 'toggle-run') toggleRunRow(el);
+  if (el.dataset.action === 'toggle-run') toggleRunRow(el);
 });
 
 // ── Server Config ────────────────────────────────────────────────────────────

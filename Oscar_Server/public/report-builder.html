@@ -1463,7 +1463,7 @@ document.getElementById('http-content').addEventListener('click', function(e) {
     // could be a nav-arrow click
     var nav = e.target.closest('[data-nav-req-id]');
     if (nav) {
-      var navId = nav.getAttribute('data-nav-req-id');
+      var navId = nav.dataset.navReqId;
       navigateToHttpRequest(navId);
     }
     // or a json toggle — walk up to the .node ancestor (the .line wrapping
@@ -1497,7 +1497,7 @@ document.getElementById('http-content').addEventListener('click', function(e) {
 });
 
 async function toggleHttpRow(row) {
-  var reqId = row.getAttribute('data-req-id');
+  var reqId = row.dataset.reqId;
   var detail = document.getElementById('http-detail-' + reqId);
   if (row.classList.contains('expanded')) {
     row.classList.remove('expanded');
@@ -1641,8 +1641,8 @@ function renderJsonNode(value, key, root) {
 }
 
 function switchHttpTab(tabEl) {
-  var kind = tabEl.getAttribute('data-http-tab');
-  var detailId = tabEl.getAttribute('data-detail-id');
+  var kind = tabEl.dataset.httpTab;
+  var detailId = tabEl.dataset.detailId;
   if (tabEl.classList.contains('empty')) return;
   // toggle active on siblings
   tabEl.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -1666,7 +1666,7 @@ function navigateToHttpRequest(reqId) {
   document.querySelectorAll('.http-row.expanded').forEach(function(r) {
     if (r !== existing) {
       r.classList.remove('expanded');
-      var d = document.getElementById('http-detail-' + r.getAttribute('data-req-id'));
+      var d = document.getElementById('http-detail-' + r.dataset.reqId);
       if (d) d.style.display = 'none';
     }
   });
@@ -1675,11 +1675,11 @@ function navigateToHttpRequest(reqId) {
 }
 
 function copyJsonContent(btn) {
-  var targetId = btn.getAttribute('data-copy-target');
+  var targetId = btn.dataset.copyTarget;
   var el = document.getElementById(targetId);
   if (!el) return;
   // Prefer the original raw payload (kept as data-raw) over the formatted tree
-  var text = el.getAttribute('data-raw') || el.textContent || '';
+  var text = el.dataset.raw || el.textContent || '';
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(function() {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
@@ -1698,14 +1698,14 @@ function _rbSanitiseFilename(s) {
     .replace(/^_|_$/g, '');   // one at most after the collapse above
 }
 function downloadJsonContent(btn) {
-  var targetId = btn.getAttribute('data-download-target');
+  var targetId = btn.dataset.downloadTarget;
   var el = document.getElementById(targetId);
   if (!el) return;
-  var text = el.getAttribute('data-raw') || el.textContent || '';
+  var text = el.dataset.raw || el.textContent || '';
   if (!text) return;
-  var scenario = btn.getAttribute('data-download-scenario') || '';
-  var step     = btn.getAttribute('data-download-step')     || '';
-  var kind     = btn.getAttribute('data-download-kind')     || 'response';
+  var scenario = btn.dataset.downloadScenario || '';
+  var step     = btn.dataset.downloadStep     || '';
+  var kind     = btn.dataset.downloadKind     || 'response';
   var filename = [
     _rbSanitiseFilename(scenario) || 'oscar',
     _rbSanitiseFilename(step)     || 'request',
