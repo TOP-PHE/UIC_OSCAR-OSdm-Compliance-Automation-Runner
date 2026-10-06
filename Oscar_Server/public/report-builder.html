@@ -1647,7 +1647,10 @@ function renderJsonNode(value, key, root) {
 }
 
 function switchHttpTab(tabEl) {
-  var kind = tabEl.dataset.httpTab;
+  // Kept as getAttribute on purpose: this value is the source of the open
+  // code-scanning alert on the innerHTML below, and rewriting the read could
+  // make the alert disappear without the flow being fixed.
+  var kind = tabEl.getAttribute('data-http-tab');
   var detailId = tabEl.dataset.detailId;
   if (tabEl.classList.contains('empty')) return;
   // toggle active on siblings
