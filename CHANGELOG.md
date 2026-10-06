@@ -19,9 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Sonar clean-up 4/5: the pages.** Closes #527 (tracking #523). The inline
-  scripts and styles of six pages under `Oscar_Server/public`:
-  `report-builder.html`, `admin.html`, `run-detail.html`, `dashboard.html`,
-  `compare.html` and `welcome.html`. 90 of the 113 findings in scope are
+  scripts and styles of the pages under `Oscar_Server/public`. Five pages are
+  changed: `report-builder.html`, `admin.html`, `run-detail.html`,
+  `dashboard.html` and `compare.html`. 90 of the 113 findings in scope are
   addressed, one rule per commit. Nothing is meant to change for a user.
 
   | Rule | What changed | Done |
@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from this branch in a fake browser that records what the script writes
   (`innerHTML`, text, checked states, CSV content, fetch calls, dialogs). The
   same 297 calls, as tester, Test Manager, administrator and certifier, give
-  1,319 recorded writes that are identical.
+  1,312 recorded writes that are identical.
 - **The comparison reaches the changed lines.** Each changed expression was
   broken in turn: 93 of 94 breakages were detected. The last one cannot change
   behaviour: it sits in a second pattern that the first already covers.

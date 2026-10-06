@@ -450,7 +450,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     sequential `await`s in a loop (S9382); 2 TODO comments (S1135);
     `e.returnValue` in the unsaved-changes prompt (S1874), which older
     browsers need.
-  - **PR 4, the pages, is #527 (v1.11.206): 90 of 113.** Six HTML pages.
+  - **PR 4, the pages, is #527 (v1.11.206): 90 of 113.** Five HTML pages changed.
     What it added to the method:
     - **A page can be compared with itself without a browser.** Run the
       page's inline script from `main` and from the branch inside
