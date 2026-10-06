@@ -267,6 +267,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   why, and revisit it whenever an advisory names that package. Symptom to
   recognise: a Dependabot alert that stays open with no PR, or a PR that
   changes nothing in the lockfile.
+- **Several Dependabot npm PRs open at once: combine them** (2026-10-06, #547).
+  `main` requires a branch to be up to date before merging, and every npm
+  update touches `package-lock.json`, so five PRs mean five rounds of rebase
+  and CI. Dependabot rebases its npm PRs about three minutes after the
+  lockfile changes on `main`, and sometimes fails to ("tried to update this
+  pull request, but something went wrong"). Instead: cherry-pick Dependabot's
+  commits, unchanged, onto one branch from `main`, check `npm ci --dry-run`,
+  and open one PR. It runs the full CI, which Dependabot's own runs do not
+  (they skip the steps that need secrets), and Dependabot closes its PRs by
+  itself once the combined one is on `main`. A dependency-only merge does not deploy: it needs
+  a release entry of its own if it should ship (1.11.205 / 2026.230).
 - **SonarQube Cloud GitHub App is installed** (2026-07-02) — the repo was
   previously wired via the CI-token upload path only (`SONAR_TOKEN` +
   `sonarcloud-github-action`), which posts a plain pass/fail check but no PR
@@ -643,8 +654,9 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
     issue — its own "remaining cleanup" checklist is now 100% resolved,
     verified item-by-item against current `Bruno_Collection/`, no single PR).
   - **Confirmed still genuinely open, real remaining work:**
-    - **#306** — ephemeral Bruno env-yml carries the OAuth token in
-      plaintext on disk (`worker/runner.js`). Security-relevant, unfixed.
+    - (**#306**, the OAuth token in plaintext in the ephemeral Bruno env-yml,
+      was listed here as unfixed. It was fixed the next day by PR #468 and
+      closed on 2026-07-03; checked 2026-10-06.)
     - **#239**, **#222**, **#211** — scenario-authoring gaps
       (`optionalReservationSelections`, collective booking, night-train
       sales/refund).
