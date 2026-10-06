@@ -652,7 +652,7 @@ async function loadArtifacts() {
     // report_{SCENARIO_CODE}.html → "OTST RFND PATCH ..." (underscores → spaces)
     // Falls back to "HTML Report" for legacy single-scenario report.html
     const scenarioLabel = a.type === 'html_report'
-      ? (a.filename.replace(/^report_/, '').replace(/\.html$/i, '').replace(/_/g, ' ') || 'HTML Report')
+      ? (a.filename.replace(/^report_/, '').replace(/\.html$/i, '').replaceAll('_', ' ') || 'HTML Report')
       : null;
     const label    = a.type === 'html_report' ? `📊 ${scenarioLabel}` : '📄 JSON Results';
     if (a.type === 'html_report') {

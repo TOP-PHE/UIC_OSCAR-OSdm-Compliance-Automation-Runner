@@ -519,7 +519,7 @@ function runScenarioLabel(r) {
   //   - multi-scenario run  → distinct scenario_names from run_suites (joined backend-side)
   //   - legacy run with no structured data → fall back to env_name_used or short id
   if (r.scenario_code) return r.scenario_code;
-  if (r.scenario_names) return r.scenario_names.split(',').join(', ');
+  if (r.scenario_names) return r.scenario_names.replaceAll(',', ', ');
   return r.env_name_used || r.id.slice(0, 8);
 }
 function pct(n, d) {
@@ -754,7 +754,7 @@ function renderReport() {
   var meta = '';
   if (run) {
     var scenarioList = run.scenario_code
-      || (run.scenario_names ? run.scenario_names.split(',').join(', ') : '');
+      || (run.scenario_names ? run.scenario_names.replaceAll(',', ', ') : '');
     var scenariosFromReport = (reportData.suites || [])
       .map(function(su) { return su.scenario_name; })
       .filter(function(v, i, a) { return v && a.indexOf(v) === i; });
@@ -1211,7 +1211,7 @@ function exportCSV() {
           a.category || '',
           a.domain || '',
           a.severity || '',
-          (a.error_msg || '').replace(/"/g, '""')
+          (a.error_msg || '').replaceAll('"', '""')
         ]);
       });
     });
@@ -1235,13 +1235,13 @@ function exportCSV() {
         e.ts || '',
         (e.level || ''),
         e.category || '',
-        (e.message || '').replace(/"/g, '""')
+        (e.message || '').replaceAll('"', '""')
       ]);
     });
   }
 
   var csv = rows.map(function(r) {
-    return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    return r.map(function(c) { return '"' + String(c).replaceAll('"', '""') + '"'; }).join(',');
   }).join('\n');
 
   var blob = new Blob([csv], { type: 'text/csv' });
