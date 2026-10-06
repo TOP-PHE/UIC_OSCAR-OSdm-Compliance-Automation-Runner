@@ -12,7 +12,7 @@
 // dev / HTTP environments where the Secure cookie attribute would block the
 // cookie. Both paths are accepted by the auth middleware.
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-if (!user || !user.email) { window.location.href = '/'; }
+if (!user?.email) { window.location.href = '/'; }
 const token = localStorage.getItem('oscar_token');
 const authHeaders = token ? { Authorization: 'Bearer ' + token } : {};
 const isTestManager = user.role === 'test_manager' || user.role === 'administrator';
@@ -169,15 +169,15 @@ function fwFilter(fullList, allowed) {
 function fwIropsCodesFor(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return [];
   const key = String(scenarioType).toLowerCase();
-  const fw = (wizData && wizData.framework) || {};
-  const codes = fw.iropsCodes && fw.iropsCodes[key];
+  const fw = wizData?.framework || {};
+  const codes = fw.iropsCodes?.[key];
   return Array.isArray(codes) ? codes : [];
 }
 // Is IROPS enabled for this scenario type in the framework's salesFlows?
 // The gate the wizard uses for the sub-type card (REFUND_IROPS / EXCHANGE_IROPS).
 function fwSupportsIrops(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return false;
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
   return flows.includes(String(scenarioType).toUpperCase() + '_IROPS');
 }
@@ -188,7 +188,7 @@ function fwSupportsIrops(scenarioType) {
 // flow in salesFlows[] (REFUND_PARTIAL / EXCHANGE_PARTIAL).
 function fwDeclaresPartialRefund(scenarioType) {
   if (!scenarioType || scenarioType === 'SALE') return false;
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = Array.isArray(fw.salesFlows) ? fw.salesFlows : [];
   return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
 }
@@ -199,12 +199,12 @@ function fwDeclaresPartialRefund(scenarioType) {
 // (the server-side authority). Add new field/flow pairs as features land.
 function fwUndeclaredArmedCount() {
   const scenarios = (state && state.scenarios) || [];
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const flows = new Set(Array.isArray(fw.salesFlows) ? fw.salesFlows : []);
   function armed(v) { return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1; }
   let n = 0;
   for (const sc of scenarios) {
-    const t = String((sc && sc.scenarioType) || 'SALE').toUpperCase();
+    const t = String(sc?.scenarioType || 'SALE').toUpperCase();
     if (t === 'REFUND' && (armed(sc.partialRefundByLeg) || armed(sc.partialRefundByPax))
         && !flows.has('REFUND_PARTIAL')) {
       n++;
@@ -277,9 +277,9 @@ function decodeCode(code) {
 // making it look like the system had renamed the scenario.) A generated/decoded
 // default applies ONLY when there is no code at all.
 function scenarioTitle(sc) {
-  const code = (sc && sc.code != null) ? String(sc.code).trim() : '';
+  const code = (sc?.code != null) ? String(sc.code).trim() : '';
   if (code) return code;
-  return decodeCode((sc && sc.code) || '') || 'Untitled scenario';
+  return decodeCode(sc?.code || '') || 'Untitled scenario';
 }
 
 function scenarioTypeBadge(sc) {
@@ -378,8 +378,8 @@ async function refreshAllSections() {
   let framework = null;
   if (fwLoad.state === 'loaded') {
     const fwBody = fwLoad.value;
-    let cfg = fwBody && fwBody.config;
-    if (cfg && cfg.config && typeof cfg.config === 'object' && !Array.isArray(cfg.config)) {
+    let cfg = fwBody?.config;
+    if (cfg?.config && typeof cfg.config === 'object' && !Array.isArray(cfg.config)) {
       cfg = cfg.config;
     }
     framework = (cfg && typeof cfg === 'object') ? cfg : null;
@@ -391,7 +391,7 @@ async function refreshAllSections() {
   wizData.resources = resources;
 
   // Company profile
-  if (companyRes && companyRes.ok) wizProfile = await companyRes.json();
+  if (companyRes?.ok) wizProfile = await companyRes.json();
 
   // Datafile
   const datafile = dfLoad.state === 'loaded' ? dfLoad.value : null;
@@ -453,7 +453,7 @@ function renderFrameworkSection(framework) {
   // → renderFrameworkSection wipes body. Without capture here, every form
   // re-render resets the sub-section expand state and steals focus from the
   // input the user is typing into.
-  const wasOpen = !!(toggleEl && toggleEl.classList.contains('open'));
+  const wasOpen = !!toggleEl?.classList.contains('open');
   const _fwOpenBefore  = wasOpen ? captureFwOpenState() : null;
   const _fwFocusBefore = wasOpen ? captureFwFocus()     : null;
 
@@ -477,7 +477,7 @@ function renderFrameworkSection(framework) {
     badge.textContent = '✅ Configured';
     const fw = framework;
     const flows = (fw.salesFlows||[]).join(', ') || 'None';
-    const modes = [fw.rail&&fw.rail.enabled?'Rail':'',fw.pt&&fw.pt.enabled?'Urban':'',fw.shared&&fw.shared.enabled?'Shared':''].filter(Boolean).join(', ')||'None';
+    const modes = [fw.rail?.enabled?'Rail':'',fw.pt?.enabled?'Urban':'',fw.shared?.enabled?'Shared':''].filter(Boolean).join(', ')||'None';
     const paxTypes = (fw.passengerTypes||[]).length;
     summary.innerHTML = `OSDM v${esc(fw.osdmVersion||'?')} · Flows: ${esc(flows)} · Modes: ${esc(modes)} · ${esc(paxTypes)} passenger type(s)`;
     body.innerHTML = `<div id="framework-form-area"></div>`;
@@ -527,8 +527,7 @@ function restoreFwOpenState(openSet) {
 }
 function captureFwFocus() {
   const a = document.activeElement;
-  if (!a || !document.getElementById('body-framework') ||
-      !document.getElementById('body-framework').contains(a)) return null;
+  if (!a || !document.getElementById('body-framework')?.contains(a)) return null;
   const action = a.getAttribute && a.getAttribute('data-action');
   if (!action) return null;
   const state = { action, tag: a.tagName };
@@ -792,7 +791,7 @@ async function deleteTrainResource(resourceId) {
 
 // 1) Delete a single scenario
 function deleteScenario(idx) {
-  if (!state || !state.scenarios || !state.scenarios[idx]) return;
+  if (!state || !state.scenarios?.[idx]) return;
   const sc = state.scenarios[idx];
   if (!confirm(`Delete scenario "${sc.code}"?`)) return;
 
@@ -1017,7 +1016,7 @@ function renderWizardStep3InSection(targetEl) {
 
 // ── Handle file upload ───────────────────────────────────────────────────────
 async function handleFileUpload(input) {
-  if (!input.files || !input.files[0]) return;
+  if (!input.files?.[0]) return;
   const loadEl = document.getElementById('loading');
   document.getElementById('sections-container').style.display = 'none';
   loadEl.textContent = '⏳ Uploading data file…';
@@ -1062,7 +1061,7 @@ async function handleFileUpload(input) {
 async function extractFromDatafile(datafile) {
   try {
     // a) Extract framework
-    const osdmVersion = datafile.osdmVersion || (datafile.scenarios && datafile.scenarios[0] && datafile.scenarios[0].osdmVersion) || '3.4';
+    const osdmVersion = datafile.osdmVersion || datafile.scenarios?.[0]?.osdmVersion || '3.4';
     const scenarioTypes = [...new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean))];
     const salesFlows = [];
     if (scenarioTypes.includes('SALE')) salesFlows.push('SALE');
@@ -1408,7 +1407,7 @@ function buildDetailHTML(idx) {
           // showing the dropdown there is confusing and lets users save
           // garbage values. Mirrors the wizard which gates wiz-action the
           // same way (see renderWizardStep3, 's3-action-row' section).
-          const scType = (state.scenarios[idx] || {}).scenarioType;
+          const scType = state.scenarios[idx]?.scenarioType;
           if (scType !== 'REFUND' && scType !== 'EXCHANGE') return '';
           return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction);
         })()}
@@ -1422,14 +1421,14 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'stepFailurePolicy',  'Step Failure Policy',  ENUMS.stepFailurePolicy,
           'What a failed non-critical step (passenger PATCH/GET) does. Hard stop (default): abandon the scenario, loop to the next one. Continue: record the failure, warn, and keep testing the remaining steps (fulfillment & co) — the scenario verdict stays FAILED. Offer/booking failures always hard-stop.')}
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
-          [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), (wizData.framework||{}).offerCriteria && wizData.framework.offerCriteria.flexibilities)],
+          [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), wizData.framework?.offerCriteria?.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE
           // scenarios whose _IROPS flow is in salesFlows, and the codes
           // offered are intersected with fw.iropsCodes.<type>.
-          const scType = (state.scenarios[idx] || {}).scenarioType;
+          const scType = state.scenarios[idx]?.scenarioType;
           if (!fwSupportsIrops(scType)) return '';
           const codes = [null, ...fwIropsCodesFor(scType)];
           return buildSelect(idx, 'overruleCode', 'Overrule Code', codes,
@@ -1602,7 +1601,7 @@ function previewExternalRef(pattern, n) {
 // SEARCH-mode trips can't be statically checked for leg-count — the runtime
 // degradation in 10.yml handles that case with a WARNING.
 function buildPartialRefundFields(idx, sc) {
-  if (!sc || sc.scenarioType !== 'REFUND') return '';
+  if (sc?.scenarioType !== 'REFUND') return '';
 
   // Resolve passengersList + tripRequirement via the canonical state.* helpers
   // already defined at the top of this file (getPassengers / getTrip). The
@@ -1613,7 +1612,7 @@ function buildPartialRefundFields(idx, sc) {
   const paxGroup = getPassengers(sc.passengersListId);
   const resolvedPassengerCount = Array.isArray(paxGroup.passengers) ? paxGroup.passengers.length : 0;
   const tripRequirement = getTrip(sc.tripRequirementId);
-  const isSpec  = tripRequirement && tripRequirement.tripType === 'SPECIFICATION';
+  const isSpec  = tripRequirement?.tripType === 'SPECIFICATION';
   const specLegCount = isSpec && Array.isArray(tripRequirement.legs) ? tripRequirement.legs.length : 0;
   const isReturn = !!(tripRequirement && (tripRequirement.returnSearchParameters || tripRequirement.tripType === 'RETURN'));
 
@@ -1679,7 +1678,7 @@ function buildPartialRefundFields(idx, sc) {
 }
 
 function buildNonHappyFlowSection(idx, sc) {
-  const scType = (sc && sc.scenarioType) || '';
+  const scType = sc?.scenarioType || '';
   const showRefund   = (scType === 'REFUND');
   const showExchange = (scType === 'EXCHANGE');
 
@@ -1687,7 +1686,7 @@ function buildNonHappyFlowSection(idx, sc) {
   // `action` is the dataset.action of the Max-wait input (must be registered
   // in the input event-delegation switch below).
   function timerRow(testField, testLabel, testHint, waitField, waitHint, action) {
-    const val = (state.scenarios[idx] || {})[waitField];
+    const val = state.scenarios[idx]?.[waitField];
     return `
       ${buildSelect(idx, testField, testLabel, ENUMS[testField], testHint)}
       <div class="param-field">
@@ -1975,10 +1974,10 @@ function buildSalesFlowActionsSection(idx, sc) {
   // Gate 0 — the Test Framework authorises which optional actions a scenario may
   // select (issue #107). An unsupported action is shown disabled with the reason;
   // it cannot be turned on here.
-  const fw = (wizData && wizData.framework) || {};
+  const fw = wizData?.framework || {};
   const ticketTypes  = (fw.rail && Array.isArray(fw.rail.ticketTypes)) ? fw.rail.ticketTypes : [];
   const hasReservations = ticketTypes.includes('IRT') || ticketTypes.includes('NRT_OPTIONAL_RESERVATION');
-  const hasSeatMap      = !!(fw.placeSelection && fw.placeSelection.seatMap);
+  const hasSeatMap      = !!fw.placeSelection?.seatMap;
   const hasAncillaries  = Array.isArray(fw.ancillaries) && fw.ancillaries.length > 0;
   const blockedReasonFor = {
     placeSelection: (hasReservations && hasSeatMap) ? null
@@ -2091,7 +2090,7 @@ function buildSalesFlowActionsSection(idx, sc) {
 }
 
 function buildSelect(idx, field, label, options, hint) {
-  const val = (state.scenarios[idx] || {})[field];
+  const val = state.scenarios[idx]?.[field];
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   const opts = options.map(o =>
     `<option value="${esc(o == null ? '' : o)}" ${(val == null ? '' : val) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
@@ -2107,7 +2106,7 @@ function buildSelect(idx, field, label, options, hint) {
 }
 
 function buildText(idx, field, label, placeholder, hint) {
-  const val = (state.scenarios[idx] || {})[field] || '';
+  const val = state.scenarios[idx]?.[field] || '';
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   return `
   <div class="param-field">
@@ -2157,7 +2156,7 @@ function buildTripTrainPicker(idx, tIdx, target, trains) {
 // tripRequirement.trip.searchCriteria.* — scenarioParser builds the OSDM
 // objects from it.
 function buildTripSearchCriteriaPanel(tIdx, trip) {
-  const sc = (trip.trip && trip.trip.searchCriteria) || {};
+  const sc = trip.trip?.searchCriteria || {};
   const isSet = v => v != null && String(v).trim() !== '';
   const setCount =
     ['via1Place', 'via2Place', 'notVias', 'transferLimit', 'numberOfResults',
@@ -2330,10 +2329,10 @@ function buildTripTextField(tIdx, path, label, val, placeholder) {
 // we restore explicitly so it's not subject to that condition.
 function reRenderScenarioDetail(scIdx) {
   const detail = document.getElementById('detail-' + scIdx);
-  if (!detail || !detail.dataset.rendered) return;
+  if (!detail?.dataset.rendered) return;
   const openSections = new Set();
   detail.querySelectorAll('.param-section-head').forEach(h => {
-    if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+    if (h.nextElementSibling?.classList.contains('open')) {
       openSections.add((h.textContent || '').trim());
     }
   });
@@ -2414,7 +2413,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
   // later restricted it — editing must not silently coerce existing data.
   const FULL_PAX_CATS = ['ADULT','CHILD','YOUTH','SENIOR','YOUNG_CHILD','FAMILY_CHILD','PRM','ACCOMP_PRM',
     'DOG','PET','BICYCLE','LUGGAGE','PRAM','CAR','MOTORCYCLE','TRAILER','WHEELCHAIR'];
-  const fwPaxTypes = ((wizData && wizData.framework) || {}).passengerTypes;
+  const fwPaxTypes = wizData?.framework?.passengerTypes;
   const allowedPaxCats = fwFilter(FULL_PAX_CATS, fwPaxTypes);
   // Collect the current set of family groups in this passenger list, and
   // the canonical lastName for each — that's the lastName any member can
@@ -2619,9 +2618,9 @@ function buildPurchaserSection(idx, sc, purchGroup) {
   // carries the materialised values, so downstream consumers don't need to
   // resolve the link.
   const paxList = (state.passengersList || []).find(p => p.id === sc.passengersListId);
-  const passengers = (paxList && paxList.passengers) || [];
+  const passengers = paxList?.passengers || [];
   const isLinked   = !!purch.isPassenger;
-  const linkedRef  = purch.passengerRef || (passengers[0] && passengers[0].reference) || '';
+  const linkedRef  = purch.passengerRef || passengers[0]?.reference || '';
 
   const linkToggle = `
   <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer">
@@ -2692,7 +2691,7 @@ function syncPurchaserFromPassenger(paxList, pax) {
     const purchList = (state.purchaserList || []).find(p => p.id === sc.purchaserListId);
     if (!purchList) return;
     const p0 = (purchList.purchaser = purchList.purchaser || [{}])[0];
-    if (!p0 || !p0.isPassenger || p0.passengerRef !== pax.reference) return;
+    if (!p0?.isPassenger || p0.passengerRef !== pax.reference) return;
     p0.purchaserFirstName    = pax.firstName    || '';
     p0.purchaserLastName     = pax.lastName     || '';
     p0.purchaserEmail        = pax.email        || '';
@@ -2905,7 +2904,7 @@ function setTripFieldByPath(tIdx, path, value) {
 function setPaxField(pIdx, paxIdx, field, value) {
   if (pIdx < 0) return;
   const paxList = state.passengersList[pIdx];
-  if (!paxList || !paxList.passengers || !paxList.passengers[paxIdx]) return;
+  if (!paxList?.passengers?.[paxIdx]) return;
   // null (from e.g. gender 'None') → delete the property so the data file
   // JSON omits the field entirely rather than carrying an explicit `null`.
   // Matches library-bruno's `!= null` request-builder guards.
@@ -3391,7 +3390,7 @@ function renderWizardStep1() {
   // Build IROPS panel HTML for one flow type
   function iropsPanelHtml(type) {
     const key   = type.toLowerCase(); // 'refund' | 'exchange'
-    const codes = (fw.iropsCodes && fw.iropsCodes[key]) ? fw.iropsCodes[key] : [...WIZ_IROPS_MANDATORY];
+    const codes = fw.iropsCodes?.[key] ? fw.iropsCodes[key] : [...WIZ_IROPS_MANDATORY];
     return `
     <div class="irops-panel${fw.salesFlows.includes(type+'_IROPS')?' open':''}" id="irops-${type}">
       <div class="irops-panel-title">⚡ IROPS Reason Codes — ${type[0]+type.slice(1).toLowerCase()}</div>
@@ -3582,7 +3581,7 @@ function renderWizardStep1() {
           ${WIZ_HUMAN_PAX_TYPES.map(p => {
             const sel   = (fw.passengerTypes||[]).includes(p);
             const dflt  = WIZ_PAX_DEFAULT_AGES[p] || { min: 0, max: 99 };
-            const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[p]) ? fw.passengerAgeRanges[p] : dflt;
+            const range = fw.passengerAgeRanges?.[p] ? fw.passengerAgeRanges[p] : dflt;
             return `<div class="pax-age-row" id="pax-age-${esc(p)}" style="${sel?'':'display:none'}">
               <span class="pax-age-label">${p.replaceAll('_',' ')}</span>
               <label class="pax-age-pair">Min age
@@ -3804,13 +3803,13 @@ function renderWizardStep2() {
   const probeWarnings = [];
   trains.forEach(t => {
     const p = probeOf(t);
-    if (p && p.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
+    if (p?.findings.length) probeWarnings.push({ label: t.label || '-', findings: p.findings, probedAt: p.probedAt });
   });
 
   const trainItems = trains.map((t, tidx) => {
     const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
     const probe = probeOf(t);
-    const probeChip = (probe && probe.findings.length)
+    const probeChip = probe?.findings.length
       ? `<span title="${esc(probe.findings.join('\n'))}" style="color:#ef6c00;font-size:12px;font-weight:700;flex-shrink:0;cursor:help">&#9888; ${probe.findings.length}</span>`
       : '';
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
@@ -3924,9 +3923,9 @@ function normalizeTrainData(d) {
     d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
   }
   d.services = d.services.map(s => ({
-    vehicleNumber: (s && s.vehicleNumber) || '',
-    departureTime: (s && s.departureTime) || '',
-    arrivalTime:   (s && s.arrivalTime) || ''
+    vehicleNumber: s?.vehicleNumber || '',
+    departureTime: s?.departureTime || '',
+    arrivalTime:   s?.arrivalTime || ''
   }));
   // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
   // single `productCategory` text field into the ref so saved sets keep working.
@@ -3997,7 +3996,7 @@ function trainAddService(tidx) {
 
 function trainRemoveService(tidx, rowEl) {
   const rows = readTrainServiceRows(tidx);
-  const tr = rowEl && rowEl.closest('tr.svc-row');
+  const tr = rowEl?.closest('tr.svc-row');
   const tbody = document.getElementById(`tf-${tidx}-services`);
   if (tr && tbody) {
     const i = [...tbody.querySelectorAll('tr.svc-row')].indexOf(tr);
@@ -4370,7 +4369,7 @@ async function wizSaveAllTrains() {
   const targets = [];
   trains.forEach((t, tidx) => {
     const detail = document.getElementById('train-detail-' + tidx);
-    if (detail && detail.dataset.rendered) targets.push(tidx);
+    if (detail?.dataset.rendered) targets.push(tidx);
   });
   if (targets.length === 0) { showMsg('Open the train(s) you want to save first (click a row to expand).', false); return; }
   for (const tidx of targets) {
@@ -4462,7 +4461,7 @@ async function runTimetableDiscovery() {
 
   const originURN = originEl.value.trim();
   const destinationURN = destEl.value.trim();
-  let days = Number.parseInt(daysEl && daysEl.value, 10);
+  let days = Number.parseInt(daysEl?.value, 10);
   if (!Number.isInteger(days) || days < 1) days = 7;
   if (days > 14) days = 14;
 
@@ -4593,7 +4592,7 @@ async function downloadPlaces(btn) {
 // every render path that produces these inputs.
 document.body.addEventListener('focusin', function(e) {
   const input = e.target;
-  if (input && input.matches && input.matches('input[data-place-lookup]')) {
+  if (input?.matches?.('input[data-place-lookup]')) {
     attachPlaceAutocomplete(input);
   }
 });
@@ -5040,7 +5039,7 @@ async function wizSaveJourney(jidx) {
   const j = journeys[jidx];
   if (!j) return;
   const detail = document.getElementById('journey-detail-' + jidx);
-  const labelEl = detail && detail.querySelector('[data-action="journey-label"]');
+  const labelEl = detail?.querySelector('[data-action="journey-label"]');
   const label = labelEl ? labelEl.value.trim() : (j.label || '');
   const legs = journeyData(j).legs.filter(l => l && l.trainResourceId !== '' && l.trainResourceId != null);
 
@@ -5156,7 +5155,7 @@ function wizInitScenario() {
     type:               firstType,
     subType:            null,
     action:             'PATCH',
-    desiredFlexibility: (fw.offerCriteria && fw.offerCriteria.flexibilities && fw.offerCriteria.flexibilities[0]) || 'FULL_FLEXIBLE',
+    desiredFlexibility: fw.offerCriteria?.flexibilities?.[0] || 'FULL_FLEXIBLE',
     customCode:         '',    // optional user-typed name that overrides the auto-generated scenario code
     passengerGender:    {},    // per-type default gender applied at generation: { ADULT: 'X'|'MALE'|'FEMALE', ... }
     overruleCode:       null,
@@ -5178,8 +5177,8 @@ function wizInitScenario() {
     flexibilities:       [],
     offerMode:           '',
     currency:            '',
-    fulfillmentTypes:    (fw.fulfillment && fw.fulfillment.types) ? [...fw.fulfillment.types] : ['ETICKET'],
-    fulfillmentMedia:    (fw.fulfillment && fw.fulfillment.media) ? [...fw.fulfillment.media] : ['PDF_A4']
+    fulfillmentTypes:    fw.fulfillment?.types ? [...fw.fulfillment.types] : ['ETICKET'],
+    fulfillmentMedia:    fw.fulfillment?.media ? [...fw.fulfillment.media] : ['PDF_A4']
   };
 }
 
@@ -5277,7 +5276,7 @@ function renderWizardStep3() {
   const paxRows = Object.entries(sc.passengers).map(([type, count]) => {
     const isHuman = WIZ_HUMAN_PAX_TYPES.includes(type);
     const range = isHuman
-      ? ((fw.passengerAgeRanges && fw.passengerAgeRanges[type]) || WIZ_PAX_DEFAULT_AGES[type] || {min:18,max:99})
+      ? (fw.passengerAgeRanges?.[type] || WIZ_PAX_DEFAULT_AGES[type] || {min:18,max:99})
       : null;
     const ageHint = range ? `Age ${range.min}–${range.max}` : '&nbsp;';
     const abbr = WIZ_PAX_ABBREV[type] || type.slice(0,3);
@@ -5285,7 +5284,7 @@ function renderWizardStep3() {
     // value — the gender field is then omitted entirely from requests,
     // rather than sending an unvalidated default. Existing stored values
     // (MALE, FEMALE, X) still match their corresponding option.
-    const g = (sc.passengerGender && sc.passengerGender[type]) || '';
+    const g = sc.passengerGender?.[type] || '';
     const genderSelect = isHuman ? `
       <select class="param-input param-select" style="max-width:130px;font-size:12px;margin-right:6px"
         data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replaceAll('_',' ')} generated — 'None' omits the field from offer requests">
@@ -5348,7 +5347,7 @@ function renderWizardStep3() {
         <div class="param-field" style="min-width:180px">
           <label class="param-label">Desired flexibility</label>
           <select class="param-input param-select" data-action="wiz-flexibility">
-            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replaceAll('_',' ')}</option>`).join('')}
+            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria?.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replaceAll('_',' ')}</option>`).join('')}
           </select>
         </div>
         ${(() => {
@@ -5484,7 +5483,7 @@ function renderWizardStep3() {
         <div style="font-size:12px;color:#546e7a;background:#f5f8ff;border:1px solid #e3eaf5;border-radius:6px;padding:10px 12px">
           <strong>First name:</strong> Purchaser &nbsp;·&nbsp;
           <strong>Last name:</strong> ${esc(wizProfile.company_name||wizProfile.slug||'Company')} &nbsp;·&nbsp;
-          <strong>Email:</strong> ${esc(wizProfile.email||(user&&user.email)||'tester@example.com')}
+          <strong>Email:</strong> ${esc(wizProfile.email||user?.email||'tester@example.com')}
         </div>
       </div>
     </div>
@@ -5535,11 +5534,11 @@ function renderWizardStep3() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment type</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment && fw.fulfillment.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replaceAll('_',' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment?.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment media</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment && fw.fulfillment.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment?.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -5568,7 +5567,7 @@ function renderWizardStep3() {
 function reRenderStep3InSection() {
   // Re-render step 3 form into whichever section container it lives in
   const area = document.getElementById('scenario-creator-area');
-  if (area && area.innerHTML) {
+  if (area?.innerHTML) {
     renderWizardStep3InSection(area);
   } else {
     const bodyEl = document.getElementById('body-scenarios');
@@ -5625,8 +5624,8 @@ function wizSelectTrain(id) {
     const tr = (wizData.resources||[]).find(r => r.id === parsed);
     if (tr) {
       const d = typeof tr.data==='string' ? JSON.parse(tr.data) : (tr.data||{});
-      if (d.serviceClasses && d.serviceClasses.length) wizScenario.serviceClasses = [...d.serviceClasses];
-      if (d.travelClasses  && d.travelClasses.length)  wizScenario.travelClasses  = [...d.travelClasses];
+      if (d.serviceClasses?.length) wizScenario.serviceClasses = [...d.serviceClasses];
+      if (d.travelClasses?.length)  wizScenario.travelClasses  = [...d.travelClasses];
       // Pre-fill origin/destination URNs from train resource (user can still override)
       if (d.originURN)      wizScenario.originURN      = d.originURN;
       if (d.destinationURN) wizScenario.destinationURN = d.destinationURN;
@@ -5780,12 +5779,12 @@ function wizGenPassengers() {
         // via their existing `!= null` guards). Otherwise use the chosen
         // value for both gender and updateGender so aftersales PATCH flows
         // stay consistent.
-        const rawDefault = sc.passengerGender && sc.passengerGender[category];
+        const rawDefault = sc.passengerGender?.[category];
         const defaultGender = rawDefault || null;
         pax.firstName   = firstName;
         pax.lastName    = lastName;
         if (defaultGender) pax.gender = defaultGender;   // omitted when null
-        const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[category])
+        const range = fw.passengerAgeRanges?.[category]
           || WIZ_PAX_DEFAULT_AGES[category] || { min: 18, max: 99 };
         pax.dateOfBirth       = genDateOfBirth(range.min, range.max);
         // Update fields — needed for PATCH passenger requests in aftersales scenarios
@@ -5887,7 +5886,7 @@ async function wizGenerateScenario() {
     // A train set may carry several services (timetable, #136); the wizard uses
     // the first one. Per-service selection is available in the trip editor's
     // "Apply test data" picker.
-    const svc0 = (d.services && d.services[0]) || {};
+    const svc0 = d.services?.[0] || {};
 
     // #143 — a selected Journey supersedes the single train: build a multi-leg
     // SPECIFICATION from its legs (origin/dest/times/vehicle/operator + product
@@ -6145,7 +6144,7 @@ async function wizGenerateScenario() {
 function findAction(target) {
   let el = target;
   while (el && el !== document.body) {
-    if (el.dataset && el.dataset.action) return el;
+    if (el.dataset?.action) return el;
     el = el.parentElement;
   }
   return null;
@@ -6208,7 +6207,7 @@ document.body.addEventListener('click', function(e) {
       const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
       const isHuman = WIZ_HUMAN_PAX_TYPES.includes(category);
       const paxList = state.passengersList[pIdx];
-      if (!paxList || !paxList.passengers) break;
+      if (!paxList?.passengers) break;
       const companySlug = (wizProfile.slug || wizProfile.company_name || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
       const fn = randomPick(WIZ_RANDOM_FIRST_NAMES);
       const ln = randomPick(WIZ_RANDOM_LAST_NAMES);
@@ -6237,7 +6236,7 @@ document.body.addEventListener('click', function(e) {
       markDirty();
       // Re-render the detail for this scenario
       const detail = document.getElementById(`detail-${esc(scIdx)}`);
-      if (detail && detail.innerHTML) {
+      if (detail?.innerHTML) {
         renderScenarioDetail(detail, scIdx);
         // Re-open the passengers section
         detail.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
@@ -6262,7 +6261,7 @@ document.body.addEventListener('click', function(e) {
       const tpPi  = Number.parseInt(el.dataset.pi);
       const key   = tpIdx + ':' + tpPi;
       const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
-      const row   = panel && panel.previousElementSibling;
+      const row   = panel?.previousElementSibling;
       const nowOpen = _paxEditOpen.has(key) ? false : true;
       if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
       if (panel) panel.style.display = nowOpen ? 'block' : 'none';
@@ -6275,7 +6274,7 @@ document.body.addEventListener('click', function(e) {
       const arIdx = Number.parseInt(el.dataset.pidx);
       const arPi  = Number.parseInt(el.dataset.pi);
       const arList = state.passengersList[arIdx];
-      const arPax  = arList && arList.passengers && arList.passengers[arPi];
+      const arPax  = arList?.passengers?.[arPi];
       if (!arPax) break;
       if (!Array.isArray(arPax.reductionCards)) arPax.reductionCards = [];
       arPax.reductionCards.push('');
@@ -6302,7 +6301,7 @@ document.body.addEventListener('click', function(e) {
       const rrPi  = Number.parseInt(el.dataset.pi);
       const rrCi  = Number.parseInt(el.dataset.cidx);
       const rrList = state.passengersList[rrIdx];
-      const rrPax  = rrList && rrList.passengers && rrList.passengers[rrPi];
+      const rrPax  = rrList?.passengers?.[rrPi];
       if (!rrPax || !Array.isArray(rrPax.reductionCards)) break;
       rrPax.reductionCards.splice(rrCi, 1);
       markDirty();
@@ -6321,7 +6320,7 @@ document.body.addEventListener('click', function(e) {
       const alIdx = Number.parseInt(el.dataset.pidx);
       const alPi  = Number.parseInt(el.dataset.pi);
       const alList = state.passengersList[alIdx];
-      const alPax  = alList && alList.passengers && alList.passengers[alPi];
+      const alPax  = alList?.passengers?.[alPi];
       if (!alPax) break;
       if (!Array.isArray(alPax.loyaltyCards)) alPax.loyaltyCards = [];
       alPax.loyaltyCards.push({ carrierCode: '', cardReference: '' });
@@ -6344,7 +6343,7 @@ document.body.addEventListener('click', function(e) {
       const rlPi  = Number.parseInt(el.dataset.pi);
       const rlCi  = Number.parseInt(el.dataset.cidx);
       const rlList = state.passengersList[rlIdx];
-      const rlPax  = rlList && rlList.passengers && rlList.passengers[rlPi];
+      const rlPax  = rlList?.passengers?.[rlPi];
       if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) break;
       rlPax.loyaltyCards.splice(rlCi, 1);
       markDirty();
@@ -6361,7 +6360,7 @@ document.body.addEventListener('click', function(e) {
       const rpIdx = Number.parseInt(el.dataset.pidx);
       const rpPi = Number.parseInt(el.dataset.pi);
       const rpList = state.passengersList[rpIdx];
-      if (!rpList || !rpList.passengers || rpList.passengers.length <= 1) break;
+      if (!rpList?.passengers || rpList.passengers.length <= 1) break;
       if (!confirm(`Remove passenger ${rpPi + 1}?`)) break;
       rpList.passengers.splice(rpPi, 1);
       // When a passenger is removed, drop its stale Edit-open entry so the
@@ -6508,7 +6507,7 @@ document.body.addEventListener('click', function(e) {
       // same trip / passengers / purchaser / fulfillment records as the
       // original, so editing one would silently mutate the other — a
       // classic aliasing bug in the earlier duplicate implementation.
-      const maxId = (arr) => (arr && arr.length)
+      const maxId = (arr) => arr?.length
         ? Math.max(...arr.map(x => x && typeof x.id === 'number' ? x.id : 0))
         : 0;
       let nextId = Math.max(
@@ -6723,7 +6722,7 @@ document.body.addEventListener('change', function(e) {
       // Update just the header row's displayed code (human + raw) without
       // a full renderAll() that would collapse the detail panel.
       const detailWrap = document.getElementById('detail-' + sci);
-      const rowHeader = detailWrap && detailWrap.previousElementSibling;
+      const rowHeader = detailWrap?.previousElementSibling;
       if (rowHeader) {
         const human = rowHeader.querySelector('div[data-action="toggle-detail"] > div:first-child');
         const raw   = rowHeader.querySelector('div[data-action="toggle-detail"] > div:nth-child(2)');
@@ -6738,7 +6737,7 @@ document.body.addEventListener('change', function(e) {
       }
       // Toggle-scenario checkbox uses the code as identifier — refresh its
       // data-code so toggling the run flag after a rename still works.
-      const checkbox = rowHeader && rowHeader.querySelector('input[data-action="toggle-scenario"]');
+      const checkbox = rowHeader?.querySelector('input[data-action="toggle-scenario"]');
       if (checkbox) checkbox.dataset.code = normalised;
       // in-run badge element id includes the code — rename its id as well.
       const inrun = document.getElementById('inrun-' + origCode);
@@ -6775,12 +6774,12 @@ document.body.addEventListener('change', function(e) {
           }
         }
         const detail = document.getElementById('detail-' + scIdx);
-        if (detail && detail.dataset.rendered) {
+        if (detail?.dataset.rendered) {
           // Preserve which param-section headers were open so the user isn't
           // bounced back to the default section layout.
           const openSections = new Set();
           detail.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+            if (h.nextElementSibling?.classList.contains('open')) {
               openSections.add((h.textContent || '').trim());
             }
           });
@@ -6788,11 +6787,11 @@ document.body.addEventListener('change', function(e) {
           detail.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             if (openSections.has(label)) {
-              h.nextElementSibling && h.nextElementSibling.classList.add('open');
+              h.nextElementSibling?.classList.add('open');
               const arrow = h.querySelector('.ps-arrow');
               if (arrow) arrow.classList.add('open');
             } else {
-              h.nextElementSibling && h.nextElementSibling.classList.remove('open');
+              h.nextElementSibling?.classList.remove('open');
               const arrow = h.querySelector('.ps-arrow');
               if (arrow) arrow.classList.remove('open');
             }
@@ -6821,7 +6820,7 @@ document.body.addEventListener('change', function(e) {
           // Preserve which param sections were open
           const openSections = new Set();
           det.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling && h.nextElementSibling.classList.contains('open')) {
+            if (h.nextElementSibling?.classList.contains('open')) {
               openSections.add((h.textContent || '').trim());
             }
           });
@@ -6829,7 +6828,7 @@ document.body.addEventListener('change', function(e) {
           det.querySelectorAll('.param-section-head').forEach(h => {
             const label = (h.textContent || '').trim();
             const isOpen = openSections.has(label);
-            h.nextElementSibling && h.nextElementSibling.classList.toggle('open', isOpen);
+            h.nextElementSibling?.classList.toggle('open', isOpen);
             const arrow = h.querySelector('.ps-arrow');
             if (arrow) arrow.classList.toggle('open', isOpen);
           });
@@ -6841,7 +6840,7 @@ document.body.addEventListener('change', function(e) {
       const sfpIdx = Number.parseInt(el.dataset.pidx);
       const sfpPi  = Number.parseInt(el.dataset.pi);
       const sfpList = state.passengersList[sfpIdx];
-      const sfpPax  = sfpList && sfpList.passengers && sfpList.passengers[sfpPi];
+      const sfpPax  = sfpList?.passengers?.[sfpPi];
       if (!sfpPax) break;
       const raw = el.value;
       let nextGroup;
@@ -6862,7 +6861,7 @@ document.body.addEventListener('change', function(e) {
       // name-sharing semantics visible immediately.
       if (nextGroup != null) {
         const sibling = sfpList.passengers.find((q, qi) =>
-          qi !== sfpPi && q && q.familyGroup === nextGroup && q.lastName);
+          qi !== sfpPi && q?.familyGroup === nextGroup && q.lastName);
         if (sibling && sibling.lastName !== sfpPax.lastName) {
           sfpPax.lastName = sibling.lastName;
         }
@@ -6962,9 +6961,9 @@ document.body.addEventListener('change', function(e) {
         // purchaser fields so the UI shows the resolved values immediately.
         const sc = state.scenarios[tpScIdx];
         const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-        const passengers = (paxList && paxList.passengers) || [];
+        const passengers = paxList?.passengers || [];
         if (!p0.passengerRef || !passengers.some(p => p.reference === p0.passengerRef)) {
-          p0.passengerRef = (passengers[0] && passengers[0].reference) || '';
+          p0.passengerRef = passengers[0]?.reference || '';
         }
         const linked = passengers.find(p => p.reference === p0.passengerRef);
         if (linked) syncPurchaserFromPassenger(paxList, linked);
@@ -6982,7 +6981,7 @@ document.body.addEventListener('change', function(e) {
       pp0.passengerRef = el.value;
       const sc = state.scenarios[ppScIdx];
       const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-      const passengers = (paxList && paxList.passengers) || [];
+      const passengers = paxList?.passengers || [];
       const linked = passengers.find(p => p.reference === el.value);
       if (linked) syncPurchaserFromPassenger(paxList, linked);
       markDirty();
@@ -7006,7 +7005,7 @@ document.body.addEventListener('change', function(e) {
       // pick from).
       if (spxField === 'gender' && rawValue) {
         const pxList = state.passengersList[spxIdx];
-        const pxPax  = pxList && pxList.passengers && pxList.passengers[spxPi];
+        const pxPax  = pxList?.passengers?.[spxPi];
         if (pxPax) {
           if (isAutoGeneratedFirstName(pxPax.firstName)) {
             pxPax.firstName = pickFirstNameForGender(rawValue);
@@ -7032,7 +7031,7 @@ document.body.addEventListener('change', function(e) {
       const cpScIdx = Number.parseInt(el.dataset.scenidx);
       const newCat = el.value;
       const cpList = state.passengersList[cpIdx];
-      if (!cpList || !cpList.passengers[cpPi]) break;
+      if (!cpList?.passengers[cpPi]) break;
       const pax = cpList.passengers[cpPi];
       pax.category = newCat;
       pax.type = WIZ_PAX_TO_OSDM_TYPE[newCat] || 'PERSON';
@@ -7082,7 +7081,7 @@ document.body.addEventListener('change', function(e) {
       const n = Number.parseInt(raw, 10);
       if (raw === '' || !Number.isFinite(n) || n < 0 || n > 120) {
         const ranges = wizData.framework && wizData.framework.passengerAgeRanges;
-        const stored = ranges && ranges[el.dataset.paxtype] && ranges[el.dataset.paxtype][el.dataset.bound];
+        const stored = ranges?.[el.dataset.paxtype]?.[el.dataset.bound];
         if (typeof stored === 'number') el.value = stored;
         break;
       }
@@ -7200,7 +7199,7 @@ document.body.addEventListener('input', function(e) {
       // a re-render, so the change is immediately visible in the row above.
       if (sptField === 'firstName' || sptField === 'lastName') {
         const pxList = state.passengersList[sptIdx];
-        const pxPax  = pxList && pxList.passengers && pxList.passengers[sptPi];
+        const pxPax  = pxList?.passengers?.[sptPi];
         const disp = document.querySelector('[data-pax-display="' + sptIdx + '-' + sptPi + '"]');
         if (pxPax && disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
       }
@@ -7211,7 +7210,7 @@ document.body.addEventListener('input', function(e) {
       const spPi  = Number.parseInt(el.dataset.pi);
       const spCi  = Number.parseInt(el.dataset.cidx);
       const spList = state.passengersList[spIdx];
-      const spPax  = spList && spList.passengers && spList.passengers[spPi];
+      const spPax  = spList?.passengers?.[spPi];
       if (!spPax) break;
       if (!Array.isArray(spPax.reductionCards)) spPax.reductionCards = [];
       spPax.reductionCards[spCi] = el.value;
@@ -7224,7 +7223,7 @@ document.body.addEventListener('input', function(e) {
       const slCi  = Number.parseInt(el.dataset.cidx);
       const field = el.dataset.field;
       const slList = state.passengersList[slIdx];
-      const slPax  = slList && slList.passengers && slList.passengers[slPi];
+      const slPax  = slList?.passengers?.[slPi];
       if (!slPax) break;
       if (!Array.isArray(slPax.loyaltyCards)) slPax.loyaltyCards = [];
       if (!slPax.loyaltyCards[slCi] || typeof slPax.loyaltyCards[slCi] !== 'object') {

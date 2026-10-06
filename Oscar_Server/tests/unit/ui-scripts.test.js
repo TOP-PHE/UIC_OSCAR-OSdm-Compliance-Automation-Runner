@@ -234,6 +234,36 @@ describe('js/scenarios.js — esc', () => {
   });
 });
 
+describe('js/scenarios.js — fwIropsCodesFor', () => {
+  // Reads the framework through two optional chains since #526. The answer
+  // for a missing or odd framework must stay an empty list.
+  const codesFor = (wizData, type) => loadFunction('js/scenarios.js', 'fwIropsCodesFor', { wizData })(type);
+
+  test('returns the codes configured for the scenario type', () => {
+    const wizData = { framework: { iropsCodes: { refund: ['DELAY', 'CANCELLED'], exchange: ['STRIKE'] } } };
+    expect(codesFor(wizData, 'REFUND')).toEqual(['DELAY', 'CANCELLED']);
+    expect(codesFor(wizData, 'exchange')).toEqual(['STRIKE']);
+  });
+
+  test.each([
+    ['no working copy yet', null],
+    ['no framework', {}],
+    ['a framework with no IROPS codes', { framework: {} }],
+    ['IROPS codes set to null', { framework: { iropsCodes: null } }],
+    ['nothing for this type', { framework: { iropsCodes: { exchange: ['STRIKE'] } } }],
+    ['a value that is not a list', { framework: { iropsCodes: { refund: 'DELAY' } } }],
+  ])('%s → []', (_label, wizData) => {
+    expect(codesFor(wizData, 'REFUND')).toEqual([]);
+  });
+
+  test('SALE and a missing type have no codes', () => {
+    const wizData = { framework: { iropsCodes: { sale: ['X'], refund: ['DELAY'] } } };
+    expect(codesFor(wizData, 'SALE')).toEqual([]);
+    expect(codesFor(wizData, '')).toEqual([]);
+    expect(codesFor(wizData, undefined)).toEqual([]);
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });
