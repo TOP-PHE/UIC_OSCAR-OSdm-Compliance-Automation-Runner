@@ -18,6 +18,7 @@
  *   - ensurePlatformCompany: idempotent creation of the platform-root company
  *   - auditLog: inserts into auth_events; never throws on failure
  *   - resolveCompanyScope: 403 for certification_user, correct companyId for others
+ *   - companyEndpointChange: who may change a company's OSDM endpoint (#544)
  */
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-shared';
@@ -29,6 +30,7 @@ const {
   ensurePlatformCompany,
   auditLog,
   resolveCompanyScope,
+  companyEndpointChange,
   ALLOWED_ROLES,
   PLATFORM_SLUG,
 } = require('../../src/api/helpers/shared');
@@ -195,5 +197,59 @@ describe('resolveCompanyScope', () => {
     expect(result).toBeNull();
     // No error response (null companyId is valid for admins — means "all companies")
     expect(res.statusCode).toBe(0);
+  });
+});
+
+// ── companyEndpointChange (#544) ─────────────────────────────────────────────
+
+describe('companyEndpointChange', () => {
+  const STORED = 'https://provider.example/osdm';
+  const OTHER = 'https://elsewhere.example/collect';
+  const REFUSED = { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
+
+  test.each([['test_manager'], ['administrator']])('%s writes the endpoint, trimmed', (role) => {
+    expect(companyEndpointChange(role, `  ${OTHER}  `, STORED)).toEqual({ write: OTHER });
+  });
+
+  // The route stops a certifier earlier (resolveCompanyScope). The rule must
+  // not depend on that: isPlatformRole() is true for a certifier.
+  test.each([['company_user'], ['certification_user'], ['Test_Manager'], ['unknown'], [''], [undefined], [null]])(
+    'role %p is refused another endpoint', (role) => {
+      expect(companyEndpointChange(role, OTHER, STORED)).toEqual(REFUSED);
+      expect(companyEndpointChange(role, OTHER, null)).toEqual(REFUSED);
+    });
+
+  test('anyone may send back the stored endpoint: nothing to write', () => {
+    for (const role of ['company_user', 'certification_user', undefined]) {
+      expect(companyEndpointChange(role, STORED, STORED)).toEqual({ write: null, echoed: true });
+      expect(companyEndpointChange(role, ` ${STORED}\n`, STORED)).toEqual({ write: null, echoed: true });
+    }
+  });
+
+  test('spaces only, with no endpoint stored yet, is not a change either', () => {
+    expect(companyEndpointChange('company_user', '   ', null)).toEqual({ write: null, echoed: true });
+    expect(companyEndpointChange('company_user', '   ', STORED)).toEqual(REFUSED);
+  });
+
+  test('an endpoint that only looks like the stored one is a change', () => {
+    for (const near of [STORED.toUpperCase(), `${STORED}/`, STORED.replace('https', 'http'), `${STORED}?x=1`]) {
+      expect(companyEndpointChange('company_user', near, STORED)).toEqual(REFUSED);
+    }
+  });
+
+  test('absent or empty asks for nothing, whoever sends it', () => {
+    for (const role of ['company_user', 'test_manager', 'administrator']) {
+      for (const nothing of [undefined, null, '']) {
+        expect(companyEndpointChange(role, nothing, STORED)).toEqual({ write: null });
+      }
+    }
+  });
+
+  test('a value that is not a string is a bad request, whoever sends it', () => {
+    for (const role of ['company_user', 'test_manager']) {
+      for (const bad of [42, true, [OTHER], { url: OTHER }]) {
+        expect(companyEndpointChange(role, bad, STORED)).toEqual({ status: 400, detail: 'api_base must be a string.' });
+      }
+    }
   });
 });

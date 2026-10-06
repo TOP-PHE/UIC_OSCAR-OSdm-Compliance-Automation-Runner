@@ -109,6 +109,30 @@ function requireTestManager(req, res) {
   return true;
 }
 
+// ── Who may change a company's OSDM endpoint (#544) ──────────────────────────
+// The endpoint is company-wide: every request of every run goes to it with the
+// token of the tester who started the run. A tester who could change it would
+// send colleagues' runs, and their tokens, anywhere. So a Test Manager changes
+// it. An administrator who names the company keeps the access they had, as
+// for the dedicated headers. The two roles are named here on purpose:
+// isPlatformRole() also covers certifiers, and an unknown role must be refused.
+//
+// A tester may send back the endpoint that is stored. The API Config page did
+// so on every save, for every role, until 1.11.207, and a page left open
+// across the upgrade still does. That is not a change and nothing is written.
+//
+// Pure. Returns { write } (the trimmed endpoint, or null for "nothing to
+// write"), with echoed: true for the case above, or { status, detail } to
+// refuse.
+function companyEndpointChange(role, requested, stored) {
+  if (!requested) return { write: null };   // absent or empty: nothing asked, as before
+  if (typeof requested !== 'string') return { status: 400, detail: 'api_base must be a string.' };
+  const endpoint = requested.trim();
+  if (role === 'test_manager' || role === 'administrator') return { write: endpoint };
+  if (endpoint === (stored || '')) return { write: null, echoed: true };
+  return { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
+}
+
 module.exports = {
   ALLOWED_ROLES,
   PLATFORM_SLUG,
@@ -118,4 +142,5 @@ module.exports = {
   resolveCompanyScope,
   denyAdminAndCertifier,
   requireTestManager,
+  companyEndpointChange,
 };
