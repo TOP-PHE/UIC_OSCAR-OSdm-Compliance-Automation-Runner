@@ -14,6 +14,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.206] — 2026-10-06
+
+### Changed
+
+- **Sonar clean-up 4/5: the pages.** Closes #527 (tracking #523). The inline
+  scripts and styles of the pages under `Oscar_Server/public`. Five pages are
+  changed: `report-builder.html`, `admin.html`, `run-detail.html`,
+  `dashboard.html` and `compare.html`. 90 of the 113 findings in scope are
+  addressed, one rule per commit. Nothing is meant to change for a user.
+
+  | Rule | What changed | Done |
+  |---|---|---|
+  | S7761 | `getAttribute('data-x')` → `dataset.x` | 31 of 32 |
+  | S3358 | Nested conditionals taken apart | 20 of 20 |
+  | S1874 | `word-break:break-word` → `overflow-wrap:anywhere` | 9 of 9 |
+  | S7765 | `includes()` for membership tests | 7 of 7 |
+  | S7781 | `replaceAll()` where the pattern is a plain string | 6 of 27 |
+  | S6535 | Needless escapes in regular expressions | 6 of 7 |
+  | S7778 | One `push()` for consecutive rows | 4 of 4 |
+  | S7762, S6661, S7780, S4658, S1121 | `remove()`, object spread, `String.raw`, an empty CSS rule, an assignment inside an expression | 7 of 7 |
+
+- **Six small functions come out of the nested conditionals**, so that a test
+  can call them: `configInputType` (admin), `diffErrorHtml` (compare),
+  `deleteModalVariant` (dashboard), `resultBadgeHtml`, `httpStatusClass` and
+  `initialHttpTab` (report builder; `resultBadgeHtml` also in run detail).
+
+### Left open on purpose (23)
+
+- **21 `replace(/x/g)` calls in the pages' HTML encoders** (S7781). CodeQL
+  recognises that form as an encoder and did not recognise `replaceAll` with a
+  string (1.11.204). A test now pins the form in each page.
+- **One data-attribute read in `report-builder.html`** (S7761),
+  `switchHttpTab()`: it is the source of the open code-scanning alert on the
+  `innerHTML` below it. Reading it through `dataset` could hide that flow from
+  CodeQL without fixing it.
+- **One escape in `run-detail.html`** (S6535): the backslash of a closing
+  script tag inside an inline script. Without it the HTML parser ends the
+  script there.
+
+### Verification
+
+- **Old against new, page by page.** Each page's script was run from `main` and
+  from this branch in a fake browser that records what the script writes
+  (`innerHTML`, text, checked states, CSV content, fetch calls, dialogs). The
+  same 297 calls, as tester, Test Manager, administrator and certifier, give
+  1,312 recorded writes that are identical.
+- **The comparison reaches the changed lines.** Each changed expression was
+  broken in turn: 93 of 94 breakages were detected. The last one cannot change
+  behaviour: it sits in a second pattern that the first already covers.
+- **CSS.** CSS Text Level 3 defines `word-break:break-word` as
+  `overflow-wrap:anywhere` with normal word breaking. Measured in Chromium 152
+  for the nine rules: 1,600 layouts come out the same, and the same measurement
+  does tell other wrapping rules apart.
+- **Regular expressions.** Old and new give the same result on 2,065,066
+  strings.
+- **Tests.** 20 new in `tests/unit/ui-scripts.test.js`; 35 deliberate breakages
+  each fail at least one.
+- **One difference that cannot be reached.** For a missing data attribute,
+  `dataset` gives `undefined` where `getAttribute` gave `null`. Every element
+  these handlers receive carries its attributes, because the same page writes
+  them.
+- **Not done.** The pages were not opened on a running instance. Worth a look
+  after deployment: Dashboard, Run Detail, Report Builder, Compare and the
+  administrator pages.
+
+Not in scope: the 97 contrast findings and 8 other accessibility findings
+(decision pending in #523), and 15 functions over the complexity limit.
+Server-only; collection unchanged at OTST_V2.0.101. No news entry.
+
+---
+
 ## [server-1.11.205] — 2026-10-06
 
 ### Changed

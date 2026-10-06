@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.230",
+  "current_release": "2026.231",
   "releases": [
+    {
+      "release": "2026.231",
+      "date": "2026-10-06",
+      "server": "1.11.206",
+      "collection": "OTST_V2.0.101",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor(ui): Sonar clean-up 4/5, the inline scripts and styles of the pages under Oscar_Server/public. Closes #527 (tracking #523). Five pages are changed: report-builder.html, admin.html, run-detail.html, dashboard.html and compare.html. 90 of the 113 findings in scope are addressed, one rule per commit: 31 data-attribute reads through dataset (S7761), 20 nested conditionals (S3358), 9 deprecated word-break:break-word (S1874), 7 includes() (S7765), 6 replaceAll() (S7781), 6 needless regex escapes (S6535), 4 combined push() (S7778), 2 remove() (S7762), 2 object spreads (S6661), and one each of String.raw (S7780), an empty CSS rule (S4658) and an assignment inside an expression (S1121).",
+        "Nothing is meant to change for a user, and it was checked as such. Each page's script was run twice, from main and from this branch, in a fake browser that records everything the script writes (innerHTML, text, checked states, CSV content, fetch calls, dialogs), and the same scenarios were played against both: 297 calls over the roles tester, Test Manager, administrator and certifier, 1,312 recorded writes, identical. To know that the comparison reaches the changed lines, each changed expression was broken in turn: 93 of 94 breakages were detected, and the last one cannot change behaviour (a second pattern that the first already covers).",
+        "CSS: word-break:break-word is defined by CSS Text Level 3 as overflow-wrap:anywhere with normal word breaking. Measured in Chromium 152 for the nine rules: 1,600 layouts (blocks, flex items, min-content boxes, table cells at four widths with ten kinds of content) come out the same; the same measurement does tell other wrapping rules apart. Regular expressions: old and new give the same result on 2,065,066 strings.",
+        "Left open on purpose (23). 21 replace(/x/g) calls are the pages' HTML encoders (S7781): CodeQL recognises that form as an encoder and did not recognise replaceAll with a string (see 1.11.204), so they stay. One data-attribute read in report-builder.html (S7761) stays as getAttribute: it is the source of the open code-scanning alert on the innerHTML below it, and reading it through dataset could hide that flow without fixing it. One escape in run-detail.html (S6535) is the backslash of a closing script tag inside an inline script, which the HTML parser needs.",
+        "One difference exists and cannot be reached: for a data attribute that is missing, dataset gives undefined where getAttribute gave null. Every element these handlers receive carries its attributes, because the same page writes them.",
+        "Not in scope and unchanged: the 97 contrast findings and 8 other accessibility findings (decision pending in #523), and 15 functions over the complexity limit. Tests: 20 new in tests/unit/ui-scripts.test.js for the functions taken out of the nested conditionals and for the three things left as they are; 35 deliberate breakages each fail at least one of them. Not done: the pages were not opened on a running instance; worth a look after deployment at the Dashboard, Run Detail, Report Builder, Compare and the administrator pages. Server-only (Oscar_Server/public); collection unchanged at OTST_V2.0.101. No news entry: nothing changes for users."
+      ]
+    },
     {
       "release": "2026.230",
       "date": "2026-10-06",

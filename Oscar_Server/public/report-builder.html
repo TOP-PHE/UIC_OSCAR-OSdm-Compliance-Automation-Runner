@@ -114,7 +114,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 /* Full error message on its own line — wraps instead of being truncated to
    180px / 60 chars, so the certifier can read the expected-vs-actual detail
    without scrolling the log or hovering for a tooltip. */
-.assertion-error{padding:2px 16px 8px 42px;border-bottom:1px solid #f5f5f5;font-size:11px;color:#c62828;font-family:'Consolas','Monaco','Courier New',monospace;white-space:pre-wrap;word-break:break-word;line-height:1.5;background:#fff7f7}
+.assertion-error{padding:2px 16px 8px 42px;border-bottom:1px solid #f5f5f5;font-size:11px;color:#c62828;font-family:'Consolas','Monaco','Courier New',monospace;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;background:#fff7f7}
 .a-pass{color:#2e7d32}
 .a-fail{color:#c62828;font-weight:700}
 .a-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700}
@@ -143,7 +143,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
    chip rendered without its badge colors. */
 .log-level.l-debug{background:#eceff1;color:#78909c}
 .log-cat{font-size:10px;color:#1565c0;background:#e3f2fd;border-radius:3px;padding:1px 6px;text-align:center;align-self:center}
-.log-msg{color:#37474f;white-space:pre-wrap;word-break:break-word}
+.log-msg{color:#37474f;white-space:pre-wrap;overflow-wrap:anywhere}
 .log-empty{padding:20px;text-align:center;color:#90a4ae;font-size:13px}
 
 /* Scenario milestone banners — full-width dividers in the log stream so the
@@ -173,7 +173,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .log-json-toggle .caret{transition:transform .15s;display:inline-block}
 .log-json-toggle.expanded .caret{transform:rotate(90deg)}
 .log-json-summary{color:#546e7a;font-size:11px;margin-left:4px;font-family:'Segoe UI',Arial,sans-serif}
-.log-json-body{display:none;padding:8px 16px 8px 80px;background:#fafbfc;border-bottom:1px solid #f5f5f5;font-family:'Consolas','Monaco','Courier New',monospace;font-size:11px;color:#37474f;white-space:pre-wrap;word-break:break-word;line-height:1.45;max-height:400px;overflow:auto}
+.log-json-body{display:none;padding:8px 16px 8px 80px;background:#fafbfc;border-bottom:1px solid #f5f5f5;font-family:'Consolas','Monaco','Courier New',monospace;font-size:11px;color:#37474f;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;max-height:400px;overflow:auto}
 .log-json-body.expanded{display:block}
 
 /* Vendor capability matrix */
@@ -248,7 +248,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .http-detail .tab-body{background:#fff;border:1px solid #eceff1;border-radius:0 6px 6px 6px;padding:12px;max-height:520px;overflow:auto}
 .http-detail .copy-btn{float:right;font-size:11px;background:#eceff1;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;color:#546e7a;font-family:inherit}
 .http-detail .copy-btn:hover{background:#cfd8dc}
-.http-detail .raw-text{font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#37474f;line-height:1.5}
+.http-detail .raw-text{font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;color:#37474f;line-height:1.5}
 
 /* JSON tree viewer */
 .json-tree{font-family:'Courier New',monospace;font-size:12px;line-height:1.35;color:#37474f}
@@ -269,8 +269,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
 .json-tree-empty{color:#90a4ae;font-style:italic;padding:8px;text-align:center}
 .headers-table{width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:12px}
 .headers-table td{padding:4px 8px;border-bottom:1px solid #f0f4f7;vertical-align:top}
-.headers-table td:first-child{color:#6a1b9a;font-weight:600;width:30%;word-break:break-word}
-.headers-table td:last-child{color:#37474f;word-break:break-word}
+.headers-table td:first-child{color:#6a1b9a;font-weight:600;width:30%;overflow-wrap:anywhere}
+.headers-table td:last-child{color:#37474f;overflow-wrap:anywhere}
 .site-footer{text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d;margin-top:auto}
 
 @media print{
@@ -519,7 +519,7 @@ function runScenarioLabel(r) {
   //   - multi-scenario run  → distinct scenario_names from run_suites (joined backend-side)
   //   - legacy run with no structured data → fall back to env_name_used or short id
   if (r.scenario_code) return r.scenario_code;
-  if (r.scenario_names) return r.scenario_names.split(',').join(', ');
+  if (r.scenario_names) return r.scenario_names.replaceAll(',', ', ');
   return r.env_name_used || r.id.slice(0, 8);
 }
 function pct(n, d) {
@@ -561,7 +561,7 @@ async function loadRuns() {
     var res = await fetch('/v1/runs?limit=200', {});
     if (res.status === 401) { logout(); return; }
     var data = await res.json();
-    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.indexOf(r.status) !== -1; });
+    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.includes(r.status); });
     populateFilterDropdowns();
     applyDefaultSelection();
     renderRunsList();
@@ -754,7 +754,7 @@ function renderReport() {
   var meta = '';
   if (run) {
     var scenarioList = run.scenario_code
-      || (run.scenario_names ? run.scenario_names.split(',').join(', ') : '');
+      || (run.scenario_names ? run.scenario_names.replaceAll(',', ', ') : '');
     var scenariosFromReport = (reportData.suites || [])
       .map(function(su) { return su.scenario_name; })
       .filter(function(v, i, a) { return v && a.indexOf(v) === i; });
@@ -819,14 +819,14 @@ function getFilteredLogs() {
 function looksLikeJsonOpener(msg) {
   var s = (msg || '').trimEnd();
   if (/^\s*\[JSON:[^\]]+\]/.test(s)) return true;          // explicit marker
-  if (/[:=]\s*[\{\[]\s*$/.test(s)) return true;             // "Selected Offer: {"
-  if (/^[A-Za-z_][\w\s]*:\s*[\{\[]\s*$/.test(s.trim())) return true;
+  if (/[:=]\s*[{[]\s*$/.test(s)) return true;             // "Selected Offer: {"
+  if (/^[A-Za-z_][\w\s]*:\s*[{[]\s*$/.test(s.trim())) return true;
   return false;
 }
 function looksLikeJsonContinuation(msg) {
   if (msg == null) return false;
   if (/^\s+\S/.test(msg)) return true;                      // indented line
-  if (/^[\}\]][,\s]*$/.test(msg.trim())) return true;       // closer
+  if (/^[}\]][,\s]*$/.test(msg.trim())) return true;       // closer
   return false;
 }
 function coalesceJsonBlocks(events) {
@@ -1094,6 +1094,13 @@ function renderBreakdown(tableId, data, keyField) {
   }).join('');
 }
 
+// The PASS / FAIL / SKIP badge of a request.
+function resultBadgeHtml(result) {
+  if (result === 'PASS') return '<span class="a-pass">PASS</span>';
+  if (result === 'FAIL') return '<span class="a-fail">FAIL</span>';
+  return '<span style="color:#90a4ae">SKIP</span>';
+}
+
 function renderAssertions(suites) {
   var el = document.getElementById('assertion-content');
   if (!suites.length) {
@@ -1125,9 +1132,7 @@ function renderAssertions(suites) {
     var iterIndex = {};
 
     reqList.forEach(function(req) {
-      var statusBadge = req.result === 'PASS' ? '<span class="a-pass">PASS</span>'
-        : req.result === 'FAIL' ? '<span class="a-fail">FAIL</span>'
-        : '<span style="color:#90a4ae">SKIP</span>';
+      var statusBadge = resultBadgeHtml(req.result);
       var rname = req.request_name || '(unnamed)';
       var iterSuffix = '';
       if (nameCounts[rname] > 1) {
@@ -1166,8 +1171,10 @@ function exportCSV() {
 
   // Capability matrix first — it's the certifier's top-level conclusion.
   if (Array.isArray(reportData.capability_matrix) && reportData.capability_matrix.length) {
-    rows.push(['--- VENDOR CAPABILITY MATRIX ---']);
-    rows.push(['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']);
+    rows.push(
+      ['--- VENDOR CAPABILITY MATRIX ---'],
+      ['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']
+    );
     reportData.capability_matrix.forEach(function(r) {
       rows.push([
         r.scenario_name || '',
@@ -1181,8 +1188,10 @@ function exportCSV() {
     rows.push([]);
   }
 
-  rows.push(['--- ASSERTIONS ---']);
-  rows.push(['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']);
+  rows.push(
+    ['--- ASSERTIONS ---'],
+    ['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']
+  );
 
   reportData.suites.forEach(function(suite) {
     var reqList = suite.requests || [];
@@ -1211,7 +1220,7 @@ function exportCSV() {
           a.category || '',
           a.domain || '',
           a.severity || '',
-          (a.error_msg || '').replace(/"/g, '""')
+          (a.error_msg || '').replaceAll('"', '""')
         ]);
       });
     });
@@ -1220,9 +1229,11 @@ function exportCSV() {
   // Append a logs section using the same toggle the user has on screen.
   var logEvents = getFilteredLogs();
   if (logEvents.length > 0) {
-    rows.push([]); // blank row separator
-    rows.push(['--- LOGS ---']);
-    rows.push(['Scenario','Group','Request','Timestamp','Level','Category','Message']);
+    rows.push(
+      [], // blank row separator
+      ['--- LOGS ---'],
+      ['Scenario','Group','Request','Timestamp','Level','Category','Message']
+    );
     var scenarioBySuite = {};
     (reportData.suites || []).forEach(function(s) {
       if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
@@ -1235,13 +1246,13 @@ function exportCSV() {
         e.ts || '',
         (e.level || ''),
         e.category || '',
-        (e.message || '').replace(/"/g, '""')
+        (e.message || '').replaceAll('"', '""')
       ]);
     });
   }
 
   var csv = rows.map(function(r) {
-    return r.map(function(c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    return r.map(function(c) { return '"' + String(c).replaceAll('"', '""') + '"'; }).join(',');
   }).join('\n');
 
   var blob = new Blob([csv], { type: 'text/csv' });
@@ -1288,15 +1299,15 @@ function loadTemplate() {
 
   // Apply categories
   document.querySelectorAll('input[name="filter_cat"]').forEach(function(cb) {
-    cb.checked = tpl.categories.indexOf(cb.value) !== -1;
+    cb.checked = tpl.categories.includes(cb.value);
   });
   // Apply domains
   document.querySelectorAll('input[name="filter_dom"]').forEach(function(cb) {
-    cb.checked = tpl.domains.indexOf(cb.value) !== -1;
+    cb.checked = tpl.domains.includes(cb.value);
   });
   // Apply severities
   document.querySelectorAll('input[name="filter_sev"]').forEach(function(cb) {
-    cb.checked = tpl.severities.indexOf(cb.value) !== -1;
+    cb.checked = tpl.severities.includes(cb.value);
   });
   // Apply status
   document.querySelectorAll('input[name="filter_status"]').forEach(function(r) {
@@ -1436,12 +1447,19 @@ function renderHttpList() {
   document.getElementById('http-content').innerHTML = html;
 }
 
+// The colour class of an HTTP status: s2 to s5 by hundreds, s0 when there is
+// no status or it is below 200.
+function httpStatusClass(status) {
+  if (status == null) return 's0';
+  if (status >= 500) return 's5';
+  if (status >= 400) return 's4';
+  if (status >= 300) return 's3';
+  if (status >= 200) return 's2';
+  return 's0';
+}
+
 function renderHttpRow(r) {
-  var sClass = r.http_status == null ? 's0'
-    : r.http_status >= 500 ? 's5'
-    : r.http_status >= 400 ? 's4'
-    : r.http_status >= 300 ? 's3'
-    : r.http_status >= 200 ? 's2' : 's0';
+  var sClass = httpStatusClass(r.http_status);
   var statusLbl = r.http_status == null ? '—' : r.http_status;
   var linkBadge = r.parent_request_id
     ? '<span class="has-link" title="Linked to parent request">↑ chain</span>' : '';
@@ -1463,7 +1481,7 @@ document.getElementById('http-content').addEventListener('click', function(e) {
     // could be a nav-arrow click
     var nav = e.target.closest('[data-nav-req-id]');
     if (nav) {
-      var navId = nav.getAttribute('data-nav-req-id');
+      var navId = nav.dataset.navReqId;
       navigateToHttpRequest(navId);
     }
     // or a json toggle — walk up to the .node ancestor (the .line wrapping
@@ -1497,7 +1515,7 @@ document.getElementById('http-content').addEventListener('click', function(e) {
 });
 
 async function toggleHttpRow(row) {
-  var reqId = row.getAttribute('data-req-id');
+  var reqId = row.dataset.reqId;
   var detail = document.getElementById('http-detail-' + reqId);
   if (row.classList.contains('expanded')) {
     row.classList.remove('expanded');
@@ -1524,6 +1542,14 @@ async function fetchHttpDetail(reqId) {
   return await res.json();
 }
 
+// Which tab of an HTTP exchange is shown first: the first of response body,
+// request body and response headers that has content, else request headers.
+function initialHttpTab(hasResBody, hasReqBody, hasResHdr) {
+  if (hasResBody) return 'response';
+  if (hasReqBody) return 'request';
+  return hasResHdr ? 'resHeaders' : 'reqHeaders';
+}
+
 function renderHttpDetail(data) {
   var r = data.request || {};
   var nav = '';
@@ -1548,13 +1574,17 @@ function renderHttpDetail(data) {
   var hasReqHdr  = !!r.request_headers;
   var hasResHdr  = !!r.response_headers;
 
+  // The response tab is the open one unless only the request has a body.
+  var responseTabActive = hasResBody || !hasReqBody;
+  var requestTabActive  = !hasResBody && hasReqBody;
+
   var tabs =
-      '<button class="tab' + (hasResBody ? ' active' : (hasReqBody ? '' : ' active')) + (hasResBody ? '' : ' empty') + '" data-http-tab="response" data-detail-id="' + r.id + '">Response Body</button>'
-    + '<button class="tab' + (hasResBody ? '' : (hasReqBody ? ' active' : '')) + (hasReqBody ? '' : ' empty') + '" data-http-tab="request" data-detail-id="' + r.id + '">Request Body</button>'
+      '<button class="tab' + (responseTabActive ? ' active' : '') + (hasResBody ? '' : ' empty') + '" data-http-tab="response" data-detail-id="' + r.id + '">Response Body</button>'
+    + '<button class="tab' + (requestTabActive ? ' active' : '') + (hasReqBody ? '' : ' empty') + '" data-http-tab="request" data-detail-id="' + r.id + '">Request Body</button>'
     + '<button class="tab' + (hasResHdr ? '' : ' empty') + '" data-http-tab="resHeaders" data-detail-id="' + r.id + '">Response Headers</button>'
     + '<button class="tab' + (hasReqHdr ? '' : ' empty') + '" data-http-tab="reqHeaders" data-detail-id="' + r.id + '">Request Headers</button>';
 
-  var initial = hasResBody ? 'response' : (hasReqBody ? 'request' : (hasResHdr ? 'resHeaders' : 'reqHeaders'));
+  var initial = initialHttpTab(hasResBody, hasReqBody, hasResHdr);
   var body = renderHttpTabBody(r, initial);
 
   return navHtml
@@ -1641,8 +1671,11 @@ function renderJsonNode(value, key, root) {
 }
 
 function switchHttpTab(tabEl) {
+  // Kept as getAttribute on purpose: this value is the source of the open
+  // code-scanning alert on the innerHTML below, and rewriting the read could
+  // make the alert disappear without the flow being fixed.
   var kind = tabEl.getAttribute('data-http-tab');
-  var detailId = tabEl.getAttribute('data-detail-id');
+  var detailId = tabEl.dataset.detailId;
   if (tabEl.classList.contains('empty')) return;
   // toggle active on siblings
   tabEl.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
@@ -1666,7 +1699,7 @@ function navigateToHttpRequest(reqId) {
   document.querySelectorAll('.http-row.expanded').forEach(function(r) {
     if (r !== existing) {
       r.classList.remove('expanded');
-      var d = document.getElementById('http-detail-' + r.getAttribute('data-req-id'));
+      var d = document.getElementById('http-detail-' + r.dataset.reqId);
       if (d) d.style.display = 'none';
     }
   });
@@ -1675,11 +1708,11 @@ function navigateToHttpRequest(reqId) {
 }
 
 function copyJsonContent(btn) {
-  var targetId = btn.getAttribute('data-copy-target');
+  var targetId = btn.dataset.copyTarget;
   var el = document.getElementById(targetId);
   if (!el) return;
   // Prefer the original raw payload (kept as data-raw) over the formatted tree
-  var text = el.getAttribute('data-raw') || el.textContent || '';
+  var text = el.dataset.raw || el.textContent || '';
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(function() {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
@@ -1693,19 +1726,19 @@ function copyJsonContent(btn) {
 // downloaded file from either view has the same name.
 function _rbSanitiseFilename(s) {
   return String(s == null ? '' : s)
-    .replace(/[\\\/:*?"<>|\s]+/g, '_')
+    .replace(/[\\/:*?"<>|\s]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');   // one at most after the collapse above
 }
 function downloadJsonContent(btn) {
-  var targetId = btn.getAttribute('data-download-target');
+  var targetId = btn.dataset.downloadTarget;
   var el = document.getElementById(targetId);
   if (!el) return;
-  var text = el.getAttribute('data-raw') || el.textContent || '';
+  var text = el.dataset.raw || el.textContent || '';
   if (!text) return;
-  var scenario = btn.getAttribute('data-download-scenario') || '';
-  var step     = btn.getAttribute('data-download-step')     || '';
-  var kind     = btn.getAttribute('data-download-kind')     || 'response';
+  var scenario = btn.dataset.downloadScenario || '';
+  var step     = btn.dataset.downloadStep     || '';
+  var kind     = btn.dataset.downloadKind     || 'response';
   var filename = [
     _rbSanitiseFilename(scenario) || 'oscar',
     _rbSanitiseFilename(step)     || 'request',

@@ -351,8 +351,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
   findings in the UI and the Bruno library, is #525 (v1.11.202 /
   OTST_V2.0.101). PR 3, `public/js/scenarios.js`, is #526 (v1.11.204): 340 of
-  that file's 373 findings. The gate only judges new code, so none of this
-  blocks a release. What the first three established, for the two that follow:
+  that file's 373 findings. PR 4, the HTML pages, is #527 (v1.11.206). The
+  gate only judges new code, so none of this blocks a release. What they
+  established, for #528 (the Bruno library), which is the one left:
   - **The findings are public.** No token is needed:
     `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
     (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an
@@ -449,6 +450,45 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     sequential `await`s in a loop (S9382); 2 TODO comments (S1135);
     `e.returnValue` in the unsaved-changes prompt (S1874), which older
     browsers need.
+  - **PR 4, the pages, is #527 (v1.11.206): 90 of 113.** Five HTML pages changed.
+    What it added to the method:
+    - **A page can be compared with itself without a browser.** Run the
+      page's inline script from `main` and from the branch inside
+      `with (proxy) { … }`, where the proxy answers every unknown name with a
+      stub and a fake `document` records each write (`innerHTML`, text,
+      `checked`, Blob content, fetch calls, dialogs). A closing
+      `proxy.__hook = c => eval(c)` inside the block lets the test set the
+      page's `let` state and call its functions. Same scenarios against both,
+      and the two recordings must be equal. Scratch work, not in the repo.
+    - **Then prove the comparison reaches the changed lines:** break each
+      changed expression in turn and check that it reports a difference. The
+      first run missed nine sites (a function never called, a `fetch` that
+      never answered, a fake element without the attribute it was selected
+      by). A comparison that says "identical" has shown nothing until this is
+      done.
+    - **`getAttribute('data-x')` and `dataset.x` differ for a missing
+      attribute:** `null` against `undefined`. Harmless when the page writes
+      the attribute itself, but read each site.
+    - **Do not rewrite a read that feeds an open code-scanning alert.**
+      `switchHttpTab()` in `report-builder.html` keeps `getAttribute`: the
+      value is the source of alert 37, and `dataset` might hide the flow from
+      CodeQL without fixing it. `gh api …/code-scanning/alerts?state=open`
+      lists the lines to stay off.
+    - **`word-break:break-word` → `overflow-wrap:anywhere`** is the same
+      rendering by definition (CSS Text 3). Checked by measuring 1,600 layouts
+      in Chromium, with a control showing the measurement tells other wrapping
+      rules apart. `overflow-wrap:break-word` is *not* the same in table cells
+      and min-content boxes.
+    - **`<\/script>` inside an inline script is not a needless escape**
+      (S6535), whatever Sonar says: the HTML parser needs it.
+    - **Take a nested conditional out as a top-level function** when it
+      depends only on its inputs. `loadFunction()` can then test it, and the
+      host function's complexity does not go up.
+    - **Left open on purpose (23):** 21 `replace(/x/g)` in the pages' encoders,
+      the one `getAttribute` above, the one `<\/script>`. Three tests in
+      `ui-scripts.test.js` pin them. Out of scope: 97 contrast and 8 other
+      accessibility findings (decision pending), 15 functions over the
+      complexity limit.
 - **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
   express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
   could not move to 6.16.0 without it. The whole migration was **one line**:
