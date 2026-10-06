@@ -1118,11 +1118,11 @@ async function loadRequestBodies(reqId, bodyEl) {
     const msgOpts = { stepName: r.request_name || '', scenarioName: r.scenario_name || r.suite_name || '' };
     bodyEl.innerHTML = '<div class="msg-block">'
       + renderMessage('Request', reqMeta, r.request_body,
-          Object.assign({ kind: 'request',
-            headersHtml: renderHeadersBlock('Request headers', r.request_headers) }, msgOpts))
+          { kind: 'request',
+            headersHtml: renderHeadersBlock('Request headers', r.request_headers), ...msgOpts })
       + renderMessage('Response', resMeta, r.response_body,
-          Object.assign({ kind: 'response',
-            headersHtml: renderHeadersBlock('Response headers', r.response_headers) }, msgOpts))
+          { kind: 'response',
+            headersHtml: renderHeadersBlock('Response headers', r.response_headers), ...msgOpts })
       + '</div>';
   } catch (e) {
     console.error('Loading the message failed:', e);
