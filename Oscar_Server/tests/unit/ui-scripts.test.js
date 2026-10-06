@@ -388,6 +388,58 @@ describe('js/scenarios.js — functions whose nested conditionals were unfolded 
   });
 });
 
+describe('js/scenarios.js — helpers moved out of their host function (#526)', () => {
+  const page = 'js/scenarios.js';
+  const escHtml = loadFunction(page, 'esc');
+  const isArmed = loadFunction(page, 'isArmed');
+
+  test('isArmed accepts the spellings datafiles use, and nothing else', () => {
+    for (const v of [true, 'on', 'true', 'yes', 1]) expect(isArmed(v)).toBe(true);
+    for (const v of [false, 'off', 'ON', 'no', '1', 0, 2, null, undefined, '']) expect(isArmed(v)).toBe(false);
+  });
+
+  test.each([
+    ['partial refund by leg armed, flow not declared', [{ scenarioType: 'REFUND', partialRefundByLeg: 'on' }], ['SALE', 'REFUND_FULL'], 1],
+    ['the flow is declared', [{ scenarioType: 'REFUND', partialRefundByPax: true }], ['REFUND_PARTIAL'], 0],
+    ['nothing armed', [{ scenarioType: 'refund', partialRefundByLeg: 'off' }], [], 0],
+    ['a SALE scenario is not counted', [{ scenarioType: 'SALE', partialRefundByLeg: 'on' }], [], 0],
+    ['two of three', [{ scenarioType: 'Refund', partialRefundByPax: 'yes' }, { scenarioType: 'REFUND', partialRefundByLeg: 1 }, {}], [], 2],
+  ])('fwUndeclaredArmedCount: %s', (_label, scenarios, salesFlows, expected) => {
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, state: { scenarios }, wizData: { framework: { salesFlows } } });
+    expect(count()).toBe(expected);
+  });
+
+  test('fwUndeclaredArmedCount with nothing loaded', () => {
+    expect(loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, state: null, wizData: null })()).toBe(0);
+  });
+
+  test('armedCountBadge is amber when something is armed, grey when not', () => {
+    const badge = loadFunction(page, 'armedCountBadge');
+    const shape = 'display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;';
+    expect(badge(0, 4, 'armed')).toBe(`<span style="${shape}background:#eceff1;color:#90a4ae;margin-left:8px;vertical-align:middle">0 of 4 armed</span>`);
+    expect(badge(2, 6)).toBe(`<span style="${shape}background:#FCC44D;color:#005A8A;margin-left:8px;vertical-align:middle">2 of 6</span>`);
+  });
+
+  test.each([
+    [{ category: 'CHILD', firstName: 'ADULT_Marie' }, 'CHILD'],
+    [{ firstName: 'senior_Anna' }, 'SENIOR'],
+    [{ firstName: 'ACCOMP_PRM_Jo' }, 'ACCOMP_PRM'],
+    [{ firstName: 'PRM_x' }, 'PRM'],
+    [{ firstName: 'Anna' }, 'ADULT'],
+    [{ firstName: 'DOG_Rex' }, 'ADULT'],
+    [{}, 'ADULT'],
+  ])('inferCategory(%j) → %j', (passenger, expected) => {
+    expect(loadFunction(page, 'inferCategory')(passenger)).toBe(expected);
+  });
+
+  test('probeWarningHTML: one route, its probe date and its findings', () => {
+    const line = loadFunction(page, 'probeWarningHTML', { esc: escHtml });
+    expect(line({ label: 'A<B', probedAt: '2026-10-01T10:00:00Z', findings: ['f1', 'f<2'] }))
+      .toBe('<div style="margin-bottom:6px"><strong>A&lt;B</strong> <span style="color:#a1887f">(probed 2026-10-01)</span><br>&nbsp;&nbsp;&bull; f1<br>&nbsp;&nbsp;&bull; f&lt;2</div>');
+    expect(line({ label: 'x', findings: [] })).toBe('<div style="margin-bottom:6px"><strong>x</strong><br></div>');
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });

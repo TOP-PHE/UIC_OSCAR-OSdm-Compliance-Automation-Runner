@@ -193,6 +193,11 @@ function fwDeclaresPartialRefund(scenarioType) {
   return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
 }
 
+// A scenario flag counts as armed in any of the spellings datafiles use.
+function isArmed(v) {
+  return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1;
+}
+
 // Count of scenarios in the current datafile whose armed feature is not
 // declared in the framework — used by the top-of-scenarios banner.
 // Kept in sync with Oscar_Server/src/utils/frameworkGating.js scenarioWarnings()
@@ -201,11 +206,10 @@ function fwUndeclaredArmedCount() {
   const scenarios = (state && state.scenarios) || [];
   const fw = wizData?.framework || {};
   const flows = new Set(Array.isArray(fw.salesFlows) ? fw.salesFlows : []);
-  function armed(v) { return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1; }
   let n = 0;
   for (const sc of scenarios) {
     const t = String(sc?.scenarioType || 'SALE').toUpperCase();
-    if (t === 'REFUND' && (armed(sc.partialRefundByLeg) || armed(sc.partialRefundByPax))
+    if (t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax))
         && !flows.has('REFUND_PARTIAL')) {
       n++;
     }
@@ -1683,6 +1687,17 @@ function buildPartialRefundFields(idx, sc) {
     </div>`;
 }
 
+// ── Badge renderer ────────────────────────────────────────────────────────
+// One small inline-block pill; amber when anything is armed, neutral grey
+// when not. Same shape as the rest of the wizard's count badges so we don't
+// introduce a new visual vocabulary.
+function armedCountBadge(n, total, suffix) {
+  const armed = n > 0;
+  const bg    = armed ? '#FCC44D' : '#eceff1';
+  const fg    = armed ? '#005A8A' : '#90a4ae';
+  return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
+}
+
 function buildNonHappyFlowSection(idx, sc) {
   const scType = sc?.scenarioType || '';
   const showRefund   = (scType === 'REFUND');
@@ -1765,17 +1780,6 @@ function buildNonHappyFlowSection(idx, sc) {
 
   const totalArmed = armedTimers + armedShapes + armedPlaceProbes;
 
-  // ── Badge renderer ────────────────────────────────────────────────────────
-  // One small inline-block pill; amber when anything is armed, neutral grey
-  // when not. Same shape as the rest of the wizard's count badges so we don't
-  // introduce a new visual vocabulary.
-  function badge(n, total, suffix) {
-    const armed = n > 0;
-    const bg    = armed ? '#FCC44D' : '#eceff1';
-    const fg    = armed ? '#005A8A' : '#90a4ae';
-    return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg};margin-left:8px;vertical-align:middle">${n} of ${total}${suffix ? ' ' + suffix : ''}</span>`;
-  }
-
   // Auto-expand a sub-group when anything inside it is armed; otherwise stay
   // collapsed. The user can still toggle manually via the standard
   // toggle-param-section handler — re-renders preserve the manual state by
@@ -1793,7 +1797,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             🪪 Field-shape &amp; payload probes
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">alter the request, document provider strictness</span>
-            ${badge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
+            ${armedCountBadge(armedShapes, SHAPE_PROBES_TOTAL, 'armed')}
             <span class="ps-arrow${shapesOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${shapesOpenClass}" style="padding:10px 14px">
@@ -1868,7 +1872,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             🪑 Place-selection probes
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">corrupt the booking&#39;s placeSelections, document how the provider reacts</span>
-            ${badge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
+            ${armedCountBadge(armedPlaceProbes, PLACE_PROBES_TOTAL, 'armed')}
             <span class="ps-arrow${placeProbesOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${placeProbesOpenClass}" style="padding:10px 14px">
@@ -1898,7 +1902,7 @@ function buildNonHappyFlowSection(idx, sc) {
           <div class="param-section-head" style="font-size:13px;padding:8px 12px;cursor:pointer" data-action="toggle-param-section">
             ⏰ Expiry timers
             <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae;margin-left:6px">wait past a deadline, assert next request is rejected</span>
-            ${badge(armedTimers, totalTimers, 'armed')}
+            ${armedCountBadge(armedTimers, totalTimers, 'armed')}
             <span class="ps-arrow${timersOpenClass}" style="float:right">▶</span>
           </div>
           <div class="param-section-body${timersOpenClass}" style="padding:10px 14px">
@@ -1959,7 +1963,7 @@ function buildNonHappyFlowSection(idx, sc) {
 
   return `
   <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${badge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
+    <div class="param-section-head" data-action="toggle-param-section">⏰ Non Happy Flow customisation <span class="param-hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:#90a4ae">negative tests and conformance probes</span>${armedCountBadge(totalArmed, totalTimers + SHAPE_PROBES_TOTAL + PLACE_PROBES_TOTAL, 'armed')}<span class="ps-arrow${topOpenClass}">▶</span></div>
     <div class="param-section-body${topOpenClass}">
       <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
         ${expiryTimersSubsection}
@@ -2401,6 +2405,16 @@ function buildLoyaltyCardRow(pIdx, pi, ci, card, readOnly) {
   </div>`;
 }
 
+// Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
+function inferCategory(p) {
+  if (p.category) return p.category;
+  if (p.firstName) {
+    const match = p.firstName.match(/^(ADULT|CHILD|YOUTH|SENIOR|YOUNG_CHILD|FAMILY_CHILD|PRM|ACCOMP_PRM)_/i);
+    if (match) return match[1].toUpperCase();
+  }
+  return 'ADULT';
+}
+
 function buildPassengersSection(idx, sc, paxGroup) {
   const pIdx = (state.passengersList || []).findIndex(p => p.id === sc.passengersListId);
   const passengers = paxGroup.passengers || [];
@@ -2408,16 +2422,6 @@ function buildPassengersSection(idx, sc, paxGroup) {
   const readOnly = isReadOnlyForMe(sc);
   // A read-only passenger can still be opened, to read its details.
   const paxVerb = readOnly ? 'View' : 'Edit';
-  // Infer category from firstName prefix (e.g. "ADULT_Marie") or from stored category field
-  function inferCategory(p) {
-    if (p.category) return p.category;
-    if (p.firstName) {
-      const match = p.firstName.match(/^(ADULT|CHILD|YOUTH|SENIOR|YOUNG_CHILD|FAMILY_CHILD|PRM|ACCOMP_PRM)_/i);
-      if (match) return match[1].toUpperCase();
-    }
-    return 'ADULT';
-  }
-
   // Passenger category dropdown is filtered by the framework's passengerTypes.
   // The current category is always preserved in the list even if the framework
   // later restricted it — editing must not silently coerce existing data.
