@@ -694,7 +694,7 @@ async function downloadArtifact(artifactId, filename) {
     a.download = filename || 'artifact';
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   } catch (e) {
     oscarToast('Network error during download: ' + e.message, 'error');
