@@ -5784,16 +5784,31 @@ function wizGenCode() {
   return [slug, typePart, actionPart, paxStr, legStr].filter(Boolean).join('_');
 }
 
-function randomPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function genPhone() { return '+' + Array.from({length:10}, () => Math.floor(Math.random()*10)).join(''); }
+// A whole number from 0 to n - 1, from the browser's cryptographic generator
+// (0 when n is not positive). The values built from it are test data: a
+// first name, a phone number, a date of birth. The plain generator would do
+// for that, but CodeQL reads those field names as personal data and reports
+// a weak generator feeding them (js/insecure-randomness, #542).
+function randomInt(n) {
+  if (!(n > 0)) return 0;
+  const one = new Uint32Array(1);
+  crypto.getRandomValues(one);
+  return one[0] % n;
+}
+function randomPick(arr) {
+  return arr[randomInt(arr.length)];
+}
+function genPhone() {
+  return '+' + Array.from({length:10}, () => randomInt(10)).join('');
+}
 
 function genDateOfBirth(minAge, maxAge) {
   const today   = new Date();
   const minYear = today.getFullYear() - maxAge;
   const maxYear = today.getFullYear() - minAge;
-  const year  = minYear + Math.floor(Math.random() * (maxYear - minYear + 1));
-  const month = 1 + Math.floor(Math.random() * 12);
-  const day   = 1 + Math.floor(Math.random() * 28); // safe for all months
+  const year  = minYear + randomInt(maxYear - minYear + 1);
+  const month = 1 + randomInt(12);
+  const day   = 1 + randomInt(28); // safe for all months
   return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 

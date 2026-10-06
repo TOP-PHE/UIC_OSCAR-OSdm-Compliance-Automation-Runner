@@ -452,6 +452,66 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
   });
 });
 
+describe('js/scenarios.js — random test data (#542)', () => {
+  // Names, phone numbers and dates of birth of generated passengers. They come
+  // from crypto.getRandomValues() through randomInt(); CodeQL reports
+  // Math.random() feeding such fields as a weak generator.
+  const page = 'js/scenarios.js';
+  // A generator that hands out a fixed list of 32-bit values, then repeats it.
+  function withValues(values) {
+    let i = 0;
+    const crypto = { getRandomValues: (array) => { array[0] = values[i++ % values.length]; return array; } };
+    const randomInt = loadFunction(page, 'randomInt', { crypto, Uint32Array });
+    return { randomInt, calls: () => i };
+  }
+
+  test('randomInt stays in range and uses the cryptographic generator', () => {
+    const { randomInt, calls } = withValues([0, 1, 9, 10, 4294967295]);
+    expect([randomInt(10), randomInt(10), randomInt(10), randomInt(10), randomInt(10)]).toEqual([0, 1, 9, 0, 5]);
+    expect(calls()).toBe(5);
+  });
+
+  test('randomInt of nothing is 0 and asks for no random value', () => {
+    const { randomInt, calls } = withValues([7]);
+    expect([randomInt(0), randomInt(-3), randomInt(undefined), randomInt(Number.NaN)]).toEqual([0, 0, 0, 0]);
+    expect(calls()).toBe(0);
+    expect(randomInt(1)).toBe(0);
+  });
+
+  test('randomPick takes the element the generator points at', () => {
+    const { randomInt } = withValues([2, 3, 0]);
+    const randomPick = loadFunction(page, 'randomPick', { randomInt });
+    expect([randomPick(['a', 'b', 'c']), randomPick(['a', 'b', 'c']), randomPick(['a', 'b', 'c'])]).toEqual(['c', 'a', 'a']);
+    expect(randomPick([])).toBeUndefined();
+  });
+
+  test('genPhone is a plus sign and ten digits', () => {
+    const { randomInt } = withValues([3, 14, 15, 92, 65, 35, 89, 79, 32, 38]);
+    expect(loadFunction(page, 'genPhone', { randomInt })()).toBe('+3452559928');
+  });
+
+  test.each([
+    ['the youngest allowed, first day', [0, 0, 0], (y) => `${y - 60}-01-01`],
+    ['the oldest allowed, last month and day', [42, 11, 27], (y) => `${y - 18}-12-28`],
+    ['in between', [5, 6, 14], (y) => `${y - 55}-07-15`],
+  ])('genDateOfBirth for ages 18 to 60: %s', (_label, values, expected) => {
+    const { randomInt } = withValues(values);
+    const year = new Date().getFullYear();
+    expect(loadFunction(page, 'genDateOfBirth', { randomInt, Date })(18, 60)).toBe(expected(year));
+  });
+
+  test('a single age and an impossible range both give a valid date', () => {
+    const { randomInt } = withValues([123456, 3, 9]);
+    const year = new Date().getFullYear();
+    expect(loadFunction(page, 'genDateOfBirth', { randomInt, Date })(30, 30)).toBe(`${year - 30}-04-10`);
+    expect(loadFunction(page, 'genDateOfBirth', { randomInt, Date })(40, 30)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('the page no longer uses Math.random', () => {
+    expect(read(page)).not.toContain('Math.random');
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });
