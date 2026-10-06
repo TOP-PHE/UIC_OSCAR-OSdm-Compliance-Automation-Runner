@@ -2711,7 +2711,8 @@ function syncPurchaserFromPassenger(paxList, pax) {
     if (sc.passengersListId !== paxList.id) return;
     const purchList = (state.purchaserList || []).find(p => p.id === sc.purchaserListId);
     if (!purchList) return;
-    const p0 = (purchList.purchaser = purchList.purchaser || [{}])[0];
+    if (!purchList.purchaser) purchList.purchaser = [{}];
+    const p0 = purchList.purchaser[0];
     if (!p0?.isPassenger || p0.passengerRef !== pax.reference) return;
     p0.purchaserFirstName    = pax.firstName    || '';
     p0.purchaserLastName     = pax.lastName     || '';
@@ -6140,12 +6141,19 @@ async function wizGenerateScenario() {
     }
 
     // ── 8. Append ─────────────────────────────────────────────────────────────────
-    (dataFile.scenarios                       = dataFile.scenarios                       || []).push(scenario);
-    (dataFile.scenariosToRun                  = dataFile.scenariosToRun                  || []).push(code);
-    (dataFile.tripRequirements                = dataFile.tripRequirements                || []).push(tripReq);
-    (dataFile.passengersList                  = dataFile.passengersList                  || []).push(passengersList);
-    (dataFile.purchaserList                   = dataFile.purchaserList                   || []).push(purchaserList);
-    (dataFile.requestedFulfillmentOptionsList = dataFile.requestedFulfillmentOptionsList || []).push(requestedFulfillmentOptionsList);
+    // Same order as before: a list that is missing is created in this order, and that is the key order of the saved file.
+    const appended = [
+      ['scenarios', scenario],
+      ['scenariosToRun', code],
+      ['tripRequirements', tripReq],
+      ['passengersList', passengersList],
+      ['purchaserList', purchaserList],
+      ['requestedFulfillmentOptionsList', requestedFulfillmentOptionsList],
+    ];
+    for (const [listName, entry] of appended) {
+      if (!dataFile[listName]) dataFile[listName] = [];
+      dataFile[listName].push(entry);
+    }
 
     // ── 9. Save ───────────────────────────────────────────────────────────────────
     const saveRes = await fetch('/v1/company/datafile/json', {
@@ -6996,7 +7004,8 @@ document.body.addEventListener('change', function(e) {
       const tpPrIdx = Number.parseInt(el.dataset.purchIdx);
       const tpPurchList = state.purchaserList[tpPrIdx];
       if (!tpPurchList) break;
-      const p0 = (tpPurchList.purchaser = tpPurchList.purchaser || [{}])[0];
+      if (!tpPurchList.purchaser) tpPurchList.purchaser = [{}];
+      const p0 = tpPurchList.purchaser[0];
       p0.isPassenger = !!el.checked;
       if (p0.isPassenger) {
         // When turning the link ON, default the passengerRef to the first
@@ -7020,7 +7029,8 @@ document.body.addEventListener('change', function(e) {
       const ppPrIdx = Number.parseInt(el.dataset.purchIdx);
       const ppPurchList = state.purchaserList[ppPrIdx];
       if (!ppPurchList) break;
-      const pp0 = (ppPurchList.purchaser = ppPurchList.purchaser || [{}])[0];
+      if (!ppPurchList.purchaser) ppPurchList.purchaser = [{}];
+      const pp0 = ppPurchList.purchaser[0];
       pp0.passengerRef = el.value;
       const sc = state.scenarios[ppScIdx];
       const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
