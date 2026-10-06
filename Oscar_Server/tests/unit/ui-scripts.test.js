@@ -211,9 +211,21 @@ describe('js/scenarios.js — setTripFieldByPath', () => {
 });
 
 describe('js/scenarios.js — esc', () => {
-  // The page's HTML encoder. Its five replace(/x/g) calls became replaceAll('x')
-  // in #526; every occurrence must still be encoded, "&" first.
+  // The page's HTML encoder: every occurrence must be encoded, "&" first.
   const esc = loadFunction('js/scenarios.js', 'esc');
+
+  test('it keeps the form CodeQL recognises as an encoder', () => {
+    // Sonar (S7781) asks for replaceAll('<', ...). #526 did that, and CodeQL then
+    // reported escaped values reaching innerHTML as XSS: it knows an encoder by
+    // replace() with a global regex. If this fails, read the comment in esc().
+    const lines = read('js/scenarios.js').split('\n');
+    const start = lines.indexOf('function esc(s) {');
+    const body = lines.slice(start, lines.indexOf('}', start)).filter(l => !l.trim().startsWith('//')).join('\n');
+    for (const pattern of [String.raw`.replace(/&/g,`, String.raw`.replace(/</g,`, String.raw`.replace(/>/g,`, String.raw`.replace(/"/g,`, String.raw`.replace(/'/g,`]) {
+      expect(body).toContain(pattern);
+    }
+    expect(body).not.toContain('replaceAll');
+  });
 
   test.each([
     ['<b onclick="x(\'y\')">a & b</b>', '&lt;b onclick=&quot;x(&#39;y&#39;)&quot;&gt;a &amp; b&lt;/b&gt;'],

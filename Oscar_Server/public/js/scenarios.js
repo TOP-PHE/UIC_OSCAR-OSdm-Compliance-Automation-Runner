@@ -118,9 +118,13 @@ function esc(s) {
   // double- and single-quoted attributes and in text content. (Sonar S5696 may
   // still flag innerHTML sinks here — it doesn't recognise this custom encoder
   // as a sanitiser; those alerts are false positives, see issue #82.)
+  // Keep replace() with a global regex here. Sonar (S7781) asks for
+  // replaceAll('<', ...), but CodeQL recognises an encoder by this form only:
+  // with replaceAll and a string, it reported escaped values reaching innerHTML
+  // as XSS (#541).
   return String(s == null ? '' : s)
-    .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
-    .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
