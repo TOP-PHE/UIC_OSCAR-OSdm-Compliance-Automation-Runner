@@ -626,7 +626,7 @@ function renderWizardStep1InSection() {
     </div>`;
 
   // Clean up temp div
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 
   // Restore the open/collapse state captured at the top of this function.
   // Keeps the sub-section the user is currently editing expanded across the
@@ -881,7 +881,7 @@ function renderWizardStep2InSection() {
   renderWizardStep2();
 
   targetEl.innerHTML = tempDiv.innerHTML;
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 
   // Read-only mode for testers
   if (isTester) {
@@ -1011,7 +1011,7 @@ function renderWizardStep3InSection(targetEl) {
   targetEl.innerHTML = '<div style="margin-top:14px;padding-top:14px;border-top:2px solid #e3eaf5">' +
     '<div style="font-size:14px;font-weight:800;color:#0090D4;margin-bottom:14px">⚡ Create New Scenario</div>' +
     tempDiv.innerHTML + '</div>';
-  document.body.removeChild(tempDiv);
+  tempDiv.remove();
 }
 
 // ── Handle file upload ───────────────────────────────────────────────────────
