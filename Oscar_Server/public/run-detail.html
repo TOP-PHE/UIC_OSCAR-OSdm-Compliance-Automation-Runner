@@ -967,7 +967,7 @@ function loadJsonEditorModule() {
 // HTML parser scanning this <script> block does NOT see "</" and therefore
 // does NOT terminate this outer <script> while reading the source.
 function safeJsonForInlineScript(s) {
-  return String(s).replace(/<\/(?=script)/gi, '<\\/');
+  return String(s).replace(/<\/(?=script)/gi, String.raw`<\/`);
 }
 
 function renderMessage(label, meta, body, opts) {
