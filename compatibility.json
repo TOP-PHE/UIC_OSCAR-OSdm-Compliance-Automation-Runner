@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.228",
+  "current_release": "2026.229",
   "releases": [
+    {
+      "release": "2026.229",
+      "date": "2026-10-06",
+      "server": "1.11.204",
+      "collection": "OTST_V2.0.101",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor(test-config): Sonar clean-up 3/5, Oscar_Server/public/js/scenarios.js. Closes #526 (tracking #523). 345 of the 373 findings Sonar had on this file are addressed, one rule per commit: 20 un-awaited promises (S9383, typed as bugs), 125 Number.parseInt / Number.isNaN (S7773), 97 optional chains (S6582), 37 nested conditionals (S3358), 28 replaceAll (S7781), 9 assignments inside an expression (S1121), and 29 across 13 smaller rules.",
+        "One visible change, in a failure path: the 20 actions that click, change and timer handlers start without awaiting them now end in .catch(reportActionError), which shows the reason as an error notification. 15 of the 18 functions involved already report their own failures; refreshAllSections() from the \"refresh\" link, wizDeleteResource() and wizSaveAllTrains() could reject with nothing shown. Checked in a browser: with the datafile answering 500, the refresh link shows \"The test configuration could not be loaded...\", no unhandled rejection, and the page keeps what it had.",
+        "Everything else is meant to change nothing, and was checked as such. Renames: with the rewrite undone in both versions, the file is identical to the previous commit. isNaN on a path segment (a string) became Number.isNaN(Number(x)), not Number.isNaN(x). The 95 optional-chain sites were each read for what happens to the value: 66 are only tested, 29 keep or pass it and what follows treats null and undefined alike. Nested conditionals were flattened without touching the text of a template. Rewritten top-level functions were run from the old and the new file over 110 inputs with identical results.",
+        "Browser comparison, old page script against new on the same throwaway instance (Bileto sample with 15 scenarios reshaped for variety, a full Test Framework, 4 trains, 1 journey): every scenario card as built and as drawn, the framework editor, the test data section, 7 variants of the scenario wizard, the datafile the wizard generates (randomness fixed), a nullable field, adding reduction and loyalty cards, the purchaser link, and duplicating a scenario. 52 captures as Test Manager and 34 as tester: all identical.",
+        "Left open on purpose (28): 20 functions over the complexity limit (S3776) and the 72-case switch (S1479), which are structural and not planned; 4 awaits in a loop (S9382), which are sequential on purpose; 2 TODO comments (S1135); and e.returnValue in the unsaved-changes prompt (S1874), which is the only thing that raises the prompt in browsers older than Chrome 119.",
+        "Tests: 79 new in tests/unit/ui-scripts.test.js (1,806 total, lint clean). They run the page helpers in a vm context, including a source check that no top-level async function is called as a bare statement. User-visible, so it carries a news entry and a Troubleshooting row in the Tester User Guide. Server-only (Oscar_Server/public); Bruno collection unchanged."
+      ]
+    },
     {
       "release": "2026.228",
       "date": "2026-10-06",

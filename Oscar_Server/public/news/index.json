@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-06-test-config-action-failures",
+    "date": "October 6, 2026",
+    "tag": "Bug Fix",
+    "title": "Test Config now tells you when an action fails",
+    "summary": "A few actions in Test Config did nothing visible when they failed. They now show a red notification with the reason.",
+    "content": "Some actions in Test Config do their work in the background: the Refresh link, deleting a train, Save all trains. If one of them failed in an unexpected way, the page gave no sign. Nothing changed and no message appeared.\n\nFrom this release such a failure shows a red notification with the reason. For example, if the test configuration cannot be read when you click Refresh, you see \"The test configuration could not be loaded\", and the page keeps what it had.\n\nThe same release tidies the code behind the Test Config page. That part changes nothing you can see: the page was compared before and after on the same data, as a Test Manager and as a tester, and it draws and saves exactly the same.\n\nNo action is required. If a red notification appears, reload the page and try again."
+  },
+  {
     "id": "2026-10-06-read-only-scenarios-locked",
     "date": "October 6, 2026",
     "tag": "Bug Fix",
