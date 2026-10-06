@@ -4335,7 +4335,7 @@ async function wizSaveTrain(tidx, opts = {}) {
     // logic referenced an undeclared `wizEditingId` variable, which caused
     // a ReferenceError on every save — "Network error: wizEditingId is not
     // defined" — even though the actual HTTP call had succeeded.)
-    const targetIdx = wizData.resources.findIndex(r => r === t);
+    const targetIdx = wizData.resources.indexOf(t);
     if (targetIdx !== -1) wizData.resources[targetIdx] = saved;
     else wizData.resources.push(saved);
     // Save-all reads + persists several panels, then re-renders once itself.
@@ -5068,7 +5068,7 @@ async function wizSaveJourney(jidx) {
       return;
     }
     const saved = await res.json();
-    const idx = wizData.resources.findIndex(r => r === j);
+    const idx = wizData.resources.indexOf(j);
     if (idx !== -1) wizData.resources[idx] = saved; else wizData.resources.push(saved);
     showMsg(`✅ Journey "${label}" saved.`, true);
     // Local re-render + re-open (keep the panel expanded after save, #141).
