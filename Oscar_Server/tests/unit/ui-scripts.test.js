@@ -322,6 +322,72 @@ describe('js/scenarios.js — small helpers rewritten for #526', () => {
   });
 });
 
+describe('js/scenarios.js — functions whose nested conditionals were unfolded (#526)', () => {
+  // Expected values were taken from the functions as they were before.
+  const page = 'js/scenarios.js';
+  const escHtml = loadFunction(page, 'esc');
+  const optionValue = loadFunction(page, 'optionValue');
+
+  test('optionValue: null and undefined are the empty option, anything else is itself', () => {
+    expect(optionValue(null)).toBe('');
+    expect(optionValue(undefined)).toBe('');
+    expect(optionValue('')).toBe('');
+    expect(optionValue(0)).toBe(0);
+    expect(optionValue(false)).toBe(false);
+    expect(optionValue('A')).toBe('A');
+  });
+
+  test.each([
+    [{ f: null }, '<option value="" selected>none</option><option value="A" >A</option>'],
+    [{ f: 'A' }, '<option value="" >none</option><option value="A" selected>A</option>'],
+    [{}, '<option value="" selected>none</option><option value="A" >A</option>'],
+    [{ f: 'B' }, '<option value="" >none</option><option value="A" >A</option>'],
+  ])('buildSelect marks the stored value: %j', (scenario, options) => {
+    const buildSelect = loadFunction(page, 'buildSelect', {
+      esc: escHtml, optionValue, lbl: (o) => (o == null ? 'none' : String(o)), state: { scenarios: [scenario] },
+    });
+    expect(buildSelect(0, 'f', 'L', [null, 'A'])).toContain(options);
+  });
+
+  test('parseServiceToken turns bare station codes into URNs and leaves URNs alone', () => {
+    const parse = loadFunction(page, 'parseServiceToken');
+    expect(parse('IC100|IC|2026-01-01T08:00:00|10:00|8500010|urn:uic:stn:8400058')).toEqual({
+      vehicleNumber: 'IC100', productCategory: 'IC', departureTime: '08:00:00', arrivalTime: '10:00',
+      originURN: 'urn:uic:stn:8500010', destinationURN: 'urn:uic:stn:8400058',
+    });
+    expect(parse('7|RJ|1|2')).toEqual({
+      vehicleNumber: '7', productCategory: 'RJ', departureTime: '1', arrivalTime: '2', originURN: '', destinationURN: '',
+    });
+    expect(parse('x|y|z|w|  URN:X:stn:9  |')).toMatchObject({ originURN: 'URN:X:stn:9', destinationURN: '' });
+    expect(parse('a|b|c')).toBeNull();
+    expect(parse('|b|c|d')).toBeNull();
+  });
+
+  test.each([
+    ['no resources', undefined, { origin: '', destination: '' }],
+    ['no train among them', [{ resource_type: 'JOURNEY', data: {} }], { origin: '', destination: '' }],
+    ['a train', [{ resource_type: 'TRAIN', data: { originURN: 'A', destinationURN: 'B' } }], { origin: 'A', destination: 'B' }],
+    ['a train stored as text', [{ resource_type: 'TRAIN', data: '{"originURN":"A"}' }], { origin: 'A', destination: '' }],
+    ['a train with no data', [{ resource_type: 'TRAIN' }], { origin: '', destination: '' }],
+  ])('_ttSeedOD: %s', (_label, resources, expected) => {
+    const seed = loadFunction(page, '_ttSeedOD', { wizData: { resources }, normalizeTrainData: loadFunction(page, 'normalizeTrainData') });
+    expect(seed()).toEqual(expected);
+  });
+
+  test('renderDiscoveryDays: one line per day, the error only on a failed day', () => {
+    const el = { innerHTML: '' };
+    loadFunction(page, 'renderDiscoveryDays', { esc: escHtml })(el, [
+      { status: 200, date: '2026-01-01', trips: 3, legs: 5, via: 'A', error: 'not shown' },
+      { status: 500, date: '2026-01-02', error: 'boom <b>' },
+      { status: 404, date: '2026-01-03' },
+    ]);
+    expect(el.innerHTML).toContain('✅ 2026-01-01</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">3 trip(s), 5 leg(s) via A</td>');
+    expect(el.innerHTML).toContain('⚠️ 2026-01-02</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">HTTP 500 — boom &lt;b&gt;</td>');
+    expect(el.innerHTML).toContain('⚠️ 2026-01-03</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">HTTP 404</td>');
+    expect(el.innerHTML).not.toContain('not shown');
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });

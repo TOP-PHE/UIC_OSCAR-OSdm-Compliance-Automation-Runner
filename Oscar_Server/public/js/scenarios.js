@@ -1251,6 +1251,12 @@ function renderAll() {
     // AND the viewer is a tester — in that case a 📋 pill is shown in its
     // own spot (template-duplicate usage was the original use-case).
     const showDuplicate = true;
+    let shareButton = '';
+    if (isTestManager) {
+      const shareTitle = sc.shared ? 'Make private (your use only)' : 'Share with all testers';
+      const shareColours = sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc';
+      shareButton = `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${esc(idx)}" title="${shareTitle}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${shareColours}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>`;
+    }
     // data-sc-card ties every control on the card to its scenario (isLockedControl).
     return `
     <div class="scenario-item" data-sc-card="${esc(idx)}">
@@ -1271,7 +1277,7 @@ function renderAll() {
             ${inRun ? '✓ In run' : 'Not in run'}
           </span>
           <span class="toggle-arrow" id="arrow-${esc(idx)}" data-action="toggle-detail" data-idx="${esc(idx)}" style="cursor:pointer;padding:4px">▶</span>
-          ${isTestManager ? `<button class="btn btn-sm" data-action="toggle-shared" data-idx="${esc(idx)}" title="${sc.shared ? 'Make private (your use only)' : 'Share with all testers'}" style="font-size:11px;padding:3px 8px;position:relative;z-index:2;${sc.shared ? 'background:#f3e5f5;color:#6a1b9a;border:1px solid #ce93d8' : 'background:#eceff1;color:#78909c;border:1px solid #cfd8dc'}">${sc.shared ? '🔒 Shared' : '🔓 Private'}</button>` : ''}
+          ${shareButton}
           ${showDuplicate ? `<button class="btn btn-sm btn-secondary" data-action="duplicate-scenario" data-idx="${esc(idx)}" title="Duplicate this shared scenario as your own">📋 Duplicate</button>` : ''}
           ${canDelete ? `<button class="row-delete-btn" data-action="delete-scenario" data-idx="${esc(idx)}" title="Delete this scenario">🗑</button>` : ''}
         </div>
@@ -1728,8 +1734,7 @@ function buildNonHappyFlowSection(idx, sc) {
     'expiredExchangeOfferTest',
   ];
   const sc0 = state.scenarios[idx] || {};
-  const totalTimers = (showRefund && showExchange) ? 6
-                    : (showRefund || showExchange) ? 5 : 4;
+  const totalTimers = 4 + (showRefund ? 1 : 0) + (showExchange ? 1 : 0);
   const armedTimers = TIMER_FIELDS.filter(f => sc0[f] === 'on').length;
 
   // Shape-probe armed when:
@@ -1804,7 +1809,7 @@ function buildNonHappyFlowSection(idx, sc) {
               const sc = state.scenarios[idx] || {};
               const current = sc.requestedInformationProbe;
               const opts = ENUMS.requestedInformationProbe.map(o =>
-                `<option value="${esc(o == null ? '' : o)}" ${(current == null ? '' : current) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+                `<option value="${esc(optionValue(o))}" ${optionValue(current) === optionValue(o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
               ).join('');
               return `
               <div style="padding:10px;border:1px dashed #b0bec5;border-radius:6px">
@@ -2089,11 +2094,16 @@ function buildSalesFlowActionsSection(idx, sc) {
   </div>`;
 }
 
+// The value of a <select> option: null and undefined stand for the empty option.
+function optionValue(v) {
+  return v == null ? '' : v;
+}
+
 function buildSelect(idx, field, label, options, hint) {
   const val = state.scenarios[idx]?.[field];
   const hintHtml = hint ? `<span class="param-hint">${esc(hint)}</span>` : '';
   const opts = options.map(o =>
-    `<option value="${esc(o == null ? '' : o)}" ${(val == null ? '' : val) === (o == null ? '' : o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
+    `<option value="${esc(optionValue(o))}" ${optionValue(val) === optionValue(o) ? 'selected' : ''}>${esc(lbl(o))}</option>`
   ).join('');
   return `
   <div class="param-field">
@@ -2449,14 +2459,17 @@ function buildPassengersSection(idx, sc, paxGroup) {
     // accept across the test corpus. "None" (empty value) means the gender
     // field is omitted from the offer / booking / PATCH requests entirely,
     // for vendors that treat gender as optional and reject synthetic values.
-    const genderSelect = isHuman ? `
+    let genderSelect = '';
+    if (isHuman) {
+      genderSelect = `
     <select class="param-input param-select" style="max-width:130px;font-size:12px"
       data-action="set-pax" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="gender" ${readOnly ? 'disabled' : ''}>
       <option value=""       ${!gender           ?'selected':''}>— None (omit) —</option>
       <option value="MALE"   ${gender==='MALE'   ?'selected':''}>Male</option>
       <option value="FEMALE" ${gender==='FEMALE' ?'selected':''}>Female</option>
       <option value="X"      ${gender==='X'      ?'selected':''}>X (legacy)</option>
-    </select>` : '';
+    </select>`;
+    }
     const editKey = pIdx + ':' + pi;
     const isEditOpen = _paxEditOpen.has(editKey);
     // Expandable editor — personal details + free-entry reduction cards +
@@ -2536,20 +2549,25 @@ function buildPassengersSection(idx, sc, paxGroup) {
   ${editPanel}`;
   }).join('');
 
-  return `
-  <div class="param-section">
-    <div class="param-section-head" data-action="toggle-param-section">👥 Passengers (list #${sc.passengersListId} — ${passengers.length} passenger${passengers.length!==1?'s':''})<span class="ps-arrow">▶</span></div>
-    <div class="param-section-body">
-      <div style="padding:12px 14px">
-        ${rows || '<div style="color:#90a4ae;font-size:13px">No passengers defined.</div>'}
-        ${!readOnly ? `
+  let addPassengerRow = '';
+  if (!readOnly) {
+    addPassengerRow = `
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eceff1;display:flex;gap:8px;align-items:center">
           <select id="add-pax-type-${esc(pIdx)}" class="param-input param-select" style="max-width:180px;font-size:12px">
             ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replaceAll('_',' ')}</option>`).join('')}
           </select>
           <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${esc(pIdx)}" data-scenidx="${esc(idx)}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
           ${allowedPaxCats.length===0 ? '<span style="font-size:11px;color:#e65100">⚠ No passenger types in framework — configure Step 1 first.</span>' : ''}
-        </div>` : ''}
+        </div>`;
+  }
+
+  return `
+  <div class="param-section">
+    <div class="param-section-head" data-action="toggle-param-section">👥 Passengers (list #${sc.passengersListId} — ${passengers.length} passenger${passengers.length!==1?'s':''})<span class="ps-arrow">▶</span></div>
+    <div class="param-section-body">
+      <div style="padding:12px 14px">
+        ${rows || '<div style="color:#90a4ae;font-size:13px">No passengers defined.</div>'}
+        ${addPassengerRow}
       </div>
     </div>
   </div>`;
@@ -2630,7 +2648,9 @@ function buildPurchaserSection(idx, sc, purchGroup) {
     <span>Purchaser is one of the passengers</span>
   </label>`;
 
-  const passengerPicker = isLinked ? `
+  let passengerPicker = '';
+  if (isLinked) {
+    passengerPicker = `
   <div class="param-field" style="max-width:320px;margin-top:8px">
     <span class="param-label">Which passenger?</span>
     <select class="param-input param-select"
@@ -2640,7 +2660,8 @@ function buildPurchaserSection(idx, sc, purchGroup) {
         return '<option value="' + esc(p.reference||'') + '"' + (p.reference===linkedRef?' selected':'') + '>' + esc(display) + '</option>';
       }).join('') || '<option disabled>No passengers defined</option>'}
     </select>
-  </div>` : '';
+  </div>`;
+  }
 
   // When linked, show the resolved values in disabled fields so the user sees
   // what the data file will contain. Edits are disabled — change the linked
@@ -3814,9 +3835,9 @@ function renderWizardStep2() {
       : '';
     const route = [d.originURN, d.destinationURN].filter(Boolean).join(' → ') || '';
     const svc = d.services || [];
-    const svcSummary = svc.length === 0 ? 'no services'
-      : svc.length === 1 ? (svc[0].vehicleNumber || '1 service')
-      : `${svc.length} services`;
+    let svcSummary = `${svc.length} services`;
+    if (svc.length === 0) svcSummary = 'no services';
+    else if (svc.length === 1) svcSummary = svc[0].vehicleNumber || '1 service';
     const classes = (d.travelClasses || []).join(', ') || '';
     const sub = [route, svcSummary, classes].filter(Boolean).join('  ·  ');
     return `
@@ -3942,7 +3963,11 @@ function parseServiceToken(tok) {
   const p = String(tok || '').trim().split('|');
   if (p.length < 4 || !p[0].trim()) return null;
   const timeOf = (iso) => { const i = String(iso).indexOf('T'); return (i >= 0 ? iso.slice(i + 1) : iso).trim(); };
-  const stnUrn = (s) => { s = String(s || '').trim(); return s ? (/^urn:/i.test(s) ? s : `urn:uic:stn:${s}`) : ''; };
+  const stnUrn = (s) => {
+    s = String(s || '').trim();
+    if (!s) return '';
+    return /^urn:/i.test(s) ? s : `urn:uic:stn:${s}`;
+  };
   return {
     vehicleNumber: p[0].trim(),
     productCategory: (p[1] || '').trim(),
@@ -4397,7 +4422,8 @@ async function wizSaveAllTrains() {
 // Seed the O&D from the first existing train set, as a convenience.
 function _ttSeedOD() {
   const t = (wizData.resources || []).find(r => r.resource_type === 'TRAIN');
-  const d = t ? normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {})) : {};
+  if (!t) return { origin: '', destination: '' };
+  const d = normalizeTrainData(typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {}));
   return { origin: d.originURN || '', destination: d.destinationURN || '' };
 }
 
@@ -4526,7 +4552,8 @@ function renderDiscoveryDays(el, dayResults) {
     const ok = d.status >= 200 && d.status < 300;
     const icon = ok ? '✅' : '⚠️';
     const via = d.via ? ` via ${esc(d.via)}` : '';
-    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : ''}`;
+    const errorText = d.error ? ' — ' + esc(String(d.error).slice(0, 200)) : '';
+    const detail = ok ? `${d.trips || 0} trip(s), ${d.legs || 0} leg(s)${via}` : `HTTP ${esc(d.status)}${errorText}`;
     return `<tr><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${icon} ${esc(d.date)}</td><td style="padding:2px 8px;font-size:11.5px;color:#607d8b">${detail}</td></tr>`;
   }).join('');
   el.innerHTML += `<details style="margin-top:10px"><summary style="font-size:12px;color:#78909c;cursor:pointer">Per-day detail</summary>
@@ -5141,10 +5168,11 @@ function wizInitScenario() {
   const sf = fw.salesFlows || ['SALE'];
 
   // First available type
-  const firstType = sf.includes('SALE') ? 'SALE'
-    : sf.some(f => f.startsWith('REFUND'))   ? 'REFUND'
-    : sf.some(f => f.startsWith('EXCHANGE')) ? 'EXCHANGE'
-    : 'SALE';
+  let firstType = 'SALE';
+  if (!sf.includes('SALE')) {
+    if (sf.some(f => f.startsWith('REFUND'))) firstType = 'REFUND';
+    else if (sf.some(f => f.startsWith('EXCHANGE'))) firstType = 'EXCHANGE';
+  }
 
   // Initial pax counts
   const passengers = {};
@@ -5285,14 +5313,17 @@ function renderWizardStep3() {
     // rather than sending an unvalidated default. Existing stored values
     // (MALE, FEMALE, X) still match their corresponding option.
     const g = sc.passengerGender?.[type] || '';
-    const genderSelect = isHuman ? `
+    let genderSelect = '';
+    if (isHuman) {
+      genderSelect = `
       <select class="param-input param-select" style="max-width:130px;font-size:12px;margin-right:6px"
         data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replaceAll('_',' ')} generated — 'None' omits the field from offer requests">
         <option value=""       ${!g                ?'selected':''}>— None (omit) —</option>
         <option value="MALE"   ${g==='MALE'        ?'selected':''}>Male</option>
         <option value="FEMALE" ${g==='FEMALE'      ?'selected':''}>Female</option>
         <option value="X"      ${g==='X'           ?'selected':''}>X (legacy)</option>
-      </select>` : '';
+      </select>`;
+    }
     return `<div class="pax-counter-row">
       <span class="pax-counter-label">${type.replaceAll('_',' ')} <small style="font-weight:400;color:#90a4ae;letter-spacing:0">(${abbr})</small></span>
       <span class="pax-counter-age">${ageHint}</span>
@@ -5313,6 +5344,16 @@ function renderWizardStep3() {
   // whatever's already selected as a safety net.
   const availSC = [...new Set([...WIZ_SERVICE_CLASSES, ...(sc.serviceClasses || [])])];
   const availTC = [...new Set([...WIZ_TRAVEL_CLASSES,  ...(sc.travelClasses  || [])])];
+
+  // Pieces of the trip block below, worked out here so that the template has no condition inside a condition.
+  const specPill   = sc.tripType === 'SPECIFICATION' ? ' selected' : '';
+  const searchPill = sc.tripType === 'SEARCH' ? ' selected' : '';
+  const tripModeHint = sc.tripType === 'SPECIFICATION'
+    ? '📋 <b>SPECIFICATION</b>: exact trip (vehicle, route, times) sent to the API'
+    : '🔍 <b>SEARCH</b>: origin/destination/date criteria sent — API finds matching trips';
+  const noTrainsWarning = trains.length === 0
+    ? `<div style="margin-top:10px;font-size:12px;color:#e65100">⚠️ No trains defined. <a href="#" data-action="goto-section2" style="color:#0090D4">Go to Section 2</a> to add trains first.</div>`
+    : '';
 
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
@@ -5402,14 +5443,12 @@ function renderWizardStep3() {
         <div>
           <div class="param-label" style="margin-bottom:4px">Trip search mode</div>
           <div style="display:flex;gap:6px">
-            <div class="pill${sc.tripType==='SPECIFICATION'?' selected':''}" data-action="wiz-trip-type" data-val="SPECIFICATION" title="Use exact train details (vehicle number, times, route)">📋 SPECIFICATION</div>
-            <div class="pill${sc.tripType==='SEARCH'?' selected':''}" data-action="wiz-trip-type" data-val="SEARCH" title="Search by origin/destination/date — train used for route data only">🔍 SEARCH</div>
+            <div class="pill${specPill}" data-action="wiz-trip-type" data-val="SPECIFICATION" title="Use exact train details (vehicle number, times, route)">📋 SPECIFICATION</div>
+            <div class="pill${searchPill}" data-action="wiz-trip-type" data-val="SEARCH" title="Search by origin/destination/date — train used for route data only">🔍 SEARCH</div>
           </div>
         </div>
         <div style="font-size:11px;color:#90a4ae;max-width:340px;line-height:1.5;align-self:flex-end;padding-bottom:2px">
-          ${sc.tripType==='SPECIFICATION'
-            ? '📋 <b>SPECIFICATION</b>: exact trip (vehicle, route, times) sent to the API'
-            : '🔍 <b>SEARCH</b>: origin/destination/date criteria sent — API finds matching trips'}
+          ${tripModeHint}
         </div>
       </div>
       <div class="param-field">
@@ -5419,12 +5458,13 @@ function renderWizardStep3() {
         </select>
       </div>
       ${trainDetail}
-      ${trains.length===0?`<div style="margin-top:10px;font-size:12px;color:#e65100">⚠️ No trains defined. <a href="#" data-action="goto-section2" style="color:#0090D4">Go to Section 2</a> to add trains first.</div>`:''}
+      ${noTrainsWarning}
 
       ${(() => {
         // Determine if the selected train already provides both URNs
         const selTrain = sc.trainResourceId ? trains.find(t => t.id === sc.trainResourceId) : null;
-        const td = selTrain ? (typeof selTrain.data==='string'?JSON.parse(selTrain.data):selTrain.data||{}) : {};
+        let td = {};
+        if (selTrain) td = typeof selTrain.data === 'string' ? JSON.parse(selTrain.data) : (selTrain.data || {});
         const trainHasOrigin      = !!(td.originURN);
         const trainHasDestination = !!(td.destinationURN);
         const trainHasRoute       = trainHasOrigin && trainHasDestination;
@@ -5438,6 +5478,10 @@ function renderWizardStep3() {
         const needsOrigin      = !trainHasOrigin;
         const needsDestination = !trainHasDestination;
         const isSearch         = sc.tripType === 'SEARCH';
+        const requiredMark     = isSearch ? ' <span style="color:#c62828">*</span>' : '';
+        const requiredNote     = '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>';
+        const originNote       = isSearch && !sc.originURN ? requiredNote : '';
+        const destinationNote  = isSearch && !sc.destinationURN ? requiredNote : '';
 
         return `<div style="margin-top:12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 12px">
           <div style="font-size:11px;color:#e65100;font-weight:700;margin-bottom:8px">
@@ -5445,20 +5489,20 @@ function renderWizardStep3() {
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             ${needsOrigin ? `<div class="param-field">
-              <label class="param-label">Origin station URN${isSearch?' <span style="color:#c62828">*</span>':''}</label>
+              <label class="param-label">Origin station URN${requiredMark}</label>
               <input class="param-input" id="s3-originURN"
                 placeholder="urn:uic:stn:8500010"
                 value="${esc(sc.originURN||'')}"
                 data-action="wiz-origin-urn">
-              ${isSearch && !sc.originURN ? '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>' : ''}
+              ${originNote}
             </div>` : `<div></div>`}
             ${needsDestination ? `<div class="param-field">
-              <label class="param-label">Destination station URN${isSearch?' <span style="color:#c62828">*</span>':''}</label>
+              <label class="param-label">Destination station URN${requiredMark}</label>
               <input class="param-input" id="s3-destinationURN"
                 placeholder="urn:uic:stn:8400058"
                 value="${esc(sc.destinationURN||'')}"
                 data-action="wiz-dest-urn">
-              ${isSearch && !sc.destinationURN ? '<span style="font-size:10px;color:#e65100">Required for SEARCH</span>' : ''}
+              ${destinationNote}
             </div>` : `<div></div>`}
           </div>
         </div>`;
@@ -5882,7 +5926,8 @@ async function wizGenerateScenario() {
     const trainRes = sc.trainResourceId
       ? (wizData.resources||[]).find(r => r.id === sc.trainResourceId)
       : null;
-    const d = trainRes ? normalizeTrainData(typeof trainRes.data==='string'?JSON.parse(trainRes.data):trainRes.data||{}) : {};
+    let d = {};
+    if (trainRes) d = normalizeTrainData(typeof trainRes.data === 'string' ? JSON.parse(trainRes.data) : (trainRes.data || {}));
     // A train set may carry several services (timetable, #136); the wizard uses
     // the first one. Per-service selection is available in the trip editor's
     // "Apply test data" picker.
@@ -6749,9 +6794,7 @@ document.body.addEventListener('change', function(e) {
     case 'set-scenario': {
       const scIdx = Number.parseInt(el.dataset.idx);
       const field = el.dataset.field;
-      const newVal = el.dataset.nullable === 'true'
-        ? (el.value === '' ? null : el.value)
-        : el.value;
+      const newVal = (el.dataset.nullable === 'true' && el.value === '') ? null : el.value;
       setScenarioField(scIdx, field, newVal);
       // scenarioType drives visibility of the Overrule Code field (IROPS),
       // and its allowed values. If the user flips REFUND → EXCHANGE (or the
