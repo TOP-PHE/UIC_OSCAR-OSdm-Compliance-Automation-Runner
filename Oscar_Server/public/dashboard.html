@@ -331,12 +331,12 @@ function renderRunRow(r, opts) {
 // ── Compute summary status for a batch of runs ──────────────────────────────
 function batchSummaryStatus(runs) {
   const statuses = runs.map(r => r.status);
-  if (statuses.some(s => s === 'FAILED'))     return 'FAILED';
-  if (statuses.some(s => s === 'RUNNING'))    return 'RUNNING';
+  if (statuses.includes('FAILED'))     return 'FAILED';
+  if (statuses.includes('RUNNING'))    return 'RUNNING';
   if (statuses.every(s => s === 'COMPLETED')) return 'COMPLETED';
   if (statuses.every(s => s === 'QUEUED'))    return 'QUEUED';
   // mixed (some completed, some queued, etc.)
-  if (statuses.some(s => s === 'COMPLETED'))  return 'RUNNING';
+  if (statuses.includes('COMPLETED'))  return 'RUNNING';
   return 'QUEUED';
 }
 

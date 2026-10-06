@@ -561,7 +561,7 @@ async function loadRuns() {
     var res = await fetch('/v1/runs?limit=200', {});
     if (res.status === 401) { logout(); return; }
     var data = await res.json();
-    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.indexOf(r.status) !== -1; });
+    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.includes(r.status); });
     populateFilterDropdowns();
     applyDefaultSelection();
     renderRunsList();
@@ -1288,15 +1288,15 @@ function loadTemplate() {
 
   // Apply categories
   document.querySelectorAll('input[name="filter_cat"]').forEach(function(cb) {
-    cb.checked = tpl.categories.indexOf(cb.value) !== -1;
+    cb.checked = tpl.categories.includes(cb.value);
   });
   // Apply domains
   document.querySelectorAll('input[name="filter_dom"]').forEach(function(cb) {
-    cb.checked = tpl.domains.indexOf(cb.value) !== -1;
+    cb.checked = tpl.domains.includes(cb.value);
   });
   // Apply severities
   document.querySelectorAll('input[name="filter_sev"]').forEach(function(cb) {
-    cb.checked = tpl.severities.indexOf(cb.value) !== -1;
+    cb.checked = tpl.severities.includes(cb.value);
   });
   // Apply status
   document.querySelectorAll('input[name="filter_status"]').forEach(function(r) {
