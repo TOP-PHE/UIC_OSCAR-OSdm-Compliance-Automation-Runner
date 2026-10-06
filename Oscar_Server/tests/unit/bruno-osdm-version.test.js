@@ -41,6 +41,25 @@ describe('osdmVersion parsing & comparison', () => {
     expect(parseVersion(null)).toBeNull();
   });
 
+  // #525: the pattern is anchored at the start of a digit run so it cannot
+  // backtrack over a long one. These pin that the anchoring changed nothing.
+  test('parseVersion: takes whole digit runs, leftmost match first', () => {
+    expect(parseVersion('OSDM v10.12')).toEqual({ major: 10, minor: 12, patch: 0 });
+    expect(parseVersion('abc123.45.6xyz')).toEqual({ major: 123, minor: 45, patch: 6 });
+    expect(parseVersion('release 2026.224, spec 3.8.1')).toEqual({ major: 2026, minor: 224, patch: 0 });
+    expect(parseVersion('3.8.1.4')).toEqual({ major: 3, minor: 8, patch: 1 });
+    expect(parseVersion('1234567')).toBeNull();
+    expect(parseVersion('3.')).toBeNull();
+    expect(parseVersion('.8')).toBeNull();
+    expect(parseVersion(3.9)).toEqual({ major: 3, minor: 9, patch: 0 });
+  });
+
+  test('parseVersion: a long digit run with no dot is rejected in linear time', () => {
+    const t = process.hrtime.bigint();
+    expect(parseVersion('9'.repeat(60000))).toBeNull();   // about 5 s with the old pattern
+    expect(Number(process.hrtime.bigint() - t) / 1e6).toBeLessThan(500);
+  });
+
   test('compareVersions & atLeast', () => {
     expect(compareVersions('3.8.0', '3.8.0')).toBe(0);
     expect(compareVersions('3.7', '3.8.0')).toBe(-1);

@@ -51,7 +51,7 @@ function returnInwardDateFromOutbound() {
     const tsc = parseEnvJson("offerTripSearchCriteria", {});
     const d = tsc && tsc.returnSearchParameters && tsc.returnSearchParameters.inwardReturnDate;
     return (typeof d === "string" && d) ? d : null;
-  } catch (_) { return null; }
+  } catch { return null; }
 }
 
 // Build the INWARD (return) offer request — OSDM two-step return, leg 2.

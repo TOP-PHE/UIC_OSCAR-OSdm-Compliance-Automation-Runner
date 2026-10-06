@@ -3685,7 +3685,7 @@ function fwAddCustomAncillary() {
   const input = document.getElementById('fw-custom-ancillary');
   if (!input) return;
   // Normalise to an UPPER_SNAKE code (OSDM AncillaryType is a string code list).
-  const code = (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  const code = trimUnderscores((input.value || '').trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_'));
   if (!code) return;
   const fw = wizData.framework;
   if (!Array.isArray(fw.ancillaries)) fw.ancillaries = [];
@@ -3735,7 +3735,7 @@ function renderWizardStep2() {
     try {
       const raw = typeof t.data === 'string' ? JSON.parse(t.data) : (t.data || {});
       return (raw.offerProbe && Array.isArray(raw.offerProbe.findings)) ? raw.offerProbe : null;
-    } catch (_e) { return null; }
+    } catch { return null; }
   };
   const probeWarnings = [];
   trains.forEach(t => {
@@ -4490,7 +4490,7 @@ async function refreshPlacesStatus() {
       el.textContent = `${b.place_count} place(s) cached${b.cached_at ? ' · ' + placesAgo(b.cached_at) : ''}`;
       el.style.color = '#90a4ae';
     }
-  } catch (_) { el.textContent = ''; }
+  } catch { el.textContent = ''; }
 }
 
 // Compact "x ago" for the cache timestamp. Server stores UTC "YYYY-MM-DD HH:MM:SS".
@@ -4603,7 +4603,7 @@ function attachPlaceAutocomplete(input) {
       items = Array.isArray(b.places) ? b.places : [];
       active = -1;
       render();
-    } catch (_) { removeBox(); }
+    } catch { removeBox(); }
   }
 
   input.addEventListener('input', () => {
@@ -4658,7 +4658,8 @@ function wizDuplicateTrain(tidx) {
   const existing = new Set(trains.map(t => t.label).filter(Boolean));
   const base = `${src.label || 'Train'} (copy)`;
   let newLabel = base;
-  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  let suffix = 2;
+  while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
 
   const copy = {
     id: null,
@@ -4766,7 +4767,10 @@ function journeyToTripLegs(j) {
 // shared trip date, so a fixed-date parse compares them correctly.
 function journeyContinuityWarnings(j) {
   const legs = journeyData(j).legs;
-  const ms = (t) => { if (!t) return NaN; const d = new Date('2000-01-01T' + t); return d.getTime(); };
+  const ms = (t) => {
+    if (!t) return Number.NaN;
+    return new Date('2000-01-01T' + t).getTime();
+  };
   const warns = [];
   for (let i = 1; i < legs.length; i++) {
     const prev = journeyResolveLeg(legs[i - 1]);
@@ -4905,7 +4909,8 @@ function wizDuplicateJourney(jidx) {
   const existing = new Set(journeys.map(x => x.label).filter(Boolean));
   const base = `${src.label || 'Journey'} (copy)`;
   let newLabel = base;
-  for (let n = 2; existing.has(newLabel); n++) newLabel = `${base} ${n}`;
+  let suffix = 2;
+  while (existing.has(newLabel)) newLabel = `${base} ${suffix++}`;
   wizData.resources.push({
     id: null, _unsaved: true, label: newLabel, resource_type: 'JOURNEY',
     data: JSON.parse(JSON.stringify(journeyData(src)))
@@ -5608,7 +5613,16 @@ function wizNormaliseCustomCode(raw) {
     .toUpperCase()
     .replace(/[^A-Z0-9_]+/g, '_')
     .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/^_|_$/g, '');   // one at most after the collapse above
+}
+
+// Strip leading and trailing underscores in one pass each.
+function trimUnderscores(s) {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === '_') start++;
+  while (end > start && s[end - 1] === '_') end--;
+  return s.slice(start, end);
 }
 
 function wizGenCode() {

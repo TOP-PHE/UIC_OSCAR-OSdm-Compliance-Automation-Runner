@@ -1,8 +1,26 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.226",
+  "current_release": "2026.227",
   "releases": [
+    {
+      "release": "2026.227",
+      "date": "2026-10-05",
+      "server": "1.11.202",
+      "collection": "OTST_V2.0.101",
+      "min_collection": "OTST_V2.0.95",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor: Sonar code-smell clean-up, part 2 of 5 - the \"possible defect\" findings in the browser UI (Oscar_Server/public) and the Bruno library (Bruno_Collection/library-bruno). Closes #525; the series is tracked in #523. All 50 findings were read and addressed. Reading them found one real defect, #534 (next note); the other findings are not defects.",
+        "One real defect was found on the way: Test Config treated any failed datafile load (network error, 500, 429, 403) as \"no datafile yet\", and the scenario wizard then saved a fresh file over the stored one. It was fixed separately in release 2026.226 (server 1.11.201, #534), which rewrote the three catch blocks involved; this release does not touch them.",
+        "Browser UI (36): 22 catch blocks were read. 3 are the failed-load blocks fixed in 1.11.201. The other 19 no longer discard the error: the 11 that tell the user something failed (sign-in, registration, password reset, e-mail verification, admin load, report builder, message load) keep their message and now also log the error to the browser console - a bug inside the try block used to be indistinguishable from a network fault. The other 8 are intended fallbacks or optional panels: the unused binding is dropped and the reason written down. 8 regular expressions that could backtrack super-linearly are rewritten or replaced by a loop. 6 small logic findings: an unused variable in run.html removed, two correct loops and a one-line helper in scenarios.js restyled.",
+        "Bruno library (14): the unused binding is dropped on 7 catch blocks that parse a value from the Bruno environment and fall back; three identical REFUND / EXCHANGE branches in offers.js are merged; 4 regular expressions are rewritten (mergeReport normUrl, osdmVersion parseVersion, the {{var}} substitution in offers.js, the {param} path match in validators.js).",
+        "Equivalence: 10 of the 12 pattern rewrites give identical results on every string over a small alphabet (1.4 to 6.7 million inputs each). The other 2 - {{var}} in offers.js and {param} in validators.js, which now exclude \"{\" as well as \"}\" from the name - differ only on a malformed token with a \"{\" between the braces; all 60 paths of the bundled OpenAPI document and all 283 {{...}} tokens in the collection give identical results.",
+        "Tests: 62 new (1,655 total). New tests/unit/ui-scripts.test.js compiles every inline script and every public/js file - until now nothing in CI would notice a syntax error in a page - and runs the rewritten page helpers in a bare vm context. 13 deliberate breakages each fail at least one new test. The Bruno library's 12 existing test files (345 tests) pass.",
+        "Not verified: no run against a vendor sandbox was made (no vendor credentials on the development machine), and the pages were not opened in a browser. Worth doing after deployment: one sale and one refund scenario, and a look at Test Config, the run page and the Report Builder.",
+        "Collection OTST_V2.0.100 -> OTST_V2.0.101 (library-bruno only; no .yml request changed). Server 1.11.201 -> 1.11.202."
+      ]
+    },
     {
       "release": "2026.226",
       "date": "2026-10-05",

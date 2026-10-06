@@ -95,7 +95,7 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
   let offer = null;
-  try { const raw = bru.getEnvVar("offer"); offer = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_e) { offer = null; }
+  try { const raw = bru.getEnvVar("offer"); offer = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { offer = null; }
   if (!offer || typeof offer !== "object") {
     validationLogger("[DEBUG] Refund permissibility check skipped — no selected offer in the environment.");
     return;
@@ -225,7 +225,8 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     try {
       const local = parsedDate.toLocaleString('sv-SE', { timeZone: 'Europe/Paris' });
       return `${utcString} (= ${local} Europe/Paris)`;
-    } catch (_e) {
+    } catch {
+      // toLocaleString() throws where the time zone is not supported: show the UTC value alone.
       return utcString;
     }
   }
