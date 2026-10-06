@@ -1,6 +1,6 @@
 {
   "name": "oscar-server",
-  "version": "1.11.207",
+  "version": "1.11.208",
   "description": "OSCAR — OSDM Conformance Automation Runner Server",
   "main": "src/server.js",
   "scripts": {
@@ -42,11 +42,12 @@
   "devDependencies": {
     "eslint": "~9.39.5",
     "jest": "^30.5.2",
+    "js-yaml": "^4.3.1",
     "supertest": "^7.3.1"
   },
   "_notes": "SQLite via built-in node:sqlite (Node.js 22+) — no native compilation needed",
   "overrides": {
-    "js-yaml": "^4.3.1",
+    "js-yaml": "$js-yaml",
     "@babel/core": "^7.29.6"
   }
 }

@@ -587,3 +587,220 @@ describe('executeRun — #306 credential transport', () => {
     await runPromise;
   });
 });
+
+// ── PR-03 — what the two child processes are handed ──────────────────────────
+// NEW-01: the Bruno spawn passed an allowlisted environment, but the second
+// child, `node mergeReport.js`, was started with no `env` option at all and so
+// inherited process.env whole: ENCRYPTION_KEY, JWT_SECRET, the SMTP password.
+// mergeReport.js is a file of the bind-mounted collection, not of the server.
+// NEW-02: the environment file is checked here as executeRun writes it, with
+// the three variables executeRun adds itself.
+describe('executeRun — PR-03: child processes and the environment file', () => {
+  const { CHILD_ENV_ALLOWLIST } = require('../../src/worker/runner');
+  const { readEnvYml, valueIn } = require('../helpers/env-yml');
+  const RUN_CREDENTIALS = ['OSCAR_ACCESS_TOKEN', 'OSCAR_SUBSCRIPTION_KEY', 'OSCAR_OAUTH_EXTRA'];
+  const SERVER_SECRETS = {
+    JWT_SECRET: 'jwt-secret-for-pr03',
+    SMTP_HOST: 'smtp.example.test',
+    SMTP_USER: 'mailer@example.test',
+    SMTP_PASS: 'smtp-password-for-pr03',
+    DATABASE_URL: 'postgres://user:pw@db.example.test/x',
+    SOME_FUTURE_API_KEY: 'a-secret-nobody-listed-yet',
+  };
+  let saved;
+
+  beforeEach(() => {
+    saved = {};
+    for (const [k, v] of Object.entries(SERVER_SECRETS)) { saved[k] = process.env[k]; process.env[k] = v; }
+  });
+  afterEach(() => {
+    for (const k of Object.keys(SERVER_SECRETS)) {
+      if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
+    }
+  });
+
+  // Starts a run that reaches the second spawn, and gives back both spawn calls.
+  async function runWithReportScript({ scenarioOverride } = {}) {
+    const { encrypt } = require('../../src/db/db');
+    const { companyId, userId } = seedCompanyUser();
+    run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
+      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId]);
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
+    fs.mkdirSync(path.dirname(MERGE_REPORT_JS), { recursive: true });
+    fs.writeFileSync(MERGE_REPORT_JS, '// stub, never executed (spawn is mocked)');
+
+    const mainProc = makeFakeProc();
+    const mergeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(mainProc).mockReturnValueOnce(mergeProc);
+
+    const runPromise = executeRun({ runId, companyId, userId, scenarioOverride });
+    await waitForSpawnCalls(1);
+    const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
+    const envName = `OTST_${slug}_${runId.slice(0, 8)}_Env`;
+    const envFile = fs.readFileSync(path.join(ENVS_DIR, `${envName}.yml`), 'utf8');
+    fs.writeFileSync(path.join(VAL_DIR, `.bru_results_${runId.slice(0, 8)}.json`), JSON.stringify({ results: [] }));
+    mainProc.emit('close', 0);
+    await waitForSpawnCalls(2);
+    mergeProc.emit('close', 0);
+    await runPromise;
+    return { runId, envName, envFile, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
+  }
+
+  test('the report script is started with an environment of its own, not the server\'s', async () => {
+    const { report } = await runWithReportScript();
+    expect(report[0]).toBe(process.execPath);
+    expect(report[1][0]).toBe(MERGE_REPORT_JS);
+    const env = report[2].env;
+    expect(env).toBeDefined();                       // no `env` option means "inherit everything"
+    expect(env).not.toBe(process.env);
+    expect(env).not.toHaveProperty('ENCRYPTION_KEY');
+    for (const secret of Object.keys(SERVER_SECRETS)) expect(env).not.toHaveProperty(secret);
+    for (const value of [process.env.ENCRYPTION_KEY, ...Object.values(SERVER_SECRETS)]) {
+      expect(Object.values(env)).not.toContain(value);
+    }
+  });
+
+  test('the report script gets none of the run\'s credentials either', async () => {
+    const { report } = await runWithReportScript();
+    for (const name of RUN_CREDENTIALS) expect(report[2].env).not.toHaveProperty(name);
+    expect(Object.values(report[2].env)).not.toContain('tok-secret-123');
+    expect(JSON.stringify(report[1])).not.toContain('tok-secret-123');   // nor on its command line
+  });
+
+  test('both children receive only allowlisted variables, so a new server secret is not passed on', async () => {
+    const { bruno, report } = await runWithReportScript();
+    const allowed = new Set(CHILD_ENV_ALLOWLIST);
+    expect(Object.keys(report[2].env).filter(k => !allowed.has(k))).toEqual([]);
+    expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual([...RUN_CREDENTIALS].sort());
+    expect(report[2].env.PATH).toBe(process.env.PATH);                   // it can still find what it needs
+    expect(report[2].shell).toBe(false);
+  });
+
+  test('the environment file on disk, with the variables executeRun adds, holds values only', async () => {
+    const { runId, envName, envFile } = await runWithReportScript({ scenarioOverride: 'OTST_SALE_1ADT_1LEG' });
+    const file = readEnvYml(envFile);                 // throws on any line that is not a name or a quoted value
+    expect(file.name).toBe(envName);
+    expect(file.variables.map(v => v.name)).toEqual([
+      'api_base', 'library_base', 'data_base', 'json_schema', 'scenariosToRunIndex', 'scenario_override',
+      'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
+    ]);
+    expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');
+    expect(valueIn(file, 'scenario_override')).toBe('OTST_SALE_1ADT_1LEG');
+    expect(valueIn(file, '__runId')).toBe(runId);
+    expect(valueIn(file, 'runHardDeadlineMs')).toMatch(/^\d{13}$/);
+    expect(valueIn(file, 'oscar_loopback_base')).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+  });
+
+  // Escaping keeps a code from adding to the file. Bruno then does one more
+  // thing with a value: it fills in {{...}} when a script reads it, and
+  // {{process.env.OSCAR_ACCESS_TOKEN}} is the token of whoever started the run
+  // (checked with Bruno CLI 4.2.1). The collection would then report that
+  // "code" as not found, in a run log every member of the company can read.
+  // There is no way to write {{ so that Bruno leaves it alone, so such a run
+  // is refused before anything is started.
+  describe('a scenario code holding a template, or one that is not text, is not run', () => {
+    const OPEN = '{'.repeat(2);
+    const CLOSE = '}'.repeat(2);
+
+    test.each([
+      [`${OPEN}process.env.OSCAR_ACCESS_TOKEN${CLOSE}`],
+      [`OTST_${OPEN}access_token${CLOSE}_1ADT`],
+      [`${OPEN}$guid${CLOSE}`],
+      [`unclosed ${OPEN} is refused too`],
+    ])('%s: FAILED, no token asked for, no file written, nothing started', async (code) => {
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
+      const before = fs.readdirSync(ENVS_DIR);
+      // If the refusal were ever removed, the run would go on to spawn. Let
+      // that child end at once, so this test fails on its assertions instead
+      // of hanging. The event is sent from inside spawn(), after which the
+      // runner attaches its listeners in the same tick.
+      spawn.mockImplementation(() => {
+        const proc = makeFakeProc();
+        setImmediate(() => proc.emit('close', 0));
+        return proc;
+      });
+
+      const result = await executeRun({ runId, companyId, userId, scenarioOverride: code });
+      const started = spawn.mock.calls.length;         // read before the mock is put back
+      spawn.mockReset();
+
+      expect(result.exitCode).toBe(1);
+      expect(result.error).toMatch(/scenario code/i);
+      expect(getRunRow(runId).status).toBe('FAILED');
+      expect(getRunRow(runId).error_message).toBe(result.error);
+      expect(started).toBe(0);
+      expect(resolveAccessToken).not.toHaveBeenCalled();
+      expect(fs.readdirSync(ENVS_DIR)).toEqual(before);
+      const events = getDecryptedEvents(runId);
+      expect(events.some(e => e.level === 'error' && /scenario code/i.test(e.message))).toBe(true);
+      expect(JSON.stringify(events)).not.toContain('tok-secret-123');
+      resolveAccessToken.mockReset();
+    });
+
+    // A code is whatever JSON was stored. An object that cannot become a string
+    // made the runner throw after the run was marked RUNNING, and a run that
+    // throws is never marked FAILED: it stayed RUNNING until the next restart.
+    test.each([
+      ['an object', { toString: 1 }],
+      ['an object with no prototype', Object.create(null)],
+      ['a list', ['OTST_SALE_1ADT_1LEG']],
+      ['a number', 42],
+      ['true', true],
+    ])('a code that is %s: FAILED with a reason, not left RUNNING', async (_what, code) => {
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      spawn.mockImplementation(() => {
+        const proc = makeFakeProc();
+        setImmediate(() => proc.emit('close', 0));
+        return proc;
+      });
+
+      let result;
+      let thrown = null;
+      try { result = await executeRun({ runId, companyId, userId, scenarioOverride: code }); } catch (e) { thrown = e; }
+      const started = spawn.mock.calls.length;
+      spawn.mockReset();
+
+      expect(thrown).toBeNull();
+      expect(result.exitCode).toBe(1);
+      expect(result.error).toMatch(/scenario code is not text/i);
+      expect(getRunRow(runId).status).toBe('FAILED');
+      expect(started).toBe(0);
+      expect(resolveAccessToken).not.toHaveBeenCalled();
+    });
+
+    test('the rule on its own: what is refused, and what is not', () => {
+      const { refusedScenarioCode } = require('../../src/worker/runner');
+      for (const none of [null, undefined, '']) expect(refusedScenarioCode(none)).toBeNull();
+      for (const fine of ['OTST_SALE_1ADT_1LEG', 'a {single} brace', '} {', 'x"\ny', 'é 🚆', ' ']) {
+        expect(refusedScenarioCode(fine)).toBeNull();
+      }
+      for (const template of [OPEN, `a${OPEN}b`, `${OPEN}x${CLOSE}`, `${CLOSE}${OPEN}`]) {
+        expect(refusedScenarioCode(template)).toMatch(/replace with the value of a variable/);
+      }
+      for (const notText of [0, 42, false, true, [], ['A'], {}, { toString: 1 }, Object.create(null), Symbol('s'), 10n, () => 'A']) {
+        expect(refusedScenarioCode(notText)).toMatch(/not text/);
+      }
+    });
+
+    test('single braces, and a code with no template, still run', async () => {
+      for (const code of ['OTST_SALE_1ADT_1LEG', 'with {one} brace pair', 'a } then a {']) {
+        const { envFile } = await runWithReportScript({ scenarioOverride: code });
+        expect(valueIn(readEnvYml(envFile), 'scenario_override')).toBe(code);
+        jest.clearAllMocks();
+      }
+    });
+  });
+
+  test('a crafted scenario code reaches the file as one value: one endpoint, the company\'s', async () => {
+    const crafted = 'X"\n  - name: api_base\n    value: "https://elsewhere.example/collect';
+    const { envFile } = await runWithReportScript({ scenarioOverride: crafted });
+    const file = readEnvYml(envFile);
+    expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');   // valueIn throws on a second one
+    expect(valueIn(file, 'scenario_override')).toBe(crafted);
+    expect(file.variables).toHaveLength(9);
+  });
+});
