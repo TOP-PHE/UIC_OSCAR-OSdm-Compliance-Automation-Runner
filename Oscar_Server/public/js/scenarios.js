@@ -3452,6 +3452,8 @@ function renderWizardStep1() {
     </div>`;
   }
 
+  const customAncillaryPills = (fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a))
+    .map(a => `<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('');
   document.getElementById('wizard-body').innerHTML = `
   <p style="color:#546e7a;font-size:13px;line-height:1.6;margin-bottom:4px">
     Define the functional scope of your OSDM certification. These settings describe what
@@ -3631,8 +3633,8 @@ function renderWizardStep1() {
         <div class="pill-group">
           ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replaceAll('_',' '))}</div>`).join('')}
         </div>
-        ${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).length
-          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).map(a=>`<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('')}</div></div>`
+        ${customAncillaryPills
+          ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${customAncillaryPills}</div></div>`
           : ''}
         <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
           <input class="param-input" id="fw-custom-ancillary" placeholder="Add custom — e.g. BIKE" style="max-width:240px" maxlength="40">
@@ -3811,6 +3813,13 @@ function fwSetPaxAge(type, bound, value) {
 }
 
 // ── Step 2: Test Resources ────────────────────────────────────────────────────
+// One route's offer-availability findings, for the warning box above the train list.
+function probeWarningHTML(w) {
+  const probed = w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : '';
+  const findings = w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>');
+  return `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${probed}<br>${findings}</div>`;
+}
+
 function renderWizardStep2() {
   const trains = (wizData.resources || []).filter(r => r.resource_type === 'TRAIN');
 
@@ -3886,7 +3895,7 @@ function renderWizardStep2() {
   <details style="margin:0 0 10px;background:#fff8f0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px">
     <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#ef6c00;user-select:none">&#9888; ${probeWarnings.reduce((n2, w) => n2 + w.findings.length, 0)} offer-availability warning(s) on discovered routes - a route in the timetable does not guarantee offers</summary>
     <div style="margin-top:8px;font-size:12.5px;color:#5d4037;line-height:1.6">
-      ${probeWarnings.map(w => `<div style="margin-bottom:6px"><strong>${esc(w.label)}</strong>${w.probedAt ? ` <span style="color:#a1887f">(probed ${esc(String(w.probedAt).slice(0, 10))})</span>` : ''}<br>${w.findings.map(f => `&nbsp;&nbsp;&bull; ${esc(f)}`).join('<br>')}</div>`).join('')}
+      ${probeWarnings.map(w => probeWarningHTML(w)).join('')}
       <div style="color:#a1887f">Findings refresh on the next Discover timetable for the route (anonymous 1-adult offer request).</div>
     </div>
   </details>` : ''}
@@ -4539,10 +4548,12 @@ function renderDiscoveryResult(el, body) {
   if (!el) return;
   const created = body.created || [];
   const updated = body.updated || [];
-  const list = (title, arr) => arr.length
-    ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
-        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('')}</ul></div>`
-    : '';
+  const list = (title, arr) => {
+    if (!arr.length) return '';
+    const items = arr.map(x => `<li>${esc(x.label || x.id)}</li>`).join('');
+    return `<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:#455a64">${esc(title)} (${arr.length})</div>
+        <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;color:#546e7a">${items}</ul></div>`;
+  };
   el.innerHTML = list('Created train sets', created) + list('Updated train sets', updated);
   renderDiscoveryDays(el, body.dayResults || []);
 }
