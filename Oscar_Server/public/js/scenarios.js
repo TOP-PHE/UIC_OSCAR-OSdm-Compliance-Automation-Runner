@@ -734,7 +734,7 @@ async function deleteTrainResource(resourceId) {
   let impacted = [];
   if (state && state.scenarios && state.tripRequirements) {
     // Find tripRequirement IDs that match this train's data
-    const matchingTripIds = (state.tripRequirements || [])
+    const matchingTripIds = new Set((state.tripRequirements || [])
       .filter(tr => {
         if (tr.tripType === 'SEARCH' && tr.trip) {
           return vehicleNumbers.includes(tr.trip.vehicleNumber);
@@ -744,10 +744,10 @@ async function deleteTrainResource(resourceId) {
         }
         return false;
       })
-      .map(tr => tr.id);
+      .map(tr => tr.id));
 
     impacted = (state.scenarios || []).filter(sc =>
-      matchingTripIds.includes(sc.tripRequirementId)
+      matchingTripIds.has(sc.tripRequirementId)
     );
   }
 
@@ -1062,11 +1062,11 @@ async function extractFromDatafile(datafile) {
   try {
     // a) Extract framework
     const osdmVersion = datafile.osdmVersion || datafile.scenarios?.[0]?.osdmVersion || '3.4';
-    const scenarioTypes = [...new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean))];
+    const scenarioTypes = new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean));
     const salesFlows = [];
-    if (scenarioTypes.includes('SALE')) salesFlows.push('SALE');
-    if (scenarioTypes.includes('REFUND')) salesFlows.push('REFUND_FULL');
-    if (scenarioTypes.includes('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
+    if (scenarioTypes.has('SALE')) salesFlows.push('SALE');
+    if (scenarioTypes.has('REFUND')) salesFlows.push('REFUND_FULL');
+    if (scenarioTypes.has('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
 
     // Extract passenger types from passengersList
     const passengerTypes = [...new Set(
