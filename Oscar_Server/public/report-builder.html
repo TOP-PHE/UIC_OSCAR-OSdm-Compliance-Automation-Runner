@@ -1166,8 +1166,10 @@ function exportCSV() {
 
   // Capability matrix first — it's the certifier's top-level conclusion.
   if (Array.isArray(reportData.capability_matrix) && reportData.capability_matrix.length) {
-    rows.push(['--- VENDOR CAPABILITY MATRIX ---']);
-    rows.push(['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']);
+    rows.push(
+      ['--- VENDOR CAPABILITY MATRIX ---'],
+      ['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']
+    );
     reportData.capability_matrix.forEach(function(r) {
       rows.push([
         r.scenario_name || '',
@@ -1181,8 +1183,10 @@ function exportCSV() {
     rows.push([]);
   }
 
-  rows.push(['--- ASSERTIONS ---']);
-  rows.push(['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']);
+  rows.push(
+    ['--- ASSERTIONS ---'],
+    ['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']
+  );
 
   reportData.suites.forEach(function(suite) {
     var reqList = suite.requests || [];
@@ -1220,9 +1224,11 @@ function exportCSV() {
   // Append a logs section using the same toggle the user has on screen.
   var logEvents = getFilteredLogs();
   if (logEvents.length > 0) {
-    rows.push([]); // blank row separator
-    rows.push(['--- LOGS ---']);
-    rows.push(['Scenario','Group','Request','Timestamp','Level','Category','Message']);
+    rows.push(
+      [], // blank row separator
+      ['--- LOGS ---'],
+      ['Scenario','Group','Request','Timestamp','Level','Category','Message']
+    );
     var scenarioBySuite = {};
     (reportData.suites || []).forEach(function(s) {
       if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
