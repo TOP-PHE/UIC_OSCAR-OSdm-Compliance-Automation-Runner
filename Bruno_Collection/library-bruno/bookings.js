@@ -460,7 +460,7 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
   if (!requested || requested === "null") return;   // scenario asked for no accommodation family
 
   let selAcc = null;
-  try { const raw = bru.getEnvVar("selectedAccommodation"); selAcc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_e) { selAcc = null; }
+  try { const raw = bru.getEnvVar("selectedAccommodation"); selAcc = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { selAcc = null; }
   const reservationId = bru.getEnvVar("reservationId");
   const offeredLabel = selAcc
     ? `${selAcc.accommodationType}${selAcc.accommodationSubType ? '/' + selAcc.accommodationSubType : ''}`
@@ -516,7 +516,7 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
     }
   });
   let tlc = [];
-  try { const raw = bru.getEnvVar("tripLegCoverage"); tlc = typeof raw === 'string' ? JSON.parse(raw) : (raw || []); } catch (_e) { tlc = []; }
+  try { const raw = bru.getEnvVar("tripLegCoverage"); tlc = typeof raw === 'string' ? JSON.parse(raw) : (raw || []); } catch { tlc = []; }
   if (Array.isArray(tlc) && tlc.length > 0 && alloc.tripLegCoverage) {
     test(`🎯 placeAllocation.tripLegCoverage matches the selected coverage`, () => {
       const ok = tlc.some(c => c && c.tripId === alloc.tripLegCoverage.tripId && c.legId === alloc.tripLegCoverage.legId);
@@ -670,7 +670,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   try {
     const _raw = bru.getEnvVar("bookingPassengerReferences");
     _submittedRefs = _raw ? (Array.isArray(_raw) ? _raw : JSON.parse(_raw)) : [];
-  } catch (_e) { _submittedRefs = []; }
+  } catch { _submittedRefs = []; }
   const _align = alignPassengerIdsToSubmittedOrder(booking.passengers, _submittedRefs);
   const passengerIdList = _align.ids;
   if (_align.aligned && _align.reordered) {
@@ -787,7 +787,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     const _readObj = (n) => {
       const r = bru.getEnvVar(n);
       if (r === null || r === undefined || r === '') return {};
-      try { const v = typeof r === 'string' ? JSON.parse(r) : r; return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch (_e) { return {}; }
+      try { const v = typeof r === 'string' ? JSON.parse(r) : r; return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch { return {}; }
     };
     const _purSpec = _readObj('bookingPurchaserSpecifications');
     const _purAdd = _readObj('purchaserAdditionalData');

@@ -311,7 +311,10 @@ function friendlyArtifactBase() {
   const scenario = r.scenario_code || 'run';
   let base = [sandbox, date, scenario].filter(Boolean).join('_')
     .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-{2,}/g, '-');
-  if (base.length > 120) base = base.slice(0, 120).replace(/[-_.]+$/, '');   // mind the filename length
+  if (base.length > 120) {   // mind the filename length
+    base = base.slice(0, 120);
+    while (/[-_.]$/.test(base)) base = base.slice(0, -1);
+  }
   return base || 'run';
 }
 
@@ -755,7 +758,7 @@ async function loadAssertions() {
       domSel.appendChild(o);
     });
     renderAssertions();
-  } catch(_) {}
+  } catch { /* optional card: a failure to load it is not shown to the user */ }
 }
 
 // Two-level collapse: suite (main area) → request (endpoint) → assertions.
@@ -898,7 +901,7 @@ async function loadRequests() {
     }
     document.getElementById('requests-card').style.display = 'block';
     renderRequests();
-  } catch (_) {}
+  } catch { /* optional card: a failure here is not shown to the user */ }
 }
 
 function renderRequests() {
@@ -986,7 +989,8 @@ function renderMessage(label, meta, body, opts) {
       const parsed = JSON.parse(body);
       pretty = JSON.stringify(parsed, null, 2);
       parsedOk = true;
-    } catch (_) {
+    } catch {
+      // Not JSON: show the body as received.
       pretty = body;
     }
   }
@@ -1120,7 +1124,8 @@ async function loadRequestBodies(reqId, bodyEl) {
           Object.assign({ kind: 'response',
             headersHtml: renderHeadersBlock('Response headers', r.response_headers) }, msgOpts))
       + '</div>';
-  } catch (_) {
+  } catch (e) {
+    console.error('Loading the message failed:', e);
     bodyEl.innerHTML = '<div class="msg-loading">Network error loading this message.</div>';
   }
 }
@@ -1130,7 +1135,7 @@ async function loadRequestBodies(reqId, bodyEl) {
 //   ${scenario}_${step}_${kind}.json
 // with non-filesystem-safe chars collapsed to underscores.
 function _msgSanitiseFilename(s) {
-  return String(s || '').replace(/[\\/:*?"<>|\s]+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  return String(s || '').replace(/[\\/:*?"<>|\s]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 }
 function _msgFlash(btn, text) {
   const original = btn.textContent;

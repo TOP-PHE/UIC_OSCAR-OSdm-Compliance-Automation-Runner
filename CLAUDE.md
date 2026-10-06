@@ -322,8 +322,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     the only place the difference is observable.
 - **Sonar code-smell backlog: five behaviour-neutral PRs, tracked in #523**
   (started 2026-10-05; 1,333 smells on `main`, 0 bugs, gate green). PR 1,
-  server code, is #524 (v1.11.199). The gate only judges new code, so none of
-  this blocks a release. What PR 1 established, for the four that follow:
+  server code, is #524 (v1.11.199, merged). PR 2, the "possible defect"
+  findings in the UI and the Bruno library, is #525 (v1.11.202 /
+  OTST_V2.0.101). The gate only judges new code, so none of this blocks a
+  release. What the first two established, for the three that follow:
   - **The findings are public.** No token is needed:
     `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&branch=main&resolved=false&ps=500`
     (add `&pullRequest=N` instead of `branch` for a PR). Each issue carries an
@@ -349,6 +351,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     measured 5× slower than the indexed loop (`zip.js`, S4138), so it stays.
     Code inside an already-applied migration is not restyled either. A finding
     left open on purpose is named in the CHANGELOG entry with its reason.
+  - **The pages have a compile check now** (`tests/unit/ui-scripts.test.js`,
+    #525). ESLint ignores `public/` and the inline-script lint only looks for
+    a stray closing script tag, so a syntax error in a page used to reach
+    `main` unnoticed. The same file runs page helpers in a bare `vm` context:
+    `loadFunction(file, name)` lifts a top-level function out of a page by its
+    `function name(` line and the next `}` at column 0. Use it for any pure
+    helper touched in PRs 3 and 4.
+  - **A trim after a collapse needs no quantifier.** `/^_+|_+$/g` right after
+    `.replace(/_+/g, '_')` only ever meets one character at each end, so
+    `/^_|_$/g` is the same thing and cannot backtrack. It is not the same
+    where underscores the user typed survive (the ancillary code in
+    `scenarios.js`): that one needs a real trim.
+  - **Check the lines you touch for other findings first.** A pre-existing
+    smell on a line you rewrite is reported on the PR as new. Sonar's
+    newer rules also matter here: 20 un-awaited promises in `scenarios.js`
+    (S9383) are typed as *bugs*, and a PR that rewrites one of those lines
+    fails the gate. Their line numbers are in the issue list; stay off them
+    until they are fixed (#526).
+  - **Reading "ignored exception" findings found a real defect, #534:** Test
+    Config treated any failed datafile load as "no datafile yet", and the
+    scenario wizard then saved a fresh file over the stored one. It was fixed
+    on its own (v1.11.201, the `loadForEdit` bullet above), not inside the
+    clean-up PR. Reading a finding is worth more than clearing it.
+  - **A linear-time test should fail in seconds, not minutes.** Size the input
+    so the old pattern takes a few seconds (60,000 digits for `parseVersion`).
+    At 100,000 a regression would have held CI for minutes before failing.
 - **Express 5 since 2026-09-05 (#492).** Arrived as a Dependabot bump —
   express 4.22.2 → 5.2.1 — because express 4 pins `qs: ~6.15.1`, so qs
   could not move to 6.16.0 without it. The whole migration was **one line**:

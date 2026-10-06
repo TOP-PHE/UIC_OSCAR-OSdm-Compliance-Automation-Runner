@@ -131,6 +131,7 @@ async function init() {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main').style.display    = 'block';
   } catch(e) {
+    console.error('Checking the verification link failed:', e);
     showExpired('Server unreachable.');
   }
 }
@@ -181,6 +182,7 @@ async function doConfirm(e) {
       setTimeout(() => { window.location.href = '/profile.html'; }, 2000);
     }
   } catch(e) {
+    console.error('Account activation failed:', e);
     errEl.textContent = 'Server unreachable.';
     errEl.style.display = 'block';
   } finally {
