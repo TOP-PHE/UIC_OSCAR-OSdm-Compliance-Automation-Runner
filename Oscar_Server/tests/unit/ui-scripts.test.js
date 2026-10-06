@@ -648,3 +648,140 @@ describe('run-detail.html — friendlyArtifactBase', () => {
     expect(baseFor(null)).toBe('sandbox_run');
   });
 });
+
+// ── #527: the pages ───────────────────────────────────────────────────────────
+// Nested conditionals in the pages were taken apart; where the value depends on
+// nothing but its inputs it became a top-level function, pinned here.
+
+describe('pages — helpers taken out of nested conditionals (#527)', () => {
+  test('admin.html configInputType: a sensitive value is a password field, even when numeric', () => {
+    const configInputType = loadFunction('admin.html', 'configInputType');
+    expect([[true, true], [true, false], [false, true], [false, false]].map(([sensitive, num]) => configInputType(sensitive, num)))
+      .toEqual(['password', 'password', 'number', 'text']);
+  });
+
+  describe('compare.html diffErrorHtml', () => {
+    const esc = loadFunction('compare.html', 'esc');
+    const diffErrorHtml = loadFunction('compare.html', 'diffErrorHtml', { esc });
+
+    test("run B's error is shown, escaped, whatever the category", () => {
+      expect(diffErrorHtml({ category: 'ADDED', run_a: { error: 'a' }, run_b: { error: '<b> & more' } }))
+        .toBe('<div class="diff-error">&lt;b&gt; &amp; more</div>');
+    });
+
+    test("run A's error is shown only for a removed item", () => {
+      expect(diffErrorHtml({ category: 'REMOVED', run_a: { error: 'gone' }, run_b: null })).toBe('<div class="diff-error">gone</div>');
+      expect(diffErrorHtml({ category: 'PASSED_TO_FAILED', run_a: { error: 'gone' }, run_b: {} })).toBe('');
+    });
+
+    test('no error, an empty error or a missing run gives nothing', () => {
+      for (const item of [{ category: 'REMOVED' }, { category: 'REMOVED', run_a: { error: '' }, run_b: { error: '' } }, { category: 'REMOVED', run_a: null, run_b: undefined }]) {
+        expect(diffErrorHtml(item)).toBe('');
+      }
+    });
+  });
+
+  test('dashboard.html deleteModalVariant: tester wording for every role but Test Manager and administrator', () => {
+    const deleteModalVariant = loadFunction('dashboard.html', 'deleteModalVariant');
+    expect(['test_manager', 'administrator', 'company_user', 'certification_user', undefined, ''].map(deleteModalVariant))
+      .toEqual(['test_manager', 'administrator', 'tester', 'tester', 'tester', 'tester']);
+  });
+
+  test('dashboard.html batchSummaryStatus', () => {
+    const summary = loadFunction('dashboard.html', 'batchSummaryStatus');
+    const of = (...statuses) => summary(statuses.map(status => ({ status })));
+    expect(of('COMPLETED', 'FAILED', 'RUNNING')).toBe('FAILED');     // a failure wins
+    expect(of('COMPLETED', 'RUNNING', 'QUEUED')).toBe('RUNNING');
+    expect(of('RUNNING', 'QUEUED')).toBe('RUNNING');                 // running, nothing done yet
+    expect(of('COMPLETED', 'COMPLETED')).toBe('COMPLETED');
+    expect(of('QUEUED', 'QUEUED')).toBe('QUEUED');
+    expect(of('COMPLETED', 'QUEUED')).toBe('RUNNING');               // partly done
+    expect(of('CANCELLED', 'QUEUED')).toBe('QUEUED');
+  });
+
+  describe('report-builder.html', () => {
+    test('httpStatusClass: by hundreds, s0 below 200 or without a status', () => {
+      const httpStatusClass = loadFunction('report-builder.html', 'httpStatusClass');
+      const cases = [[null, 's0'], [undefined, 's0'], [0, 's0'], [199, 's0'], [200, 's2'], [299, 's2'], [300, 's3'], [399, 's3'],
+        [400, 's4'], [499, 's4'], [500, 's5'], [599, 's5'], [600, 's5'], ['404', 's4'], ['abc', 's0']];
+      for (const [status, expected] of cases) expect([status, httpStatusClass(status)]).toEqual([status, expected]);
+    });
+
+    test('initialHttpTab: the first of response body, request body and response headers that has content', () => {
+      const initialHttpTab = loadFunction('report-builder.html', 'initialHttpTab');
+      const got = [];
+      for (const res of [true, false]) for (const req of [true, false]) for (const hdr of [true, false]) got.push(initialHttpTab(res, req, hdr));
+      expect(got).toEqual(['response', 'response', 'response', 'response', 'request', 'request', 'resHeaders', 'reqHeaders']);
+    });
+
+    test('runScenarioLabel: the scenario code, else the scenario names spaced out, else the environment or a short id', () => {
+      const label = loadFunction('report-builder.html', 'runScenarioLabel');
+      expect(label({ scenario_code: 'OTST_X', scenario_names: 'A,B' })).toBe('OTST_X');
+      expect(label({ scenario_names: 'A,B,C' })).toBe('A, B, C');
+      expect(label({ scenario_names: 'One' })).toBe('One');
+      expect(label({ env_name_used: 'ENV', id: '1234567890' })).toBe('ENV');
+      expect(label({ id: '1234567890' })).toBe('12345678');
+    });
+
+    test('looksLikeJsonOpener and looksLikeJsonContinuation', () => {
+      const opener = loadFunction('report-builder.html', 'looksLikeJsonOpener');
+      const continuation = loadFunction('report-builder.html', 'looksLikeJsonContinuation');
+      for (const s of ['Selected Offer: {', 'items = [', 'key: {   ', '[JSON:offer] anything']) expect([s, opener(s)]).toEqual([s, true]);
+      for (const s of ['plain text', '{', '}', 'a: b', '', null]) expect([s, opener(s)]).toEqual([s, false]);
+      for (const s of ['  indented', '}', '],', '} ,  ']) expect([s, continuation(s)]).toEqual([s, true]);
+      for (const s of ['{', 'text', '} x', '', null]) expect([s, continuation(s)]).toEqual([s, false]);
+    });
+
+    test('_rbSanitiseFilename still turns a slash and a backslash into an underscore', () => {
+      const rb = loadFunction('report-builder.html', '_rbSanitiseFilename');
+      expect(rb('a/b\\c:d')).toBe('a_b_c_d');
+    });
+  });
+
+  test('resultBadgeHtml is the same in report-builder.html and run-detail.html', () => {
+    for (const page of ['report-builder.html', 'run-detail.html']) {
+      const badge = loadFunction(page, 'resultBadgeHtml');
+      expect(badge('PASS')).toBe('<span class="a-pass">PASS</span>');
+      expect(badge('FAIL')).toBe('<span class="a-fail">FAIL</span>');
+      for (const other of ['SKIP', undefined, 'pass', '']) expect(badge(other)).toBe('<span style="color:#90a4ae">SKIP</span>');
+    }
+  });
+
+  test('run-detail.html safeJsonForInlineScript breaks every closing script tag, whatever its case', () => {
+    const safe = loadFunction('run-detail.html', 'safeJsonForInlineScript');
+    expect(safe('{"a":"</script><SCRIPT>x</ScRiPt>"}')).toBe('{"a":"<\\/script><SCRIPT>x<\\/ScRiPt>"}');
+    expect(safe('</div> and </ script>')).toBe('</div> and </ script>');
+  });
+});
+
+// What #527 left as it was, with the reason. A later clean-up should not undo these.
+describe('pages — written this way on purpose (#527)', () => {
+  // CodeQL recognises replace(/x/g, …) as an HTML encoder. Rewritten with
+  // replaceAll and a string it no longer did, and reported the escaped values
+  // reaching innerHTML as XSS (see js/scenarios.js — esc, #526).
+  test.each([
+    ['admin.html', 5], ['compare.html', 3], ['report-builder.html', 5], ['run-detail.html', 5], ['welcome.html', 3],
+  ])('%s keeps its HTML encoders in the replace(/x/g) form', (page, minimum) => {
+    const src = read(page);
+    const encoderCalls = src.match(/\.replace\(\/[&<>"']\/g,\s*'&(amp|lt|gt|quot|#39);'\)/g) || [];
+    expect(encoderCalls.length).toBeGreaterThanOrEqual(minimum);
+    expect(src).not.toMatch(/\.replaceAll\(\s*['"][&<>"']['"]\s*,\s*'&(amp|lt|gt|quot|#39);'\)/);
+  });
+
+  // The tab kind is the source of an open code-scanning alert on the innerHTML
+  // a few lines below. Reading it through dataset could hide that flow from
+  // CodeQL without fixing it.
+  test('report-builder.html switchHttpTab reads the tab kind with getAttribute', () => {
+    const src = read('report-builder.html');
+    const start = src.indexOf('function switchHttpTab(');
+    const body = src.slice(start, src.indexOf('\n}\n', start));
+    expect(body).toContain("var kind = tabEl.getAttribute('data-http-tab');");
+    expect(body).not.toContain('dataset.httpTab');
+  });
+
+  // Inside an inline script the closing tag has to be written with a backslash,
+  // or the HTML parser ends the script there. Sonar reports it as a needless escape.
+  test('run-detail.html writes the closing script tag of the payload with a backslash', () => {
+    expect(read('run-detail.html')).toContain('${safeJsonForInlineScript(pretty)}<\\/script>`');
+  });
+});
