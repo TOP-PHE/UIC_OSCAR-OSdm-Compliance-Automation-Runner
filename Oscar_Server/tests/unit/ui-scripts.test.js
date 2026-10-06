@@ -210,6 +210,30 @@ describe('js/scenarios.js — setTripFieldByPath', () => {
   });
 });
 
+describe('js/scenarios.js — esc', () => {
+  // The page's HTML encoder. Its five replace(/x/g) calls became replaceAll('x')
+  // in #526; every occurrence must still be encoded, "&" first.
+  const esc = loadFunction('js/scenarios.js', 'esc');
+
+  test.each([
+    ['<b onclick="x(\'y\')">a & b</b>', '&lt;b onclick=&quot;x(&#39;y&#39;)&quot;&gt;a &amp; b&lt;/b&gt;'],
+    ['&&&', '&amp;&amp;&amp;'],
+    ['<<>>""\'\'', '&lt;&lt;&gt;&gt;&quot;&quot;&#39;&#39;'],
+    ['&lt;', '&amp;lt;'],
+    ['plain text', 'plain text'],
+    ['$& $1 $$', '$&amp; $1 $$'],
+  ])('%j → %j', (input, expected) => {
+    expect(esc(input)).toBe(expected);
+  });
+
+  test('null and undefined give an empty string; other values are converted', () => {
+    expect(esc(null)).toBe('');
+    expect(esc(undefined)).toBe('');
+    expect(esc(0)).toBe('0');
+    expect(esc(false)).toBe('false');
+  });
+});
+
 describe('report-builder.html — jsonBlockLabel', () => {
   const jsonBlockLabel = loadFunction('report-builder.html', 'jsonBlockLabel');
   const label = (message) => jsonBlockLabel({ message });

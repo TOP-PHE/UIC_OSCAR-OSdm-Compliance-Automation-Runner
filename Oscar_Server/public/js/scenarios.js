@@ -119,8 +119,8 @@ function esc(s) {
   // still flag innerHTML sinks here — it doesn't recognise this custom encoder
   // as a sanitiser; those alerts are false positives, see issue #82.)
   return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+    .replaceAll('"','&quot;').replaceAll("'",'&#39;');
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -2296,7 +2296,7 @@ function egPlaceholder(placeholder) {
 }
 
 function buildTripTimeField(tIdx, path, label, val, placeholder) {
-  const displayVal = (val || '').replace(/%TRIP_DATE%T/g, '');
+  const displayVal = (val || '').replaceAll('%TRIP_DATE%T', '');
   return `
   <div class="param-field">
     <span class="param-label">${label}</span>
@@ -2524,7 +2524,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
     <select class="param-input param-select" style="max-width:180px;font-size:12px"
       data-action="change-pax-category" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-scenidx="${esc(idx)}" ${readOnly ? 'disabled' : ''}>
       ${catOptions.map(c =>
-        `<option value="${esc(c)}" ${c===cat?'selected':''}>${c.replace(/_/g,' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
+        `<option value="${esc(c)}" ${c===cat?'selected':''}>${c.replaceAll('_',' ')}${allowedPaxCats.includes(c) ? '' : ' (not in framework)'}</option>`
       ).join('')}
     </select>
     ${genderSelect}
@@ -2546,7 +2546,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
         ${!readOnly ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eceff1;display:flex;gap:8px;align-items:center">
           <select id="add-pax-type-${esc(pIdx)}" class="param-input param-select" style="max-width:180px;font-size:12px">
-            ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replace(/_/g,' ')}</option>`).join('')}
+            ${allowedPaxCats.map(c => `<option value="${esc(c)}">${c.replaceAll('_',' ')}</option>`).join('')}
           </select>
           <button class="btn btn-sm btn-primary" data-action="add-pax" data-pidx="${esc(pIdx)}" data-scenidx="${esc(idx)}" style="font-size:12px" ${allowedPaxCats.length===0?'disabled':''}>➕ Add Passenger</button>
           ${allowedPaxCats.length===0 ? '<span style="font-size:11px;color:#e65100">⚠ No passenger types in framework — configure Step 1 first.</span>' : ''}
@@ -2881,7 +2881,7 @@ function setTripField(tIdx, field, value) {
 
 // Save time field: prepends %TRIP_DATE%T to the time-only value
 function setTripTimeFieldByPath(tIdx, path, value) {
-  const stored = value ? '%TRIP_DATE%T' + value.replace(/%TRIP_DATE%T/g, '') : '';
+  const stored = value ? '%TRIP_DATE%T' + value.replaceAll('%TRIP_DATE%T', '') : '';
   setTripFieldByPath(tIdx, path, stored);
 }
 
@@ -3397,13 +3397,13 @@ function renderWizardStep1() {
       <div class="irops-panel-title">⚡ IROPS Reason Codes — ${type[0]+type.slice(1).toLowerCase()}</div>
       <div style="margin-bottom:6px;font-size:11px;color:#f57f17">Mandatory (always included):</div>
       <div class="pill-group">
-        ${WIZ_IROPS_MANDATORY.map(c=>`<div class="pill mandatory">✓ ${c.replace(/_/g,' ')}</div>`).join('')}
+        ${WIZ_IROPS_MANDATORY.map(c=>`<div class="pill mandatory">✓ ${c.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div style="margin:10px 0 6px;font-size:11px;color:#78909c">Optional (tick if your system supports it):</div>
       <div class="pill-group">
         ${WIZ_IROPS_OPTIONAL.map(c=>`
           <div class="pill${codes.includes(c)?' selected':''}" data-action="fw-toggle-irops" data-type="${key}" data-code="${esc(c)}">
-            ${c.replace(/_/g,' ')}
+            ${c.replaceAll('_',' ')}
           </div>`).join('')}
       </div>
     </div>`;
@@ -3493,7 +3493,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_RAIL_SUBMODES.map(m=>`<div class="pill${(fw.rail.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="rail" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_RAIL_SUBMODES.map(m=>`<div class="pill${(fw.rail.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="rail" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
           <div class="fw-subsection">
@@ -3514,7 +3514,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_PT_SUBMODES.map(m=>`<div class="pill${(fw.pt.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="pt" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_PT_SUBMODES.map(m=>`<div class="pill${(fw.pt.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="pt" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
         </div>
@@ -3529,7 +3529,7 @@ function renderWizardStep1() {
           <div class="fw-subsection">
             <div class="fw-subsection-label">Sub-modes</div>
             <div class="pill-group">
-              ${WIZ_SHARED_SUBMODES.map(m=>`<div class="pill${(fw.shared.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="shared" data-group="subModes" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+              ${WIZ_SHARED_SUBMODES.map(m=>`<div class="pill${(fw.shared.subModes||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="shared" data-group="subModes" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
             </div>
           </div>
         </div>
@@ -3571,7 +3571,7 @@ function renderWizardStep1() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Select supported passenger types</div>
       <div class="pill-group" style="margin-bottom:16px">
-        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${esc(p)}">${p.replace(/_/g,' ')}</div>`).join('')}
+        ${WIZ_PAX_TYPES.map(p=>`<div class="pill${(fw.passengerTypes||[]).includes(p)?' selected':''}" data-action="fw-pax-type" data-val="${esc(p)}">${p.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection">
         <div class="fw-subsection-label" style="margin-bottom:8px">
@@ -3584,7 +3584,7 @@ function renderWizardStep1() {
             const dflt  = WIZ_PAX_DEFAULT_AGES[p] || { min: 0, max: 99 };
             const range = (fw.passengerAgeRanges && fw.passengerAgeRanges[p]) ? fw.passengerAgeRanges[p] : dflt;
             return `<div class="pax-age-row" id="pax-age-${esc(p)}" style="${sel?'':'display:none'}">
-              <span class="pax-age-label">${p.replace(/_/g,' ')}</span>
+              <span class="pax-age-label">${p.replaceAll('_',' ')}</span>
               <label class="pax-age-pair">Min age
                 <input type="number" min="0" max="120" value="${range.min}" data-action="fw-pax-age" data-paxtype="${esc(p)}" data-bound="min">
               </label>
@@ -3608,7 +3608,7 @@ function renderWizardStep1() {
       <div style="padding:12px 14px">
         <div class="fw-subsection-label" style="margin-bottom:8px">Ancillaries the platform supports — standard (OSDM) plus any custom ones. Train resources pick from this catalog.</div>
         <div class="pill-group">
-          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replace(/_/g,' '))}</div>`).join('')}
+          ${OSDM_ANCILLARY_TYPES.map(a=>`<div class="pill${(fw.ancillaries||[]).includes(a)?' selected':''}" data-action="fw-ancillary" data-val="${esc(a)}">${esc(a.replaceAll('_',' '))}</div>`).join('')}
         </div>
         ${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).length
           ? `<div class="fw-subsection" style="margin-top:10px"><div class="fw-subsection-label">Custom</div><div class="pill-group">${(fw.ancillaries||[]).filter(a => !OSDM_ANCILLARY_TYPES.includes(a)).map(a=>`<div class="pill selected" data-action="fw-remove-ancillary" data-val="${esc(a)}" title="Click to remove">${esc(a)} ✕</div>`).join('')}</div></div>`
@@ -3630,13 +3630,13 @@ function renderWizardStep1() {
         <div class="fw-subsection">
           <div class="fw-subsection-label">Fulfillment type — which delivery mechanisms does the system support?</div>
           <div class="pill-group">
-            ${WIZ_FULFIL_TYPES.map(t=>`<div class="pill${(fw.fulfillment.types||[]).includes(t)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="types" data-val="${esc(t)}">${t.replace(/_/g,' ')}</div>`).join('')}
+            ${WIZ_FULFIL_TYPES.map(t=>`<div class="pill${(fw.fulfillment.types||[]).includes(t)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="types" data-val="${esc(t)}">${t.replaceAll('_',' ')}</div>`).join('')}
           </div>
         </div>
         <div class="fw-subsection" style="margin-top:10px">
           <div class="fw-subsection-label">Fulfillment media — how is the document delivered?</div>
           <div class="pill-group">
-            ${WIZ_FULFIL_MEDIA.map(m=>`<div class="pill${(fw.fulfillment.media||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="media" data-val="${esc(m)}">${m.replace(/_/g,' ')}</div>`).join('')}
+            ${WIZ_FULFIL_MEDIA.map(m=>`<div class="pill${(fw.fulfillment.media||[]).includes(m)?' selected':''}" data-action="fw-pill" data-mode="fulfillment" data-group="media" data-val="${esc(m)}">${m.replaceAll('_',' ')}</div>`).join('')}
           </div>
         </div>
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">Scenarios can only request the fulfillment type/media declared here — leave a category empty to allow the full OSDM set.</div>
@@ -4042,7 +4042,7 @@ function buildTrainDetailHTML(tidx) {
   function pills(items, field) {
     const vals = d[field] || [];
     return items.map(v => {
-      const label = typeof v === 'object' ? (v.label || v.value) : String(v).replace(/_/g, ' ');
+      const label = typeof v === 'object' ? (v.label || v.value) : String(v).replaceAll('_', ' ');
       const value = typeof v === 'object' ? v.value : v;
       const sel = vals.includes(value) ? ' selected' : '';
       return `<div class="pill${sel}" data-val="${esc(value)}" data-action="pill-toggle">${esc(label)}</div>`;
@@ -5288,14 +5288,14 @@ function renderWizardStep3() {
     const g = (sc.passengerGender && sc.passengerGender[type]) || '';
     const genderSelect = isHuman ? `
       <select class="param-input param-select" style="max-width:130px;font-size:12px;margin-right:6px"
-        data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replace(/_/g,' ')} generated — 'None' omits the field from offer requests">
+        data-action="wiz-pax-gender" data-type="${type}" title="Default gender applied to every ${type.replaceAll('_',' ')} generated — 'None' omits the field from offer requests">
         <option value=""       ${!g                ?'selected':''}>— None (omit) —</option>
         <option value="MALE"   ${g==='MALE'        ?'selected':''}>Male</option>
         <option value="FEMALE" ${g==='FEMALE'      ?'selected':''}>Female</option>
         <option value="X"      ${g==='X'           ?'selected':''}>X (legacy)</option>
       </select>` : '';
     return `<div class="pax-counter-row">
-      <span class="pax-counter-label">${type.replace(/_/g,' ')} <small style="font-weight:400;color:#90a4ae;letter-spacing:0">(${abbr})</small></span>
+      <span class="pax-counter-label">${type.replaceAll('_',' ')} <small style="font-weight:400;color:#90a4ae;letter-spacing:0">(${abbr})</small></span>
       <span class="pax-counter-age">${ageHint}</span>
       <div class="pax-counter-ctrl">
         ${genderSelect}
@@ -5348,7 +5348,7 @@ function renderWizardStep3() {
         <div class="param-field" style="min-width:180px">
           <label class="param-label">Desired flexibility</label>
           <select class="param-input param-select" data-action="wiz-flexibility">
-            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replace(/_/g,' ')}</option>`).join('')}
+            ${fwFilter(WIZ_FLEXIBILITIES, fw.offerCriteria && fw.offerCriteria.flexibilities).map(f=>`<option value="${esc(f)}" ${sc.desiredFlexibility===f?'selected':''}>${f.replaceAll('_',' ')}</option>`).join('')}
           </select>
         </div>
         ${(() => {
@@ -5364,7 +5364,7 @@ function renderWizardStep3() {
           <label class="param-label">Overrule code <span class="param-hint">(IROPS reason)</span></label>
           <select class="param-input param-select" data-action="wiz-overrule">
             <option value="">— none —</option>
-            ${codes.map(c => `<option value="${esc(c)}" ${sc.overruleCode===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
+            ${codes.map(c => `<option value="${esc(c)}" ${sc.overruleCode===c?'selected':''}>${c.replaceAll('_',' ')}</option>`).join('')}
           </select>
           ${codes.length === 0 ? '<div style="font-size:11px;color:#e65100;margin-top:4px">⚠ No IROPS codes configured in Framework Step 1.</div>' : ''}
         </div>`;
@@ -5515,7 +5515,7 @@ function renderWizardStep3() {
       <div class="fw-subsection-label" style="margin-bottom:8px">Service class</div>
       <div class="pill-group" style="margin-bottom:14px">
         ${availSC.length
-          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${esc(c)}">${c.replace(/_/g,' ')}</div>`).join('')
+          ? availSC.map(c=>`<div class="pill${(sc.serviceClasses||[]).includes(c)?' selected':''}" data-action="wiz-scen-array" data-field="serviceClasses" data-val="${esc(c)}">${c.replaceAll('_',' ')}</div>`).join('')
           : '<span style="font-size:12px;color:#b0bec5">No service classes available — define them in Step 1 or select a train.</span>'}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Travel class</div>
@@ -5524,7 +5524,7 @@ function renderWizardStep3() {
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities</div>
       <div class="pill-group">
-        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replace(/_/g,' ')}</div>`).join('')}
+        ${[...new Set([...WIZ_FLEXIBILITIES, ...(sc.flexibilities||[])])].map(f=>`<div class="pill${(sc.flexibilities||[]).includes(f)?' selected':''}" data-action="wiz-scen-array" data-field="flexibilities" data-val="${esc(f)}">${f.replaceAll('_',' ')}</div>`).join('')}
       </div>
     </div>
   </div>
@@ -5535,11 +5535,11 @@ function renderWizardStep3() {
     <div class="fw-section-body open">
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment type</div>
       <div class="pill-group" style="margin-bottom:14px">
-        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment && fw.fulfillment.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replace(/_/g,' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_TYPES, fw.fulfillment && fw.fulfillment.types).map(t=>`<div class="pill${(sc.fulfillmentTypes||[]).includes(t)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentTypes" data-val="${t}">${t.replaceAll('_',' ')}</div>`).join('')}
       </div>
       <div class="fw-subsection-label" style="margin-bottom:8px">Fulfillment media</div>
       <div class="pill-group">
-        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment && fw.fulfillment.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replace(/_/g,' ')}</div>`).join('')}
+        ${fwFilter(WIZ_FULFIL_MEDIA, fw.fulfillment && fw.fulfillment.media).map(m=>`<div class="pill${(sc.fulfillmentMedia||[]).includes(m)?' selected':''}" data-action="wiz-scen-array" data-field="fulfillmentMedia" data-val="${m}">${m.replaceAll('_',' ')}</div>`).join('')}
       </div>
     </div>
   </div>
