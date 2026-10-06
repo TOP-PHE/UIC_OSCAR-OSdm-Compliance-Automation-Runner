@@ -102,6 +102,9 @@ input[type=password]::placeholder{letter-spacing:2px}
     <div class="field">
       <label for="api_base">OSDM API Endpoint</label>
       <input type="url" id="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
+      <div id="api-base-readonly-note" style="display:none;font-size:12px;color:#546e7a;margin-top:6px">
+        Only a Test Manager of your company can change this address.
+      </div>
     </div>
 
     <!-- Dedicated headers (issue #426): company-wide custom request headers -->
@@ -311,6 +314,11 @@ function switchProfile() {
 // {{var}} template resolved per tester at request time).
 const CAN_EDIT_HEADERS = (user.role === 'test_manager');
 
+// The shared endpoint (#544). Every run of every tester in the company goes to
+// it, so it is the Test Manager's to change. Everyone else sees it read-only,
+// and the server refuses the change from anyone else.
+const CAN_EDIT_ENDPOINT = (user.role === 'test_manager');
+
 function makeHeaderRow(name, value) {
   const row = document.createElement('div');
   row.className = 'eh-row';
@@ -367,6 +375,13 @@ async function loadProfile() {
 
   // Company-shared
   document.getElementById('api_base').value          = c.api_base  || '';
+  if (!CAN_EDIT_ENDPOINT) {
+    // Read-only, not disabled: a tester can still select and copy the address.
+    const endpointInput = document.getElementById('api_base');
+    endpointInput.readOnly = true;
+    endpointInput.style.background = '#f5f7f8';
+    document.getElementById('api-base-readonly-note').style.display = 'block';
+  }
   renderExtraHeaders(c.extra_headers);   // issue #426 — company dedicated headers
   // v1.11.15: the share-reports-with-certifier toggle was removed here —
   // certifier sharing is now per-report from the Dashboard.
@@ -401,7 +416,9 @@ async function saveConfig() {
   // the share_reports_with_certifier toggle was removed in v1.11.15
   // (certifier sharing is per-report from the Dashboard).
   const companyPayload = {};
-  if (apiBase) companyPayload.api_base = apiBase;
+  // #544 — only a Test Manager sends the endpoint. For everyone else the field
+  // is read-only, and their save goes straight to their own credentials.
+  if (apiBase && CAN_EDIT_ENDPOINT) companyPayload.api_base = apiBase;
   // Issue #426 — always send the current header list (so emptying it clears the
   // stored value). Test-Manager-only; the server rejects edits from other roles.
   if (CAN_EDIT_HEADERS) companyPayload.extra_headers = collectExtraHeaders();

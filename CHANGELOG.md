@@ -14,6 +14,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.207] — 2026-10-06
+
+### Security
+
+- **Only a Test Manager changes the company's OSDM API endpoint.** Closes #544.
+  The endpoint (`companies.api_base`) is company-wide: every request of every
+  run goes to it, with the token of the tester who started the run.
+  `PATCH /v1/company` accepted `api_base` from any signed-in member of the
+  company, and the API Config page sent it with every save, whatever the role.
+  A tester could point the whole company at another address. The dedicated
+  headers on the same route were already Test-Manager-only.
+
+  | Who sends `api_base` | Before | Now |
+  |---|---|---|
+  | Test Manager of the company | Stored | Stored |
+  | Administrator naming the company | Stored | Stored |
+  | Tester, a different address | **Stored** | **403**, nothing written |
+  | Tester, exactly the stored address | Stored again | 200, nothing written, no audit event |
+  | Certifier | 403 | 403 |
+
+- **The rule is one pure function**, `companyEndpointChange()` in
+  `api/helpers/shared.js`. It names the two roles that may write.
+  `isPlatformRole()` also covers certifiers; they are stopped earlier on this
+  route, and the rule does not rely on that. An unknown role is refused.
+- **Why a tester may send back the stored address.** Until this release the
+  page did so on every credential save, and a page left open across the
+  upgrade still does. Refusing it would have broken the tester's save until a
+  reload. The comparison is exact after trimming spaces: a different case,
+  scheme, path or query is a change.
+
+### Changed
+
+- **API Config page.** For anyone who is not a Test Manager the endpoint is
+  read-only (it can still be selected and copied), with the line "Only a Test
+  Manager of your company can change this address." **Save Configuration**
+  then sends the tester's own credentials and nothing to the company.
+- `FINISHED_STATUSES` in `report-builder.html` is a `Set` read with
+  `has()` (Sonar S7776, raised on #551 after it was merged; tracking #523).
+  One use, a membership test on a run's status. Nothing changes for a user.
+
+### Fixed
+
+- `PATCH /v1/company` with an `api_base` that is not a string answered 500.
+  It answers 400.
+
+### Tests
+
+- 9 on the route (`tests/integration/company-routes.test.js`), written
+  first: 4 failed on the old code, the other 5 pin what must stay as it was.
+  14 on the rule (`tests/unit/shared.test.js`). 11 on the page
+  (`tests/unit/profile-endpoint.test.js`, which lifts `loadProfile` and
+  `saveConfig` out of `profile.html` and runs them with a fake document
+  and fetch). 33 deliberate breakages of the rule, the route and the page each
+  fail at least one test.
+- In a browser, on a throwaway local instance. As a tester: the address is
+  greyed and read-only, the note sits under it, the address can still be
+  selected, and **Save Configuration** sends the credentials only. A tester on
+  the page from 1.11.206: saving credentials still works, and changing the
+  address shows the 403 message with nothing stored. As a Test Manager: the
+  address is edited and saved as before.
+
+### Not changed, not done
+
+- Who may read the endpoint, and what address a Test Manager may enter.
+- The audit event still names the fields sent, not their values. Before this
+  release every save by any role wrote one, so the log cannot show whether a
+  tester changed the address in the past.
+- Not checked on production.
+
+---
+
 ## [server-1.11.206] — 2026-10-06
 
 ### Changed

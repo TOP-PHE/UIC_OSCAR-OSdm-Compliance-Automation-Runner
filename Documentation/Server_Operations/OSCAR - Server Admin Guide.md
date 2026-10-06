@@ -871,6 +871,7 @@ cannot defend against.
 | Run results, artifacts, HTTP traffic | Tester + Test Manager of the owning company | Other companies, Administrators |
 |  | **Plus** Certifiers — but ONLY for runs where the Test Manager has clicked "Share with certifiers" on that specific run | Certifiers without explicit per-run share |
 | API credentials (per-tester) | The owning tester only — encrypted at rest | Everyone else, including admins, even on the database |
+| OSDM API endpoint and dedicated headers (company-wide) | Tester (read-only) + Test Manager (edit) of the owning company; Administrators (§15.9) | Other companies, Certifiers |
 | Audit log | Administrator only | Everyone else |
 
 ### 15.2 The certifier share gate
@@ -1165,3 +1166,44 @@ then deleted it, while `companies.datafile_path` still pointed at the old file.
 If a company reports "our data file vanished after a failed upload" from
 before v1.11.195, that is the cause. The Test Manager needs to upload or rebuild
 it once. The fixed release leaves the previous file untouched.
+
+### 15.9 v1.11.207 — only a Test Manager changes the company's OSDM endpoint
+
+A company has one OSDM API endpoint (`companies.api_base`, shown as **OSDM API
+Endpoint** on the API Config page). Every request of every run in that company
+goes to it, with the access token of the tester who started the run.
+
+Until this release `PATCH /v1/company` accepted `api_base` from any signed-in
+member of the company, and the API Config page sent it with every save, whatever
+the role. A tester could therefore point the whole company at another address
+(issue #544). The dedicated headers on the same route were already
+Test-Manager-only; the endpoint was not.
+
+| Who sends `api_base` | Before | Now |
+|---|---|---|
+| Test Manager of the company | Stored | Stored, as before. Audit event `company_update:` followed by the fields sent. |
+| Administrator naming the company (`?company_id=`) | Stored | Stored, as before, like the dedicated headers. |
+| Tester, a different address | **Stored** | **403** "Only Test Managers can change the OSDM API endpoint." Nothing is written. |
+| Tester, exactly the stored address | Stored again | 200, nothing written, no audit event. |
+| Certifier | 403 | 403, as before. |
+
+The fourth row exists for one reason. Before this release the page sent the
+endpoint back unchanged each time a tester saved their credentials, and a page
+left open across the upgrade still does. Refusing that would have broken the
+tester's credential save until they reloaded. The comparison is exact after
+trimming spaces: a different case, scheme, path or query is a change.
+
+On the page, anyone who is not a Test Manager now sees the endpoint read-only,
+with the line "Only a Test Manager of your company can change this address."
+Their **Save** sends their own credentials and nothing else.
+
+Two things for support:
+
+- "I can no longer change the API address" from a tester is the intended
+  behaviour. The company's Test Manager makes the change.
+- The audit log cannot tell you whether a tester changed the endpoint before
+  the upgrade. Until this release every save of the API Config page, by any
+  role, wrote a `company_update:api_base…` event whether or not the address
+  had changed, and the event does not record the address. If there is a doubt,
+  have the Test Manager check the address shown on the page. From this release
+  that event is written only for a Test Manager or an Administrator.
