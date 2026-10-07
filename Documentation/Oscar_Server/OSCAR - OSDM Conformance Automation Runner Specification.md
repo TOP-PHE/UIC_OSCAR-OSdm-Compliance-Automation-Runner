@@ -461,7 +461,8 @@ a script of the bind-mounted collection. Neither is handed the server's environm
 which holds `ENCRYPTION_KEY`, `JWT_SECRET` and the SMTP credentials. Both start from
 one allowlist, `CHILD_ENV_ALLOWLIST` in `worker/runner.js`: the path and profile
 variables a process needs to start, plus `NODE_ENV` and `NODE_PATH`. Bruno gets the
-run's three credentials on top (§9.9). The report script gets nothing more.
+run's three credentials and the per-run loopback secret (§9.17) on top (§9.9). The
+report script gets nothing more.
 
 Until v1.11.207 only the Bruno spawn used the allowlist. The report script was
 started with no environment option and inherited everything (audit tracker NEW-01,
@@ -472,6 +473,41 @@ The allowlist stops inheritance. It is not isolation: collection code runs as th
 same operating-system user as the server, so a script written to do harm could still
 read the server's files, and on Linux the environment of the server process itself.
 The integrity of the collection (who can push to `main`) remains the control for that.
+
+### 9.17 Loopback Route Authentication
+
+Two routes exist for the Bruno subprocess to call back while a run is in flight:
+`GET /data/:filename` returns the company's decrypted datafile, and
+`POST /v1/runs/:runId/refresh-access-token` returns a live vendor access token for a
+long-running scenario. A spawned child has no web session, so these cannot be gated
+on a cookie or bearer token.
+
+Until v1.11.210 they were gated on the source address alone: the request had to come
+from `127.0.0.1`/`::1` with no `X-Forwarded-For`. That is a single condition with no
+second factor. Any other process on the host, and any fronting proxy that does not
+inject `X-Forwarded-For` (an L4/stream forwarder, a sidecar), satisfied it and could
+read any company's datafile (slugs are enumerable) and a live vendor token — audit
+tracker S8-loopback.
+
+Since v1.11.210 the gate is a per-run secret (`utils/runSecrets.js`). When the runner
+spawns Bruno it mints a random 32-byte secret, keyed by run id and bound to the run's
+company, passes it through the child environment as `OSCAR_RUN_SECRET` (never the env
+file on disk, §9.9), and revokes it when the child exits. The collection returns it as
+the `X-OSCAR-Run-Secret` header — on the datafile fetch together with the run id in
+`X-OSCAR-Run-Id`, since that route is keyed on the slug. Each route verifies the secret
+in constant time and confirms it was issued for the company that owns what is asked:
+a run of company A requesting company B's datafile is answered `404`. Nothing reads
+`req.ip` for these routes any more. A signed-in Test Manager of the owning company
+remains an authenticated fallback on `/data`; the refresh route is secret-only.
+
+Because the secret is only on the collection's own two OSCAR calls, a run's OSDM
+requests to the company `api_base` never carry it: aiming `api_base` at the internal
+`/data` route now returns `401`, not a datafile. Constraining `api_base`/`token_url`
+away from loopback and private ranges altogether (tracker S5) is a separate control.
+
+The server now requires the header, so this release pairs server 1.11.210 with
+collection OTST_V2.0.103 (`min_collection`); the bind-mounted collection updates before
+the server image is promoted, so the header is sent before it is required.
 
 ---
 

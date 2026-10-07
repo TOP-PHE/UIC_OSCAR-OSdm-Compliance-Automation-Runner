@@ -186,10 +186,18 @@ async function refreshAccessTokenIfNeeded(opts) {
     return false;
   }
   const url = `${loopbackBase}/v1/runs/${runId}/refresh-access-token${force ? '?force=1' : ''}`;
+  // S8-loopback: the route requires this run's secret, handed to the child in
+  // OSCAR_RUN_SECRET. Without it the endpoint 403s and we fall back to the
+  // existing token (logged below), so an older runner that does not set it
+  // degrades, it does not break.
+  let runSecret = null;
+  try { runSecret = bru.getProcessEnv('OSCAR_RUN_SECRET'); } catch (_e) { runSecret = null; }
+  const headers = { 'Content-Type': 'application/json' };
+  if (runSecret) headers['X-OSCAR-Run-Secret'] = runSecret;
   try {
     const resp = await new Promise(function (resolve, reject) {
       bru.sendRequest(
-        { url: url, method: 'POST', proxy: false, headers: { 'Content-Type': 'application/json' } },
+        { url: url, method: 'POST', proxy: false, headers: headers },
         function (err, r) { if (err) reject(err); else resolve(r); }
       );
     });

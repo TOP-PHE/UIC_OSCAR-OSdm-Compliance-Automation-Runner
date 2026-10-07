@@ -49,6 +49,7 @@ const { viewForTester } = require('../../src/utils/datafileOwnership');
 
 const { run, get, colDecrypt } = require('../../src/db/db');
 const { executeRun, killRun } = require('../../src/worker/runner');
+const runSecrets = require('../../src/utils/runSecrets');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
 const COLLECTION_PATH = process.env.COLLECTION_PATH; // set by tests/setup.js
@@ -248,6 +249,33 @@ describe('executeRun — spawn happy paths', () => {
 
     expect(result.exitCode).toBe(1);
     expect(getRunRow(runId).status).toBe('FAILED');
+  });
+
+  // S8-loopback: the child is handed a per-run secret bound to the run's
+  // company, and the secret is revoked once the child exits.
+  test('hands the Bruno child a per-run secret and revokes it on close', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+
+    const childEnv = spawn.mock.calls[0][2].env;
+    const secret = childEnv.OSCAR_RUN_SECRET;
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(childEnv).not.toHaveProperty('ENCRYPTION_KEY');          // still never inherited
+    // Valid while the child runs, and scoped to this run's company.
+    expect(runSecrets.verify(runId, secret)).toBe(companyId);
+
+    fakeProc.emit('close', 0);
+    await runPromise;
+
+    // Gone once the child is gone.
+    expect(runSecrets.verify(runId, secret)).toBeNull();
   });
 
   test("resolves exitCode 1 and logs an error when the process itself errors (e.g. ENOENT)", async () => {
@@ -736,6 +764,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
   test('the report script gets none of the run\'s credentials either', async () => {
     const { report } = await runWithReportScript();
     for (const name of RUN_CREDENTIALS) expect(report[2].env).not.toHaveProperty(name);
+    expect(report[2].env).not.toHaveProperty('OSCAR_RUN_SECRET');        // S8-loopback: the secret is Bruno's alone
     expect(Object.values(report[2].env)).not.toContain('tok-secret-123');
     expect(JSON.stringify(report[1])).not.toContain('tok-secret-123');   // nor on its command line
   });
@@ -743,8 +772,10 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
   test('both children receive only allowlisted variables, so a new server secret is not passed on', async () => {
     const { bruno, report } = await runWithReportScript();
     const allowed = new Set(CHILD_ENV_ALLOWLIST);
+    // S8-loopback: Bruno also gets the per-run secret; the report script does not.
+    const brunoExtras = [...RUN_CREDENTIALS, 'OSCAR_RUN_SECRET'].sort();
     expect(Object.keys(report[2].env).filter(k => !allowed.has(k))).toEqual([]);
-    expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual([...RUN_CREDENTIALS].sort());
+    expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual(brunoExtras);
     expect(report[2].env.PATH).toBe(process.env.PATH);                   // it can still find what it needs
     expect(report[2].shell).toBe(false);
   });
@@ -758,7 +789,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       expect(report[1][0]).toBe(path.join(cwd, 'library-bruno', 'mergeReport.js'));
       const allowed = new Set(CHILD_ENV_ALLOWLIST);
       expect(Object.keys(report[2].env).filter(k => !allowed.has(k))).toEqual([]);
-      expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual([...RUN_CREDENTIALS].sort());
+      expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual([...RUN_CREDENTIALS, 'OSCAR_RUN_SECRET'].sort());
     });
 
     test('the environment file on disk, with the variables executeRun adds, holds values only', async () => {

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-07-run-fetches-its-own-data-with-a-secret",
+    "date": "October 7, 2026",
+    "tag": "Security",
+    "title": "A test run now proves which company it belongs to before OSCAR hands it a data file or a token",
+    "summary": "While a run is in progress, OSCAR's test engine fetches two things from the server: your company's data file, and a fresh access token for long tests. Those two internal addresses used to trust any request that came from the same machine. They now require a secret that is unique to the run and tied to its company, so one company's run can never be made to read another's data. Nothing changes in how you use OSCAR.",
+    "content": "When you start a test, the engine behind OSCAR runs on the same server and calls back to it for two things during the run: your company's data file, and — for tests that wait a long time — a fresh access token so the test does not fail when the first one expires.\n\nUntil now, those two internal addresses accepted any request that appeared to come from the server itself. That was a single, weak check. Another program on the same machine, or a particular kind of network front-end, could meet it and read any company's data file or a live access token. It also meant that if a Test Manager pointed the company's API address at one of these internal addresses, the run could copy another company's data file into its report.\n\nFrom this release, each run is given its own secret the moment it starts. OSCAR keeps the secret only while the run is in progress, ties it to the run's company, and the engine presents it on every internal call. The server checks it and confirms the run is asking for its own company's data — a run can no longer be steered to read anything belonging to another company. Pointing the company API address at an internal OSCAR address now simply fails, instead of returning data.\n\nWe found this during our own security review of the platform, not through an incident, and no data file or token is known to have been read this way.\n\n**Testers and Test Managers:** nothing to do. This is entirely internal; your scenarios, runs and reports are unchanged. Self-hosting operators should take the updated reverse-proxy configuration that now ships with OSCAR; the server administrator guide explains the one deployment note."
+  },
+  {
     "id": "2026-10-07-scenario-text-is-not-a-template",
     "date": "October 7, 2026",
     "tag": "Security",

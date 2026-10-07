@@ -64,6 +64,7 @@ process.env.PORT = '0';
 const app = require('../../src/server');
 const { run } = require('../../src/db/db');
 const { encryptToFile } = require('../../src/utils/at-rest');
+const runSecrets = require('../../src/utils/runSecrets');
 
 const DATAFILES_DIR = path.resolve(__dirname, '../../data/datafiles');
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
@@ -208,18 +209,75 @@ describe('GET /data/:filename', () => {
     }
   });
 
-  test('200 for a loopback (Bruno subprocess) call — no session needed', async () => {
+  // S8-loopback (v1.11.210): coming from 127.0.0.1 is no longer enough. A run's
+  // secret, bound to the run's company, is what the Bruno subprocess carries.
+  test('401 for a loopback call with no run secret and no session (the old bypass is gone)', async () => {
     const { slug } = seedCompanyUser();
     fs.mkdirSync(DATAFILES_DIR, { recursive: true });
     const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
-    encryptToFile(Buffer.from(JSON.stringify({ scenarios: ['loopback-ok'] })), filePath);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: ['secret-only'] })), filePath);
     try {
-      // No X-Forwarded-For and supertest's in-process socket is loopback by
-      // nature — isLoopbackBrunoCall() is true, bypassing session auth.
       const res = await request(app).get(`/data/${slug}-datafile.json`);
-      expect(res.status).toBe(200);
-      expect(res.body.scenarios).toContain('loopback-ok');
+      expect(res.status).toBe(401);
+      expect(res.text).not.toContain('secret-only');
     } finally {
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
+  test('200 for a run of the owning company carrying its secret', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: ['run-ok'] })), filePath);
+    try {
+      const res = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(200);
+      expect(res.body.scenarios).toContain('run-ok');
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
+  test("404 when a run's secret is used against another company's datafile (no cross-tenant read)", async () => {
+    const victim = seedCompanyUser();                 // the file we try to steal
+    const attacker = seedCompanyUser();               // the run we legitimately hold
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, attacker.companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${victim.slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: ['VICTIM_PRIVATE'] })), filePath);
+    try {
+      const res = await request(app).get(`/data/${victim.slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(404);
+      expect(res.text).not.toContain('VICTIM_PRIVATE');
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
+  test('401 when the run secret is wrong, with no session fallback', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    const runId = uuidv4();
+    runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(JSON.stringify({ scenarios: [] })), filePath);
+    try {
+      const res = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', 'deadbeef'.repeat(8));   // 64 hex, wrong value
+      expect(res.status).toBe(401);                          // falls through to the session branch
+    } finally {
+      runSecrets.revoke(runId);
       fs.rmSync(filePath, { force: true });
     }
   });
@@ -232,59 +290,94 @@ describe('POST /v1/runs/:runId/refresh-access-token', () => {
     expect(res.status).toBe(400);
   });
 
-  test('403 for a non-loopback caller even with a well-formed runId', async () => {
-    const res = await request(app).post(`/v1/runs/${uuidv4()}/refresh-access-token`).set('X-Forwarded-For', '1.2.3.4');
+  // S8-loopback (v1.11.210): the run's secret, not the source address.
+  test('403 for a caller with no run secret, even with a well-formed runId', async () => {
+    const res = await request(app).post(`/v1/runs/${uuidv4()}/refresh-access-token`);
     expect(res.status).toBe(403);
   });
 
-  test('404 when the run does not exist (loopback call)', async () => {
-    const res = await request(app).post(`/v1/runs/${uuidv4()}/refresh-access-token`);
-    expect(res.status).toBe(404);
-  });
-
-  test('200 + a fresh token on a real run, loopback call', async () => {
+  test('403 when the run secret is wrong', async () => {
     const { companyId, userId } = seedCompanyUser();
     const runId = uuidv4();
     run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    runSecrets.issue(runId, companyId);
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', 'deadbeef'.repeat(8));
+      expect(res.status).toBe(403);
+    } finally {
+      runSecrets.revoke(runId);
+    }
+  });
+
+  test('404 when the run does not exist, even with a secret issued for that id', async () => {
+    const { companyId } = seedCompanyUser();
+    const runId = uuidv4();                            // never inserted into runs
+    const secret = runSecrets.issue(runId, companyId);
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(404);
+    } finally {
+      runSecrets.revoke(runId);
+    }
+  });
+
+  test('200 + a fresh token on a real run carrying its secret', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = uuidv4();
+    run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    const secret = runSecrets.issue(runId, companyId);
     resolveAccessToken.mockResolvedValueOnce('fresh-token-xyz');
-
-    const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`);
-
-    expect(res.status).toBe(200);
-    expect(res.body.access_token).toBe('fresh-token-xyz');
-    expect(res.body.forced).toBe(false);
-    expect(resolveAccessToken).toHaveBeenCalledWith(
-      expect.objectContaining({ id: userId }),
-      expect.anything(),
-      expect.objectContaining({ forceRefresh: false })
-    );
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(200);
+      expect(res.body.access_token).toBe('fresh-token-xyz');
+      expect(res.body.forced).toBe(false);
+      expect(resolveAccessToken).toHaveBeenCalledWith(
+        expect.objectContaining({ id: userId }),
+        expect.anything(),
+        expect.objectContaining({ forceRefresh: false })
+      );
+    } finally {
+      runSecrets.revoke(runId);
+    }
   });
 
   test('?force=1 is threaded through as forceRefresh:true', async () => {
     const { companyId, userId } = seedCompanyUser();
     const runId = uuidv4();
     run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    const secret = runSecrets.issue(runId, companyId);
     resolveAccessToken.mockResolvedValueOnce('forced-token');
-
-    const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token?force=1`);
-
-    expect(res.status).toBe(200);
-    expect(res.body.forced).toBe(true);
-    expect(resolveAccessToken).toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), expect.objectContaining({ forceRefresh: true })
-    );
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token?force=1`)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(200);
+      expect(res.body.forced).toBe(true);
+      expect(resolveAccessToken).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), expect.objectContaining({ forceRefresh: true })
+      );
+    } finally {
+      runSecrets.revoke(runId);
+    }
   });
 
   test('502 when resolveAccessToken rejects', async () => {
     const { companyId, userId } = seedCompanyUser();
     const runId = uuidv4();
     run(`INSERT INTO runs (id, company_id, user_id, status) VALUES (?, ?, ?, 'RUNNING')`, [runId, companyId, userId]);
+    const secret = runSecrets.issue(runId, companyId);
     resolveAccessToken.mockRejectedValueOnce(new Error('vendor rejected credentials'));
-
-    const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`);
-
-    expect(res.status).toBe(502);
-    expect(res.body.detail).toMatch(/vendor rejected credentials/);
+    try {
+      const res = await request(app).post(`/v1/runs/${runId}/refresh-access-token`)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(502);
+      expect(res.body.detail).toMatch(/vendor rejected credentials/);
+    } finally {
+      runSecrets.revoke(runId);
+    }
   });
 });
 

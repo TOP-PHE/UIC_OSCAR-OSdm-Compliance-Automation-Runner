@@ -245,6 +245,19 @@ function resolveTripDateForWeekday(baseIso, departureDay) {
 }
 
 // Helper: GET JSON via Bruno's sendRequest
+// S8-loopback: OSCAR's /data and refresh-access-token routes require the run's
+// secret, handed to this child in OSCAR_RUN_SECRET (with the runId in __runId).
+// Returned here as request headers. Standalone Bruno has neither, so this is
+// empty and the local data-file server just ignores it.
+function oscarRunHeaders() {
+  try {
+    const secret = bru.getProcessEnv('OSCAR_RUN_SECRET');
+    const runId = bru.getEnvVar('__runId');
+    if (secret && runId) return { 'X-OSCAR-Run-Id': runId, 'X-OSCAR-Run-Secret': secret };
+  } catch (_e) { /* standalone Bruno — no OSCAR environment */ }
+  return {};
+}
+
 function getJson(url) {
   // Normalize double-slashes in path (e.g. http://host//path → http://host/path)
   const cleanUrl = url.replace(/([^:])\/\/+/g, '$1/');
@@ -252,7 +265,7 @@ function getJson(url) {
     validationLogger(`[INFO] 🔧 data_base URL had double-slash, normalized: "${cleanUrl}"`);
   }
   return new Promise((resolve, reject) => {
-    bru.sendRequest({ url: cleanUrl, method: "GET", proxy: false }, function (err, res) {
+    bru.sendRequest({ url: cleanUrl, method: "GET", proxy: false, headers: oscarRunHeaders() }, function (err, res) {
       if (err) return reject(new Error(`Network error fetching data file from "${cleanUrl}": ${_errMsg(err)}. Is the data-file server running and reachable? When testing locally in Bruno, serve the data_base folder over HTTP (e.g. run "python -m http.server 8000" in Bruno_Collection/data_base) and point the data_base env var at it.`));
       const status = res.status || res.statusCode || 200;
       if (status < 200 || status >= 300) {
