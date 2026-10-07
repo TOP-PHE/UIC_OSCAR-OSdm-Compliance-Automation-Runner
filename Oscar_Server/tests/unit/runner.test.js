@@ -47,7 +47,7 @@ jest.mock('../../src/utils/datafileOwnership', () => {
 });
 const { viewForTester } = require('../../src/utils/datafileOwnership');
 
-const { run, get, colDecrypt } = require('../../src/db/db');
+const { run, get, colDecrypt, colEncrypt } = require('../../src/db/db');
 const { executeRun, killRun } = require('../../src/worker/runner');
 const runSecrets = require('../../src/utils/runSecrets');
 
@@ -488,6 +488,34 @@ describe('executeRun — S5 api_base policy', () => {
 
     expect(out.exitCode).toBe(0);
     expect(getRunRow(runId).status).toBe('COMPLETED');
+  });
+});
+
+// ── S6: encrypted dedicated headers are decrypted into the run env ────────────
+describe('executeRun — S6 dedicated-header decryption', () => {
+  test('an encrypted extra_headers row is decrypted and written to the run env', async () => {
+    const enc = colEncrypt(JSON.stringify([{ name: 'X-Dedicated', value: 'dedicated-secret-xyz' }]));
+    const { companyId, userId } = seedCompanyUser({ extraHeaders: enc });
+    expect(enc.startsWith('enc:v1:')).toBe(true);     // genuinely stored encrypted
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+
+    // The env file is written before the spawn and deleted after the run ends,
+    // so read it now (between spawn and close).
+    const envFile = fs.readdirSync(ENVS_DIR).find(f => f.includes(runId.slice(0, 8)));
+    const envText = fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8');
+    expect(envText).toContain('__extraHeaders');
+    expect(envText).toContain('X-Dedicated');
+    expect(envText).toContain('dedicated-secret-xyz');   // decrypted, not the enc:v1 blob
+    expect(envText).not.toContain('enc:v1:');
+
+    fakeProc.emit('close', 0);
+    await p;
   });
 });
 

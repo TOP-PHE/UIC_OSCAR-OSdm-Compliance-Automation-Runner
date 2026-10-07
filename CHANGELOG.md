@@ -14,6 +14,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.213] — 2026-10-07
+
+Audit tracker S6 (server half of PR-05). Closes #563. Server-only; collection
+unchanged (OTST_V2.0.103). The report-redaction half (NEW-03) follows separately.
+
+### Security
+
+- **Dedicated headers (`companies.extra_headers`) are encrypted at rest and no
+  longer returned to clients.** The field — presented as the home for vendor
+  API keys — was stored plaintext, returned verbatim by `GET /v1/company`, and
+  visible to a platform administrator, unlike every other credential (AES-256-GCM
+  at rest, never serialized). Now the write path `colEncrypt`s the JSON blob
+  (`enc:v1:` envelope); a new migration (v27) encrypts existing rows at boot
+  (mirroring v19's per-row, prefix-skipping loop); `colDecrypt` reads both the
+  encrypted form and any legacy-plaintext row. The run engine and the server's
+  OSDM calls decrypt only at use.
+- **Values are withheld from everyone but the owning Test Manager.**
+  `safeCompany(company, canSeeHeaderValues)` returns header values only to the
+  Test Manager who set them (and needs them to edit); an administrator, a tester
+  and a certifier get the header **name** and a `has_value` boolean, never the
+  value — the platform cross-company view is masked the same way. The editor is
+  unchanged (the owning TM still receives the values).
+
+### Tests
+
+- company-routes: stored `enc:v1` not plaintext; the owning TM gets values; a
+  tester and a platform administrator get name + `has_value` only; a certifier is
+  403 with no leak path. db-migrations: a plaintext row is encrypted in place by
+  migration 27, no plaintext secret left. osdm-client: an encrypted row decrypts
+  at use and resolves `{{var}}` templates; a legacy plaintext row still resolves.
+  A mutation check breaks each guard; each fails a test.
+
+### Note
+
+- Server half of PR-05. **NEW-03** — the HTML report a certifier reads still
+  renders a tenant-named header value verbatim (redaction matches a fixed name
+  list) — is delivered next, redacting header values **by value** (masking any
+  header whose value is the run's resolved credential) so diagnostic headers
+  (OSDM version, correlation / trace IDs) stay visible.
+
+---
+
 ## [server-1.11.212] — 2026-10-07
 
 Audit tracker S7-cors (part of PR-09). Closes #561. Server-only; collection

@@ -25,7 +25,7 @@ const path        = require('node:path');
 const fs          = require('node:fs');
 const { spawn }   = require('node:child_process');
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { get, run: dbRun, decrypt, colEncrypt, getConfig } = require('../db/db');
+const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken } = require('./access-token');
@@ -766,7 +766,10 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // any {{var}} templates in the values against the env at send time.
   let extraHeaders = [];
   try {
-    const _eh = companyRow.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
+    // S6: extra_headers is encrypted at rest; colDecrypt reads both the
+    // encrypted form and any legacy-plaintext row.
+    const _stored = companyRow.extra_headers ? colDecrypt(companyRow.extra_headers) : null;
+    const _eh = _stored ? JSON.parse(_stored) : null;
     if (Array.isArray(_eh)) extraHeaders = _eh;
   } catch (_ehErr) {
     logEvent(runId, 'warn', `[runner] Ignoring malformed company extra_headers: ${_ehErr.message}`);

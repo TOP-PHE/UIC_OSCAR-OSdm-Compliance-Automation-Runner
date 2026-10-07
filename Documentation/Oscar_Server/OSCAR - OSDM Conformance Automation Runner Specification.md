@@ -536,6 +536,33 @@ resolves to an internal address, and a value stored before the policy existed.
 `ALLOW_PRIVATE_TARGETS=1` disables the policy for a self-hosted or development
 deployment whose providers sit on `localhost` or the LAN. It is read at call time.
 
+### 9.19 Dedicated Headers at Rest (companies.extra_headers)
+
+The company "Dedicated Headers" field (`companies.extra_headers`, a JSON array of
+`{ name, value }` injected on every OSDM request) is presented as the home for
+vendor API keys, yet it was stored plaintext and serialized verbatim by
+`GET /v1/company` — including to a platform administrator — unlike every other
+credential (encrypted at rest, never returned). Audit tracker S6.
+
+It is now encrypted at rest with the shared `enc:v1:` column envelope
+(`db.colEncrypt`): the write path in `PATCH /v1/company` encrypts the JSON blob,
+migration v27 encrypts existing rows at boot (mirroring v19), and `colDecrypt`
+reads both the encrypted form and any legacy-plaintext row, so a row left plain
+by an interrupted migration still works. The run engine (`worker/runner.js`) and
+the server's own OSDM calls (`utils/osdm-client.mergeDedicatedHeaders`) decrypt
+at use.
+
+On read, `safeCompany(company, canSeeHeaderValues)` returns the values only to the
+owning Test Manager — who set them and needs them to edit. An administrator, a
+tester, a certifier, and the platform cross-company view receive the header name
+and a `has_value` flag, never the value. Runs are unaffected (the engine reads
+from the database, not from this response).
+
+This is the storage/read half (S6). The report a certifier reads still renders a
+tenant-named header value verbatim because redaction matches a fixed name list;
+that is tracker NEW-03, redacted by value (any header whose value is the run's
+resolved credential) so diagnostic headers stay visible.
+
 ---
 
 ## 10. Execution Worker — Credential Handling and Error Detection
