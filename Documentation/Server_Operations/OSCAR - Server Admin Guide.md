@@ -1286,3 +1286,52 @@ What to check on your deployment:
 - If you maintain a fork of the collection that needs a server variable in
   `mergeReport.js`, it no longer receives it. Add the variable's name to
   `CHILD_ENV_ALLOWLIST` in `worker/runner.js`, never a secret.
+
+### 15.11 v1.11.209 — text in a datafile is never read as a template
+
+Found while fixing §15.10 (tracker item NEW-10). The test engine fills in a
+double-brace template, `{{name}}`, wherever a value is used. One template
+gives the access token of whoever started the run.
+
+Before every run, the collection hands the **whole** datafile to the test
+engine for a schema check, and that check prints the value of a field that is
+not on its list of allowed values. It then builds the requests from the
+scenario being run.
+
+So a tester could type that template into a field of one of their own
+scenarios, in the ordinary editor. From then on, the access token of anyone in
+the company who ran **any** scenario was written into the log of that run, or
+into one of its requests. Every member of the company can read a run's log and
+HTTP traffic, and a certifier can once the run is shared. The mechanism was
+confirmed with the real test engine; the complete path through a provider
+sandbox was not replayed.
+
+| | Before | Now |
+|---|---|---|
+| Saving text that contains `{{` in a scenario, a trip, a passenger list, a purchaser or fulfillment options | Stored | Refused: the message names the scenario and the field |
+| Uploading a datafile that adds such text | Stored | Refused, the stored file stays |
+| Starting a run while the datafile holds such text, anywhere | The template is filled in | The run is not started; the message says where |
+| A datafile the server cannot read | The run starts and fails later | The run is not started, with the reason |
+| Dedicated headers with `{{variable}}` | Filled in | Unchanged: that is their documented use, and only a Test Manager sets them |
+
+A save is refused only for text it adds. Text someone stored earlier never
+blocks a save of something else. It does block runs: **while one such text is
+stored anywhere in a company's datafile, no run of that company starts**. That
+is deliberate: the engine fills it in for every run.
+
+What to check on your deployment:
+
+- Nothing has to be configured.
+- **If every run of a company fails at once with "This run was not started: the
+  data file holds text that contains {{"**, such text is stored in that
+  company's datafile. A Test Manager's run names every place. A tester's run
+  names the places in their own scenarios, and otherwise says only that the
+  text is in a part they cannot see. An Administrator cannot read the datafile (§15.3): the company's
+  Test Manager opens the scenario in Test Config, removes the two curly braces
+  from the field, and saves. Runs start again at once.
+- If the text was not put there by accident, treat the access tokens of
+  everyone in that company who ran anything while it was stored as exposed, and
+  have them replaced at the provider.
+- "The data file could not be read" on a run means the stored file is damaged.
+  Before this release such a run was started anyway and failed later inside the
+  test engine.

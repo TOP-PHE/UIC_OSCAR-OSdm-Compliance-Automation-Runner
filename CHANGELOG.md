@@ -14,6 +14,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.209] — 2026-10-07
+
+Audit tracker NEW-10. Closes #555.
+
+### Security
+
+- **Text in a datafile is never read as a template by the test engine.** Bruno
+  fills in a double-brace template wherever a value is used, and
+  `{{process.env.OSCAR_ACCESS_TOKEN}}` and `{{access_token}}` both give
+  the access token of whoever started the run. The collection makes the whole
+  datafile such a value:
+
+  - Before every run it stores the whole datafile as one variable and reads
+    it back for the schema check. Bruno fills in every template in it, in
+    every scenario, and the schema check prints the value of a field that is
+    not in its enum.
+  - It then copies the scenario being run, and the entries it uses, into the
+    variables requests are built from.
+
+  A tester controls the text of their own scenarios through the ordinary
+  editor. So one template typed by a tester into one of their own scenarios
+  showed the token of anyone in the company who ran **any** scenario, in that
+  run's log or in its HTTP traffic. Every member of the company can read both,
+  and a certifier once the run is shared. Each step was checked: the two
+  expansions with Bruno CLI 4.2.1, the printed value by running the
+  collection's own schema check. 1.11.208 closed this for the scenario code
+  only.
+
+  Bruno has no literal form for `{{`, and no datafile needs it. It is refused,
+  by two rules in the new `utils/datafileTemplates.js`:
+
+  | | Before | Now |
+  |---|---|---|
+  | Saving text that contains `{{` | Stored | 400, with the scenario and the field |
+  | Uploading a datafile that adds such text | Stored | 400, the stored file stays |
+  | Starting a run while the datafile holds such text, anywhere | The template is filled in | Refused before a token is requested, with the place |
+  | Dedicated headers with `{{variable}}` | Filled in | Unchanged: their documented use, Test Manager only |
+
+- **A save may not add it.** A template counts as stored when the same text is
+  at the same place, or failing that anywhere; one more copy is new. Nothing
+  else about the file is compared, so text stored earlier, by anyone, does not
+  block a save of something else, whatever the save changes, reorders or
+  removes. Names of fields count as well as values.
+- **No run starts while the datafile holds it.** Any scenario, any entry of
+  any root list, any other root key. For a company that already has such text
+  stored, no run starts until a Test Manager removes it: the engine fills it
+  in for every run, and the message says where.
+- **Both rules are needed.** Bruno fetches the datafile itself after the runner
+  has read it, so the run-time rule alone could be raced by a save. The
+  save-time rule alone would leave text stored before it existed.
+- **What the person running is told.** A Test Manager, every place. A tester,
+  the places in what Test Config shows them, and for the rest only that the
+  text is also in a part of the datafile they cannot see: no code, no field,
+  no count. Neither message repeats the text.
+
+### Changed
+
+- **The runner fails closed on a datafile it cannot read.** Such a run is
+  refused with "The data file could not be read…". Before, it was started
+  anyway and failed later inside Bruno. A missing datafile is still reported
+  by the step that already did. Anything else that goes wrong while the file
+  is checked ends the same way: a run whose check throws would never be marked
+  as failed.
+
+### Fixed
+
+- **Test Config no longer answers 500 to testers when the datafile holds a
+  `null` among its scenarios.** A Test Manager's save or upload accepts such a
+  file. Working out what a tester sees (`viewForTester`) then threw, so
+  `GET /v1/company/datafile` failed for every tester of the company. Found by
+  running the old and the new rule side by side on random files; the new run
+  check goes through the same function and would have left such a run
+  unmarked.
+
+### Tests
+
+- 97 new: 56 on the rule, 22 on the runner, 17 on the two save routes, 2 on
+  the tester's view. 64 deliberate breakages of the fix each fail at least
+  one.
+- The rule as first written and the rule as it is now were run side by side
+  on 150,000 random pairs of datafiles: the same places, the same counts and
+  the same refusals every time.
+- Two rounds of independent review before the pull request. The first broke a
+  first version that looked only at the scenario being run:
+  - a 195 KB save stalled the server for 17 s, because every place was
+    compared with every other;
+  - 3,000 levels of nesting ended in a `RangeError`;
+  - ids missing on both sides matched in the collection and not in the rule;
+  - a save could point a clean scenario at an entry that already held a
+    template;
+  - the fields the editor fills in on its own made old text look new.
+
+  One of its notes led to reading `getScenarioData`, which showed that the
+  whole file is exposed and the shape of the rule was wrong. The second round
+  found no way through the reworked rule. Its two remaining points are fixed:
+  what a tester's message gave away about parts they cannot see, and the cost
+  of building a text for every place.
+- The looking stops at 1,000 templates; the message then ends "and many
+  more". A file of a million, about the largest body the server accepts, is
+  refused in a few milliseconds, where an earlier version took 2.4 s. A save
+  over a file that already stores several hundred thousand still takes about
+  a second; no save or upload can create such a file any more.
+- Runner tests seed a real datafile now, not "any file that exists": the
+  runner reads it before every run.
+
+### Left alone, not done
+
+- The dedicated headers, and the two root keys only a Test Manager can write
+  (`systemInfoParameters`, `knownDeviations`), which the engine still expands.
+- The complete path, from a typed template to a token in a run log, was not
+  replayed through the real collection on a provider sandbox.
+- A single curly brace is accepted.
+- A possible hardening of the collection, handing the datafile to its schema
+  check directly instead of reading it back through Bruno, is not part of this
+  release.
+
+---
+
 ## [server-1.11.208] — 2026-10-06
 
 Collection OTST_V2.0.102. Audit tracker PR-03 (NEW-01, NEW-02). Closes #553.

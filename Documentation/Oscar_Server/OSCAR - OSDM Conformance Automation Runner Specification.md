@@ -533,6 +533,51 @@ After the Bruno process exits, if either flag was set, the runner writes the sen
 
 OAuth2 authentication failures are handled earlier: if the OAuth2 token request (`POST` to the token URL) returns a non-200 status, the run is immediately marked `FAILED` and the HTTP error response is stored in `error_message`.
 
+### 10.3 Templates in Datafile Text
+
+Bruno fills in a double-brace template wherever a value is used: in a request body, a
+URL, a header, or when a script reads a variable back. `{{process.env.OSCAR_ACCESS_TOKEN}}`
+and `{{access_token}}` both give the access token of whoever started the run.
+
+The collection makes the whole datafile such a value, in two ways:
+
+- Before every run it stores the whole datafile as one variable and reads it back for
+  the schema check. Bruno fills in every template in it, in every scenario, and the
+  schema check prints the value of a field that is not on its list of allowed values.
+- It then copies the scenario being run, and the resource entries it uses, into the
+  variables requests are built from.
+
+So text a tester typed into one of their own scenarios, in the ordinary editor, showed
+the token of whoever ran **any** scenario of the company: in that run's log, or in its
+HTTP traffic. Every member of the company can read both, and a certifier can once the
+run is shared. Checked with Bruno CLI 4.2.1 (audit tracker NEW-10, fixed in v1.11.209).
+
+Bruno has no way to write `{{` literally and no datafile needs it, so it is refused, by
+two rules in `utils/datafileTemplates.js`:
+
+- **A save may not add it.** `PUT /v1/company/datafile/json` (a tester's merged save, a
+  Test Manager's whole-file save) and `POST /v1/company/datafile` (upload) answer 400
+  when the write adds `{{`, in a value or in the name of a field. The answer names the
+  place and never repeats the text. Only text that is not already stored counts: text
+  stored earlier, by anyone, does not block a save of something else, whatever else the
+  save changes or reorders. One more copy of a stored template is new.
+- **A run is not started while the datafile holds it.** Before a token is requested,
+  the runner reads the datafile and refuses the run if `{{` is anywhere in it: any
+  scenario, any entry of any list, any other root key. The run is marked `FAILED` with
+  the place. A Test Manager is told every place. A tester is told the places in what
+  Test Config shows them (`viewForTester`), and for anything else only that the text
+  is also in a part of the datafile they cannot see: no code, no field, no count. A
+  datafile that is present but cannot be read refuses the run as well: starting it
+  would mean starting it unchecked.
+
+Both are needed. Bruno reads the datafile itself, after the runner has looked at it, so
+the run-time rule alone could be raced by a save; the save-time rule alone would leave
+text stored before it existed.
+
+Left alone, on purpose: the two root keys only a Test Manager can write
+(`systemInfoParameters`, `knownDeviations`), and the dedicated headers, where a template
+is the documented way to reference a variable.
+
 ---
 
 ## 11. Bruno Collection — Resilient Scenario Execution

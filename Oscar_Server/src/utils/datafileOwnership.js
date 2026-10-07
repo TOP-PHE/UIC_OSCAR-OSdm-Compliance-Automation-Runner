@@ -190,7 +190,9 @@ function viewForTester(datafile, email, selection) {
   for (const [list, ref] of RESOURCE_LISTS) {
     if (!Array.isArray(datafile[list])) continue;
     const usedByVisible = new Set(visible.map(s => s[ref]));
-    const usedByHidden  = new Set(hidden.map(s => s[ref]));
+    // `hidden` also holds whatever is not a scenario object: a Test Manager's
+    // save can store a null there, and reading a field of it would throw.
+    const usedByHidden  = new Set(hidden.map(s => s?.[ref]));
     view[list] = datafile[list].filter(e => !(isObj(e) && usedByHidden.has(e.id) && !usedByVisible.has(e.id)));
   }
   const codes = visibleCodes(datafile, email);
