@@ -558,10 +558,28 @@ tester, a certifier, and the platform cross-company view receive the header name
 and a `has_value` flag, never the value. Runs are unaffected (the engine reads
 from the database, not from this response).
 
-This is the storage/read half (S6). The report a certifier reads still renders a
-tenant-named header value verbatim because redaction matches a fixed name list;
-that is tracker NEW-03, redacted by value (any header whose value is the run's
-resolved credential) so diagnostic headers stay visible.
+That was the storage/read half (S6). The report redaction half is §9.20.
+
+### 9.20 Report Header Redaction by Value (companies.extra_headers)
+
+Every redaction layer historically matched a fixed list of header **names**
+(`authorization`, `ocp-apim-subscription-key`, …), so a dedicated header a Test
+Manager named freely (`X-My-Auth: {{access_token}}`) rendered its value — the
+run's live token — verbatim in the stored `run_requests` traffic a certifier
+reads and in the HTML report. Audit tracker NEW-03.
+
+Redaction is now also by **value**: a header whose value contains one of the
+run's own resolved secrets (access token, APIM subscription key, OAuth extra) is
+masked wherever it sits and whatever its name, and only the secret substring is
+masked. Headers that carry no secret — an OSDM version, a correlation /
+session-trace id, `Accept` — stay fully visible, which is deliberate: they are
+the diagnostic value a certifier needs. The server path
+(`reports/structureResults.js`) reads the run's secrets from the user row and
+redacts at write time, before `run_requests` is stored and served; the
+collection path (`library-bruno/reportGenerator.js`) does the same in the Bruno
+sandbox from the run env, for the standalone HTML artifact. `mergeReport.js` (the
+fallback report) stays name-based: it runs as a credential-free child (§9.16 /
+tracker NEW-01), so it has no secret to value-match.
 
 ---
 

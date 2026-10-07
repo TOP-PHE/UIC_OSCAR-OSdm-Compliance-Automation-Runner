@@ -32,7 +32,52 @@ jest.mock('../../src/db/db', () => ({
 const {
   classifyVendorCapability,
   serializeBounded,
+  redactHeaders,
 } = require('../../src/reports/structureResults');
+
+// ── redactHeaders (tracker NEW-03) ────────────────────────────────────────────
+// Headers are redacted two ways: a known-credential name is masked by name
+// (unchanged behaviour), and ANY header whose value contains one of the run's
+// own secrets is masked by value — so a tenant-named header carrying the token
+// is covered, while a header that carries no secret (version, trace id, Accept)
+// stays fully visible for debugging.
+describe('redactHeaders', () => {
+  const TOKEN = 'super-secret-token-value-1234567890';
+
+  test('masks a known-credential header by name (no secrets needed)', () => {
+    const out = redactHeaders({ Authorization: `Bearer ${TOKEN}` });
+    expect(out.Authorization).not.toContain(TOKEN);
+    expect(out.Authorization).toContain('…[masked');
+  });
+
+  test('masks a tenant-named header whose value is the run secret', () => {
+    const out = redactHeaders({ 'X-My-Auth': TOKEN }, [TOKEN]);
+    expect(out['X-My-Auth']).not.toContain(TOKEN);
+    expect(out['X-My-Auth']).toContain('…[masked');
+  });
+
+  test('leaves diagnostic headers (version, trace id, Accept) fully visible', () => {
+    const headers = { 'OSDM-Version': '3.9.0', 'X-Correlation-Id': 'req-abc-123', Accept: 'application/json' };
+    expect(redactHeaders(headers, [TOKEN])).toEqual(headers);
+  });
+
+  test('masks only the secret substring, keeping the rest of a mixed value', () => {
+    const out = redactHeaders({ 'X-Mixed': `trace=req-1; tok=${TOKEN}` }, [TOKEN]);
+    expect(out['X-Mixed']).toContain('trace=req-1');       // diagnostic part kept
+    expect(out['X-Mixed']).not.toContain(TOKEN);           // secret masked in place
+  });
+
+  test('with no secrets, only name-based masking applies', () => {
+    const out = redactHeaders({ 'X-My-Auth': TOKEN, Accept: 'application/json' }, []);
+    expect(out['X-My-Auth']).toBe(TOKEN);                  // not a known name, no secret list → untouched
+    expect(out.Accept).toBe('application/json');
+  });
+
+  test('a non-object is returned unchanged', () => {
+    expect(redactHeaders(null, [TOKEN])).toBeNull();
+    expect(redactHeaders('x', [TOKEN])).toBe('x');
+  });
+});
 
 // ── classifyVendorCapability ──────────────────────────────────────────────────
 

@@ -1455,5 +1455,23 @@ What to check on your deployment:
 - A Test Manager still sees and edits their company's dedicated headers as
   before. If an administrator reports they can no longer see the values, that is
   intended.
-- The report-side counterpart — a tenant-named header value appearing in the HTML
-  report a certifier reads — is addressed separately (tracker NEW-03).
+- The report-side counterpart is §15.16 (tracker NEW-03).
+
+### 15.16 v1.11.214 — report headers are redacted by value, not just by name
+
+Audit tracker item NEW-03. The reports a certifier reads (the stored request
+traffic and the HTML report) used to hide credentials by matching a fixed list of
+header **names**. A dedicated header a Test Manager named themselves — say
+`X-My-Auth` carrying `{{access_token}}` — was not on that list, so its value (the
+run's live token) showed in clear.
+
+From this release the reports also hide a header **by its value**: any header
+whose value is one of the run's own secrets (the access token, the subscription
+key, the OAuth extra) is masked, whatever the header is called. Headers that do
+not carry a secret stay visible on purpose — an OSDM version header, a
+correlation or session-trace id (useful when chasing a problem with the vendor),
+`Accept`, and so on — so you lose no diagnostic information.
+
+Nothing to configure. This applies to new runs; traffic already stored from older
+runs keeps whatever masking it had. The companion storage change (dedicated
+headers encrypted at rest, §15.15) shipped in the previous release.

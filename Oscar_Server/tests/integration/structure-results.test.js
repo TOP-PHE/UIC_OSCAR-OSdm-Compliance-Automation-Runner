@@ -27,7 +27,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { run, get, all } = require('../../src/db/db');
+const { run, get, all, encrypt, colDecrypt } = require('../../src/db/db');
 const { encryptToFile } = require('../../src/utils/at-rest');
 const {
   extractStructuredResults,
@@ -243,5 +243,63 @@ describe('extractStructuredResults', () => {
 
   test('valid UUID with no artifact file → zero counts', () => {
     expect(extractStructuredResults(uuidv4(), companyId)).toEqual({ suites: 0, requests: 0, assertions: 0 });
+  });
+});
+
+// ── NEW-03: value-based redaction of the run's own secrets, end-to-end ─────────
+describe('extractStructuredResults — dedicated-header credential redaction (NEW-03)', () => {
+  const companyId = uuidv4();
+  const userId    = uuidv4();
+  const runId     = uuidv4();
+  const artifactDir = path.join(ARTIFACTS_DIR, runId);
+  const TOKEN = 'resolved-access-token-abcdef0123456789';
+
+  beforeAll(() => {
+    run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'NEW03 Test', 'new03-test')`, [companyId]);
+    // The run's resolved access token lives (encrypted) on the user row; the
+    // extractor reads it to redact by value.
+    run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, cached_token_enc)
+         VALUES (?, ?, 'user@new03-test.com', 'x', 'company_user', ?)`, [userId, companyId, encrypt(TOKEN)]);
+    run(`INSERT INTO runs (id, company_id, user_id, status, scenario_code, queued_at, completed_at)
+         VALUES (?, ?, ?, 'COMPLETED', 'SALE_NEW03', datetime('now'), datetime('now'))`, [runId, companyId, userId]);
+
+    const results = [{
+      path: 'SALE_NEW03/01-Common/00. GET Offers.bru',
+      name: 'GET Offers',
+      request: {
+        method: 'GET', url: 'https://vendor.example/offers',
+        headers: {
+          'X-My-Auth': TOKEN,                 // tenant-named header carrying the token — the NEW-03 gap
+          'OSDM-Version': '3.9.0',            // behavioural header — must stay visible
+          'X-Correlation-Id': 'trace-xyz-1',  // session/trace id — must stay visible
+        },
+      },
+      response: { status: 200, data: { offers: [] }, headers: { 'Content-Type': 'application/json' } },
+      runDuration: 0.01,
+      testResults: [{ description: 'status is 200', status: 'pass' }],
+    }];
+    fs.mkdirSync(artifactDir, { recursive: true });
+    encryptToFile(JSON.stringify(results), path.join(artifactDir, '.bru_results.json'));
+  });
+
+  afterAll(() => {
+    const safe = (sql, p) => { try { run(sql, p); } catch (_) { /* ignore */ } };
+    safe('DELETE FROM run_assertions WHERE company_id = ?', [companyId]);
+    safe('DELETE FROM run_requests   WHERE company_id = ?', [companyId]);
+    safe('DELETE FROM run_suites     WHERE company_id = ?', [companyId]);
+    safe('DELETE FROM runs           WHERE company_id = ?', [companyId]);
+    safe('DELETE FROM users          WHERE company_id = ?', [companyId]);
+    safe('DELETE FROM companies      WHERE id = ?', [companyId]);
+    try { fs.rmSync(artifactDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+  });
+
+  test('a tenant-named header carrying the token is stored masked; diagnostic headers stay', () => {
+    extractStructuredResults(runId, companyId);
+    const row = get(`SELECT request_headers FROM run_requests WHERE run_id = ? AND request_name = 'GET Offers'`, [runId]);
+    const headers = colDecrypt(row.request_headers);
+    expect(headers).not.toContain(TOKEN);          // the secret is gone, even under a tenant name
+    expect(headers).toContain('…[masked');
+    expect(headers).toContain('3.9.0');            // OSDM-Version kept
+    expect(headers).toContain('trace-xyz-1');      // correlation id kept
   });
 });

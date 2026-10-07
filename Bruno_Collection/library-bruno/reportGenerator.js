@@ -64,11 +64,44 @@ function _maskCredentialValue(v) {
   return _REDACTED_MARKER;
 }
 
+// NEW-03: the name list above cannot cover a dedicated header a Test Manager
+// named themselves (X-My-Auth: <token>). Redact by VALUE as well — mask any
+// header whose value contains one of this run's own secrets, wherever it is and
+// whatever its name. Only the secret substring is masked, so a header carrying a
+// trace id plus a token keeps the trace id, and a header with no secret (OSDM
+// version, correlation / session id, Accept) is left untouched for debugging.
+function _runSecrets() {
+  const out = [];
+  const push = (v) => { if (v && String(v).length >= 8) out.push(String(v)); };
+  try {
+    for (const n of ['access_token', 'Ocp-Apim-Subscription-Key', 'oauth_extra', 'auth_key_secret']) {
+      push(typeof bru !== 'undefined' && bru.getEnvVar && bru.getEnvVar(n));
+    }
+    for (const n of ['OSCAR_ACCESS_TOKEN', 'OSCAR_SUBSCRIPTION_KEY', 'OSCAR_OAUTH_EXTRA']) {
+      push(typeof bru !== 'undefined' && bru.getProcessEnv && bru.getProcessEnv(n));
+    }
+  } catch (_e) { /* no env context — fall back to name-only redaction */ }
+  return Array.from(new Set(out));
+}
+
+function _maskSecretsInValue(v, secrets) {
+  if (v == null || !secrets.length) return v;
+  let s = String(v);
+  for (const secret of secrets) {
+    // split/join, never a dynamic RegExp built from the secret (ReDoS / CodeQL).
+    if (secret && s.includes(secret)) s = s.split(secret).join(_maskCredentialValue(secret));
+  }
+  return s;
+}
+
 function _redactHeaders(h) {
   if (!h || typeof h !== 'object') return h;
+  const secrets = _runSecrets();
   const out = {};
   for (const [k, v] of Object.entries(h)) {
-    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase()) ? _maskCredentialValue(v) : v;
+    out[k] = _SENSITIVE_HEADERS.has(String(k).toLowerCase())
+      ? _maskCredentialValue(v)
+      : _maskSecretsInValue(v, secrets);
   }
   return out;
 }
