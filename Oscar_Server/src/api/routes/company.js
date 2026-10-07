@@ -30,6 +30,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
+const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const log = require('../../utils/logger').child({ module: 'company' });
@@ -336,6 +337,20 @@ router.patch('/', (req, res) => {
   return res.json(safeCompany(updated));
 });
 
+// ── The datafile as stored now, for the template rule (NEW-10) ───────────────
+// What a write is compared with: only text the write adds or changes is looked
+// at (utils/datafileTemplates.js). A file that is missing or cannot be read
+// counts as empty, so the write is then looked at whole. Call under the lock.
+async function storedDatafileOrEmpty(companyId) {
+  const current = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
+  if (!current?.datafile_path || !fs.existsSync(current.datafile_path)) return {};
+  try {
+    return JSON.parse((await decryptFromFileAsync(current.datafile_path)).toString('utf8'));
+  } catch {
+    return {};
+  }
+}
+
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
 // Order matters: authorizeDatafileWrite runs before upload.single, so nothing
 // is parsed, buffered or written for a caller who may not write (S2).
@@ -351,8 +366,9 @@ router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadP
   // the contents (sha256 of the file they uploaded — the encryption is
   // transparent to them). The file on disk is the OSCAR1 envelope.
   const plaintext = req.file.buffer;
+  let uploaded;
   try {
-    JSON.parse(plaintext.toString('utf8'));
+    uploaded = JSON.parse(plaintext.toString('utf8'));
   } catch (_e) {
     // Nothing was written, so there is nothing to clean up — the previous
     // datafile is still the live one.
@@ -365,8 +381,12 @@ router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadP
   // Atomic temp+rename inside the helper: a crash mid-write leaves the
   // previous datafile intact, which matters because Bruno reads it during runs.
   // Under the per-company lock so it cannot interleave with a tester's merge.
+  let refusal = null;
   try {
     await withDatafileLock(company.id, async () => {
+      // NEW-10: the upload may not add a double-brace template to scenario text.
+      refusal = saveRefusal(templatesAddedBy(await storedDatafileOrEmpty(company.id), uploaded));
+      if (refusal) return;
       await encryptToFileAsync(plaintext, livePath);
       run(
         `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
@@ -376,6 +396,9 @@ router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadP
   } catch (err) {
     log.error({ err, companyId: company.id }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
+  }
+  if (refusal) {
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: refusal });
   }
 
   auditLog(req.user.id, company.id, req.user.email, 'datafile_uploaded');
@@ -425,6 +448,7 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
     // Manager still saves the whole file.
     let toStore = body;
     let merge = null;
+    let stored = null;                   // read once: the merge and the template rule both need it
     if (isTester) {
       // The personal run list is keyed on the users row. A tester deleted while
       // their session is still open would otherwise have their save written
@@ -432,7 +456,7 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
       if (!get('SELECT 1 AS ok FROM users WHERE id = ?', [req.user.id])) {
         return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This account no longer exists. Sign in again.' });
       }
-      let stored = {};
+      stored = {};
       const current = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);
       if (current?.datafile_path && fs.existsSync(current.datafile_path)) {
         try {
@@ -445,6 +469,18 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
       }
       merge = mergeTesterSave(stored, body, req.user.email);
       toStore = merge.datafile;
+    }
+
+    // NEW-10: a save may not add a double-brace template to scenario text. The
+    // test engine fills such a template in, and the one naming the run's token
+    // gives the token of whoever runs the scenario. Only what this save adds or
+    // changes is looked at, so text stored earlier, by anyone, does not block a
+    // save of something else; a run of it is refused instead (worker/runner.js).
+    // For a tester this is looked at after the merge: it is what would be stored.
+    if (stored === null) stored = await storedDatafileOrEmpty(targetCompanyId);
+    const templateRefusal = saveRefusal(templatesAddedBy(stored, toStore));
+    if (templateRefusal) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: templateRefusal });
     }
 
     // Known-deviation projection (#398 / Test Findings register): knownDeviations[]

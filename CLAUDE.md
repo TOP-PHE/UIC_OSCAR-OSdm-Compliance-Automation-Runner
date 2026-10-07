@@ -277,14 +277,73 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     cannot be bound to the runs table, and one tester's scenario used to turn
     the Test Manager's "ALL" into a 500. **A run whose `executeRun` throws is
     never marked FAILED** (the queue only logs it), so refuse, do not throw.
-    **This covers the scenario code only.** How Bruno treats templates in the
-    rest of a scenario's text is a separate subject, not part of this change.
-    It is recorded outside the repository; ask the maintainer.
+    The rest of a scenario's text is the next bullet (NEW-10).
   - A base URL or requestor holding a `"` no longer fails the run with
     `TOKEN_FORMAT_ERROR`. The detection stays as a safety net.
   - The collection counts the datafile's codes instead of listing them when a
     `scenario_override` is missing: the run log belongs to whoever started the
     run, and the file holds everyone's scenarios.
+- **Datafile text is never a template** (tracker NEW-10, v1.11.209). Bruno
+  fills in `{{...}}` wherever a value is used, and `{{access_token}}` is
+  the token of whoever runs. **The collection hands the whole datafile to
+  Bruno before every run**: `getScenarioData` stores it as the variable
+  `data_base_tmp` and reads it back with `bru.getEnvVar`, which stringifies an
+  object, fills in every template and parses it again, and the schema check
+  then prints the value of any field that is not in its enum. So a template a
+  tester typed into one of their own scenarios showed the token of whoever ran
+  *any* scenario, in the run log, readable by the whole company. Both steps
+  were checked with the real CLI. Bruno has no literal form for `{{`.
+  `utils/datafileTemplates.js`, pure, holds two rules:
+  - **A save may not add it** (`templatesAddedBy`): the tester's merged save,
+    the Test Manager's whole-file save and the upload answer 400 naming the
+    place. A template counts as stored when the same text is at the same
+    place, or failing that anywhere; one more copy is new. Nothing else about
+    the file is compared, so the editor's backfilled fields, `__` keys and
+    reordering never make old text look new.
+  - **No run starts while the datafile holds it** (`templatesInDatafile`,
+    called from `refusedDatafileText()` in the runner, before the token is
+    resolved): every scenario, every entry of every root list, every other
+    root key, except `systemInfoParameters` and `knownDeviations`.
+  - **Whole file, not "the scenario being run".** The first version looked at
+    the running scenario and the entries it points to. An independent review
+    showed three holes in that (ids that are missing on both sides match in
+    the collection, a save could re-point a clean scenario at an old entry,
+    root `osdmVersion`), and reading `getScenarioData` showed it was the wrong
+    shape altogether. Do not narrow it again.
+  - **Nothing in that module recurses or compares every place with every
+    other.** The same review stalled the first version for 17 s with a 195 KB
+    save (a quadratic de-duplication) and crashed it with 3,000 levels of
+    nesting (a recursive comparison). Sizes and depths are the client's choice.
+  - **The runner fails closed:** a datafile that is there but cannot be read
+    refuses the run. A missing one is left to the step that already reports it.
+    Runner tests therefore seed a real datafile, not "any file that exists".
+    The check sits inside the same `try`, so anything that goes wrong in it is
+    a refusal too: a thrown `executeRun` leaves the run unmarked.
+  - **`viewForTester` threw on a `null` scenario**, which a Test Manager's save
+    can store: `GET /datafile` answered 500 to every tester, and the new check
+    would have thrown with it. Found by running the first committed rule and
+    the final one side by side on 150,000 random files (same places, counts
+    and refusals), which is also how the rework was shown to change nothing.
+    A fixture with odd scenarios needs a resource list as well, or the line
+    that throws is never reached.
+  - **What the person running is told** (`templatesForRunner`): a Test
+    Manager, every place. A tester, the places in their `viewForTester` view,
+    and for the rest one sentence, "in a part of the data file that you cannot
+    see": no code, no field, no entry position, no count. A first attempt that
+    only masked scenario codes still gave all of those away.
+  - **The walk is a generator that reads one child at a time, and the looking
+    stops at 1,000** (`STOP_AFTER`; the message then ends "and many more").
+    A million templates in a 5 MB body are refused in a few milliseconds. An
+    earlier version pushed every child of a list before reading the first and
+    took 2.4 s for the same file; one before that built a text for every place
+    and used 480 MB. A caller that stops early must not have paid for the
+    whole value: keep `lookAtNext()` lazy. What still costs about a second is
+    a save over a file that already *stores* several hundred thousand, which
+    no save or upload can create any more.
+  - **Left alone on purpose:** dedicated headers (templates are their
+    documented use) and the two root keys only a Test Manager writes.
+  - Two test files cover the routes because `datafileMutationLimiter` allows
+    twenty writes per app instance: a test file that makes more gets 429.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network

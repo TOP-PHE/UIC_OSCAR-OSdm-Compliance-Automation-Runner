@@ -30,6 +30,7 @@ const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-r
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
+const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -552,6 +553,28 @@ function refusedScenarioCode(code) {
   return null;
 }
 
+// The same question for the text of the datafile (tracker NEW-10). The rule and
+// its reasons are in utils/datafileTemplates.js; in short, the collection hands
+// the WHOLE datafile to Bruno before every run, so a template anywhere in it is
+// filled in with the variables of whoever runs anything. Returns the reason,
+// or null when the run may go on. `runner` says whose run it is: a Test Manager
+// is told every place, a tester only the places they can see in Test Config.
+//
+// A datafile that is missing is left to the step that already reports it. One
+// that is there but cannot be read refuses the run: starting it would mean
+// starting it unchecked.
+async function refusedDatafileText(datafilePath, runner) {
+  if (!datafilePath || !(await fsExists(datafilePath))) return null;
+  // The check is inside the `try` on purpose: a run whose executeRun throws is
+  // never marked FAILED, so whatever goes wrong here has to end as a refusal.
+  try {
+    const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    return runRefusal(templatesForRunner(datafile, runner));
+  } catch {
+    return 'The data file could not be read, so it could not be checked and the run was not started. Try again; if it happens again, ask your Test Manager to check the data file.';
+  }
+}
+
 function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {
   // #306: this file deliberately carries NO credentials. The access token,
   // Ocp-Apim-Subscription-Key and oauth_extra travel via the Bruno child
@@ -679,10 +702,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
 
-  // 2b. Some scenario codes are not run (tracker NEW-02, second half). The
-  //     run stops here: before a token is asked for, before the environment
-  //     file is written, before anything is started.
-  const refusal = refusedScenarioCode(scenarioOverride);
+  // 2b. Some runs are not started: because of the scenario's code (tracker
+  //     NEW-02, second half) or of text in the datafile (NEW-10). The run
+  //     stops here: before a token is asked for, before the environment file
+  //     is written, before anything is started.
+  const refusal = refusedScenarioCode(scenarioOverride)
+    || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email });
   if (refusal) {
     dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
     logEvent(runId, 'error', `[runner] ${refusal}`);
