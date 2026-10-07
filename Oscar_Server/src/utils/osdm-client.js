@@ -17,6 +17,7 @@
  */
 
 const { decrypt } = require('../db/db');
+const { usableUrlRefusal } = require('./urlPolicy');
 const log = require('./logger').child({ module: 'osdm-client' });
 
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -37,6 +38,10 @@ async function osdmGet(apiBase, path, token, extraHeaders = {}, timeoutMs = DEFA
   const base = stripTrailingSlashes(String(apiBase));
   const rel  = String(path).replace(/^\/+/, '');
   const url  = `${base}/${rel}`;
+  // S5: these server-side OSDM calls (places refresh, discover timetable) go to
+  // the company api_base. Refuse a non-public target before the fetch, with DNS.
+  const urlRefusal = await usableUrlRefusal(url, 'OSDM endpoint');
+  if (urlRefusal) throw new Error(urlRefusal);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

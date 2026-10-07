@@ -509,6 +509,33 @@ The server now requires the header, so this release pairs server 1.11.210 with
 collection OTST_V2.0.103 (`min_collection`); the bind-mounted collection updates before
 the server image is promoted, so the header is sent before it is required.
 
+### 9.18 Outbound Target Policy (api_base / token_url)
+
+Two fields a company's members control become outbound requests: `companies.api_base`,
+to which every OSDM request of every run is sent, and a tester's `users.token_url`, from
+which the OAuth token is fetched. Unvalidated, each is a server-side request-forgery
+(SSRF) primitive: a `token_url` of `http://127.0.0.1:3001/…` or an `api_base` of
+`http://grafana:3000` reaches loopback, the private network (RFC 1918), link-local
+(including the cloud metadata address `169.254.169.254`) and the Docker service mesh,
+and the response returns in the run log or the token error — audit tracker S5. §9.17
+removed the loopback *trust* on OSCAR's own routes; this stops the request being aimed
+at an internal address in the first place.
+
+`utils/urlPolicy.js` is the rule, with IP ranges classified by `ipaddr.js` rather than
+by hand. A target must use `https` and resolve to a public (`unicast`) address;
+loopback, private, link-local, unique-local, carrier-grade NAT, the
+unspecified/broadcast/multicast/reserved ranges, and any bare single-label host name (a
+Docker service name, `localhost`) are refused. It is applied twice: a synchronous
+structural check at save time (`PATCH /v1/company`, `PATCH /v1/me/credentials` → 400,
+nothing stored, no DNS in the request path), and a structural-plus-DNS check at use time
+— before the token fetch (`access-token.js`), before the server's own OSDM calls
+(`osdm-client.js`), and before a run starts (`worker/runner.js` refuses it, ahead of
+token resolution and any spawn). The use-time DNS lookup catches a host name that
+resolves to an internal address, and a value stored before the policy existed.
+
+`ALLOW_PRIVATE_TARGETS=1` disables the policy for a self-hosted or development
+deployment whose providers sit on `localhost` or the LAN. It is read at call time.
+
 ---
 
 ## 10. Execution Worker — Credential Handling and Error Detection

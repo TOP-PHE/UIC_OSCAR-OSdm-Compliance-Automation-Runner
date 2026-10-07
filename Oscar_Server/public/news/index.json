@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-07-endpoints-must-be-public-addresses",
+    "date": "October 7, 2026",
+    "tag": "Security",
+    "title": "A test endpoint and a token URL must now be a public https address",
+    "summary": "OSCAR sends your tests to the API endpoint you configure, and fetches OAuth tokens from the token URL you configure. Those two addresses must now be public https addresses. OSCAR will no longer send a request to your own machine, a private network or an internal service, which closes a request-forgery weakness. If you self-host with providers on your own network, one setting restores the old behaviour.",
+    "content": "OSCAR makes two kinds of outbound request on your behalf: every test request goes to your company's API endpoint, and, for OAuth providers, a token is fetched from the token URL in your profile. You set both of these.\n\nUntil now neither was checked. A value pointing at the server itself, at a private network address or at an internal service name — for example 127.0.0.1, a 10.x or 192.168.x address, or a bare service name — would be contacted all the same, and whatever came back appeared in the run log or the token error. That is a request-forgery weakness: it could be used to reach things that are not meant to be reachable from outside.\n\nFrom this release, both addresses must use https and point at a public host. OSCAR refuses to save one that does not, with a message explaining why, and it also re-checks at the moment it would make the request (including resolving the name), so an address saved earlier, or a name that quietly points inward, is caught too. A run whose API endpoint is not public is stopped before anything is sent, with a message that says what to fix.\n\nWe found this during our own security review, not through an incident.\n\n**Testers and Test Managers on the hosted service (oscar.uic.org):** nothing to do, unless you had configured a non-public address — in which case set a real https endpoint in API Config. **Self-hosting operators** whose providers legitimately sit on localhost or a private network: set ALLOW_PRIVATE_TARGETS=1 in the server configuration to keep using them. The server administrator guide has the details."
+  },
+  {
     "id": "2026-10-07-run-fetches-its-own-data-with-a-secret",
     "date": "October 7, 2026",
     "tag": "Security",

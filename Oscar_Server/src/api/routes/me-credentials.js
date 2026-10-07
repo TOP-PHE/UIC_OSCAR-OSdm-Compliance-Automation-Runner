@@ -23,6 +23,7 @@ const { get, run, encrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
 const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
 const { auditLog } = require('../helpers/shared');
+const { storedUrlRefusal } = require('../../utils/urlPolicy');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -78,6 +79,15 @@ router.patch('/', (req, res) => {
         status: 400, title: 'Bad Request',
         detail: `oauth_custom_template must be valid JSON: ${err.message}`
       });
+    }
+  }
+  // S5: the token URL is fetched server-side, so it must be a public https
+  // address — not loopback, the private network or a Docker service name.
+  // Structural only here; access-token.js re-checks, with DNS, before it fetches.
+  if (token_url) {
+    const urlRefusal = storedUrlRefusal(String(token_url).trim(), 'token URL');
+    if (urlRefusal) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: urlRefusal });
     }
   }
 

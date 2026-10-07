@@ -1379,5 +1379,38 @@ What to check on your deployment:
   is promoted, so the collection sends the header before the server requires
   it. If you pin versions by hand, move both together.
 - The companion item — validating `api_base`/`token_url` so a run cannot be
-  aimed at loopback or private-range addresses at all (tracker S5) — is a
-  separate, later change.
+  aimed at loopback or private-range addresses at all (tracker S5) — shipped in
+  1.11.211; see §15.13.
+
+### 15.13 v1.11.211 — api_base and token_url must be public https targets
+
+Audit tracker item S5. Two fields the company's members set become outbound
+requests the server makes: the company `api_base` (every OSDM request of every
+run) and a tester's `token_url` (the OAuth token fetch). Neither was checked, so
+either could point at the server's own host, the private network or a container
+on the Docker network — `http://127.0.0.1:3001/…`, `http://grafana:3000`,
+`https://169.254.169.254/…` (the cloud metadata address). The run or the token
+fetch then reached that internal address and the reply came back in the run log
+or the token error. §15.12 removed the loopback trust on OSCAR's own routes;
+this stops the request being aimed inward at all.
+
+From this release a target must be `https` and resolve to a public address.
+Blocked: loopback, private, link-local, unique-local, carrier-grade NAT, the
+unspecified / broadcast / multicast / reserved ranges, and any bare single-label
+host name (a Docker service name, `localhost`). The check runs when the value is
+saved (a 400, nothing stored) and again when it is used (the token fetch, the
+server's own OSDM calls, and the start of a run, which is refused before a token
+is fetched) — the second time with a DNS lookup, so a host name that resolves to
+an internal address is caught too.
+
+What to check on your deployment:
+
+- **If your providers are genuinely on `localhost` or your LAN** (a self-hosted
+  or development box), set `ALLOW_PRIVATE_TARGETS=1` in the server's `.env`. That
+  turns the policy off. It is read per request, so no restart is needed. A public
+  VPS deployment must **not** set it.
+- A Test Manager saving a non-public endpoint now gets a 400 that says it must be
+  a public https host. A tester saving a non-public `token_url` gets the same.
+- If a company's runs start failing with "This run was not started … public
+  host", its `api_base` is non-public: either fix it in API Config, or (for a
+  deliberately private deployment) set `ALLOW_PRIVATE_TARGETS=1`.

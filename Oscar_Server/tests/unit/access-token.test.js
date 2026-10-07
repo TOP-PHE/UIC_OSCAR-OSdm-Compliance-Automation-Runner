@@ -47,6 +47,27 @@ describe('resolveAccessToken — bearer mode', () => {
   });
 });
 
+// S5 (v1.11.211): the token URL is re-checked at use time, before the fetch.
+// The suite allows private targets (tests/setup.js); off here. A structurally
+// internal URL needs no DNS, so dns is not mocked in this file.
+describe('resolveAccessToken — S5 URL policy at use time', () => {
+  const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
+  beforeEach(() => { process.env.ALLOW_PRIVATE_TARGETS = ''; });
+  afterEach(() => { process.env.ALLOW_PRIVATE_TARGETS = PRIOR; });
+
+  test.each([
+    'https://127.0.0.1/token',
+    'http://auth.vendor.com/token',
+    'https://keycloak/token',
+  ])('throws for %s before fetchToken is called', async (bad) => {
+    await expect(resolveAccessToken({
+      auth_mode: 'oauth2', oauth_profile: 'oauth2_basic',
+      token_url: bad, client_id_enc: 'enc:c', client_secret_enc: 'enc:s',
+    }, log)).rejects.toThrow(/public host/);
+    expect(fetchToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('resolveAccessToken — oauth2 missing fields', () => {
   test('names every missing credential', async () => {
     await expect(
