@@ -210,17 +210,17 @@ describe('js/scenarios.js — setTripFieldByPath', () => {
   });
 });
 
-describe('js/scenarios.js — esc', () => {
-  // The page's HTML encoder: every occurrence must be encoded, "&" first.
-  const esc = loadFunction('js/scenarios.js', 'esc');
+describe('js/esc.js — the one shared esc (tracker S11)', () => {
+  // S11: every page's encoder was consolidated into js/esc.js. It is CommonJS-
+  // requireable (the same dual-mode shape as scenario-access.js), so load it
+  // directly rather than lifting a top-level function.
+  const { esc } = require('../../public/js/esc.js');
 
   test('it keeps the form CodeQL recognises as an encoder', () => {
     // Sonar (S7781) asks for replaceAll('<', ...). #526 did that, and CodeQL then
     // reported escaped values reaching innerHTML as XSS: it knows an encoder by
-    // replace() with a global regex. If this fails, read the comment in esc().
-    const lines = read('js/scenarios.js').split('\n');
-    const start = lines.indexOf('function esc(s) {');
-    const body = lines.slice(start, lines.indexOf('}', start)).filter(l => !l.trim().startsWith('//')).join('\n');
+    // replace() with a global regex. If this fails, read the comment in esc.js.
+    const body = read('js/esc.js').split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*')).join('\n');
     for (const pattern of [String.raw`.replace(/&/g,`, String.raw`.replace(/</g,`, String.raw`.replace(/>/g,`, String.raw`.replace(/"/g,`, String.raw`.replace(/'/g,`]) {
       expect(body).toContain(pattern);
     }
@@ -243,6 +243,37 @@ describe('js/scenarios.js — esc', () => {
     expect(esc(undefined)).toBe('');
     expect(esc(0)).toBe('0');
     expect(esc(false)).toBe('false');
+  });
+});
+
+// S11: the dashboard is opened by a certifier of another tenant, and it renders
+// tenant-controlled strings (api_base_used, submitted_by, env_name_used,
+// deleted_by, scenario_code). A hostile value must come back escaped, not break
+// out of the HTML. The renders are lifted and run with the real shared esc.
+describe('dashboard.html — tenant strings are escaped (S11)', () => {
+  const { esc } = require('../../public/js/esc.js');
+  const XSS = '"><img src=x onerror=alert(1)>';
+  const baseCtx = { esc, fmtDate: () => 'd', duration: () => '0s', shareLineFor: () => '',
+    user: { id: 'me', role: 'administrator' }, selected: new Set(), compared: new Set(), canDelete: true };
+
+  test('renderRunRow escapes api_base_used, submitted_by and the label', () => {
+    const render = loadFunction('dashboard.html', 'renderRunRow', baseCtx);
+    const html = render({ id: '00000000-1111-2222-3333-444444444444', status: 'FAILED',
+      api_base_used: XSS, submitted_by: XSS, env_name_used: XSS, user_id: 'other', artifact_count: 0 }, {});
+    expect(html).not.toContain('<img src=x onerror=');       // no breakout
+    expect(html).toContain('&lt;img src=x onerror=');          // present, escaped
+    expect(html).not.toContain('"><img');
+  });
+
+  test('renderAdminDeletedRuns escapes env_name_used, api_base_used and deleted_by', () => {
+    let written = '';
+    const el = { style: {}, set innerHTML(v) { written = v; }, get innerHTML() { return written; } };
+    const doc = { getElementById: () => el };
+    const render = loadFunction('dashboard.html', 'renderAdminDeletedRuns', { ...baseCtx, document: doc });
+    render([{ id: '00000000-1111-2222-3333-444444444444', status: 'DELETED_BY_ADMIN',
+      api_base_used: XSS, env_name_used: XSS, deleted_by: XSS }]);
+    expect(written).not.toContain('<img src=x onerror=');
+    expect(written).toContain('&lt;img src=x onerror=');
   });
 });
 
@@ -337,7 +368,7 @@ describe('js/scenarios.js — small helpers rewritten for #526', () => {
 describe('js/scenarios.js — functions whose nested conditionals were unfolded (#526)', () => {
   // Expected values were taken from the functions as they were before.
   const page = 'js/scenarios.js';
-  const escHtml = loadFunction(page, 'esc');
+  const escHtml = require('../../public/js/esc.js').esc;   // S11: esc is shared now
   const optionValue = loadFunction(page, 'optionValue');
 
   test('optionValue: null and undefined are the empty option, anything else is itself', () => {
@@ -402,7 +433,7 @@ describe('js/scenarios.js — functions whose nested conditionals were unfolded 
 
 describe('js/scenarios.js — helpers moved out of their host function (#526)', () => {
   const page = 'js/scenarios.js';
-  const escHtml = loadFunction(page, 'esc');
+  const escHtml = require('../../public/js/esc.js').esc;   // S11: esc is shared now
   const isArmed = loadFunction(page, 'isArmed');
 
   test('isArmed accepts the spellings datafiles use, and nothing else', () => {
@@ -661,7 +692,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
   });
 
   describe('compare.html diffErrorHtml', () => {
-    const esc = loadFunction('compare.html', 'esc');
+    const esc = require('../../public/js/esc.js').esc;   // S11: esc is shared now
     const diffErrorHtml = loadFunction('compare.html', 'diffErrorHtml', { esc });
 
     test("run B's error is shown, escaped, whatever the category", () => {
@@ -759,13 +790,17 @@ describe('pages — written this way on purpose (#527)', () => {
   // CodeQL recognises replace(/x/g, …) as an HTML encoder. Rewritten with
   // replaceAll and a string it no longer did, and reported the escaped values
   // reaching innerHTML as XSS (see js/scenarios.js — esc, #526).
+  // S11 consolidated every page's encoder into js/esc.js (its replace(/x/g) form
+  // is pinned above). A page must no longer define its own encoder, and must not
+  // reintroduce one in the replaceAll(string) shape CodeQL fails to recognise.
   test.each([
-    ['admin.html', 5], ['compare.html', 3], ['report-builder.html', 5], ['run-detail.html', 5], ['welcome.html', 3],
-  ])('%s keeps its HTML encoders in the replace(/x/g) form', (page, minimum) => {
+    ['admin.html'], ['compare.html'], ['report-builder.html'], ['run-detail.html'], ['welcome.html'], ['js/scenarios.js'], ['nav.js'], ['js/findings.js'],
+  ])('%s has no inline HTML encoder of its own (shared from js/esc.js)', (page) => {
     const src = read(page);
-    const encoderCalls = src.match(/\.replace\(\/[&<>"']\/g,\s*'&(amp|lt|gt|quot|#39);'\)/g) || [];
-    expect(encoderCalls.length).toBeGreaterThanOrEqual(minimum);
     expect(src).not.toMatch(/\.replaceAll\(\s*['"][&<>"']['"]\s*,\s*'&(amp|lt|gt|quot|#39);'\)/);
+    // the full 5-char replace-chain encoder only lives in js/esc.js now
+    const encoderChain = /\.replace\(\/&\/g,\s*'&amp;'\)[\s\S]{0,120}\.replace\(\/'\/g,\s*'&#39;'\)/;
+    expect(encoderChain.test(src)).toBe(false);
   });
 
   // The tab kind is the source of an open code-scanning alert on the innerHTML

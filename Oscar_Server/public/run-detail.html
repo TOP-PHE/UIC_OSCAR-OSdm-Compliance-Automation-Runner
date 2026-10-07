@@ -186,6 +186,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     </div>
   </div>
   <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
   <script>renderOscarNav('oscar-nav', 'dashboard');</script>
 </header>
@@ -734,7 +735,8 @@ document.getElementById('share-btn-wrap').addEventListener('click', function(e) 
 let assertionsData = null;
 let activeAssertionFilter = 'all';
 
-function escHtml(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// S11: the one shared escaper (js/esc.js, loaded before this script). Was a local escHtml.
+const escHtml = window.esc;
 
 async function loadAssertions() {
   try {

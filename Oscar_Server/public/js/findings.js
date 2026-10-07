@@ -1,3 +1,4 @@
+/* global oscarToast, parseServerTs */  // defined in nav.js / pages (S11b)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,11 +61,8 @@
   var CAT_ORDER = ['provider_deviation', 'oscar_issue', 'not_supported', 'spec_question', 'open'];
 
   // ── Tiny utilities ───────────────────────────────────────────────────────────
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
+  // S11: the one shared escaper (js/esc.js, loaded before findings.js).
+  const esc = window.esc;
   function fmtTs(s) {
     try { return (typeof parseServerTs === 'function' ? parseServerTs(s) : new Date(s)).toLocaleString(); }
     catch (_e) { return String(s || ''); }

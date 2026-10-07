@@ -1,3 +1,4 @@
+/* global OscarScenarioAccess, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -112,20 +113,11 @@ const LABELS = {
 };
 
 function lbl(val) { return val == null ? '— none —' : (LABELS[val] || val); }
-function esc(s) {
-  // HTML-context entity encoder for every value interpolated into innerHTML.
-  // Escapes the full set incl. single quote (&#39;) so values are safe in BOTH
-  // double- and single-quoted attributes and in text content. (Sonar S5696 may
-  // still flag innerHTML sinks here — it doesn't recognise this custom encoder
-  // as a sanitiser; those alerts are false positives, see issue #82.)
-  // Keep replace() with a global regex here. Sonar (S7781) asks for
-  // replaceAll('<', ...), but CodeQL recognises an encoder by this form only:
-  // with replaceAll and a string, it reported escaped values reaching innerHTML
-  // as XSS (#541).
-  return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
+// S11: the one shared HTML escaper now lives in js/esc.js (loaded before
+// scenarios.js on scenarios.html). It has the identical rule set this local
+// copy used — the full & < > " ' encoder, built with chained .replace(/…/g)
+// so CodeQL still recognises it as a sanitiser (replaceAll breaks that, #541).
+const esc = window.esc;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 /**

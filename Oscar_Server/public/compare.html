@@ -93,6 +93,7 @@ h2{color:#0090D4;font-size:20px;margin-bottom:18px}
     </div>
   </div>
   <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
   <script>renderOscarNav('oscar-nav', 'compare');</script>
 </header>
@@ -205,9 +206,8 @@ function renderItems() {
   }).join('');
 }
 
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// S11: the one shared escaper (js/esc.js). Was {&,<,>}-only; now also " and '.
+const esc = window.esc;
 
 async function loadComparison() {
   const res = await fetch('/v1/reports/compare', {

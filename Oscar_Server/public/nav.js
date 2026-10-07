@@ -1,3 +1,4 @@
+/* global logout */  // defined in the page that embeds nav.js (S11b)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -67,11 +68,9 @@
     global.__oscarFetchPatched = true;
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
+  // S11: the one shared escaper (js/esc.js, loaded before this script on every
+  // page). Was a local copy that missed the single quote.
+  const esc = window.esc;
 
   // ── Badge helper ──────────────────────────────────────────────────────────────
   var ROLE_META = {

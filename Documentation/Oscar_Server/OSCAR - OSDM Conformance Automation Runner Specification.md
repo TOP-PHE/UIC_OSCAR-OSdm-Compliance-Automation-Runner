@@ -581,6 +581,30 @@ sandbox from the run env, for the standalone HTML artifact. `mergeReport.js` (th
 fallback report) stays name-based: it runs as a credential-free child (§9.16 /
 tracker NEW-01), so it has no secret to value-match.
 
+### 9.21 Output Escaping on the Web UI (one shared escaper)
+
+Tenant-controlled strings — `api_base_used`, `scenario_code`, `submitted_by`,
+`env_name_used`, `deleted_by`, `user_email`, company names — are rendered on
+pages a certifier of **another** tenant opens (the dashboard, the report builder,
+compare). Interpolated raw into `innerHTML` they are stored cross-tenant XSS;
+`dashboard.html` carried no escaper at all. Audit tracker S11.
+
+Every page now shares one escaper, `public/js/esc.js` (`esc(s)`): it escapes
+`& < > " '` — so a single function is safe both in HTML text and in a
+double/single-quoted attribute — maps null/undefined to the empty string, and is
+written as chained `.replace(/…/g, …)` because CodeQL recognises an HTML encoder
+only in that form (`replaceAll` with a string stops the recognition, #541). It is
+loaded before every other page script and is also `require()`-able in Node for
+the tests, the same dual-mode shape as `scenario-access.js`. The eight per-page
+copies that existed before — in three different rule sets, some missing `"`, some
+`'` (S11a) — are gone.
+
+`public/` is linted (S11b): `eslint.config.js` has a `public/**` block with
+browser globals and the real-bug rules, and `npm run lint` covers `src/` and
+`public/`. A sink that loses its `esc()` reference fails `no-undef`; the
+inline-page renders are additionally guarded by a jsdom/vm regression test that
+pushes a hostile value through them and asserts the output is escaped.
+
 ---
 
 ## 10. Execution Worker — Credential Handling and Error Detection

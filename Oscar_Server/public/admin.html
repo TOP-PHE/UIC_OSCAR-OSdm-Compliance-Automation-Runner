@@ -94,6 +94,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
     </div>
   </div>
   <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
   <script>
     var _tab = new URLSearchParams(location.search).get('tab') || 'users';
@@ -416,14 +417,8 @@ async function emergencyStopAllPlatform() {
 // js/incomplete-html-attribute-sanitization on the new "Reset Link" button
 // (and the same pattern was already present on neighbouring buttons —
 // hardening esc() fixes them all in one place).
-function esc(s) {
-  return String(s || '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-}
+// S11: the one shared escaper (js/esc.js, loaded in <head> before this script).
+const esc = window.esc;
 
 function fmtDate(ts) {
   if (!ts) return '-';
