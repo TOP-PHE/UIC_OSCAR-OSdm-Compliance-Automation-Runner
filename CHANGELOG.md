@@ -14,6 +14,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.210] — 2026-10-07
+
+Audit tracker S8-loopback. Closes #557. Server + collection (OTST_V2.0.103).
+
+### Security
+
+- **The two loopback routes require a per-run secret, not a loopback source
+  address.** `GET /data/:filename` (a company's decrypted datafile) and
+  `POST /v1/runs/:runId/refresh-access-token` (a live vendor access token) were
+  gated only on "the request came from `127.0.0.1` with no `X-Forwarded-For`".
+  That one condition was enough for any co-located process that could reach the
+  port, and for any fronting proxy that does not inject `X-Forwarded-For` (an L4
+  TCP forwarder, a sidecar), to read **any** company's datafile and a live
+  vendor token — slugs are enumerable. It also let a Test Manager who pointed
+  the company `api_base` at the server's own `/data` route reflect another
+  company's datafile into the run report.
+- **How it is gated now.** The runner issues a random 32-byte secret when it
+  spawns Bruno (`utils/runSecrets.js`), bound to the run's company, hands it to
+  the child through its process environment (`OSCAR_RUN_SECRET`, never the env
+  file on disk), and revokes it when the child exits. The collection sends it
+  back as the `X-OSCAR-Run-Secret` header — `scenarioParser.js` on the datafile
+  fetch (with the runId in `X-OSCAR-Run-Id`), `auth.js` on the token refresh.
+  Each route verifies it in constant time and binds it to the run's own
+  company: a run of company A asking for company B's datafile gets `404`. The
+  `isLoopbackBrunoCall` source-address test is deleted; nothing reads `req.ip`
+  for these routes any more.
+- **The `api_base` reflection is closed as a side effect.** A run's own OSDM
+  requests do not carry the header (the collection adds it only to its two
+  OSCAR calls), so pointing `api_base` at `http://127.0.0.1:3001/data/<other>`
+  now returns `401`, not the datafile. The broader SSRF item (an `api_base` or
+  `token_url` that reaches private targets, tracker S5) is a separate change.
+- A signed-in Test Manager of the owning company is still accepted on `/data`
+  as an authenticated, same-company fallback (no page calls it). The refresh
+  route was loopback-only and is now secret-only.
+
+### Changed
+
+- A canonical nginx reverse-proxy config is committed at
+  `OSCAR_Deploy/nginx/oscar.conf.example` (the audit noted none shipped). With
+  the loopback trust gone it is hygiene, not a security boundary, but it is the
+  reference the VPS guide points at.
+
+### Tests
+
+- `utils/runSecrets` unit tests (issue / verify / revoke, constant-time, the
+  wrong secret, re-issue). `server.test.js` rebuilt off the deleted loopback
+  bypass: no secret → 401/403; a run's secret reads its own file (200) and
+  another company's → 404; a wrong secret falls through. `runner.test.js`
+  asserts the child gets a 64-hex secret bound to the run's company and that it
+  is revoked on close; the PR-03 allowlist tests expect `OSCAR_RUN_SECRET` on
+  the Bruno child and never on the report script.
+
+### Compatibility
+
+- The server now **requires** the header, so `min_collection` is
+  `OTST_V2.0.103`. On deploy the bind-mounted collection updates (git pull on
+  push to `main`) before the server image is promoted on the release tag, so the
+  collection sends the header before the server starts requiring it; an older
+  server ignores the extra header. A brief mismatch only fails a run.
+
+---
+
 ## [server-1.11.209] — 2026-10-07
 
 Audit tracker NEW-10. Closes #555.
