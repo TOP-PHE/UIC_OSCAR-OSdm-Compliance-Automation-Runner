@@ -258,7 +258,7 @@ function datafileSessionDenial(req, company) {
   try {
     const cookieAuth = require('./api/middleware/auth');
     user = cookieAuth.userFromRequest(req);     // parsed JWT or null
-  } catch (_e) { user = null; }
+  } catch { user = null; }                       // malformed token → treated as no session
   if (!user) return 401;
   if (user.companyId !== company.id) return 403;
   if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile

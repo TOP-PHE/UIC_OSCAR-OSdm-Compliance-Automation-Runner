@@ -200,7 +200,7 @@ async function refreshAccessTokenIfNeeded(opts) {
   // S8-loopback: the route requires this run's secret (oscarRunSecretHeader).
   // Without it the endpoint 403s and we fall back to the existing token (logged
   // below), so an older runner that does not set it degrades, it does not break.
-  const headers = Object.assign({ 'Content-Type': 'application/json' }, oscarRunSecretHeader());
+  const headers = { 'Content-Type': 'application/json', ...oscarRunSecretHeader() };
   try {
     const resp = await new Promise(function (resolve, reject) {
       bru.sendRequest(
