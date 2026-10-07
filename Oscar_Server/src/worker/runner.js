@@ -31,6 +31,7 @@ const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
 const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
+const runSecrets = require('../utils/runSecrets');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -893,6 +894,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     safeEnv.OSCAR_ACCESS_TOKEN = accessToken;
     if (subscriptionKey) safeEnv.OSCAR_SUBSCRIPTION_KEY = subscriptionKey;
     if (oauthExtra)      safeEnv.OSCAR_OAUTH_EXTRA      = String(oauthExtra);
+    // S8-loopback: the secret that lets this child — and only while it runs —
+    // fetch its company's datafile and refresh its token. Carried via the
+    // environment like the token above, never written to the env file on disk.
+    // The collection sends it back as a header on both loopback calls; the
+    // routes bind it to this run's company. Revoked when the child exits.
+    safeEnv.OSCAR_RUN_SECRET = runSecrets.issue(runId, companyRow.id);
     // Shell mode is only required when BRU_CMD points at a Windows
     // batch wrapper (.cmd / .bat) — direct execve cannot launch those.
     // On Linux / macOS / Windows-with-.exe we use shell: false so
@@ -994,12 +1001,14 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       clearTimeout(timeout);
       stopTokenWatchdog();
       _activeProcs.delete(runId);
+      runSecrets.revoke(runId);            // S8-loopback: the child is gone; no more loopback calls
       resolve(code ?? 1);
     });
     proc.on('error', err => {
       clearTimeout(timeout);
       stopTokenWatchdog();
       _activeProcs.delete(runId);
+      runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });

@@ -1143,8 +1143,8 @@ Now the server merges a tester's save into the stored file
 - A tester cannot newly point one of their scenarios at an entry that only
   hidden scenarios use; that would make it appear in their view.
 - `/data/:filename` answers a logged-in session only for a Test Manager. It
-  used to hand any tester of the company the whole unfiltered file. Bruno's
-  loopback read is unchanged.
+  used to hand any tester of the company the whole unfiltered file. Bruno reads
+  it with the run's secret (see §15.12), not as "a logged-in session".
 - Resource ids are allocated by the browser from what the tester can see, so
   one can clash with a hidden scenario's entry. The merge never lets a tester's
   entry replace one that another scenario references: it copies the tester's
@@ -1156,8 +1156,9 @@ Now the server merges a tester's save into the stored file
   batch from it. The datafile's `scenariosToRun` is the Test Manager's company
   default. Bruno is unaffected: each run is still handed its one scenario.
 
-Test Managers still see and save the whole file. The unfiltered file Bruno
-reads (`/data/:filename`) is unchanged.
+Test Managers still see and save the whole file. Bruno still reads the
+unfiltered file from `/data/:filename`, but now with the run's own secret
+(§15.12), scoped to the run's company.
 
 A side effect worth knowing when you field a support call: before this release,
 a Test Manager who uploaded an invalid or oversized file lost the company's
@@ -1335,3 +1336,48 @@ What to check on your deployment:
 - "The data file could not be read" on a run means the stored file is damaged.
   Before this release such a run was started anyway and failed later inside the
   test engine.
+
+### 15.12 v1.11.210 — the loopback routes require a per-run secret
+
+Audit tracker item S8-loopback. The server serves two things to the test engine
+while a run is in flight, both on the loopback interface: the company's data
+file (`GET /data/:filename`) and, for long scenarios, a fresh vendor access
+token (`POST /v1/runs/:runId/refresh-access-token`).
+
+Until this release both were gated on one thing only: the request came from
+`127.0.0.1` with no `X-Forwarded-For` header. That single condition was enough
+for **any** other process on the host, and for **any** fronting proxy that does
+not add `X-Forwarded-For` (an L4/TCP forwarder, an nginx `stream` block, a
+sidecar), to read **any** company's decrypted data file and a live vendor
+token. Data-file names are the company slug, which is guessable. It also meant
+a Test Manager who set the company's OSDM endpoint (`api_base`) to the server's
+own `/data` route made the run copy another company's data file into its report.
+
+Now trust is a per-run secret, not the source address:
+
+- The server issues a random secret when it starts the test engine for a run,
+  tied to that run's company, hands it to the engine through its process
+  environment (never a file on disk), and destroys it when the run ends.
+- The engine sends the secret back as a header on both calls. The routes
+  require it, compare it in constant time, and bind it to the run's own
+  company — a run of one company asking for another company's data file is
+  answered `404`.
+- The `127.0.0.1` / `X-Forwarded-For` test is gone. A signed-in Test Manager of
+  the owning company is still accepted on `/data` (no page uses it; it is a
+  fallback). The token-refresh route is secret-only.
+
+What to check on your deployment:
+
+- Nothing has to be configured. The secret is internal and per-run.
+- A canonical nginx config ships at `OSCAR_Deploy/nginx/oscar.conf.example`.
+  With the loopback trust gone, that config's `X-Forwarded-For` line is for
+  correct client IPs in logs and rate limiting, not a security boundary — but
+  do not front OSCAR with a plain TCP/stream forwarder that drops it.
+- This release pairs the server (1.11.210) with the collection (OTST_V2.0.103):
+  older collections do not send the header and their runs would be refused. On
+  a normal deploy the bind-mounted collection updates before the server image
+  is promoted, so the collection sends the header before the server requires
+  it. If you pin versions by hand, move both together.
+- The companion item — validating `api_base`/`token_url` so a run cannot be
+  aimed at loopback or private-range addresses at all (tracker S5) — is a
+  separate, later change.

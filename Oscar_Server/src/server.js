@@ -224,14 +224,13 @@ const fileDownloadLimiter = require('express-rate-limit')({
 // ── Serve data files (Bruno fetches these during runs) ────────────────────────
 // Route: GET /data/:filename  →  data/datafiles/:filename
 //
-// SECURITY (issue #60, v1.10.0): previously served via express.static with no
-// auth at all. Anyone reaching the /data path could download any company's
-// datafile if they guessed the slug. Now requires EITHER:
-//   (a) an authenticated session whose company owns the file (slug match), OR
-//   (b) a true-loopback request with no X-Forwarded-For — i.e. the Bruno
-//       subprocess fetching from the same host. Nginx-proxied external
-//       traffic always carries X-Forwarded-For, so the loopback path can't
-//       be reached from outside the host.
+// SECURITY (issue #60, v1.10.0; tracker S8-loopback, v1.11.210): previously
+// served via express.static with no auth at all. Now requires EITHER:
+//   (a) the per-run secret the runner issued for a live run, bound to that
+//       run's company (the Bruno subprocess fetching this run's own file), OR
+//   (b) an authenticated Test Manager session whose company owns the slug.
+// Until v1.11.210 (b)'s alternative was "any request from 127.0.0.1 with no
+// X-Forwarded-For", which trusted the source address; that is gone.
 const DATAFILES_DIR = path.resolve(__dirname, '../data/datafiles');
 
 // Filename sanitiser: only allow `{slug}-datafile.json`-style names.
@@ -241,12 +240,29 @@ const DATAFILES_DIR = path.resolve(__dirname, '../data/datafiles');
 // the regex slips, the DB lookup catches forged inputs).
 const SAFE_DATAFILE_RE = /^([a-z0-9][a-z0-9-]*)-datafile\.json$/;
 
-function isLoopbackBrunoCall(req) {
-  // Bruno subprocess on the same host. No proxy hops in front of it.
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return false;                       // proxied = not direct loopback
-  const ip = (req.ip || '').replace(/^::ffff:/, '');
-  return ip === '127.0.0.1' || ip === '::1';
+// ── Per-run loopback auth (tracker S8-loopback) ──────────────────────────────
+// Bruno carries a per-run secret issued by the runner (utils/runSecrets) and
+// sends it on the two loopback calls below. This replaced the old gate, which
+// trusted any request that arrived from 127.0.0.1 with no X-Forwarded-For —
+// a single condition any co-located process, or any L4 proxy that does not
+// inject X-Forwarded-For, could satisfy to read every tenant's datafile and a
+// live vendor token. Trust is now the secret, not the source address, so
+// nothing here reads req.ip.
+const runSecrets = require('./utils/runSecrets');
+
+// The authenticated fallback on GET /data: a signed-in Test Manager of the
+// company that owns the slug. Returns null when allowed, else the HTTP status
+// to answer with. Kept out of the handler so the handler stays simple.
+function datafileSessionDenial(req, company) {
+  let user;
+  try {
+    const cookieAuth = require('./api/middleware/auth');
+    user = cookieAuth.userFromRequest(req);     // parsed JWT or null
+  } catch { user = null; }                       // malformed token → treated as no session
+  if (!user) return 401;
+  if (user.companyId !== company.id) return 403;
+  if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile
+  return null;
 }
 
 // ── Route: GET /json_validator/datafile.schema.json (#333, v1.11.112) ───────
@@ -294,25 +310,21 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const company = dbGet('SELECT id, slug FROM companies WHERE slug = ?', [slug]);
   if (!company) return res.status(404).send('Not found');
 
-  // Loopback Bruno subprocess — bypass session auth (no cookie/Bearer
-  // available to a spawned child process).
-  if (!isLoopbackBrunoCall(req)) {
-    // Public-facing request — must carry a valid session AND belong to the
-    // company that owns the slug. Tester / test_manager only — no certifier
-    // / admin direct-download path here (they consume reports through
-    // /v1/runs endpoints which apply the per-run share gate).
-    let user;
-    try {
-      const cookieAuth = require('./api/middleware/auth');
-      user = cookieAuth.userFromRequest(req);  // returns parsed JWT or null
-    } catch (_e) { /* fall through to 401 */ }
-    if (!user) return res.status(401).send('Unauthorized');
-    if (user.companyId !== company.id) return res.status(403).send('Forbidden');
-    // v1.11.197: the raw file holds every scenario of the company, other
-    // testers' private ones included. A tester reads their filtered view from
-    // GET /v1/company/datafile; serving them this file would undo it. Nothing
-    // in the UI calls this path, and Bruno takes the loopback branch above.
-    if (user.role !== 'test_manager') return res.status(403).send('Forbidden');
+  // (a) The Bruno subprocess of a live run: a per-run secret the runner issued,
+  //     bound to that run's company (tracker S8-loopback). A run may only read
+  //     its own company's file — a secret for company A asking for company B's
+  //     slug gets 404 (no disclosure). The runId travels in a header because
+  //     this route is keyed on the slug, not the run.
+  const runCompanyId = runSecrets.verify(req.get('X-OSCAR-Run-Id'), req.get('X-OSCAR-Run-Secret'));
+  if (runCompanyId !== null) {
+    if (runCompanyId !== company.id) return res.status(404).send('Not found');
+  } else {
+    // (b) No run secret: fall back to a signed-in Test Manager of the owning
+    //     company (datafileSessionDenial). No page calls this path; it is only
+    //     reached directly, and no certifier / admin path exists — they consume
+    //     reports through /v1/runs with the per-run share gate.
+    const denied = datafileSessionDenial(req, company);
+    if (denied) return res.status(denied).send(denied === 401 ? 'Unauthorized' : 'Forbidden');
   }
 
   // Resolve, traversal-guard, decrypt, send.
@@ -346,10 +358,13 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
 // AFTER the wait to obtain a fresh token; the provider then sees a valid
 // token and the test can observe the actual expiry behaviour.
 //
-// SECURITY: same loopback gate as /data — caller MUST be on 127.0.0.1/::1
-// with NO X-Forwarded-For header. There is no session/Bearer auth (Bruno is
-// a spawned child process). The endpoint only refreshes the token belonging
-// to the run being requested; it never crosses run boundaries.
+// SECURITY (tracker S8-loopback, v1.11.210): the caller MUST carry the run's
+// own secret (utils/runSecrets), issued by the runner to the Bruno child and
+// sent as the X-OSCAR-Run-Secret header. There is no session/Bearer auth
+// (Bruno is a spawned child process). The secret is bound to the run's
+// company, so it only refreshes the token of the run it was minted for; it
+// never crosses run boundaries. Until v1.11.210 this was gated on the source
+// address (127.0.0.1, no X-Forwarded-For) alone.
 //
 // The SAFE_RUNID_RE used below is defined further down for the
 // /artifacts/:runId path — declared inline here so the order doesn't matter.
@@ -359,12 +374,21 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   if (!SAFE_RUNID_RE_FOR_REFRESH.test(runId || '')) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Invalid runId format.' });
   }
-  if (!isLoopbackBrunoCall(req)) {
-    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint is loopback-only.' });
+  // S8-loopback: the run's own secret, not the source address. A missing or
+  // wrong secret is a 403 — the run is identified by the path and the secret
+  // together, so this never hands a token to a guessed runId.
+  const runCompanyId = runSecrets.verify(runId, req.get('X-OSCAR-Run-Secret'));
+  if (runCompanyId === null) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'This endpoint requires the run secret.' });
   }
-  const runRow = dbGet('SELECT id, user_id FROM runs WHERE id = ?', [runId]);
+  const runRow = dbGet('SELECT id, user_id, company_id FROM runs WHERE id = ?', [runId]);
   if (!runRow) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Run not found.' });
+  }
+  // Defence in depth: the secret was issued for this run's company. A mismatch
+  // cannot happen through the runner, so treat it as a forgery, not a 404.
+  if (runRow.company_id !== runCompanyId) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Run secret does not match the run.' });
   }
   const userRow = dbGet('SELECT * FROM users WHERE id = ?', [runRow.user_id]);
   if (!userRow) {

@@ -1,0 +1,49 @@
+# OSCAR — canonical nginx reverse-proxy config (tracker S8-loopback).
+#
+# Copy to /etc/nginx/sites-available/oscar, replace the domain, enable with
+#   sudo ln -s /etc/nginx/sites-available/oscar /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+# then run certbot to add the TLS listener (see the VPS Deployment Guide).
+#
+# OSCAR listens on 127.0.0.1:3001 only (see OSCAR_Deploy/docker-compose.yml);
+# nginx is the only public entry point. Terminate TLS here and proxy to the app.
+#
+# Note on X-Forwarded-For: since v1.11.210 the server's two loopback routes
+# (GET /data/:filename, POST /v1/runs/:runId/refresh-access-token) are gated on
+# a per-run secret, NOT on the source address, so an L4/stream front-end that
+# omits X-Forwarded-For can no longer be tricked into a cross-tenant read. This
+# HTTP-level proxy still sets X-Forwarded-For — it is what the rate limiter and
+# the logs use (app.set('trust proxy', 1)) — but it is hygiene now, not a
+# security boundary. Do not put a plain TCP/stream forwarder in front of OSCAR
+# without this header; you lose correct client IPs in logs and rate limiting.
+
+server {
+    listen 80;
+    server_name oscar.example.com;          # ← your domain
+
+    # Data-file uploads (Test Config / company datafile).
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass         http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection 'upgrade';
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+
+        # Bruno runs can take several minutes — allow long-running requests.
+        proxy_read_timeout    660s;
+        proxy_connect_timeout 660s;
+        proxy_send_timeout    660s;
+    }
+
+    # Internal only — the in-cluster Prometheus scrapes oscar:3001 over the
+    # Docker bridge directly, so the public vhost should not expose /metrics.
+    location = /metrics {
+        return 404;
+    }
+}
