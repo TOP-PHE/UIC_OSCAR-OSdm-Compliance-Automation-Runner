@@ -131,6 +131,40 @@ describe('PATCH /v1/company', () => {
     expect(res.status).toBe(400);
     expect(res.body.detail).toMatch(/per-report/i);
   });
+
+  // S5 (v1.11.211): api_base is fetched by every run, so a non-public endpoint
+  // is a request-forgery primitive. The suite runs with ALLOW_PRIVATE_TARGETS=1
+  // (tests/setup.js), so turn it off here to see the policy.
+  describe('S5 — the endpoint must be a public https address', () => {
+    const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
+    beforeEach(() => { process.env.ALLOW_PRIVATE_TARGETS = ''; });
+    afterEach(() => { process.env.ALLOW_PRIVATE_TARGETS = PRIOR; });
+
+    test.each([
+      'http://api.example.com/v1',            // not https
+      'https://127.0.0.1/osdm',               // loopback
+      'https://10.1.2.3/osdm',                // private
+      'https://169.254.169.254/latest',       // cloud metadata
+      'https://oscar:3001/data/x-datafile.json', // a Docker service name
+      'https://localhost/osdm',
+    ])('rejects %s and stores nothing', async (bad) => {
+      const token = makeToken('test_manager');
+      const before = get('SELECT api_base FROM companies WHERE id = ?', [companyId]).api_base;
+      const res = await request(app).patch('/v1/company')
+        .set('Authorization', `Bearer ${token}`).send({ api_base: bad });
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toContain('public host');
+      expect(get('SELECT api_base FROM companies WHERE id = ?', [companyId]).api_base).toBe(before);
+    });
+
+    test('still accepts a public https endpoint', async () => {
+      const token = makeToken('test_manager');
+      const res = await request(app).patch('/v1/company')
+        .set('Authorization', `Bearer ${token}`).send({ api_base: 'https://api.vendor.com/osdm' });
+      expect(res.status).toBe(200);
+      expect(res.body.api_base).toBe('https://api.vendor.com/osdm');
+    });
+  });
 });
 
 // ── PATCH /v1/company — extra_headers (issue #426) ────────────────────────────

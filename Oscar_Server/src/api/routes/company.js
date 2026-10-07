@@ -31,6 +31,7 @@ const { enforceTenant } = require('../middleware/tenant');
 const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
 const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
+const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const log = require('../../utils/logger').child({ module: 'company' });
@@ -290,6 +291,15 @@ router.patch('/', (req, res) => {
       title: endpoint.status === 403 ? 'Forbidden' : 'Bad Request',
       detail: endpoint.detail
     });
+  }
+  // S5: an endpoint that is actually changing must be a public https address —
+  // not loopback, the private network or a Docker service name. Structural only
+  // here (no DNS in the request path); the runner re-checks, with DNS, at use.
+  if (endpoint.write !== null) {
+    const urlRefusal = storedUrlRefusal(endpoint.write, 'OSDM endpoint');
+    if (urlRefusal) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: urlRefusal });
+    }
   }
 
   // Dedicated headers (issue #426) — company-wide config, Test-Manager-only.
