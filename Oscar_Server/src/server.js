@@ -250,6 +250,21 @@ const SAFE_DATAFILE_RE = /^([a-z0-9][a-z0-9-]*)-datafile\.json$/;
 // nothing here reads req.ip.
 const runSecrets = require('./utils/runSecrets');
 
+// The authenticated fallback on GET /data: a signed-in Test Manager of the
+// company that owns the slug. Returns null when allowed, else the HTTP status
+// to answer with. Kept out of the handler so the handler stays simple.
+function datafileSessionDenial(req, company) {
+  let user;
+  try {
+    const cookieAuth = require('./api/middleware/auth');
+    user = cookieAuth.userFromRequest(req);     // parsed JWT or null
+  } catch (_e) { user = null; }
+  if (!user) return 401;
+  if (user.companyId !== company.id) return 403;
+  if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile
+  return null;
+}
+
 // ── Route: GET /json_validator/datafile.schema.json (#333, v1.11.112) ───────
 // Serve the JSON schema bundled with the Bruno collection. Before this
 // route, operators had to set JSON_SCHEMA_URL to an external URL (the
@@ -304,19 +319,12 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   if (runCompanyId !== null) {
     if (runCompanyId !== company.id) return res.status(404).send('Not found');
   } else {
-    // (b) A signed-in Test Manager of the owning company. No page calls this
-    //     path (testers read their filtered view from GET /v1/company/datafile,
-    //     which this raw file would undo), so it is only reached directly; kept
-    //     as an authenticated, same-company fallback. No certifier / admin
-    //     path — they consume reports through /v1/runs with the per-run gate.
-    let user;
-    try {
-      const cookieAuth = require('./api/middleware/auth');
-      user = cookieAuth.userFromRequest(req);  // returns parsed JWT or null
-    } catch (_e) { /* fall through to 401 */ }
-    if (!user) return res.status(401).send('Unauthorized');
-    if (user.companyId !== company.id) return res.status(403).send('Forbidden');
-    if (user.role !== 'test_manager') return res.status(403).send('Forbidden');
+    // (b) No run secret: fall back to a signed-in Test Manager of the owning
+    //     company (datafileSessionDenial). No page calls this path; it is only
+    //     reached directly, and no certifier / admin path exists — they consume
+    //     reports through /v1/runs with the per-run share gate.
+    const denied = datafileSessionDenial(req, company);
+    if (denied) return res.status(denied).send(denied === 401 ? 'Unauthorized' : 'Forbidden');
   }
 
   // Resolve, traversal-guard, decrypt, send.

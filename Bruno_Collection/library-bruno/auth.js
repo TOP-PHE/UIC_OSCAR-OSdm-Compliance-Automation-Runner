@@ -149,6 +149,17 @@ function checkAuthRejection(res, reqName, reqUrl) {
   return true;
 }
 
+// S8-loopback: the run's secret OSCAR handed this child in OSCAR_RUN_SECRET, as
+// a request header for the loopback refresh call. Standalone Bruno has none, so
+// this is empty and the call simply carries no secret.
+function oscarRunSecretHeader() {
+  try {
+    const s = bru.getProcessEnv('OSCAR_RUN_SECRET');
+    if (s) return { 'X-OSCAR-Run-Secret': s };
+  } catch (_e) { /* standalone Bruno — no OSCAR environment */ }
+  return {};
+}
+
 /**
  * refreshAccessTokenIfNeeded() — call OSCAR's loopback refresh endpoint to
  * pick up a fresh access token before a request. The endpoint respects the
@@ -186,14 +197,10 @@ async function refreshAccessTokenIfNeeded(opts) {
     return false;
   }
   const url = `${loopbackBase}/v1/runs/${runId}/refresh-access-token${force ? '?force=1' : ''}`;
-  // S8-loopback: the route requires this run's secret, handed to the child in
-  // OSCAR_RUN_SECRET. Without it the endpoint 403s and we fall back to the
-  // existing token (logged below), so an older runner that does not set it
-  // degrades, it does not break.
-  let runSecret = null;
-  try { runSecret = bru.getProcessEnv('OSCAR_RUN_SECRET'); } catch (_e) { runSecret = null; }
-  const headers = { 'Content-Type': 'application/json' };
-  if (runSecret) headers['X-OSCAR-Run-Secret'] = runSecret;
+  // S8-loopback: the route requires this run's secret (oscarRunSecretHeader).
+  // Without it the endpoint 403s and we fall back to the existing token (logged
+  // below), so an older runner that does not set it degrades, it does not break.
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, oscarRunSecretHeader());
   try {
     const resp = await new Promise(function (resolve, reject) {
       bru.sendRequest(
