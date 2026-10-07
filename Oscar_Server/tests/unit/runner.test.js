@@ -97,16 +97,24 @@ async function waitForKillCall(fakeProc, timeoutMs = 4000) {
   }
 }
 
-function seedCompanyUser({ authMode = 'bearer', extraHeaders = null } = {}) {
+// Every seeded company gets a datafile the runner can read: since NEW-10 it reads
+// the file before any run, and one it cannot read refuses the run. (The file
+// used to be this test file itself, "any file that exists".)
+const SEED_DATAFILE_DIR = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'runner-seed-datafile-'));
+const SEED_DATAFILE = path.join(SEED_DATAFILE_DIR, 'datafile.json');
+fs.writeFileSync(SEED_DATAFILE, JSON.stringify({ scenariosToRun: 'ALL', scenarios: [{ code: 'SEED_SCENARIO' }] }));
+afterAll(() => { try { fs.rmSync(SEED_DATAFILE_DIR, { recursive: true, force: true }); } catch (_) {} });
+
+function seedCompanyUser({ authMode = 'bearer', extraHeaders = null, role = 'test_manager' } = {}) {
   const companyId = uuidv4();
   const userId = uuidv4();
   run(
     `INSERT INTO companies (id, name, slug, api_base, datafile_path, extra_headers) VALUES (?, ?, ?, ?, ?, ?)`,
-    [companyId, 'Runner Test Co', `runner-test-${companyId.slice(0, 8)}`, 'https://vendor.example/osdm', __filename /* any file that exists, for fsExists() */, extraHeaders]
+    [companyId, 'Runner Test Co', `runner-test-${companyId.slice(0, 8)}`, 'https://vendor.example/osdm', SEED_DATAFILE, extraHeaders]
   );
   run(
-    `INSERT INTO users (id, company_id, email, password_hash, role, auth_mode) VALUES (?, ?, ?, 'x', 'test_manager', ?)`,
-    [userId, companyId, `runner-${userId.slice(0, 8)}@runner-test.com`, authMode]
+    `INSERT INTO users (id, company_id, email, password_hash, role, auth_mode) VALUES (?, ?, ?, 'x', ?, ?)`,
+    [userId, companyId, `runner-${userId.slice(0, 8)}@runner-test.com`, role, authMode]
   );
   return { companyId, userId };
 }
@@ -638,10 +646,40 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     }
   });
 
+  // A run that names its scenario reads the company's datafile before it starts
+  // (NEW-10), so such a run is given a real one: this scenario, and the entries
+  // it points to. `datafile` replaces it for a test that needs something else.
+  const os = require('node:os');
+  const datafileDirs = [];
+  afterAll(() => {
+    for (const dir of datafileDirs) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }
+  });
+  function datafileFor(code) {
+    return {
+      scenariosToRun: 'ALL',
+      scenarios: [
+        { code, tripRequirementId: 1, passengersListId: 1, purchaserListId: 2 },
+        { code: 'SOMEONE_ELSES', tripRequirementId: 2, passengersListId: 2, purchaserListId: 1 },
+      ],
+      tripRequirements: [{ id: 1, legs: [{ origin: 'urn:a' }] }, { id: 2, legs: [{ origin: 'urn:c' }] }],
+      passengersList: [{ id: 1, passengers: [{ firstName: 'Ada' }] }, { id: 2, passengers: [{ firstName: 'Bob' }] }],
+      purchaserList: [{ id: 1, purchaser: [{ firstName: 'Pat' }] }, { id: 2, purchaser: [{ firstName: 'Quinn' }] }],
+    };
+  }
+  function useDatafile(companyId, content) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-datafile-'));
+    datafileDirs.push(dir);
+    const file = path.join(dir, 'datafile.json');
+    fs.writeFileSync(file, typeof content === 'string' || Buffer.isBuffer(content) ? content : JSON.stringify(content));
+    run('UPDATE companies SET datafile_path = ? WHERE id = ?', [file, companyId]);
+    return file;
+  }
+
   // Starts a run that reaches the second spawn, and gives back both spawn calls.
-  async function runWithReportScript({ scenarioOverride, platform } = {}) {
+  async function runWithReportScript({ scenarioOverride, platform, datafile } = {}) {
     const { encrypt } = require('../../src/db/db');
     const { companyId, userId } = seedCompanyUser();
+    if (scenarioOverride !== undefined) useDatafile(companyId, datafile || datafileFor(scenarioOverride));
     run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
       [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId]);
     const runId = seedRun(companyId, userId);
@@ -841,6 +879,212 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       for (const notText of [0, 42, false, true, [], ['A'], {}, { toString: 1 }, Object.create(null), Symbol('s'), 10n, () => 'A']) {
         expect(refusedScenarioCode(notText)).toMatch(/not text/);
       }
+    });
+  });
+
+  // ── NEW-10: the text of the datafile, not only the scenario's code ──────────
+  // Before every run the collection hands the WHOLE datafile to Bruno, which
+  // fills in every double-brace template in it; it then copies the scenario
+  // being run into the variables requests are built from. A template naming the
+  // run's token, typed into any scenario of the company, showed the token of
+  // whoever ran anything (checked with Bruno CLI 4.2.1). The rule itself is
+  // tested in datafile-templates.test.js; here, what the runner does with it.
+  describe('a run is not started while the datafile holds a template (NEW-10)', () => {
+    const OPEN = '{'.repeat(2);
+    const CLOSE = '}'.repeat(2);
+    const TOKEN = `${OPEN}process.env.OSCAR_ACCESS_TOKEN${CLOSE}`;
+    const CODE = 'OTST_SALE_1ADT_1LEG';
+
+    // Runs to the end whatever the runner decides: if it went on to spawn, the
+    // fake children end at once, so a missing refusal fails on its assertions.
+    // `datafile` may be a function of the runner's email, for a file that
+    // holds a scenario private to the person running.
+    async function attempt(datafile, { role = 'test_manager', scenarioOverride = CODE } = {}) {
+      const { companyId, userId } = seedCompanyUser({ role });
+      const email = get('SELECT email FROM users WHERE id = ?', [userId]).email;
+      const file = useDatafile(companyId, typeof datafile === 'function' ? datafile(email) : datafile);
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
+      spawn.mockImplementation(() => {
+        const proc = makeFakeProc();
+        setImmediate(() => proc.emit('close', 0));
+        return proc;
+      });
+      const envFilesBefore = fs.readdirSync(ENVS_DIR);
+      let result;
+      let thrown = null;
+      try { result = await executeRun({ runId, companyId, userId, scenarioOverride }); } catch (e) { thrown = e; }
+      const out = {
+        result, thrown, runId, file,
+        started: spawn.mock.calls.length,
+        tokenAsked: resolveAccessToken.mock.calls.length,
+        envFilesAdded: fs.readdirSync(ENVS_DIR).filter(f => !envFilesBefore.includes(f)),
+        row: getRunRow(runId),
+        events: getDecryptedEvents(runId),
+      };
+      spawn.mockReset();
+      resolveAccessToken.mockReset();
+      return out;
+    }
+
+    function expectRefused(out, where) {
+      expect(out.thrown).toBeNull();
+      expect(out.result.exitCode).toBe(1);
+      expect(out.result.error).toContain('was not started');
+      expect(out.result.error).toContain(where);
+      expect(out.result.error).not.toContain('OSCAR_ACCESS_TOKEN');   // says where, never repeats the text
+      expect(out.row.status).toBe('FAILED');
+      expect(out.row.error_message).toBe(out.result.error);
+      expect(out.started).toBe(0);
+      expect(out.tokenAsked).toBe(0);
+      expect(out.envFilesAdded).toEqual([]);
+      expect(out.events.some(e => e.level === 'error' && e.message.includes(where))).toBe(true);
+      expect(JSON.stringify(out.events)).not.toContain('tok-secret-123');
+    }
+
+    function expectStarted(out) {
+      expect(out.thrown).toBeNull();
+      expect(out.result.exitCode).toBe(0);
+      expect(out.started).toBeGreaterThan(0);
+      expect(out.tokenAsked).toBe(1);
+    }
+
+    test('a clean datafile: the run starts', async () => {
+      expectStarted(await attempt(datafileFor(CODE)));
+    });
+
+    test('in the scenario being run', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[0].label = `Paris ${TOKEN}`;
+      expectRefused(await attempt(df), `scenario "${CODE}": label`);
+    });
+
+    test.each([
+      ['a passenger', df => { df.passengersList[0].passengers[0].firstName = TOKEN; }, 'passengersList, entry 1: passengers[0].firstName'],
+      ['a trip', df => { df.tripRequirements[0].legs[0].origin = TOKEN; }, 'tripRequirements, entry 1: legs[0].origin'],
+      ['a purchaser', df => { df.purchaserList[1].purchaser[0].firstName = TOKEN; }, 'purchaserList, entry 2: purchaser[0].firstName'],
+      ['an entry no scenario uses', df => { df.passengersList.push({ id: 99, passengers: [{ firstName: TOKEN }] }); }, 'passengersList, entry 3: passengers[0].firstName'],
+      ['the name of a field', df => { df.scenarios[0][`${OPEN}k`] = 'v'; }, '(the name of the field)'],
+      ['a root key a tester may set on a first save', df => { df.osdmVersion = TOKEN; }, 'osdmVersion: (the value itself)'],
+    ])('in %s', async (_what, plant, where) => {
+      const df = datafileFor(CODE);
+      plant(df);
+      expectRefused(await attempt(df), where);
+    });
+
+    // The schema check reads the whole file back through Bruno and prints the
+    // value of a field that is not on its list of allowed values: a template in
+    // SOMEONE ELSE'S scenario showed the token of the person running this one.
+    test('in another scenario: refused too, and a Test Manager is told which', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[1].scenarioType = TOKEN;
+      expectRefused(await attempt(df), 'scenario "SOMEONE_ELSES": scenarioType');
+    });
+
+    test('in someone else\'s private scenario, run by a tester: refused, and told nothing about it', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[1].created_by = 'someone.else@runner-test.com';   // private to another tester
+      df.scenarios[1].scenarioType = TOKEN;
+      df.tripRequirements[1].secretField = TOKEN;                    // an entry only that scenario uses
+      const out = await attempt(df, { role: 'company_user' });
+      expectRefused(out, 'a part of the data file that you cannot see');
+      for (const hidden of ['SOMEONE_ELSES', 'scenarioType', 'secretField', 'tripRequirements', 'entry', 'Where:']) {
+        expect(out.result.error).not.toContain(hidden);
+        expect(JSON.stringify(out.events)).not.toContain(hidden);
+      }
+    });
+
+    test('the same file, run by the Test Manager: both places are named', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[1].created_by = 'someone.else@runner-test.com';
+      df.scenarios[1].scenarioType = TOKEN;
+      df.tripRequirements[1].secretField = TOKEN;
+      const out = await attempt(df);
+      expectRefused(out, 'scenario "SOMEONE_ELSES": scenarioType');
+      expect(out.result.error).toContain('tripRequirements, entry 2: secretField');
+      expect(out.result.error).not.toContain('cannot see');
+    });
+
+    test('a tester is told the code of the scenario they are running', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[0].label = TOKEN;
+      expectRefused(await attempt(df, { role: 'company_user' }), `scenario "${CODE}": label`);
+    });
+
+    test('a tester is told the place in a private scenario of their own, and in the entries it uses', async () => {
+      const out = await attempt((email) => {
+        const df = datafileFor(CODE);
+        df.scenarios[0].created_by = email;                          // private to the person running
+        df.scenarios[0].label = TOKEN;
+        df.passengersList[0].passengers[0].firstName = TOKEN;
+        return df;
+      }, { role: 'company_user' });
+      expectRefused(out, `scenario "${CODE}": label`);
+      expect(out.result.error).toContain('passengersList, entry 1: passengers[0].firstName');
+      expect(out.result.error).not.toContain('cannot see');
+    });
+
+    test('a run that names no scenario is looked at as well', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[1].label = TOKEN;
+      const out = await attempt(df, { scenarioOverride: undefined });
+      expectRefused(out, 'scenario "SOMEONE_ELSES": label');
+    });
+
+    test('the two root keys only a Test Manager writes do not stop a run', async () => {
+      const df = datafileFor(CODE);
+      df.systemInfoParameters = { note: TOKEN };
+      df.knownDeviations = [{ step: 'x', expectedStatus: 400, note: TOKEN }];
+      expectStarted(await attempt(df));
+    });
+
+    test('single braces do not stop a run', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[0].label = 'a {single} brace, } and {';
+      df.passengersList[0].passengers[0].firstName = '{';
+      df.passengersList[0].passengers[0].lastName = '{x}';
+      expectStarted(await attempt(df));
+    });
+
+    test('an encrypted datafile, as stored in production, is read the same way', async () => {
+      const { encryptBuffer } = require('../../src/utils/at-rest');
+      const df = datafileFor(CODE);
+      df.passengersList[0].passengers[0].firstName = TOKEN;
+      const stored = encryptBuffer(Buffer.from(JSON.stringify(df), 'utf8'));
+      expect(stored.toString('latin1')).not.toContain('firstName');        // it really is the envelope
+      expectRefused(await attempt(stored), 'passengersList, entry 1: passengers[0].firstName');
+    });
+
+    test('10,000 templates in one datafile: refused at once, three places named', async () => {
+      const df = datafileFor(CODE);
+      df.scenarios[0].many = Array.from({ length: 10000 }, () => TOKEN);
+      const began = Date.now();
+      const out = await attempt(df);
+      expect(Date.now() - began).toBeLessThan(5000);
+      expectRefused(out, `scenario "${CODE}": many[0]`);
+      expect(out.result.error).toContain('and 9997 more');
+      expect(out.result.error.length).toBeLessThan(700);
+    });
+
+    test('a datafile that cannot be read: the run is refused, not started unchecked', async () => {
+      const out = await attempt('this is not JSON');
+      expect(out.thrown).toBeNull();
+      expect(out.result.exitCode).toBe(1);
+      expect(out.result.error).toMatch(/data file could not be read/i);
+      expect(out.row.status).toBe('FAILED');
+      expect(out.started).toBe(0);
+      expect(out.tokenAsked).toBe(0);
+    });
+
+    test('no datafile at all is left to the step that already reports it', async () => {
+      const { companyId, userId } = seedCompanyUser();
+      run('UPDATE companies SET datafile_path = ? WHERE id = ?', ['/does/not/exist.json', companyId]);
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-abc');
+      const result = await executeRun({ runId, companyId, userId, scenarioOverride: CODE });
+      expect(result.error).toMatch(/No data file/i);
+      expect(spawn).not.toHaveBeenCalled();
+      resolveAccessToken.mockReset();
     });
   });
 });
