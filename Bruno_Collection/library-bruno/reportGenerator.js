@@ -74,11 +74,14 @@ function _runSecrets() {
   const out = [];
   const push = (v) => { if (v && String(v).length >= 8) out.push(String(v)); };
   try {
+    // `typeof bru` guard first: in some sandbox contexts `bru` is not declared
+    // at all, so a bare `bru?.` would still throw a ReferenceError. The optional
+    // call keeps Sonar S6582 happy without losing that guard.
     for (const n of ['access_token', 'Ocp-Apim-Subscription-Key', 'oauth_extra', 'auth_key_secret']) {
-      push(typeof bru !== 'undefined' && bru.getEnvVar && bru.getEnvVar(n));
+      push(typeof bru !== 'undefined' && bru.getEnvVar?.(n));
     }
     for (const n of ['OSCAR_ACCESS_TOKEN', 'OSCAR_SUBSCRIPTION_KEY', 'OSCAR_OAUTH_EXTRA']) {
-      push(typeof bru !== 'undefined' && bru.getProcessEnv && bru.getProcessEnv(n));
+      push(typeof bru !== 'undefined' && bru.getProcessEnv?.(n));
     }
   } catch (_e) { /* no env context — fall back to name-only redaction */ }
   return Array.from(new Set(out));
