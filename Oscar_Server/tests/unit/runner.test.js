@@ -1062,7 +1062,7 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       const out = await attempt(df);
       expect(Date.now() - began).toBeLessThan(5000);
       expectRefused(out, `scenario "${CODE}": many[0]`);
-      expect(out.result.error).toContain('and 9997 more');
+      expect(out.result.error).toContain('and many more');
       expect(out.result.error.length).toBeLessThan(700);
     });
 

@@ -60,33 +60,67 @@ const SEP = String.fromCodePoint(0);            // between a place and a text, i
 const TEST_MANAGER_ROOT_KEYS = Object.freeze(['systemInfoParameters', 'knownDeviations']);
 const MAX_SHOWN = 3;            // places named in a message
 const MAX_KEPT = 20;            // places kept once found; more are only counted
+const SAME_PLACE_LIMIT = 5000;  // stored templates up to which "the same place" is looked at
+const STOP_AFTER = 1000;       // found this many: stop looking, the answer is the same
 const MAX_NAME = 60;            // characters of a name shown
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const shown = name => (name.length > MAX_NAME ? `${name.slice(0, MAX_NAME)}…` : name);
 
+const holds = v => typeof v === 'string' && v.includes(OPEN);
+const walkable = v => v !== null && typeof v === 'object';
+const NOTHING = Object.freeze([]);
+const ITSELF = '(the value itself)';
+
+// A list or an object being walked: its path, its keys (none for a list) and
+// how far along it we are.
+function opened(v, at) {
+  const keys = Array.isArray(v) ? null : Object.keys(v);
+  return { v, at, keys, i: 0, n: (keys || v).length };
+}
+
+// The path of the child at `i` of a level.
+function pathIn(level, i) {
+  if (level.keys === null) return `${level.at}[${i}]`;
+  const name = shown(level.keys[i]);
+  return level.at ? `${level.at}.${name}` : name;
+}
+
+// Looks at the next child of the level on top of the stack. Goes into it when
+// it is a list or an object, and returns the [path, text] pairs it gives by
+// itself: its name, its text. A child with nothing to say costs no path.
+function lookAtNext(stack) {
+  const level = stack.at(-1);
+  if (level.i >= level.n) { stack.pop(); return NOTHING; }
+  const i = level.i++;
+  const key = level.keys === null ? null : level.keys[i];
+  const child = level.keys === null ? level.v[i] : level.v[key];
+  const named = holds(key);
+  const text = holds(child);
+  const deeper = walkable(child);
+  if (!named && !text && !deeper) return NOTHING;
+  const here = pathIn(level, i);
+  if (deeper) stack.push(opened(child, here));
+  if (!named && !text) return NOTHING;
+  const pairs = [];
+  if (named) pairs.push([`${here} (the name of the field)`, key]);
+  if (text) pairs.push([here || ITSELF, child]);
+  return pairs;
+}
+
 /**
  * Every string, and every name of a field, inside `value` that holds two
  * opening braces, one [path, text] pair at a time; the path reads like
- * `passengers[0].firstName`. Walks with its own stack, and hands the pairs
- * out one by one so that a caller who only counts keeps none of them.
+ * `passengers[0].firstName`. Walks with its own stack, one child at a time:
+ * a caller who stops early has paid for what it read, not for the whole
+ * value, and one who only counts keeps nothing.
  */
 function* templateTexts(value) {
-  const stack = [[value, '']];
+  if (holds(value)) yield [ITSELF, value];
+  const stack = walkable(value) ? [opened(value, '')] : [];
   while (stack.length > 0) {
-    const [v, at] = stack.pop();
-    if (typeof v === 'string') {
-      if (v.includes(OPEN)) yield [at || '(the value itself)', v];
-    } else if (Array.isArray(v)) {
-      for (let i = v.length - 1; i >= 0; i--) stack.push([v[i], `${at}[${i}]`]);
-    } else if (isObj(v)) {
-      const keys = Object.keys(v);
-      for (let i = keys.length - 1; i >= 0; i--) {
-        const here = at ? `${at}.${shown(keys[i])}` : shown(keys[i]);
-        stack.push([v[keys[i]], here]);
-        if (keys[i].includes(OPEN)) stack.push([keys[i], `${here} (the name of the field)`]);
-      }
-    }
+    const pairs = lookAtNext(stack);
+    if (pairs !== NOTHING) yield* pairs;
   }
 }
 
@@ -126,16 +160,21 @@ function* occurrences(datafile) {
 }
 
 // What the functions below hand back: the first places found, as texts, with
-// `total`, the number found in all. Places past MAX_KEPT are counted only.
+// `total`, the number found. Places past MAX_KEPT are counted only, and at
+// STOP_AFTER the looking stops: `capped` then says the number is a floor.
 function collector() {
   const kept = [];
   kept.total = 0;
   kept.elsewhere = false;
+  kept.capped = false;
   return {
     kept,
+    // Returns true when enough have been found and the caller should stop.
     add(what, at) {
       kept.total++;
       if (kept.length < MAX_KEPT) kept.push(`${what}: ${at}`);
+      kept.capped = kept.total >= STOP_AFTER;
+      return kept.capped;
     },
   };
 }
@@ -143,7 +182,9 @@ function collector() {
 /** The places where the datafile holds two opening braces, with every scenario named. */
 function templatesInDatafile(datafile) {
   const found = collector();
-  for (const [what, at] of occurrences(datafile)) found.add(what, at);
+  for (const [what, at] of occurrences(datafile)) {
+    if (found.add(what, at)) break;
+  }
   return found.kept;
 }
 
@@ -157,11 +198,61 @@ function templatesInDatafile(datafile) {
 function templatesForRunner(datafile, { testManager, email } = {}) {
   if (testManager === true) return templatesInDatafile(datafile);
   const visible = templatesInDatafile(viewForTester(datafile, email, null));
+  // Is there one more in the whole file than in what they see? Counting stops
+  // as soon as that is known.
   let all = 0;
   const every = occurrences(datafile);
-  while (!every.next().done) all++;
-  visible.elsewhere = all > visible.total;
+  while (all <= visible.total && !every.next().done) all++;
+  visible.elsewhere = !visible.capped && all > visible.total;
   return visible;
+}
+
+const placeKey = (text, what, at) => text + SEP + what + SEP + at;
+
+// What `stored` holds. Per text: how many are stored, and room for what the
+// sent file will show (`hits` still in place, `others` not, the first of those
+// `kept`). Per text and place: how many are stored there, unless there are too
+// many for "the same place" to be worth looking at.
+function storedTemplates(stored) {
+  const perText = new Map();
+  let samePlace = new Map();
+  let count = 0;
+  for (const [what, at, text] of occurrences(stored)) {
+    const e = perText.get(text) || { stored: 0, hits: 0, others: 0, kept: [] };
+    e.stored++;
+    perText.set(text, e);
+    count++;
+    if (count > SAME_PLACE_LIMIT) samePlace = null;
+    if (samePlace) {
+      const key = placeKey(text, what, at);
+      samePlace.set(key, (samePlace.get(key) || 0) + 1);
+    }
+  }
+  return { perText, samePlace };
+}
+
+// Is this copy where a stored one was? If so that stored one is used up: one
+// stored place vouches for one copy there, not for two.
+function stillInPlace(samePlace, e, text, what, at) {
+  if (samePlace === null || e.hits >= e.stored) return false;
+  const key = placeKey(text, what, at);
+  const n = samePlace.get(key) || 0;
+  if (n === 0) return false;
+  samePlace.set(key, n - 1);
+  e.hits++;
+  return true;
+}
+
+// The copies of one text beyond the stored ones: new. Of the copies that are
+// not where a stored one was, the first `free` are stored ones that moved.
+function addExtra(added, e) {
+  const free = e.stored - e.hits;
+  const extra = e.others - free;
+  if (extra <= 0) return;
+  const named = e.kept.slice(free);
+  for (const [what, at] of named) added.add(what, at);
+  added.kept.total += extra - named.length;           // the rest are counted, not named
+  added.kept.capped = added.kept.total >= STOP_AFTER;
 }
 
 /**
@@ -170,35 +261,27 @@ function templatesForRunner(datafile, { testManager, email } = {}) {
  * failing that anywhere (the file may have been reordered); one more copy of a
  * stored one is new. Everything else about the file is ignored, so the fields
  * the editor fills in on its own never make old text look new.
+ *
+ * The work is bounded by what is stored, not by what is sent: a text with no
+ * stored copy is new at once, for a text that is stored only as many places
+ * are kept as could matter, and the looking stops once STOP_AFTER are known
+ * to be new. Past SAME_PLACE_LIMIT stored templates the look at "the same
+ * place" is given up, and texts alone are counted.
  */
 function templatesAddedBy(stored, toStore) {
   const added = collector();
-  const samePlace = new Map();                      // place + text -> how many are stored
-  const anywhere = new Map();                       // text -> how many are stored
-  for (const [what, at, text] of occurrences(stored)) {
-    const key = what + SEP + at + SEP + text;
-    samePlace.set(key, (samePlace.get(key) || 0) + 1);
-    anywhere.set(text, (anywhere.get(text) || 0) + 1);
-  }
-  // Nothing stored: everything found is new, and nothing has to be remembered.
-  if (anywhere.size === 0) {
-    for (const [what, at] of occurrences(toStore)) added.add(what, at);
-    return added.kept;
-  }
-  const take = (map, key) => {
-    const n = map.get(key) || 0;
-    if (n > 0) map.set(key, n - 1);
-    return n > 0;
-  };
-  // First the ones still where they were, then the ones that only moved.
-  const moved = [];
+  const { perText, samePlace } = storedTemplates(stored);
   for (const [what, at, text] of occurrences(toStore)) {
-    if (take(samePlace, what + SEP + at + SEP + text)) take(anywhere, text);
-    else moved.push([what, at, text]);
+    const e = perText.get(text);
+    if (!e) {                                           // no stored copy of this text at all
+      if (added.add(what, at)) return added.kept;
+    } else if (!stillInPlace(samePlace, e, text, what, at)) {
+      e.others++;
+      if (e.kept.length < e.stored + MAX_KEPT) e.kept.push([what, at]);
+      if (e.others - e.stored >= STOP_AFTER) break;     // at least that many are new: enough
+    }
   }
-  for (const [what, at, text] of moved) {
-    if (!take(anywhere, text)) added.add(what, at);
-  }
+  for (const e of perText.values()) addExtra(added, e);
   return added.kept;
 }
 
@@ -209,6 +292,7 @@ const totalOf = found => (typeof found.total === 'number' ? found.total : found.
 function listed(found) {
   const first = found.slice(0, MAX_SHOWN).join('; ');
   const more = totalOf(found) - Math.min(found.length, MAX_SHOWN);
+  if (found.capped === true) return `${first}; and many more`;
   return more > 0 ? `${first}; and ${more} more` : first;
 }
 

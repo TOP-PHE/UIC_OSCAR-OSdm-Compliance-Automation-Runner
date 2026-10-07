@@ -322,9 +322,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     and for the rest one sentence, "in a part of the data file that you cannot
     see": no code, no field, no entry position, no count. A first attempt that
     only masked scenario codes still gave all of those away.
-  - **The walk is a generator**, and places past the first twenty are counted,
-    not built: 650,000 templates in a 5 MB file cost about a second and
-    480 MB when a text was made for each.
+  - **The walk is a generator that reads one child at a time, and the looking
+    stops at 1,000** (`STOP_AFTER`; the message then ends "and many more").
+    A million templates in a 5 MB body are refused in a few milliseconds. An
+    earlier version pushed every child of a list before reading the first and
+    took 2.4 s for the same file; one before that built a text for every place
+    and used 480 MB. A caller that stops early must not have paid for the
+    whole value: keep `lookAtNext()` lazy. What still costs about a second is
+    a save over a file that already *stores* several hundred thousand, which
+    no save or upload can create any more.
   - **Left alone on purpose:** dedicated headers (templates are their
     documented use) and the two root keys only a Test Manager writes.
   - Two test files cover the routes because `datafileMutationLimiter` allows

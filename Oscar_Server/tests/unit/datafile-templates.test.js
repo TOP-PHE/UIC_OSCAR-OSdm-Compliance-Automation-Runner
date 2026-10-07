@@ -84,20 +84,18 @@ describe('templatePaths — where text holds two opening braces', () => {
 });
 
 describe('templatesInDatafile — what a datafile may not hold when a run starts', () => {
-  const asManager = { showAll: true };
-
   test('a clean file gives nothing', () => {
-    const found = templatesInDatafile(datafile(), asManager);
+    const found = templatesInDatafile(datafile());
     expect(plain(found)).toEqual([]);
     expect(found.total).toBe(0);
   });
 
   test('the two root keys only a Test Manager writes are left alone, and only those two', () => {
     expect(TEST_MANAGER_ROOT_KEYS).toEqual(['systemInfoParameters', 'knownDeviations']);
-    expect(plain(templatesInDatafile(datafile(), asManager))).toEqual([]);      // both hold one in the fixture
+    expect(plain(templatesInDatafile(datafile()))).toEqual([]);      // both hold one in the fixture
     const df = datafile();
     df.somethingElse = { note: TOKEN };
-    expect(plain(templatesInDatafile(df, asManager))).toEqual(['somethingElse: note']);
+    expect(plain(templatesInDatafile(df))).toEqual(['somethingElse: note']);
   });
 
   test.each([
@@ -117,21 +115,28 @@ describe('templatesInDatafile — what a datafile may not hold when a run starts
   ])('in %s', (_what, plant, expected) => {
     const df = datafile();
     plant(df);
-    expect(plain(templatesInDatafile(df, asManager))).toEqual([expected]);
+    expect(plain(templatesInDatafile(df))).toEqual([expected]);
   });
 
-  test('40,000 of them: counted in well under a second, twenty kept', () => {
-    const df = datafile();
-    df.scenarios[0].many = Array.from({ length: 40000 }, () => OPEN);
+  test('999 of them are all counted; from 1,000 on the looking stops and says "many more"', () => {
+    const some = datafile();
+    some.scenarios[0].many = Array.from({ length: 999 }, () => OPEN);
+    const all = templatesInDatafile(some);
+    expect([all.length, all.total, all.capped]).toEqual([20, 999, false]);
+    expect(runRefusal(all)).toContain('and 996 more');
+
+    const lots = datafile();
+    lots.scenarios[0].many = Array.from({ length: 40000 }, () => OPEN);
     const began = Date.now();
-    const found = templatesInDatafile(df, asManager);
-    expect(Date.now() - began).toBeLessThan(2000);
-    expect(found).toHaveLength(20);
-    expect(found.total).toBe(40000);
+    const found = templatesInDatafile(lots);
+    expect(Date.now() - began).toBeLessThan(1000);
+    expect([found.length, found.total, found.capped]).toEqual([20, 1000, true]);
+    expect(runRefusal(found)).toContain('many[2]; and many more.');
+    expect(runRefusal(found)).not.toContain('997');
   });
 
   test('what is not a datafile holds nothing', () => {
-    for (const odd of [null, undefined, 'text', 7, [], [TOKEN]]) expect(plain(templatesInDatafile(odd, asManager))).toEqual([]);
+    for (const odd of [null, undefined, 'text', 7, [], [TOKEN]]) expect(plain(templatesInDatafile(odd))).toEqual([]);
   });
 });
 
@@ -216,14 +221,23 @@ describe('templatesForRunner — what the person running is told', () => {
     expect(plain(templatesForRunner(everywhere()))).not.toContain('scenario "THEIRS": scenarioType');
   });
 
-  test('650,000 of them, the size of the largest body: counted in about a second, twenty kept', () => {
+  test('a million of them, the size of the largest body the server accepts: refused at once', () => {
     const df = datafile();
-    df.scenarios[0].many = Array.from({ length: 650000 }, () => OPEN);
-    const began = Date.now();
-    const found = templatesForRunner(df, { testManager: false, email: ME });
-    expect(Date.now() - began).toBeLessThan(4000);
-    expect(found).toHaveLength(20);
-    expect(found.total).toBe(650000);
+    df.scenarios[0].many = Array.from({ length: 1000000 }, () => OPEN);
+    for (const who of [{ testManager: false, email: ME }, { testManager: true }]) {
+      const began = Date.now();
+      const found = templatesForRunner(df, who);
+      expect(Date.now() - began).toBeLessThan(1500);
+      expect([found.length, found.total, found.capped, found.elsewhere]).toEqual([20, 1000, true, false]);
+      expect(runRefusal(found)).toContain('was not started');
+    }
+  });
+
+  test('with a great many in their own scenario, a tester is still not told about the rest', () => {
+    const df = everywhere();
+    df.scenarios[0].many = Array.from({ length: 5000 }, () => OPEN);
+    const sentence = runRefusal(templatesForRunner(df, { testManager: false, email: ME }));
+    for (const hidden of ['THEIRS', 'scenarioType', 'secretField', 'tripRequirements']) expect(sentence).not.toContain(hidden);
   });
 });
 
@@ -293,6 +307,18 @@ describe('templatesAddedBy — what a save may not add', () => {
     expect(plain(templatesAddedBy(legacy(), sent))).toEqual(['scenario "MINE": label']);
   });
 
+  test('one stored place vouches for one copy there, not for two', () => {
+    const stored = datafile();
+    stored.scenarios = [{ code: 'TWIN', label: TOKEN }, { code: 'GONE', label: TOKEN }];
+    const sent = datafile();
+    sent.scenarios = [{ code: 'TWIN', label: TOKEN }, { code: 'ELSEWHERE', label: TOKEN }, { code: 'TWIN', label: TOKEN }];
+    const found = templatesAddedBy(stored, sent);
+    // Two were stored, three are sent. The first TWIN is where it was, the one
+    // from GONE moved to ELSEWHERE, and the second TWIN is the one too many.
+    expect(plain(found)).toEqual(['scenario "TWIN": label']);
+    expect(found.total).toBe(1);
+  });
+
   test('changing the text of a stored template is new', () => {
     const sent = legacy();
     sent.scenarios[1].label = `theirs ${OTHER}`;
@@ -310,14 +336,28 @@ describe('templatesAddedBy — what a save may not add', () => {
     const sent = legacy();
     sent.scenarios[0].passengersListId = 20;                       // MINE now uses the entry with the old template
     expect(plain(templatesAddedBy(legacy(), sent))).toEqual([]);
-    expect(plain(templatesInDatafile(sent, { ownCode: 'MINE' }))).toContain('passengersList, entry 2: passengers[0].firstName');
-    expect(plain(templatesInDatafile(legacy(), { ownCode: 'MINE' }))).toContain('passengersList, entry 2: passengers[0].firstName');
+    expect(plain(templatesInDatafile(sent))).toContain('passengersList, entry 2: passengers[0].firstName');
+    expect(plain(templatesInDatafile(legacy()))).toContain('passengersList, entry 2: passengers[0].firstName');
   });
 
   test('a first save, with nothing stored, is looked at whole', () => {
     for (const nothing of [{}, null, undefined, 'text', []]) {
       expect(plain(templatesAddedBy(nothing, legacy()))).toEqual(['scenario "THEIRS": label', 'passengersList, entry 2: passengers[0].firstName']);
     }
+  });
+
+  test('a text that is stored 3 times and sent 1,002 more times is counted, and it stops there', () => {
+    const stored = datafile();
+    stored.scenarios[1].many = [OPEN, OPEN, OPEN];
+    const sent = copy(stored);
+    sent.scenarios[0].many = Array.from({ length: 5000 }, () => OPEN);
+    const found = templatesAddedBy(stored, sent);
+    expect([found.length, found.total, found.capped]).toEqual([20, 1000, true]);
+    const fewer = copy(stored);
+    fewer.scenarios[0].many = Array.from({ length: 999 }, () => OPEN);
+    const all = templatesAddedBy(stored, fewer);
+    expect([all.length, all.total, all.capped]).toEqual([20, 999, false]);
+    expect(saveRefusal(all)).toContain('and 996 more.');
   });
 
   test('the two root keys only a Test Manager writes are left alone', () => {
@@ -331,14 +371,28 @@ describe('templatesAddedBy — what a save may not add', () => {
     for (const odd of [null, undefined, 'text', 3, [], [TOKEN]]) expect(plain(templatesAddedBy(datafile(), odd))).toEqual([]);
   });
 
-  test('40,000 new ones in one save: answered in well under a second', () => {
-    const sent = datafile();
-    sent.scenarios[0].many = Array.from({ length: 40000 }, () => OPEN);
+  test('a million new ones in one save, identical or all different: refused at once', () => {
+    for (const make of [() => OPEN, (_, i) => `${OPEN}${i}`]) {
+      const sent = datafile();
+      sent.scenarios[0].many = Array.from({ length: 1000000 }, make);
+      const began = Date.now();
+      const found = templatesAddedBy(datafile(), sent);
+      expect(Date.now() - began).toBeLessThan(1500);
+      expect([found.length, found.total, found.capped]).toEqual([20, 1000, true]);
+      expect(saveRefusal(found)).toContain('and many more.');
+    }
+  });
+
+  test('a million more copies of a text that is stored once: refused at once too', () => {
+    const stored = datafile();
+    stored.scenarios[1].label = OPEN;
+    const sent = copy(stored);
+    sent.scenarios[0].many = Array.from({ length: 1000000 }, () => OPEN);
     const began = Date.now();
-    const found = templatesAddedBy(datafile(), sent);
-    expect(Date.now() - began).toBeLessThan(2000);
-    expect(found).toHaveLength(20);
-    expect(found.total).toBe(40000);
+    const found = templatesAddedBy(stored, sent);
+    expect(Date.now() - began).toBeLessThan(1500);
+    expect([found.length, found.total, found.capped]).toEqual([20, 1000, true]);    // it stopped at a thousand
+    expect(saveRefusal(found)).toContain('and many more.');
   });
 
   test('40,000 stored ones, saved back: still nothing added, still fast', () => {
@@ -347,6 +401,47 @@ describe('templatesAddedBy — what a save may not add', () => {
     const began = Date.now();
     expect(plain(templatesAddedBy(stored, copy(stored)))).toEqual([]);
     expect(Date.now() - began).toBeLessThan(2000);
+  });
+
+  test('many more copies of a stored one: all counted, twenty named', () => {
+    const stored = datafile();
+    stored.scenarios[1].label = OPEN;
+    const sent = copy(stored);
+    sent.scenarios[0].many = Array.from({ length: 100 }, () => OPEN);
+    const found = templatesAddedBy(stored, sent);
+    expect(found.total).toBe(100);
+    expect(found).toHaveLength(20);
+    expect(found[0]).toBe('scenario "MINE": many[0]');
+    expect(plain(found)).not.toContain('scenario "THEIRS": label');   // the stored one is still where it was
+  });
+
+  test('a file that already holds 6,000 of them: saved back, nothing added; one more, one added', () => {
+    const stored = datafile();
+    stored.scenarios[1].many = Array.from({ length: 6000 }, (_, i) => `${OPEN}${i % 50}`);
+    expect(plain(templatesAddedBy(stored, copy(stored)))).toEqual([]);
+
+    const reordered = copy(stored);
+    reordered.scenarios.reverse();
+    reordered.scenarios[0].many.reverse();
+    expect(plain(templatesAddedBy(stored, reordered))).toEqual([]);
+
+    const oneMore = copy(stored);
+    oneMore.scenarios[0].label = `${OPEN}7`;                       // a text that is stored 120 times already
+    expect(templatesAddedBy(stored, oneMore).total).toBe(1);
+    const another = copy(stored);
+    another.scenarios[0].label = `${OPEN}never stored`;
+    expect(plain(templatesAddedBy(stored, another))).toEqual(['scenario "MINE": label']);
+  });
+
+  test('300,000 stored and sent back with one more: answered in about a second', () => {
+    const stored = datafile();
+    stored.scenarios[0].many = Array.from({ length: 300000 }, () => OPEN);
+    const sent = datafile();
+    sent.scenarios[0].many = Array.from({ length: 300001 }, () => OPEN);
+    const began = Date.now();
+    const found = templatesAddedBy(stored, sent);
+    expect(Date.now() - began).toBeLessThan(4000);
+    expect(found.total).toBe(1);
   });
 
   test('a scenario nested 20,000 levels deep does not end in a RangeError', () => {
@@ -365,7 +460,7 @@ describe('the two sentences', () => {
     expect(saveRefusal([])).toBeNull();
     expect(runRefusal([])).toBeNull();
     expect(saveRefusal(templatesAddedBy(datafile(), datafile()))).toBeNull();
-    expect(runRefusal(templatesInDatafile(datafile(), { showAll: true }))).toBeNull();
+    expect(runRefusal(templatesInDatafile(datafile()))).toBeNull();
   });
 
   test('they say what, why and where, and never repeat the text itself', () => {
@@ -387,7 +482,7 @@ describe('the two sentences', () => {
   test('more than three places are counted, not listed', () => {
     const df = datafile();
     df.scenarios[0].many = [OPEN, OPEN, OPEN, OPEN, OPEN];
-    const sentence = saveRefusal(templatesInDatafile(df, { showAll: true }));
+    const sentence = saveRefusal(templatesInDatafile(df));
     expect(sentence).toContain('many[0]; scenario "MINE": many[1]; scenario "MINE": many[2]; and 2 more.');
     expect(sentence).not.toContain('many[3]');
   });
