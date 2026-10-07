@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.238",
+  "current_release": "2026.239",
   "releases": [
+    {
+      "release": "2026.239",
+      "date": "2026-10-07",
+      "server": "1.11.214",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): report header redaction is by value, not only by header name, so a tenant-named header carrying the run credential no longer leaks. Audit tracker NEW-03 (report half of PR-05; the storage half S6 shipped in 1.11.213). Closes #565. Server (structureResults) + collection (reportGenerator).",
+        "Every redaction layer matched a fixed list of header NAMES (authorization, ocp-apim-subscription-key, ...), so a company dedicated header named anything (X-My-Auth: {{access_token}}) rendered its value — the run's live token — verbatim in the stored run_requests traffic a certifier reads and in the HTML report. Now redaction is also by VALUE: any header whose value contains one of the run's own resolved secrets (access token, APIM subscription key, OAuth extra) is masked, wherever it sits and whatever its name, and only the secret substring is masked.",
+        "Per the maintainer: diagnostic headers stay visible. A header with no secret — an OSDM version, a correlation / session-trace id (useful for finding traces), Accept — is left intact; a header carrying both a trace id and the token keeps the trace id and masks only the token. Known-name credential headers (Authorization, subscription key) stay fully masked as before.",
+        "Server: Oscar_Server/src/reports/structureResults.js reads the run's resolved secrets (cached access token, subscription key, oauth extra) from the user row and redacts request/response headers by value at write time, before they are stored (encrypted) in run_requests and served by reports.js. Collection: Bruno_Collection/library-bruno/reportGenerator.js does the same in the Bruno sandbox, reading the secrets from the run env, for the standalone HTML artifact. The mergeReport.js fallback report stays name-based on purpose: it runs as a separate child with no credentials (the #306 / NEW-01 guarantee), so it cannot value-match.",
+        "How it was checked: redactHeaders unit tests (name-mask; value-mask of a tenant-named header; diagnostic headers left intact; only the secret substring masked in a mixed value; no-secret list falls back to name-only); an end-to-end structure-results test (a user cached token + an artifact header X-My-Auth carrying it -> stored masked, OSDM-Version and correlation id kept); the collection reportGenerator verified through appendRequest with a stubbed run env (same outcome). A mutation check breaks each guard. Lint and the full suite green (72 suites, 2,089 tests).",
+        "This completes PR-05 and the 8 P0/P1 security items on the pen-test prerequisite list."
+      ]
+    },
     {
       "release": "2026.238",
       "date": "2026-10-07",
