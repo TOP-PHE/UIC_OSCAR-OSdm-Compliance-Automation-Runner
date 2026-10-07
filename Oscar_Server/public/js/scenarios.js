@@ -4932,7 +4932,7 @@ function journeyBodyHtml(jidx) {
     </div>`).join('') : '<div style="color:#90a4ae;font-size:12px;padding:6px 0">No legs yet — chain the train sets this journey runs over.</div>';
   const warns = journeyContinuityWarnings(j);
   const warnHtml = warns.length
-    ? `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#e65100">⚠ ${warns.map(esc).join('<br>')}</div>`
+    ? `<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#e65100">⚠ ${warns.map((w) => esc(w)).join('<br>')}</div>`
     : '';
   return `
     <div style="font-size:11px;color:#78909c;margin-bottom:8px">🧭 ${esc(journeySummary(j))}</div>
