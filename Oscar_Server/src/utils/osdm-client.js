@@ -16,7 +16,7 @@
  * auth-header / URL-join / timeout boilerplate.
  */
 
-const { decrypt } = require('../db/db');
+const { decrypt, colDecrypt } = require('../db/db');
 const { usableUrlRefusal } = require('./urlPolicy');
 const log = require('./logger').child({ module: 'osdm-client' });
 
@@ -96,7 +96,10 @@ function mergeDedicatedHeaders(headers, companyRow, accessToken) {
     'Ocp-Apim-Subscription-Key': headers['Ocp-Apim-Subscription-Key'] || ''
   };
   try {
-    const raw = companyRow?.extra_headers ? JSON.parse(companyRow.extra_headers) : null;
+    // S6: extra_headers is encrypted at rest; colDecrypt reads both the
+    // encrypted form and any legacy-plaintext row.
+    const stored = companyRow?.extra_headers ? colDecrypt(companyRow.extra_headers) : null;
+    const raw = stored ? JSON.parse(stored) : null;
     if (!Array.isArray(raw)) return headers;
     for (const hdr of raw) {
       if (!hdr?.name) continue;

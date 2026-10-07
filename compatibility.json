@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.237",
+  "current_release": "2026.238",
   "releases": [
+    {
+      "release": "2026.238",
+      "date": "2026-10-07",
+      "server": "1.11.213",
+      "collection": "OTST_V2.0.103",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): dedicated headers (companies.extra_headers) are encrypted at rest and no longer returned to clients. Audit tracker S6 (server half of PR-05). Closes #563. Server-only; collection unchanged at OTST_V2.0.103. The report-redaction half, NEW-03, follows separately.",
+        "companies.extra_headers (the \"Dedicated Headers\" field, presented as the home for vendor API keys) was stored plaintext, returned verbatim by GET /v1/company, and visible to a platform administrator — unlike every other credential, which is AES-256-GCM encrypted at rest and never serialized. Now: the write path colEncrypts the JSON blob (enc:v1: envelope); a new migration (v27) encrypts existing rows at boot, mirroring v19's per-row prefix-skipping loop; colDecrypt reads both the encrypted form and any legacy-plaintext row, so a row left plaintext by a crash still works. The run engine (worker/runner.js) and the server OSDM calls (utils/osdm-client.mergeDedicatedHeaders) decrypt at use.",
+        "Read path: safeCompany(company, canSeeHeaderValues) returns the header values ONLY to the owning Test Manager (who set them and needs them to edit). An administrator, a tester and a certifier get the header name and a has_value boolean, never the value; the platform cross-company view is masked the same way. The editor is unchanged because the owning Test Manager still receives the values.",
+        "How it was checked: company-routes tests (stored enc:v1 not plaintext; the owning TM gets values; a tester and a platform administrator get name + has_value, no value; a certifier is 403 with no leak path); a db-migrations test (a plaintext row is encrypted in place by migration 27, no plaintext secret left); osdm-client tests (an encrypted row decrypts at use and resolves {{var}} templates; a legacy plaintext row still resolves). A mutation check breaks each guard; each fails a test. Lint and the full suite green (72 suites, 2,080 tests).",
+        "Scope note: this is the server half of PR-05. NEW-03 — the HTML report a certifier reads still renders a tenant-named header value verbatim because redaction matches a fixed name list — is delivered as its own change, redacting header values by value (masking any header whose value is the run's resolved credential) so diagnostic headers (OSDM version, correlation/trace IDs) stay visible."
+      ]
+    },
     {
       "release": "2026.237",
       "date": "2026-10-07",

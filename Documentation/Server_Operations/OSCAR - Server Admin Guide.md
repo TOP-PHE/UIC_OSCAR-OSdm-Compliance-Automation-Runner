@@ -1431,3 +1431,29 @@ What to check on your deployment:
   `ALLOWED_ORIGINS` to that origin (comma-separated for several), e.g.
   `ALLOWED_ORIGINS=https://oscar.uic.org`. Listed origins are then allowed with
   credentials; everything else is refused. See `.env.example`.
+
+### 15.15 v1.11.213 — dedicated headers are encrypted and not shown to others
+
+Audit tracker item S6. The company "Dedicated Headers" field (API Config) is the
+home for vendor API keys. It was stored in clear in the database and returned in
+full by the company API — including to a platform administrator — unlike every
+other credential, which is encrypted at rest and never sent back to a client.
+
+From this release the dedicated-header values are encrypted at rest (the same
+`enc:v1:` envelope as the other sensitive columns), and a migration encrypts any
+existing rows on first boot. The values are returned **only** to the Test Manager
+of the owning company — who sets them and needs them to edit. An administrator, a
+tester and a certifier see the header **name** and whether a value is set, never
+the value. Runs are unaffected: the engine reads the headers from the database
+and decrypts them itself.
+
+What to check on your deployment:
+
+- Nothing to configure. The migration runs automatically; a row left in clear by
+  an interrupted migration is still read correctly and re-encrypted on its next
+  save.
+- A Test Manager still sees and edits their company's dedicated headers as
+  before. If an administrator reports they can no longer see the values, that is
+  intended.
+- The report-side counterpart — a tenant-named header value appearing in the HTML
+  report a certifier reads — is addressed separately (tracker NEW-03).

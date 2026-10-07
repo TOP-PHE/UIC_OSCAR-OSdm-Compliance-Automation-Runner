@@ -14,7 +14,8 @@
  * request leaves the process.
  */
 
-const { osdmGet } = require('../../src/utils/osdm-client');
+const { osdmGet, mergeDedicatedHeaders } = require('../../src/utils/osdm-client');
+const { colEncrypt } = require('../../src/db/db');
 
 const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
 let fetchSpy;
@@ -41,4 +42,28 @@ test('osdmGet fetches when the api_base is a public literal IP (no DNS)', async 
   expect(res.ok).toBe(true);
   expect(fetchSpy).toHaveBeenCalledTimes(1);
   expect(fetchSpy.mock.calls[0][0]).toBe('https://8.8.8.8/places');
+});
+
+// S6 (v1.11.213): extra_headers is encrypted at rest; mergeDedicatedHeaders must
+// decrypt it at use and resolve the configured headers (incl. {{var}} templates).
+describe('mergeDedicatedHeaders decrypts the stored (encrypted) extra_headers', () => {
+  test('an encrypted row resolves to the configured headers', () => {
+    const companyRow = {
+      id: 'c1',
+      extra_headers: colEncrypt(JSON.stringify([
+        { name: 'X-Api-Key', value: 'sk-secret-123' },
+        { name: 'X-Requestor', value: '{{requestor}}' },
+      ])),
+    };
+    expect(companyRow.extra_headers.startsWith('enc:v1:')).toBe(true);   // genuinely encrypted
+    const headers = mergeDedicatedHeaders({ Requestor: 'ACME' }, companyRow, 'tok-xyz');
+    expect(headers['X-Api-Key']).toBe('sk-secret-123');
+    expect(headers['X-Requestor']).toBe('ACME');                         // {{requestor}} resolved
+  });
+
+  test('a legacy plaintext row still resolves (colDecrypt passthrough)', () => {
+    const companyRow = { id: 'c2', extra_headers: JSON.stringify([{ name: 'X-Legacy', value: 'plain' }]) };
+    const headers = mergeDedicatedHeaders({}, companyRow, 'tok');
+    expect(headers['X-Legacy']).toBe('plain');
+  });
 });

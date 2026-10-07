@@ -572,6 +572,48 @@ const MIGRATIONS = [
         )`);
       } catch (_e) { /* benign if already exists */ }
   }},
+  { version: 27, name: 'companies-extra-headers-encrypt', up: () => {
+      // Tracker S6 — companies.extra_headers (the "Dedicated Headers" field,
+      // presented as the home for vendor API keys) was stored plaintext, unlike
+      // every other credential. Encrypt existing rows at rest with the same
+      // enc:v1: envelope as the sensitive columns in migration v19. colDecrypt
+      // reads both, so this is a cleanup — the write path now colEncrypts; a
+      // row left plaintext by a crash still reads correctly.
+      //
+      // The crypto is inlined (local COL_PREFIX, hoisted _key()), exactly as
+      // v19 does: the module-level COL_PREFIX / colEncrypt are `const`s defined
+      // below this IIFE, so calling them here would hit the temporal dead zone.
+      const COL_PREFIX = 'enc:v1:';
+      let rows;
+      try {
+        rows = db.prepare(
+          `SELECT id, extra_headers AS v FROM companies WHERE extra_headers IS NOT NULL AND extra_headers != ''`
+        ).all();
+      } catch (_e) {
+        return;   // column absent on a very old DB — migration 21 adds it first
+      }
+      if (rows.length === 0) return;   // nothing to backfill — stay quiet (fresh DBs, tests)
+      const upd = db.prepare('UPDATE companies SET extra_headers = ? WHERE id = ?');
+      let encrypted = 0, skipped = 0;
+      db.exec('BEGIN');
+      try {
+        for (const r of rows) {
+          if (typeof r.v !== 'string' || r.v.startsWith(COL_PREFIX)) { skipped++; continue; }
+          const iv = crypto.randomBytes(12);
+          const cipher = crypto.createCipheriv('aes-256-gcm', _key(), iv);
+          const enc = Buffer.concat([cipher.update(r.v, 'utf8'), cipher.final()]);
+          const tag = cipher.getAuthTag();
+          upd.run(COL_PREFIX + Buffer.concat([iv, tag, enc]).toString('base64'), r.id);
+          encrypted++;
+        }
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        console.error('[db] migration v27 companies.extra_headers FAILED:', e.message);
+        throw e;
+      }
+      console.log(`[db] migration v27 — companies.extra_headers: encrypted ${encrypted} rows (skipped ${skipped} already-encrypted)`);
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
