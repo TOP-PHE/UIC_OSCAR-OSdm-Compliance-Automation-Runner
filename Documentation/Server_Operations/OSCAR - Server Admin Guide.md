@@ -1414,3 +1414,20 @@ What to check on your deployment:
 - If a company's runs start failing with "This run was not started … public
   host", its `api_base` is non-public: either fix it in API Config, or (for a
   deliberately private deployment) set `ALLOW_PRIVATE_TARGETS=1`.
+
+### 15.14 v1.11.212 — CORS fails closed without an allowlist
+
+Audit tracker item S7-cors. When `ALLOWED_ORIGINS` was unset the server reflected
+the CORS `Access-Control-Allow-Origin` header back to **any** site, with
+credentials — so any web page a signed-in user visited could call the API with
+their session. OSCAR is served same-origin (nginx fronts the SPA and the API on
+one host), so with no allowlist the server now permits **no** cross-origin at all.
+
+What to check on your deployment:
+
+- A normal deployment (UI and API on the same host, as in the shipped nginx
+  config) needs nothing — same-origin requests are unaffected.
+- **Only if you serve the UI from a different origin than the API**, set
+  `ALLOWED_ORIGINS` to that origin (comma-separated for several), e.g.
+  `ALLOWED_ORIGINS=https://oscar.uic.org`. Listed origins are then allowed with
+  credentials; everything else is refused. See `.env.example`.

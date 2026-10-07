@@ -190,17 +190,17 @@ app.use(helmet({
   hsts: { maxAge: 31536000, includeSubDomains: true },
 }));
 
-// ── Security: CORS — restrict to allowed origins in production ───────────────
+// ── Security: CORS — allowlist, and fail closed when none is set (S7-cors) ────
+// An unset ALLOWED_ORIGINS used to reflect ANY origin with credentials. OSCAR is
+// served same-origin, so with no allowlist we now permit no cross-origin at all
+// (utils/corsPolicy); the same-origin app is unaffected. Set ALLOWED_ORIGINS to
+// permit a cross-origin UI host.
+const { corsOptions } = require('./utils/corsPolicy');
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
 if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
-  log.warn('ALLOWED_ORIGINS is not set in production — CORS is wide open (any origin accepted).');
+  log.warn('ALLOWED_ORIGINS is not set — CORS is fail-closed (same-origin only). Set ALLOWED_ORIGINS to permit a cross-origin UI host.');
 }
-app.use(cors({
-  origin: ALLOWED_ORIGINS.length > 0
-    ? (origin, cb) => (!origin || ALLOWED_ORIGINS.includes(origin)) ? cb(null, true) : cb(new Error('CORS blocked'))
-    : true,  // dev fallback: allow all if ALLOWED_ORIGINS not configured
-  credentials: true
-}));
+app.use(cors(corsOptions(ALLOWED_ORIGINS)));
 
 app.use(express.json({ limit: '5mb' }));  // 5 MB — covers largest expected datafile
 app.use(express.urlencoded({ extended: true }));
