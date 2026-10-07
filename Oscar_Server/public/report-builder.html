@@ -297,6 +297,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     </div>
   </div>
   <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
   <script>renderOscarNav('oscar-nav', 'report-builder');</script>
 </header>
@@ -505,9 +506,8 @@ let reportData = null;
 let runFilters = { companyId: '', userId: '', date: '' };
 
 /* ── Utilities ─────────────────────────────────────────────────────────────── */
-function escHtml(s) {
-  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// S11: the one shared escaper (js/esc.js, loaded in <head> before this script).
+const escHtml = window.esc;
 function fmtDate(d) {
   if (!d) return '-';
   // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
@@ -1754,7 +1754,8 @@ function downloadJsonContent(btn) {
   setTimeout(function() { btn.textContent = 'Download'; }, 1400);
 }
 
-function escAttr(s) { return escHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;'); }
+// S11: attribute escaping is the same shared escaper (it already escapes " and ').
+const escAttr = window.esc;
 
 
 // Templates

@@ -110,6 +110,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#3C3C3B;color:#222;font-
     </div>
   </div>
   <div class="uic-banner-nav" id="oscar-nav"></div>
+  <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
   <script>renderOscarNav('oscar-nav', 'welcome');</script>
 </header>
@@ -264,10 +265,8 @@ function getRoleConfig() {
 let newsItems = [];
 let newsIndex = 0;
 
-function esc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// S11: the one shared escaper (js/esc.js). Was {&,<,>}-only; now also " and '.
+const esc = window.esc;
 
 function renderNewsItem(idx) {
   const item = newsItems[idx];

@@ -1475,3 +1475,25 @@ correlation or session-trace id (useful when chasing a problem with the vendor),
 Nothing to configure. This applies to new runs; traffic already stored from older
 runs keeps whatever masking it had. The companion storage change (dedicated
 headers encrypted at rest, §15.15) shipped in the previous release.
+
+### 15.17 v1.11.215 — tenant text is escaped on every page (cross-tenant XSS)
+
+Audit tracker item S11. Values a company controls — its API endpoint, a scenario
+code, who submitted a run, an environment name — are shown on pages that a
+certifier of another company opens. They were written into the page without
+escaping (the dashboard had no escaping at all), so a company could store markup
+that runs as code in another company's browser (a stored cross-site-scripting
+weakness).
+
+From this release every such value is escaped through one shared routine before
+it reaches the page, on all pages. Nothing changes for ordinary values; only
+characters that would otherwise be read as HTML are neutralised.
+
+Nothing to configure. Two operator-facing notes:
+
+- The browser code under `public/` is now checked by the linter (`npm run lint`),
+  which previously only read the server code — this is what let the gap go
+  unnoticed.
+- After deploying, a quick load of the dashboard confirms the shared escaper
+  (`js/esc.js`) is served and the pages render normally; it loads before the
+  nav bar script on every page.
