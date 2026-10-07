@@ -34,6 +34,7 @@ const companyId  = uuidv4();
 const testMgrId  = uuidv4();
 const certUserId = uuidv4();
 const testerId   = uuidv4();
+const adminId    = uuidv4();
 
 function makeToken(role, uid = testMgrId, cid = companyId) {
   return jwt.sign(
@@ -64,6 +65,11 @@ beforeAll(() => {
     `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
      VALUES (?, ?, 'tester@test-company.com', 'x', 'company_user')`,
     [testerId, companyId]
+  );
+  run(
+    `INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+     VALUES (?, NULL, 'admin@platform.test', 'x', 'administrator')`,
+    [adminId]
   );
 });
 
@@ -326,6 +332,70 @@ describe('PATCH /v1/company — extra_headers', () => {
     expect(cleared.body.extra_headers).toEqual([]);
     const row = get('SELECT extra_headers FROM companies WHERE id = ?', [companyId]);
     expect(row.extra_headers).toBeNull();
+  });
+
+  // S6 (v1.11.213): values are vendor secrets — encrypted at rest, and withheld
+  // from everyone except the owning Test Manager.
+  describe('S6 — dedicated-header values are encrypted and not leaked', () => {
+    const SECRET = 'sk-live-abcdef0123456789';
+    beforeEach(async () => {
+      await request(app).patch('/v1/company')
+        .set('Authorization', `Bearer ${makeToken('test_manager')}`)
+        .send({ extra_headers: [{ name: 'X-Api-Key', value: SECRET }] });
+    });
+    afterEach(async () => {
+      await request(app).patch('/v1/company')
+        .set('Authorization', `Bearer ${makeToken('test_manager')}`)
+        .send({ extra_headers: [] });
+    });
+
+    test('stored encrypted at rest — the DB column is the enc:v1 envelope, not the plaintext secret', () => {
+      const row = get('SELECT extra_headers FROM companies WHERE id = ?', [companyId]);
+      expect(row.extra_headers.startsWith('enc:v1:')).toBe(true);
+      expect(row.extra_headers).not.toContain(SECRET);
+    });
+
+    test('the owning Test Manager gets the value back (to edit it)', async () => {
+      const res = await request(app).get('/v1/company')
+        .set('Authorization', `Bearer ${makeToken('test_manager')}`);
+      expect(res.body.extra_headers).toEqual([{ name: 'X-Api-Key', value: SECRET }]);
+    });
+
+    test('a tester (company_user) sees the name but not the value', async () => {
+      const res = await request(app).get('/v1/company')
+        .set('Authorization', `Bearer ${makeToken('company_user', testerId)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.extra_headers).toEqual([{ name: 'X-Api-Key', value: '', has_value: true }]);
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    test('a platform administrator targeting the company sees the name but not the value', async () => {
+      const res = await request(app).get(`/v1/company?company_id=${companyId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.extra_headers).toEqual([{ name: 'X-Api-Key', value: '', has_value: true }]);
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    test('a certification_user cannot read company settings at all (no leak path)', async () => {
+      const res = await request(app).get(`/v1/company?company_id=${companyId}`)
+        .set('Authorization', `Bearer ${makeToken('certification_user', certUserId)}`);
+      expect(res.status).toBe(403);
+      expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    });
+
+    test('a platform administrator editing the headers gets the response masked too', async () => {
+      const ADMIN_SECRET = 'admin-set-sk-7777';
+      const res = await request(app).patch(`/v1/company?company_id=${companyId}`)
+        .set('Authorization', `Bearer ${makeToken('administrator', adminId)}`)
+        .send({ extra_headers: [{ name: 'X-Admin-Set', value: ADMIN_SECRET }] });
+      expect(res.status).toBe(200);
+      expect(res.body.extra_headers).toEqual([{ name: 'X-Admin-Set', value: '', has_value: true }]);
+      expect(JSON.stringify(res.body)).not.toContain(ADMIN_SECRET);
+      // …and it was still stored (encrypted), readable by the owning TM.
+      const asTm = await request(app).get('/v1/company').set('Authorization', `Bearer ${makeToken('test_manager')}`);
+      expect(asTm.body.extra_headers).toEqual([{ name: 'X-Admin-Set', value: ADMIN_SECRET }]);
+    });
   });
 });
 

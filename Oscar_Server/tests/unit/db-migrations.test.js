@@ -190,4 +190,43 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
 
     expect(columnsOf(dbFile, 'run_selections')).toEqual(expect.arrayContaining(['company_id', 'user_id', 'codes_json']));
   });
+
+  // Tracker S6 — companies.extra_headers encryption (migration 27). Simulate a
+  // DB already at version 26 holding a PLAINTEXT dedicated-header row, and
+  // confirm migration 27 encrypts it in place at boot (the enc:v1 envelope),
+  // leaving no plaintext secret in the column.
+  test('companies.extra_headers (plaintext) is encrypted at rest by migration 27', () => {
+    const dbFile = tempDbPath();
+    const SECRET = 'sk-live-MIGRATION-SECRET-xyz';
+    const plaintext = JSON.stringify([{ name: 'X-Api-Key', value: SECRET }]);
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec(fs.readFileSync(SCHEMA_SQL, 'utf8'));
+      // The companies table + extra_headers column exist from schema.sql / an
+      // earlier migration; seed a plaintext row and pin the version at 26.
+      d.prepare("INSERT INTO companies (id, name, slug, extra_headers) VALUES ('mig27-co', 'Mig27', 'mig27-co', ?)").run(plaintext);
+      d.exec('DELETE FROM schema_version WHERE version >= 27');
+      d.exec('INSERT OR IGNORE INTO schema_version (version) VALUES (26)');
+      d.close();
+    }
+    // Pre-condition: stored in clear.
+    const before = readExtraHeaders(dbFile);
+    expect(before).toBe(plaintext);
+
+    bootDbAgainst(dbFile);
+
+    const after = readExtraHeaders(dbFile);
+    expect(after.startsWith('enc:v1:')).toBe(true);     // encrypted envelope
+    expect(after).not.toContain(SECRET);                // no plaintext secret left
+    expect(after).not.toBe(plaintext);
+  });
 });
+
+function readExtraHeaders(dbFile) {
+  const d = new DatabaseSync(dbFile);
+  try {
+    return d.prepare("SELECT extra_headers AS v FROM companies WHERE id = 'mig27-co'").get().v;
+  } finally {
+    d.close();
+  }
+}

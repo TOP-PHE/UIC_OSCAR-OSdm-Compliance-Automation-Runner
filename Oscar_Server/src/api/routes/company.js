@@ -24,7 +24,7 @@ const fs        = require('node:fs');
 const crypto    = require('node:crypto');
 const multer    = require('multer');
 const rateLimit = require('express-rate-limit');
-const { get, all, run, colDecrypt } = require('../../db/db');
+const { get, all, run, colDecrypt, colEncrypt } = require('../../db/db');
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
@@ -150,9 +150,20 @@ const upload = multer({
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function safeCompany(c) {
+// Dedicated-header values are vendor secrets (S6). They are decrypted here only
+// to be handed to the owning Test Manager (who set them and needs them to
+// edit); for every other caller — a platform administrator, a tester, a
+// certifier, and the platform list-all path — the value is withheld and only
+// the name + whether a value is set is returned. The run engine reads the
+// decrypted values straight from the DB, never from this response.
+function maskHeaderValues(headers) {
+  return headers.map(h => ({ name: h.name, value: '', has_value: h.value != null && String(h.value) !== '' }));
+}
+
+function safeCompany(c, canSeeHeaderValues = false) {
   // Company-level fields only. Per-tester credentials live on the user row
   // since v12 — see GET /v1/me/credentials for the auth profile.
+  const headers = parseExtraHeaders(colDecrypt(c.extra_headers));
   return {
     id:                           c.id,
     name:                         c.name,
@@ -164,7 +175,7 @@ function safeCompany(c) {
     // retired. Certifier visibility is now per-report (the test_manager
     // shares individual runs from the dashboard). The DB column is kept for
     // backward compatibility but is no longer surfaced or writable here.
-    extra_headers:                parseExtraHeaders(c.extra_headers),
+    extra_headers:                canSeeHeaderValues ? headers : maskHeaderValues(headers),
     created_at:                   c.created_at,
     updated_at:                   c.updated_at
   };
@@ -234,13 +245,17 @@ router.get('/', (req, res) => {
   if (targetCompanyId === null) return;
 
   if (isPlatformRole(req.user.role) && !targetCompanyId) {
-    const companies = all('SELECT * FROM companies ORDER BY created_at DESC LIMIT 200').map(safeCompany);
+    // Platform list-all: header values are withheld (the S6 bulk-leak path).
+    // `.map(safeCompany)` would pass the array index as canSeeHeaderValues — be
+    // explicit and keep it false.
+    const companies = all('SELECT * FROM companies ORDER BY created_at DESC LIMIT 200').map(c => safeCompany(c, false));
     return res.json({ companies });
   }
 
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found' });
-  return res.json(safeCompany(company));
+  // Only the owning Test Manager gets the header values back (to edit them).
+  return res.json(safeCompany(company, req.user.role === 'test_manager'));
 });
 
 // ── PATCH /v1/company ─────────────────────────────────────────────────────────
@@ -324,8 +339,10 @@ router.patch('/', (req, res) => {
   if (endpoint.write !== null) { updates.push('api_base = ?'); values.push(endpoint.write); }
   if (extra_headers !== undefined) {
     // Store null (not "[]") when the list is emptied so the column reads clean.
+    // S6: encrypt at rest — these values may be vendor API keys. colDecrypt
+    // reads both this and any legacy plaintext row (migration 27 backfills).
     updates.push('extra_headers = ?');
-    values.push(normalizedExtra.length ? JSON.stringify(normalizedExtra) : null);
+    values.push(normalizedExtra.length ? colEncrypt(JSON.stringify(normalizedExtra)) : null);
   }
 
   if (updates.length === 0) {
@@ -344,7 +361,9 @@ router.patch('/', (req, res) => {
   auditLog(req.user.id, targetCompanyId, req.user.email, `company_update:${changedFields.join(',')}`);
 
   const updated = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
-  return res.json(safeCompany(updated));
+  // The owning Test Manager sees the values back (they just set them); an
+  // administrator editing cross-company does not.
+  return res.json(safeCompany(updated, req.user.role === 'test_manager'));
 });
 
 // ── The datafile as stored now, for the template rule (NEW-10) ───────────────
