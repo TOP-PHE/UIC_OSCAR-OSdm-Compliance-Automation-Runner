@@ -102,6 +102,26 @@ describe('GET /health', () => {
   });
 });
 
+// ── CORS fail-closed (tracker S7-cors) ───────────────────────────────────────
+// The test env leaves ALLOWED_ORIGINS unset, so the app is built fail-closed.
+// A cross-origin request must NOT get its origin reflected (the old behaviour
+// was origin: true + credentials, which reflected any site).
+describe('CORS', () => {
+  test('an arbitrary Origin is not reflected when no allowlist is configured', async () => {
+    const res = await request(app).get('/health').set('Origin', 'https://evil.example');
+    expect(res.status).toBe(200);                                   // same-origin app still answers
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    expect(res.headers['access-control-allow-credentials']).toBeUndefined();
+  });
+
+  test('a preflight from an arbitrary origin is not granted', async () => {
+    const res = await request(app).options('/v1/runs')
+      .set('Origin', 'https://evil.example')
+      .set('Access-Control-Request-Method', 'POST');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
 // ── /metrics ───────────────────────────────────────────────────────────────
 describe('GET /metrics', () => {
   test('200 with Prometheus exposition text', async () => {
