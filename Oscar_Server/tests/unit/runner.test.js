@@ -542,6 +542,13 @@ describe('executeRun — #306 credential transport', () => {
     const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
     const envFile = path.join(ENVS_DIR, `OTST_${slug}_${runId.slice(0, 8)}_Env.yml`);
     const yml = fs.readFileSync(envFile, 'utf8');
+    const spawnEnv = spawn.mock.calls[0][2].env;
+    // Let the run end before asserting. An assertion that fails while the fake
+    // process is still open leaves executeRun waiting on its 10-minute timeout,
+    // and Jest then reports the failure but does not exit until that timer.
+    fakeProc.emit('close', 0);
+    await runPromise;
+
     // Neither the secret values nor even the variable names may appear.
     expect(yml).not.toContain('tok-secret-123');
     expect(yml).not.toContain('subkey-secret-456');
@@ -555,16 +562,12 @@ describe('executeRun — #306 credential transport', () => {
     expect(yml).toContain('__runId');
 
     // Credentials travel via the child process environment instead.
-    const spawnEnv = spawn.mock.calls[0][2].env;
     expect(spawnEnv.OSCAR_ACCESS_TOKEN).toBe('tok-secret-123');
     expect(spawnEnv.OSCAR_SUBSCRIPTION_KEY).toBe('subkey-secret-456');
     expect(spawnEnv.OSCAR_OAUTH_EXTRA).toBe('basic-extra-789');
     // The server's own secret env is still never forwarded (allowlist).
     expect(spawnEnv).not.toHaveProperty('ENCRYPTION_KEY');
     expect(spawnEnv).not.toHaveProperty('JWT_SECRET');
-
-    fakeProc.emit('close', 0);
-    await runPromise;
   });
 
   test('optional credential env vars are absent when the tester has none configured', async () => {
@@ -579,12 +582,12 @@ describe('executeRun — #306 credential transport', () => {
     await waitForSpawnCalls(1);
 
     const spawnEnv = spawn.mock.calls[0][2].env;
+    fakeProc.emit('close', 0);                       // end the run first, as above
+    await runPromise;
+
     expect(spawnEnv.OSCAR_ACCESS_TOKEN).toBe('tok-abc');
     expect(spawnEnv).not.toHaveProperty('OSCAR_SUBSCRIPTION_KEY');
     expect(spawnEnv).not.toHaveProperty('OSCAR_OAUTH_EXTRA');
-
-    fakeProc.emit('close', 0);
-    await runPromise;
   });
 });
 
@@ -619,8 +622,24 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     }
   });
 
+  // Where the runner works depends on the machine. On Windows it is the
+  // collection folder. Elsewhere, a run that names a scenario gets a copy of
+  // the collection of its own (data/workspaces/<runId>), and the environment
+  // file, the results and mergeReport.js are the ones in that copy. A test that
+  // looks in the collection folder only passes on Windows, so the folder is
+  // read from what the runner hands to spawn, and both modes are run on any
+  // machine: `platform` is what process.platform reads as during the run.
+  const WORKSPACES_DIR = path.resolve(__dirname, '../../data/workspaces');
+  const MODES = [['in the collection folder', 'win32'], ['in a workspace of its own', 'linux']];
+
+  afterEach(() => {
+    for (const runId of createdRunIds) {
+      try { fs.rmSync(path.join(WORKSPACES_DIR, runId), { recursive: true, force: true }); } catch (_) {}
+    }
+  });
+
   // Starts a run that reaches the second spawn, and gives back both spawn calls.
-  async function runWithReportScript({ scenarioOverride } = {}) {
+  async function runWithReportScript({ scenarioOverride, platform } = {}) {
     const { encrypt } = require('../../src/db/db');
     const { companyId, userId } = seedCompanyUser();
     run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
@@ -634,17 +653,25 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     const mergeProc = makeFakeProc();
     spawn.mockReturnValueOnce(mainProc).mockReturnValueOnce(mergeProc);
 
-    const runPromise = executeRun({ runId, companyId, userId, scenarioOverride });
-    await waitForSpawnCalls(1);
-    const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
-    const envName = `OTST_${slug}_${runId.slice(0, 8)}_Env`;
-    const envFile = fs.readFileSync(path.join(ENVS_DIR, `${envName}.yml`), 'utf8');
-    fs.writeFileSync(path.join(VAL_DIR, `.bru_results_${runId.slice(0, 8)}.json`), JSON.stringify({ results: [] }));
-    mainProc.emit('close', 0);
-    await waitForSpawnCalls(2);
-    mergeProc.emit('close', 0);
-    await runPromise;
-    return { runId, envName, envFile, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
+    const realPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+    if (platform) Object.defineProperty(process, 'platform', { ...realPlatform, value: platform });
+    try {
+      const runPromise = executeRun({ runId, companyId, userId, scenarioOverride });
+      await waitForSpawnCalls(1);
+      const cwd = spawn.mock.calls[0][2].cwd;          // the folder the runner works in for this run
+      const slug = get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug;
+      const envName = `OTST_${slug}_${runId.slice(0, 8)}_Env`;
+      const envFile = fs.readFileSync(path.join(cwd, 'environments', `${envName}.yml`), 'utf8');
+      fs.mkdirSync(path.join(cwd, 'Validation_Reports'), { recursive: true });
+      fs.writeFileSync(path.join(cwd, 'Validation_Reports', `.bru_results_${runId.slice(0, 8)}.json`), JSON.stringify({ results: [] }));
+      mainProc.emit('close', 0);
+      await waitForSpawnCalls(2);
+      mergeProc.emit('close', 0);
+      await runPromise;
+      return { runId, envName, envFile, cwd, bruno: spawn.mock.calls[0], report: spawn.mock.calls[1] };
+    } finally {
+      Object.defineProperty(process, 'platform', realPlatform);
+    }
   }
 
   test('the report script is started with an environment of its own, not the server\'s', async () => {
@@ -677,19 +704,49 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     expect(report[2].shell).toBe(false);
   });
 
-  test('the environment file on disk, with the variables executeRun adds, holds values only', async () => {
-    const { runId, envName, envFile } = await runWithReportScript({ scenarioOverride: 'OTST_SALE_1ADT_1LEG' });
-    const file = readEnvYml(envFile);                 // throws on any line that is not a name or a quoted value
-    expect(file.name).toBe(envName);
-    expect(file.variables.map(v => v.name)).toEqual([
-      'api_base', 'library_base', 'data_base', 'json_schema', 'scenariosToRunIndex', 'scenario_override',
-      'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
-    ]);
-    expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');
-    expect(valueIn(file, 'scenario_override')).toBe('OTST_SALE_1ADT_1LEG');
-    expect(valueIn(file, '__runId')).toBe(runId);
-    expect(valueIn(file, 'runHardDeadlineMs')).toMatch(/^\d{13}$/);
-    expect(valueIn(file, 'oscar_loopback_base')).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+  describe.each(MODES)('a run that names its scenario, %s', (_where, platform) => {
+    test('the runner works where expected, and the report script it starts is the one there', async () => {
+      const { runId, cwd, bruno, report } = await runWithReportScript({ scenarioOverride: 'OTST_SALE_1ADT_1LEG', platform });
+      expect(cwd).toBe(platform === 'win32' ? COLLECTION_PATH : path.join(WORKSPACES_DIR, runId));
+      expect(bruno[2].cwd).toBe(cwd);
+      expect(report[2].cwd).toBe(cwd);
+      expect(report[1][0]).toBe(path.join(cwd, 'library-bruno', 'mergeReport.js'));
+      const allowed = new Set(CHILD_ENV_ALLOWLIST);
+      expect(Object.keys(report[2].env).filter(k => !allowed.has(k))).toEqual([]);
+      expect(Object.keys(bruno[2].env).filter(k => !allowed.has(k)).sort()).toEqual([...RUN_CREDENTIALS].sort());
+    });
+
+    test('the environment file on disk, with the variables executeRun adds, holds values only', async () => {
+      const { runId, envName, envFile } = await runWithReportScript({ scenarioOverride: 'OTST_SALE_1ADT_1LEG', platform });
+      const file = readEnvYml(envFile);               // throws on any line that is not a name or a quoted value
+      expect(file.name).toBe(envName);
+      expect(file.variables.map(v => v.name)).toEqual([
+        'api_base', 'library_base', 'data_base', 'json_schema', 'scenariosToRunIndex', 'scenario_override',
+        'runHardDeadlineMs', '__runId', 'oscar_loopback_base',
+      ]);
+      expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');
+      expect(valueIn(file, 'scenario_override')).toBe('OTST_SALE_1ADT_1LEG');
+      expect(valueIn(file, '__runId')).toBe(runId);
+      expect(valueIn(file, 'runHardDeadlineMs')).toMatch(/^\d{13}$/);
+      expect(valueIn(file, 'oscar_loopback_base')).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+    });
+
+    test('a crafted scenario code reaches the file as one value: one endpoint, the company\'s', async () => {
+      const crafted = 'X"\n  - name: api_base\n    value: "https://elsewhere.example/collect';
+      const { envFile } = await runWithReportScript({ scenarioOverride: crafted, platform });
+      const file = readEnvYml(envFile);
+      expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');   // valueIn throws on a second one
+      expect(valueIn(file, 'scenario_override')).toBe(crafted);
+      expect(file.variables).toHaveLength(9);
+    });
+
+    test('single braces, and a code with no template, still run', async () => {
+      for (const code of ['OTST_SALE_1ADT_1LEG', 'with {one} brace pair', 'a } then a {']) {
+        const { envFile } = await runWithReportScript({ scenarioOverride: code, platform });
+        expect(valueIn(readEnvYml(envFile), 'scenario_override')).toBe(code);
+        jest.clearAllMocks();
+      }
+    });
   });
 
   // Escaping keeps a code from adding to the file. Bruno then does one more
@@ -785,22 +842,5 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
         expect(refusedScenarioCode(notText)).toMatch(/not text/);
       }
     });
-
-    test('single braces, and a code with no template, still run', async () => {
-      for (const code of ['OTST_SALE_1ADT_1LEG', 'with {one} brace pair', 'a } then a {']) {
-        const { envFile } = await runWithReportScript({ scenarioOverride: code });
-        expect(valueIn(readEnvYml(envFile), 'scenario_override')).toBe(code);
-        jest.clearAllMocks();
-      }
-    });
-  });
-
-  test('a crafted scenario code reaches the file as one value: one endpoint, the company\'s', async () => {
-    const crafted = 'X"\n  - name: api_base\n    value: "https://elsewhere.example/collect';
-    const { envFile } = await runWithReportScript({ scenarioOverride: crafted });
-    const file = readEnvYml(envFile);
-    expect(valueIn(file, 'api_base')).toBe('https://vendor.example/osdm');   // valueIn throws on a second one
-    expect(valueIn(file, 'scenario_override')).toBe(crafted);
-    expect(file.variables).toHaveLength(9);
   });
 });

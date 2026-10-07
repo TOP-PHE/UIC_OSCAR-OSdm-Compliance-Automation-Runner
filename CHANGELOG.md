@@ -93,9 +93,16 @@ Collection OTST_V2.0.102. Audit tracker PR-03 (NEW-01, NEW-02). Closes #553.
 
 ### Tests
 
-- 57 new: 37 on the environment file, 16 on `executeRun`, 2 on the collection
+- 62 new: 37 on the environment file, 21 on `executeRun`, 2 on the collection
   message, 2 on run submission. All but one failed on the old code; that one
   pins the answer when no code in the file is text.
+- The first CI run failed on three of them, and was right to. Outside Windows
+  a run that names its scenario works in a copy of the collection of its own
+  (`data/workspaces/<runId>`), and the tests looked in the collection folder.
+  They now take the folder from what the runner hands to `spawn`, and run in
+  both modes on any machine. An older test asserted while its fake process was
+  still open, so a failure there kept Jest alive for ten minutes; it now ends
+  the run first.
 - 42 deliberate breakages of the fix. Each fails at least one test. The run
   also showed two source files holding a raw character where an escape
   sequence had been typed; the behaviour was the same, and both now hold the
