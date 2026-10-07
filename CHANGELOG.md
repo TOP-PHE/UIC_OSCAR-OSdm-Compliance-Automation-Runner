@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.212] — 2026-10-07
+
+Audit tracker S7-cors (part of PR-09). Closes #561. Server-only; collection
+unchanged (OTST_V2.0.103).
+
+### Security
+
+- **CORS fails closed when `ALLOWED_ORIGINS` is unset, instead of reflecting any
+  origin with credentials.** The app used `origin: true` + `credentials: true`
+  when no allowlist was configured — the `Access-Control-Allow-Origin` header was
+  reflected back to **any** site, credentials permitted, so any page a signed-in
+  user visited could make credentialed cross-origin calls to the API. OSCAR is
+  served same-origin (nginx fronts the SPA and the API on one host), so with no
+  allowlist the app now permits no cross-origin at all (`utils/corsPolicy`):
+  same-origin requests are unaffected, a cross-origin request gets no `ACAO` and
+  no `Allow-Credentials`. With `ALLOWED_ORIGINS` set, only those origins are
+  allowed, with credentials (unchanged). `ALLOWED_ORIGINS` is now documented in
+  `.env.example`.
+
+### Tests
+
+- `cors-policy` unit tests (no allowlist → `origin:false` + `credentials:false`;
+  an allowlist → only listed origins, with credentials, scheme-sensitive,
+  no-Origin allowed) and `server.test.js` end-to-end (an arbitrary Origin is not
+  reflected on a request or a preflight). A mutation check breaks each branch;
+  each fails a test.
+
+### Note
+
+- Part of tracker PR-09; the remaining config-hygiene items in that bundle
+  (production boot assertions, S13.5–7, NEW-06) are not in this release. A
+  self-hosted deployment that serves its UI from a different origin must set
+  `ALLOWED_ORIGINS`.
+
+---
+
 ## [server-1.11.211] — 2026-10-07
 
 Audit tracker S5. Closes #559. Server-only; collection unchanged (OTST_V2.0.103).
