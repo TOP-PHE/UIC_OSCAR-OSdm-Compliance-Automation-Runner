@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.239",
+  "current_release": "2026.240",
   "releases": [
+    {
+      "release": "2026.240",
+      "date": "2026-10-07",
+      "server": "1.11.215",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): tenant-controlled strings are HTML-escaped everywhere, by one shared escaper; the browser code under public/ is now linted. Audit tracker S11 / S11a / S11b (PR-08). Closes #567. Server-only (public/ + eslint config); collection unchanged at OTST_V2.0.104. Completes the 8 pen-test prerequisites.",
+        "S11: tenant-controlled strings (api_base_used, scenario_code, submitted_by, env_name_used, deleted_by, user_email) were interpolated raw into innerHTML on pages a certifier of another tenant opens — dashboard.html had no escaper at all — a stored cross-tenant XSS. Every such sink now runs through the escaper. The dashboard sinks are covered by a regression test that pushes a hostile api_base / submitted_by / deleted_by through renderRunRow and renderAdminDeletedRuns and asserts the output is escaped (no breakout). The other named pages (run, run-detail, compare, welcome, scenarios.js) were audited and already escaped; admin.html already escaped (showMsg uses textContent).",
+        "S11a: the eight local escapers across eight files (three different rule sets — some missed the double quote, some the single quote) are replaced by one shared public/js/esc.js. It escapes & < > \" ' so one function is safe in HTML-text and in double/single-quoted attributes, maps null/undefined to the empty string, and is built with chained .replace(/.../g) because CodeQL only recognises the encoder in that form (replaceAll broke it, #541). It loads before every page script and is also CommonJS-requireable for the tests, the same dual-mode shape as scenario-access.js.",
+        "S11b: ESLint only scoped src/**; public/ (incl. ~7000 lines of scenarios.js) was never linted, which is how S11 went unnoticed. eslint.config.js now has a public/** block with browser globals and the real-bug rules (no-undef, no-redeclare, no-const-assign, no-dupe-keys), and npm run lint runs eslint over src/ and public/. no-unused-vars is off for public/ (handlers are invoked from inline-HTML onclick ESLint cannot see), and public/vendor/ (bundled third-party libraries) is ignored. A fixed sink that loses its esc() reference now fails no-undef in a .js file; the inline-page sinks are guarded by the regression test.",
+        "How it was checked: a js/esc.js unit test (the CodeQL replace-form, the five characters, null handling) and the dashboard XSS regression test; the existing public/ vm tests (ui-scripts, scenario-access, scenarios-load-guard) updated where they lifted the old per-page esc. A mutation check removes esc() from each dashboard sink and weakens the escaper; each break fails a test. Lint (now over public/) and the full suite green (72 suites, 2,095 tests).",
+        "Note: this escapes output; it does not change what any benign value renders. A browser smoke of the dashboard after deploy confirms esc.js loads before nav.js and pages render normally."
+      ]
+    },
     {
       "release": "2026.239",
       "date": "2026-10-07",

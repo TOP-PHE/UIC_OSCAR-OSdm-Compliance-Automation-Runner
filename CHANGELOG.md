@@ -14,6 +14,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.215] — 2026-10-07
+
+Audit tracker S11 / S11a / S11b (PR-08). Closes #567. Server-only; collection
+unchanged (OTST_V2.0.104). Completes the 8 pen-test prerequisites.
+
+### Security
+
+- **Tenant-controlled strings are HTML-escaped on every page (stored XSS).**
+  `api_base_used`, `scenario_code`, `submitted_by`, `env_name_used`,
+  `deleted_by` and `user_email` were interpolated raw into `innerHTML` on pages
+  a certifier of **another** tenant opens — `dashboard.html` had no escaper at
+  all — so a vendor could store script (e.g. an `api_base` of
+  `"><img src=x onerror=…>`) that runs in another tenant's browser. Every such
+  sink now runs through the escaper; the other named pages were audited and were
+  already escaped.
+- **One shared escaper** (`public/js/esc.js`): escapes `& < > " '` (safe in
+  HTML-text and in double/single-quoted attributes), maps null/undefined to
+  `''`, and is built with chained `.replace(/…/g)` so CodeQL still recognises it
+  as a sanitiser (`replaceAll` breaks that, #541). It loads before every page
+  script and is CommonJS-requireable for tests. The eight per-page copies — in
+  three different rule sets, some missing `"`, some `'` — are deleted and point
+  at it (S11a).
+
+### Changed
+
+- **`public/` is now linted** (S11b). ESLint only scoped `src/**`; the browser
+  code (incl. ~7,000 lines of `scenarios.js`) was unlinted, which is how S11 went
+  unnoticed. `eslint.config.js` gains a `public/**` block (browser globals + the
+  real-bug rules), and `npm run lint` covers `src/` and `public/`. A fixed sink
+  that loses its `esc()` now fails `no-undef`.
+
+### Tests
+
+- A `js/esc.js` unit test (the CodeQL replace-form, the five characters, null
+  handling) and a dashboard XSS regression test (a hostile `api_base` /
+  `submitted_by` / `deleted_by` through `renderRunRow` and
+  `renderAdminDeletedRuns`, asserting escaped output). The existing `public/` vm
+  tests were updated where they lifted the old per-page `esc`. A mutation check
+  removes `esc()` from each dashboard sink and weakens the escaper; each break
+  fails a test.
+
+---
+
 ## [server-1.11.214] — 2026-10-07
 
 Audit tracker NEW-03 (report half of PR-05; the storage half S6 shipped in
