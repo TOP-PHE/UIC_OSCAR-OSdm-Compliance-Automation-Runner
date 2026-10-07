@@ -133,6 +133,38 @@ describe('PATCH /v1/me/credentials', () => {
     expect(res.body.auth_mode).toBe('oauth2');
   });
 
+  // S5 (v1.11.211): token_url is fetched server-side, so it must be a public
+  // https address. The suite allows private targets (tests/setup.js); off here.
+  describe('S5 — token_url must be a public https address', () => {
+    const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
+    beforeEach(() => { process.env.ALLOW_PRIVATE_TARGETS = ''; });
+    afterEach(() => { process.env.ALLOW_PRIVATE_TARGETS = PRIOR; });
+
+    test.each([
+      'http://auth.vendor.com/token',
+      'https://127.0.0.1/token',
+      'https://192.168.1.9/oauth/token',
+      'https://169.254.169.254/latest',
+      'https://keycloak/token',
+    ])('rejects %s and stores nothing', async (bad) => {
+      const token = makeToken();
+      const before = get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url;
+      const res = await request(app).patch('/v1/me/credentials')
+        .set('Authorization', `Bearer ${token}`).send({ token_url: bad });
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toContain('public host');
+      expect(get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url).toBe(before);
+    });
+
+    test('accepts a public https token URL', async () => {
+      const token = makeToken();
+      const res = await request(app).patch('/v1/me/credentials')
+        .set('Authorization', `Bearer ${token}`).send({ token_url: 'https://auth.vendor.com/oauth/token' });
+      expect(res.status).toBe(200);
+      expect(get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url).toBe('https://auth.vendor.com/oauth/token');
+    });
+  });
+
   test('200 stores encrypted access_token and reflects has_token: true', async () => {
     const token = makeToken();
     const res = await request(app)

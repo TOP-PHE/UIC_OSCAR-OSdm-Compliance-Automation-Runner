@@ -1,8 +1,25 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.235",
+  "current_release": "2026.236",
   "releases": [
+    {
+      "release": "2026.236",
+      "date": "2026-10-07",
+      "server": "1.11.211",
+      "collection": "OTST_V2.0.103",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(security): api_base and token_url must be public https targets; a run or token fetch cannot be aimed at loopback or the private network (SSRF). Audit tracker S5. Closes #559. Server-only; collection unchanged at OTST_V2.0.103.",
+        "Two member-controlled fields become outbound requests: companies.api_base (every OSDM request of every run) and users.token_url (the OAuth token fetch). Neither was validated. A token_url of http://127.0.0.1:3001/... or an api_base of http://grafana:3000 turned the server, and the Bruno child, into a request-forgery tool reaching loopback, RFC1918, link-local (incl. the cloud metadata address 169.254.169.254) and the Docker service mesh, with the reply coming back in the run log or the token error. S8 (1.11.210) removed the loopback trust on the two OSCAR routes; this stops the request being aimed at an internal address at all.",
+        "New utils/urlPolicy.js (pure, IP ranges classified by ipaddr.js, not by hand): a target must be https and resolve to a public (unicast) address. Blocked: loopback, private, link-local, unique-local, carrier-grade NAT, unspecified/broadcast/multicast/reserved, and any bare single-label host name (a Docker service name, localhost). storedUrlRefusal() is a synchronous structural check for the save routes (no DNS in the request path); usableUrlRefusal() adds a DNS lookup of the host for the use sites, so a name that resolves inward is caught too (DNS-rebinding backstop, and values stored before this policy).",
+        "Store-time: PATCH /v1/company (api_base, Test-Manager-only) and PATCH /v1/me/credentials (token_url) answer 400 and store nothing for a non-public target. Use-time: access-token.js re-checks token_url before the token fetch (throws, no fetch); osdm-client.js osdmGet re-checks api_base before the server-side places/discover calls; worker/runner.js refuses a run (FAILED, before a token is resolved and before any spawn) whose api_base is non-public.",
+        "ALLOW_PRIVATE_TARGETS=1 turns the whole policy off, for a self-hosted or development box whose providers sit on http://localhost or the LAN. Read at call time, so no restart is needed. The vendor error body reflected on a failed token fetch was already capped at 500 characters; with the policy a forged internal target is not reached in the first place.",
+        "How it was checked: new url-policy unit tests (exhaustive IP ranges incl. ipv4-mapped v6, scheme, bare names, ALLOW_PRIVATE_TARGETS, DNS mocked) and osdm-client tests; store-time route tests on both PATCH routes (private targets 400, stored value unchanged, public accepted); use-time tests on resolveAccessToken (throws before fetchToken) and executeRun (FAILED before token/spawn, public literal IP still runs). The whole suite runs with ALLOW_PRIVATE_TARGETS=1 (tests/setup.js) because the fixtures use local/example hosts; the policy tests flip it off. A mutation check breaks each guard and the policy internals; each break fails a test. Lint and the full suite green.",
+        "Left for its own change: nothing from S5. The companion item S8-loopback (the loopback routes) shipped in 1.11.210."
+      ]
+    },
     {
       "release": "2026.235",
       "date": "2026-10-07",

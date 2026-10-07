@@ -14,6 +14,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.211] — 2026-10-07
+
+Audit tracker S5. Closes #559. Server-only; collection unchanged (OTST_V2.0.103).
+
+### Security
+
+- **`api_base` and `token_url` must be public https targets — a run or a token
+  fetch can no longer be aimed at loopback or the private network (SSRF).** Two
+  member-controlled fields become outbound requests: `companies.api_base` (every
+  OSDM request of every run) and a tester's `users.token_url` (the OAuth token
+  fetch). Neither was validated. A `token_url` of `http://127.0.0.1:3001/…`, or
+  an `api_base` of `http://grafana:3000`, turned the server — and the Bruno
+  child — into a request-forgery tool reaching loopback, RFC 1918, link-local
+  (incl. the cloud metadata address `169.254.169.254`) and the Docker service
+  mesh, with the reply coming back in the run log or the token error. S8
+  (1.11.210) removed the loopback *trust* on the two OSCAR routes; this stops the
+  request being aimed at an internal address at all.
+- **The rule** (`utils/urlPolicy.js`, IP ranges classified by `ipaddr.js`): a
+  target must be `https` and resolve to a public (`unicast`) address. Blocked are
+  loopback, private, link-local, unique-local, carrier-grade NAT, the
+  unspecified / broadcast / multicast / reserved ranges, and any bare
+  single-label host name (a Docker service name, `localhost`).
+- **Checked at save and at use.** `PATCH /v1/company` (`api_base`) and
+  `PATCH /v1/me/credentials` (`token_url`) answer 400 and store nothing for a
+  non-public target (structural check, no DNS in the request path). At use,
+  `access-token.js` re-checks `token_url` before the token fetch, `osdm-client.js`
+  re-checks `api_base` before the server's places/discover calls, and the runner
+  refuses a run whose `api_base` is non-public before a token is resolved or
+  anything is spawned — each with a DNS lookup, so a name that resolves inward,
+  or a value stored before this policy, is caught too.
+- **`ALLOW_PRIVATE_TARGETS=1`** turns the whole policy off, for a self-hosted or
+  development box whose providers sit on `http://localhost` or the LAN. It is
+  read at call time, so no restart is needed.
+
+### Tests
+
+- `url-policy` unit tests (exhaustive IP ranges incl. IPv4-mapped IPv6, scheme,
+  bare names, the env switch, DNS mocked) and `osdm-client` tests; store-time
+  route tests on both PATCH routes (non-public → 400, stored value unchanged,
+  public accepted); use-time tests on `resolveAccessToken` (throws before the
+  fetch) and `executeRun` (FAILED before token/spawn; a public literal IP still
+  runs). The suite runs with `ALLOW_PRIVATE_TARGETS=1` (its fixtures use
+  local/example hosts); the policy tests flip it off. A mutation check breaks
+  each guard and the policy internals; each break fails a test.
+
+---
+
 ## [server-1.11.210] — 2026-10-07
 
 Audit tracker S8-loopback. Closes #557. Server + collection (OTST_V2.0.103).

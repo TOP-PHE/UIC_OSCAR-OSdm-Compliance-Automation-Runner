@@ -29,6 +29,13 @@ process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef01
 process.env.COLLECTION_PATH = path.join(os.tmpdir(), 'oscar-test-collection');
 process.env.BRU_CMD         = 'bru-test-stub';
 process.env.LOG_LEVEL       = 'silent';   // keep test output clean
+// The suite's fixtures use local/example api_base + token_url values
+// ("https://x", "https://vendor.example"). The S5 URL policy (utils/urlPolicy)
+// would reject those as non-public, so the suite runs as a self-hosted box that
+// permits private targets. Tests that exercise the policy's blocking flip this
+// off themselves (it is read at call time); see url-policy.test.js and the
+// store/use-time route tests.
+process.env.ALLOW_PRIVATE_TARGETS = '1';
 
 // Unique DB per test process (jest runs files in parallel by default)
 const tmpDb = path.join(os.tmpdir(), `oscar-test-${process.pid}-${Date.now()}.db`);

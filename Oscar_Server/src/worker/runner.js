@@ -32,6 +32,7 @@ const { resolveAccessToken } = require('./access-token');
 const { safeJoinUuid } = require('../utils/paths');
 const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
 const runSecrets = require('../utils/runSecrets');
+const { usableUrlRefusal } = require('../utils/urlPolicy');
 
 // Inline UUID regex (see comment in reports/diff.js). Sonar's taint
 // analyzer (jssecurity:S6549) requires the regex to live in the same
@@ -576,6 +577,18 @@ async function refusedDatafileText(datafilePath, runner) {
   }
 }
 
+// S5: a run sends every OSDM request to the company api_base. Refuse to start
+// one aimed at a non-public target (loopback, the private network, a Docker
+// service name) before a token is resolved — with DNS, so a name that resolves
+// inward is caught too. A company with no api_base yet is left to the step that
+// already reports it. ALLOW_PRIVATE_TARGETS turns this off for a dev/self-host.
+async function refusedApiBase(apiBase) {
+  if (!apiBase) return null;
+  const refusal = await usableUrlRefusal(apiBase, 'OSDM endpoint (API Config)');
+  if (!refusal) return null;
+  return `This run was not started. ${refusal} Ask your Test Manager to set a public https endpoint in API Config.`;
+}
+
 function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {
   // #306: this file deliberately carries NO credentials. The access token,
   // Ocp-Apim-Subscription-Key and oauth_extra travel via the Bruno child
@@ -708,6 +721,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   //     stops here: before a token is asked for, before the environment file
   //     is written, before anything is started.
   const refusal = refusedScenarioCode(scenarioOverride)
+    || await refusedApiBase(companyRow.api_base)
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email });
   if (refusal) {
     dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);

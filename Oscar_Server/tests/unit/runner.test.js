@@ -447,6 +447,50 @@ describe('executeRun — spawn happy paths', () => {
   });
 });
 
+// ── S5: a run is refused when the company api_base is not a public https target ─
+describe('executeRun — S5 api_base policy', () => {
+  const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
+  beforeEach(() => { process.env.ALLOW_PRIVATE_TARGETS = ''; });   // suite runs with it on; off here
+  afterEach(() => { process.env.ALLOW_PRIVATE_TARGETS = PRIOR; });
+
+  // Structural blocks need no DNS (this file does not mock dns).
+  test.each([
+    'https://127.0.0.1/osdm',          // loopback
+    'http://vendor.example/osdm',       // not https
+    'https://grafana:3000/osdm',        // a Docker service name
+    'https://169.254.169.254/latest',   // cloud metadata
+  ])('refuses a run whose api_base is %s, before a token or a spawn', async (bad) => {
+    const { companyId, userId } = seedCompanyUser();
+    run('UPDATE companies SET api_base = ? WHERE id = ?', [bad, companyId]);
+    const runId = seedRun(companyId, userId);
+
+    const out = await executeRun({ runId, companyId, userId });
+
+    expect(out.exitCode).toBe(1);
+    expect(out.error).toContain('public host');
+    expect(getRunRow(runId).status).toBe('FAILED');
+    expect(spawn).not.toHaveBeenCalled();
+    expect(resolveAccessToken).not.toHaveBeenCalled();   // refused before the token step
+  });
+
+  test('a public api_base (literal IP, no DNS) still runs', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    run('UPDATE companies SET api_base = ? WHERE id = ?', ['https://8.8.8.8/osdm', companyId]);
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+
+    const p = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('close', 0);
+    const out = await p;
+
+    expect(out.exitCode).toBe(0);
+    expect(getRunRow(runId).status).toBe('COMPLETED');
+  });
+});
+
 // ── Detected auth/format errors surfaced onto the run row ─────────────────────
 describe('executeRun — auth/token-format error detection from CLI output', () => {
   test('sets error_message = TOKEN_AUTH_ERROR when a 401 appears in stdout', async () => {
