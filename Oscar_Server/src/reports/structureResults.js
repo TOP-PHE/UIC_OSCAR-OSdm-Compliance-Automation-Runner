@@ -22,7 +22,7 @@
 const fs   = require('node:fs');
 const path = require('node:path');
 const { safeJoinUuid } = require('../utils/paths');
-const { run: dbRun, get, transaction, colEncrypt } = require('../db/db');
+const { run: dbRun, get, transaction, colEncrypt, decrypt } = require('../db/db');
 
 // Inline UUID regex (see comment in reports/diff.js) — Sonar's taint
 // analyzer (jssecurity:S6549) requires the validation to live in the
@@ -139,13 +139,53 @@ function maskCredentialValue(v) {
   return REDACTED_MARKER;
 }
 
-function redactHeaders(headersObj) {
+// NEW-03: the name list above only catches credentials in headers we can name.
+// A Test Manager's dedicated header can be called anything (X-My-Auth: <token>),
+// so its value renders verbatim. Redact by VALUE as well: mask any header whose
+// value contains one of the run's own resolved secrets, wherever it sits and
+// whatever the header is named. Only the secret substring is masked, so a header
+// that carries both a trace id and a token keeps the trace id — and a header with
+// no secret (an OSDM version, a correlation / session id, Accept) is untouched,
+// exactly what the maintainer asked to preserve for debugging.
+function maskSecretsInValue(v, secrets) {
+  if (v == null || !secrets || secrets.length === 0) return v;
+  let s = String(v);
+  for (const secret of secrets) {
+    // split/join, never a dynamic RegExp — the secret is attacker-influenced
+    // text and must not be compiled as a pattern (ReDoS / CodeQL).
+    if (secret && s.includes(secret)) s = s.split(secret).join(maskCredentialValue(secret));
+  }
+  return s;
+}
+
+function redactHeaders(headersObj, secrets = []) {
   if (!headersObj || typeof headersObj !== 'object') return headersObj;
   const out = {};
   for (const [k, v] of Object.entries(headersObj)) {
-    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase()) ? maskCredentialValue(v) : v;
+    out[k] = SENSITIVE_HEADER_NAMES.has(String(k).toLowerCase())
+      ? maskCredentialValue(v)              // a known credential header: mask the whole value
+      : maskSecretsInValue(v, secrets);     // any other header: mask only a credential substring
   }
   return out;
+}
+
+// The run's own resolved secrets, for value-based redaction. The access token
+// (cached), the APIM subscription key and the OAuth "extra" are the values a
+// dedicated header can carry under a tenant-chosen name. Short/empty values are
+// skipped so a trivial value cannot cause every header to be masked.
+function runCredentialSecrets(runId) {
+  const runRow = get('SELECT user_id FROM runs WHERE id = ?', [runId]);
+  if (!runRow?.user_id) return [];
+  const u = get('SELECT cached_token_enc, subscription_key_enc, oauth_extra_enc FROM users WHERE id = ?', [runRow.user_id]);
+  if (!u) return [];
+  const out = [];
+  for (const enc of [u.cached_token_enc, u.subscription_key_enc, u.oauth_extra_enc]) {
+    try {
+      const v = enc ? decrypt(enc) : null;
+      if (v && String(v).length >= 8) out.push(String(v));
+    } catch { /* a value we cannot decrypt is one we cannot match; skip it */ }
+  }
+  return [...new Set(out)];
 }
 
 // Auth endpoints (URL matches /token | /login | /auth | /logon | /oauth) carry
@@ -316,6 +356,11 @@ function extractStructuredResults(runId, companyId) {
   const runRow = get('SELECT scenario_code FROM runs WHERE id = ?', [runId]);
   const runScenarioCode = runRow?.scenario_code || null;
 
+  // NEW-03: the run's own secrets, resolved once, for value-based header
+  // redaction below (catches a credential carried under a tenant-chosen
+  // header name that the name list cannot know about).
+  const runSecrets = runCredentialSecrets(runId);
+
   // v1.11.5 — artifact files are OSCAR1-encrypted since v1.11.0. The
   // helper handles both encrypted and legacy plaintext files transparently.
   const { decryptFromFile } = require('../utils/at-rest');
@@ -414,8 +459,8 @@ function extractStructuredResults(runId, companyId) {
         const resBody = isAuth
           ? `${REDACTED_MARKER} (auth-endpoint response body — typically access_token / refresh_token)`
           : serializeBounded(getResponseBody(entry));
-        const reqHeaders = serializeBounded(redactHeaders(getHeaders(entry.request)));
-        const resHeaders = serializeBounded(redactHeaders(getHeaders(entry.response)));
+        const reqHeaders = serializeBounded(redactHeaders(getHeaders(entry.request), runSecrets));
+        const resHeaders = serializeBounded(redactHeaders(getHeaders(entry.response), runSecrets));
 
         // Heuristic parent linkage: when this is a /bookings, /refund-offers,
         // /exchange-offers, or /fulfillments call, look up the most recent
@@ -549,4 +594,4 @@ function extractStructuredResults(runId, companyId) {
   return { suites: suiteCount, requests: requestCount, assertions: assertionCount };
 }
 
-module.exports = { extractStructuredResults, classifyVendorCapability, serializeBounded };
+module.exports = { extractStructuredResults, classifyVendorCapability, serializeBounded, redactHeaders };

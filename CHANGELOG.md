@@ -14,6 +14,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.214] — 2026-10-07
+
+Audit tracker NEW-03 (report half of PR-05; the storage half S6 shipped in
+1.11.213). Closes #565. Server + collection (OTST_V2.0.104).
+
+### Security
+
+- **Report header redaction is now by value, not only by header name.** Every
+  redaction layer matched a fixed list of header names, so a company dedicated
+  header named anything (`X-My-Auth: {{access_token}}`) rendered its value — the
+  run's live token — verbatim in the stored `run_requests` traffic a certifier
+  reads and in the HTML report. Redaction now also masks any header whose value
+  **contains one of the run's own resolved secrets** (access token, APIM
+  subscription key, OAuth extra), wherever it sits and whatever the header is
+  named; only the secret substring is masked.
+- **Diagnostic headers stay visible** (maintainer requirement). A header with no
+  secret — an OSDM version, a correlation / session-trace id, `Accept` — is left
+  intact; a header carrying both a trace id and the token keeps the trace id and
+  masks only the token. Known-name credential headers (Authorization, subscription
+  key) stay fully masked as before.
+- **Server** (`reports/structureResults.js`): the run's secrets are read from the
+  user row and headers are redacted by value at write time, before they are stored
+  (encrypted) in `run_requests` and served by `reports.js`. **Collection**
+  (`library-bruno/reportGenerator.js`): the same, in the Bruno sandbox, reading
+  the secrets from the run env, for the standalone HTML artifact. `mergeReport.js`
+  (the fallback report) stays name-based on purpose — it runs as a separate child
+  with no credentials (the #306 / NEW-01 guarantee), so it cannot value-match.
+
+### Tests
+
+- `redactHeaders` unit tests (name-mask; value-mask of a tenant-named header;
+  diagnostic headers intact; only the secret substring masked in a mixed value;
+  no-secret list → name-only). An end-to-end `structure-results` test (a user
+  cached token + an artifact header `X-My-Auth` carrying it → stored masked,
+  `OSDM-Version` and the correlation id kept). The collection `reportGenerator`
+  verified through `appendRequest` with a stubbed run env. A mutation check breaks
+  each guard.
+
+### Note
+
+- This completes PR-05 and the 8 P0/P1 security items on the pen-test prerequisite
+  list.
+
+---
+
 ## [server-1.11.213] — 2026-10-07
 
 Audit tracker S6 (server half of PR-05). Closes #563. Server-only; collection
