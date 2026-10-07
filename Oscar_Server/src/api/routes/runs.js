@@ -236,6 +236,12 @@ router.post('/', runSubmitLimiter, (req, res) => {
     scenarioList = allCodes;
   }
 
+  // PR-03: a code is whatever JSON was stored, and only text can be a run's
+  // scenario. An object or a list cannot be written to the runs table: the
+  // insert threw and the whole batch answered 500, so one tester's scenario
+  // stopped the Test Manager's "ALL". Anything that is not text is left out.
+  scenarioList = scenarioList.filter(code => typeof code === 'string' && code !== '');
+
   if (scenarioList.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No scenarios to run. Check scenariosToRun in your data file.' });
   }

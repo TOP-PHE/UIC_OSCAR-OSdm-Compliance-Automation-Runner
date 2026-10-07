@@ -462,6 +462,62 @@ describe('POST /v1/runs — submission validation', () => {
       const dbRows = get('SELECT COUNT(*) AS n FROM runs WHERE batch_id = ?', [res.body.batch_id]);
       expect(dbRows.n).toBe(2);
     });
+
+    // PR-03: a scenario code is whatever JSON a tester stored. One that is not
+    // text (an object, a list) could not be written to the runs table, so the
+    // whole submission failed with a 500 — and a Test Manager's "ALL" includes
+    // testers' private scenarios. Only text codes are run; the rest are left out.
+    test('202 — scenarios whose code is not text are left out, and do not fail the batch', async () => {
+      const managerId = uuidv4();
+      run(`INSERT INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc)
+           VALUES (?, ?, ?, 'x', 'test_manager', 'bearer', ?)`,
+        [managerId, submitCompanyId, `manager-${managerId}@${EMAIL_DOMAIN}`, colEncrypt('tok-456')]);
+      const dfDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'runs-cov-df-codes-'));
+      covDatafileDirs.push(dfDir);
+      const dfPath = path.join(dfDir, 'datafile.enc');
+      const plain  = JSON.stringify({
+        scenarios: [
+          { code: 'SCEN_A' },
+          { code: { toString: 1 }, created_by: 'someone@example.test' },
+          { code: ['SCEN_X'] },
+          { code: 42 },
+          { code: true },
+          { code: null },
+          { code: '' },
+          {},
+          { code: 'SCEN_B' },
+        ],
+        scenariosToRun: 'ALL',
+      });
+      fs.writeFileSync(dfPath, encryptBuffer(Buffer.from(plain, 'utf8')));
+      run(`UPDATE companies SET datafile_path = ? WHERE id = ?`, [dfPath, submitCompanyId]);
+
+      const res = await request(app)
+        .post('/v1/runs')
+        .set('Authorization', `Bearer ${covToken('test_manager', managerId, submitCompanyId)}`)
+        .send({});
+
+      expect(res.status).toBe(202);
+      expect(res.body.runs.map(r => r.scenario_code).sort()).toEqual(['SCEN_A', 'SCEN_B']);
+      const stored = require('../../src/db/db').all('SELECT scenario_code FROM runs WHERE batch_id = ?', [res.body.batch_id]);
+      expect(stored.map(r => r.scenario_code).sort()).toEqual(['SCEN_A', 'SCEN_B']);
+    });
+
+    test('400 "No scenarios to run" when no code in the file is text', async () => {
+      const dfDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'runs-cov-df-nocode-'));
+      covDatafileDirs.push(dfDir);
+      const dfPath = path.join(dfDir, 'datafile.enc');
+      const plain  = JSON.stringify({ scenarios: [{ code: { a: 1 } }, { code: 7 }], scenariosToRun: 'ALL' });
+      fs.writeFileSync(dfPath, encryptBuffer(Buffer.from(plain, 'utf8')));
+      run(`UPDATE companies SET datafile_path = ? WHERE id = ?`, [dfPath, submitCompanyId]);
+
+      const res = await request(app)
+        .post('/v1/runs')
+        .set('Authorization', `Bearer ${covToken('company_user', submitUserId, submitCompanyId)}`)
+        .send({});
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toMatch(/No scenarios to run/);
+    });
   });
 });
 

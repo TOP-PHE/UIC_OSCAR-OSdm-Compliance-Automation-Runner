@@ -1207,3 +1207,82 @@ Two things for support:
   had changed, and the event does not record the address. If there is a doubt,
   have the Test Manager check the address shown on the page. From this release
   that event is written only for a Test Manager or an Administrator.
+
+### 15.10 v1.11.208 — what a run's child processes receive, and how the environment file is written
+
+Two findings of our own review of the 2026-09-05 assessment (tracker items NEW-01
+and NEW-02), both in the code that starts a run.
+
+**The report script inherited the server's secrets.** A run starts two child
+processes: the Bruno CLI, then `library-bruno/mergeReport.js`. The Bruno spawn
+was given an allowlisted environment. The second was given none, so it
+inherited the server's whole environment: `ENCRYPTION_KEY`, `JWT_SECRET`, the
+SMTP credentials. That script is a file of the collection, which is
+bind-mounted and refreshed from GitHub on every push to `main`, not a file of
+the server image. A script that printed or reported its environment would have
+exposed the key that encrypts every company's data. Both children now start
+from the same allowlist, and the report script gets none of the run's
+credentials either.
+
+This closes the inheritance and nothing more. Collection code still runs as the
+same operating-system user as the server: a script written to do harm could
+read the server's files, and on Linux the environment of the server process
+itself. Keeping the collection trustworthy (who can push to `main`, branch
+protection, the refresh workflow) remains the control for that. Running
+collection code under a separate user is not done.
+
+**A scenario code could redirect a run.** The environment file Bruno reads for
+a run is YAML, and values were pasted into it between double quotes as they
+came. A scenario code is free text a tester stores in the datafile. A code
+holding a quote and a line break added variables of its own to the file,
+including a second `api_base`, and Bruno uses the last one. The run's requests
+then went to an address the tester chose, with the access token of whoever
+started the run. That could be the Test Manager, whose run list "ALL" includes
+testers' private scenarios, or a colleague once the Test Manager had shared the
+scenario. Every value is now written through one escaping function, so a value
+can neither break the file nor add to it.
+
+**A scenario code could also be a template.** Bruno fills in `{{...}}` in a
+value when a script reads it. A code written as
+`{{process.env.OSCAR_ACCESS_TOKEN}}` was read as the access token of whoever
+started the run, then reported as "not found" in the run log, which every member
+of the company can read. Escaping cannot prevent that, and Bruno has no way to
+write `{{` literally. The runner now refuses a run whose scenario code contains
+`{{`: it is marked FAILED before a token is requested and before anything is
+started. A failed run with that message in a Test Manager's batch is also the
+sign that someone stored such a code.
+
+**A scenario code need not be text.** The datafile is JSON, and a code could be
+stored as an object or a list. Such a code could not be written to the runs
+table, so a Test Manager's "run all" answered a server error for the whole
+batch as long as one tester's scenario had one. Only text codes are run now;
+the others are left out of the batch.
+
+| | Before | Now |
+|---|---|---|
+| Environment of `mergeReport.js` | The server's, complete | The allowlist only |
+| A scenario code with a `"` and a line break | Adds variables to the run | One value, passed to Bruno unchanged |
+| A scenario code containing `{{` | Bruno replaces the template with a variable's value, the run's token for example, and the run log shows it | The run is refused before it starts, with a message asking for the scenario to be renamed |
+| A scenario code that is not text (an object, a list) | The whole "run all" answers a server error | That scenario is left out of the batch |
+| An API base URL or requestor with a `"` | The run fails: "Invalid API configuration" | Passed to Bruno unchanged |
+| Run log when a run's scenario no longer exists | Lists every scenario code in the datafile | Gives the number of scenarios |
+
+The last row is in the collection (OTST_V2.0.102). The datafile holds every
+tester's scenarios, and the message is written to the run log of whoever
+started the run. A tester could delete one of their own scenarios right after
+starting its run and read the codes of everyone's private scenarios.
+
+What to check on your deployment:
+
+- Nothing has to be configured. Runs behave as before for ordinary values.
+- **Whether a crafted code was ever stored cannot be seen from the server
+  side**: an Administrator has no access to datafiles (§15.3). A Test Manager
+  can look at the scenario codes in Test Config; a code containing a double
+  quote, `{{`, or spreading over several lines would stand out. The editor itself
+  only produces codes made of capital letters, digits and underscores, so any
+  other code was stored through the API or an upload. If one is found,
+  treat the access tokens of everyone who ran that scenario as exposed and
+  have them replaced at the provider.
+- If you maintain a fork of the collection that needs a server variable in
+  `mergeReport.js`, it no longer receives it. Add the variable's name to
+  `CHILD_ENV_ALLOWLIST` in `worker/runner.js`, never a secret.

@@ -460,9 +460,13 @@ function parseScenarioData(jsonData) {
   const scenarioOverride = bru.getEnvVar('scenario_override');
   if (scenarioOverride) {
     if (!allCodes.includes(scenarioOverride)) {
+      // The codes in the file are counted, not listed. Under OSCAR this message
+      // lands in the run log of whoever started the run, and the data file
+      // holds every tester's scenarios, private ones included.
       throw new Error(
-        `[ERROR] ❌ scenario_override "${scenarioOverride}" not found in scenarios list. ` +
-        `Available: ${allCodes.join(', ')}`
+        `[ERROR] ❌ scenario_override "${scenarioOverride}" not found in scenarios list ` +
+        `(the data file holds ${allCodes.length} scenario${allCodes.length === 1 ? '' : 's'}). ` +
+        `It may have been renamed or deleted after the run was started.`
       );
     }
     effectiveList = [scenarioOverride];

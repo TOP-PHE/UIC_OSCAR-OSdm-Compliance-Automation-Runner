@@ -14,6 +14,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.208] — 2026-10-06
+
+Collection OTST_V2.0.102. Audit tracker PR-03 (NEW-01, NEW-02). Closes #553.
+
+### Security
+
+- **The report script no longer inherits the server's secrets (NEW-01).**
+  `worker/runner.js` starts two child processes for a run: the Bruno CLI, then
+  `library-bruno/mergeReport.js`. The Bruno spawn was given an allowlisted
+  environment. The second had no `env` option, so it inherited `process.env`
+  whole: `ENCRYPTION_KEY`, `JWT_SECRET`, the SMTP credentials.
+  `mergeReport.js` is a file of the bind-mounted collection, not of the server
+  image. Both children now start from one list (`CHILD_ENV_ALLOWLIST`,
+  `childBaseEnv()`), and the report script gets none of the run's credentials.
+  This stops inheritance. It is not isolation: collection code still runs as
+  the server's operating-system user.
+- **A value written to a run's environment file can no longer add to it
+  (NEW-02).** The file is YAML, and values were pasted into it between double
+  quotes as they came; only the dedicated headers were escaped. A scenario code
+  is free text a tester stores in the datafile. One holding a quote and a line
+  break added variables of its own, a second `api_base` among them, and Bruno
+  uses the last one. Reproduced with Bruno CLI 4.2.1: the request and its
+  bearer token went to the other address. The run could be the Test Manager's
+  (a company run list of "ALL" includes testers' private scenarios), or a
+  colleague's once the scenario was shared.
+
+  Every value now goes through `yamlQuoted()`: one line, double-quoted,
+  printable ASCII only, JSON escapes plus `\uXXXX` from DEL upwards (some
+  YAML parsers treat U+0085, U+2028 and U+2029 as line breaks).
+
+  | Written to the file | Before | Now |
+  |---|---|---|
+  | Environment name | Bare | Quoted and escaped |
+  | API base URL, datafile URL, requestor, scenario override | Between quotes, as they came | Escaped |
+  | Dedicated headers | Quote and backslash escaped | Escaped, the same function |
+  | Run id, deadline, loopback address (added by `executeRun`) | Between quotes | The same function |
+
+- **A scenario code holding a template is not run.** Found while fixing.
+  Escaping does not cover what Bruno does next with a value: it fills in
+  `{{...}}` when a script reads it, and
+  `{{process.env.OSCAR_ACCESS_TOKEN}}` is the token of whoever started
+  the run (checked with the real CLI). As a scenario code it would have been
+  reported "not found" in a run log every member of the company can read.
+  Bruno has no literal form for `{{`, so `refusedScenarioCode()` refuses
+  such a run: FAILED with a reason, before a token is requested, before the
+  file is written, before anything is started.
+- **The run log no longer lists every scenario code** (collection,
+  `scenarioParser.js`). When a run's `scenario_override` is not in the
+  datafile, the error ended with "Available:" and every code in the file. That
+  text lands in the run log of whoever started the run, and the file holds
+  every tester's scenarios. A tester who deleted one of their own scenarios
+  after starting its run could read the codes of the others' private ones. The
+  message now gives their number. This is how we read the item "the run log
+  can list codes" left open by the 1.11.197 review.
+
+### Fixed
+
+- **A scenario code that is not text no longer fails a whole batch.** A code
+  is whatever JSON was stored. An object or a list could not be written to the
+  runs table, so `POST /v1/runs` answered 500, and one tester's scenario
+  stopped a Test Manager's "ALL". Only text codes are run. The runner refuses
+  a non-text code that reaches it instead of throwing: a run that throws is
+  never marked FAILED.
+
+### Changed
+
+- For an ordinary run the environment file differs in its first line only: the
+  environment name is quoted. A value with nothing to escape is written byte
+  for byte as before.
+- An API base URL or requestor holding a double quote no longer fails the run
+  with `TOKEN_FORMAT_ERROR` ("Invalid API configuration"). It reaches Bruno as
+  it is. The detection stays as a safety net.
+- `js-yaml`, the parser Bruno uses, is a declared devDependency: the tests
+  read the file with it. The existing override now follows it
+  (`"$js-yaml"`), because npm refuses a direct dependency whose range differs
+  from its override (`EOVERRIDE`). The installed version is unchanged, 4.3.2.
+
+### Tests
+
+- 62 new: 37 on the environment file, 21 on `executeRun`, 2 on the collection
+  message, 2 on run submission. All but one failed on the old code; that one
+  pins the answer when no code in the file is text.
+- The first CI run failed on three of them, and was right to. Outside Windows
+  a run that names its scenario works in a copy of the collection of its own
+  (`data/workspaces/<runId>`), and the tests looked in the collection folder.
+  They now take the folder from what the runner hands to `spawn`, and run in
+  both modes on any machine. An older test asserted while its fake process was
+  still open, so a failure there kept Jest alive for ten minutes; it now ends
+  the run first.
+- 42 deliberate breakages of the fix. Each fails at least one test. The run
+  also showed two source files holding a raw character where an escape
+  sequence had been typed; the behaviour was the same, and both now hold the
+  escape.
+- With the real Bruno CLI 4.2.1 and a crafted scenario code: before the fix
+  the request went to the injected address with the token; after it, to the
+  real one.
+- Bruno's own environment loader (`@usebruno/filestore`) read 5,006 generated
+  files, with hostile and random values in every position including the
+  environment name. No difference from what was given. Bruno reports the same
+  environment name for the quoted and the bare line.
+- An independent review of the diff, asked to break it, reported no way
+  through the escaping or the allowlist. It raised the template in a scenario
+  code, the non-text codes and two wordings; all are addressed above.
+
+### Not changed, not done
+
+- Scenario codes are not restricted to a character set beyond the two rules
+  above. Existing datafiles may hold unusual codes.
+- How Bruno treats templates in the rest of a scenario's text is outside this
+  change. The dedicated headers keep their templates on purpose.
+- The address a Test Manager may enter as API base URL is not validated
+  (tracker S5).
+- Collection code is not run under a separate user.
+- Not run on a vendor sandbox. Worth one run on production after deployment.
+- `min_collection` stays OTST_V2.0.95: the server change does not need the new
+  collection.
+
+---
+
 ## [server-1.11.207] — 2026-10-06
 
 ### Security

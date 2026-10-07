@@ -183,3 +183,34 @@ describe('resolveSalesFlowActions (issue #107)', () => {
     );
   });
 });
+
+// PR-03: under OSCAR every run carries a scenario_override, and this message is
+// written to the run log of whoever started the run. It used to end with
+// "Available:" and every code in the data file, which holds all testers'
+// scenarios. A tester who deleted a scenario of their own after starting its
+// run got the codes of everyone's private scenarios.
+describe('parseScenarioData — a scenario_override that is not in the file', () => {
+  const datafile = () => ({
+    scenariosToRun: 'ALL',
+    scenarios: [{ code: 'MINE' }, { code: 'COLLEAGUE_PRIVATE_ALPHA' }, { code: 'COLLEAGUE_PRIVATE_BETA' }],
+  });
+  const messageFor = (override, file = datafile()) => {
+    envStore.scenario_override = override;
+    try { sp.parseScenarioData(file); } catch (e) { return e.message; }
+    return null;
+  };
+
+  test('the error names the code that was asked for and counts the others, without listing them', () => {
+    const message = messageFor('DELETED_SINCE');
+    expect(message).toContain('scenario_override "DELETED_SINCE" not found');
+    expect(message).toContain('the data file holds 3 scenarios');
+    expect(message).not.toContain('COLLEAGUE_PRIVATE');
+    expect(message).not.toContain('MINE');
+    expect(message).not.toContain('Available');
+  });
+
+  test('one scenario is counted in the singular', () => {
+    expect(messageFor('GONE', { scenariosToRun: 'ALL', scenarios: [{ code: 'ONLY' }] }))
+      .toContain('the data file holds 1 scenario)');
+  });
+});

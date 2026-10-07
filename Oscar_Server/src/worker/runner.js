@@ -51,6 +51,28 @@ const ARTIFACTS_DIR   = path.resolve(__dirname, '../../data/artifacts');
 const ENVS_DIR        = path.join(COLLECTION_PATH, 'environments');
 const WORKSPACES_DIR  = path.resolve(__dirname, '../../data/workspaces');
 
+// ── What a child process may inherit (tracker NEW-01) ────────────────────────
+// process.env holds ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials. No
+// child process is handed it. The runner starts two: the Bruno CLI, and
+// library-bruno/mergeReport.js, which is a file of the bind-mounted collection
+// and not of the server. Both start from this list and nothing else; a spawn
+// with no `env` option inherits everything, which is what mergeReport.js did.
+// Windows needs ComSpec + PATHEXT for shell:true to find .cmd files.
+const CHILD_ENV_ALLOWLIST = Object.freeze([
+  'PATH', 'PATHEXT', 'ComSpec', 'SystemRoot', 'SystemDrive',
+  'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'USERNAME',
+  'TEMP', 'TMP', 'HOME', 'HOMEDRIVE', 'HOMEPATH',
+  'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData',
+  'NODE_ENV', 'NODE_PATH',
+]);
+function childBaseEnv() {
+  const env = {};
+  for (const key of CHILD_ENV_ALLOWLIST) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  return env;
+}
+
 // ── Stream backpressure — cap log events per run to prevent OOM/DB bloat ─────
 // A pathological Bruno run could emit millions of log lines (e.g. infinite
 // loop, runaway debug output). Each line triggers a synchronous DB INSERT.
@@ -478,6 +500,58 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
 }
 
+// ── One way to write a value into the Bruno environment file (tracker NEW-02) ─
+// The file is YAML, and a value used to be pasted between two double quotes as
+// it came. A scenario code is free text a tester stores: one holding a quote
+// and a line break closed its scalar and added variables of its own, a second
+// api_base among them. Bruno uses the last one, so the run's requests, token
+// included, went to an address the tester chose — and the run may be a
+// colleague's, or the Test Manager's "run all".
+//
+// Every value now goes through yamlQuoted(). It writes a YAML double-quoted
+// scalar on one line that holds printable ASCII only: JSON.stringify escapes
+// the quote, the backslash and the control characters, and everything from DEL
+// upwards is written as \uXXXX (some YAML parsers treat U+0085, U+2028 and
+// U+2029 as line breaks). Each escape it uses is valid in YAML and reads back
+// as the same character, so the value Bruno sees is exactly the one given. A
+// value with nothing to escape is written byte for byte as before.
+function yamlQuoted(value) {
+  return JSON.stringify(String(value))
+    .replaceAll(/[\u007f-\uffff]/g, (c) => String.raw`\u` + c.codePointAt(0).toString(16).padStart(4, '0'));
+}
+
+// The two lines of one variable. `name` is always a literal of this file.
+function envVar(name, value) {
+  return [`  - name: ${name}`, `    value: ${yamlQuoted(value)}`];
+}
+
+// ── Scenario codes that are not run ──────────────────────────────────────────
+// Returns the reason, as a sentence for the person who started the run, or
+// null when the code may run. No code at all (null, '') is not refused: that
+// is a run of the datafile's own list.
+//
+// A code holding "{{". Escaping keeps a code from adding to the environment
+// file, but Bruno then fills in {{...}} in a value when a script reads it
+// (bru.getEnvVar), and {{process.env.OSCAR_ACCESS_TOKEN}} is the token of
+// whoever started the run. The collection would print that "code" as not
+// found, in a run log every member of the company can read; {{requestor}}
+// could even make it name a colleague's private scenario. Bruno has no way to
+// write "{{" literally.
+//
+// A code that is not text. It is whatever JSON was stored; an object without a
+// usable toString() made String() throw here, and a run that throws stays
+// RUNNING in the database.
+function refusedScenarioCode(code) {
+  if (code === null || code === undefined || code === '') return null;
+  if (typeof code !== 'string') {
+    return 'The scenario code is not text. Correct the scenario in Test Config, then run it again.';
+  }
+  if (code.includes('{{')) {
+    return 'The scenario code contains "{{", which the test engine would replace with the value of a variable. Rename the scenario in Test Config, then run it again.';
+  }
+  return null;
+}
+
 function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {
   // #306: this file deliberately carries NO credentials. The access token,
   // Ocp-Apim-Subscription-Key and oauth_extra travel via the Bruno child
@@ -486,33 +560,25 @@ function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride,
   // hook (opencollection.yml, bru.getProcessEnv) — so no secret ever touches
   // disk, even if the worker dies between the env-file write and cleanup.
   const lines = [
-    `name: ${envName}`,
+    `name: ${yamlQuoted(envName)}`,
     `variables:`,
-    `  - name: api_base`,
-    `    value: "${apiBase}"`,
-    `  - name: library_base`,
-    `    value: "./library-bruno/"`,
-    `  - name: data_base`,
-    `    value: "${datafileUrl}"`,
-    `  - name: json_schema`,
-    `    value: "${JSON_SCHEMA_URL}"`,
-    `  - name: scenariosToRunIndex`,
-    `    value: "0"`,
+    ...envVar('api_base', apiBase),
+    ...envVar('library_base', './library-bruno/'),
+    ...envVar('data_base', datafileUrl),
+    ...envVar('json_schema', JSON_SCHEMA_URL),
+    ...envVar('scenariosToRunIndex', '0'),
   ];
   if (requestor) {
-    lines.push(`  - name: requestor`, `    value: "${requestor}"`);
+    lines.push(...envVar('requestor', requestor));
   }
   if (scenarioOverride) {
-    lines.push(`  - name: scenario_override`, `    value: "${scenarioOverride}"`);
+    lines.push(...envVar('scenario_override', scenarioOverride));
   }
   if (Array.isArray(extraHeaders) && extraHeaders.length > 0) {
     // Issue #426 — company-wide dedicated headers. Passed through as a JSON
     // string for the collection's before-request hook to parse + inject (the
-    // hook resolves any {{var}} templates in the values). Escape backslashes
-    // then double-quotes so the JSON survives inside a YAML double-quoted
-    // scalar — a stray " would otherwise produce invalid YAML and crash Bruno.
-    const safeEh = JSON.stringify(extraHeaders).replaceAll('\\', String.raw`\\`).replaceAll('"', String.raw`\"`);
-    lines.push(`  - name: __extraHeaders`, `    value: "${safeEh}"`);
+    // hook resolves any {{var}} templates in the values).
+    lines.push(...envVar('__extraHeaders', JSON.stringify(extraHeaders)));
   }
   return lines.join('\n') + '\n';
 }
@@ -612,6 +678,16 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   const runArtifactDir = safeJoinUuid(ARTIFACTS_DIR, runId);
   if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
+
+  // 2b. Some scenario codes are not run (tracker NEW-02, second half). The
+  //     run stops here: before a token is asked for, before the environment
+  //     file is written, before anything is started.
+  const refusal = refusedScenarioCode(scenarioOverride);
+  if (refusal) {
+    dbRun(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
+    logEvent(runId, 'error', `[runner] ${refusal}`);
+    return { exitCode: 1, error: refusal };
+  }
 
   // 3. Resolve access token (per-tester credentials, per-tester token cache).
   //    The oauth2/bearer logic + token cache live in access-token.js so the
@@ -723,10 +799,11 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   // #204: inject the runId so 06.yml can call the loopback refresh-access-token
   // endpoint after the wait. The endpoint validates that the requested runId
   // exists and only refreshes the token bound to that run.
-  const envYmlOut  = envYml
-    + `  - name: runHardDeadlineMs\n    value: "${Date.now() + _runBudget.effectiveMs}"\n`
-    + `  - name: __runId\n    value: "${runId}"\n`
-    + `  - name: oscar_loopback_base\n    value: "http://127.0.0.1:${process.env.PORT || 3001}"\n`;
+  const envYmlOut  = envYml + [
+    ...envVar('runHardDeadlineMs', Date.now() + _runBudget.effectiveMs),
+    ...envVar('__runId', runId),
+    ...envVar('oscar_loopback_base', `http://127.0.0.1:${process.env.PORT || 3001}`),
+  ].join('\n') + '\n';
   const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
   const envFilePath = path.join(envsDir, `${envName}.yml`);
 
@@ -779,21 +856,9 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       `--reporter-json`, bruJsonRel    // relative path — no spaces issue
     ];
 
-    // Security: whitelist only the env vars Bruno CLI needs.
-    // Do NOT pass process.env — it contains ENCRYPTION_KEY, JWT_SECRET,
-    // and SMTP credentials that must never leak to child processes.
-    // Windows requires ComSpec + PATHEXT for shell:true to find .cmd files.
-    const safeEnv = {};
-    const ALLOWED_ENV = [
-      'PATH', 'PATHEXT', 'ComSpec', 'SystemRoot', 'SystemDrive',
-      'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'USERNAME',
-      'TEMP', 'TMP', 'HOME', 'HOMEDRIVE', 'HOMEPATH',
-      'ProgramFiles', 'ProgramFiles(x86)', 'ProgramData',
-      'NODE_ENV', 'NODE_PATH',
-    ];
-    for (const key of ALLOWED_ENV) {
-      if (process.env[key] !== undefined) safeEnv[key] = process.env[key];
-    }
+    // Security: only the allowlisted env vars, never process.env — it holds
+    // ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials (CHILD_ENV_ALLOWLIST).
+    const safeEnv = childBaseEnv();
     // #306: hand the per-run credentials to Bruno via its process
     // environment — never via the env yml on disk (see buildEnvYml). The
     // collection's before-request hook (opencollection.yml) seeds them into
@@ -1012,9 +1077,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     try { await fs.promises.copyFile(bruJsonAbsPath, stdJsonPath); } catch (_) {}
 
     const htmlExitCode = await new Promise((resolve) => {
+      // NEW-01: the same allowlist as the Bruno spawn, and none of the run's
+      // credentials — the script reads its argument and two files, nothing else.
       const proc = spawn(process.execPath, [mergeReportJs, envName], {
         cwd:   runCwd,
-        shell: false
+        shell: false,
+        env:   childBaseEnv()
       });
       proc.stdout.on('data', c => logEvent(runId, 'stdout', c.toString().trim()));
       proc.stderr.on('data', c => logEvent(runId, 'stderr', c.toString().trim()));
@@ -1103,4 +1171,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml };
+module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };
