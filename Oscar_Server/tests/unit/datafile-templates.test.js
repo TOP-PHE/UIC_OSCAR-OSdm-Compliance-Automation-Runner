@@ -233,6 +233,32 @@ describe('templatesForRunner — what the person running is told', () => {
     }
   });
 
+  // The runner calls this before every run, and a run whose check throws is
+  // never marked as failed. So it has to give an answer for anything that can
+  // be stored, and a Test Manager's save can store a great deal.
+  test('whatever the file looks like, it answers and does not throw', () => {
+    const odd = [
+      null, undefined, 'text', 7, [], [TOKEN], {},
+      { scenarios: null }, { scenarios: 'ALL' }, { scenarios: {} }, { scenarios: [null] }, { scenarios: [null, undefined, 7, 'x', [], [TOKEN], true] },
+      { scenarios: [null], tripRequirements: [{ id: 1 }], passengersList: [{ id: 1 }], purchaserList: [null] },
+      { scenarios: [{ code: null }, { code: 7 }, { code: {} }, { created_by: {} }, { shared: 'yes', created_by: 7 }] },
+      { scenarios: [{ code: 'A', tripRequirementId: {} }], tripRequirements: [null, 7, 'x', [], { id: {} }, { id: null }] },
+      { scenarios: [], scenariosToRun: { not: 'a list' } }, { scenarios: [], scenariosToRun: 7 }, { scenarios: [], scenariosToRun: [null, {}, 7] },
+      { scenarios: [null, { code: 'MINE', created_by: ME, note: TOKEN }, { code: 'THEIRS', created_by: 'other@example.test', note: TOKEN }], passengersList: [{ id: 1 }] },
+    ];
+    for (const file of odd) {
+      for (const who of [{ testManager: true }, { testManager: false, email: ME }, { testManager: false }, { email: null }, {}, undefined]) {
+        expect(() => templatesForRunner(file, who)).not.toThrow();
+        expect(() => runRefusal(templatesForRunner(file, who))).not.toThrow();
+      }
+      expect(() => templatesAddedBy(file, file)).not.toThrow();
+      expect(() => templatesAddedBy({}, file)).not.toThrow();
+    }
+    // and with a null among the scenarios the answer is still the right one
+    const last = templatesForRunner(odd.at(-1), { testManager: false, email: ME });
+    expect([plain(last), last.total, last.elsewhere]).toEqual([['scenario "MINE": note'], 1, true]);
+  });
+
   test('with a great many in their own scenario, a tester is still not told about the rest', () => {
     const df = everywhere();
     df.scenarios[0].many = Array.from({ length: 5000 }, () => OPEN);

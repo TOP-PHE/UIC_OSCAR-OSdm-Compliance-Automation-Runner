@@ -565,13 +565,14 @@ function refusedScenarioCode(code) {
 // starting it unchecked.
 async function refusedDatafileText(datafilePath, runner) {
   if (!datafilePath || !(await fsExists(datafilePath))) return null;
-  let datafile;
+  // The check is inside the `try` on purpose: a run whose executeRun throws is
+  // never marked FAILED, so whatever goes wrong here has to end as a refusal.
   try {
-    datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    const datafile = JSON.parse((await decryptFromFileAsync(datafilePath)).toString('utf8'));
+    return runRefusal(templatesForRunner(datafile, runner));
   } catch {
     return 'The data file could not be read, so it could not be checked and the run was not started. Try again; if it happens again, ask your Test Manager to check the data file.';
   }
-  return runRefusal(templatesForRunner(datafile, runner));
 }
 
 function buildEnvYml(envName, apiBase, requestor, datafileUrl, scenarioOverride, extraHeaders) {

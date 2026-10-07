@@ -317,6 +317,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **The runner fails closed:** a datafile that is there but cannot be read
     refuses the run. A missing one is left to the step that already reports it.
     Runner tests therefore seed a real datafile, not "any file that exists".
+    The check sits inside the same `try`, so anything that goes wrong in it is
+    a refusal too: a thrown `executeRun` leaves the run unmarked.
+  - **`viewForTester` threw on a `null` scenario**, which a Test Manager's save
+    can store: `GET /datafile` answered 500 to every tester, and the new check
+    would have thrown with it. Found by running the first committed rule and
+    the final one side by side on 150,000 random files (same places, counts
+    and refusals), which is also how the rework was shown to change nothing.
+    A fixture with odd scenarios needs a resource list as well, or the line
+    that throws is never reached.
   - **What the person running is told** (`templatesForRunner`): a Test
     Manager, every place. A tester, the places in their `viewForTester` view,
     and for the rest one sentence, "in a part of the data file that you cannot

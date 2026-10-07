@@ -122,6 +122,18 @@ describe('GET /v1/company/datafile', () => {
     const res = await getAs(TM);
     expect(codes(res.body)).toEqual(['SHARED_1', 'LEGACY_1', 'ANA_1', 'BEN_1', 'TM_PRIV']);
   });
+
+  // A Test Manager's save or upload can store a null among the scenarios. The
+  // tester's view threw on it, and this answered 500 to every tester of the
+  // company (found while fixing NEW-10, v1.11.209).
+  test('a null among the scenarios does not stop a tester from loading the file', async () => {
+    const file = storedFile();
+    file.scenarios.splice(2, 0, null);
+    encryptToFile(JSON.stringify(file), LIVE_PATH);
+    const res = await getAs(ANA);
+    expect(res.status).toBe(200);
+    expect(codes(res.body)).toEqual(['SHARED_1', 'LEGACY_1', 'ANA_1']);
+  });
 });
 
 // ── What a tester's save can change ───────────────────────────────────────────

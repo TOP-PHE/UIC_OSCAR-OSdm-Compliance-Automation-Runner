@@ -74,12 +74,28 @@ Audit tracker NEW-10. Closes #555.
 - **The runner fails closed on a datafile it cannot read.** Such a run is
   refused with "The data file could not be read…". Before, it was started
   anyway and failed later inside Bruno. A missing datafile is still reported
-  by the step that already did.
+  by the step that already did. Anything else that goes wrong while the file
+  is checked ends the same way: a run whose check throws would never be marked
+  as failed.
+
+### Fixed
+
+- **Test Config no longer answers 500 to testers when the datafile holds a
+  `null` among its scenarios.** A Test Manager's save or upload accepts such a
+  file. Working out what a tester sees (`viewForTester`) then threw, so
+  `GET /v1/company/datafile` failed for every tester of the company. Found by
+  running the old and the new rule side by side on random files; the new run
+  check goes through the same function and would have left such a run
+  unmarked.
 
 ### Tests
 
-- 92 new: 55 on the rule, 20 on the runner, 17 on the two routes. 59
-  deliberate breakages of the fix each fail at least one.
+- 97 new: 56 on the rule, 22 on the runner, 17 on the two save routes, 2 on
+  the tester's view. 64 deliberate breakages of the fix each fail at least
+  one.
+- The rule as first written and the rule as it is now were run side by side
+  on 150,000 random pairs of datafiles: the same places, the same counts and
+  the same refusals every time.
 - Two rounds of independent review before the pull request. The first broke a
   first version that looked only at the scenario being run:
   - a 195 KB save stalled the server for 17 s, because every place was

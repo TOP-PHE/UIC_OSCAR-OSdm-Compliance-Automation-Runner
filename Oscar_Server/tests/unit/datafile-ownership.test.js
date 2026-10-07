@@ -135,6 +135,20 @@ describe('viewForTester', () => {
   test('other top-level keys are passed through untouched', () => {
     expect(viewForTester(companyFile(), ANA, null).systemInfoParameters).toEqual({ v: 'company' });
   });
+
+  // A Test Manager's save or upload can store an entry of `scenarios` that is
+  // not a scenario at all. The view threw on a null one, so Test Config
+  // answered 500 to every tester of the company (found while fixing NEW-10).
+  test('an entry of `scenarios` that is not an object is left out, and breaks nothing', () => {
+    for (const odd of [null, 'text', 7, [1], true]) {
+      const file = companyFile();
+      file.scenarios.splice(1, 0, odd);
+      const view = viewForTester(file, ANA, null);
+      expect(codes(view)).toEqual(['SHARED_1', 'LEGACY_1', 'ANA_1']);
+      expect(view.tripRequirements.map(e => e.id)).toEqual([10, 20, 30]);
+      expect(view.scenariosToRun).toEqual(['SHARED_1', 'LEGACY_1', 'ANA_1']);
+    }
+  });
 });
 
 // ── The merge ─────────────────────────────────────────────────────────────────

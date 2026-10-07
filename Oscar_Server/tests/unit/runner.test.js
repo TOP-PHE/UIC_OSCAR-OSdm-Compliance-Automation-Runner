@@ -40,6 +40,13 @@ const { spawn } = require('child_process');
 jest.mock('../../src/worker/access-token');
 const { resolveAccessToken } = require('../../src/worker/access-token');
 
+// The real module. viewForTester is wrapped so that one test can make it throw.
+jest.mock('../../src/utils/datafileOwnership', () => {
+  const real = jest.requireActual('../../src/utils/datafileOwnership');
+  return { ...real, viewForTester: jest.fn(real.viewForTester) };
+});
+const { viewForTester } = require('../../src/utils/datafileOwnership');
+
 const { run, get, colDecrypt } = require('../../src/db/db');
 const { executeRun, killRun } = require('../../src/worker/runner');
 
@@ -1066,11 +1073,42 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
       expect(out.result.error.length).toBeLessThan(700);
     });
 
+    // A Test Manager's save can store a null among the scenarios. Working out
+    // what a tester sees threw on it, and a run whose executeRun throws is never
+    // marked as failed.
+    test('a null among the scenarios: a tester\'s run starts when the file is clean, and is refused when it is not', async () => {
+      const clean = datafileFor(CODE);
+      clean.scenarios.push(null);
+      expectStarted(await attempt(clean, { role: 'company_user' }));
+
+      const holds = email => {
+        const df = datafileFor(CODE);
+        df.scenarios[0].created_by = email;
+        df.scenarios[0].label = TOKEN;
+        df.scenarios.push(null);
+        return df;
+      };
+      expectRefused(await attempt(holds, { role: 'company_user' }), `scenario "${CODE}": label`);
+    });
+
     test('a datafile that cannot be read: the run is refused, not started unchecked', async () => {
       const out = await attempt('this is not JSON');
       expect(out.thrown).toBeNull();
       expect(out.result.exitCode).toBe(1);
       expect(out.result.error).toMatch(/data file could not be read/i);
+      expect(out.row.status).toBe('FAILED');
+      expect(out.started).toBe(0);
+      expect(out.tokenAsked).toBe(0);
+    });
+
+    test('whatever goes wrong while the file is checked ends as a refusal, never as a thrown error', async () => {
+      viewForTester.mockImplementationOnce(() => { throw new Error('something nobody thought of'); });
+      const out = await attempt(datafileFor(CODE), { role: 'company_user' });
+      expect(viewForTester).toHaveBeenCalled();
+      expect(out.thrown).toBeNull();
+      expect(out.result.exitCode).toBe(1);
+      expect(out.result.error).toMatch(/data file could not be read/i);
+      expect(out.result.error).not.toContain('nobody thought of');
       expect(out.row.status).toBe('FAILED');
       expect(out.started).toBe(0);
       expect(out.tokenAsked).toBe(0);
