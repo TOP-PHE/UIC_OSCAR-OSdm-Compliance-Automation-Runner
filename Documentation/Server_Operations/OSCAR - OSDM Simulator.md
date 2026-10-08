@@ -88,19 +88,35 @@ without printing the whole file:
 python3 -c "import json;print(json.load(open('clients.json'))['alpha'][0]['client_secret'])"
 ```
 
-Then, from any other machine:
+Then, from any other machine, in two steps.
+
+First, on its own, this line. It stops at a prompt and waits: paste the secret
+of that client and press Enter. Nothing is shown while you paste.
 
 ```bash
-H=https://<simulator-host>
-ID=alpha-client-1
-read -rs SECRET     # paste the secret of that client; it is not shown
-curl -s $H/healthz
+H=https://<simulator-host>; ID=alpha-client-1; read -rsp "Secret of $ID: " SECRET; echo
+```
+
+Do not paste it together with the lines below: the terminal would then wait
+for the secret without saying so, and look frozen.
+
+Then the checks:
+
+```bash
+curl -s $H/healthz; echo
 # a token for alpha
-T=$(curl -s -d grant_type=client_credentials -d "client_id=$ID" --data-urlencode "client_secret=$SECRET" $H/alpha/oauth/token | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+T=$(curl -s -d grant_type=client_credentials -d "client_id=$ID" --data-urlencode "client_secret=$SECRET" $H/alpha/oauth/token | python3 -c "import json,sys;print(json.load(sys.stdin).get('access_token',''))")
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/alpha/versions   # 200
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/beta/versions    # 401: alpha's token on beta
 curl -s -o /dev/null -w '%{http_code}\n' $H/alpha/versions                                 # 401: no token
 ```
+
+Expected: `{"status":"ok"}`, then `200`, `401`, `401`. If the first number is
+`401`, no token was issued: the secret is not the one of that client.
+
+What needs no secret can be checked at any time: `/healthz` answers
+`{"status":"ok"}` over https with a valid certificate, `/alpha/versions`
+without a token answers 401, and an unknown provider answers 404.
 
 ## 5. Point a company at it
 
