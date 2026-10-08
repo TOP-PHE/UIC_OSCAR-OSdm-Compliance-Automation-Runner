@@ -15,6 +15,7 @@
 
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run } = require('../../db/db');
+const { stripTrailingSlashes } = require('../../utils/osdm-client');
 const { normalizeRole } = require('../middleware/auth');
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -145,7 +146,7 @@ function companyEndpointChange(role, requested, stored) {
 // being written (null for one being created under `parentId`). Comparison
 // ignores case and trailing slashes.
 function familyEndpointClash(companyId, parentId, endpoint) {
-  const norm = v => String(v || '').trim().replace(/\/+$/, '').toLowerCase();
+  const norm = v => stripTrailingSlashes(String(v || '').trim()).toLowerCase();
   const wanted = norm(endpoint);
   if (!wanted) return null;
   const root = parentId || get('SELECT parent_id FROM companies WHERE id = ?', [companyId])?.parent_id || companyId;

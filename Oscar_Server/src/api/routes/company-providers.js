@@ -38,7 +38,6 @@ const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { currentMember } = require('../helpers/provider-access');
 
 const router = express.Router();
-router.use(requireAuth);
 
 const providerMutationLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -55,10 +54,10 @@ const providerReadLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window.' }
 });
-router.use((req, res, next) => {
-  const limiter = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method) ? providerMutationLimiter : providerReadLimiter;
-  return limiter(req, res, next);
-});
+// Every request counts against the read bucket; changes also against the
+// tighter one (mounted on each changing route below).
+router.use(providerReadLimiter);
+router.use(requireAuth);
 
 const NOT_FOUND = { status: 404, title: 'Not Found', detail: 'Provider not found.' };
 const NAME_MAX = 100;
@@ -141,7 +140,7 @@ router.get('/', (req, res) => {
 });
 
 // ── POST / ────────────────────────────────────────────────────────────────────
-router.post('/', (req, res) => {
+router.post('/', providerMutationLimiter, (req, res) => {
   if (!requireTestManager(req, res)) return;
   const parent = get('SELECT * FROM companies WHERE id = ?', [req.user.companyId]);
   // Only a top-level company may own providers: one level, never a chain.
@@ -183,7 +182,7 @@ router.post('/', (req, res) => {
 // ── PATCH /:id — rename ───────────────────────────────────────────────────────
 // The endpoint and the dedicated headers are changed with PATCH /v1/company
 // naming the provider, like any company's.
-router.patch('/:id', (req, res) => {
+router.patch('/:id', providerMutationLimiter, (req, res) => {
   if (!requireTestManager(req, res)) return;
   const provider = ownProvider(req);
   if (!provider) return res.status(404).json(NOT_FOUND);
@@ -221,7 +220,7 @@ function distributorTester(req, provider) {
   return user && normalizeRole(user.role) === 'company_user' ? user : null;
 }
 
-router.put('/:id/access/:userId', (req, res) => {
+router.put('/:id/access/:userId', providerMutationLimiter, (req, res) => {
   if (!requireTestManager(req, res)) return;
   const provider = ownProvider(req);
   if (!provider) return res.status(404).json(NOT_FOUND);
@@ -233,7 +232,7 @@ router.put('/:id/access/:userId', (req, res) => {
   return res.json({ provider_id: provider.id, user_id: tester.id, granted: true });
 });
 
-router.delete('/:id/access/:userId', (req, res) => {
+router.delete('/:id/access/:userId', providerMutationLimiter, (req, res) => {
   if (!requireTestManager(req, res)) return;
   const provider = ownProvider(req);
   if (!provider) return res.status(404).json(NOT_FOUND);

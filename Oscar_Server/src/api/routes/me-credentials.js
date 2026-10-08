@@ -19,6 +19,7 @@
  */
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { encrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
@@ -34,6 +35,14 @@ const router = express.Router();
 // A platform user (administrator, certifier) is not a tenant member: it keeps
 // one set, for its own company, used for any company it names (as before
 // #540), so no company is resolved for it here.
+const credentialsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window.' }
+});
+router.use(credentialsLimiter);
 router.use(requireAuth, (req, res, next) => (isPlatformRole(req.user.role) ? next() : enforceTenant(req, res, next)));
 
 // Sanitised projection — booleans for "is set?" instead of the encrypted
