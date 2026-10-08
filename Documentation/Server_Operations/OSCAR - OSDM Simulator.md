@@ -150,11 +150,32 @@ runs must not see each other's.
 
 ## 6. Several providers for one distributor (#540)
 
-Each provider company gets the endpoint and the token URL of one simulated
-provider, and each tester the client of that provider. A tester who uses
-`alpha`'s credentials on the `beta` company gets no token, and a token of
-`alpha` sent to `beta` is refused with 401: a mix-up between providers shows as
-a failed run instead of a passing one.
+In OSCAR, one company or provider has one endpoint, and each user has one set
+of credentials for it. **API Config always shows the one named at its top and
+in the menu's *Working on* selector.** Credentials for `beta` entered while the
+page shows the company itself replace the ones entered for `alpha`: they are
+not added next to them.
+
+To use a second simulated provider, a Test Manager adds it as a provider:
+
+1. Menu **Providers** → *Add a provider*: a name (for example `Beta`) and the
+   endpoint `https://<simulator-host>/beta`. Tick the testers who may use it.
+2. The menu bar now shows **Working on**. Choose `Beta`. The page reloads and
+   every page of that browser tab works on `Beta`.
+3. **API Config** now reads *Beta — Shared API Endpoint* and *Your Credentials
+   for Beta*. Enter the token URL `https://<simulator-host>/beta/oauth/token`
+   and a client of `beta` from `clients.json`. Each user does this for
+   themselves.
+4. **Test Config** → *Upload datafile*, the same file as in section 5: a
+   provider has its own data file and Test Framework.
+5. Run a scenario. Switch *Working on* back to the company, or to another
+   provider, to run there.
+
+Do the same for `gamma`. What this arrangement shows: a user who enters
+`alpha`'s client on the `Beta` provider gets no token, and a token of `alpha`
+sent to `beta` is refused with 401. A mix-up between providers is a failed run,
+not a passing one, and every identifier in a report starts with the name of the
+provider that answered.
 
 ## 7. Day to day
 
