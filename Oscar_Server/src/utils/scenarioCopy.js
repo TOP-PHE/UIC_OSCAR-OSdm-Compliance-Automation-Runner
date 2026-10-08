@@ -61,8 +61,9 @@ const findById = (list, id) => arr(list).find(e => isObj(e) && e.id === id) || n
 function tripSummary(entry) {
   const legs = arr(entry.legs).filter(isObj);
   const spec = entry.tripType === 'SPECIFICATION' && legs.length > 0;
-  const first = spec ? legs[0] : (isObj(entry.trip) ? entry.trip : {});
-  const last = spec ? legs[legs.length - 1] : first;
+  let first = isObj(entry.trip) ? entry.trip : {};
+  if (spec) first = legs[0];
+  const last = spec ? legs.at(-1) : first;
   return {
     id: entry.id,
     tripType: entry.tripType || 'SEARCH',
@@ -138,30 +139,34 @@ function planCopy(source, codes, frameworkConfig) {
   };
 }
 
+function mapToTrain(entry, out, mapping, resources) {
+  if (needsJourney(entry)) return { error: 'has several legs: map it to a journey' };
+  const picked = TripApply.trainService(resources, mapping.train_id, Number.parseInt(mapping.service_index, 10) || 0);
+  if (!picked) return { error: 'is mapped to a train that is not in the target\'s Test Data' };
+  if (out.tripType === 'SPECIFICATION' && arr(out.legs).length === 1) {
+    out.legs = [TripApply.applyTrainService(isObj(out.legs[0]) ? out.legs[0] : {}, picked.d, picked.svc)];
+  } else {
+    out.trip = TripApply.applyTrainService(isObj(out.trip) ? out.trip : {}, picked.d, picked.svc);
+  }
+  return { entry: out };
+}
+
+function mapToJourney(out, mapping, resources) {
+  const journey = arr(resources).find(r => String(r.id) === String(mapping.journey_id) && r.resource_type === 'JOURNEY');
+  if (!journey) return { error: 'is mapped to a journey that is not in the target\'s Test Data' };
+  const legs = TripApply.journeyToTripLegs(journey, resources);
+  if (!legs.length) return { error: 'is mapped to a journey whose trains are not in the target\'s Test Data' };
+  out.tripType = 'SPECIFICATION';
+  out.legs = legs;
+  return { entry: out };
+}
+
 // The rebuilt trip entry for one mapping, or { error }.
 function mappedTrip(entry, mapping, resources) {
   const out = clone(entry);
   delete out.id;
-  if (mapping?.type === 'train') {
-    if (needsJourney(entry)) return { error: 'has several legs: map it to a journey' };
-    const picked = TripApply.trainService(resources, mapping.train_id, Number.parseInt(mapping.service_index, 10) || 0);
-    if (!picked) return { error: 'is mapped to a train that is not in the target\'s Test Data' };
-    if (out.tripType === 'SPECIFICATION' && arr(out.legs).length === 1) {
-      out.legs = [TripApply.applyTrainService(isObj(out.legs[0]) ? out.legs[0] : {}, picked.d, picked.svc)];
-    } else {
-      out.trip = TripApply.applyTrainService(isObj(out.trip) ? out.trip : {}, picked.d, picked.svc);
-    }
-    return { entry: out };
-  }
-  if (mapping?.type === 'journey') {
-    const journey = arr(resources).find(r => String(r.id) === String(mapping.journey_id) && r.resource_type === 'JOURNEY');
-    if (!journey) return { error: 'is mapped to a journey that is not in the target\'s Test Data' };
-    const legs = TripApply.journeyToTripLegs(journey, resources);
-    if (!legs.length) return { error: 'is mapped to a journey whose trains are not in the target\'s Test Data' };
-    out.tripType = 'SPECIFICATION';
-    out.legs = legs;
-    return { entry: out };
-  }
+  if (mapping?.type === 'train') return mapToTrain(entry, out, mapping, resources);
+  if (mapping?.type === 'journey') return mapToJourney(out, mapping, resources);
   return { error: 'has no train or journey chosen' };
 }
 
@@ -174,6 +179,67 @@ function addEntry(datafile, list, entry, allocate) {
 }
 
 const withoutId = e => { const c = clone(e); delete c.id; return c; };
+
+// The next free code among `scenarios`, as `CODE_2`, `CODE_3`… on a clash.
+function codeAllocator(scenarios) {
+  const taken = new Set(scenarios.filter(isObj).map(s => s.code));
+  return code => {
+    let candidate = code;
+    for (let n = 2; taken.has(candidate); n++) candidate = `${code}_${n}`;
+    taken.add(candidate);
+    return candidate;
+  };
+}
+
+// The target trip id for `tripEntry`, mapped once however many scenarios use
+// it; null when its mapping fails (the error is recorded once).
+function copiedTrip(ctx, tripEntry) {
+  if (!ctx.tripIds.has(tripEntry.id)) {
+    const mapping = isObj(ctx.tripMap) ? ctx.tripMap[String(tripEntry.id)] : null;
+    const built = mappedTrip(tripEntry, mapping, ctx.resources);
+    if (built.error) ctx.errors.push(`Trip ${tripEntry.id} ${built.error}.`);
+    ctx.tripIds.set(tripEntry.id, built.error ? null : addEntry(ctx.out, 'tripRequirements', built.entry, ctx.allocate));
+  }
+  return ctx.tripIds.get(tripEntry.id);
+}
+
+// The target id of a copy of `sourceEntry`, made once per entry.
+function copiedEntry(ctx, list, sourceEntry, build) {
+  const key = `${list}:${sourceEntry.id}`;
+  if (!ctx.entryIds.has(key)) ctx.entryIds.set(key, addEntry(ctx.out, list, build(withoutId(sourceEntry)), ctx.allocate));
+  return ctx.entryIds.get(key);
+}
+
+// `sc` re-pointed at copies of its entries in the target, or null (errors recorded).
+function copiedScenario(ctx, sc) {
+  const { source, errors } = ctx;
+  const tripEntry = findById(source.tripRequirements, sc.tripRequirementId);
+  if (!tripEntry) { errors.push(`Scenario ${sc.code} points to a trip the source does not hold.`); return null; }
+  const tripId = copiedTrip(ctx, tripEntry);
+  if (tripId === null) return null;
+
+  const copy = clone(sc);
+  for (const k of Object.keys(copy)) if (k.startsWith('__')) delete copy[k];
+  copy.tripRequirementId = tripId;
+
+  for (const [field, list] of COPIED_LISTS) {
+    if (copy[field] == null) continue;
+    const entry = findById(source[list], sc[field]);
+    if (entry) copy[field] = copiedEntry(ctx, list, entry, e => e);
+    else delete copy[field];   // a dangling optional reference is not carried over
+  }
+  let broken = false;
+  const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
+  if (fulfillment) {
+    copy.requestedFulfillmentOptionsListId = copiedEntry(ctx, 'requestedFulfillmentOptionsList', fulfillment,
+      e => ({ ...e, requestedFulfillmentOptions: declaredOptions(fulfillment, ctx.framework).options }));
+  } else {
+    errors.push(`Scenario ${sc.code} points to fulfillment options the source does not hold.`);
+    broken = true;
+  }
+  if (copy.passengersListId == null) { errors.push(`Scenario ${sc.code} points to passengers the source does not hold.`); broken = true; }
+  return broken ? null : copy;
+}
 
 /**
  * Copy `codes` from `source` into `target`. `tripMap` maps each source trip
@@ -190,56 +256,19 @@ function applyCopy(source, target, { codes, tripMap, frameworkConfig, resources,
 
   const out = isObj(target) ? clone(target) : {};
   out.scenarios = arr(out.scenarios);
-  // Fresh ids avoid every id and every reference in the target, dangling ones
-  // included: max+1 over one list could land on another scenario's reference.
-  const allocate = idAllocator(out);
-  const taken = new Set(out.scenarios.filter(isObj).map(s => s.code));
-  const freeCode = code => {
-    if (!taken.has(code)) { taken.add(code); return code; }
-    let n = 2, candidate;
-    do { candidate = `${code}_${n++}`; } while (taken.has(candidate));
-    taken.add(candidate);
-    return candidate;
+  const ctx = {
+    source, out, tripMap, resources, framework, errors,
+    // Fresh ids avoid every id and every reference in the target, dangling ones
+    // included: max+1 over one list could land on another scenario's reference.
+    allocate: idAllocator(out),
+    tripIds: new Map(),     // source trip id -> target trip id, once per trip
+    entryIds: new Map(),    // "list:source id" -> target id, once per entry
   };
-
-  const tripIds = new Map();     // source trip id -> target trip id, once per trip
-  const entryIds = new Map();    // "list:source id" -> target id, once per entry
-  const copiedEntry = (list, sourceEntry, build) => {
-    const key = `${list}:${sourceEntry.id}`;
-    if (!entryIds.has(key)) entryIds.set(key, addEntry(out, list, build(withoutId(sourceEntry)), allocate));
-    return entryIds.get(key);
-  };
+  const freeCode = codeAllocator(out.scenarios);
   const copied = [];
   for (const sc of selected) {
-    const tripEntry = findById(source.tripRequirements, sc.tripRequirementId);
-    if (!tripEntry) { errors.push(`Scenario ${sc.code} points to a trip the source does not hold.`); continue; }
-    if (!tripIds.has(tripEntry.id)) {
-      const built = mappedTrip(tripEntry, isObj(tripMap) ? tripMap[String(tripEntry.id)] : null, resources);
-      if (built.error) { errors.push(`Trip ${tripEntry.id} ${built.error}.`); tripIds.set(tripEntry.id, null); continue; }
-      tripIds.set(tripEntry.id, addEntry(out, 'tripRequirements', built.entry, allocate));
-    }
-    if (tripIds.get(tripEntry.id) === null) continue;
-
-    const copy = clone(sc);
-    for (const k of Object.keys(copy)) if (k.startsWith('__')) delete copy[k];
-    copy.tripRequirementId = tripIds.get(tripEntry.id);
-
-    let broken = false;
-    for (const [field, list] of COPIED_LISTS) {
-      if (copy[field] == null) continue;
-      const entry = findById(source[list], sc[field]);
-      if (!entry) { delete copy[field]; continue; }   // a dangling optional reference is not carried over
-      copy[field] = copiedEntry(list, entry, e => e);
-    }
-    const fulfillment = findById(source.requestedFulfillmentOptionsList, sc.requestedFulfillmentOptionsListId);
-    if (!fulfillment) { errors.push(`Scenario ${sc.code} points to fulfillment options the source does not hold.`); broken = true; }
-    else {
-      copy.requestedFulfillmentOptionsListId = copiedEntry('requestedFulfillmentOptionsList', fulfillment,
-        e => ({ ...e, requestedFulfillmentOptions: declaredOptions(fulfillment, framework).options }));
-    }
-    if (copy.passengersListId == null) { errors.push(`Scenario ${sc.code} points to passengers the source does not hold.`); broken = true; }
-    if (broken) continue;
-
+    const copy = copiedScenario(ctx, sc);
+    if (!copy) continue;
     if (framework.osdmVersion) copy.osdmVersion = String(framework.osdmVersion);
     copy.code = freeCode(sc.code);
     copy.created_by = email;

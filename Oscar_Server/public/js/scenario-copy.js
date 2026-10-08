@@ -28,6 +28,8 @@
 
   const hasUnsavedEdits = () => typeof dirty !== 'undefined' && dirty;   // scenarios.js
   const stnShort = urn => String(urn || '').split(':').pop() || '?';
+  const trainValue = (id, index) => ['train', id, index].join('::');
+  const warningLine = w => `<br><span style="color:#e65100;font-size:12px">⚠ ${esc(w)}</span>`;
 
   function showMsg(text, kind) {
     const el = document.getElementById('sc-copy-msg');
@@ -61,10 +63,10 @@
     for (const t of testData.trains) {
       t.services.forEach(s => {
         const when = [s.departureTime, s.arrivalTime].filter(Boolean).map(x => String(x).slice(0, 5)).join('→');
-        opts.push({ value: 'train::' + t.id + '::' + s.index,
+        opts.push({ value: trainValue(t.id, s.index),
           text: `🚆 ${t.label} · ${stnShort(t.origin)}→${stnShort(t.destination)}${s.vehicleNumber ? ' · ' + s.vehicleNumber : ''}${when ? ' · ' + when : ''}` });
       });
-      if (!t.services.length) opts.push({ value: 'train::' + t.id + '::0', text: `🚆 ${t.label}` });
+      if (!t.services.length) opts.push({ value: trainValue(t.id, 0), text: `🚆 ${t.label}` });
     }
     return opts;
   }
@@ -107,7 +109,7 @@
     list.innerHTML = preview.scenarios.map(s => `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:pointer">
         <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px">
         <span><strong>${esc(s.code)}</strong> <span style="color:#90a4ae">${esc(s.scenarioType)}${s.scenarioAction ? ' · ' + esc(s.scenarioAction) : ''}</span>
-        ${s.warnings.map(w => `<br><span style="color:#e65100;font-size:12px">⚠ ${esc(w)}</span>`).join('')}</span></label>`).join('');
+        ${s.warnings.map(warningLine).join('')}</span></label>`).join('');
     renderTrips();
   }
 
@@ -175,7 +177,7 @@
     anchor.parentNode.insertBefore(panel, anchor.nextSibling);
   }
 
-  const reportError = e => showMsg((e && e.message) || 'Something went wrong.', 'error');
+  const reportError = e => showMsg(e?.message || 'Something went wrong.', 'error');
 
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-copy-action]');

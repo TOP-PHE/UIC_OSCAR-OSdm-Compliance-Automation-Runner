@@ -46,6 +46,15 @@ distributor. Collection unchanged (OTST_V2.0.104).
   and what is written. Twelve guards broken in turn, each caught.
 - Checked in Chromium on a throwaway server.
 
+### Sonar findings left open on purpose
+
+- `trip-apply.js`, three "move function to the outer scope" (S7721): the file
+  is a browser global and a CommonJS module at once; its functions live in the
+  factory so the page gets one `OscarTripApply` name, not four globals.
+- `scenarioCopy.js`, `JSON.parse(JSON.stringify(…))` over `structuredClone`
+  (S7784): the copy is written as JSON, and the round trip keeps it JSON-shaped
+  (an `undefined` field is dropped, as the stored file would drop it).
+
 ---
 
 ## [server-1.11.217] — 2026-10-08
