@@ -131,6 +131,10 @@ const esc = window.esc;
  */
 let state = null;  // live copy of the datafile JSON
 let dirty = false;
+// #540: the version of the data file `state` was loaded from (the server's
+// ETag), null when there was none, undefined when unknown. Each save sends it
+// back, so a save from a stale load is refused instead of overwriting.
+let datafileLoadedVersion;
 
 // Apply state to every .save-btn element so the top and bottom "Save & Apply"
 // buttons stay in lockstep. Used for dirty flag, in-progress label, and
@@ -350,7 +354,29 @@ async function loadForEdit(url, what) {
   if (value === null || typeof value !== 'object') {
     return { state: 'failed', reason: `${what} could not be loaded: the answer was not what was expected.` };
   }
-  return { state: 'loaded', value };
+  return { state: 'loaded', value, version: res.headers?.get?.('ETag') || undefined };
+}
+
+// #540: the version a load gives a later save: the ETag of a loaded file, null
+// for "there was none", undefined when the server sent no version.
+function loadedVersion(load) {
+  if (load.state === 'loaded') return load.version || undefined;
+  return load.state === 'none' ? null : undefined;
+}
+
+// The headers of a data file save made from a load of `version`: the server
+// refuses it (412) when the file is no longer that version.
+function datafileSaveHeaders(version) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (typeof version === 'string' && version) headers['If-Match'] = version;
+  else if (version === null) headers['If-None-Match'] = '*';
+  return headers;
+}
+
+// The message for a save the server refused because the file changed meanwhile.
+function staleSaveMessage(detail) {
+  return `${detail || 'The data file has changed since this page loaded it. Nothing was saved.'} `
+    + 'Your edits are still in this page: use Download JSON to keep a copy before you reload.';
 }
 
 // ── Refresh all three sections from server ───────────────────────────────────
@@ -395,6 +421,7 @@ async function refreshAllSections() {
 
   // Datafile
   const datafile = dfLoad.state === 'loaded' ? dfLoad.value : null;
+  datafileLoadedVersion = loadedVersion(dfLoad);
 
   if (datafile) {
     state = datafile;
@@ -772,11 +799,16 @@ async function deleteTrainResource(resourceId) {
       state.scenarios = (state.scenarios || []).filter(s => !impactedCodes.has(s.code));
       state.scenariosToRun = (state.scenariosToRun || []).filter(c => !impactedCodes.has(c));
       // Save updated datafile
-      await fetch('/v1/company/datafile/json', {
+      const saveRes = await fetch('/v1/company/datafile/json', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: datafileSaveHeaders(datafileLoadedVersion),
         body: JSON.stringify(state)
       });
+      if (!saveRes.ok) {
+        const err = await saveRes.json().catch(() => ({}));
+        const detail = err.detail || err.title || `HTTP ${saveRes.status}`;
+        throw new Error(`The train was deleted, but its scenarios were not removed: ${detail}`);
+      }
     }
 
     showMsg(`✅ Train "${trainLabel}" deleted` + (impacted.length > 0 ? ` along with ${impacted.length} scenario(s).` : '.'), true);
@@ -3085,7 +3117,7 @@ async function saveDatafile() {
     // 1. Send the updated datafile to the server
     const res = await fetch('/v1/company/datafile/json', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: datafileSaveHeaders(datafileLoadedVersion),
       body: JSON.stringify(state)
     });
     if (res.status === 401) { logout(); return; }
@@ -3093,6 +3125,10 @@ async function saveDatafile() {
     let data;
     try { data = await res.json(); } catch(_) { data = {}; }
 
+    if (res.status === 412) {
+      showSaveError(staleSaveMessage(data.detail));
+      return;
+    }
     if (!res.ok) {
       showSaveError(`Server responded with ${res.status}: ${data.detail || data.title || 'Unknown error'}. Your changes were NOT saved.`);
       return;
@@ -6151,7 +6187,7 @@ async function wizGenerateScenario() {
     // ── 9. Save ───────────────────────────────────────────────────────────────────
     const saveRes = await fetch('/v1/company/datafile/json', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: datafileSaveHeaders(loadedVersion(dfLoad)),
       body: JSON.stringify(dataFile)
     });
 

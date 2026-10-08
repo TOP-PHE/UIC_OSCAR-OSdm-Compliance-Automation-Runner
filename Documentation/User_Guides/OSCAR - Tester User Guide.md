@@ -123,6 +123,12 @@ Framework, test resources, findings, runs and reports.
   already used. The endpoint, credentials, known deviations and findings are
   never copied. Save or discard unsaved changes first: the page reloads after
   the copy. The provider needs a Test Framework and Test Data before you copy.
+- **"The data file has changed since this page loaded it."** Test Config
+  refuses a save when the data file changed after you opened the page: in
+  another tab, by your Test Manager, or by a copy. Nothing is saved. Your edits
+  are still on the page: use **Download JSON** to keep a copy, reload, and make
+  your change again. A colleague saving their own private scenarios does not
+  cause this; a change to anything you can see does.
 
 ---
 

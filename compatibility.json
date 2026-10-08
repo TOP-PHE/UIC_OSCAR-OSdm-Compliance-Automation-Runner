@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.243",
+  "current_release": "2026.244",
   "releases": [
+    {
+      "release": "2026.244",
+      "date": "2026-10-08",
+      "server": "1.11.219",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#540): a Test Config save made from a data file that is no longer the current one is refused (412) instead of overwriting what was saved in between. Server and pages; collection unchanged at OTST_V2.0.104.",
+        "GET /v1/company/datafile sends an ETag: the version of the file as that person sees it (a tester's view with their run list; knownDeviations left out). PUT /v1/company/datafile/json accepts If-Match (that ETag) or If-None-Match: * (the page loaded no file) and answers 412 when the file is no longer that version. A save with neither header goes ahead, so a page loaded before this release still saves. Rule in utils/datafileVersion.js (pure).",
+        "Test Config sends the version on its three data file saves (Save & Apply, the scenario wizard, removing the scenarios of a deleted train). A 412 keeps the edits on the page and says to keep a copy with Download JSON before reloading. Removing a deleted train's scenarios now reports a failed save instead of ignoring it.",
+        "Not covered: the whole-file upload and the delete (Test Manager actions that replace or remove the file on purpose) and the scenario copy (read and written by the server under the lock).",
+        "How it was checked: unit tests of the version and of the If-Match rule, route tests (two tabs, a colleague's private save, a change a tester can see, known deviations, first file, deleted file, no header), page tests in the vm harness; ten deliberate breaks, nine caught and the tenth an equivalent code path, since removed. Lint and the full suite green."
+      ]
+    },
     {
       "release": "2026.243",
       "date": "2026-10-08",

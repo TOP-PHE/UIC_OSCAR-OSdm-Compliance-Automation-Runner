@@ -34,6 +34,7 @@ const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
+const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafileVersion');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -383,6 +384,26 @@ async function storedDatafileOrEmpty(companyId) {
   }
 }
 
+// ── The version of the stored file as this person sees it (#540) ─────────────
+// What GET sends as its ETag and a save is checked against (utils/datafileVersion).
+// null when there is no file; a file that cannot be decrypted has a version no
+// page can hold, so a save that names one is refused. Call under the lock.
+function viewerOf(req, companyId) {
+  return req.user.role === 'company_user'
+    ? { role: 'company_user', email: req.user.email, selection: getRunSelection(companyId, req.user.id) }
+    : { role: req.user.role };
+}
+
+async function storedVersion(companyId, viewer) {
+  const current = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
+  if (!current?.datafile_path || !fs.existsSync(current.datafile_path)) return null;
+  try {
+    return datafileVersion(await decryptFromFileAsync(current.datafile_path), viewer);
+  } catch {
+    return 'unreadable';
+  }
+}
+
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
 // Order matters: authorizeDatafileWrite runs before upload.single, so nothing
 // is parsed, buffered or written for a caller who may not write (S2).
@@ -473,6 +494,17 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
   const isTester = req.user.role === 'company_user';
 
   return withDatafileLock(targetCompanyId, async () => {
+    // #540: a save made from a data file that is no longer the current one is
+    // refused, not written over what was saved in between. The page sends the
+    // ETag of the file it loaded (If-Match), or If-None-Match: * when it loaded
+    // none. A save with neither header goes ahead, as before this release.
+    const staleRefusal = staleSaveRefusal(
+      { ifMatch: req.get('If-Match'), ifNoneMatch: req.get('If-None-Match') },
+      await storedVersion(targetCompanyId, viewerOf(req, targetCompanyId)));
+    if (staleRefusal) {
+      return res.status(412).json({ status: 412, title: 'Precondition Failed', detail: staleRefusal });
+    }
+
     // S3, second half (v1.11.197): a tester's save is merged into the stored
     // file rather than replacing it — only their own scenarios change, shared
     // and other people's scenarios stay exactly as stored, and what they tick
@@ -541,9 +573,14 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
     // tester the counts describe their view and to_run is their own run list.
     const scenariosCount = merge ? viewForTester(toStore, req.user.email, merge.selection).scenarios.length : body.scenarios.length;
     const toRun = merge ? merge.selection : body.scenariosToRun;
+    // The version the next save from this page names: the stored file as this
+    // person now sees it (for a tester, with the run list now stored).
+    const version = datafileVersion(JSON.stringify(toStore), viewerOf(req, targetCompanyId));
+    res.setHeader('ETag', etag(version));
     return res.json({
       filename:        path.basename(filePath),
       hash,
+      version,
       saved_at:        new Date().toISOString(),
       scenarios_count: scenariosCount,
       to_run_count:    toRun.length,
@@ -659,6 +696,9 @@ router.get('/datafile', datafileReadLimiter, async (req, res) => {
     serveBytes = testerView ? Buffer.from(JSON.stringify(testerView), 'utf8') : plaintext;
   }
 
+  // #540: the version a save from this load names (If-Match). Taken from the
+  // stored file before annotation, as this person sees it.
+  res.setHeader('ETag', etag(datafileVersion(plaintext, viewerOf(req, targetCompanyId))));
   res.setHeader('Content-Disposition', `attachment; filename="${company.slug}-datafile.json"`);
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(serveBytes.length));

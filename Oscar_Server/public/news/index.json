@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-08-stale-save-refused",
+    "date": "October 8, 2026",
+    "tag": "Improvement",
+    "title": "Test Config no longer overwrites changes made in the meantime",
+    "summary": "If the data file changed after you opened Test Config, in another tab or by someone else, saving is refused instead of overwriting their changes.",
+    "content": "Before, two people (or two tabs) editing Test Config at the same time could overwrite each other: the last save won.\n\nNow each save says which version of the data file it was made from. If the file has changed since, nothing is saved and the page tells you so. Your edits stay on the page: use Download JSON to keep a copy, reload, and make your change again.\n\nTesters are not blocked by colleagues saving their own private scenarios, only by changes to what they can see."
+  },
+  {
     "id": "2026-10-08-copy-scenarios-between-providers",
     "date": "October 8, 2026",
     "tag": "New",

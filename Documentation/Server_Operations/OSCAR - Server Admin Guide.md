@@ -1550,3 +1550,15 @@ deviations and findings are never copied.
 Nothing to configure. Each copy is written to the audit log as
 `scenarios_copied:<source company id>:<count>` against the target company.
 
+### 15.21 v1.11.219 — a save from a stale page is refused (#540)
+
+Test Config now sends, with each save of the data file, the version of the file
+it loaded. When the file has changed since (another tab, another person, a
+scenario copy), the server answers 412 and writes nothing; the page keeps the
+edits and asks the user to reload. A tester's version covers only what they can
+see, so colleagues saving their own private scenarios do not block each other.
+
+Nothing to configure. A page opened before the upgrade sends no version and
+saves as before until it is reloaded. The whole-file upload and the delete are
+not checked: they replace or remove the file on purpose.
+
