@@ -185,7 +185,8 @@ function codeAllocator(scenarios) {
   const taken = new Set(scenarios.filter(isObj).map(s => s.code));
   return code => {
     let candidate = code;
-    for (let n = 2; taken.has(candidate); n++) candidate = `${code}_${n}`;
+    let n = 2;
+    while (taken.has(candidate)) candidate = `${code}_${n++}`;
     taken.add(candidate);
     return candidate;
   };
