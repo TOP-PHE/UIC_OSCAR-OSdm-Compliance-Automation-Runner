@@ -138,7 +138,7 @@ describe('guard — direct reads of the token\'s company', () => {
     // Providers are children of the caller's own company, by definition.
     'api/routes/company-providers.js': 5,
     // The rule itself, and its middleware.
-    'api/helpers/provider-access.js': 4,
+    'api/helpers/provider-access.js': 5,
     'api/middleware/tenant.js': 3,
   };
 

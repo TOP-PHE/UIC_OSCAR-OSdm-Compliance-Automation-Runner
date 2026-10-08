@@ -56,6 +56,15 @@ interface yet (PR 2); copying scenarios between providers is PR 3.
   gets a FAILED run with the reason.
 - Registration, the admin company list and admin user assignment only offer
   top-level companies. A company that has providers cannot be deleted.
+- Access to a provider is decided on the user as stored, not as the session
+  token says: a Test Manager demoted or moved loses the distributor's
+  providers at once. Withdrawn access also stops new tokens for a run in
+  flight (token refresh route and token watchdog).
+- A change of a user's company or role ends their provider grants; on a move,
+  the user's own credentials follow them, as before. Administrators keep one
+  set of credentials, used for any company they name, as before.
+- `GET /data/:filename` answers a refused request for a provider's file as it
+  answers an unknown file.
 
 ### Tests
 
@@ -63,7 +72,10 @@ interface yet (PR 2); copying scenarios between providers is PR 3.
   two testers each) through the real routes; unit tests of the rule and of the
   provider header; runner refusal tests. A guard test lists every direct read
   of the token's company in `src/` and fails on a new one. Each guard was
-  removed in turn (14 mutations); each removal fails a test.
+  removed in turn (19 mutations); each removal fails a test.
+- An independent review in three parts (isolation, credentials and runner,
+  regressions) before the PR; every finding was reproduced, fixed and kept as
+  a regression test.
 
 ---
 

@@ -310,7 +310,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   if (!m) return res.status(400).send('Bad request');
 
   const slug = m[1];
-  const company = dbGet('SELECT id, slug FROM companies WHERE slug = ?', [slug]);
+  const company = dbGet('SELECT id, slug, parent_id FROM companies WHERE slug = ?', [slug]);
   if (!company) return res.status(404).send('Not found');
 
   // (a) The Bruno subprocess of a live run: a per-run secret the runner issued,
@@ -327,6 +327,9 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
     //     reached directly, and no certifier / admin path exists — they consume
     //     reports through /v1/runs with the per-run share gate.
     const denied = datafileSessionDenial(req, company);
+    // #540: a provider's slug is not public; its file must not reveal that it
+    // exists, so every refusal on it reads as an unknown slug.
+    if (denied && company.parent_id) return res.status(404).send('Not found');
     if (denied) return res.status(denied).send(denied === 401 ? 'Unauthorized' : 'Forbidden');
   }
 

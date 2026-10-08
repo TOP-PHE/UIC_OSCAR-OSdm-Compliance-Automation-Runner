@@ -44,11 +44,28 @@ function canUseCompany(user, companyId) {
   try {
     const company = get('SELECT parent_id FROM companies WHERE id = ?', [companyId]);
     if (!company || company.parent_id !== user.companyId) return false;
-    if (user.role === 'test_manager') return true;
+    // A provider is decided on the user as stored now, not as the session
+    // token says: a Test Manager demoted or moved since signing in loses the
+    // distributor's providers at once, not when the token expires.
+    const member = currentMember(user);
+    if (!member) return false;
+    if (member.role === 'test_manager') return true;
     return !!get('SELECT 1 AS ok FROM provider_access WHERE company_id = ? AND user_id = ?', [companyId, user.id]);
   } catch {
     return false;
   }
+}
+
+/**
+ * The user as stored, when it is still a member of the company its token
+ * names: { role } (normalised), or null.
+ */
+function currentMember(user) {
+  const { normalizeRole } = require('../middleware/auth');
+  const row = get('SELECT company_id, role FROM users WHERE id = ?', [user?.id]);
+  if (!row || row.company_id !== user.companyId) return null;
+  const role = normalizeRole(row.role);
+  return MEMBER_ROLES.has(role) ? { role } : null;
 }
 
 /**
@@ -94,4 +111,4 @@ function membershipChanged(userId, before) {
   }
 }
 
-module.exports = { canUseCompany, requestedProviderId, membershipChanged, MEMBER_ROLES };
+module.exports = { canUseCompany, currentMember, requestedProviderId, membershipChanged, MEMBER_ROLES };

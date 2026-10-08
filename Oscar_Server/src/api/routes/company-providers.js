@@ -35,6 +35,7 @@ const { get, all, run } = require('../../db/db');
 const { requireAuth, isPlatformRole, normalizeRole } = require('../middleware/auth');
 const { auditLog, companyEndpointChange, familyEndpointClash, PLATFORM_SLUG } = require('../helpers/shared');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
+const { currentMember } = require('../helpers/provider-access');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -68,11 +69,15 @@ router.use((req, res, next) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Providers are managed by the distributor\'s Test Managers.' });
   }
   if (!req.user.companyId) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'No company context.' });
+  // Role and company as stored now, not as the session token says.
+  const member = currentMember(req.user);
+  if (!member) return res.status(404).json(NOT_FOUND);
+  req.memberRole = member.role;
   next();
 });
 
 function requireTestManager(req, res) {
-  if (normalizeRole(req.user.role) !== 'test_manager') {
+  if (req.memberRole !== 'test_manager') {
     res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Only Test Managers manage providers.' });
     return false;
   }
@@ -127,8 +132,7 @@ function providerView(c) {
 
 // ── GET / ─────────────────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
-  const role = normalizeRole(req.user.role);
-  const rows = role === 'test_manager'
+  const rows = req.memberRole === 'test_manager'
     ? all('SELECT * FROM companies WHERE parent_id = ? ORDER BY name ASC', [req.user.companyId])
     : all(`SELECT c.* FROM companies c
              JOIN provider_access pa ON pa.company_id = c.id AND pa.user_id = ?
