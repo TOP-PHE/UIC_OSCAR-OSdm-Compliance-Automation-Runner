@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-08-providers-pages",
+    "date": "October 8, 2026",
+    "tag": "New",
+    "title": "Several OSDM providers in one company",
+    "summary": "A distributor can now keep each carrier it tests as a separate provider in OSCAR, with its own endpoint, data file, credentials and reports. Test Managers set them up on the new Providers page; everyone picks what to work on with the \"Working on\" selector in the menu bar.",
+    "content": "Some companies test more than one OSDM system: a distributor, for example, integrates several carriers. OSCAR now lets you keep each one as a provider of your company.\n\nTest Managers: open Providers in the menu to add a provider, set its OSDM endpoint and choose which testers may use it.\n\nEveryone: when your company has providers you may use, the menu bar shows a \"Working on\" selector. Pick a provider and every page of that tab works on it: API Config (your credentials for that provider), Test Config, New Run, the Dashboard and the reports. Another tab can work on another provider at the same time.\n\nNothing changes if your company has no provider."
+  },
+  {
     "id": "2026-10-08-providers-foundation",
     "date": "October 8, 2026",
     "tag": "New",

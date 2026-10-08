@@ -259,6 +259,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     company's; a duplicate within the family needs `allow_duplicate_endpoint`
     (audited). Deleting a provider is not built; deleting a distributor that has
     providers is refused.
+  - **The pages (PR 2, v1.11.217) choose the provider per browser tab.**
+    `nav.js` keeps it in `sessionStorage` (`oscar_provider`) and its fetch
+    wrapper adds `X-Provider-Id` to a member's same-origin `/v1/` calls, except
+    `UNSCOPED_PREFIXES` (`/v1/auth/`, `/v1/admin`, `/v1/company/users`,
+    `/v1/company/providers`); a header the caller set wins. A 404 whose detail
+    is exactly `Provider not found.` clears the choice and reloads. A new page
+    needs nothing: any `fetch` through `nav.js` follows the selector. A request
+    that does not go through `fetch` (a plain link to `/v1/...`) does not, so
+    download routes must stay company-agnostic (`canUserSeeRun`) or be fetched.
+    Pinned by `tests/unit/nav-provider.test.js`. `providers.html` is the Test
+    Manager's page; it names the provider explicitly on each call.
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
@@ -787,6 +798,7 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
 | `Oscar_Server/src/utils/datafileOwnership.js` | what a tester sees (`viewForTester`) and may change (`mergeTesterSave`) in the company datafile — pure, v1.11.197 |
 | `Oscar_Server/src/api/helpers/provider-access.js` | `canUseCompany()`, the one rule for which company (own or provider) a member may act in, #540 |
 | `Oscar_Server/src/api/routes/company-providers.js` | provider list/create/rename and tester access list, #540 |
+| `Oscar_Server/public/providers.html` | Providers page (Test Managers): add/rename, endpoint, tester access, #540 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |

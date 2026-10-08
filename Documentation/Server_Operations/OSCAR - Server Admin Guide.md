@@ -1526,3 +1526,15 @@ Notes for operators:
 - A company that has providers cannot be deleted from the admin page.
 - Within one company and its providers, two of them pointing at the same
   endpoint must be confirmed explicitly; the confirmation is in the audit log.
+
+### 15.19 v1.11.217 — the provider pages (#540, user interface)
+
+The screens for §15.18. Test Managers find a **Providers** entry in the menu to
+add and rename providers, set each provider's OSDM endpoint and grant testers.
+Members of a company that has providers get a **Working on** selector in the
+menu bar; each browser tab works on the company or provider chosen there.
+
+Nothing to configure, and no change for companies without providers. A request
+made on a provider carries the `X-Provider-Id` header; the audit log records
+provider creation, grants, withdrawals and confirmed duplicate endpoints.
+
