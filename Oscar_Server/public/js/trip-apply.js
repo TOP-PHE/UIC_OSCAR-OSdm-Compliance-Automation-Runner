@@ -55,8 +55,9 @@
   // A resource's data as an object (stored as text or as an object).
   function resourceData(resource) {
     if (!resource) return {};
-    if (typeof resource.data !== 'string') return resource.data || {};
-    try { return JSON.parse(resource.data || '{}'); } catch { return {}; }
+    let d = resource.data;
+    if (typeof d === 'string') { try { d = JSON.parse(d || '{}'); } catch { return {}; } }
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
   }
 
   // Fill trip block or leg `t` from train data `d` (normalized) and service `svc`.

@@ -276,7 +276,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     once per entry and rebuilt with **`public/js/trip-apply.js`, the one
     implementation of "Apply test data"**: `scenarios.js` and the server both
     use it, so change it there only. Copied entries always get fresh ids, never
-    an existing target entry (it may belong to others' hidden scenarios). The
+    an existing target entry (it may belong to others' hidden scenarios), and
+    from `idAllocator()` (`datafileOwnership.js`, rule J, shared with the
+    merge): not max+1 per list, which lands on a dangling reference. The
     write goes through `utils/datafileWrite.js`, shared with the Test Config
     save. Still open from #540: the server does not yet refuse a datafile save
     made from a stale load (needs an `If-Match` on every Test Config writer).

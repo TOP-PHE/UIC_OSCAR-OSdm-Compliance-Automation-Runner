@@ -152,11 +152,40 @@ describe('applyCopy', () => {
   test('entries are copied to fresh ids, never reusing an entry already in the target', () => {
     const { datafile } = applyCopy(source(), target(), opts());
     const [s1, s2] = datafile.scenarios.slice(1);
-    expect(s1.passengersListId).toBe(2);                   // the target's entry 1 has the same content: not reused
+    expect(s1.tripRequirementId).toBe(2);
+    expect(s1.passengersListId).toBe(3);                   // the target's entry 1 has the same content: not reused
     expect(s2.passengersListId).toBe(s1.passengersListId); // one copy for scenarios that shared it
     expect(datafile.passengersList).toHaveLength(2);
-    expect(s1.purchaserListId).toBe(1);                    // the target had no purchaser list
+    expect(s1.purchaserListId).toBe(4);                    // fresh across every list, not per list
+    expect(datafile.purchaserList).toEqual([{ id: 4, purchaser: { name: 'P' } }]);
     expect(s2.purchaserListId).toBeUndefined();
+  });
+
+  test('a fresh id never lands on a reference another scenario already holds', () => {
+    // Another tester's scenario points to entries the lists do not hold (left
+    // dangling by an earlier edit). A copied entry under that id would become
+    // theirs, and show in their view.
+    const tgt = target();
+    tgt.scenarios.push({ code: 'BEN', tripRequirementId: 2, passengersListId: 3, purchaserListId: 4,
+      requestedFulfillmentOptionsListId: 5, created_by: 'ben@d.example' });
+    const { datafile } = applyCopy(source(), tgt, opts());
+    const ben = datafile.scenarios.find(s => s.code === 'BEN');
+    for (const [list, ref] of [['tripRequirements', 'tripRequirementId'], ['passengersList', 'passengersListId'],
+      ['purchaserList', 'purchaserListId'], ['requestedFulfillmentOptionsList', 'requestedFulfillmentOptionsListId']]) {
+      expect((datafile[list] || []).find(e => e.id === ben[ref])).toBeUndefined();
+    }
+  });
+
+  test('ids stay safe integers and unique when the target holds an id at 2^53', () => {
+    const tgt = target();
+    tgt.passengersList.push({ id: 2 ** 53, passengers: [] });
+    tgt.tripRequirements.push({ id: Number.MAX_SAFE_INTEGER, tripType: 'SEARCH', trip: {} });
+    const { datafile } = applyCopy(source(), tgt, opts());
+    for (const list of ['tripRequirements', 'passengersList', 'requestedFulfillmentOptionsList']) {
+      const ids = datafile[list].map(e => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+    for (const s of datafile.scenarios.slice(1)) expect(Number.isSafeInteger(s.passengersListId)).toBe(true);
   });
 
   test('nothing but scenarios and their entries crosses over', () => {
@@ -201,6 +230,13 @@ describe('trip-apply', () => {
   test('fields neither the train nor the service defines are kept', () => {
     const t = TripApply.applyTrainService({ origin: 'keep', extra: 1 }, { destinationURN: 'D' }, {});
     expect(t).toEqual({ origin: 'keep', extra: 1, destination: 'D' });
+  });
+
+  test('a train whose stored data is not an object offers no service, and does not throw', () => {
+    for (const data of [true, 5, 'x', '7', '[1]', null, [1, 2]]) {
+      expect(TripApply.trainService([{ id: 'odd', resource_type: 'TRAIN', data }], 'odd', 0))
+        .toEqual({ train: expect.any(Object), d: expect.objectContaining({ services: [] }), svc: {} });
+    }
   });
 
   test('a journey leg whose train is missing is left out', () => {

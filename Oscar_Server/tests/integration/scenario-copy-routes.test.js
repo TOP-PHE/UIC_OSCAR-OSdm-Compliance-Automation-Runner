@@ -190,4 +190,20 @@ describe('copy', () => {
     expect((await readFile(ids.P1)).scenarios).toHaveLength(3);
     await writeDatafile({ id: ids.D, slug: `sc-d-${tag}` }, SOURCE());
   });
+
+  test('the target\'s run list is kept as it is, "ALL" included', async () => {
+    await writeDatafile({ id: ids.P1, slug: `sc-d-${tag}--p1` }, { ...(await readFile(ids.P1)), scenariosToRun: 'ALL' });
+    const res = await request(app).post('/v1/company/scenario-copy').set(as('ANA', 'P1'))
+      .send({ source_id: ids.D, codes: ['SHARED'], trip_map: MAP() });
+    expect(res.status).toBe(200);
+    expect((await readFile(ids.P1)).scenariosToRun).toBe('ALL');
+  });
+
+  test('a train whose stored data is not an object is offered without services', async () => {
+    run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'odd', ?)`,
+      [`odd-${tag}`, ids.P1, colEncrypt(JSON.stringify(true))]);
+    const res = await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P1')).send({ source_id: ids.D });
+    expect(res.status).toBe(200);
+    expect(res.body.testData.trains.find(t => t.id === `odd-${tag}`)).toEqual(expect.objectContaining({ services: [] }));
+  });
 });

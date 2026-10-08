@@ -83,6 +83,8 @@ function readTestData(companyId) {
     .map(r => {
       let data = {};
       try { data = JSON.parse(colDecrypt(r.data)); } catch { /* an unreadable entry offers nothing */ }
+      // The Test Data routes store any JSON value; only an object is a train or journey.
+      if (!data || typeof data !== 'object' || Array.isArray(data)) data = {};
       return { id: r.id, resource_type: r.resource_type, label: r.label, data };
     });
 }
@@ -171,7 +173,9 @@ router.post('/scenario-copy', copyLimiter, async (req, res) => {
     // NEW-10: what the copy adds may not carry a double-brace template.
     const templateRefusal = saveRefusal(templatesAddedBy(stored, result.datafile));
     if (templateRefusal) return res.status(400).json({ status: 400, title: 'Bad Request', detail: templateRefusal });
-    if (!Array.isArray(result.datafile.scenariosToRun)) result.datafile.scenariosToRun = [];
+    // A file with no run list gets an empty one; an existing one ("ALL", a
+    // comma list, an array) is the company's and stays as it is.
+    if (!('scenariosToRun' in result.datafile)) result.datafile.scenariosToRun = [];
 
     let hash;
     try { ({ hash } = await writeDatafile({ id: ctx.targetId, slug: target.slug }, result.datafile)); }

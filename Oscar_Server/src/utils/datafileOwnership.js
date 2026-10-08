@@ -133,6 +133,22 @@ function collectIds(...datafiles) {
   return ids;
 }
 
+/**
+ * (J) A source of fresh resource ids: unique among every id and every
+ * reference anywhere in the datafiles given, and always safe integers. max+1
+ * over one list is not enough: it can land on a dangling reference of another
+ * scenario, and stops counting at 2^53. Used by the merge and the scenario copy.
+ */
+function idAllocator(...datafiles) {
+  const usedIds = collectIds(...datafiles);
+  let cursor = 1 + Math.max(0, ...[...usedIds].filter(Number.isSafeInteger));
+  return () => {
+    while (!Number.isSafeInteger(cursor) || usedIds.has(cursor)) cursor = Number.isSafeInteger(cursor) ? cursor + 1 : 1;
+    usedIds.add(cursor);
+    return cursor++;
+  };
+}
+
 /** A run list with each renamed code swapped in where the editor had put it. */
 function withRenames(scenariosToRun, renamed) {
   if (scenariosToRun === 'ALL') return 'ALL';
@@ -294,16 +310,8 @@ function mergeTesterSave(stored, incoming, email) {
   }
   datafile.scenarios = scenarios;
 
-  // (J) Fresh ids are unique among every id and every reference anywhere in the
-  // stored file and the request, and always safe integers — max+1 stops
-  // counting at 2^53, which let a copy land on another tester's entry.
-  const usedIds = collectIds(base, inc);
-  let cursor = 1 + Math.max(0, ...[...usedIds].filter(Number.isSafeInteger));
-  const allocateId = () => {
-    while (!Number.isSafeInteger(cursor) || usedIds.has(cursor)) cursor = Number.isSafeInteger(cursor) ? cursor + 1 : 1;
-    usedIds.add(cursor);
-    return cursor++;
-  };
+  // (J) Fresh ids, over the stored file and the request: see idAllocator().
+  const allocateId = idAllocator(base, inc);
 
   const forked = [];
   const visibleOthers = scenarios.filter(s => !isOwnedBy(s, email) && isVisibleTo(s, email));
@@ -403,4 +411,5 @@ module.exports = {
   resolveRunList,
   viewForTester,
   mergeTesterSave,
+  idAllocator,
 };

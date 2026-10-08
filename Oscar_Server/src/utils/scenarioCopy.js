@@ -35,6 +35,7 @@
 
 const { scenarioWarnings } = require('./frameworkGating');
 const TripApply = require('../../public/js/trip-apply');
+const { idAllocator } = require('./datafileOwnership');
 
 const arr = v => (Array.isArray(v) ? v : []);
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -55,12 +56,6 @@ function frameworkOf(config) {
 }
 
 const findById = (list, id) => arr(list).find(e => isObj(e) && e.id === id) || null;
-
-function nextId(list) {
-  let max = 0;
-  for (const e of arr(list)) if (isObj(e) && Number.isInteger(e.id) && e.id > max) max = e.id;
-  return max + 1;
-}
 
 /** What a trip entry looks like, for the person choosing its target train. */
 function tripSummary(entry) {
@@ -170,10 +165,10 @@ function mappedTrip(entry, mapping, resources) {
   return { error: 'has no train or journey chosen' };
 }
 
-// Put `entry` (without id) in `list` under a fresh id; returns the id.
-function addEntry(datafile, list, entry) {
+// Put `entry` (without id) in `list` under the id `allocate()` gives; returns it.
+function addEntry(datafile, list, entry, allocate) {
   datafile[list] = arr(datafile[list]);
-  const id = nextId(datafile[list]);
+  const id = allocate();
   datafile[list].push({ id, ...entry });
   return id;
 }
@@ -195,6 +190,9 @@ function applyCopy(source, target, { codes, tripMap, frameworkConfig, resources,
 
   const out = isObj(target) ? clone(target) : {};
   out.scenarios = arr(out.scenarios);
+  // Fresh ids avoid every id and every reference in the target, dangling ones
+  // included: max+1 over one list could land on another scenario's reference.
+  const allocate = idAllocator(out);
   const taken = new Set(out.scenarios.filter(isObj).map(s => s.code));
   const freeCode = code => {
     if (!taken.has(code)) { taken.add(code); return code; }
@@ -208,7 +206,7 @@ function applyCopy(source, target, { codes, tripMap, frameworkConfig, resources,
   const entryIds = new Map();    // "list:source id" -> target id, once per entry
   const copiedEntry = (list, sourceEntry, build) => {
     const key = `${list}:${sourceEntry.id}`;
-    if (!entryIds.has(key)) entryIds.set(key, addEntry(out, list, build(withoutId(sourceEntry))));
+    if (!entryIds.has(key)) entryIds.set(key, addEntry(out, list, build(withoutId(sourceEntry)), allocate));
     return entryIds.get(key);
   };
   const copied = [];
@@ -218,10 +216,7 @@ function applyCopy(source, target, { codes, tripMap, frameworkConfig, resources,
     if (!tripIds.has(tripEntry.id)) {
       const built = mappedTrip(tripEntry, isObj(tripMap) ? tripMap[String(tripEntry.id)] : null, resources);
       if (built.error) { errors.push(`Trip ${tripEntry.id} ${built.error}.`); tripIds.set(tripEntry.id, null); continue; }
-      out.tripRequirements = arr(out.tripRequirements);
-      const id = nextId(out.tripRequirements);
-      out.tripRequirements.push({ id, ...built.entry });
-      tripIds.set(tripEntry.id, id);
+      tripIds.set(tripEntry.id, addEntry(out, 'tripRequirements', built.entry, allocate));
     }
     if (tripIds.get(tripEntry.id) === null) continue;
 
