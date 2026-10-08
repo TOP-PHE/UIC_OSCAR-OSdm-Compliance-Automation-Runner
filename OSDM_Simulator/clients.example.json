@@ -1,0 +1,11 @@
+{
+  "alpha": [
+    { "client_id": "alpha-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+  ],
+  "beta": [
+    { "client_id": "beta-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+  ],
+  "gamma": [
+    { "client_id": "gamma-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+  ]
+}

@@ -27,6 +27,7 @@ on:
     branches: [main]
     paths:
       - 'Oscar_Server/**'
+      - 'OSDM_Simulator/**'
       - 'sonar-project.properties'
       - '.github/workflows/sonar.yml'
   # No paths: filter on pull_request — Sonar is a required check in branch
@@ -87,6 +88,15 @@ jobs:
         env:
           NODE_ENV: test
           ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' }}
+
+      - name: Run OSDM simulator tests with coverage
+        # Run from the repository root so that the paths in the report are
+        # relative to it (OSDM_Simulator/src/...), which is how Sonar knows
+        # the files. Node's test runner does not create the report directory.
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        run: |
+          mkdir -p OSDM_Simulator/coverage
+          node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=OSDM_Simulator/coverage/lcov.info "OSDM_Simulator/tests/*.test.js"
 
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}

@@ -1,0 +1,201 @@
+{
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT"],
+  "systemInfoParameters": { "coachId": null, "productId": null },
+  "knownDeviations": [],
+  "scenarios": [
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_SEARCH_1ADT",
+      "description": "Simulated provider: sale of a searched trip for one adult, passenger details updated after booking.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_SEARCH_2ADT_SAVER",
+      "description": "Simulated provider: sale of a searched trip for two adults on the non-flexible offer.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 2,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    }
+  ],
+  "offerSearchCriteriaList": [
+    {
+      "id": 1,
+      "offerSearchCriteria": [
+        {
+          "currency": "EUR",
+          "offerMode": "INDIVIDUAL",
+          "requestedOfferParts": ["ADMISSION"],
+          "flexibilities": [],
+          "serviceClass": [],
+          "travelClass": [],
+          "requiresPlaceSelection": false
+        }
+      ]
+    }
+  ],
+  "requestedFulfillmentOptionsList": [
+    {
+      "id": 1,
+      "requestedFulfillmentOptions": [
+        { "fulfillmentMedia": "PDF_A4", "fulfillmentType": "ETICKET" }
+      ]
+    }
+  ],
+  "tripRequirements": [
+    {
+      "id": 1,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000001",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000001 to station 0000002"
+      }
+    },
+    {
+      "id": 2,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000003",
+        "destination": "urn:uic:stn:0000001",
+        "startDatetime": "%TRIP_DATE%T14:30:00+01:00",
+        "endDatetime": "%TRIP_DATE%T19:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000003 to station 0000001"
+      }
+    }
+  ],
+  "purchaserList": [
+    {
+      "id": 1,
+      "purchaser": [
+        {
+          "purchaserFirstName": "Paula",
+          "purchaserLastName": "Purchaser",
+          "purchaserPhoneNumber": "+33199000010",
+          "purchaserEmail": "paula.purchaser@example.org"
+        }
+      ]
+    }
+  ],
+  "passengersList": [
+    {
+      "id": 1,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1990-01-15",
+          "firstName": "Alex",
+          "lastName": "Example",
+          "phoneNumber": "+33199000001",
+          "email": "alex.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Alexis",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1990-01-16",
+          "updatePhoneNumber": "+33199000002",
+          "updateEmail": "alexis.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Example",
+          "phoneNumber": "+33199000003",
+          "email": "sam.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    }
+  ]
+}
