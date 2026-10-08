@@ -107,6 +107,22 @@ Framework, test resources, findings, runs and reports.
   providers, sets each provider's OSDM endpoint, and grants or withdraws testers.
   An endpoint already used by another company or provider of yours asks for
   confirmation before it is saved.
+- **Copying scenarios between providers.** On Test Config, **📋 Copy scenarios
+  from…** (shown when you may work on more than one company or provider) copies
+  scenarios from another of them into the one this tab works on:
+  1. choose the source and tick the scenarios (a tester sees the shared ones and
+     their own);
+  2. for each trip they use, choose a train (and its service) or a journey of
+     this provider's Test Data. A trip is asked once, however many scenarios
+     share it; a trip with several legs needs a journey;
+  3. warnings are shown before you copy: features the provider's Test Framework
+     does not declare, fulfillment options it does not offer (they are reduced
+     to what it declares), and the OSDM version, which becomes the framework's.
+
+  The copies are yours (not shared) and get a new code when the code is
+  already used. The endpoint, credentials, known deviations and findings are
+  never copied. Save or discard unsaved changes first: the page reloads after
+  the copy. The provider needs a Test Framework and Test Data before you copy.
 
 ---
 

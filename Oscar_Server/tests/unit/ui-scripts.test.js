@@ -413,7 +413,7 @@ describe('js/scenarios.js — functions whose nested conditionals were unfolded 
     ['a train stored as text', [{ resource_type: 'TRAIN', data: '{"originURN":"A"}' }], { origin: 'A', destination: '' }],
     ['a train with no data', [{ resource_type: 'TRAIN' }], { origin: '', destination: '' }],
   ])('_ttSeedOD: %s', (_label, resources, expected) => {
-    const seed = loadFunction(page, '_ttSeedOD', { wizData: { resources }, normalizeTrainData: loadFunction(page, 'normalizeTrainData') });
+    const seed = loadFunction(page, '_ttSeedOD', { wizData: { resources }, normalizeTrainData: loadFunction(page, 'normalizeTrainData', { OscarTripApply: require('../../public/js/trip-apply') }) });
     expect(seed()).toEqual(expected);
   });
 
