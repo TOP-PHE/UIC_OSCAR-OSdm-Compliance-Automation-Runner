@@ -174,9 +174,11 @@ function redactHeaders(headersObj, secrets = []) {
 // dedicated header can carry under a tenant-chosen name. Short/empty values are
 // skipped so a trivial value cannot cause every header to be masked.
 function runCredentialSecrets(runId) {
-  const runRow = get('SELECT user_id FROM runs WHERE id = ?', [runId]);
+  const runRow = get('SELECT user_id, company_id FROM runs WHERE id = ?', [runId]);
   if (!runRow?.user_id) return [];
-  const u = get('SELECT cached_token_enc, subscription_key_enc, oauth_extra_enc FROM users WHERE id = ?', [runRow.user_id]);
+  // The credentials the run used: its user's, for its company (#540).
+  const u = get('SELECT cached_token_enc, subscription_key_enc, oauth_extra_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?',
+    [runRow.user_id, runRow.company_id]);
   if (!u) return [];
   const out = [];
   for (const enc of [u.cached_token_enc, u.subscription_key_enc, u.oauth_extra_enc]) {

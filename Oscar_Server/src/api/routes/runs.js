@@ -40,11 +40,12 @@ const { ipKeyGenerator } = require('express-rate-limit');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
-const { enforceTenant } = require('../middleware/tenant');
+const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { auditLog } = require('../helpers/shared');
 const queue = require('../../worker/queue');
 const { resolveRunList, visibleCodes } = require('../../utils/datafileOwnership');
 const { getRunSelection } = require('../../utils/runSelections');
+const { credentialsFor } = require('../../utils/testerCredentials');
 const runner = require('../../worker/runner');
 
 const router = express.Router();
@@ -152,11 +153,11 @@ router.post('/', runSubmitLimiter, (req, res) => {
   const company = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   if (!company) return res.status(404).json({ status: 404, title: 'Company not found.' });
 
-  // Per-tester credentials (since v12) live on the requesting user's row.
-  // The runner will read the same row when the job is dequeued; checking
-  // here gives the operator an immediate field-level error instead of a
-  // delayed run-failure.
-  const user = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  // Per-tester credentials, for the company the run targets (#540: per user
+  // and company). The runner reads the same row when the job is dequeued;
+  // checking here gives the operator an immediate field-level error instead
+  // of a delayed run-failure.
+  const user = credentialsFor(req.user.id, targetCompanyId);
   if (!user) return res.status(404).json({ status: 404, title: 'User not found.' });
 
   const missing = [];
@@ -589,7 +590,7 @@ router.post('/bulk-admin-action', (req, res) => {
 // Returns the current queue state for the authenticated user's company.
 // Must be registered BEFORE /:id to avoid Express treating "queue-status" as an ID.
 router.get('/queue-status', (req, res) => {
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
 
   // Get concurrent limit from test framework config
   const tfRow = get('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
@@ -650,7 +651,7 @@ router.post('/stop-all', (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'certification_user cannot stop runs.' });
   }
 
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   const isAdmin   = req.user.role === 'administrator';
   const scope     = isAdmin ? 'platform' : 'own';
 
@@ -713,7 +714,7 @@ router.post('/stop-all', (req, res) => {
 // ── GET /v1/runs/batch/:batchId ──────────────────────────────────────────────
 // Returns all runs in a batch with aggregated status.
 router.get('/batch/:batchId', (req, res) => {
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   const batchFilter = companyId
     ? 'WHERE batch_id = ? AND company_id = ?'
     : 'WHERE batch_id = ?';
@@ -758,7 +759,7 @@ const bulkDownloadLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many bulk downloads in a short window — please wait a moment.' }
 });
 router.get('/batch/:batchId/reports.zip', bulkDownloadLimiter, (req, res) => {
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   if (!companyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'A company context is required to download batch reports.' });
   }
@@ -1136,12 +1137,10 @@ router.post('/:id/share', (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden',
       detail: 'Only test_manager can share runs with certifiers.' });
   }
-  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
-  if (!runRow || runRow.status === 'DELETED') {
-    return res.status(404).json({ status: 404, title: 'Run not found.' });
-  }
-  // Tenant scope: a test_manager can only share their OWN company's runs.
-  if (runRow.company_id !== req.user.companyId) {
+  // Tenant scope: a test_manager can only share runs of their own company or
+  // of its providers (#540) — the run-visibility rule, which answers 404.
+  const runRow = canUserSeeRun(req.params.id, req.user);
+  if (!runRow) {
     return res.status(404).json({ status: 404, title: 'Run not found.' });
   }
   if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(runRow.status)) {
@@ -1168,8 +1167,8 @@ router.delete('/:id/share', (req, res) => {
     return res.status(403).json({ status: 403, title: 'Forbidden',
       detail: 'Only test_manager can revoke certifier access.' });
   }
-  const runRow = get('SELECT * FROM runs WHERE id = ?', [req.params.id]);
-  if (!runRow || runRow.status === 'DELETED' || runRow.company_id !== req.user.companyId) {
+  const runRow = canUserSeeRun(req.params.id, req.user);
+  if (!runRow) {
     return res.status(404).json({ status: 404, title: 'Run not found.' });
   }
   dbRun(

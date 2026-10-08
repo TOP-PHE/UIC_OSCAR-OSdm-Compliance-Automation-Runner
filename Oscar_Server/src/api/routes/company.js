@@ -28,7 +28,7 @@ const { get, all, run, colDecrypt, colEncrypt } = require('../../db/db');
 const { annotateDatafile } = require('../../utils/frameworkGating');
 const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
-const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange } = require('../helpers/shared');
+const { auditLog, resolveCompanyScope, requireTestManager, denyAdminAndCertifier, companyEndpointChange, familyEndpointClash } = require('../helpers/shared');
 const { viewForTester, mergeTesterSave } = require('../../utils/datafileOwnership');
 const { templatesAddedBy, saveRefusal } = require('../../utils/datafileTemplates');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
@@ -168,6 +168,7 @@ function safeCompany(c, canSeeHeaderValues = false) {
     id:                           c.id,
     name:                         c.name,
     slug:                         c.slug,
+    parent_id:                    c.parent_id || null,   // #540: set for a provider
     api_base:                     c.api_base || null,
     datafile_hash:                c.datafile_hash || null,
     datafile_updated_at:          c.datafile_updated_at || null,
@@ -316,6 +317,16 @@ router.patch('/', (req, res) => {
       return res.status(400).json({ status: 400, title: 'Bad Request', detail: urlRefusal });
     }
   }
+  // #540: within a distributor and its providers, one endpoint per company,
+  // unless the Test Manager confirms the duplicate (audited below).
+  let duplicateOf = null;
+  if (endpoint.write !== null && endpoint.write !== company.api_base) {
+    duplicateOf = familyEndpointClash(company.id, company.parent_id, endpoint.write);
+    if (duplicateOf && req.body?.allow_duplicate_endpoint !== true) {
+      return res.status(409).json({ status: 409, title: 'Conflict',
+        detail: `This OSDM endpoint is already used by ${duplicateOf}. Send allow_duplicate_endpoint: true to use it anyway.` });
+    }
+  }
 
   // Dedicated headers (issue #426) — company-wide config, Test-Manager-only.
   // Validate before touching the row so a bad payload changes nothing.
@@ -359,6 +370,7 @@ router.patch('/', (req, res) => {
   // Audit: log company configuration changes
   const changedFields = updates.filter(u => !u.startsWith('updated_at')).map(u => u.split(' = ')[0]);
   auditLog(req.user.id, targetCompanyId, req.user.email, `company_update:${changedFields.join(',')}`);
+  if (duplicateOf) auditLog(req.user.id, targetCompanyId, req.user.email, 'company_update:api_base:duplicate_endpoint_confirmed');
 
   const updated = get('SELECT * FROM companies WHERE id = ?', [targetCompanyId]);
   // The owning Test Manager sees the values back (they just set them); an

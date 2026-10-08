@@ -29,6 +29,9 @@ const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require(
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
 const { resolveAccessToken } = require('./access-token');
+const { credentialsFor } = require('../utils/testerCredentials');
+const { canUseCompany } = require('../api/helpers/provider-access');
+const { normalizeRole } = require('../api/middleware/auth');
 const { safeJoinUuid } = require('../utils/paths');
 const { templatesForRunner, runRefusal } = require('../utils/datafileTemplates');
 const runSecrets = require('../utils/runSecrets');
@@ -686,17 +689,40 @@ async function cleanupWorkspace(runId) {
   }
 }
 
+// ── Run, endpoint and credentials of one company (#540) ──────────────────────
+// The endpoint is the run's company's (companyRow.api_base) and the credentials
+// are the user's for that company (credentialsFor), so both follow the company
+// the job names. This checks that the job's company is the run's own, and that
+// a member who started it may still act in it: a tester whose access to a
+// provider was withdrawn while the run was queued is not sent there. Platform
+// users are not tenant members and keep the path they had. Returns a refusal
+// sentence, or null. Never throws: a thrown executeRun leaves the run unmarked.
+function refusedRunScope(runRow, companyId, userId) {
+  try {
+    if (runRow.company_id !== companyId) return 'Run refused: the run does not belong to the company it was queued for.';
+    const user = get('SELECT id, company_id, role FROM users WHERE id = ?', [userId]);
+    if (!user) return 'Run refused: the user who started the run no longer exists.';
+    const member = { id: user.id, companyId: user.company_id, role: normalizeRole(user.role) };
+    if (member.role === 'administrator') return null;
+    if (!canUseCompany(member, companyId)) return 'Run refused: the user who started the run may no longer use this company.';
+    return null;
+  } catch {
+    return 'Run refused: the run\'s company could not be checked.';
+  }
+}
+
 // ── Main execution function ────────────────────────────────────────────────────
 async function executeRun({ runId, companyId, userId, scenarioOverride }) {
-  // 1. Load run + company + user from DB. The user row carries the OSDM
-  //    credentials (auth_mode, OAuth fields, bearer token, token cache) — see
-  //    migration v12. The company row keeps api_base + datafile only.
+  // 1. Load run + company + user from DB. The OSDM credentials (auth_mode,
+  //    OAuth fields, bearer token, token cache) are the user's for THIS
+  //    company (#540: tester_credentials, per user and company). The company
+  //    row keeps api_base + datafile only.
   const runRow     = get('SELECT * FROM runs     WHERE id = ?', [runId]);
   const companyRow = get('SELECT * FROM companies WHERE id = ?', [companyId]);
   // Prefer the userId from the queue job; fall back to the run's recorded
   // user_id (set at POST /v1/runs time) so legacy queue items still resolve.
   const effectiveUserId = userId || runRow?.user_id || null;
-  const userRow = effectiveUserId ? get('SELECT * FROM users WHERE id = ?', [effectiveUserId]) : null;
+  const userRow = effectiveUserId ? credentialsFor(effectiveUserId, companyId) : null;
 
   if (!runRow || !companyRow) throw new Error('Run or company not found in DB.');
   if (!userRow)               throw new Error('User row not found for run — cannot resolve credentials.');
@@ -720,7 +746,8 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   //     NEW-02, second half) or of text in the datafile (NEW-10). The run
   //     stops here: before a token is asked for, before the environment file
   //     is written, before anything is started.
-  const refusal = refusedScenarioCode(scenarioOverride)
+  const refusal = refusedRunScope(runRow, companyId, effectiveUserId)
+    || refusedScenarioCode(scenarioOverride)
     || await refusedApiBase(companyRow.api_base)
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email });
   if (refusal) {
@@ -961,6 +988,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       // Disabled when set to 0 (operator opt-out).
       if (tickMs > 0) {
         tokenWatchdog = setInterval(async () => {
+          // #540: no new token once the user may no longer use this company.
+          const scopeRefusal = refusedRunScope(runRow, companyId, effectiveUserId);
+          if (scopeRefusal) {
+            logEvent(runId, 'warn', `[token-watchdog] refresh skipped — ${scopeRefusal}`);
+            return;
+          }
           try {
             await resolveAccessToken(
               userRow,
@@ -1222,4 +1255,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };
+module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };

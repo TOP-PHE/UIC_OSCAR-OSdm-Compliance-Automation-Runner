@@ -72,7 +72,7 @@ module.exports = {
 - \`test_manager\` — manages shared scenarios for a company
 - \`company_user\` — runs tests for their own company only
 
-**Multi-tenancy:** Company users are automatically scoped to their own company. Platform users (admin/certifier) can target a specific company via \`?company_id=\` query param or \`X-Company-Id\` header.`,
+**Multi-tenancy:** Company users are automatically scoped to their own company, or to one of its providers named with the \`X-Provider-Id\` header or \`?provider_id=\` (Test Managers: every provider of their company; testers: the providers granted to them; anything else answers 404). Platform users (admin/certifier) can target a specific company via \`?company_id=\` query param or \`X-Company-Id\` header.`,
     version: pkg.version,
     contact: { name: 'UIC — Union Internationale des Chemins de fer' },
   },
@@ -303,6 +303,33 @@ module.exports = {
     '/v1/admin/rotate-jwt-secret': {
       post: { tags: ['Admin'], summary: 'Rotate the JWT secret — invalidates ALL existing sessions', security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Rotated' } } },
+    },
+    '/v1/company/providers': {
+      get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'Providers' } } },
+      post: { tags: ['Company'], summary: 'Create a provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        description: 'Body: { name, api_base?, allow_duplicate_endpoint? }. An endpoint already used by the distributor or another of its providers answers 409 unless allow_duplicate_endpoint is true (audited).',
+        responses: { 201: { description: 'Provider created' }, 400: { description: 'Validation failed' }, 403: { description: 'Test Manager role required' }, 409: { description: 'Name or endpoint already used' } } },
+    },
+    '/v1/company/providers/{id}': {
+      patch: { tags: ['Company'], summary: 'Rename a provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Renamed' }, 404: { description: 'Not a provider of this company' } } },
+    },
+    '/v1/company/providers/{id}/access': {
+      get: { tags: ['Company'], summary: 'Testers granted this provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Granted testers' }, 404: { description: 'Not a provider of this company' } } },
+    },
+    '/v1/company/providers/{id}/access/{userId}': {
+      put: { tags: ['Company'], summary: 'Grant a tester of this company the provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                     { name: 'userId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Granted' }, 404: { description: 'Provider or tester not found' } } },
+      delete: { tags: ['Company'], summary: 'Withdraw a tester\'s access to the provider (Test Manager only)', security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+                     { name: 'userId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { 200: { description: 'Withdrawn' }, 404: { description: 'Provider or tester not found' } } },
     },
     '/v1/company/users': {
       get: {

@@ -14,7 +14,8 @@
  */
 
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { get, run } = require('../../db/db');
+const { get, all, run } = require('../../db/db');
+const { stripTrailingSlashes } = require('../../utils/osdm-client');
 const { normalizeRole } = require('../middleware/auth');
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -63,8 +64,8 @@ function auditLog(userId, companyId, email, eventType) {
 
 /**
  * Resolve the effective company scope for company-settings routes.
- * Returns a companyId string, or null (after sending 403) if the caller
- * is a certification_user who should not access company settings.
+ * Returns a companyId string, or null (after sending the answer) if the
+ * caller is a certification_user who should not access company settings.
  */
 function resolveCompanyScope(req, res) {
   const { isPlatformRole } = require('../middleware/auth');
@@ -74,11 +75,15 @@ function resolveCompanyScope(req, res) {
     return null;
   }
 
-  if (isPlatformRole(req.user.role)) {
-    return req.companyId;
+  // enforceTenant chose it: for a member, the own company or a provider of it
+  // (#540); for a platform user, the company it named, if any. A member route
+  // mounted without enforceTenant has no scope, and is refused rather than
+  // guessed.
+  if (!isPlatformRole(req.user.role) && !req.companyId) {
+    res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'No company scope.' });
+    return null;
   }
-
-  return req.user.companyId;
+  return req.companyId;
 }
 
 // v1.11.15: companyShareWithCertifier() removed — the company-wide
@@ -133,6 +138,24 @@ function companyEndpointChange(role, requested, stored) {
   return { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
 }
 
+// ── One endpoint per provider within a distributor (#540) ────────────────────
+// Two companies of the same family (a distributor and its providers) pointing
+// at the same OSDM endpoint is almost always a mistake: runs meant for one
+// provider would go to another. Returns the name of the other company of the
+// family that already uses `endpoint`, or null. `companyId` is the company
+// being written (null for one being created under `parentId`). Comparison
+// ignores case and trailing slashes.
+function familyEndpointClash(companyId, parentId, endpoint) {
+  const norm = v => stripTrailingSlashes(String(v || '').trim()).toLowerCase();
+  const wanted = norm(endpoint);
+  if (!wanted) return null;
+  const root = parentId || get('SELECT parent_id FROM companies WHERE id = ?', [companyId])?.parent_id || companyId;
+  if (!root) return null;
+  const family = all('SELECT id, name, api_base FROM companies WHERE id = ? OR parent_id = ?', [root, root]);
+  const clash = family.find(c => c.id !== companyId && norm(c.api_base) === wanted);
+  return clash ? clash.name : null;
+}
+
 module.exports = {
   ALLOWED_ROLES,
   PLATFORM_SLUG,
@@ -143,4 +166,5 @@ module.exports = {
   denyAdminAndCertifier,
   requireTestManager,
   companyEndpointChange,
+  familyEndpointClash,
 };

@@ -228,7 +228,8 @@ const fileDownloadLimiter = require('express-rate-limit')({
 // served via express.static with no auth at all. Now requires EITHER:
 //   (a) the per-run secret the runner issued for a live run, bound to that
 //       run's company (the Bruno subprocess fetching this run's own file), OR
-//   (b) an authenticated Test Manager session whose company owns the slug.
+//   (b) an authenticated Test Manager session whose company owns the slug,
+//       or is the distributor of the provider that owns it (#540).
 // Until v1.11.210 (b)'s alternative was "any request from 127.0.0.1 with no
 // X-Forwarded-For", which trusted the source address; that is gone.
 const DATAFILES_DIR = path.resolve(__dirname, '../data/datafiles');
@@ -253,15 +254,21 @@ const runSecrets = require('./utils/runSecrets');
 // The authenticated fallback on GET /data: a signed-in Test Manager of the
 // company that owns the slug. Returns null when allowed, else the HTTP status
 // to answer with. Kept out of the handler so the handler stays simple.
+const DENIAL_TEXT = { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not found' };
 function datafileSessionDenial(req, company) {
   let user;
   try {
     const cookieAuth = require('./api/middleware/auth');
     user = cookieAuth.userFromRequest(req);     // parsed JWT or null
   } catch { user = null; }                       // malformed token → treated as no session
-  if (!user) return 401;
-  if (user.companyId !== company.id) return 403;
-  if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile
+  // #540: a provider's slug is not public; its file must not reveal that it
+  // exists, so every refusal on it reads as an unknown slug.
+  const refuse = status => (company.parent_id ? 404 : status);
+  if (!user) return refuse(401);
+  if (user.role !== 'test_manager') return refuse(403);  // testers read their filtered view from /v1/company/datafile
+  // The owning company, or a provider of it (#540): the rule enforceTenant uses.
+  const { canUseCompany } = require('./api/helpers/provider-access');
+  if (!canUseCompany(user, company.id)) return refuse(403);
   return null;
 }
 
@@ -307,7 +314,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   if (!m) return res.status(400).send('Bad request');
 
   const slug = m[1];
-  const company = dbGet('SELECT id, slug FROM companies WHERE slug = ?', [slug]);
+  const company = dbGet('SELECT id, slug, parent_id FROM companies WHERE slug = ?', [slug]);
   if (!company) return res.status(404).send('Not found');
 
   // (a) The Bruno subprocess of a live run: a per-run secret the runner issued,
@@ -324,7 +331,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
     //     reached directly, and no certifier / admin path exists — they consume
     //     reports through /v1/runs with the per-run share gate.
     const denied = datafileSessionDenial(req, company);
-    if (denied) return res.status(denied).send(denied === 401 ? 'Unauthorized' : 'Forbidden');
+    if (denied) return res.status(denied).send(DENIAL_TEXT[denied]);
   }
 
   // Resolve, traversal-guard, decrypt, send.
@@ -390,7 +397,16 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   if (runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Run secret does not match the run.' });
   }
-  const userRow = dbGet('SELECT * FROM users WHERE id = ?', [runRow.user_id]);
+  // #540: the user must still be allowed to use the run's company — access
+  // withdrawn mid-run stops new tokens here, as it refuses a queued run.
+  const runRowFull = dbGet('SELECT * FROM runs WHERE id = ?', [runId]);
+  const scopeRefusal = require('./worker/runner').refusedRunScope(runRowFull, runCompanyId, runRow.user_id);
+  if (scopeRefusal) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: scopeRefusal });
+  }
+  // The credentials of the run's user for the run's company (#540).
+  const { credentialsFor } = require('./utils/testerCredentials');
+  const userRow = credentialsFor(runRow.user_id, runRow.company_id);
   if (!userRow) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User for this run not found.' });
   }
@@ -502,6 +518,7 @@ app.get('/metrics', async (_req, res) => {
 app.use('/v1/auth',            require('./api/routes/auth'));
 app.use('/v1/me/credentials',  require('./api/routes/me-credentials'));
 app.use('/v1/company/users',   require('./api/routes/company-users'));
+app.use('/v1/company/providers', require('./api/routes/company-providers'));
 app.use('/v1/company',         require('./api/routes/company'));
 app.use('/v1/company',         require('./api/routes/company-test-framework'));
 app.use('/v1/company',         require('./api/routes/company-test-resources'));

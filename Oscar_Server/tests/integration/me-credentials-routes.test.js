@@ -148,12 +148,12 @@ describe('PATCH /v1/me/credentials', () => {
       'https://keycloak/token',
     ])('rejects %s and stores nothing', async (bad) => {
       const token = makeToken();
-      const before = get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url;
+      const before = (get('SELECT token_url FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {}).token_url;
       const res = await request(app).patch('/v1/me/credentials')
         .set('Authorization', `Bearer ${token}`).send({ token_url: bad });
       expect(res.status).toBe(400);
       expect(res.body.detail).toContain('public host');
-      expect(get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url).toBe(before);
+      expect((get('SELECT token_url FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {}).token_url).toBe(before);
     });
 
     test('accepts a public https token URL', async () => {
@@ -161,7 +161,7 @@ describe('PATCH /v1/me/credentials', () => {
       const res = await request(app).patch('/v1/me/credentials')
         .set('Authorization', `Bearer ${token}`).send({ token_url: 'https://auth.vendor.com/oauth/token' });
       expect(res.status).toBe(200);
-      expect(get('SELECT token_url FROM users WHERE id = ?', [userId]).token_url).toBe('https://auth.vendor.com/oauth/token');
+      expect((get('SELECT token_url FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {}).token_url).toBe('https://auth.vendor.com/oauth/token');
     });
   });
 
@@ -177,7 +177,7 @@ describe('PATCH /v1/me/credentials', () => {
     expect(res.body.access_token).toBeUndefined();
     expect(res.body.access_token_enc).toBeUndefined();
     // DB should have an encrypted value, not plaintext
-    const row = get('SELECT access_token_enc FROM users WHERE id = ?', [userId]);
+    const row = (get('SELECT access_token_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(row.access_token_enc).toBeTruthy();
     expect(row.access_token_enc).not.toBe('my-secret-bearer-token');
   });
@@ -185,8 +185,9 @@ describe('PATCH /v1/me/credentials', () => {
   test('200 setting auth credentials clears the token cache', async () => {
     // First seed a fake cached token
     run(
-      `UPDATE users SET cached_token_enc = 'fake-cache', cached_token_expires_at = '2099-01-01T00:00:00Z' WHERE id = ?`,
-      [userId]
+      `INSERT INTO tester_credentials (user_id, company_id, cached_token_enc, cached_token_expires_at) VALUES (?, ?, 'fake-cache', '2099-01-01T00:00:00Z')
+       ON CONFLICT (user_id, company_id) DO UPDATE SET cached_token_enc = excluded.cached_token_enc, cached_token_expires_at = excluded.cached_token_expires_at`,
+      [userId, companyId]
     );
     const token = makeToken();
     const res = await request(app)
@@ -196,7 +197,7 @@ describe('PATCH /v1/me/credentials', () => {
     expect(res.status).toBe(200);
     // Cache must have been wiped
     expect(res.body.has_cached_token).toBe(false);
-    const row = get('SELECT cached_token_enc FROM users WHERE id = ?', [userId]);
+    const row = (get('SELECT cached_token_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(row.cached_token_enc).toBeNull();
   });
 
@@ -218,7 +219,7 @@ describe('PATCH /v1/me/credentials', () => {
       .send({ subscription_key: 'my-sub-key' });
     expect(res.status).toBe(200);
     expect(res.body.has_subscription_key).toBe(true);
-    const row = get('SELECT subscription_key_enc FROM users WHERE id = ?', [userId]);
+    const row = (get('SELECT subscription_key_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(row.subscription_key_enc).not.toBe('my-sub-key');
   });
 });

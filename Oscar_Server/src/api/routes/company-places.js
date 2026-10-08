@@ -27,6 +27,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
+const { credentialsFor } = require('../../utils/testerCredentials');
 const { osdmGet, buildTesterHeaders, mergeDedicatedHeaders } = require('../../utils/osdm-client');
 const log = require('../../utils/logger').child({ module: 'places' });
 
@@ -72,7 +73,7 @@ router.post('/places/refresh', async (req, res) => {
   if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
-  const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  const userRow = credentialsFor(req.user.id, companyId);
   if (!userRow) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
   }

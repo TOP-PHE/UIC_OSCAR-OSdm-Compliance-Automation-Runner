@@ -204,7 +204,7 @@ describe('PATCH /v1/me/credentials — updates', () => {
     expect(res.status).toBe(200);
     expect(res.body.has_token).toBe(true);
     // Raw token should NOT appear in response
-    const raw = get('SELECT access_token_enc FROM users WHERE id = ?', [userId]);
+    const raw = (get('SELECT access_token_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(raw.access_token_enc).not.toBe('my-bearer-token-value');
     expect(raw.access_token_enc).toBeTruthy(); // encrypted value is stored
   });
@@ -222,8 +222,9 @@ describe('PATCH /v1/me/credentials — updates', () => {
 
   test('updating an auth field clears the cached token', async () => {
     // First set a fake cached token
-    run(`UPDATE users SET cached_token_enc = 'fake-cached', cached_token_expires_at = '2099-01-01' WHERE id = ?`, [userId]);
-    const verifyBefore = get('SELECT cached_token_enc FROM users WHERE id = ?', [userId]);
+    run(`INSERT INTO tester_credentials (user_id, company_id, cached_token_enc, cached_token_expires_at) VALUES (?, ?, 'fake-cached', '2099-01-01')
+         ON CONFLICT (user_id, company_id) DO UPDATE SET cached_token_enc = excluded.cached_token_enc, cached_token_expires_at = excluded.cached_token_expires_at`, [userId, companyId]);
+    const verifyBefore = (get('SELECT cached_token_enc FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(verifyBefore.cached_token_enc).toBe('fake-cached');
 
     const token = makeToken();
@@ -232,7 +233,7 @@ describe('PATCH /v1/me/credentials — updates', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ auth_mode: 'oauth2' });
 
-    const after = get('SELECT cached_token_enc, cached_token_expires_at FROM users WHERE id = ?', [userId]);
+    const after = (get('SELECT cached_token_enc, cached_token_expires_at FROM tester_credentials WHERE user_id = ? AND company_id = ?', [userId, companyId]) || {});
     expect(after.cached_token_enc).toBeNull();
     expect(after.cached_token_expires_at).toBeNull();
   });

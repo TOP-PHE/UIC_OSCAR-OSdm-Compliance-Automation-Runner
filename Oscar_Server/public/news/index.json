@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-08-providers-foundation",
+    "date": "October 8, 2026",
+    "tag": "New",
+    "title": "Coming soon: one company, several OSDM providers",
+    "summary": "A distributor that tests several carriers' OSDM systems will be able to keep each one as a separate provider in OSCAR, with its own endpoint, data file, credentials and reports. This release lays the groundwork on the server; the screens follow in the next release.",
+    "content": "Some companies test more than one OSDM system: a distributor, for example, integrates several carriers. Until now OSCAR had one endpoint and one data file per company, so testing a second system meant a second company and a second set of accounts.\n\nThis release adds providers on the server. A provider belongs to your company and has its own endpoint, dedicated headers, data file, Test Framework, test resources, findings, runs and reports. Your Test Managers can use every provider of your company; a tester uses the providers a Test Manager has granted them. Each tester keeps separate credentials for each provider.\n\nNothing changes for you yet: your company works exactly as before, and your existing credentials were carried over. The pages for creating providers, granting testers and switching between providers come in the next release."
+  },
+  {
     "id": "2026-10-07-endpoints-must-be-public-addresses",
     "date": "October 7, 2026",
     "tag": "Security",

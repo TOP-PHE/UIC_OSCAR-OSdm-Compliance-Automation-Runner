@@ -256,10 +256,13 @@ describe('extractStructuredResults — dedicated-header credential redaction (NE
 
   beforeAll(() => {
     run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'NEW03 Test', 'new03-test')`, [companyId]);
-    // The run's resolved access token lives (encrypted) on the user row; the
-    // extractor reads it to redact by value.
-    run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, cached_token_enc)
-         VALUES (?, ?, 'user@new03-test.com', 'x', 'company_user', ?)`, [userId, companyId, encrypt(TOKEN)]);
+    // The run's resolved access token lives (encrypted) in the user's
+    // credentials for the run's company (#540); the extractor reads it to
+    // redact by value.
+    run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role)
+         VALUES (?, ?, 'user@new03-test.com', 'x', 'company_user')`, [userId, companyId]);
+    run(`INSERT OR IGNORE INTO tester_credentials (user_id, company_id, cached_token_enc) VALUES (?, ?, ?)`,
+      [userId, companyId, encrypt(TOKEN)]);
     run(`INSERT INTO runs (id, company_id, user_id, status, scenario_code, queued_at, completed_at)
          VALUES (?, ?, ?, 'COMPLETED', 'SALE_NEW03', datetime('now'), datetime('now'))`, [runId, companyId, userId]);
 

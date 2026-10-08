@@ -88,7 +88,7 @@ describe('resolveAccessToken — oauth2 missing fields', () => {
 
 describe('resolveAccessToken — oauth2 cache', () => {
   const base = {
-    id: 'u1', auth_mode: 'oauth2', oauth_profile: 'oauth2_basic',
+    id: 'u1', user_id: 'u1', company_id: 'c1', auth_mode: 'oauth2', oauth_profile: 'oauth2_basic',
     token_url: 'https://token', client_id_enc: 'enc:cid', client_secret_enc: 'enc:secret',
     oauth_scope: '',
   };
@@ -101,8 +101,8 @@ describe('resolveAccessToken — oauth2 cache', () => {
   async function captureCredFp() {
     fetchToken.mockResolvedValue({ token: 'seed', expiresIn: 3600 });
     await resolveAccessToken({ ...base }, log);
-    const persist = db.run.mock.calls.find(([sql]) => /cached_token_cred_fp = \?/.test(sql));
-    return persist[1][2]; // 3rd bound param of the persist UPDATE = credFp
+    const persist = db.run.mock.calls.find(([sql]) => sql.includes('tester_credentials') && sql.includes('cached_token_cred_fp'));
+    return persist[1][4]; // bound params: user_id, company_id, token, expiry, credFp
   }
 
   test('reuses a still-valid cached token without fetching', async () => {
@@ -143,9 +143,10 @@ describe('resolveAccessToken — oauth2 cache', () => {
       tokenUrl: 'https://token', clientId: 'cid', clientSecret: 'secret',
     }), log);
     // Cache persisted with the encrypted token + an expiry.
+    // #540: written to the (user, company) row the credentials came from.
     expect(db.run).toHaveBeenCalledWith(
-      expect.stringContaining('cached_token_enc = ?'),
-      expect.arrayContaining(['enc:freshtok'])
+      expect.stringContaining('INSERT INTO tester_credentials'),
+      expect.arrayContaining(['u1', 'c1', 'enc:freshtok'])
     );
   });
 
@@ -154,8 +155,8 @@ describe('resolveAccessToken — oauth2 cache', () => {
     const tok = await resolveAccessToken({ ...base }, log);
     expect(tok).toBe('freshtok');
     expect(db.run).toHaveBeenCalledWith(
-      expect.stringContaining('cached_token_enc = NULL'),
-      ['u1']
+      expect.stringContaining('INSERT INTO tester_credentials'),
+      ['u1', 'c1', null, null, null]
     );
   });
 
@@ -200,5 +201,16 @@ describe('resolveAccessToken — oauth2 cache', () => {
     const tok = await resolveAccessToken({ ...base }, log);
     expect(tok).toBe('freshtok');               // valid token still returned
     expect(log.error).toHaveBeenCalled();        // failure logged, not thrown
+  });
+
+  // #540: the cache belongs to one (user, company) row. Credentials that do
+  // not name it must not be cached anywhere (the old code wrote users.id).
+  test('a token is not cached for credentials that name no company', async () => {
+    fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+    const { company_id: _omit, ...noCompany } = base;
+    const tok = await resolveAccessToken(noCompany, log);
+    expect(tok).toBe('freshtok');
+    expect(db.run).not.toHaveBeenCalled();
+    expect(log.error).toHaveBeenCalled();
   });
 });

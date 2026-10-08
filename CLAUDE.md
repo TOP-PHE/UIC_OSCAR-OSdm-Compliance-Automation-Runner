@@ -234,6 +234,31 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `tests/unit/profile-endpoint.test.js` runs an HTML page's own functions and
   `const` lines in a `vm`, the way `scenarios-load-guard.test.js` does for a
   script file.
+- **Providers: one company, several OSDM systems** (#540, PR 1 = v1.11.216;
+  PR 2 the UI, PR 3 scenario copy with trip re-mapping). A provider is a child
+  company (`companies.parent_id`) and reuses every per-company table by its own
+  id; users only ever belong to top-level companies. Rules that will bite:
+  - **One access rule, `canUseCompany()`** (`api/helpers/provider-access.js`):
+    own company for every member; a child of it for the distributor's Test
+    Managers, and for testers in `provider_access`. `enforceTenant` sets
+    `req.companyId` from it and `canUserSeeRun` calls it. **Routes read
+    `req.companyId`, never `req.user.companyId`**: `tests/unit/provider-access.test.js`
+    counts every direct read in `src/` and fails on a new one; extend its
+    allow-list only with a reason (user directory, `/me`, provider management).
+  - **The provider travels with each request** (`X-Provider-Id` or
+    `?provider_id=`), never in the body; there is no session-level "active
+    provider". Absent = own company. Unknown or refused = 404.
+  - **Credentials are per (user, company)** in `tester_credentials`
+    (`utils/testerCredentials.js`); the token cache is written back to the same
+    row. The `users.*` credential columns are dormant since migration 29 and are
+    to be dropped by a later migration. Test fixtures that insert users with
+    credentials call `credentialsAsMigrated()` (`tests/helpers/credentials.js`).
+  - **The runner re-checks** (`refusedRunScope`): job company = run company, and
+    the user may still use it. The run secret stays bound to the run's company.
+  - A provider's endpoint goes through `companyEndpointChange()` like any
+    company's; a duplicate within the family needs `allow_duplicate_endpoint`
+    (audited). Deleting a provider is not built; deleting a distributor that has
+    providers is refused.
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
@@ -760,6 +785,9 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
 | `Oscar_Server/src/utils/knownDeviationProjection.js` | projects baselined findings into `knownDeviations[]` |
 | `Oscar_Server/src/utils/osdm-client.js` | shared vendor-call helper (`osdmGet` + `buildTesterHeaders`), #450 |
 | `Oscar_Server/src/utils/datafileOwnership.js` | what a tester sees (`viewForTester`) and may change (`mergeTesterSave`) in the company datafile — pure, v1.11.197 |
+| `Oscar_Server/src/api/helpers/provider-access.js` | `canUseCompany()`, the one rule for which company (own or provider) a member may act in, #540 |
+| `Oscar_Server/src/api/routes/company-providers.js` | provider list/create/rename and tester access list, #540 |
+| `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |
 | `Oscar_Server/src/api/routes/company-places.js` | Places API cache: `POST /places/refresh` (paginated download) + `GET /places?q=` (ranked search), #450 |

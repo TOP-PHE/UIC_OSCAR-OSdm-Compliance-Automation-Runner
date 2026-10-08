@@ -32,6 +32,7 @@
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-runs-routes';
 
+const { credentialsAsMigrated } = require('../helpers/credentials');
 const jwt     = require('jsonwebtoken');
 const fs      = require('fs');
 const os      = require('os');
@@ -383,6 +384,7 @@ describe('POST /v1/runs — submission validation', () => {
       run(`INSERT INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc)
            VALUES (?, ?, ?, 'x', 'company_user', 'bearer', ?)`,
         [submitUserId, submitCompanyId, `submit-${submitUserId}@${EMAIL_DOMAIN}`, colEncrypt('tok-123')]);
+      credentialsAsMigrated(submitUserId);
     });
 
     afterAll(() => {
@@ -472,6 +474,7 @@ describe('POST /v1/runs — submission validation', () => {
       run(`INSERT INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc)
            VALUES (?, ?, ?, 'x', 'test_manager', 'bearer', ?)`,
         [managerId, submitCompanyId, `manager-${managerId}@${EMAIL_DOMAIN}`, colEncrypt('tok-456')]);
+      credentialsAsMigrated(managerId);
       const dfDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'runs-cov-df-codes-'));
       covDatafileDirs.push(dfDir);
       const dfPath = path.join(dfDir, 'datafile.enc');

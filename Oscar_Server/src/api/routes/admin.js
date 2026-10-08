@@ -26,6 +26,7 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
+const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
 const { sendTestEmail, isSmtpConfigured } = require('../../utils/mailer');
 
@@ -133,7 +134,7 @@ router.post('/users',
     if (!company_id) {
       return res.status(400).json({ status: 400, title: 'Bad Request', detail: `company_id is required for ${resolvedRole}.` });
     }
-    targetCompany = get('SELECT id, name, slug FROM companies WHERE id = ?', [company_id]);
+    targetCompany = get('SELECT id, name, slug FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
     if (!targetCompany) {
       return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
     }
@@ -208,7 +209,7 @@ router.patch('/users/:id',
       // catch-all below). A company-bound role may not sit on the platform
       // company, so require company_id if the user is currently on it.
       if (company_id) {
-        const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
+        const targetCompany = get('SELECT id FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
         if (!targetCompany) {
           return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
         }
@@ -225,7 +226,7 @@ router.patch('/users/:id',
     } else if (resolvedRole === 'certification_user') {
       // Certifiers may optionally belong to a specific company; if not provided keep current
       if (company_id) {
-        const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
+        const targetCompany = get('SELECT id FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
         if (!targetCompany) {
           return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
         }
@@ -239,7 +240,7 @@ router.patch('/users/:id',
       values.push(platformCompany.id);
     }
   } else if (company_id) {
-    const targetCompany = get('SELECT id FROM companies WHERE id = ?', [company_id]);
+    const targetCompany = get('SELECT id FROM companies WHERE id = ? AND parent_id IS NULL', [company_id]);
     if (!targetCompany) {
       return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Target company not found.' });
     }
@@ -252,7 +253,11 @@ router.patch('/users/:id',
   }
 
   values.push(userId);
-  run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+  // #540: grants and credentials follow a change of company or role.
+  transaction(() => {
+    run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+    membershipChanged(userId, user);
+  });
   auditLog(req.user.id, null, req.user.email, `user_updated:${userId}`);
 
   const updated = get(
@@ -460,6 +465,7 @@ router.get('/companies', (req, res) => {
             COUNT(u.id) AS user_count
      FROM companies c
      LEFT JOIN users u ON u.company_id = c.id
+     WHERE c.parent_id IS NULL
      GROUP BY c.id
      ORDER BY c.created_at DESC`
   );
@@ -521,6 +527,12 @@ router.delete('/companies/:id', (req, res) => {
   if (!company) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Company not found.' });
   if (company.slug === PLATFORM_SLUG) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'The platform root company cannot be deleted.' });
+  }
+  // #540: a distributor's providers keep their own data; deleting the
+  // distributor would orphan them. Refused until provider deletion exists.
+  const providerCount = get('SELECT COUNT(*) AS n FROM companies WHERE parent_id = ?', [companyId]).n;
+  if (providerCount > 0) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: `Cannot delete a company that has ${providerCount} provider(s).` });
   }
   const userCount = get('SELECT COUNT(*) AS n FROM users WHERE company_id = ?', [companyId]).n;
   if (userCount > 0) {

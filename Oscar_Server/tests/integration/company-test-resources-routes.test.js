@@ -23,6 +23,7 @@
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-test-resources-routes';
 
+const { credentialsAsMigrated } = require('../helpers/credentials');
 const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
@@ -54,10 +55,12 @@ beforeAll(() => {
   run(`INSERT OR IGNORE INTO companies (id, name, slug, api_base) VALUES (?, 'TR Other', 'tr-other', 'https://other.example/osdm')`, [otherCompanyId]);
   // test_manager with BEARER creds → resolveAccessToken returns without network.
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc) VALUES (?, ?, 'test_manager@tr-routes-test.com', 'x', 'test_manager', 'bearer', ?)`, [tmId, companyId, encrypt('stub-bearer-token')]);
+  credentialsAsMigrated(tmId);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'company_user@tr-routes-test.com', 'x', 'company_user')`, [testerId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'certification_user@tr-routes-test.com', 'x', 'certification_user')`, [certId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'administrator@tr-routes-test.com', 'x', 'administrator')`, [adminId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc) VALUES (?, ?, 'tm2@tr-routes-test.com', 'x', 'test_manager', 'bearer', ?)`, [tmNoApiId, noApiCompanyId, encrypt('stub-bearer-token')]);
+  credentialsAsMigrated(tmNoApiId);
 });
 
 // ── Auth + role gating ────────────────────────────────────────────────────────
