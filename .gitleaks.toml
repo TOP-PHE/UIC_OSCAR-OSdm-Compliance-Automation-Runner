@@ -26,7 +26,11 @@ description = "OSCAR-specific known-safe strings"
 # and sonar.yml; gitleaks only scans the latest commit so this allowlist
 # entry covers any future reappearance too.
 regexes = [
-  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'''
+  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef''',
+  # Placeholder password in the Self-Hosted Quick Start doc — an example value
+  # the reader is told to replace, not a secret (S9: narrow replacement for the
+  # removed Documentation/.* path allowlist).
+  '''ChooseAStrongPasswordHere123!'''
 ]
 
 # Files that contain known-public values gitleaks flags as suspicious:
@@ -38,8 +42,9 @@ paths = [
   '''(.*?)(LICENSE)$''',
   '''(.*?)(package-lock\.json)$''',
   '''(.*?)(_test\.js|\.test\.js)$''',
-  '''Bruno_Collection/.*''',
-  '''Documentation/.*''',
+  # S9: the broad 'Bruno_Collection/.*' and 'Documentation/.*' path allowlists
+  # were removed — they masked whole trees from the secret scanner. The only
+  # known-safe value they covered is the example password allowlisted below.
   # Vendored third-party front-end bundles (e.g. vanilla-jsoneditor v3.12.0).
   # Minified ES bundles can contain base64-like substrings that match generic
   # secret heuristics. These files are vendored verbatim from upstream, are
