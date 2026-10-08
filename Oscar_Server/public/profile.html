@@ -96,7 +96,7 @@ input[type=password]::placeholder{letter-spacing:2px}
 
   <!-- Company-shared: visible to all testers in this company -->
   <div class="card">
-    <h3>Company — Shared API Endpoint</h3>
+    <h3><span id="scope-endpoint">Company</span> — Shared API Endpoint</h3>
     <p style="font-size:12px;color:#90a4ae;margin-bottom:14px">
       This URL is shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.
     </p>
@@ -138,7 +138,7 @@ input[type=password]::placeholder{letter-spacing:2px}
 
   <!-- Per-tester: only YOUR credentials. Each tester maintains their own. -->
   <div class="card">
-    <h3>Your Credentials</h3>
+    <h3>Your Credentials<span id="scope-creds"></span></h3>
     <p style="font-size:12px;color:#90a4ae;margin-bottom:14px">
       Visible to you only. Each tester maintains their own credentials — when they change, only your runs are affected.
     </p>
@@ -374,6 +374,11 @@ async function loadProfile() {
   const c = await companyRes.json();
   const m = await credsRes.json();
 
+  // #540: name the company or provider this page configures (the menu's
+  // "Working on" selector decides which one the requests act in).
+  document.getElementById('scope-endpoint').textContent = c.name || 'Company';
+  document.getElementById('scope-creds').textContent = c.parent_id ? ' for ' + c.name : '';
+
   // Company-shared
   document.getElementById('api_base').value          = c.api_base  || '';
   if (!CAN_EDIT_ENDPOINT) {
@@ -424,11 +429,21 @@ async function saveConfig() {
   // stored value). Test-Manager-only; the server rejects edits from other roles.
   if (CAN_EDIT_HEADERS) companyPayload.extra_headers = collectExtraHeaders();
   if (Object.keys(companyPayload).length > 0) {
-    const r = await fetch('/v1/company', {
+    const patchCompany = payload => fetch('/v1/company', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(companyPayload)
+      body: JSON.stringify(payload)
     });
+    let r = await patchCompany(companyPayload);
+    // #540: another company of the same distributor already uses this
+    // endpoint. Ask, then send again with the confirmation (it is audited).
+    if (r.status === 409) {
+      const d = await r.json().catch(() => ({}));
+      const detail = String(d.detail || '');
+      if (!detail.includes('allow_duplicate_endpoint')) { showMsg(detail || 'Saving company settings failed.', false); return; }
+      if (!confirm(detail.replace(/ Send allow_duplicate_endpoint: true to use it anyway\.$/, '') + '\n\nUse this endpoint anyway?')) return;
+      r = await patchCompany({ ...companyPayload, allow_duplicate_endpoint: true });
+    }
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       showMsg(d.detail || d.title || 'Saving company settings failed.', false); return;

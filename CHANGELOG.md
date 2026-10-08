@@ -14,6 +14,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.217] — 2026-10-08
+
+Issue #540, PR 2 of 3: the pages for a distributor that tests several OSDM
+providers. Pages only (`public/`); the API is the one from 1.11.216.
+Collection unchanged (OTST_V2.0.104).
+
+### Added
+
+- **"Working on" selector** in the menu bar, for members of a company that has
+  providers they may use: the company itself, or one of its providers. The
+  choice is kept per browser tab and sent with that tab's API calls as
+  `X-Provider-Id`; the server still decides on every request.
+- **Providers page** (Test Managers): add and rename providers, set a provider's
+  OSDM endpoint, grant and withdraw testers.
+- **API Config** names the company or provider it configures. Credentials saved
+  there are that provider's only.
+
+### Changed
+
+- An endpoint already used by another company or provider of the same
+  distributor asks for confirmation before it is saved (API Config and the
+  Providers page).
+- When access to the selected provider is withdrawn, the tab returns to the
+  own company with a message, instead of failing every request.
+
+### Tests
+
+- `tests/unit/nav-provider.test.js` runs `nav.js` in a `vm`: which calls carry
+  the header, a header the caller set, platform roles, and the reset on a
+  refused provider. Each guard was broken in turn; each break fails a test.
+- Checked in Chromium on a throwaway server: the Test Manager and tester flows,
+  credentials stored for the provider only, withdrawal mid-session, and every
+  member page on a provider without a page error.
+
+---
+
 ## [server-1.11.216] — 2026-10-08
 
 Issue #540, PR 1 of 3: server foundation for a distributor that tests several

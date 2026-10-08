@@ -12,6 +12,7 @@
 
 1. [Concepts & roles](#1-concepts--roles)
 2. [One‑time setup](#2-one-time-setup)
+   - 2.1 Several providers in one company (distributors)
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
 4. [Authoring a scenario](#4-authoring-a-scenario)
@@ -83,6 +84,29 @@ Do these once before your first run.
 > **Credentials never leave the server in the clear.** OSDM credentials and the
 > framework/data are encrypted at rest; auth request/response bodies are redacted
 > in every report.
+
+### 2.1 Several providers in one company (distributors)
+
+A distributor often tests more than one OSDM system: each carrier it sells is a
+**provider**. In OSCAR a provider has its own endpoint, data file, Test
+Framework, test resources, findings, runs and reports.
+
+- **Choosing what you work on.** When your company has providers you may use, the
+  menu bar shows a **Working on** selector instead of the company name. Pick your
+  own company or a provider: every page of that browser tab then works on it,
+  including API Config, Test Config, New Run, the Dashboard and the reports.
+  Another tab can work on another provider at the same time.
+- **Credentials per provider.** On API Config, the card reads *Your Credentials
+  for <provider>*. Enter the credentials that provider gave you; they are used
+  only for runs on that provider. Your own company's credentials are unchanged.
+- **Who sees which provider.** Test Managers see every provider of the company.
+  A tester sees the providers a Test Manager has granted. If access is withdrawn
+  while you work on a provider, OSCAR tells you and switches the tab back to
+  your own company.
+- **Test Managers: the Providers page** (menu **Providers**) adds and renames
+  providers, sets each provider's OSDM endpoint, and grants or withdraws testers.
+  An endpoint already used by another company or provider of yours asks for
+  confirmation before it is saved.
 
 ---
 

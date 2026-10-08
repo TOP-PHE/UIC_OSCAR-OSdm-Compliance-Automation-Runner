@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.241",
+  "current_release": "2026.242",
   "releases": [
+    {
+      "release": "2026.242",
+      "date": "2026-10-08",
+      "server": "1.11.217",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#540, PR 2 of 3): the pages for a distributor testing several OSDM providers. Pages under public/ only; the API is the one from 1.11.216; collection unchanged at OTST_V2.0.104.",
+        "A 'Working on' selector in the menu bar (members of a company that has providers they may use) picks the company or provider a browser tab works on. nav.js keeps the choice per tab (sessionStorage) and adds X-Provider-Id to the tab's same-origin /v1/ calls, except /v1/auth, /v1/admin, /v1/company/users and /v1/company/providers; platform roles never send it. A provider the server refuses (404 'Provider not found.') clears the choice and reloads on the own company.",
+        "New Providers page (Test Managers): add and rename providers, set a provider's endpoint (PATCH /v1/company naming it, so companyEndpointChange() applies), grant and withdraw testers. An endpoint already used within the distributor asks for confirmation (allow_duplicate_endpoint, audited). API Config names the company or provider it configures and asks the same confirmation.",
+        "How it was checked: a nav.js unit test (vm) of which calls carry the header, a header the caller set, platform roles and the reset on a refused provider; each guard broken in turn (5 mutations) and caught. A browser run on a throwaway server (Chromium): creating providers, the duplicate confirmation, granting a tester, the selector per role, API Config on a provider (credentials stored for the provider only), withdrawal mid-session, and every member page on a provider without a page error. Lint and the full suite green."
+      ]
+    },
     {
       "release": "2026.241",
       "date": "2026-10-08",

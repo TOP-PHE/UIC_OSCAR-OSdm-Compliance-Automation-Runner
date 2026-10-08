@@ -29,6 +29,47 @@
   //     for dev/HTTP environments where the Secure cookie attribute is blocked
   // This way scattered fetch(url, {}) calls in scenarios.js, dashboard.html,
   // etc. don't need to know about auth — they just work.
+  // ── Provider selection (#540) ────────────────────────────────────────────────
+  // A distributor's member may work in one of its providers. The choice is kept
+  // per browser tab (sessionStorage) and sent with each API request as the
+  // X-Provider-Id header; the server decides on every request whether it is
+  // allowed (404 otherwise) and keeps no "current provider" of its own.
+  var PROVIDER_KEY = 'oscar_provider';
+  var MEMBER_ROLES = { company_user: true, test_manager: true, tester: true };
+  // Routes that act on the user's own company whatever is selected.
+  var UNSCOPED_PREFIXES = ['/v1/auth/', '/v1/admin', '/v1/company/users', '/v1/company/providers'];
+
+  function selectedProvider() {
+    try {
+      var p = JSON.parse(sessionStorage.getItem(PROVIDER_KEY) || 'null');
+      return p && typeof p.id === 'string' && p.id ? p : null;
+    } catch (_e) { return null; }
+  }
+  function selectProvider(p) {
+    try {
+      if (p && p.id) sessionStorage.setItem(PROVIDER_KEY, JSON.stringify({ id: String(p.id), name: String(p.name || '') }));
+      else sessionStorage.removeItem(PROVIDER_KEY);
+    } catch (_e) { /* storage unavailable: the own company is used */ }
+  }
+  function isMember() {
+    try { return !!MEMBER_ROLES[(JSON.parse(localStorage.getItem('oscar_user') || '{}') || {}).role]; }
+    catch (_e) { return false; }
+  }
+  // Does this request act in the selected company? Same-origin /v1/ calls only.
+  function providerScoped(input) {
+    try {
+      var raw = (typeof input === 'string') ? input : (input && input.url) || '';
+      var u = new URL(raw, global.location.href);
+      if (u.origin !== global.location.origin || u.pathname.indexOf('/v1/') !== 0) return false;
+      for (var i = 0; i < UNSCOPED_PREFIXES.length; i++) {
+        if (u.pathname.indexOf(UNSCOPED_PREFIXES[i]) === 0) return false;
+      }
+      return true;
+    } catch (_e) { return false; }
+  }
+  global.oscarSelectedProvider = selectedProvider;
+  global.oscarSelectProvider = selectProvider;
+
   if (!global.__oscarFetchPatched) {
     var _origFetch = global.fetch.bind(global);
     global.fetch = function(input, init) {
@@ -43,7 +84,30 @@
         if (!hdrs.has('Authorization')) hdrs.set('Authorization', 'Bearer ' + bearer);
         init.headers = hdrs;
       }
+      // #540: the selected provider travels with the request, unless the
+      // caller named one itself.
+      var provider = selectedProvider();
+      var sentProvider = false;
+      if (provider && isMember() && providerScoped(input)) {
+        var ph = new Headers(init.headers || {});
+        if (!ph.has('X-Provider-Id')) { ph.set('X-Provider-Id', provider.id); sentProvider = true; }
+        init.headers = ph;
+      }
       return _origFetch(input, init).then(function(res) {
+        // #540: a provider that is no longer available (access withdrawn)
+        // answers 404 "Provider not found." Go back to the own company once,
+        // and say why, instead of failing every request.
+        if (sentProvider && res.status === 404) {
+          res.clone().json().then(function (b) {
+            if (b && b.detail === 'Provider not found.' && selectedProvider()) {
+              selectProvider(null);
+              if (typeof global.oscarToastAfterNav === 'function') {
+                global.oscarToastAfterNav('"' + provider.name + '" is no longer available to you. Back to your own company.', 'warning');
+              }
+              global.location.reload();
+            }
+          }).catch(function () { /* not JSON: an ordinary 404 */ });
+        }
         // ── Session-expiry handler (v1.9.0) ────────────────────────────────
         // 401 from any authenticated API call means the cookie expired or the
         // bearer token was rejected — clear stale localStorage, drop a friendly
@@ -239,6 +303,7 @@
       ];
       if (role === 'test_manager') {
         items.push({ href: '/admin.html?tab=users', label: 'Manage Users', page: 'admin-users' });
+        items.push({ href: '/providers.html', label: 'Providers', page: 'providers' });
       }
     }
 
@@ -254,6 +319,8 @@
     var companyLabel =
       '<span style="font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Company</span>'
       + '&nbsp;<strong style="color:#37474f;font-size:12px">' + esc(company.name || 'N/A') + '</strong>';
+    // #540: replaced by a selector once the company's providers are known.
+    var isMemberRole = !isAdmin && !isCertif;
 
     // Local timezone reference chip — every page renders timestamps in the
     // viewer's local time (parseServerTs + toLocaleString), so show the zone once
@@ -275,7 +342,7 @@
       + linkParts.join(sep)
       + '<span class="spacer"></span>'
       + tzChip
-      + '<span class="nav-user">' + companyLabel + '</span>'
+      + '<span class="nav-user" id="nav-company">' + companyLabel + '</span>'
       + sep
       + '<span class="nav-user">' + esc(user.email || '') + inlineBadge(meta) + '</span>'
       + sep
@@ -284,7 +351,52 @@
       var signout = document.getElementById('nav-signout');
       if (signout) signout.addEventListener('click', function(e) { e.preventDefault(); logout(); });
       hydrateVersionBadge();
+      if (isMemberRole) hydrateProviderSelector(company);
     }, 0);
+  }
+
+  // ── Provider selector (#540) ───────────────────────────────────────────────
+  // Shown only when the company has providers this user may use. Changing it
+  // reloads the page, so every section re-reads its data for the new company.
+  function providerOptions(company, providers, current) {
+    var opts = ['<option value="">' + esc(company.name || 'My company') + '</option>'];
+    providers.forEach(function (p) {
+      opts.push('<option value="' + esc(p.id) + '"' + (current && current.id === p.id ? ' selected' : '') + '>'
+        + esc(p.name) + '</option>');
+    });
+    return opts.join('');
+  }
+
+  function hydrateProviderSelector(company) {
+    fetch('/v1/company/providers', {})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data) return;   // could not read the list: leave the page on what it has
+        var providers = Array.isArray(data.providers) ? data.providers : [];
+        var current = selectedProvider();
+        // A selection this user can no longer use is dropped here as well.
+        if (current && !providers.some(function (p) { return p.id === current.id; })) {
+          selectProvider(null);
+          global.location.reload();
+          return;
+        }
+        if (!providers.length) return;
+        var slot = document.getElementById('nav-company');
+        if (!slot) return;
+        slot.innerHTML =
+          '<label for="nav-provider" style="font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Working on</label>'
+          + '&nbsp;<select id="nav-provider" title="The company or provider this tab works on"'
+          + ' style="font-size:12px;font-weight:700;color:#37474f;padding:2px 4px;border-radius:4px;'
+          + (current ? 'border:2px solid #0090D4;background:#e8f4fb' : 'border:1px solid #cfd8dc') + '">'
+          + providerOptions(company, providers, current) + '</select>';
+        document.getElementById('nav-provider').addEventListener('change', function (e) {
+          var id = e.target.value;
+          var chosen = providers.filter(function (p) { return p.id === id; })[0];
+          selectProvider(chosen || null);
+          global.location.reload();
+        });
+      })
+      .catch(function () { /* no selector: the page works on the own company */ });
   }
 
   global.renderOscarNav = renderOscarNav;
