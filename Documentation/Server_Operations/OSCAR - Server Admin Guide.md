@@ -1497,3 +1497,32 @@ Nothing to configure. Two operator-facing notes:
 - After deploying, a quick load of the dashboard confirms the shared escaper
   (`js/esc.js`) is served and the pages render normally; it loads before the
   nav bar script on every page.
+
+### 15.18 v1.11.216 — a distributor can test several providers (#540, server part)
+
+A company can now own **providers**: one per OSDM system it tests (for a
+distributor, each carrier it integrates). A provider has its own endpoint,
+dedicated headers, data file, Test Framework, test resources, findings, runs and
+reports. Users still belong to the company itself; nobody registers into a
+provider, and the registration list and the admin company list show top-level
+companies only.
+
+Who may use a provider:
+
+- every Test Manager of the owning company;
+- a tester, once a Test Manager has granted it to them;
+- nobody else. Any other request naming a provider answers "not found".
+
+Each tester keeps a separate set of OSDM credentials per provider. On upgrade,
+migrations 28–30 run automatically. Migration 29 copies every user's existing
+credentials into the set for their own company, so nothing has to be re-entered.
+
+This release has no screens for it yet. The API is ready
+(`/v1/company/providers`, and the `X-Provider-Id` header on the existing
+routes); the pages follow in the next release.
+
+Notes for operators:
+
+- A company that has providers cannot be deleted from the admin page.
+- Within one company and its providers, two of them pointing at the same
+  endpoint must be confirmed explicitly; the confirmation is in the audit log.

@@ -14,6 +14,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.216] — 2026-10-08
+
+Issue #540, PR 1 of 3: server foundation for a distributor that tests several
+OSDM providers. Server-only; collection unchanged (OTST_V2.0.104). No user
+interface yet (PR 2); copying scenarios between providers is PR 3.
+
+### Added
+
+- **Providers.** A provider is a company owned by a distributor
+  (`companies.parent_id`, migration 28). It keeps everything a company has: its
+  endpoint, dedicated headers, datafile, Test Framework, test resources,
+  findings, runs and reports. It has no users of its own.
+- **Choosing the provider.** A request names it with the `X-Provider-Id` header
+  or `?provider_id=`, never in the body. Without either, a request acts in the
+  user's own company, as before. Every existing company route then works on the
+  provider.
+- **One access rule** (`canUseCompany()`, `api/helpers/provider-access.js`):
+  the own company for every member; a provider of it for the distributor's Test
+  Managers, and for the testers a Test Manager granted it (`provider_access`,
+  migration 30). Anything else answers 404. `enforceTenant` and
+  `canUserSeeRun` both use it.
+- **Credentials per tester and per provider** (`tester_credentials`, migration
+  29). Migration 29 copies each user's credentials for their own company; the
+  credential columns on `users` are no longer read or written and will be
+  dropped in a later release. `/v1/me/credentials` reads and writes the set for
+  the company the request names.
+- **`/v1/company/providers`**: list (Test Manager: every provider; tester: the
+  ones granted), create and rename (Test Manager), grant and withdraw a tester.
+  A provider's endpoint is set with `PATCH /v1/company` naming it, under the
+  same rule as any company's (#544).
+
+### Changed
+
+- Within a distributor and its providers, an endpoint already used by another
+  of them answers 409 unless `allow_duplicate_endpoint: true` is sent; the
+  confirmation is written to the audit log.
+- The runner checks that a run's job, company, endpoint and credentials belong
+  to one company, and that its user may still use that company, before any
+  token is resolved. A tester whose access is withdrawn while a run is queued
+  gets a FAILED run with the reason.
+- Registration, the admin company list and admin user assignment only offer
+  top-level companies. A company that has providers cannot be deleted.
+
+### Tests
+
+- An isolation matrix (two distributors, two providers each, a Test Manager and
+  two testers each) through the real routes; unit tests of the rule and of the
+  provider header; runner refusal tests. A guard test lists every direct read
+  of the token's company in `src/` and fails on a new one. Each guard was
+  removed in turn (14 mutations); each removal fails a test.
+
+---
+
 ## [server-1.11.215] — 2026-10-07
 
 Audit tracker S11 / S11a / S11b (PR-08). Closes #567. Server-only; collection

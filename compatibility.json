@@ -1,8 +1,25 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.240",
+  "current_release": "2026.241",
   "releases": [
+    {
+      "release": "2026.241",
+      "date": "2026-10-08",
+      "server": "1.11.216",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#540, PR 1 of 3): server foundation for a distributor testing several OSDM providers. Server-only; collection unchanged at OTST_V2.0.104. No UI yet (PR 2).",
+        "Data model: a provider is a child company (companies.parent_id, migration 28). OSDM credentials and the token cache move from the users row to tester_credentials, one row per (user, company) (migration 29 copies each user's credentials for their own company; the users.* columns stay, unused, for one release). provider_access lists the testers granted each provider (migration 30).",
+        "One access rule, canUseCompany() in api/helpers/provider-access.js: own company for every member; a provider of it for the distributor's Test Managers, and for testers listed in provider_access. A request names the provider with X-Provider-Id or ?provider_id= (never the body); an unknown or refused provider answers 404. enforceTenant and canUserSeeRun both use the rule.",
+        "Credentials are read and written for the company the request or run acts in: /v1/me/credentials, POST /v1/runs, the runner, the token refresh route, places and timetable lookups, report redaction.",
+        "The runner refuses, before any token is resolved, a run whose company differs from its job or whose user may no longer use that company.",
+        "/v1/company/providers: list, create and rename providers (Test Manager), grant and withdraw testers. A provider's endpoint follows companyEndpointChange(); an endpoint already used by another company of the same distributor needs allow_duplicate_endpoint (audited). Registration and the admin company list show top-level companies only; deleting a company that has providers is refused.",
+        "How it was checked: an isolation matrix (2 distributors x 2 providers x 2 testers) through the real routes, unit tests of the rule, a guard test that fails on any new direct read of the token's company, runner refusal tests; each guard removed in turn (14 mutations) fails a test. Independent adversarial review before the PR. Lint and the full suite green."
+      ]
+    },
     {
       "release": "2026.240",
       "date": "2026-10-07",
