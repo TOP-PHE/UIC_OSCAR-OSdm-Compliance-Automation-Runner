@@ -44,21 +44,22 @@ function datafileVersion(plaintext, viewer) {
   try { df = JSON.parse(Buffer.isBuffer(plaintext) ? plaintext.toString('utf8') : String(plaintext)); } catch { /* bytes below */ }
   if (!isObj(df)) return sha256(plaintext);
   if (viewer?.role === 'company_user') df = viewForTester(df, viewer.email, viewer.selection ?? null);
-  const { knownDeviations: _ignored, ...rest } = df;
+  const rest = { ...df };
+  delete rest.knownDeviations;
   return sha256(JSON.stringify(rest));
 }
 
 const etag = version => `"${version}"`;
 
-// The entity tags of an If-Match / If-None-Match header: '*' or a list of
-// quoted tags, weak ones (W/"…") compared as strong (RFC 9110 §13.1.1 asks for
-// strong comparison; the server never sends weak tags, so a weak one is a
-// client's rewrite of ours).
+// The entity tags of an If-Match / If-None-Match header, as a list: [] when
+// there is none, ['*'] for '*', else the quoted tags unquoted. Weak ones
+// (W/"…") are compared as strong (RFC 9110 §13.1.1 asks for strong
+// comparison; the server never sends weak tags, so a weak one is a client's
+// rewrite of ours).
 function parseTags(header) {
-  if (typeof header !== 'string') return null;
+  if (typeof header !== 'string') return [];
   const value = header.trim();
-  if (value === '') return null;
-  if (value === '*') return '*';
+  if (value === '*') return ['*'];
   return value.split(',')
     .map(t => t.trim().replace(/^W\//, ''))
     .map(t => (t.length >= 2 && t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t))
@@ -76,14 +77,14 @@ function parseTags(header) {
 function staleSaveRefusal({ ifMatch, ifNoneMatch }, current) {
   const match = parseTags(ifMatch);
   const noneMatch = parseTags(ifNoneMatch);
-  if (noneMatch === '*' && current !== null) {
+  if (noneMatch.includes('*') && current !== null) {
     return 'A data file was saved since this page found none. Nothing was saved: reload the page to see it, then make your change again.';
   }
-  if (match === null) return null;
+  if (match.length === 0) return null;
   if (current === null) {
     return 'The data file this page loaded has been deleted since. Nothing was saved: reload the page, then make your change again.';
   }
-  if (match === '*' || match.includes(current)) return null;
+  if (match.includes('*') || match.includes(current)) return null;
   return 'The data file has changed since this page loaded it (another tab or another person saved). Nothing was saved: reload the page to see the current version, then make your change again.';
 }
 

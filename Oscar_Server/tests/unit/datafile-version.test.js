@@ -78,11 +78,12 @@ describe('datafileVersion', () => {
 
 describe('parseTags', () => {
   test('reads *, a list, weak tags, and nothing', () => {
-    expect(parseTags('*')).toBe('*');
+    expect(parseTags('*')).toEqual(['*']);
     expect(parseTags('"a", W/"b" ,"c"')).toEqual(['a', 'b', 'c']);
     expect(parseTags(etag('abc'))).toEqual(['abc']);
-    expect(parseTags('')).toBeNull();
-    expect(parseTags(undefined)).toBeNull();
+    expect(parseTags('')).toEqual([]);
+    expect(parseTags('  ')).toEqual([]);
+    expect(parseTags(undefined)).toEqual([]);
   });
 });
 
