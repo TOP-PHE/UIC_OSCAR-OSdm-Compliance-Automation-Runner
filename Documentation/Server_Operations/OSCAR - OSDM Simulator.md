@@ -1,0 +1,166 @@
+# OSCAR — OSDM provider simulator
+
+Issue #575. A stub OSDM provider that issues its own access tokens and answers
+a basic sale flow, so that a company in OSCAR can run scenarios without any
+operator's system. It exists to test OSCAR itself (a security test, a demo, a
+check after a deployment), not to test OSDM: it is not a conformance reference.
+
+The code and its reference are in [`OSDM_Simulator/`](../../OSDM_Simulator/README.md).
+This page is about installing it and pointing a company at it.
+
+## 1. What you get
+
+One server that plays three providers, told apart by the first part of the path:
+
+| Provider | Endpoint to give OSCAR | Currency | OSDM version | Token lifetime |
+|---|---|---|---|---|
+| `alpha` | `https://<simulator-host>/alpha` | EUR | 3.8.0 | 1 hour |
+| `beta` | `https://<simulator-host>/beta` | CHF | 3.8.0 | 2 minutes |
+| `gamma` | `https://<simulator-host>/gamma` | CZK | 3.7.0 | 15 minutes |
+
+Every identifier a provider returns starts with its name (`ALPHA-BKG-…`,
+`BETA-OFR-…`), and its carrier is named after it, so a report shows at a glance
+which provider answered. A token issued by one provider is refused by the
+others.
+
+## 2. Where to install it
+
+**On a host of its own, not on the OSCAR host.** OSCAR only accepts an OSDM
+endpoint that is `https` on a public address, so the simulator needs:
+
+- a public DNS name that resolves to the host;
+- ports 80 and 443 open (80 for the certificate, 443 for the traffic);
+- Docker with the compose plugin, nginx, certbot.
+
+It holds no data and no secret of OSCAR. Its only secrets are the client
+secrets of the simulated providers, which you generate below.
+
+## 3. Install
+
+As root on the simulator host. Do not run `umask 077` first: the container runs
+as an unprivileged user and has to read the checkout.
+
+```bash
+# Ubuntu 24.04; on another system install Docker with its compose plugin, nginx and certbot your usual way
+apt-get update && apt-get install -y docker.io docker-compose-v2 nginx certbot python3-certbot-nginx git
+git clone --depth 1 https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner.git /opt/osdm-simulator
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+```
+
+Generate the clients file: two clients per provider, with random secrets. It is
+written as `deploy/clients.json`, with access for its owner only, and an
+existing file is never replaced.
+
+```bash
+docker run --rm -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+  node scripts/make-clients.js deploy 2
+chown 1000:1000 clients.json
+```
+
+Start the simulator and check it from the host:
+
+```bash
+docker compose up -d
+docker compose ps                      # STATUS must reach "healthy"
+curl -s http://127.0.0.1:3002/healthz  # {"status":"ok"}
+```
+
+Put nginx in front and get the certificate (replace the host name twice):
+
+```bash
+sed 's/simulator.example.org/<simulator-host>/' nginx-osdm-simulator.conf.example > /etc/nginx/sites-available/osdm-simulator
+ln -s /etc/nginx/sites-available/osdm-simulator /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+certbot --nginx -d <simulator-host>
+```
+
+If the certificate is refused because the host name belongs to the hosting
+company's shared domain (too many certificates already issued for that domain),
+point a name of your own at the host (a `CNAME` or an `A` record) and use that
+name instead.
+
+## 4. Check it from outside
+
+The secrets are in `clients.json` on the host. Read the one you need there,
+without printing the whole file:
+
+```bash
+python3 -c "import json;print(json.load(open('clients.json'))['alpha'][0]['client_secret'])"
+```
+
+Then, from any other machine:
+
+```bash
+H=https://<simulator-host>
+ID=alpha-client-1
+read -rs SECRET     # paste the secret of that client; it is not shown
+curl -s $H/healthz
+# a token for alpha
+T=$(curl -s -d grant_type=client_credentials -d "client_id=$ID" --data-urlencode "client_secret=$SECRET" $H/alpha/oauth/token | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/alpha/versions   # 200
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/beta/versions    # 401: alpha's token on beta
+curl -s -o /dev/null -w '%{http_code}\n' $H/alpha/versions                                 # 401: no token
+```
+
+## 5. Point a company at it
+
+Use a company made for this. **Do not do it on a company that tests a real
+provider:** step 3 replaces the company's data file, and the upload also
+rebuilds its Test Framework from the file.
+
+1. **Endpoint** (Test Manager, API Config → *OSDM API Endpoint*):
+   `https://<simulator-host>/alpha`
+2. **Credentials** (each tester, API Config, OAuth2):
+   - Auth Profile: *Standard OAuth2 — credentials in Basic auth header*
+     (*credentials in body* works as well);
+   - Token URL: `https://<simulator-host>/alpha/oauth/token`
+   - Client ID and Client Secret: one entry of `alpha` in `clients.json`.
+     Scope is left empty.
+3. **Test data** (Test Manager, Test Config → *Upload datafile*): upload
+   [`OSDM_Simulator/oscar/datafile.json`](../../OSDM_Simulator/oscar/datafile.json).
+   It holds two sale scenarios, shared with the company's testers:
+   `SIM_SALE_SEARCH_1ADT` and `SIM_SALE_SEARCH_2ADT_SAVER`.
+4. **Run** one of them. Expected: the version check and the sale steps answer
+   200, the nine optional information requests answer 501 and are reported as
+   "not implemented by this provider", and no check fails.
+
+The data file works unchanged on the three providers. On `gamma` the run shows
+one warning, on purpose: the data file asks for OSDM 3.8.0 and `gamma` reports
+3.7.0.
+
+One client can be given to several testers, but they then share their
+bookings on the simulator. Give each tester a client of their own if their
+runs must not see each other's.
+
+## 6. Several providers for one distributor (#540)
+
+Each provider company gets the endpoint and the token URL of one simulated
+provider, and each tester the client of that provider. A tester who uses
+`alpha`'s credentials on the `beta` company gets no token, and a token of
+`alpha` sent to `beta` is refused with 401: a mix-up between providers shows as
+a failed run instead of a passing one.
+
+## 7. Day to day
+
+| To do | How |
+|---|---|
+| See what is being called | `docker compose logs -f` (one line per request: time, method, path, status, provider, client; no header, no body) |
+| Update the simulator | `git -C /opt/osdm-simulator pull && docker compose restart` |
+| Replace all secrets | delete `clients.json`, generate it again (section 3), `docker compose restart`, hand the new secrets out |
+| Add a client | add an entry to `clients.json` (a secret of 32 characters or more), `docker compose restart` |
+| Clear every booking and end every token | `docker compose restart` |
+| Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
+
+A restart clears everything: bookings are kept in memory only, and the key that
+signs the tokens is drawn at start-up.
+
+## 8. When something does not work
+
+| What you see | Why |
+|---|---|
+| OSCAR refuses the endpoint or the token URL: "must be an https address on a public host" | the address is `http`, or the name does not resolve to a public address. The simulator has to be reachable the way a real provider is. |
+| "Auth" fails at the start of a run, the simulator's log shows `POST /<provider>/oauth/token 401` | wrong secret, or the client belongs to another provider than the one in the token URL |
+| A request gets 401 in the middle of a run on `beta` | `beta`'s tokens last two minutes; OSCAR refreshes the token at the start of each scenario, so one scenario that lasts longer than that ends with an expired token |
+| 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`) |
+| The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing, or not readable by user 1000 (`chown 1000:1000 clients.json`) |
+| A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |

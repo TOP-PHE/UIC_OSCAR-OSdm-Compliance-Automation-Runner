@@ -24,6 +24,11 @@ deploy:
       - any-glob-to-any-file:
           - 'OSCAR_Deploy/**'
 
+simulator:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'OSDM_Simulator/**'
+
 ci:
   - changed-files:
       - any-glob-to-any-file:

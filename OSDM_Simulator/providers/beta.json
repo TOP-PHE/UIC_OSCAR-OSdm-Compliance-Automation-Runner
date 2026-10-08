@@ -1,0 +1,13 @@
+{
+  "name": "Beta Lines",
+  "carrier": {
+    "ref": "urn:x_osdm_simulator:carrier:beta",
+    "name": "Beta Lines (simulated)"
+  },
+  "currency": "CHF",
+  "priceFactor": 1.25,
+  "osdmVersion": "3.8.0",
+  "idPrefix": "BETA",
+  "utcOffset": "+01:00",
+  "tokenLifetimeSeconds": 120
+}

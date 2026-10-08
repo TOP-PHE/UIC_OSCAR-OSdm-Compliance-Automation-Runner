@@ -1,0 +1,58 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# OSDM provider simulator, on a host of its own.
+#
+#   docker compose up -d        # from this directory
+#   docker compose down         # when the test campaign is over
+#
+# The container shares nothing with OSCAR: no environment file, no secret, no
+# data volume. It runs the code of this checkout, mounted read-only, on the
+# stock Node image, so there is no image to build or publish. It listens on
+# the loopback address only; a reverse proxy in front terminates TLS (see
+# nginx-osdm-simulator.conf.example).
+#
+# Before the first start, create ./clients.json (see the operations page) and
+# make it readable by the container's user:  chown 1000:1000 clients.json
+
+services:
+  osdm-simulator:
+    image: node:22-slim
+    container_name: osdm-simulator
+    # The image's unprivileged "node" user.
+    user: "1000:1000"
+    working_dir: /simulator
+    command: ["node", "server.js"]
+    environment:
+      NODE_ENV: production
+      # Inside the container; the port is published on the host's loopback only.
+      SIM_HOST: 0.0.0.0
+      SIM_PORT: "3002"
+      # The only caller is the reverse proxy on this host, which appends the
+      # address it saw to X-Forwarded-For.
+      SIM_TRUST_PROXY: "1"
+      SIM_CLIENTS_FILE: /run/osdm-simulator/clients.json
+    ports:
+      - "127.0.0.1:3002:3002"
+    volumes:
+      - ..:/simulator:ro
+      - ./clients.json:/run/osdm-simulator/clients.json:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 64
+    restart: unless-stopped
+    healthcheck:
+      # Node's own fetch: the slim image has neither curl nor wget.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

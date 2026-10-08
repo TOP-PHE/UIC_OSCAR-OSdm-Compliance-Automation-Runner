@@ -714,6 +714,55 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   pre-booked parts). The other member is optional at every stage. At
   REFUNDED/EXCHANGED an `[INFO]` line shows confirmedPrice before/after —
   logged, not asserted (open OTST point, see §6).
+- **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
+  half of the product** (#575, 2026-10-08, written for the external security
+  test). It issues its own tokens and answers a basic sale; everything else is
+  501. No dependency, own `package.json`, not in `compatibility.json`, not
+  deployed with the server: it runs on a host of its own behind nginx, because
+  `urlPolicy.js` (S5) only lets a run go to https on a public address and that
+  rule must not be loosened for it. Three providers, `alpha` / `beta` /
+  `gamma`, named by the first path segment, so OSCAR needs no change (one
+  endpoint per company, one per provider under #540). What to keep in mind:
+  - **The provider check and the client check are two guards, and only a
+    client id that exists on two providers tells them apart.** The first tests
+    passed with `claims.provider === provider.key` removed, because no id was
+    shared. `tests/helpers.js` has `same-id` on alpha and beta for that.
+  - **The collection sends a search's `departureTime` without an offset**
+    (`2026-10-18T08:00:00`). It is read in the provider's `utcOffset`, and the
+    answer always carries an offset.
+  - **`04. GET Passenger` compares with the `update*` values even when the
+    scenario turned the PATCH step off**, so a scenario with
+    `patchPassengers: false` fails five checks on any provider. The ready-made
+    scenarios keep it on.
+  - **To run the real collection against it locally:** a throw-away OSCAR
+    server with `ALLOW_PRIVATE_TARGETS=1` and `BRU_CMD=bru.cmd` set before
+    `require('src/server.js')`. The local `Oscar_Server/.env` has
+    `BRU_CMD=echo`, and dotenv does not replace a variable already set: without
+    that line a run "completes" with no request made. Seed the company and a
+    Test Manager, then `PATCH /v1/company`, `PATCH /v1/me/credentials`,
+    `PUT /v1/company/datafile/json`, `POST /v1/runs`.
+  - **`node --test` takes a glob, not a directory**, on Node 22 and later
+    (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
+    destination directory. Sonar's coverage run starts from the repository root
+    so that the report's paths are `OSDM_Simulator/src/...`.
+  - **A body over the limit is read to its end before the 413**, without being
+    kept, up to a second limit. Answering while the caller is still sending
+    closes the connection under its feet and it never sees the status.
+  - It is linted and tested in the required `Lint, audit, test` job (a new
+    workflow would not be a required check), with the ESLint that
+    `Oscar_Server` installs.
+  - **Three scanners stopped its first push, each on something the tests could
+    not see.** Gitleaks (`curl-auth-user`) fires on a `curl` example that
+    passes a quoted name and secret with its user option, in a document and
+    even when the secret is a placeholder, and it scans every commit of the
+    PR, so a later commit does not clear it: write the example with the
+    credentials in the body and shell variables, and amend. CodeQL
+    (`js/user-controlled-bypass`) fires on `match && tokens.verify(match[1])`:
+    a call named *verify* that the caller's input can skip; call it always and
+    let it refuse what is not a token. Sonar (S8707) counts a command-line
+    argument that reaches a file path as a vulnerability, and one
+    vulnerability fails the gate like one bug does: `make-clients.js` now
+    writes to one of two fixed places.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image** — a `refresh-collection.yml`
   workflow `git pull`s the VPS on every push to `main`.
@@ -769,6 +818,12 @@ green. What works:
 is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
 `node_modules` too.
 
+From `OSDM_Simulator/` (no install step, it has no dependency):
+```bash
+npm test           # node --test "tests/*.test.js"
+node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
+```
+
 **Version bookkeeping — bump per functional PR:**
 - `Oscar_Server/package.json` (`version`) — server semver, bump on any
   `Oscar_Server/` change.
@@ -779,6 +834,8 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
   `current_release`.
 - Pure CI/workflow-only changes (`.github/workflows/*.yml`) do **not** bump
   any of the three (established precedent, e.g. `695117a`, `a96aeb8`).
+- `OSDM_Simulator/` has its own `package.json` version and bumps none of the
+  three either: it is not part of a server/collection release (#575).
 
 ## 5. Key files
 
@@ -815,6 +872,10 @@ is too long for git on Windows (`'$GIT_DIR' too big`), and too long for
 | `tests/unit/runner.test.js` | `worker/runner.js` coverage — `child_process.spawn` fully mocked via a `makeFakeProc()` EventEmitter + `waitForSpawnCalls()` polling helper (never a fixed sleep) |
 | `tests/unit/server.test.js` | `src/server.js` coverage — supertest against the real exported `app`; one isolated `NODE_ENV=production` re-require covers the HTTPS-redirect middleware; the `SPA fallback` block guards the Express 5 `/{*splat}` route pattern (#492) |
 | `tests/integration/company-places.test.js` | Places API: refresh pagination/dedupe (stubbed `fetch`), ranked `?q=` search, role gating |
+| `OSDM_Simulator/src/app.js` | the simulator's routing: provider from the path, token endpoint, Bearer check, per-client scope, 501 for what it does not provide (#575) |
+| `OSDM_Simulator/src/osdm/offers.js`, `bookings.js` | the simulated answers: a trip built from the request, three offers, PREBOOKED → FULFILLED |
+| `OSDM_Simulator/oscar/datafile.json` | ready-made data file, two sale scenarios; `tests/datafile.test.js` keeps it valid and answerable |
+| `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` | installing the simulator on its own host and pointing a company at it |
 
 ## 6. Next steps
 
