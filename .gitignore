@@ -66,3 +66,7 @@ Bruno_Collection/Dev working documents/
 
 # Claude Code — personal, per-machine project settings (e.g. autoMemoryDirectory). Never commit.
 .claude/settings.local.json
+
+# ── OSDM simulator ──────────────────────────────────────────────────────
+# The clients file holds the simulated providers' client secrets.
+OSDM_Simulator/**/clients.json

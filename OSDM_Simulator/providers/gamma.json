@@ -1,0 +1,13 @@
+{
+  "name": "Gamma Express",
+  "carrier": {
+    "ref": "urn:x_osdm_simulator:carrier:gamma",
+    "name": "Gamma Express (simulated)"
+  },
+  "currency": "CZK",
+  "priceFactor": 24,
+  "osdmVersion": "3.7.0",
+  "idPrefix": "GAMMA",
+  "utcOffset": "+02:00",
+  "tokenLifetimeSeconds": 900
+}

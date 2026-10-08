@@ -19,6 +19,7 @@ on:
     paths:
       - 'Oscar_Server/**'
       - 'OSCAR_Deploy/**'
+      - 'OSDM_Simulator/**'
       - 'compatibility.json'
       - '.github/workflows/ci-server.yml'
   pull_request:
@@ -66,6 +67,18 @@ jobs:
         env:
           NODE_ENV: test
           ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' }}
+
+      # The OSDM simulator has no dependency of its own (nothing to install,
+      # nothing to audit). It is linted with the ESLint installed above and
+      # tested with Node's own test runner. These steps are in this job, not
+      # in a workflow of their own, because this job is a required check.
+      - name: OSDM simulator — lint
+        working-directory: OSDM_Simulator
+        run: node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
+
+      - name: OSDM simulator — tests
+        working-directory: OSDM_Simulator
+        run: npm test
 
   docker-build:
     name: Docker image build

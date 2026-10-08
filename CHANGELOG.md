@@ -10,7 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (next cycle)
+
+- **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a
+  stub OSDM provider for testing OSCAR itself, written for the security test.
+  It is not part of the server or of the collection, changes neither, and is
+  not deployed with them: it runs on a host of its own.
+  - It issues its own access tokens (`client_credentials`, client id and
+    secret in a Basic header or in the body, so both standard OSCAR profiles
+    work) and answers a basic sale: version check, offers, booking, passenger
+    and purchaser, tickets. Every other OSDM resource answers 501, which the
+    collection reports as "not implemented by this provider".
+  - Three simulated providers, `alpha`, `beta`, `gamma`, named by the first
+    part of the path. Each has its own carrier, currency, prices, OSDM version,
+    token lifetime and id prefix. A token of one is refused by the others, and
+    a booking is visible only to the client that made it.
+  - No dependency, no data on disk, no outbound request. Client secrets are
+    read from a file that is not in the repository; without it the simulator
+    does not start.
+  - `OSDM_Simulator/oscar/datafile.json`: a ready-made data file with two sale
+    scenarios. Run through OSCAR against the three providers, with both OAuth
+    profiles, each scenario completes with no failed check (173 and 234
+    checks).
+  - Installation and use: `Documentation/Server_Operations/OSCAR - OSDM
+    Simulator.md`. Linted and tested in the required CI job, analysed by Sonar
+    with its own coverage report.
 
 ---
 

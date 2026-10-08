@@ -1,0 +1,16 @@
+{
+  "name": "osdm-simulator",
+  "version": "0.1.0",
+  "description": "A stub OSDM provider for testing OSCAR: it issues the access token and answers a basic sale flow, with content that varies per simulated provider.",
+  "private": true,
+  "license": "Apache-2.0",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "make-clients": "node scripts/make-clients.js",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

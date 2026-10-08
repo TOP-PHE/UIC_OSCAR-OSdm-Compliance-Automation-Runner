@@ -1,0 +1,13 @@
+{
+  "name": "Alpha Rail",
+  "carrier": {
+    "ref": "urn:x_osdm_simulator:carrier:alpha",
+    "name": "Alpha Rail (simulated)"
+  },
+  "currency": "EUR",
+  "priceFactor": 1,
+  "osdmVersion": "3.8.0",
+  "idPrefix": "ALPHA",
+  "utcOffset": "+01:00",
+  "tokenLifetimeSeconds": 3600
+}

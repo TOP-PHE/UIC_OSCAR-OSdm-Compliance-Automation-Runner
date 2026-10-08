@@ -1,0 +1,444 @@
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+'use strict';
+
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const { SECRETS, startSimulator, basic, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
+
+let sim;
+before(async () => { sim = await startSimulator(); });
+after(async () => { await sim.close(); });
+
+const [alphaOne, alphaTwo, alphaSame] = SECRETS.alpha;
+const [betaOne, betaSame] = SECRETS.beta;
+const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
+
+async function tokenRequest(provider, { headers = {}, body = 'grant_type=client_credentials', method = 'POST' } = {}) {
+  const res = await fetch(`${sim.base}/${provider}/oauth/token`, { method, headers: { ...form, ...headers }, body: method === 'POST' ? body : undefined });
+  return { status: res.status, headers: res.headers, body: await res.json() };
+}
+
+// ── token endpoint ──────────────────────────────────────────────────────────
+
+test('token: client credentials in a Basic header (OSCAR profile oauth2_basic)', async () => {
+  const res = await tokenRequest('alpha', { headers: { Authorization: basic(alphaOne) } });
+  assert.equal(res.status, 200);
+  assert.deepEqual(Object.keys(res.body).sort(), ['access_token', 'expires_in', 'token_type']);
+  assert.equal(res.body.token_type, 'Bearer');
+  assert.equal(res.body.expires_in, 3600);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('pragma'), 'no-cache');
+});
+
+test('token: client credentials in the body (OSCAR profile oauth2_post), and as JSON', async () => {
+  const body = new URLSearchParams({ grant_type: 'client_credentials', ...alphaOne }).toString();
+  assert.equal((await tokenRequest('alpha', { body })).status, 200);
+  const json = await tokenRequest('alpha', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'client_credentials', ...alphaOne }),
+  });
+  assert.equal(json.status, 200);
+});
+
+test('token: the lifetime is the provider\'s own', async () => {
+  const res = await tokenRequest('beta', { headers: { Authorization: basic(betaOne) } });
+  assert.equal(res.body.expires_in, 120);
+});
+
+test('token: a wrong secret, an unknown client or another provider\'s client gets none', async () => {
+  const attempts = [
+    ['alpha', { headers: { Authorization: basic({ ...alphaOne, client_secret: 'wrong' }) } }],
+    ['alpha', { headers: { Authorization: basic({ client_id: 'nobody', client_secret: alphaOne.client_secret }) } }],
+    ['beta', { headers: { Authorization: basic(alphaOne) } }],
+    ['alpha', { headers: { Authorization: 'Basic !!!' } }],
+    ['alpha', { headers: { Authorization: 'Basic ' + Buffer.from('no-colon').toString('base64') } }],
+    ['alpha', {}],
+    ['alpha', { body: new URLSearchParams({ grant_type: 'client_credentials', client_id: alphaOne.client_id, client_secret: 'wrong' }).toString() }],
+  ];
+  for (const [provider, options] of attempts) {
+    const res = await tokenRequest(provider, options);
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'invalid_client');
+    assert.equal(res.body.access_token, undefined);
+  }
+  const withBasic = await tokenRequest('alpha', { headers: { Authorization: basic({ ...alphaOne, client_secret: 'wrong' }) } });
+  assert.match(withBasic.headers.get('www-authenticate'), /^Basic /);
+});
+
+test('token: a Basic header wins over credentials in the body', async () => {
+  const body = new URLSearchParams({ grant_type: 'client_credentials', ...alphaOne }).toString();
+  const res = await tokenRequest('alpha', { headers: { Authorization: basic({ ...alphaOne, client_secret: 'wrong' }) }, body });
+  assert.equal(res.status, 401);
+});
+
+test('token: only the client_credentials grant, and only for an authenticated client', async () => {
+  const res = await tokenRequest('alpha', { headers: { Authorization: basic(alphaOne) }, body: 'grant_type=password' });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error, 'unsupported_grant_type');
+  const anonymous = await tokenRequest('alpha', { body: 'grant_type=password' });
+  assert.equal(anonymous.status, 401);
+});
+
+test('token: GET is not allowed', async () => {
+  const res = await tokenRequest('alpha', { method: 'GET' });
+  assert.equal(res.status, 405);
+  assert.equal(res.headers.get('allow'), 'POST');
+});
+
+// ── who may call what ───────────────────────────────────────────────────────
+
+test('a token issued for one provider is refused on another', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  assert.equal((await call(sim.base, token, 'GET', '/alpha/versions')).status, 200);
+  const res = await call(sim.base, token, 'GET', '/beta/versions');
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get('www-authenticate'), 'Bearer');
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/versions')).status, 401);
+});
+
+test('the same client id on two providers: each token works on its own provider only', async () => {
+  assert.equal(alphaSame.client_id, betaSame.client_id);
+  const alpha = await tokenFor(sim.base, 'alpha', alphaSame);
+  const beta = await tokenFor(sim.base, 'beta', betaSame);
+  assert.equal((await call(sim.base, alpha, 'GET', '/alpha/versions')).status, 200);
+  assert.equal((await call(sim.base, beta, 'GET', '/beta/versions')).status, 200);
+  assert.equal((await call(sim.base, alpha, 'GET', '/beta/versions')).status, 401);
+  assert.equal((await call(sim.base, beta, 'GET', '/alpha/versions')).status, 401);
+  // And each secret opens its own provider only.
+  assert.equal((await tokenRequest('beta', { headers: { Authorization: basic(alphaSame) } })).status, 401);
+});
+
+test('no token, a made-up token or a token past its lifetime is refused', async (t) => {
+  assert.equal((await call(sim.base, null, 'GET', '/alpha/versions')).status, 401);
+  assert.equal((await call(sim.base, 'made.up', 'GET', '/alpha/versions')).status, 401);
+  const res = await fetch(`${sim.base}/alpha/versions`, { headers: { Authorization: basic(alphaOne) } });
+  assert.equal(res.status, 401);
+  const token = await tokenFor(sim.base, 'beta', betaOne);
+  const started = sim.clock.ms;
+  t.after(() => { sim.clock.ms = started; });
+  sim.clock.ms += 119000;
+  assert.equal((await call(sim.base, token, 'GET', '/beta/versions')).status, 200);
+  sim.clock.ms += 1000;
+  assert.equal((await call(sim.base, token, 'GET', '/beta/versions')).status, 401);
+});
+
+test('an unknown provider is a 404, with or without a token', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  for (const url of ['/delta/versions', '/delta/oauth/token', '/', '/alpha-/versions']) {
+    assert.equal((await call(sim.base, token, 'GET', url)).status, 404, url);
+  }
+});
+
+test('the health check answers without a token and says nothing else', async () => {
+  const res = await call(sim.base, null, 'GET', '/healthz');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { status: 'ok' });
+  assert.equal((await call(sim.base, null, 'POST', '/healthz', {})).status, 405);
+});
+
+// ── what the simulator provides, and what it does not ───────────────────────
+
+test('the version check reports the provider\'s OSDM version', async () => {
+  const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'GET', '/alpha/versions');
+  assert.deepEqual(alpha.body, [{ version: '3.8.0' }]);
+  assert.equal(alpha.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(alpha.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('OSDM resources the simulator does not provide answer 501 with a Problem', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  for (const url of ['/alpha/places', '/alpha/products', '/alpha/products/abc', '/alpha/coach-deck-layouts', '/alpha/trips-collection',
+    '/alpha/bookings/any/refund-offers', '/alpha/bookings/any/exchange-operations/x', '/alpha/bookings/any/booked-offers/x/reservations']) {
+    const res = await call(sim.base, token, 'GET', url);
+    assert.equal(res.status, 501, url);
+    assert.equal(res.body.code, 'NOT_IMPLEMENTED');
+    assert.equal(res.body.status, 501);
+    assert.equal(res.headers.get('content-type'), 'application/problem+json; charset=utf-8');
+  }
+});
+
+test('a path that is no OSDM resource is a 404, a wrong method a 405', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  for (const url of ['/alpha', '/alpha/nothing', '/alpha/versions/extra', '/alpha/offers/extra', '/alpha/oauth', '/alpha/bookings/x/y/z/w',
+    '/alpha/bookings/x/passengers', '/alpha/bookings/x/unknown']) {
+    assert.equal((await call(sim.base, token, 'GET', url)).status, 404, url);
+  }
+  const wrong = [['POST', '/alpha/versions', ['GET']], ['GET', '/alpha/offers', ['POST']], ['GET', '/alpha/bookings', ['POST']],
+    ['DELETE', '/alpha/bookings/x', ['GET']], ['GET', '/alpha/bookings/x/fulfillments', ['POST']]];
+  for (const [method, url, allowed] of wrong) {
+    const res = await call(sim.base, token, method, url, method === 'POST' ? {} : undefined);
+    assert.equal(res.status, 405, `${method} ${url}`);
+    assert.equal(res.headers.get('allow'), allowed.join(', '));
+  }
+});
+
+test('a path that cannot be decoded, or is too long, is a 400', async () => {
+  assert.equal((await call(sim.base, null, 'GET', '/alpha/%E0%A4%A')).status, 400);
+  assert.equal((await call(sim.base, null, 'GET', '/alpha/' + 'a'.repeat(600))).status, 400);
+});
+
+// ── the sale flow ───────────────────────────────────────────────────────────
+
+async function sale(provider, client, request = offerRequest()) {
+  const token = await tokenFor(sim.base, provider, client);
+  const offers = await call(sim.base, token, 'POST', `/${provider}/offers`, request);
+  assert.equal(offers.status, 200);
+  const offer = offers.body.offers[0];
+  const created = await call(sim.base, token, 'POST', `/${provider}/bookings`, bookingRequest(offer));
+  assert.equal(created.status, 200);
+  return { token, offers: offers.body, offer, booking: created.body.booking };
+}
+
+test('offer, booking, tickets: the booking goes from PREBOOKED to FULFILLED', async () => {
+  const { token, offer, booking } = await sale('alpha', alphaOne);
+  assert.equal(booking.bookedOffers[0].offerId, offer.offerId);
+  assert.deepEqual(booking.bookedOffers[0].admissions.map((a) => a.status), ['PREBOOKED']);
+  assert.deepEqual(booking.provisionalPrice, offer.offerSummary.minimalPrice);
+  assert.equal(booking.confirmedPrice, undefined);
+  assert.deepEqual(booking.fulfillments, []);
+  assert.equal(booking.passengers[0].externalRef, '00001');
+  assert.equal(booking.passengers[0].detail.contact.email, 'alex.example@example.org');
+  assert.equal(booking.purchaser.detail.lastName, 'Purchaser');
+  assert.deepEqual(booking.bookedOffers[0].admissions[0].passengerIds, [booking.passengers[0].id]);
+
+  const read = await call(sim.base, token, 'GET', `/alpha/bookings/${booking.id}`);
+  assert.deepEqual(read.body.booking, booking);
+
+  const issued = await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/fulfillments`, {});
+  assert.equal(issued.status, 200);
+  const [fulfillment] = issued.body.fulfillments;
+  assert.equal(fulfillment.status, 'FULFILLED');
+  assert.equal(fulfillment.bookingRef, booking.id);
+  assert.match(fulfillment.controlNumber, /^\d{10}$/);
+  assert.deepEqual(fulfillment.bookingParts.map((p) => p.id), booking.bookedOffers[0].admissions.map((a) => a.id));
+
+  const after = (await call(sim.base, token, 'GET', `/alpha/bookings/${booking.id}`)).body.booking;
+  assert.deepEqual(after.bookedOffers[0].admissions.map((a) => a.status), ['FULFILLED']);
+  assert.deepEqual(after.confirmedPrice, offer.offerSummary.minimalPrice);
+  assert.equal(after.provisionalPrice.amount, 0);
+  assert.equal(after.fulfillments[0].id, fulfillment.id);
+
+  // Asked again, the same fulfilment: a booking is not confirmed twice.
+  const again = await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/fulfillments`);
+  assert.equal(again.body.fulfillments[0].id, fulfillment.id);
+});
+
+test('passenger and purchaser can be read and changed; id, reference and type cannot', async () => {
+  const { token, booking } = await sale('alpha', alphaOne);
+  const url = `/alpha/bookings/${booking.id}/passengers/${booking.passengers[0].id}`;
+  assert.deepEqual((await call(sim.base, token, 'GET', url)).body.passenger, booking.passengers[0]);
+  const patched = await call(sim.base, token, 'PATCH', url, {
+    id: 'forged', externalRef: 'forged', type: 'DOG', dateOfBirth: '1990-01-16', gender: 'X',
+    detail: { firstName: 'Alexis', lastName: 'Sample', contact: { email: 'alexis.sample@example.org', phoneNumber: '+33199000002' } },
+  });
+  assert.equal(patched.status, 200);
+  const passenger = patched.body.passenger;
+  assert.equal(passenger.id, booking.passengers[0].id);
+  assert.equal(passenger.externalRef, '00001');
+  assert.equal(passenger.type, 'PERSON');
+  assert.equal(passenger.dateOfBirth, '1990-01-16');
+  assert.equal(passenger.detail.firstName, 'Alexis');
+  assert.equal(passenger.detail.contact.phoneNumber, '+33199000002');
+  assert.deepEqual((await call(sim.base, token, 'GET', url)).body.passenger, passenger);
+  assert.equal((await call(sim.base, token, 'GET', `/alpha/bookings/${booking.id}/passengers/unknown`)).status, 404);
+  assert.equal((await call(sim.base, token, 'DELETE', url)).status, 405);
+
+  const purchaserUrl = `/alpha/bookings/${booking.id}/purchaser`;
+  assert.equal((await call(sim.base, token, 'GET', purchaserUrl)).body.purchaser.detail.firstName, 'Paula');
+  for (const [method, firstName] of [['PATCH', 'Pauline'], ['POST', 'Paulette']]) {
+    const res = await call(sim.base, token, method, purchaserUrl, { detail: { firstName } });
+    assert.equal(res.body.purchaser.detail.firstName, firstName);
+    assert.equal(res.body.purchaser.detail.lastName, 'Purchaser');
+  }
+  assert.equal((await call(sim.base, token, 'DELETE', purchaserUrl)).status, 405);
+});
+
+test('text from a request comes back as JSON text, and over-long text is left out', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const offer = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const request = bookingRequest(offer);
+  const markup = '<img src=x onerror=alert(1)>"{{access_token}}';
+  request.passengerSpecifications[0].detail = { firstName: markup, lastName: 'x'.repeat(201), unknownField: 'dropped' };
+  const res = await fetch(`${sim.base}/alpha/bookings`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(request),
+  });
+  assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+  const detail = (await res.json()).booking.passengers[0].detail;
+  assert.deepEqual(detail, { firstName: markup });
+});
+
+// ── isolation ───────────────────────────────────────────────────────────────
+
+test('a booking is visible only to the client that made it', async () => {
+  const { booking } = await sale('alpha', alphaOne);
+  const other = await tokenFor(sim.base, 'alpha', alphaTwo);
+  for (const [method, url, body] of [
+    ['GET', `/alpha/bookings/${booking.id}`],
+    ['POST', `/alpha/bookings/${booking.id}/fulfillments`, {}],
+    ['GET', `/alpha/bookings/${booking.id}/purchaser`],
+    ['PATCH', `/alpha/bookings/${booking.id}/purchaser`, { detail: { firstName: 'Intruder' } }],
+    ['GET', `/alpha/bookings/${booking.id}/passengers/${booking.passengers[0].id}`],
+    ['PATCH', `/alpha/bookings/${booking.id}/passengers/${booking.passengers[0].id}`, { detail: { firstName: 'Intruder' } }],
+  ]) {
+    const res = await call(sim.base, other, method, url, body);
+    assert.equal(res.status, 404, `${method} ${url}`);
+    assert.equal(res.body.code, 'BOOKING_NOT_FOUND');
+  }
+  // The same answer as for a booking that never existed.
+  const missing = await call(sim.base, other, 'GET', '/alpha/bookings/ALPHA-BKG-0000000000000000');
+  assert.deepEqual(missing.body, (await call(sim.base, other, 'GET', `/alpha/bookings/${booking.id}`)).body);
+});
+
+test('the same client id on two providers does not share offers or bookings', async () => {
+  const { offer, booking } = await sale('alpha', alphaSame);
+  const beta = await tokenFor(sim.base, 'beta', betaSame);
+  assert.equal((await call(sim.base, beta, 'GET', `/beta/bookings/${booking.id}`)).status, 404);
+  assert.equal((await call(sim.base, beta, 'POST', `/beta/bookings/${booking.id}/fulfillments`, {})).status, 404);
+  assert.equal((await call(sim.base, beta, 'POST', '/beta/bookings', bookingRequest(offer))).status, 404);
+  const alpha = await tokenFor(sim.base, 'alpha', alphaSame);
+  assert.equal((await call(sim.base, alpha, 'GET', `/alpha/bookings/${booking.id}`)).status, 200);
+});
+
+test('an offer can only be booked by the client it was made for', async () => {
+  const mine = await tokenFor(sim.base, 'alpha', alphaOne);
+  const offer = (await call(sim.base, mine, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const other = await tokenFor(sim.base, 'alpha', alphaTwo);
+  const stolen = await call(sim.base, other, 'POST', '/alpha/bookings', bookingRequest(offer));
+  assert.equal(stolen.status, 404);
+  assert.equal(stolen.body.code, 'OFFER_NOT_FOUND');
+  const beta = await tokenFor(sim.base, 'beta', betaOne);
+  assert.equal((await call(sim.base, beta, 'POST', '/beta/bookings', bookingRequest(offer))).status, 404);
+  assert.equal((await call(sim.base, mine, 'POST', '/alpha/bookings', bookingRequest(offer))).status, 200);
+});
+
+test('the same request gives another carrier, currency, price and ids on another provider', async () => {
+  const alpha = await sale('alpha', alphaOne);
+  const beta = await sale('beta', betaOne);
+  const carrier = (s) => s.offers.trips[0].legs[0].timedLeg.service.carriers[0];
+  assert.notEqual(carrier(alpha).ref, carrier(beta).ref);
+  assert.equal(alpha.offer.offerSummary.minimalPrice.currency, 'EUR');
+  assert.equal(beta.offer.offerSummary.minimalPrice.currency, 'CHF');
+  assert.notEqual(alpha.offer.offerSummary.minimalPrice.amount, beta.offer.offerSummary.minimalPrice.amount);
+  for (const [s, prefix] of [[alpha, 'ALPHA-'], [beta, 'BETA-']]) {
+    const ids = [s.offers.trips[0].id, s.offer.offerId, s.offer.admissionOfferParts[0].id, s.booking.id, s.booking.passengers[0].id];
+    for (const id of ids) assert.ok(id.startsWith(prefix), `${id} should start with ${prefix}`);
+    assert.ok(s.booking.bookingCode.startsWith(prefix.slice(0, -1)));
+  }
+});
+
+// ── refusals and limits ─────────────────────────────────────────────────────
+
+test('a booking request the simulator cannot serve is refused with a Problem', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const offer = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const cases = [
+    [{}, 400],
+    [{ offers: [] }, 400],
+    [{ offers: new Array(5).fill({ offerId: offer.offerId }) }, 400],
+    [{ offers: [{ offerId: offer.offerId }], passengerSpecifications: new Array(10).fill({ externalRef: 'x' }) }, 400],
+    [{ offers: [{ offerId: 'ALPHA-OFR-unknown' }] }, 404],
+    [{ offers: [{ offerId: 42 }] }, 404],
+    [{ offers: [null] }, 404],
+  ];
+  for (const [body, status] of cases) {
+    const res = await call(sim.base, token, 'POST', '/alpha/bookings', body);
+    assert.equal(res.status, status, JSON.stringify(body).slice(0, 60));
+    assert.equal(res.body.status, status);
+  }
+});
+
+test('an offer past its time, and a booking past its confirmation time, are refused', async (t) => {
+  const started = sim.clock.ms;
+  t.after(() => { sim.clock.ms = started; });
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const offer = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(offer))).body.booking;
+  sim.clock.ms += 30 * 60 * 1000;
+  const late = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'POST', '/alpha/bookings', bookingRequest(offer));
+  assert.equal(late.status, 409);
+  assert.equal(late.body.code, 'OFFER_EXPIRED');
+  const confirm = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'POST', `/alpha/bookings/${booking.id}/fulfillments`, {});
+  assert.equal(confirm.status, 409);
+  assert.equal(confirm.body.code, 'BOOKING_EXPIRED');
+});
+
+test('a body that is not a JSON object is a 400', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  for (const body of ['{ not json', '[]', 'null', '"text"']) {
+    const res = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body });
+    assert.equal(res.status, 400, body);
+  }
+});
+
+test('a body over the limit is refused, whether or not it declares its size', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const headers = { Authorization: `Bearer ${token}` };
+  const stream = (kilobytes) => (async function* () { for (let i = 0; i < kilobytes; i++) yield Buffer.alloc(1024, 120); })();
+  const request = JSON.stringify(offerRequest());
+  const atLimit = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers, body: request.padEnd(64 * 1024) });
+  assert.equal(atLimit.status, 200, 'a body of exactly the limit is read and served');
+  const oneOver = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers, body: request.padEnd(64 * 1024 + 1) });
+  assert.equal(oneOver.status, 413);
+  const declared = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers, body: JSON.stringify({ filler: 'x'.repeat(70 * 1024) }) });
+  assert.equal(declared.status, 413);
+  assert.equal((await declared.json()).code, 'PAYLOAD_TOO_LARGE');
+  const streamed = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers, body: stream(70), duplex: 'half' });
+  assert.equal(streamed.status, 413);
+  // Far over the limit the simulator stops reading: the caller gets a 413 or a
+  // closed connection long before it has sent everything.
+  const total = 2000;
+  let sent = 0;
+  const endless = (async function* () { for (; sent < total; sent++) yield Buffer.alloc(16 * 1024, 120); })();
+  const huge = await fetch(`${sim.base}/alpha/offers`, { method: 'POST', headers, body: endless, duplex: 'half' })
+    .then((res) => res.status, () => 'connection closed');
+  assert.ok(huge === 413 || huge === 'connection closed', String(huge));
+  assert.ok(sent < total, `the simulator read all ${total} chunks of a body far over its limit`);
+  assert.equal((await call(sim.base, token, 'GET', '/alpha/versions')).status, 200);
+});
+
+test('each client keeps a bounded number of bookings; the oldest goes first', async () => {
+  const token = await tokenFor(sim.base, 'beta', betaOne);
+  const ids = [];
+  for (let i = 0; i < 6; i++) {
+    const offer = (await call(sim.base, token, 'POST', '/beta/offers', offerRequest())).body.offers[0];
+    ids.push((await call(sim.base, token, 'POST', '/beta/bookings', bookingRequest(offer))).body.booking.id);
+  }
+  assert.equal((await call(sim.base, token, 'GET', `/beta/bookings/${ids[0]}`)).status, 404);
+  assert.equal((await call(sim.base, token, 'GET', `/beta/bookings/${ids[5]}`)).status, 200);
+});
+
+test('a booking is gone after the time to live', async (t) => {
+  const started = sim.clock.ms;
+  t.after(() => { sim.clock.ms = started; });
+  const { booking } = await sale('alpha', alphaTwo);
+  sim.clock.ms += 3600 * 1000 + 1;
+  const token = await tokenFor(sim.base, 'alpha', alphaTwo);
+  assert.equal((await call(sim.base, token, 'GET', `/alpha/bookings/${booking.id}`)).status, 404);
+});
+
+// ── the log ─────────────────────────────────────────────────────────────────
+
+test('the log names the provider and the client, also for a refusal, and never a header or a body', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  sim.logs.length = 0;
+  await call(sim.base, token, 'POST', '/alpha/offers?secret=in-the-query', offerRequest());
+  await call(sim.base, token, 'GET', '/alpha/places');
+  await call(sim.base, 'made.up', 'GET', '/alpha/versions');
+  await tokenRequest('alpha', { headers: { Authorization: basic({ ...alphaOne, client_secret: 'wrong' }) } });
+  assert.deepEqual(sim.logs.map((l) => [l.method, l.path, l.status, l.provider, l.client]), [
+    ['POST', '/alpha/offers', 200, 'alpha', 'alpha-one'],
+    ['GET', '/alpha/places', 501, 'alpha', 'alpha-one'],
+    ['GET', '/alpha/versions', 401, 'alpha', undefined],
+    ['POST', '/alpha/oauth/token', 401, 'alpha', undefined],
+  ]);
+  const written = JSON.stringify(sim.logs);
+  for (const secret of [token, alphaOne.client_secret, 'in-the-query', 'urn:uic:stn']) {
+    assert.equal(written.includes(secret), false, `the log must not contain ${secret.slice(0, 12)}`);
+  }
+});

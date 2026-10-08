@@ -1,0 +1,39 @@
+# OSDM provider simulator — nginx reverse proxy.
+#
+# Copy to /etc/nginx/sites-available/osdm-simulator, replace the host name,
+# enable with
+#   sudo ln -s /etc/nginx/sites-available/osdm-simulator /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+# then run certbot to add the TLS listener:
+#   sudo certbot --nginx -d simulator.example.org
+#
+# OSCAR only accepts an OSDM endpoint that is https on a public host, so the
+# certificate is not optional.
+
+# At most 50 requests a second per caller address, with room for a burst.
+# OSCAR's runs of one company come from one address: keep this well above what
+# a batch of parallel runs sends (about 3 requests a second per run).
+limit_req_zone $binary_remote_addr zone=osdm_simulator:10m rate=50r/s;
+
+server {
+    listen 80;
+    server_name simulator.example.org;          # <- the simulator's host name
+
+    # The simulator refuses a body over 256 kB itself; this stops it earlier.
+    client_max_body_size 512k;
+
+    location / {
+        limit_req zone=osdm_simulator burst=100 nodelay;
+        limit_req_status 429;
+
+        proxy_pass         http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        # Appends the caller's address; the simulator reads the last one.
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        # The simulator uses no cookie; none is passed on.
+        proxy_set_header   Cookie "";
+        proxy_read_timeout 30s;
+    }
+}

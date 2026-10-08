@@ -24,6 +24,7 @@ reports — without requiring testers to install a local toolchain.
 | [`Oscar_Server/`](Oscar_Server/) | Node.js + Express server, REST API, admin web UI, Bruno CLI integration |
 | [`Bruno_Collection/`](Bruno_Collection/) | OSDM conformance scenarios (`.bru` files) |
 | [`OSCAR_Deploy/`](OSCAR_Deploy/) | Docker Compose stack, nginx snippets, alerting + observability overlay |
+| [`OSDM_Simulator/`](OSDM_Simulator/) | A stub OSDM provider for testing OSCAR itself: issues the token, answers a basic sale flow, simulates several providers |
 | [`Documentation/`](Documentation/) | Architecture, specification, admin and operations guides |
 | [`compatibility.json`](compatibility.json) | Tested-together server ↔ collection version matrix |
 | [`CHANGELOG.md`](CHANGELOG.md) | Combined release history |
@@ -42,6 +43,7 @@ Loki + Alertmanager) for production-grade observability.
 - 🆕 **[Self-Hosted Quick Start](Documentation/Server_Operations/OSCAR%20-%20Self-Hosted%20Quick%20Start.md)** — recommended path, ~15 min, Docker-based
 - [Server Admin Guide](Documentation/Server_Operations/OSCAR%20-%20Server%20Admin%20Guide.md) — day-2 operations, Server Config UI, observability + alerting
 - [Metrics & Monitoring](Documentation/Server_Operations/metrics-and-monitoring.md) — Prometheus / Grafana / Loki stack
+- [OSDM Simulator](Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator.md) — a stub provider on a host of its own, and how to point a company at it
 - [Auto-Deploy Setup](Documentation/Server_Operations/auto-deploy-setup.md) — Watchtower + CI image promotion
 - [VPS Deployment Guide](Documentation/Server_Operations/OSCAR%20-%20VPS%20Deployment%20Guide.md) — legacy non-Docker manual install
 
