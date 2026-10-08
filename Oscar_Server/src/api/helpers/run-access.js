@@ -22,8 +22,9 @@
  *
  *   Role               | Can see runs in own company | Can see runs in other companies
  *   -------------------+-----------------------------+----------------------------------
- *   tester             | Yes                         | No
- *   test_manager       | Yes                         | No
+ *   tester             | Yes                         | Only providers of their company
+ *                      |                             | listed for them in provider_access
+ *   test_manager       | Yes                         | Every provider of their company
  *   certification_user | n/a (no own company)        | Only runs explicitly shared with
  *                      |                             | certifier (per-run flag set by
  *                      |                             | the company's test_manager)
@@ -37,6 +38,7 @@
  */
 
 const { get } = require('../../db/db');
+const { canUseCompany } = require('./provider-access');
 
 /**
  * Resolve a run for the given user. Returns the run row if the user is
@@ -56,9 +58,10 @@ function canUserSeeRun(runId, user) {
   // Administrator: locked out of test-data read. Operations role only.
   if (user.role === 'administrator') return null;
 
-  // Tester / test_manager: must own the run's company.
+  // Tester / test_manager: the run's company must be one they may act in,
+  // their own or a provider of it (#540) — the rule enforceTenant uses.
   if (user.role === 'tester' || user.role === 'company_user' || user.role === 'test_manager') {
-    return run.company_id === user.companyId ? run : null;
+    return canUseCompany(user, run.company_id) ? run : null;
   }
 
   // Certifier: only sees runs the test_manager has explicitly shared.

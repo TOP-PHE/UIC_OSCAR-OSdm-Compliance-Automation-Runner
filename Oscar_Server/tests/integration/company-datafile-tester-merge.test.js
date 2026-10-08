@@ -27,6 +27,7 @@ jest.mock('../../src/worker/queue', () => ({
   enqueue: jest.fn(), purge: jest.fn(), queueStatus: jest.fn(() => ({})),
 }));
 
+const { credentialsAsMigrated } = require('../helpers/credentials');
 const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
@@ -88,6 +89,7 @@ beforeAll(() => {
   for (const u of [ANA, BEN, TM]) {
     run(`INSERT INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc) VALUES (?, ?, ?, 'x', ?, 'bearer', ?)`,
       [u.id, companyId, u.email, u.role, colEncrypt('tok')]);
+    credentialsAsMigrated(u.id);
   }
 });
 

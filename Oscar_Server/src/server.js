@@ -228,7 +228,8 @@ const fileDownloadLimiter = require('express-rate-limit')({
 // served via express.static with no auth at all. Now requires EITHER:
 //   (a) the per-run secret the runner issued for a live run, bound to that
 //       run's company (the Bruno subprocess fetching this run's own file), OR
-//   (b) an authenticated Test Manager session whose company owns the slug.
+//   (b) an authenticated Test Manager session whose company owns the slug,
+//       or is the distributor of the provider that owns it (#540).
 // Until v1.11.210 (b)'s alternative was "any request from 127.0.0.1 with no
 // X-Forwarded-For", which trusted the source address; that is gone.
 const DATAFILES_DIR = path.resolve(__dirname, '../data/datafiles');
@@ -260,8 +261,10 @@ function datafileSessionDenial(req, company) {
     user = cookieAuth.userFromRequest(req);     // parsed JWT or null
   } catch { user = null; }                       // malformed token → treated as no session
   if (!user) return 401;
-  if (user.companyId !== company.id) return 403;
   if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile
+  // The owning company, or a provider of it (#540): the rule enforceTenant uses.
+  const { canUseCompany } = require('./api/helpers/provider-access');
+  if (!canUseCompany(user, company.id)) return 403;
   return null;
 }
 
@@ -390,7 +393,9 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   if (runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Run secret does not match the run.' });
   }
-  const userRow = dbGet('SELECT * FROM users WHERE id = ?', [runRow.user_id]);
+  // The credentials of the run's user for the run's company (#540).
+  const { credentialsFor } = require('./utils/testerCredentials');
+  const userRow = credentialsFor(runRow.user_id, runRow.company_id);
   if (!userRow) {
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User for this run not found.' });
   }

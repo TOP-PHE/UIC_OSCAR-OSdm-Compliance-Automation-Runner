@@ -17,6 +17,7 @@
  * beforeEach and afterAll.
  */
 
+const { credentialsAsMigrated } = require('./credentials');
 const fs      = require('node:fs');
 const path    = require('node:path');
 const crypto  = require('node:crypto');
@@ -108,6 +109,7 @@ function templatesCompany() {
     for (const u of [ANA, BEN, TM]) {
       run(`INSERT INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc) VALUES (?, ?, ?, 'x', ?, 'bearer', ?)`,
         [u.id, companyId, u.email, u.role, colEncrypt('tok')]);
+      credentialsAsMigrated(u.id);
     }
   });
 

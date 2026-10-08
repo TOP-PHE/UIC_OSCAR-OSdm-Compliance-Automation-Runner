@@ -178,14 +178,25 @@ describe('resolveCompanyScope', () => {
     expect(res.statusCode).toBe(0);  // no error response sent
   });
 
-  test('company_user gets req.user.companyId', () => {
+  // #540: enforceTenant decides the member's company (own, or a provider of
+  // it); resolveCompanyScope reads that decision and never re-derives it.
+  test('company_user gets the company enforceTenant chose', () => {
+    const { req, res } = mockReqRes({
+      user: { role: 'company_user', companyId: 'my-company-id' },
+      companyId: 'provider-id',
+    });
+    const result = resolveCompanyScope(req, res);
+    expect(result).toBe('provider-id');
+    expect(res.statusCode).toBe(0);
+  });
+
+  test('company_user with no scope (route without enforceTenant) is refused, not given the own company', () => {
     const { req, res } = mockReqRes({
       user: { role: 'company_user', companyId: 'my-company-id' },
       companyId: null,
     });
-    const result = resolveCompanyScope(req, res);
-    expect(result).toBe('my-company-id');
-    expect(res.statusCode).toBe(0);
+    expect(resolveCompanyScope(req, res)).toBeNull();
+    expect(res.statusCode).toBe(500);
   });
 
   test('administrator with null req.companyId returns null (no target specified)', () => {

@@ -19,14 +19,19 @@
  */
 
 const express = require('express');
-const { get, run, encrypt } = require('../../db/db');
+const { encrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
+const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
+const { credentialsFor, setCredentials } = require('../../utils/testerCredentials');
 const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
 const { auditLog } = require('../helpers/shared');
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
 
 const router = express.Router();
-router.use(requireAuth);
+// #540: credentials are per (user, company). The company is the one the
+// request acts in: the own company, or a provider named with X-Provider-Id /
+// ?provider_id= that enforceTenant admitted (404 otherwise).
+router.use(requireAuth, enforceTenant);
 
 // Sanitised projection — booleans for "is set?" instead of the encrypted
 // values themselves. Mirrors the pattern company.js used to use for company-
@@ -50,7 +55,7 @@ function safeUserCreds(u) {
 }
 
 router.get('/', (req, res) => {
-  const u = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  const u = credentialsFor(req.user.id, scopedCompanyId(req));
   if (!u) return res.status(404).json({ status: 404, title: 'Not Found' });
   return res.json(safeUserCreds(u));
 });
@@ -91,24 +96,14 @@ router.patch('/', (req, res) => {
     }
   }
 
-  const updates = [];
-  const values  = [];
+  const fields = {};
 
-  if (auth_mode)         { updates.push('auth_mode = ?');             values.push(auth_mode); }
-  if (token_url)         { updates.push('token_url = ?');             values.push(token_url.trim()); }
-  if (oauth_profile)     { updates.push('oauth_profile = ?');         values.push(oauth_profile); }
-  if (oauth_scope !== undefined) {
-    updates.push('oauth_scope = ?');
-    values.push(oauth_scope ? String(oauth_scope).trim() : null);
-  }
-  if (oauth_extra !== undefined) {
-    updates.push('oauth_extra_enc = ?');
-    values.push(oauth_extra ? encrypt(String(oauth_extra).trim()) : null);
-  }
-  if (oauth_custom_template !== undefined) {
-    updates.push('oauth_custom_template = ?');
-    values.push(oauth_custom_template || null);
-  }
+  if (auth_mode)         fields.auth_mode = auth_mode;
+  if (token_url)         fields.token_url = token_url.trim();
+  if (oauth_profile)     fields.oauth_profile = oauth_profile;
+  if (oauth_scope !== undefined) fields.oauth_scope = oauth_scope ? String(oauth_scope).trim() : null;
+  if (oauth_extra !== undefined) fields.oauth_extra_enc = oauth_extra ? encrypt(String(oauth_extra).trim()) : null;
+  if (oauth_custom_template !== undefined) fields.oauth_custom_template = oauth_custom_template || null;
   // For credentials we accept three intentions:
   //   key absent              → don't touch the field (keep existing)
   //   key present, truthy     → encrypt and store the new value
@@ -118,45 +113,37 @@ router.patch('/', (req, res) => {
   // already are): a trailing space or newline from a copy-paste would otherwise
   // be sent to the provider verbatim and rejected as a wrong secret — a 401 that
   // works fine in a client that trims its inputs. (#440)
-  if (access_token  !== undefined) { updates.push('access_token_enc = ?');  values.push(access_token  ? encrypt(String(access_token).trim())  : null); }
-  if (client_id     !== undefined) { updates.push('client_id_enc = ?');     values.push(client_id     ? encrypt(String(client_id).trim())     : null); }
-  if (client_secret !== undefined) { updates.push('client_secret_enc = ?'); values.push(client_secret ? encrypt(String(client_secret).trim()) : null); }
-  if (requestor !== undefined) {
-    updates.push('requestor_enc = ?');
-    values.push(requestor ? encrypt(String(requestor).trim()) : null);
-  }
-  if (subscription_key !== undefined) {
-    updates.push('subscription_key_enc = ?');
-    values.push(subscription_key ? encrypt(String(subscription_key).trim()) : null);
-  }
+  if (access_token  !== undefined) fields.access_token_enc  = access_token  ? encrypt(String(access_token).trim())  : null;
+  if (client_id     !== undefined) fields.client_id_enc     = client_id     ? encrypt(String(client_id).trim())     : null;
+  if (client_secret !== undefined) fields.client_secret_enc = client_secret ? encrypt(String(client_secret).trim()) : null;
+  if (requestor !== undefined) fields.requestor_enc = requestor ? encrypt(String(requestor).trim()) : null;
+  if (subscription_key !== undefined) fields.subscription_key_enc = subscription_key ? encrypt(String(subscription_key).trim()) : null;
 
-  if (updates.length === 0) {
+  const changedFields = Object.keys(fields);
+  if (changedFields.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No fields to update.' });
   }
 
   // Same cache-invalidation rule as the previous company-scoped version: any
   // change to a field fetchToken consumes wipes the cached token.
   const AUTH_FIELDS = new Set([
-    'auth_mode = ?', 'token_url = ?', 'access_token_enc = ?',
-    'client_id_enc = ?', 'client_secret_enc = ?',
-    'oauth_profile = ?', 'oauth_scope = ?', 'oauth_extra_enc = ?',
-    'oauth_custom_template = ?'
+    'auth_mode', 'token_url', 'access_token_enc',
+    'client_id_enc', 'client_secret_enc',
+    'oauth_profile', 'oauth_scope', 'oauth_extra_enc',
+    'oauth_custom_template'
   ]);
-  if (updates.some(u => AUTH_FIELDS.has(u))) {
-    updates.push('cached_token_enc = ?');         values.push(null);
-    updates.push('cached_token_expires_at = ?');  values.push(null);
+  if (changedFields.some(f => AUTH_FIELDS.has(f))) {
+    fields.cached_token_enc = null;
+    fields.cached_token_expires_at = null;
   }
 
-  values.push(req.user.id);
-  run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+  // Written for the company this request acts in (#540), never another's.
+  const companyId = scopedCompanyId(req);
+  setCredentials(req.user.id, companyId, fields);
 
-  const changedFields = updates
-    .filter(u => !u.startsWith('cached_'))
-    .map(u => u.split(' = ')[0]);
-  auditLog(req.user.id, req.user.companyId, req.user.email, `me_credential_update:${changedFields.join(',')}`);
+  auditLog(req.user.id, companyId, req.user.email, `me_credential_update:${changedFields.join(',')}`);
 
-  const updated = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
-  return res.json(safeUserCreds(updated));
+  return res.json(safeUserCreds(credentialsFor(req.user.id, companyId)));
 });
 
 module.exports = router;

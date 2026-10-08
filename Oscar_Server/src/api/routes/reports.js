@@ -28,7 +28,7 @@ const { requireAuth, isPlatformRole } = require('../middleware/auth');
 // administrator → null (operations role only), certifier → only runs the
 // test_manager explicitly shared, tester/test_manager → own company.
 const { canUserSeeRun } = require('../helpers/run-access');
-const { enforceTenant } = require('../middleware/tenant');
+const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { compareRuns } = require('../../reports/diff');
 
 const router = express.Router();
@@ -551,7 +551,7 @@ router.get('/requests/:id/messages', (req, res) => {
 
 // GET /v1/reports/templates — list saved templates
 router.get('/templates', (req, res) => {
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   const rows = all(
     `SELECT rt.id, rt.name, rt.config, rt.created_at, rt.updated_at, u.email AS created_by
      FROM report_templates rt
@@ -569,7 +569,7 @@ router.post('/templates', (req, res) => {
   if (!name) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'name is required.' });
 
   const id = uuidv4();
-  const companyId = req.companyId || req.user.companyId || null;
+  const companyId = scopedCompanyId(req);
   dbRun(
     `INSERT INTO report_templates (id, company_id, user_id, name, config) VALUES (?, ?, ?, ?, ?)`,
     [id, companyId, req.user.id, name, JSON.stringify(config || {})]
@@ -592,7 +592,7 @@ router.delete('/templates/:id', (req, res) => {
 // Returns top-20 most-failing assertions for the company (last 30 days).
 // Must be defined BEFORE /trends to avoid Express treating "summary" as a param.
 router.get('/trends/summary', (req, res) => {
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
   // S4: req.companyId is caller-supplied for platform roles (?company_id=),
   // so these aggregates were readable for any tenant. An administrator has no
@@ -634,7 +634,7 @@ router.get('/trends', (req, res) => {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'assertion_key query param is required.' });
   }
   const limit = Math.min(Number.parseInt(limitStr || '20', 10), 100);
-  const companyId = req.companyId || req.user.companyId;
+  const companyId = scopedCompanyId(req);
   if (!companyId) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Company scope required.' });
   // S4: same caller-supplied company scope as /trends/summary — apply the
   // same role rules. error_msg here is assertion text from another tenant's

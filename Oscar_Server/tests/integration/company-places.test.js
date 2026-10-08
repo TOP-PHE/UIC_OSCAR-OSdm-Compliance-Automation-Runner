@@ -23,6 +23,7 @@
 
 process.env.JWT_SECRET = 'test-jwt-secret-for-places-routes';
 
+const { credentialsAsMigrated } = require('../helpers/credentials');
 const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
@@ -60,6 +61,7 @@ beforeAll(() => {
   run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Places NoApi', 'places-noapi')`, [noApiCompanyId]);
   // Bearer creds so resolveAccessToken returns a token with no network call.
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role, auth_mode, access_token_enc) VALUES (?, ?, 'tm@places-test.com', 'x', 'test_manager', 'bearer', ?)`, [tmId, companyId, encrypt('stub-bearer-token')]);
+  credentialsAsMigrated(tmId);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'tester@places-test.com', 'x', 'company_user')`, [testerId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'cert@places-test.com', 'x', 'certification_user')`, [certId, companyId]);
   run(`INSERT OR IGNORE INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, 'admin@places-test.com', 'x', 'administrator')`, [adminId, companyId]);

@@ -29,6 +29,7 @@
  *    executed — only its existence matters to fsExists().
  */
 
+const { credentialsAsMigrated } = require('../helpers/credentials');
 const path = require('path');
 const fs   = require('fs');
 const { EventEmitter } = require('events');
@@ -124,6 +125,7 @@ function seedCompanyUser({ authMode = 'bearer', extraHeaders = null, role = 'tes
     `INSERT INTO users (id, company_id, email, password_hash, role, auth_mode) VALUES (?, ?, ?, 'x', ?, ?)`,
     [userId, companyId, `runner-${userId.slice(0, 8)}@runner-test.com`, role, authMode]
   );
+  credentialsAsMigrated(userId);
   return { companyId, userId };
 }
 
@@ -642,8 +644,8 @@ describe('executeRun — #306 credential transport', () => {
   test('the ephemeral env yml carries no credentials; the spawn env does', async () => {
     const { encrypt } = require('../../src/db/db');
     const { companyId, userId } = seedCompanyUser();
-    run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
-      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId]);
+    run(`UPDATE tester_credentials SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE user_id = ? AND company_id = ?`,
+      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId, companyId]);
     const runId = seedRun(companyId, userId);
     resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
 
@@ -787,8 +789,8 @@ describe('executeRun — PR-03: child processes and the environment file', () =>
     const { encrypt } = require('../../src/db/db');
     const { companyId, userId } = seedCompanyUser();
     if (scenarioOverride !== undefined) useDatafile(companyId, datafile || datafileFor(scenarioOverride));
-    run(`UPDATE users SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE id = ?`,
-      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId]);
+    run(`UPDATE tester_credentials SET subscription_key_enc = ?, oauth_extra_enc = ? WHERE user_id = ? AND company_id = ?`,
+      [encrypt('subkey-secret-456'), encrypt('basic-extra-789'), userId, companyId]);
     const runId = seedRun(companyId, userId);
     resolveAccessToken.mockResolvedValueOnce('tok-secret-123');
     fs.mkdirSync(path.dirname(MERGE_REPORT_JS), { recursive: true });

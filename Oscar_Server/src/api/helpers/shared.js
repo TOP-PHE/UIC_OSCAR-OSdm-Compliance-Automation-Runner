@@ -63,8 +63,8 @@ function auditLog(userId, companyId, email, eventType) {
 
 /**
  * Resolve the effective company scope for company-settings routes.
- * Returns a companyId string, or null (after sending 403) if the caller
- * is a certification_user who should not access company settings.
+ * Returns a companyId string, or null (after sending the answer) if the
+ * caller is a certification_user who should not access company settings.
  */
 function resolveCompanyScope(req, res) {
   const { isPlatformRole } = require('../middleware/auth');
@@ -74,11 +74,15 @@ function resolveCompanyScope(req, res) {
     return null;
   }
 
-  if (isPlatformRole(req.user.role)) {
-    return req.companyId;
+  // enforceTenant chose it: for a member, the own company or a provider of it
+  // (#540); for a platform user, the company it named, if any. A member route
+  // mounted without enforceTenant has no scope, and is refused rather than
+  // guessed.
+  if (!isPlatformRole(req.user.role) && !req.companyId) {
+    res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'No company scope.' });
+    return null;
   }
-
-  return req.user.companyId;
+  return req.companyId;
 }
 
 // v1.11.15: companyShareWithCertifier() removed — the company-wide

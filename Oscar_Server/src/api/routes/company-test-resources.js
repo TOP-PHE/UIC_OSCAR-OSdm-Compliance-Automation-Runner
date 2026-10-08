@@ -23,6 +23,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { resolveAccessToken } = require('../../worker/access-token');
+const { credentialsFor } = require('../../utils/testerCredentials');
 const { mergeDedicatedHeaders, stripTrailingSlashes } = require('../../utils/osdm-client');
 const { harvestTrips, harvestOfferCatalog, groupAndMerge, searchDates, classifyOfferProbe, summarizeOfferProbe } = require('../../services/timetable-discovery');
 const log = require('../../utils/logger').child({ module: 'timetable-discovery' });
@@ -243,7 +244,7 @@ router.post('/test-resources/discover-timetable', async (req, res) => {
   if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
-  const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  const userRow = credentialsFor(req.user.id, targetCompanyId);
   if (!userRow) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
   }
@@ -414,7 +415,7 @@ router.post('/test-resources/reprobe-offers', async (req, res) => {
   if (!company?.api_base) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No OSDM API base URL is configured for this company.' });
   }
-  const userRow = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  const userRow = credentialsFor(req.user.id, targetCompanyId);
   if (!userRow) return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'User credentials not found.' });
   let token;
   try {
