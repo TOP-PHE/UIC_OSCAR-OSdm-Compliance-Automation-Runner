@@ -136,9 +136,11 @@ function logAuthEvent({ userId = null, companyId = null, email = null, eventType
 
 // ── GET /v1/auth/register/companies ──────────────────────────────────────────
 // Public endpoint: returns list of company names for the registration dropdown.
-// Only returns name and slug — no secrets, no internal IDs.
+// Only returns name and slug — no secrets, no internal IDs. Top-level
+// companies only: a provider (#540) has no users of its own, so nobody
+// registers into one.
 router.get('/register/companies', (_req, res) => {
-  const rows = all('SELECT name, slug FROM companies ORDER BY name ASC');
+  const rows = all('SELECT name, slug FROM companies WHERE parent_id IS NULL ORDER BY name ASC');
   return res.json({ companies: rows.map(r => ({ name: r.name, slug: r.slug })) });
 });
 
@@ -163,7 +165,7 @@ router.post('/register/request',
   // match on the company's stable SLUG (sent verbatim from the dropdown), not
   // a slug re-derived from the display name — a company whose slug was frozen
   // before a rename (name 'Paxone', slug 'paxone-gmbh') would otherwise miss.
-  const targetCompany = get('SELECT id, name, slug FROM companies WHERE slug = ?', [companySlug.trim()]);
+  const targetCompany = get('SELECT id, name, slug FROM companies WHERE slug = ? AND parent_id IS NULL', [companySlug.trim()]);
   if (!targetCompany) {
     return res.status(400).json({
       status: 400, title: 'Bad Request',
@@ -262,7 +264,7 @@ router.post('/register/confirm',
   // auto-create: a stranger self-activating into a brand-new, unverified
   // company would bypass the Test-Manager-approval step entirely.
   const lookupSlug = pending.company_slug || makeSlug(pending.company_name);
-  const company = get('SELECT * FROM companies WHERE slug = ?', [lookupSlug]);
+  const company = get('SELECT * FROM companies WHERE slug = ? AND parent_id IS NULL', [lookupSlug]);
   if (!company) {
     run('DELETE FROM pending_registrations WHERE token = ?', [token]);
     return res.status(404).json({ status: 404, title: 'Not Found', detail: 'This company no longer exists. Please register again.' });

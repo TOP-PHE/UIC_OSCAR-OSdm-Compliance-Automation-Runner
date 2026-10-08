@@ -14,7 +14,7 @@
  */
 
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { get, run } = require('../../db/db');
+const { get, all, run } = require('../../db/db');
 const { normalizeRole } = require('../middleware/auth');
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -137,6 +137,24 @@ function companyEndpointChange(role, requested, stored) {
   return { status: 403, detail: 'Only Test Managers can change the OSDM API endpoint.' };
 }
 
+// ── One endpoint per provider within a distributor (#540) ────────────────────
+// Two companies of the same family (a distributor and its providers) pointing
+// at the same OSDM endpoint is almost always a mistake: runs meant for one
+// provider would go to another. Returns the name of the other company of the
+// family that already uses `endpoint`, or null. `companyId` is the company
+// being written (null for one being created under `parentId`). Comparison
+// ignores case and trailing slashes.
+function familyEndpointClash(companyId, parentId, endpoint) {
+  const norm = v => String(v || '').trim().replace(/\/+$/, '').toLowerCase();
+  const wanted = norm(endpoint);
+  if (!wanted) return null;
+  const root = parentId || get('SELECT parent_id FROM companies WHERE id = ?', [companyId])?.parent_id || companyId;
+  if (!root) return null;
+  const family = all('SELECT id, name, api_base FROM companies WHERE id = ? OR parent_id = ?', [root, root]);
+  const clash = family.find(c => c.id !== companyId && norm(c.api_base) === wanted);
+  return clash ? clash.name : null;
+}
+
 module.exports = {
   ALLOWED_ROLES,
   PLATFORM_SLUG,
@@ -147,4 +165,5 @@ module.exports = {
   denyAdminAndCertifier,
   requireTestManager,
   companyEndpointChange,
+  familyEndpointClash,
 };

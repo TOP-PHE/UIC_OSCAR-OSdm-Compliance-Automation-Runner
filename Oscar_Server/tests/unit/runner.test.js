@@ -171,6 +171,51 @@ afterEach(() => {
   }
 });
 
+// ── #540: run, endpoint and credentials of one company ────────────────────────
+describe('executeRun — provider scope (#540)', () => {
+  // A distributor (from seedCompanyUser, with a tester) and a provider of it.
+  function seedProviderRun({ granted }) {
+    const { companyId: distributorId, userId } = seedCompanyUser({ role: 'company_user' });
+    const providerId = uuidv4();
+    run(`INSERT INTO companies (id, name, slug, api_base, datafile_path, parent_id) VALUES (?, ?, ?, ?, ?, ?)`,
+      [providerId, 'Provider Co', `runner-prov-${providerId.slice(0, 8)}`, 'https://provider.example/osdm', SEED_DATAFILE, distributorId]);
+    if (granted) run('INSERT INTO provider_access (company_id, user_id) VALUES (?, ?)', [providerId, userId]);
+    return { distributorId, providerId, userId, runId: seedRun(providerId, userId) };
+  }
+
+  test('a job naming another company than the run\'s is refused before any token', async () => {
+    const { distributorId, userId, runId } = seedProviderRun({ granted: true });
+    const result = await executeRun({ runId, companyId: distributorId, userId });
+    expect(result.exitCode).toBe(1);
+    expect(result.error).toMatch(/does not belong to the company/);
+    expect(getRunRow(runId).status).toBe('FAILED');
+    expect(resolveAccessToken).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  test('a tester whose access was withdrawn while queued is refused before any token', async () => {
+    const { providerId, userId, runId } = seedProviderRun({ granted: false });
+    const result = await executeRun({ runId, companyId: providerId, userId });
+    expect(result.exitCode).toBe(1);
+    expect(result.error).toMatch(/may no longer use this company/);
+    expect(getRunRow(runId).status).toBe('FAILED');
+    expect(resolveAccessToken).not.toHaveBeenCalled();
+  });
+
+  test('a granted tester\'s run uses their credentials for the provider, not the distributor', async () => {
+    const { providerId, userId, runId } = seedProviderRun({ granted: true });
+    run(`INSERT INTO tester_credentials (user_id, company_id, auth_mode, access_token_enc) VALUES (?, ?, 'bearer', 'enc-provider')`,
+      [userId, providerId]);
+    resolveAccessToken.mockRejectedValueOnce(new Error('stop here'));
+    await executeRun({ runId, companyId: providerId, userId });
+    expect(resolveAccessToken).toHaveBeenCalledTimes(1);
+    const creds = resolveAccessToken.mock.calls[0][0];
+    expect(creds.company_id).toBe(providerId);
+    expect(creds.user_id).toBe(userId);
+    expect(creds.access_token_enc).toBe('enc-provider');
+  });
+});
+
 // ── Early-exit branches (no spawn reached) ────────────────────────────────────
 describe('executeRun — early-exit branches', () => {
   test('throws when the run or company row is missing', async () => {
