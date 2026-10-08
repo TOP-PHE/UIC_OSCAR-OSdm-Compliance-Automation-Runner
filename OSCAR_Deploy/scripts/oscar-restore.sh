@@ -29,6 +29,7 @@
 #   OSCAR_BACKUP_PASSPHRASE_FILE=~/.oscar-backup-pass \
 #     ./oscar-restore.sh oscar-backup-YYYYMMDD-HHMMSS.tar.gz.gpg [--hostname drill.example] [--force]
 set -euo pipefail
+umask 022   # anything this script writes must stay readable/traversable by the container user
 
 ARCHIVE="${1:-}"
 [ $# -gt 0 ] && shift || true
@@ -114,6 +115,21 @@ if [ -n "$HOSTNAME_OVERRIDE" ]; then
   log "drill hostname set: $HOSTNAME_OVERRIDE (ALLOWED_ORIGINS/ALLOWED_REDIRECT_HOSTS)"
 fi
 
+# --- 4b) ownership / permissions the container needs -------------------------
+# The container runs as a non-root user that owns the restored files (the backup
+# preserved its uid). A root-run restore, or a strict umask on the clone, would
+# otherwise leave the data DIR root-owned and the collection unreadable, so the
+# app cannot open the DB ("unable to open database file") or read the collection
+# (version chip "unknown", runs fail). Realign the data dir to the restored DB's
+# owner, and make the bind-mounted collection + matrix world-readable (public
+# content). Idempotent; best-effort when not run as root.
+DB_OWNER="$(stat -c '%u:%g' "$COMPOSE_DIR/data/oscar.db" 2>/dev/null || echo '')"
+if [ -n "$DB_OWNER" ]; then
+  chown -R "$DB_OWNER" "$COMPOSE_DIR/data" 2>/dev/null || log "WARN: could not chown $COMPOSE_DIR/data to $DB_OWNER (run restore as root)"
+fi
+chmod 755 "$COMPOSE_DIR/data" 2>/dev/null || true
+chmod -R a+rX "$REPO/Bruno_Collection" "$REPO/compatibility.json" 2>/dev/null || true
+
 # --- 5) bring up -------------------------------------------------------------
 log "starting OSCAR ..."
 ( cd "$COMPOSE_DIR" && docker compose pull --quiet 2>/dev/null; docker compose up -d )
@@ -122,12 +138,12 @@ log "starting OSCAR ..."
 PORT="$(grep -E '^PORT=' "$COMPOSE_DIR/.env" | head -1 | cut -d= -f2 | tr -d ' ')"; PORT="${PORT:-3001}"
 log "waiting for /health on 127.0.0.1:$PORT ..."
 H=""
-for _ in $(seq 1 30); do
+for _ in $(seq 1 90); do
   H="$(curl -fsS "http://127.0.0.1:$PORT/health" 2>/dev/null || true)"
   [ -n "$H" ] && break
   sleep 2
 done
-[ -n "$H" ] || die "no /health response after ~60s - check: (cd $COMPOSE_DIR && docker compose logs --tail=50)"
+[ -n "$H" ] || die "no /health response after ~180s - check: (cd $COMPOSE_DIR && docker compose logs --tail=50)"
 echo "$H" | grep -q '"status":"ok"' || die "health not ok: $H"
 log "HEALTH OK: $H"
 log "RESTORE COMPLETE. Expected users=$EXP_USERS companies=$EXP_COMPANIES."
