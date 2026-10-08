@@ -40,6 +40,7 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { auditLog } = require('../helpers/shared');
+const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
 
 const router = express.Router();
@@ -247,7 +248,11 @@ router.patch('/:id',
     }
 
     values.push(userId);
-    run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+    // #540: a role change ends the user's provider grants.
+    transaction(() => {
+      run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+      membershipChanged(userId, target);
+    });
     auditLog(req.user.id, companyId, req.user.email, `company_user_updated:${userId}`);
 
     const updated = get(

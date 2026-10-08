@@ -28,7 +28,7 @@
  * tenant and are never admitted here; they keep their own paths.
  */
 
-const { get } = require('../../db/db');
+const { get, run } = require('../../db/db');
 
 const MEMBER_ROLES = new Set(['tester', 'company_user', 'test_manager']);
 
@@ -69,4 +69,29 @@ function requestedProviderId(req) {
   return fromHeader === undefined ? fromQuery : fromHeader;
 }
 
-module.exports = { canUseCompany, requestedProviderId, MEMBER_ROLES };
+/**
+ * Call after a user's company or role was changed (admin or Test Manager
+ * edit), with the users row as it was before, inside the same transaction.
+ *
+ *  - Provider grants were given for one company and one role: a change of
+ *    either ends them, so a user moved back, or demoted again, does not get
+ *    access back without a Test Manager granting it.
+ *  - Credentials follow the user, as they did before #540: the set kept for
+ *    the old own company becomes the set for the new one. Sets for the old
+ *    company's providers are removed: they cannot be reached any more.
+ */
+function membershipChanged(userId, before) {
+  const after = get('SELECT company_id, role FROM users WHERE id = ?', [userId]);
+  if (!after || !before) return;
+  const { normalizeRole } = require('../middleware/auth');
+  const moved = after.company_id !== before.company_id;
+  if (moved || normalizeRole(after.role) !== normalizeRole(before.role)) {
+    run('DELETE FROM provider_access WHERE user_id = ?', [userId]);
+  }
+  if (moved) {
+    run('DELETE FROM tester_credentials WHERE user_id = ? AND company_id != ?', [userId, before.company_id]);
+    run('UPDATE tester_credentials SET company_id = ? WHERE user_id = ? AND company_id = ?', [after.company_id, userId, before.company_id]);
+  }
+}
+
+module.exports = { canUseCompany, requestedProviderId, membershipChanged, MEMBER_ROLES };

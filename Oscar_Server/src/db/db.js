@@ -665,9 +665,15 @@ const MIGRATIONS = [
              u.cached_token_enc, u.cached_token_expires_at, u.cached_token_cred_fp,
              u.requestor_enc, u.subscription_key_enc
           FROM users u
-          WHERE NOT EXISTS (
+          WHERE EXISTS (SELECT 1 FROM companies c WHERE c.id = u.company_id)
+            AND NOT EXISTS (
             SELECT 1 FROM tester_credentials tc WHERE tc.user_id = u.id AND tc.company_id = u.company_id
           )`);
+        // A user whose company row is gone (possible only where foreign keys
+        // were once off) has nowhere to put credentials; skip it, say so.
+        const orphans = db.prepare(`SELECT COUNT(*) AS n FROM users u
+          WHERE NOT EXISTS (SELECT 1 FROM companies c WHERE c.id = u.company_id)`).get().n;
+        if (orphans) console.warn(`[db] migration v29: skipped ${orphans} user(s) whose company no longer exists`);
       } catch (e) {
         console.error('[db] migration v29 tester_credentials backfill FAILED:', e.message);
         throw e;

@@ -20,7 +20,7 @@
 
 const express = require('express');
 const { encrypt } = require('../../db/db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, isPlatformRole } = require('../middleware/auth');
 const { enforceTenant, scopedCompanyId } = require('../middleware/tenant');
 const { credentialsFor, setCredentials } = require('../../utils/testerCredentials');
 const { isValidProfile, PROFILES } = require('../../worker/auth-profiles');
@@ -31,7 +31,10 @@ const router = express.Router();
 // #540: credentials are per (user, company). The company is the one the
 // request acts in: the own company, or a provider named with X-Provider-Id /
 // ?provider_id= that enforceTenant admitted (404 otherwise).
-router.use(requireAuth, enforceTenant);
+// A platform user (administrator, certifier) is not a tenant member: it keeps
+// one set, for its own company, used for any company it names (as before
+// #540), so no company is resolved for it here.
+router.use(requireAuth, (req, res, next) => (isPlatformRole(req.user.role) ? next() : enforceTenant(req, res, next)));
 
 // Sanitised projection — booleans for "is set?" instead of the encrypted
 // values themselves. Mirrors the pattern company.js used to use for company-

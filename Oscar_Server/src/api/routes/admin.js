@@ -26,6 +26,7 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, all, run, transaction, getConfig } = require('../../db/db');
 const { requireAuth, requireRole, normalizeRole } = require('../middleware/auth');
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
+const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
 const { sendTestEmail, isSmtpConfigured } = require('../../utils/mailer');
 
@@ -252,7 +253,11 @@ router.patch('/users/:id',
   }
 
   values.push(userId);
-  run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+  // #540: grants and credentials follow a change of company or role.
+  transaction(() => {
+    run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
+    membershipChanged(userId, user);
+  });
   auditLog(req.user.id, null, req.user.email, `user_updated:${userId}`);
 
   const updated = get(

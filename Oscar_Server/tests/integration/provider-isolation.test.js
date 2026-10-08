@@ -297,4 +297,34 @@ describe('/v1/company/providers', () => {
     expect(slugs).toContain(`d1-${tag}`);
     expect(slugs).not.toContain(`p1a-${tag}`);
   });
+
+  test('names: one line of plain text, unique ignoring case beyond ASCII', async () => {
+    for (const name of ['x\ny', '<b>x</b>', 'tab\there']) {
+      expect((await request(app).post('/v1/company/providers').set(as('TM2')).send({ name })).status).toBe(400);
+    }
+    expect((await request(app).post('/v1/company/providers').set(as('TM2')).send({ name: 'Ärger' })).status).toBe(201);
+    expect((await request(app).post('/v1/company/providers').set(as('TM2')).send({ name: 'ärger' })).status).toBe(409);
+  });
+
+  test('a grant can be withdrawn whoever the user has become', async () => {
+    run('INSERT INTO provider_access (company_id, user_id) VALUES (?, ?)', [ids.P1b, ids.A2]);   // e.g. left after a data repair
+    expect((await request(app).delete(`/v1/company/providers/${ids.P1b}/access/${ids.A2}`).set(as('TM1'))).status).toBe(200);
+    expect((await request(app).delete(`/v1/company/providers/${ids.P1b}/access/${ids.A2}`).set(as('TM1'))).status).toBe(404);
+  });
+});
+
+describe('administrators keep one set of credentials', () => {
+  test('a company named by an administrator does not split the set', async () => {
+    const adm = uuidv4();
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', 'administrator')`,
+      [adm, ids.D1, `adm-${tag}@iso.example`]);
+    const tok = jwt.sign({ sub: adm, email: `adm-${tag}@iso.example`, companyId: ids.D1, role: 'administrator' },
+      process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+    const auth = { Authorization: `Bearer ${tok}` };
+    expect((await request(app).patch(`/v1/me/credentials?company_id=${ids.D2}`).set(auth).send({ access_token: 't' })).status).toBe(200);
+    const got = await request(app).get(`/v1/me/credentials?company_id=${uuidv4()}`).set(auth);
+    expect(got.status).toBe(200);
+    expect(got.body.has_token).toBe(true);
+    expect(get('SELECT COUNT(*) AS n FROM tester_credentials WHERE user_id = ?', [adm]).n).toBe(1);
+  });
 });

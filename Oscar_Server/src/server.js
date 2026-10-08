@@ -393,6 +393,13 @@ app.post('/v1/runs/:runId/refresh-access-token', fileDownloadLimiter, async (req
   if (runRow.company_id !== runCompanyId) {
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Run secret does not match the run.' });
   }
+  // #540: the user must still be allowed to use the run's company — access
+  // withdrawn mid-run stops new tokens here, as it refuses a queued run.
+  const runRowFull = dbGet('SELECT * FROM runs WHERE id = ?', [runId]);
+  const scopeRefusal = require('./worker/runner').refusedRunScope(runRowFull, runCompanyId, runRow.user_id);
+  if (scopeRefusal) {
+    return res.status(403).json({ status: 403, title: 'Forbidden', detail: scopeRefusal });
+  }
   // The credentials of the run's user for the run's company (#540).
   const { credentialsFor } = require('./utils/testerCredentials');
   const userRow = credentialsFor(runRow.user_id, runRow.company_id);

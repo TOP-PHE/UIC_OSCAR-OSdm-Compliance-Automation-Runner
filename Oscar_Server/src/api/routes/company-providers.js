@@ -90,7 +90,16 @@ function cleanName(raw) {
   if (typeof raw !== 'string') return null;
   const name = raw.trim();
   if (name === '' || name.length > NAME_MAX) return null;
+  if (/[\u0000-\u001f\u007f<>]/.test(name)) return null;   // one line of plain text
   return name;
+}
+
+// Is the name taken by another provider of the same distributor? Compared
+// case-insensitively in JavaScript: SQLite's lower() only folds ASCII.
+function nameTaken(parentId, name, exceptId) {
+  const wanted = name.toLocaleLowerCase();
+  return all('SELECT id, name FROM companies WHERE parent_id = ?', [parentId])
+    .some(c => c.id !== exceptId && String(c.name).toLocaleLowerCase() === wanted);
 }
 
 function slugPart(name) {
@@ -137,9 +146,9 @@ router.post('/', (req, res) => {
   }
   const name = cleanName(req.body?.name);
   if (!name) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `name is required (1-${NAME_MAX} characters).` });
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail: `name is required: one line of plain text, 1-${NAME_MAX} characters.` });
   }
-  if (get('SELECT 1 AS x FROM companies WHERE parent_id = ? AND lower(name) = lower(?)', [parent.id, name])) {
+  if (nameTaken(parent.id, name, null)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: 'A provider with this name already exists.' });
   }
 
@@ -178,7 +187,7 @@ router.patch('/:id', (req, res) => {
   if (!name) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: `name is required (1-${NAME_MAX} characters).` });
   }
-  if (get('SELECT 1 AS x FROM companies WHERE parent_id = ? AND lower(name) = lower(?) AND id != ?', [provider.parent_id, name, provider.id])) {
+  if (nameTaken(provider.parent_id, name, provider.id)) {
     return res.status(409).json({ status: 409, title: 'Conflict', detail: 'A provider with this name already exists.' });
   }
   run(`UPDATE companies SET name = ?, updated_at = datetime('now') WHERE id = ?`, [name, provider.id]);
@@ -197,8 +206,8 @@ router.get('/:id/access', (req, res) => {
   const rows = all(
     `SELECT u.id, u.email, pa.granted_at, pa.granted_by
        FROM provider_access pa JOIN users u ON u.id = pa.user_id
-      WHERE pa.company_id = ? AND u.company_id = ?
-      ORDER BY u.email ASC`, [provider.id, provider.parent_id]);
+      WHERE pa.company_id = ?
+      ORDER BY u.email ASC`, [provider.id]);
   return res.json({ provider_id: provider.id, testers: rows });
 });
 
@@ -224,11 +233,11 @@ router.delete('/:id/access/:userId', (req, res) => {
   if (!requireTestManager(req, res)) return;
   const provider = ownProvider(req);
   if (!provider) return res.status(404).json(NOT_FOUND);
-  const tester = distributorTester(req, provider);
-  if (!tester) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Tester not found.' });
-  run('DELETE FROM provider_access WHERE company_id = ? AND user_id = ?', [provider.id, tester.id]);
-  auditLog(req.user.id, provider.id, req.user.email, `provider_access_withdrawn:${tester.id}`);
-  return res.json({ provider_id: provider.id, user_id: tester.id, granted: false });
+  // By (provider, user), whoever the user now is: a grant is always removable.
+  const removed = run('DELETE FROM provider_access WHERE company_id = ? AND user_id = ?', [provider.id, req.params.userId]);
+  if (!removed?.changes) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'Tester not found.' });
+  auditLog(req.user.id, provider.id, req.user.email, `provider_access_withdrawn:${req.params.userId}`);
+  return res.json({ provider_id: provider.id, user_id: req.params.userId, granted: false });
 });
 
 module.exports = router;

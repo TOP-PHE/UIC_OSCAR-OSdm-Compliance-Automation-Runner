@@ -988,6 +988,12 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       // Disabled when set to 0 (operator opt-out).
       if (tickMs > 0) {
         tokenWatchdog = setInterval(async () => {
+          // #540: no new token once the user may no longer use this company.
+          const scopeRefusal = refusedRunScope(runRow, companyId, effectiveUserId);
+          if (scopeRefusal) {
+            logEvent(runId, 'warn', `[token-watchdog] refresh skipped — ${scopeRefusal}`);
+            return;
+          }
           try {
             await resolveAccessToken(
               userRow,
@@ -1249,4 +1255,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };
+module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };
