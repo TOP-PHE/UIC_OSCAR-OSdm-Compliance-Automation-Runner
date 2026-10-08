@@ -1,4 +1,4 @@
-/* global OscarScenarioAccess, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
+/* global OscarScenarioAccess, OscarTripApply, logout, oscarToast, parseServerTs */  // defined in other public/ files (S11b: public/ is now linted)
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -3941,29 +3941,8 @@ function renderWizardStep2() {
 // arrivalTime; normalizeTrainData() migrates those into services[0] on read so
 // the rest of the UI can assume the array. Idempotent.
 function normalizeTrainData(d) {
-  d = d || {};
-  if (!Array.isArray(d.services)) {
-    d.services = (d.vehicleNumber || d.departureTime || d.arrivalTime)
-      ? [{ vehicleNumber: d.vehicleNumber || '', departureTime: d.departureTime || '', arrivalTime: d.arrivalTime || '' }]
-      : [];
-  }
-  // Operating days live at the set level (#141) — all services share one
-  // calendar. Migrate from a per-service daysOfWeek (the Phase 2 shape).
-  if (!Array.isArray(d.daysOfWeek)) {
-    const fromSvc = d.services.find(s => s && Array.isArray(s.daysOfWeek) && s.daysOfWeek.length);
-    d.daysOfWeek = fromSvc ? fromSvc.daysOfWeek.slice() : [];
-  }
-  d.services = d.services.map(s => ({
-    vehicleNumber: s?.vehicleNumber || '',
-    departureTime: s?.departureTime || '',
-    arrivalTime:   s?.arrivalTime || ''
-  }));
-  // Product category as OSDM ref/name/shortName (#141). Migrate the earlier
-  // single `productCategory` text field into the ref so saved sets keep working.
-  if (d.productCategoryRef == null)       d.productCategoryRef = d.productCategory || '';
-  if (d.productCategoryName == null)      d.productCategoryName = '';
-  if (d.productCategoryShortName == null) d.productCategoryShortName = '';
-  return d;
+  // One implementation, shared with the scenario copy (#540): js/trip-apply.js.
+  return OscarTripApply.normalizeTrainData(d);
 }
 
 // Parse a vendor service token, e.g. the Sqills form
@@ -4844,22 +4823,8 @@ function journeySummary(j) {
 
 // Resolve a journey into scenario trip legs (origin/destination/times/vehicle).
 function journeyToTripLegs(j) {
-  return journeyData(j).legs.map(leg => {
-    const r = journeyResolveLeg(leg);
-    if (!r) return null;
-    const { d, svc } = r;
-    const out = {};
-    if (d.originURN)      out.origin        = d.originURN;
-    if (d.destinationURN) out.destination   = d.destinationURN;
-    if (svc.departureTime) out.startDatetime = '%TRIP_DATE%T' + svc.departureTime;
-    if (svc.arrivalTime)   out.endDatetime   = '%TRIP_DATE%T' + svc.arrivalTime;
-    if (svc.vehicleNumber) out.vehicleNumber = svc.vehicleNumber;
-    if (d.operatorCode)    out.operatorCode  = d.operatorCode;
-    if (d.productCategoryRef)       out.productCategoryRef       = d.productCategoryRef;
-    if (d.productCategoryName)      out.productCategoryName      = d.productCategoryName;
-    if (d.productCategoryShortName) out.productCategoryShortName = d.productCategoryShortName;
-    return out;
-  }).filter(Boolean);
+  // One implementation, shared with the scenario copy (#540): js/trip-apply.js.
+  return OscarTripApply.journeyToTripLegs(j, wizData.resources);
 }
 
 // Continuity check (#145): a journey's legs must chain — each leg should start
@@ -6970,11 +6935,8 @@ document.body.addEventListener('change', function(e) {
       if (!raw) break;
       const [trainId, svcIdxStr] = String(raw).split('::');
       const svcIdx = Number.parseInt(svcIdxStr, 10) || 0;
-      const train = (wizData.resources || []).find(r => String(r.id) === String(trainId));
-      if (!train) break;
-      const data = normalizeTrainData(typeof train.data === 'string'
-        ? JSON.parse(train.data) : (train.data || {}));
-      const svc = data.services[svcIdx] || data.services[0] || {};
+      const picked = OscarTripApply.trainService(wizData.resources, trainId, svcIdx);
+      if (!picked) break;
       const tripReq = state.tripRequirements[atTIdx];
       if (!tripReq) break;
       // Resolve the target sub-object (trip block or leg N) and populate its
@@ -6990,16 +6952,8 @@ document.body.addEventListener('change', function(e) {
         tripReq.legs[legIdx] = tripReq.legs[legIdx] || {};
         t = tripReq.legs[legIdx];
       }
-      if (data.originURN)      t.origin         = data.originURN;
-      if (data.destinationURN) t.destination    = data.destinationURN;
-      if (svc.departureTime)   t.startDatetime  = '%TRIP_DATE%T' + svc.departureTime;
-      if (svc.arrivalTime)     t.endDatetime    = '%TRIP_DATE%T' + svc.arrivalTime;
-      if (svc.vehicleNumber)   t.vehicleNumber  = svc.vehicleNumber;
-      if (data.operatorCode)   t.operatorCode   = data.operatorCode;
-      // Product category (#141) — carried into the request's service.productCategory.
-      if (data.productCategoryRef)       t.productCategoryRef       = data.productCategoryRef;
-      if (data.productCategoryName)      t.productCategoryName      = data.productCategoryName;
-      if (data.productCategoryShortName) t.productCategoryShortName = data.productCategoryShortName;
+      // Same filling as the scenario copy between providers (js/trip-apply.js).
+      OscarTripApply.applyTrainService(t, picked.d, picked.svc);
       markDirty();
       // Reset the dropdown to its placeholder so it reads as "apply again"
       // next time (avoids users wondering whether the select remembered

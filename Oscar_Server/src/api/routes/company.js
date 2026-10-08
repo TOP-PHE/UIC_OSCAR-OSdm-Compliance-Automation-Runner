@@ -64,18 +64,9 @@ const datafileReadLimiter = rateLimit({
 });
 
 // ── Datafile location ─────────────────────────────────────────────────────────
-// One live file per company, data/datafiles/{slug}-datafile.json, always the
-// OSCAR1 encrypted envelope. The slug comes from the companies row, never from
-// the request; the prefix check keeps that property local to this function.
-const DATAFILES_DIR = path.resolve(__dirname, '../../../data/datafiles');
-
-function liveDatafilePath(slug) {
-  const p = path.resolve(DATAFILES_DIR, `${slug}-datafile.json`);
-  if (!p.startsWith(DATAFILES_DIR + path.sep)) {
-    throw new Error('Datafile path escaped the datafiles directory.');
-  }
-  return p;
-}
+// One live file per company, data/datafiles/{slug}-datafile.json: see
+// utils/datafileWrite.js, which also stores the files the server builds.
+const { writeDatafile, liveDatafilePath, DATAFILES_DIR } = require('../../utils/datafileWrite');
 
 // ── Datafile write authorisation (S2 / S3, v1.11.195) ─────────────────────────
 // Who may write a company's datafile, mounted as middleware so it runs BEFORE
@@ -524,35 +515,17 @@ router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(sav
       return res.status(400).json({ status: 400, title: 'Bad Request', detail: templateRefusal });
     }
 
-    // Known-deviation projection (#398 / Test Findings register): knownDeviations[]
-    // is server-managed — derived from the findings the test team has baselined
-    // for runs — never hand-authored in the wizard. Overwrite whatever the client
-    // sent so a datafile save can't wipe or tamper with it. Soft: a failure here
-    // leaves the rest of the save intact.
+    // knownDeviations[] is server-managed (#398 / Test Findings register): the
+    // projection of the findings the test team baselined, never the client's.
+    // writeDatafile overwrites whatever was sent, then encrypts and writes
+    // atomically (a crash mid-write leaves the previous file for Bruno).
+    let hash;
     try {
-      const { buildProjection } = require('../../utils/knownDeviationProjection');
-      toStore.knownDeviations = buildProjection(targetCompanyId);
-    } catch (err) {
-      log.warn({ err: err.message, companyId: targetCompanyId }, 'datafile save: knownDeviations projection failed');
-    }
-
-    const content  = JSON.stringify(toStore, null, 4);
-    // Hash the plaintext (so the hash matches the user-visible file content),
-    // then encrypt at write — Phase 2 of issue #60. Atomic temp+rename in the
-    // helper guarantees that a crash mid-write leaves the previous datafile
-    // intact (matters because Bruno reads it during runs).
-    try {
-      await encryptToFileAsync(content, filePath);
+      ({ hash } = await writeDatafile({ id: targetCompanyId, slug }, toStore));
     } catch (err) {
       log.error({ err, companyId: targetCompanyId }, 'Failed to encrypt-write datafile');
       return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
     }
-
-    const hash = crypto.createHash('sha256').update(content).digest('hex');
-    run(
-      `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-      [filePath, hash, targetCompanyId]
-    );
     // The file is saved at this point. A failure storing the run list must not
     // be reported as a failed save; the tester sees their previous list instead.
     let runListSaved = true;

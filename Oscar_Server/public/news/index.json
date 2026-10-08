@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-08-copy-scenarios-between-providers",
+    "date": "October 8, 2026",
+    "tag": "New",
+    "title": "Copy scenarios from one provider to another",
+    "summary": "Scenarios written for one provider can now be copied to another, with their trips re-pointed to that provider's own trains and journeys. Open Test Config and use \"Copy scenarios from…\".",
+    "content": "When you test several providers, the same scenarios usually apply to each of them, on different trains. On Test Config, \"Copy scenarios from…\" copies scenarios from another company or provider of yours into the one you are working on.\n\nYou pick the scenarios, then, for each trip they use, a train or journey of this provider's Test Data. Before copying, OSCAR tells you what will change: features this provider's Test Framework does not declare, fulfillment options it does not offer, and the OSDM version.\n\nThe copies are yours, and nothing about the other provider's system comes with them: no endpoint, credentials, known deviations or findings."
+  },
+  {
     "id": "2026-10-08-providers-pages",
     "date": "October 8, 2026",
     "tag": "New",

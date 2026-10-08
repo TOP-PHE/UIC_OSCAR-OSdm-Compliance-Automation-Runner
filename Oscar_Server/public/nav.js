@@ -383,10 +383,11 @@
         if (!providers.length) return;
         var slot = document.getElementById('nav-company');
         if (!slot) return;
+        slot.style.whiteSpace = 'nowrap';
         slot.innerHTML =
-          '<label for="nav-provider" style="font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Working on</label>'
+          '<label for="nav-provider" style="display:inline;margin:0;font-size:10px;font-weight:700;color:#b0bec5;text-transform:uppercase;letter-spacing:.4px">Working on</label>'
           + '&nbsp;<select id="nav-provider" title="The company or provider this tab works on"'
-          + ' style="font-size:12px;font-weight:700;color:#37474f;padding:2px 4px;border-radius:4px;'
+          + ' style="display:inline-block;width:auto;font-size:12px;font-weight:700;color:#37474f;padding:2px 4px;border-radius:4px;'
           + (current ? 'border:2px solid #0090D4;background:#e8f4fb' : 'border:1px solid #cfd8dc') + '">'
           + providerOptions(company, providers, current) + '</select>';
         document.getElementById('nav-provider').addEventListener('change', function (e) {

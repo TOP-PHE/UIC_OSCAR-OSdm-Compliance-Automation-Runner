@@ -37,6 +37,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.218] — 2026-10-08
+
+Issue #540, PR 3 of 3: copy scenarios between the companies and providers of a
+distributor. Collection unchanged (OTST_V2.0.104).
+
+### Added
+
+- **Copy scenarios from another company or provider** (Test Config,
+  **📋 Copy scenarios from…**; `POST /v1/company/scenario-copy/preview` and
+  `POST /v1/company/scenario-copy`). Each trip used by the copied scenarios is
+  mapped once to a train or journey of the target's Test Data and rebuilt
+  with the trip editor's own code. Warnings come before the copy: undeclared
+  features, fulfillment reduced to what the target declares, the OSDM version.
+  Copies belong to whoever copies them and get a free code on a clash. The
+  endpoint, credentials, known deviations and findings are never copied.
+
+### Changed
+
+- The trip editor's "Apply test data" code moved to `public/js/trip-apply.js`,
+  shared with the server's copy. Shown identical to the previous code on
+  60,000 random cases.
+- The Test Config save and the copy store the file through one helper
+  (`utils/datafileWrite.js`).
+- The "Working on" label sits on the selector's line.
+
+### Tests
+
+- Unit tests of the copy rules and of `trip-apply.js`; route tests of who may
+  copy from where, a tester's view of the source, the target's preconditions
+  and what is written. Twelve guards broken in turn, each caught.
+- Checked in Chromium on a throwaway server.
+
+### Sonar findings left open on purpose
+
+- `trip-apply.js`, three "move function to the outer scope" (S7721): the file
+  is a browser global and a CommonJS module at once; its functions live in the
+  factory so the page gets one `OscarTripApply` name, not four globals.
+- `scenarioCopy.js`, `JSON.parse(JSON.stringify(…))` over `structuredClone`
+  (S7784): the copy is written as JSON, and the round trip keeps it JSON-shaped
+  (an `undefined` field is dropped, as the stored file would drop it).
+
+---
+
 ## [server-1.11.217] — 2026-10-08
 
 Issue #540, PR 2 of 3: the pages for a distributor that tests several OSDM

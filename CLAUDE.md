@@ -270,6 +270,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     download routes must stay company-agnostic (`canUserSeeRun`) or be fetched.
     Pinned by `tests/unit/nav-provider.test.js`. `providers.html` is the Test
     Manager's page; it names the provider explicitly on each call.
+  - **Scenario copy (PR 3, v1.11.218)**: `utils/scenarioCopy.js` (pure) +
+    `routes/company-scenario-copy.js`. The target is the request's company, the
+    source a body parameter checked with `canUseCompany()`. Trips are mapped
+    once per entry and rebuilt with **`public/js/trip-apply.js`, the one
+    implementation of "Apply test data"**: `scenarios.js` and the server both
+    use it, so change it there only. Copied entries always get fresh ids, never
+    an existing target entry (it may belong to others' hidden scenarios), and
+    from `idAllocator()` (`datafileOwnership.js`, rule J, shared with the
+    merge): not max+1 per list, which lands on a dangling reference. The
+    write goes through `utils/datafileWrite.js`, shared with the Test Config
+    save. Still open from #540: the server does not yet refuse a datafile save
+    made from a stale load (needs an `If-Match` on every Test Config writer).
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
@@ -856,6 +868,8 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Oscar_Server/src/api/helpers/provider-access.js` | `canUseCompany()`, the one rule for which company (own or provider) a member may act in, #540 |
 | `Oscar_Server/src/api/routes/company-providers.js` | provider list/create/rename and tester access list, #540 |
 | `Oscar_Server/public/providers.html` | Providers page (Test Managers): add/rename, endpoint, tester access, #540 |
+| `Oscar_Server/src/utils/scenarioCopy.js` | rules of copying scenarios between providers, #540 |
+| `Oscar_Server/public/js/trip-apply.js` | the one "Apply test data" implementation (browser + server), #540 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |

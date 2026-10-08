@@ -1538,3 +1538,15 @@ Nothing to configure, and no change for companies without providers. A request
 made on a provider carries the `X-Provider-Id` header; the audit log records
 provider creation, grants, withdrawals and confirmed duplicate endpoints.
 
+### 15.20 v1.11.218 — copying scenarios between providers (#540)
+
+On Test Config, a member who may work on more than one company or provider can
+copy scenarios from one of them into the one their browser tab works on. Each
+trip is re-pointed to a train or journey of the target's Test Data; fulfillment
+options and the OSDM version follow the target's Test Framework. The copies
+belong to the person who copied them. The endpoint, credentials, known
+deviations and findings are never copied.
+
+Nothing to configure. Each copy is written to the audit log as
+`scenarios_copied:<source company id>:<count>` against the target company.
+

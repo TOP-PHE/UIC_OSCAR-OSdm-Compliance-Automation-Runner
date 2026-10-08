@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.242",
+  "current_release": "2026.243",
   "releases": [
+    {
+      "release": "2026.243",
+      "date": "2026-10-08",
+      "server": "1.11.218",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#540, PR 3 of 3): copy scenarios from another company or provider of the same distributor, with the trips re-pointed to the target's Test Data. Server and pages; collection unchanged at OTST_V2.0.104.",
+        "POST /v1/company/scenario-copy/preview and POST /v1/company/scenario-copy. The target is the request's company (X-Provider-Id); the source is checked with canUseCompany() (404 otherwise); a tester sees and copies what viewForTester shows them. The target needs a Test Framework and Test Data.",
+        "Rules (utils/scenarioCopy.js, pure): each source trip entry is mapped once, to a train (and service) or a journey of the target's Test Data, and rebuilt with the trip editor's own code, now shared as public/js/trip-apply.js (scenarios.js delegates to it; checked identical to the previous inline code on 60,000 random cases, 5 mutations caught). Passengers, purchaser, offer criteria and fulfillment entries go to fresh ids, never reusing a target entry. Fulfillment options keep what the target framework declares; osdmVersion becomes the framework's. Undeclared features are reported before the copy. Copies belong to the copier, are not shared, and get the next free code on a clash. Endpoint, credentials, known deviations, findings, systemInfoParameters and run lists are never copied. One error stops the whole copy.",
+        "The write goes through utils/datafileWrite.js, now shared with the Test Config save: under the datafile lock, after the template rule, with the known-deviation projection, encrypted, hash updated.",
+        "Test Config: a 'Copy scenarios from…' panel (js/scenario-copy.js); it refuses while the page has unsaved edits and reloads after the copy. The 'Working on' label now sits on the selector's line.",
+        "How it was checked: unit tests of the copy rules and of trip-apply, route tests (sources of another distributor or not granted, a tester's view, preconditions, write, rename, template refusal, nothing written on error), 12 mutations each caught; a browser run on a throwaway server (copy from the distributor into a provider, the trip re-pointed, the source unchanged, unsaved edits blocking the copy). Lint and the full suite green."
+      ]
+    },
     {
       "release": "2026.242",
       "date": "2026-10-08",
