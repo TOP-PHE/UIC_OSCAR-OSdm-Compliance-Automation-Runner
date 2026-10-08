@@ -48,11 +48,10 @@ logs/
 # ── Test outputs ────────────────────────────────────────────────────────
 Oscar_Server/tests/tmp/
 Bruno_Collection/results/
-# Bruno run reports. The existing committed reports are kept as reference
-# samples (they're already tracked — .gitignore does NOT untrack them). This
-# only stops NEW locally-generated reports + the .report_tmp.json accumulator
-# from being committed and cluttering the repo. To add a new reference report
-# deliberately, use `git add -f <file>`.
+# Bruno run reports — per-run output artifacts (HTML reports, .bru_results.json,
+# the .report_tmp.json accumulator) generated during a run, never source. Kept
+# out of git entirely; the previously-committed reports have been removed from
+# the repository. Do not re-add reports with `git add -f`.
 Bruno_Collection/Validation_Reports/
 
 # ── Bruno: local scratch ────────────────────────────────────────────────
