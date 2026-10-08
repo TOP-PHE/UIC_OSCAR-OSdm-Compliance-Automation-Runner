@@ -107,16 +107,18 @@ function nameTaken(parentId, name, exceptId) {
 }
 
 function slugPart(name) {
-  return name.toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  let part = name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-    .slice(0, 40) || 'provider';
+    .slice(0, 40);
+  while (part.endsWith('-')) part = part.slice(0, -1);   // the cut may end on one
+  return part || 'provider';
 }
 
 // {distributor slug}--{name}, made unique. The slug names the datafile on disk
 // and the Bruno environment, so it is chosen here, never taken from a request.
 function freeSlug(parentSlug, name) {
-  const base = `${parentSlug}--${slugPart(name)}`.replace(/-+$/, '');
+  const base = `${parentSlug}--${slugPart(name)}`;
   for (let n = 1; n < 1000; n++) {
     const slug = n === 1 ? base : `${base}-${n}`;
     if (!get('SELECT 1 AS x FROM companies WHERE slug = ?', [slug])) return slug;

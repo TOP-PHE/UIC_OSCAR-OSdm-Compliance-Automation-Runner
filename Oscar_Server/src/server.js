@@ -254,17 +254,21 @@ const runSecrets = require('./utils/runSecrets');
 // The authenticated fallback on GET /data: a signed-in Test Manager of the
 // company that owns the slug. Returns null when allowed, else the HTTP status
 // to answer with. Kept out of the handler so the handler stays simple.
+const DENIAL_TEXT = { 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not found' };
 function datafileSessionDenial(req, company) {
   let user;
   try {
     const cookieAuth = require('./api/middleware/auth');
     user = cookieAuth.userFromRequest(req);     // parsed JWT or null
   } catch { user = null; }                       // malformed token → treated as no session
-  if (!user) return 401;
-  if (user.role !== 'test_manager') return 403;  // testers read their filtered view from /v1/company/datafile
+  // #540: a provider's slug is not public; its file must not reveal that it
+  // exists, so every refusal on it reads as an unknown slug.
+  const refuse = status => (company.parent_id ? 404 : status);
+  if (!user) return refuse(401);
+  if (user.role !== 'test_manager') return refuse(403);  // testers read their filtered view from /v1/company/datafile
   // The owning company, or a provider of it (#540): the rule enforceTenant uses.
   const { canUseCompany } = require('./api/helpers/provider-access');
-  if (!canUseCompany(user, company.id)) return 403;
+  if (!canUseCompany(user, company.id)) return refuse(403);
   return null;
 }
 
@@ -327,10 +331,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
     //     reached directly, and no certifier / admin path exists — they consume
     //     reports through /v1/runs with the per-run share gate.
     const denied = datafileSessionDenial(req, company);
-    // #540: a provider's slug is not public; its file must not reveal that it
-    // exists, so every refusal on it reads as an unknown slug.
-    if (denied && company.parent_id) return res.status(404).send('Not found');
-    if (denied) return res.status(denied).send(denied === 401 ? 'Unauthorized' : 'Forbidden');
+    if (denied) return res.status(denied).send(DENIAL_TEXT[denied]);
   }
 
   // Resolve, traversal-guard, decrypt, send.

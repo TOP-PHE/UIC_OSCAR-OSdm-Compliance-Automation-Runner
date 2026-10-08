@@ -61,7 +61,7 @@ function credentialsFor(userId, companyId) {
   }
   return {
     ...EMPTY,
-    ...(row || {}),
+    ...row,
     id: user.id, email: user.email, role: user.role,
     user_id: user.id, company_id: row ? row.company_id : companyId,
   };
