@@ -614,6 +614,80 @@ const MIGRATIONS = [
       }
       console.log(`[db] migration v27 — companies.extra_headers: encrypted ${encrypted} rows (skipped ${skipped} already-encrypted)`);
   }},
+  { version: 28, name: 'companies-parent-id', up: () => {
+      // #540 - a Provider connection is a child company (parent_id set). NULL =
+      // top-level distributor / plain single-system company. The REFERENCES is
+      // declared in schema.sql for fresh DBs; ALTER adds a bare column here on
+      // existing ones (SQLite ALTER cannot add an inline FK, and the app
+      // enforces the parent/child rule anyway).
+      _safeAlter('ALTER TABLE companies ADD COLUMN parent_id TEXT');
+  }},
+  { version: 29, name: 'tester-credentials-per-provider', up: () => {
+      // #540 - per-tester, per-provider credentials. The credential fields and
+      // token cache used to live on the users row (one set per tester); with
+      // distributor/provider companies a tester has one set per company tested.
+      // Create the (user_id, company_id) table and copy each existing user's
+      // credentials into a row for their OWN company. Values are AES-GCM
+      // (enc:v1:) envelopes already, so they are copied verbatim - no
+      // re-encryption. The users.* credential columns are left dormant for one
+      // release as a rollback cushion and dropped in a later migration.
+      // Idempotent: only inserts a (user, own-company) row not already present.
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS tester_credentials (
+          user_id                 TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+          company_id              TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          auth_mode               TEXT NOT NULL DEFAULT 'bearer',
+          access_token_enc        TEXT,
+          client_id_enc           TEXT,
+          client_secret_enc       TEXT,
+          token_url               TEXT,
+          oauth_profile           TEXT NOT NULL DEFAULT 'oauth2_basic',
+          oauth_scope             TEXT,
+          oauth_extra_enc         TEXT,
+          oauth_custom_template   TEXT,
+          cached_token_enc        TEXT,
+          cached_token_expires_at TEXT,
+          cached_token_cred_fp    TEXT,
+          requestor_enc           TEXT,
+          subscription_key_enc    TEXT,
+          updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (user_id, company_id)
+        )`);
+      } catch (_e) { /* benign if already exists (schema.sql creates it on fresh DBs) */ }
+      try {
+        db.exec(`INSERT INTO tester_credentials
+            (user_id, company_id, auth_mode, access_token_enc, client_id_enc, client_secret_enc,
+             token_url, oauth_profile, oauth_scope, oauth_extra_enc, oauth_custom_template,
+             cached_token_enc, cached_token_expires_at, cached_token_cred_fp,
+             requestor_enc, subscription_key_enc)
+          SELECT u.id, u.company_id, u.auth_mode, u.access_token_enc, u.client_id_enc, u.client_secret_enc,
+             u.token_url, u.oauth_profile, u.oauth_scope, u.oauth_extra_enc, u.oauth_custom_template,
+             u.cached_token_enc, u.cached_token_expires_at, u.cached_token_cred_fp,
+             u.requestor_enc, u.subscription_key_enc
+          FROM users u
+          WHERE NOT EXISTS (
+            SELECT 1 FROM tester_credentials tc WHERE tc.user_id = u.id AND tc.company_id = u.company_id
+          )`);
+      } catch (e) {
+        console.error('[db] migration v29 tester_credentials backfill FAILED:', e.message);
+        throw e;
+      }
+  }},
+  { version: 30, name: 'provider-access', up: () => {
+      // #540 - which testers may use which provider (child company). A provider
+      // is visible to Test Managers of its distributor always; to a tester only
+      // if listed here. The distributor's OWN company is not listed - access to
+      // it stays the existing tenant membership (users.company_id).
+      try {
+        db.exec(`CREATE TABLE IF NOT EXISTS provider_access (
+          company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+          user_id     TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+          granted_at  TEXT NOT NULL DEFAULT (datetime('now')),
+          granted_by  TEXT,
+          PRIMARY KEY (company_id, user_id)
+        )`);
+      } catch (_e) { /* benign if already exists */ }
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

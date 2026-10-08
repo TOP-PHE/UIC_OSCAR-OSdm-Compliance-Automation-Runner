@@ -16,6 +16,11 @@ CREATE TABLE IF NOT EXISTS companies (
   id                  TEXT PRIMARY KEY,          -- UUID
   name                TEXT NOT NULL,
   slug                TEXT NOT NULL UNIQUE,       -- used as datafile prefix and env name fragment
+  -- #540: NULL = a top-level distributor (or a plain single-system company);
+  -- set = this company is a "Provider" connection owned by parent_id. A provider
+  -- reuses every per-company table (api_base, datafile, framework, findings...) by
+  -- its own company id; the distributor's own company keeps working unchanged.
+  parent_id           TEXT REFERENCES companies(id),
   -- Auth mode: 'bearer' | 'oauth2'
   auth_mode           TEXT NOT NULL DEFAULT 'bearer',
   -- OSDM endpoint
@@ -263,6 +268,48 @@ CREATE TABLE IF NOT EXISTS run_selections (
   user_id    TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
   codes_json TEXT NOT NULL DEFAULT '[]',           -- JSON array of scenario codes, in run order
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (company_id, user_id)
+);
+
+-- ── Per-tester, per-provider OSDM credentials (#540) ────────────────────────
+-- Credentials and the token cache used to live on the users row (one set per
+-- tester). With distributor/provider companies a tester has one set PER company
+-- they test (their own + each provider). Keyed by (user_id, company_id). Values
+-- are the same AES-GCM (enc:v1:) envelopes as the users columns they came from;
+-- migration 29 copies each existing user's credentials into a row for their own
+-- company. The users.* credential columns are kept dormant for one release as a
+-- rollback cushion, then dropped.
+CREATE TABLE IF NOT EXISTS tester_credentials (
+  user_id                 TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+  company_id              TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  auth_mode               TEXT NOT NULL DEFAULT 'bearer',   -- 'bearer' | 'oauth2'
+  access_token_enc        TEXT,
+  client_id_enc           TEXT,
+  client_secret_enc       TEXT,
+  token_url               TEXT,
+  oauth_profile           TEXT NOT NULL DEFAULT 'oauth2_basic',
+  oauth_scope             TEXT,
+  oauth_extra_enc         TEXT,
+  oauth_custom_template   TEXT,
+  cached_token_enc        TEXT,
+  cached_token_expires_at TEXT,
+  cached_token_cred_fp    TEXT,
+  requestor_enc           TEXT,
+  subscription_key_enc    TEXT,
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, company_id)
+);
+
+-- ── Provider access list (#540) ─────────────────────────────────────────────
+-- Which testers may use which provider (child company). A provider is visible
+-- to Test Managers of its distributor always; to a tester only if listed here.
+-- The distributor's OWN company is not listed here — access to it is the
+-- existing tenant membership (users.company_id).
+CREATE TABLE IF NOT EXISTS provider_access (
+  company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,  -- the provider (child) company
+  user_id     TEXT NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+  granted_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  granted_by  TEXT,                                                       -- Test Manager email
   PRIMARY KEY (company_id, user_id)
 );
 
