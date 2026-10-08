@@ -1562,3 +1562,14 @@ Nothing to configure. A page opened before the upgrade sends no version and
 saves as before until it is reloaded. The whole-file upload and the delete are
 not checked: they replace or remove the file on purpose.
 
+### 15.22 v1.11.220 — API Config for the company and all its providers (#580)
+
+API Config no longer follows the **Working on** selector. It shows one section
+for the company and one for each provider the user may use, with a summary of
+what is set, and each section is saved on its own.
+
+Nothing to configure and nothing stored differently: the page sends, with each
+request, the id of the company or provider of the section concerned
+(`X-Provider-Id`), which the server has accepted since v1.11.216. Stored
+endpoints and credentials are unchanged. A company without providers sees one
+section, as before.

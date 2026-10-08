@@ -201,6 +201,68 @@ describe('credentials per (tester, provider)', () => {
   });
 });
 
+// ── API Config: one section per company or provider (#580) ───────────────────
+// The page sends, for each section, the id of that section's company or
+// provider with every request, and saves one section at a time. These are the
+// two things it relies on the server for.
+describe('API Config — a section is saved on its own (#580)', () => {
+  // Everything the page saves for a company or provider, as stored.
+  const stored = (company, who) => ({
+    company: get('SELECT api_base, extra_headers FROM companies WHERE id = ?', [ids[company]]),
+    credentials: get('SELECT * FROM tester_credentials WHERE user_id = ? AND company_id = ?', [ids[who], ids[company]]),
+  });
+
+  test('an empty X-Provider-Id names the own company, as no header does', async () => {
+    // How the page asks for the user's own company while "Working on" a
+    // provider: nav.js adds the selected provider only to a request that
+    // names none, so the page names "none" itself.
+    for (const who of ['TM1', 'A1']) {
+      const res = await request(app).get('/v1/company').set(as(who)).set('X-Provider-Id', '');
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(ids.D1);
+      const creds = await request(app).get('/v1/me/credentials').set(as(who)).set('X-Provider-Id', '');
+      expect(creds.status).toBe(200);
+    }
+  });
+
+  test('saving one section changes nothing in the company or in another provider', async () => {
+    // What a Test Manager has for the company and its two providers.
+    for (const company of ['D1', 'P1a', 'P1b']) {
+      const res = await request(app).patch('/v1/me/credentials').set(as('TM1')).set('X-Provider-Id', ids[company])
+        .send({ auth_mode: 'bearer', access_token: `token-${company}` });
+      expect(res.status).toBe(200);
+    }
+    const before = { D1: stored('D1', 'TM1'), P1a: stored('P1a', 'TM1'), P1b: stored('P1b', 'TM1') };
+
+    // The page's save of the P1b section: the shared part, then the user's own.
+    const shared = await request(app).patch('/v1/company').set(as('TM1')).set('X-Provider-Id', ids.P1b)
+      .send({ api_base: `https://p1b-saved-${tag}.example/osdm`, extra_headers: [{ name: 'X-Section', value: 'P1b' }] });
+    expect(shared.status).toBe(200);
+    const own = await request(app).patch('/v1/me/credentials').set(as('TM1')).set('X-Provider-Id', ids.P1b)
+      .send({ auth_mode: 'oauth2', token_url: `https://p1b-saved-${tag}.example/token`, client_id: 'p1b-client', client_secret: 'p1b-secret', oauth_profile: 'oauth2_basic', oauth_scope: '', oauth_custom_template: '' });
+    expect(own.status).toBe(200);
+
+    expect(stored('D1', 'TM1')).toEqual(before.D1);
+    expect(stored('P1a', 'TM1')).toEqual(before.P1a);
+    const after = stored('P1b', 'TM1');
+    expect(after.company.api_base).toBe(`https://p1b-saved-${tag}.example/osdm`);
+    expect(after.company.extra_headers).not.toEqual(before.P1b.company.extra_headers);
+    expect(after.credentials.auth_mode).toBe('oauth2');
+    expect(after.credentials.client_id_enc).toBeTruthy();
+  });
+
+  test('clearing one section\'s credentials leaves the others', async () => {
+    const before = { D1: stored('D1', 'TM1'), P1b: stored('P1b', 'TM1') };
+    const wipe = { access_token: null, client_id: null, client_secret: null, oauth_extra: null, oauth_scope: null, oauth_custom_template: null, requestor: null, subscription_key: null };
+    const res = await request(app).patch('/v1/me/credentials').set(as('TM1')).set('X-Provider-Id', ids.P1a).send(wipe);
+    expect(res.status).toBe(200);
+    expect(res.body.has_token).toBe(false);
+    expect(stored('D1', 'TM1')).toEqual(before.D1);
+    expect(stored('P1b', 'TM1')).toEqual(before.P1b);
+    expect(stored('D1', 'TM1').credentials.access_token_enc).toBeTruthy();
+  });
+});
+
 // ── Runs follow canUserSeeRun → canUseCompany ───────────────────────────────
 describe('run visibility across providers', () => {
   const see = [

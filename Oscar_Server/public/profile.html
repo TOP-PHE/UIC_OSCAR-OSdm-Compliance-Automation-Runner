@@ -22,6 +22,31 @@ Copyright [2026] [International Union of Railways (UIC)]
 .notice-box{background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#bf360c;display:none}
 .notice-box strong{color:#bf360c}
 .notice-box a{color:#0090D4;font-weight:700}
+.page-hint{font-size:13px;color:#546e7a;margin-bottom:16px}
+.hint{font-size:12px;color:#546e7a;margin-bottom:14px}
+.optional{color:#546e7a;font-weight:400}
+/* The summary: one line per company or provider. */
+#targets-summary table{width:100%;border-collapse:collapse;font-size:13px}
+#targets-summary th{text-align:left;font-size:11px;color:#455a64;text-transform:uppercase;letter-spacing:.4px;padding:6px 10px;border-bottom:1px solid #eceff1}
+#targets-summary td{padding:8px 10px;border-bottom:1px solid #f1f4f6;vertical-align:middle}
+#targets-summary td.endpoint{font-family:Consolas,monospace;font-size:12px;overflow-wrap:anywhere}
+#targets-summary a{color:#0073ab;font-weight:700;text-decoration:none}
+#targets-summary a:hover{text-decoration:underline}
+/* One section per company or provider, opened by its title line. */
+details.target{padding:0}
+details.target > summary{list-style:none;cursor:pointer;padding:18px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+details.target > summary::-webkit-details-marker{display:none}
+details.target > summary::before{content:'▸';color:#546e7a;font-size:14px}
+details.target[open] > summary::before{content:'▾'}
+details.target[open] > summary{border-bottom:1px solid #eceff1}
+details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
+.target-name{font-size:16px;font-weight:800;color:#263238}
+.target-kind{font-size:11px;color:#546e7a;text-transform:uppercase;letter-spacing:.4px}
+.target-unsaved{font-size:11px;font-weight:700;color:#bf360c;display:none}
+.target-body{padding:20px 24px 24px}
+.target-body h3{margin-top:6px}
+.target-body h3.second{margin-top:28px}
+.target-msg{margin-top:14px;margin-bottom:0}
 </style>
 </head>
 <body>
@@ -47,154 +72,179 @@ Copyright [2026] [International Union of Railways (UIC)]
 <div class="container">
   <h2>⚙️ API Config</h2>
   <div id="msg" class="msg"></div>
+  <p class="page-hint" id="page-hint" style="display:none">
+    One section for your company and one for each provider you may use.
+    Each section is saved on its own, with its own button.
+  </p>
 
-  <!-- Test Config status notice (shown when no data file is configured) -->
-  <div id="notice-testconfig" class="notice-box">
-    ⚠️ <strong>Test Configuration not set up.</strong>
-    Your API credentials look good, but you have not configured any test scenarios yet.
-    Please go to <a href="/scenarios.html">Test Config</a> to upload or create your test configuration before running a test.
-  </div>
-
-  <!-- Company-shared: visible to all testers in this company -->
-  <div class="card">
-    <h3><span id="scope-endpoint">Company</span> — Shared API Endpoint</h3>
-    <p style="font-size:12px;color:#90a4ae;margin-bottom:14px">
-      This URL is shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.
-    </p>
-    <div class="field">
-      <label for="api_base">OSDM API Endpoint</label>
-      <input type="url" id="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
-      <div id="api-base-readonly-note" style="display:none;font-size:12px;color:#546e7a;margin-top:6px">
-        Only a Test Manager of your company can change this address.
-      </div>
-    </div>
-
-    <!-- Dedicated headers (issue #426): company-wide custom request headers -->
-    <div class="field" id="extra-headers-block" style="margin-top:20px">
-      <label>Dedicated Headers <span style="color:#90a4ae;font-weight:400">(optional — sent on every OSDM request)</span></label>
-      <p style="font-size:12px;color:#90a4ae;margin:2px 0 10px">
-        Extra headers your test system requires. A value can be a literal (e.g. <code>staging</code>)
-        or reference a credential variable in double braces —
-        <code>{{requestor}}</code>, <code>{{Ocp-Apim-Subscription-Key}}</code>, <code>{{access_token}}</code> —
-        resolved per tester at request time, so secrets stay out of this shared config.
-        Shared with everyone in your company.
-      </p>
-      <div id="extra-headers-list"></div>
-      <button type="button" class="btn btn-secondary" id="add-header-btn" style="margin-top:4px">➕ Add dedicated header</button>
-      <p id="extra-headers-readonly-note" style="display:none;font-size:11px;color:#90a4ae;margin-top:8px">
-        🔒 Only a Test Manager can edit dedicated headers — shown read-only.
-      </p>
-    </div>
-
-    <!-- v1.11.15: the company-wide "Share test reports with Certifiers"
-         toggle was removed. Certifier visibility is now decided per-report:
-         a Test Manager shares individual runs from the Dashboard. -->
-    <p style="font-size:12px;color:#90a4ae;margin-top:14px">
-      📊 Report sharing with Certifiers is now <strong>per-report</strong>.
-      A Test Manager chooses which specific runs to share from the
-      <a href="/dashboard.html" style="color:#0090D4">Dashboard</a> — nothing
-      is shared with Certifiers by default.
+  <!-- #580: the list. Shown when there is more than one section. -->
+  <div class="card" id="targets-summary" style="display:none">
+    <table>
+      <thead>
+        <tr><th scope="col">Company or provider</th><th scope="col">OSDM endpoint</th><th scope="col">Your credentials</th><th scope="col">Test data</th></tr>
+      </thead>
+      <tbody id="targets-summary-rows"></tbody>
+    </table>
+    <p class="hint" id="providers-link" style="display:none;margin:14px 0 0">
+      Providers are added, renamed and opened to testers on the <a href="/providers.html">Providers</a> page.
     </p>
   </div>
 
-  <!-- Per-tester: only YOUR credentials. Each tester maintains their own. -->
-  <div class="card">
-    <h3>Your Credentials<span id="scope-creds"></span></h3>
-    <p style="font-size:12px;color:#90a4ae;margin-bottom:14px">
-      Visible to you only. Each tester maintains their own credentials — when they change, only your runs are affected.
-    </p>
-    <div class="field">
-      <label for="auth_mode">Authentication Mode</label>
-      <select id="auth_mode">
-        <option value="bearer">Bearer Token (pre-obtained)</option>
-        <option value="oauth2">OAuth2 Client Credentials</option>
-      </select>
-    </div>
+  <div id="targets"></div>
 
-    <!-- Bearer mode -->
-    <div id="mode-bearer" class="mode-section active">
-      <div class="field">
-        <label for="access_token">Bearer Token <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
-        <input type="password" id="access_token" placeholder="eyJhbGci..." autocomplete="off">
+  <!-- v1.11.15: the company-wide "Share test reports with Certifiers" toggle
+       was removed. Certifier visibility is decided per-report: a Test Manager
+       shares individual runs from the Dashboard. -->
+  <p class="hint">
+    📊 Report sharing with Certifiers is <strong>per-report</strong>.
+    A Test Manager chooses which specific runs to share from the
+    <a href="/dashboard.html" style="color:#0073ab">Dashboard</a>; nothing
+    is shared with Certifiers by default.
+  </p>
+</div>
+
+<!-- One section: the shared endpoint of a company or provider, and the
+     signed-in user's own credentials for it. There is one copy of this per
+     section, so the script finds a field by data-f inside its section, never
+     by id. The ids below only tie each label to its field: addTarget() makes
+     them unique in each copy before the copy enters the page. -->
+<template id="target-template">
+  <details class="card target">
+    <summary>
+      <span class="target-name" data-f="name"></span>
+      <span class="target-kind" data-f="kind"></span>
+      <span data-f="badges"></span>
+      <span class="target-unsaved" data-f="unsaved">● not saved</span>
+    </summary>
+    <div class="target-body">
+      <div class="notice-box" data-f="notice-testconfig">
+        ⚠️ <strong>Test Configuration not set up.</strong>
+        The endpoint and your credentials are set, but there is no test scenario here yet.
+        Go to <a href="/scenarios.html">Test Config</a> to upload or create the test configuration before running a test.
       </div>
-    </div>
+      <div class="notice-box" data-f="notice-unavailable"></div>
 
-    <!-- OAuth2 mode -->
-    <div id="mode-oauth2" class="mode-section">
+      <!-- Shared: the same for everyone who works here -->
+      <h3>Shared API Endpoint</h3>
+      <p class="hint" data-f="shared-hint"></p>
       <div class="field">
-        <label for="oauth_profile">Auth Profile</label>
-        <select id="oauth_profile">
-          <option value="oauth2_basic">Standard OAuth2 — credentials in Basic auth header</option>
-          <option value="oauth2_post">Standard OAuth2 — credentials in body (Bileto, Turnit)</option>
-          <option value="paxone_json">Paxone — JSON {accountName, accountSecret}</option>
-          <option value="sqills_extension">Sqills — custom grant_type URI + Basic + body</option>
-          <option value="custom">Custom — user-supplied request template</option>
+        <label for="api_base">OSDM API Endpoint</label>
+        <input type="url" id="api_base" data-f="api_base" placeholder="https://api.yourcompany.com/osdm/v3">
+        <div data-f="api-base-readonly-note" style="display:none;font-size:12px;color:#546e7a;margin-top:6px">
+          Only a Test Manager of your company can change this address.
+        </div>
+      </div>
+
+      <!-- Dedicated headers (issue #426): custom request headers, shared -->
+      <div class="field" style="margin-top:20px">
+        <span style="display:block;font-size:12px;font-weight:700;color:#455a64;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Dedicated Headers <span class="optional" style="text-transform:none;letter-spacing:0">(optional — sent on every OSDM request)</span></span>
+        <p class="hint" style="margin:2px 0 10px">
+          Extra headers the test system requires. A value can be a literal (e.g. <code>staging</code>)
+          or reference a credential variable in double braces —
+          <code>{{requestor}}</code>, <code>{{Ocp-Apim-Subscription-Key}}</code>, <code>{{access_token}}</code> —
+          resolved per tester at request time, so secrets stay out of this shared config.
+        </p>
+        <div data-f="extra-headers-list"></div>
+        <button type="button" class="btn btn-secondary" data-f="add-header-btn" style="margin-top:4px">➕ Add dedicated header</button>
+        <p data-f="extra-headers-readonly-note" style="display:none;font-size:11px;color:#546e7a;margin-top:8px">
+          🔒 Only a Test Manager can edit dedicated headers — shown read-only.
+        </p>
+      </div>
+
+      <!-- Per user: only YOUR credentials for this company or provider -->
+      <h3 class="second">Your Credentials for <span data-f="name-2"></span></h3>
+      <p class="hint">
+        Visible to you only, and used only for your runs here. Each tester keeps their own.
+      </p>
+      <div class="field">
+        <label for="auth_mode">Authentication Mode</label>
+        <select id="auth_mode" data-f="auth_mode">
+          <option value="bearer">Bearer Token (pre-obtained)</option>
+          <option value="oauth2">OAuth2 Client Credentials</option>
         </select>
-        <div id="profile-help" style="margin-top:6px;font-size:12px;color:#90a4ae"></div>
       </div>
-      <div class="field">
-        <label for="token_url">Token URL <span style="color:#90a4ae;font-weight:400">(masked — operator-internal endpoint)</span></label>
-        <input type="password" id="token_url" autocomplete="off" placeholder="https://auth.yourcompany.com/token">
-      </div>
-      <div class="row">
+
+      <!-- Bearer mode -->
+      <div data-f="mode-bearer" class="mode-section active">
         <div class="field">
-          <label for="client_id"><span id="client_id_label">Client ID</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
-          <input type="password" id="client_id" autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="client_secret"><span id="client_secret_label">Client Secret</span> <span style="color:#90a4ae;font-weight:400">(leave blank to keep current)</span></label>
-          <input type="password" id="client_secret" autocomplete="off">
+          <label for="access_token">Bearer Token <span class="optional">(leave blank to keep current)</span></label>
+          <input type="password" id="access_token" data-f="access_token" placeholder="eyJhbGci..." autocomplete="off">
         </div>
       </div>
-      <div class="field" id="field-scope">
-        <label for="oauth_scope">Scope <span style="color:#90a4ae;font-weight:400">(optional — Turnit needs e.g. retailer-api; masked)</span></label>
-        <input type="password" id="oauth_scope" placeholder="retailer-api" autocomplete="off">
-      </div>
-      <div class="field" id="field-extra" style="display:none">
-        <label for="oauth_extra">Extra Credential <span style="color:#90a4ae;font-weight:400">(Sqills: pre-encoded Basic auth value — leave blank to keep current)</span></label>
-        <input type="password" id="oauth_extra" autocomplete="off" placeholder="the Authorization value (e.g. base64 of id:secret)">
-      </div>
-      <div class="field" id="field-custom-template" style="display:none">
-        <label for="oauth_custom_template">Custom Request Template <span style="color:#90a4ae;font-weight:400">(JSON; placeholders: {{client_id}}, {{client_secret}}, {{scope}}, {{extra}})</span></label>
-        <textarea id="oauth_custom_template" rows="10" style="width:100%;padding:9px 11px;border:1px solid #cfd8dc;border-radius:6px;font-family:Consolas,monospace;font-size:12px" placeholder='{
+
+      <!-- OAuth2 mode -->
+      <div data-f="mode-oauth2" class="mode-section">
+        <div class="field">
+          <label for="oauth_profile">Auth Profile</label>
+          <select id="oauth_profile" data-f="oauth_profile">
+            <option value="oauth2_basic">Standard OAuth2 — credentials in Basic auth header</option>
+            <option value="oauth2_post">Standard OAuth2 — credentials in body (Bileto, Turnit)</option>
+            <option value="paxone_json">Paxone — JSON {accountName, accountSecret}</option>
+            <option value="sqills_extension">Sqills — custom grant_type URI + Basic + body</option>
+            <option value="custom">Custom — user-supplied request template</option>
+          </select>
+          <div data-f="profile-help" style="margin-top:6px;font-size:12px;color:#546e7a"></div>
+        </div>
+        <div class="field">
+          <label for="token_url">Token URL <span class="optional">(masked — operator-internal endpoint)</span></label>
+          <input type="password" id="token_url" data-f="token_url" autocomplete="off" placeholder="https://auth.yourcompany.com/token">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="client_id"><span data-f="client_id_label">Client ID</span> <span class="optional">(leave blank to keep current)</span></label>
+            <input type="password" id="client_id" data-f="client_id" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="client_secret"><span data-f="client_secret_label">Client Secret</span> <span class="optional">(leave blank to keep current)</span></label>
+            <input type="password" id="client_secret" data-f="client_secret" autocomplete="off">
+          </div>
+        </div>
+        <div class="field" data-f="field-scope">
+          <label for="oauth_scope">Scope <span class="optional">(optional — Turnit needs e.g. retailer-api; masked)</span></label>
+          <input type="password" id="oauth_scope" data-f="oauth_scope" placeholder="retailer-api" autocomplete="off">
+        </div>
+        <div class="field" data-f="field-extra" style="display:none">
+          <label for="oauth_extra">Extra Credential <span class="optional">(Sqills: pre-encoded Basic auth value — leave blank to keep current)</span></label>
+          <input type="password" id="oauth_extra" data-f="oauth_extra" autocomplete="off" placeholder="the Authorization value (e.g. base64 of id:secret)">
+        </div>
+        <div class="field" data-f="field-custom-template" style="display:none">
+          <label for="oauth_custom_template">Custom Request Template <span class="optional">(JSON; placeholders: {{client_id}}, {{client_secret}}, {{scope}}, {{extra}})</span></label>
+          <textarea id="oauth_custom_template" data-f="oauth_custom_template" rows="10" style="width:100%;padding:9px 11px;border:1px solid #cfd8dc;border-radius:6px;font-family:Consolas,monospace;font-size:12px" placeholder='{
   "method": "POST",
   "headers": {"Content-Type": "application/json"},
   "body": {"username": "{{client_id}}", "password": "{{client_secret}}"},
   "body_format": "json",
   "token_field": "access_token"
 }'></textarea>
+        </div>
       </div>
-    </div>
 
-    <div class="field">
-      <label for="requestor">Requestor Header <span style="color:#90a4ae;font-weight:400">(optional — only some operators; masked)</span></label>
-      <input type="password" id="requestor" autocomplete="off" placeholder="your-requestor-id">
-    </div>
+      <div class="field">
+        <label for="requestor">Requestor Header <span class="optional">(optional — only some operators; masked)</span></label>
+        <input type="password" id="requestor" data-f="requestor" autocomplete="off" placeholder="your-requestor-id">
+      </div>
 
-    <div class="field">
-      <label for="subscription_key">Ocp-Apim-Subscription-Key <span style="color:#90a4ae;font-weight:400">(optional — Azure APIM sandboxes; masked)</span></label>
-      <input type="password" id="subscription_key" autocomplete="off" placeholder="your-subscription-key">
-    </div>
+      <div class="field">
+        <label for="subscription_key">Ocp-Apim-Subscription-Key <span class="optional">(optional — Azure APIM sandboxes; masked)</span></label>
+        <input type="password" id="subscription_key" data-f="subscription_key" autocomplete="off" placeholder="your-subscription-key">
+      </div>
 
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-primary" id="save-btn">💾 Save Configuration</button>
-      <button class="btn btn-secondary" id="clear-creds-btn"
-              style="background:#ef5350;color:white;border:none"
-              title="Wipes all stored credentials (bearer token, client id/secret, oauth_extra, requestor, subscription key, cached access token).">
-        🗑 Clear all credentials
-      </button>
-      <span id="clear-creds-help" style="font-size:11px;color:#90a4ae">
-        Recommended after a test campaign — your secrets are not retained.
-      </span>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn btn-primary" data-f="save-btn"></button>
+        <button type="button" class="btn btn-secondary" data-f="clear-creds-btn"
+                style="background:#c62828;color:white;border:none"
+                title="Wipes your stored credentials here (bearer token, client id/secret, oauth_extra, requestor, subscription key, cached access token)."></button>
+        <span class="hint" style="margin:0;font-size:11px">
+          Clearing is recommended after a test campaign — your secrets are not retained.
+        </span>
+      </div>
+      <output class="msg target-msg" data-f="msg"></output>
     </div>
-  </div>
-
-</div>
+  </details>
+</template>
 
 <script>
-const token = localStorage.getItem('oscar_token') || '';
 if (!localStorage.getItem('oscar_user')) window.location.href = '/';
-const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
 
 // logout() provided by nav.js
@@ -204,13 +254,43 @@ function showMsg(text, ok) {
   el.textContent = text;
   el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
   el.style.display = 'block';
-  setTimeout(() => el.style.display = 'none', 4000);
 }
 
-function switchMode() {
-  const mode = document.getElementById('auth_mode').value;
-  document.getElementById('mode-bearer').classList.toggle('active', mode === 'bearer');
-  document.getElementById('mode-oauth2').classList.toggle('active', mode === 'oauth2');
+// ── Sections (#580) ───────────────────────────────────────────────────────────
+// The page holds one section for the user's company and one for each provider
+// they may use. A section is a copy of #target-template; `card` below is always
+// the root element of one section.
+
+// One field of a section.
+function field(card, name) {
+  return card.querySelector('[data-f="' + name + '"]');
+}
+
+// Every request of a section names the company or provider of that section.
+// The menu's "Working on" choice plays no part on this page: nav.js adds it
+// only to a request that names none, and every request here names one.
+function inTarget(card, init) {
+  return { ...init, headers: { ...init?.headers, 'X-Provider-Id': card.dataset.targetId } };
+}
+
+// A message next to the buttons of the section it is about.
+function showTargetMsg(card, text, ok) {
+  const el = field(card, 'msg');
+  el.textContent = text;
+  el.className = 'msg target-msg ' + (ok ? 'msg-ok' : 'msg-err');
+  el.style.display = 'block';
+}
+
+// What a run needs from the user here (the same rule as POST /v1/runs).
+function credentialsSet(m) {
+  if (m.auth_mode === 'oauth2') return !!(m.token_url && m.has_client_id && m.has_client_secret);
+  return !!m.has_token;
+}
+
+function switchMode(card) {
+  const mode = field(card, 'auth_mode').value;
+  field(card, 'mode-bearer').classList.toggle('active', mode === 'bearer');
+  field(card, 'mode-oauth2').classList.toggle('active', mode === 'oauth2');
 }
 
 // Per-profile UI hints + visibility of the optional fields. Keeps storage
@@ -259,26 +339,26 @@ const PROFILE_META = {
   }
 };
 
-function switchProfile() {
-  const sel = document.getElementById('oauth_profile').value;
-  const meta = PROFILE_META[sel] || PROFILE_META.oauth2_basic;
-  document.getElementById('profile-help').textContent       = meta.help;
-  document.getElementById('client_id_label').textContent    = meta.cidLabel;
-  document.getElementById('client_secret_label').textContent= meta.csecLabel;
-  document.getElementById('field-scope').style.display          = meta.showScope    ? '' : 'none';
-  document.getElementById('field-extra').style.display          = meta.showExtra    ? '' : 'none';
-  document.getElementById('field-custom-template').style.display= meta.showTemplate ? '' : 'none';
+function switchProfile(card) {
+  const meta = PROFILE_META[field(card, 'oauth_profile').value] || PROFILE_META.oauth2_basic;
+  field(card, 'profile-help').textContent        = meta.help;
+  field(card, 'client_id_label').textContent     = meta.cidLabel;
+  field(card, 'client_secret_label').textContent = meta.csecLabel;
+  field(card, 'field-scope').style.display           = meta.showScope    ? '' : 'none';
+  field(card, 'field-extra').style.display           = meta.showExtra    ? '' : 'none';
+  field(card, 'field-custom-template').style.display = meta.showTemplate ? '' : 'none';
 }
 
 // ── Dedicated headers (issue #426) ────────────────────────────────────────────
-// Company-wide custom request headers. Editable by Test Managers only; other
-// testers see them read-only. Each row = header name + value (literal or a
-// {{var}} template resolved per tester at request time).
+// Custom request headers shared by everyone who works in the section's company
+// or provider. Editable by Test Managers only; other testers see them
+// read-only. Each row = header name + value (literal or a {{var}} template
+// resolved per tester at request time).
 const CAN_EDIT_HEADERS = (user.role === 'test_manager');
 
-// The shared endpoint (#544). Every run of every tester in the company goes to
-// it, so it is the Test Manager's to change. Everyone else sees it read-only,
-// and the server refuses the change from anyone else.
+// The shared endpoint (#544). Every run of every tester goes to it, so it is
+// the Test Manager's to change. Everyone else sees it read-only, and the server
+// refuses the change from anyone else.
 const CAN_EDIT_ENDPOINT = (user.role === 'test_manager');
 
 function makeHeaderRow(name, value) {
@@ -287,36 +367,40 @@ function makeHeaderRow(name, value) {
   row.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:center';
   const nameI = document.createElement('input');
   nameI.type = 'text'; nameI.className = 'eh-name'; nameI.placeholder = 'Header-Name';
+  nameI.setAttribute('aria-label', 'Header name');
   nameI.value = name || '';
   nameI.style.cssText = 'flex:0 0 38%;padding:8px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px';
   const valI = document.createElement('input');
   valI.type = 'text'; valI.className = 'eh-value'; valI.placeholder = 'value or {{requestor}}';
+  valI.setAttribute('aria-label', 'Header value');
   valI.value = value || '';
   valI.style.cssText = 'flex:1;padding:8px 10px;border:1px solid #cfd8dc;border-radius:6px;font-size:13px';
   const rm = document.createElement('button');
   rm.type = 'button'; rm.className = 'btn btn-secondary eh-remove'; rm.textContent = '✕';
   rm.title = 'Remove header'; rm.style.cssText = 'flex:0 0 auto;padding:8px 12px';
-  rm.addEventListener('click', () => row.remove());
+  rm.addEventListener('click', () => {
+    const card = row.closest('details.target');
+    row.remove();
+    if (card) markUnsaved(card, true);
+  });
   if (!CAN_EDIT_HEADERS) { nameI.disabled = true; valI.disabled = true; rm.style.display = 'none'; }
   row.appendChild(nameI); row.appendChild(valI); row.appendChild(rm);
   return row;
 }
 
-function renderExtraHeaders(arr) {
-  const list = document.getElementById('extra-headers-list');
+function renderExtraHeaders(card, arr) {
+  const list = field(card, 'extra-headers-list');
   list.innerHTML = '';
-  (Array.isArray(arr) ? arr : []).forEach(h => list.appendChild(makeHeaderRow(h && h.name, h && h.value)));
+  (Array.isArray(arr) ? arr : []).forEach(h => list.appendChild(makeHeaderRow(h?.name, h?.value)));
   if (!CAN_EDIT_HEADERS) {
-    const addBtn = document.getElementById('add-header-btn');
-    const note   = document.getElementById('extra-headers-readonly-note');
-    if (addBtn) addBtn.style.display = 'none';
-    if (note)   note.style.display = 'block';
+    field(card, 'add-header-btn').style.display = 'none';
+    field(card, 'extra-headers-readonly-note').style.display = 'block';
   }
 }
 
-function collectExtraHeaders() {
+function collectExtraHeaders(card) {
   const out = [];
-  document.querySelectorAll('#extra-headers-list .eh-row').forEach(r => {
+  field(card, 'extra-headers-list').querySelectorAll('.eh-row').forEach(r => {
     const name  = (r.querySelector('.eh-name').value || '').trim();
     const value = r.querySelector('.eh-value').value || '';
     if (name) out.push({ name, value });
@@ -324,139 +408,210 @@ function collectExtraHeaders() {
   return out;
 }
 
-async function loadProfile() {
-  // Two endpoints since v12: company-shared bits and per-tester credentials
-  // are now separate resources. Fire both in parallel.
-  const [companyRes, credsRes] = await Promise.all([
-    fetch('/v1/company',         {}),
-    fetch('/v1/me/credentials',  {})
-  ]);
-  if (!companyRes.ok || !credsRes.ok) return;
-  const c = await companyRes.json();
-  const m = await credsRes.json();
+// ── The summary and the title line of a section ───────────────────────────────
+// What is known of each section, by id: { name, provider, company, creds }.
+const targets = new Map();
 
-  // #540: name the company or provider this page configures (the menu's
-  // "Working on" selector decides which one the requests act in).
-  document.getElementById('scope-endpoint').textContent = c.name || 'Company';
-  document.getElementById('scope-creds').textContent = c.parent_id ? ' for ' + c.name : '';
+function badge(ok, yes, no) {
+  return '<span class="badge ' + (ok ? 'badge-ok' : 'badge-warn') + '">' + esc(ok ? yes : no) + '</span>';
+}
 
-  // Company-shared
-  document.getElementById('api_base').value          = c.api_base  || '';
+function markUnsaved(card, unsaved) {
+  card.dataset.unsaved = unsaved ? '1' : '';
+  field(card, 'unsaved').style.display = unsaved ? 'inline' : 'none';
+}
+
+function renderSummary() {
+  const rows = [];
+  targets.forEach((t, id) => {
+    const endpoint = t.company?.api_base;
+    rows.push('<tr>'
+      + '<td><a href="#target-' + esc(id) + '" data-open="' + esc(id) + '">' + esc(t.name) + '</a>'
+      + (t.provider ? '' : ' <span class="target-kind">your company</span>') + '</td>'
+      + '<td class="endpoint">' + (endpoint ? esc(endpoint) : badge(false, '', 'not set')) + '</td>'
+      + '<td>' + (t.creds ? badge(credentialsSet(t.creds), 'set', 'missing') : '') + '</td>'
+      + '<td>' + (t.company ? badge(!!t.company.datafile_updated_at, 'set', 'missing') : '') + '</td>'
+      + '</tr>');
+  });
+  document.getElementById('targets-summary-rows').innerHTML = rows.join('');
+}
+
+// ── One section: fill, save, clear ────────────────────────────────────────────
+// The name of a section's company or provider, wherever the section shows it.
+// Named everywhere, the company's own section included (#580): the credentials
+// typed here are for this one and for no other.
+function nameTarget(card, c) {
+  const name = c.name || 'Company';
+  field(card, 'name').textContent = name;
+  field(card, 'name-2').textContent = name;
+  field(card, 'kind').textContent = c.parent_id ? 'provider' : 'your company';
+  field(card, 'shared-hint').textContent = c.parent_id
+    ? 'Shared with everyone in your company who may use ' + name + '. Editing it changes the OSDM endpoint of all their runs on ' + name + '.'
+    : 'Shared with everyone in your company. Editing it changes the OSDM endpoint for all testers.';
+  field(card, 'save-btn').textContent = '💾 Save configuration for ' + name;
+  field(card, 'clear-creds-btn').textContent = '🗑 Clear my credentials for ' + name;
+}
+
+// The shared part of a section: the endpoint and the dedicated headers.
+function fillShared(card, c) {
+  field(card, 'api_base').value = c.api_base || '';
   if (!CAN_EDIT_ENDPOINT) {
     // Read-only, not disabled: a tester can still select and copy the address.
-    const endpointInput = document.getElementById('api_base');
+    const endpointInput = field(card, 'api_base');
     endpointInput.readOnly = true;
     endpointInput.style.background = '#f5f7f8';
-    document.getElementById('api-base-readonly-note').style.display = 'block';
+    field(card, 'api-base-readonly-note').style.display = 'block';
   }
-  renderExtraHeaders(c.extra_headers);   // issue #426 — company dedicated headers
-  // v1.11.15: the share-reports-with-certifier toggle was removed here —
-  // certifier sharing is now per-report from the Dashboard.
-
-  // Per-tester
-  document.getElementById('auth_mode').value             = m.auth_mode || 'bearer';
-  document.getElementById('token_url').value             = m.token_url || '';
-  document.getElementById('oauth_profile').value         = m.oauth_profile || 'oauth2_basic';
-  document.getElementById('oauth_scope').value           = m.oauth_scope || '';
-  document.getElementById('oauth_custom_template').value = m.oauth_custom_template || '';
-  document.getElementById('oauth_extra').value           = '';   // never pre-fill secrets
-  document.getElementById('requestor').value             = '';   // never pre-fill secrets
-  document.getElementById('subscription_key').value      = '';   // never pre-fill secrets
-  switchMode();
-  switchProfile();
-
-  // Show the "no test config" notice when API + creds are both set but the
-  // company hasn't uploaded a data file yet.
-  const credsConfigured = !!(m.has_token || (m.has_client_id && m.has_client_secret));
-  const apiConfigured = !!(c.api_base && credsConfigured);
-  const testConfigured = !!c.datafile_updated_at;
-  const noticeEl = document.getElementById('notice-testconfig');
-  noticeEl.style.display = (apiConfigured && !testConfigured) ? 'block' : 'none';
+  renderExtraHeaders(card, c.extra_headers);   // issue #426 — dedicated headers
 }
 
-async function saveConfig() {
-  // Save lives in two PATCHes now: api_base goes to /v1/company (shared),
-  // everything else goes to /v1/me/credentials (per-tester). Sequential so
-  // an error in either surfaces clearly.
-  const apiBase = document.getElementById('api_base').value.trim();
-  // Build the company PATCH payload. Only api_base is company-shared now;
-  // the share_reports_with_certifier toggle was removed in v1.11.15
-  // (certifier sharing is per-report from the Dashboard).
-  const companyPayload = {};
+// The user's own part of a section. A secret is never put back in its field.
+function fillCredentials(card, m) {
+  field(card, 'auth_mode').value             = m.auth_mode || 'bearer';
+  field(card, 'token_url').value             = m.token_url || '';
+  field(card, 'oauth_profile').value         = m.oauth_profile || 'oauth2_basic';
+  field(card, 'oauth_scope').value           = m.oauth_scope || '';
+  field(card, 'oauth_custom_template').value = m.oauth_custom_template || '';
+  ['access_token', 'client_id', 'client_secret', 'oauth_extra', 'requestor', 'subscription_key']
+    .forEach(secret => { field(card, secret).value = ''; });
+  switchMode(card);
+  switchProfile(card);
+}
+
+// Put what the server holds for this section into its fields.
+function fillTarget(card, c, m) {
+  const known = targets.get(card.dataset.targetId);
+  if (known) { known.company = c; known.creds = m; }
+  nameTarget(card, c);
+  fillShared(card, c);
+  fillCredentials(card, m);
+
+  // The title line: is this section ready for a run?
+  const credsConfigured = credentialsSet(m);
+  field(card, 'badges').innerHTML = badge(!!c.api_base, 'endpoint set', 'no endpoint')
+    + ' ' + badge(credsConfigured, 'credentials set', 'no credentials');
+  // The "no test config" notice: endpoint and credentials are set, but there
+  // is no data file here yet.
+  const noTestData = !!c.api_base && credsConfigured && !c.datafile_updated_at;
+  field(card, 'notice-testconfig').style.display = noTestData ? 'block' : 'none';
+  markUnsaved(card, false);
+}
+
+// A section whose company or provider could not be read: say so in it, and
+// take its buttons away, rather than show fields that would not save.
+function targetUnavailable(card, gone) {
+  const notice = field(card, 'notice-unavailable');
+  notice.textContent = gone
+    ? 'This provider is no longer available to you. Ask a Test Manager of your company.'
+    : 'This section could not be loaded. Reload the page to try again.';
+  notice.style.display = 'block';
+  field(card, 'save-btn').disabled = true;
+  field(card, 'clear-creds-btn').disabled = true;
+}
+
+async function loadTarget(card) {
+  const [companyRes, credsRes] = await Promise.all([
+    fetch('/v1/company',        inTarget(card)),
+    fetch('/v1/me/credentials', inTarget(card))
+  ]);
+  if (!companyRes.ok || !credsRes.ok) {
+    targetUnavailable(card, companyRes.status === 404 || credsRes.status === 404);
+    return;
+  }
+  fillTarget(card, await companyRes.json(), await credsRes.json());
+  renderSummary();
+}
+
+// What a save sends of a section's shared part. Empty when there is nothing
+// this user may send.
+function sharedPayload(card) {
+  const payload = {};
+  const apiBase = field(card, 'api_base').value.trim();
   // #544 — only a Test Manager sends the endpoint. For everyone else the field
   // is read-only, and their save goes straight to their own credentials.
-  if (apiBase && CAN_EDIT_ENDPOINT) companyPayload.api_base = apiBase;
+  if (apiBase && CAN_EDIT_ENDPOINT) payload.api_base = apiBase;
   // Issue #426 — always send the current header list (so emptying it clears the
   // stored value). Test-Manager-only; the server rejects edits from other roles.
-  if (CAN_EDIT_HEADERS) companyPayload.extra_headers = collectExtraHeaders();
-  if (Object.keys(companyPayload).length > 0) {
-    const patchCompany = payload => fetch('/v1/company', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    let r = await patchCompany(companyPayload);
-    // #540: another company of the same distributor already uses this
-    // endpoint. Ask, then send again with the confirmation (it is audited).
-    if (r.status === 409) {
-      const d = await r.json().catch(() => ({}));
-      const detail = String(d.detail || '');
-      if (!detail.includes('allow_duplicate_endpoint')) { showMsg(detail || 'Saving company settings failed.', false); return; }
-      if (!confirm(detail.replace(/ Send allow_duplicate_endpoint: true to use it anyway\.$/, '') + '\n\nUse this endpoint anyway?')) return;
-      r = await patchCompany({ ...companyPayload, allow_duplicate_endpoint: true });
-    }
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      showMsg(d.detail || d.title || 'Saving company settings failed.', false); return;
-    }
-  }
-
-  const creds = { auth_mode: document.getElementById('auth_mode').value };
-  if (creds.auth_mode === 'bearer') {
-    const t = document.getElementById('access_token').value.trim();
-    if (t) creds.access_token = t;
-  } else {
-    const tu = document.getElementById('token_url').value.trim();
-    const ci = document.getElementById('client_id').value.trim();
-    const cs = document.getElementById('client_secret').value.trim();
-    if (tu) creds.token_url = tu;
-    if (ci) creds.client_id = ci;
-    if (cs) creds.client_secret = cs;
-    creds.oauth_profile         = document.getElementById('oauth_profile').value;
-    // Always send these so the user can clear them (empty → null in DB)
-    creds.oauth_scope           = document.getElementById('oauth_scope').value.trim();
-    creds.oauth_custom_template = document.getElementById('oauth_custom_template').value.trim();
-    const ex = document.getElementById('oauth_extra').value.trim();
-    if (ex) creds.oauth_extra = ex;
-  }
-  const req_ = document.getElementById('requestor').value.trim();
-  if (req_) creds.requestor = req_;
-  const sk = document.getElementById('subscription_key').value.trim();
-  if (sk) creds.subscription_key = sk;
-
-  const r2 = await fetch('/v1/me/credentials', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds)
-  });
-  if (!r2.ok) {
-    const d = await r2.json().catch(() => ({}));
-    showMsg(d.detail || d.title || 'Saving credentials failed.', false); return;
-  }
-
-  showMsg('Configuration saved.', true);
-  // Clear secret fields after save
-  document.getElementById('access_token').value = '';
-  document.getElementById('client_id').value    = '';
-  document.getElementById('client_secret').value= '';
-  document.getElementById('oauth_extra').value  = '';
+  if (CAN_EDIT_HEADERS) payload.extra_headers = collectExtraHeaders(card);
+  return payload;
 }
 
-async function clearCredentials() {
-  if (!confirm('Wipe all stored credentials for your account?\n\n' +
+// What a save sends of the user's own credentials. A secret left blank is not
+// sent, so the stored one is kept.
+function credentialsPayload(card) {
+  const typed = name => field(card, name).value.trim();
+  const creds = { auth_mode: field(card, 'auth_mode').value };
+  const secrets = creds.auth_mode === 'bearer'
+    ? ['access_token']
+    : ['token_url', 'client_id', 'client_secret', 'oauth_extra'];
+  if (creds.auth_mode !== 'bearer') {
+    creds.oauth_profile         = field(card, 'oauth_profile').value;
+    // Always sent, so that the user can clear them (empty → null in DB)
+    creds.oauth_scope           = typed('oauth_scope');
+    creds.oauth_custom_template = typed('oauth_custom_template');
+  }
+  secrets.concat(['requestor', 'subscription_key']).forEach(name => {
+    if (typed(name)) creds[name] = typed(name);
+  });
+  return creds;
+}
+
+// Save a section's shared part. True when it is stored, or when there was
+// nothing to store; false when the save stopped, with the reason shown.
+async function saveShared(card) {
+  const payload = sharedPayload(card);
+  if (Object.keys(payload).length === 0) return true;
+  const patchCompany = body => fetch('/v1/company', inTarget(card, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }));
+  let r = await patchCompany(payload);
+  // #540: another company of the same distributor already uses this
+  // endpoint. Ask, then send again with the confirmation (it is audited).
+  if (r.status === 409) {
+    const d = await r.json().catch(() => ({}));
+    const detail = String(d.detail || '');
+    if (!detail.includes('allow_duplicate_endpoint')) { showTargetMsg(card, detail || 'Saving the shared settings failed.', false); return false; }
+    if (!confirm(detail.replace(/ Send allow_duplicate_endpoint: true to use it anyway\.$/, '') + '\n\nUse this endpoint anyway?')) return false;
+    r = await patchCompany({ ...payload, allow_duplicate_endpoint: true });
+  }
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    showTargetMsg(card, d.detail || d.title || 'Saving the shared settings failed.', false);
+    return false;
+  }
+  return true;
+}
+
+async function saveTarget(card) {
+  // Two PATCHes, both for this section's company or provider: the shared part
+  // goes to /v1/company, the user's own to /v1/me/credentials. Sequential so
+  // an error in either surfaces clearly.
+  if (!(await saveShared(card))) return;
+
+  const r2 = await fetch('/v1/me/credentials', inTarget(card, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentialsPayload(card))
+  }));
+  if (!r2.ok) {
+    const d = await r2.json().catch(() => ({}));
+    showTargetMsg(card, d.detail || d.title || 'Saving credentials failed.', false); return;
+  }
+
+  // Read this section again: the secret fields are emptied and the summary
+  // shows what is stored now. No other section is touched.
+  await loadTarget(card);
+  showTargetMsg(card, 'Configuration saved for ' + field(card, 'name').textContent + '.', true);
+}
+
+async function clearCredentials(card) {
+  const name = field(card, 'name').textContent;
+  if (!confirm('Wipe your stored credentials for ' + name + '?\n\n' +
                'This removes: bearer token, OAuth client id/secret, OAuth extra, ' +
                'requestor, subscription key, and any cached access token.\n\n' +
-               'You will need to re-enter them before running any new test.')) {
+               'Your credentials for any other company or provider are not touched.')) {
     return;
   }
   // Send null for every credential field so the server clears each one.
@@ -472,37 +627,118 @@ async function clearCredentials() {
     requestor: null,
     subscription_key: null
   };
-  const r = await fetch('/v1/me/credentials', {
+  const r = await fetch('/v1/me/credentials', inTarget(card, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(wipe)
-  });
+  }));
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
-    showMsg(d.detail || d.title || 'Clearing credentials failed.', false);
+    showTargetMsg(card, d.detail || d.title || 'Clearing credentials failed.', false);
     return;
   }
-  // Reset the password fields visually + reload the profile so the
-  // configured-state badges/labels update.
-  document.getElementById('access_token').value      = '';
-  document.getElementById('client_id').value         = '';
-  document.getElementById('client_secret').value     = '';
-  document.getElementById('oauth_extra').value       = '';
-  document.getElementById('requestor').value         = '';
-  document.getElementById('subscription_key').value  = '';
-  showMsg('All credentials cleared.', true);
-  loadProfile();
+  await loadTarget(card);
+  showTargetMsg(card, 'Your credentials for ' + name + ' were cleared.', true);
 }
 
-document.getElementById('auth_mode').addEventListener('change', switchMode);
-document.getElementById('oauth_profile').addEventListener('change', switchProfile);
-document.getElementById('save-btn').addEventListener('click', saveConfig);
-document.getElementById('clear-creds-btn').addEventListener('click', clearCredentials);
-document.getElementById('add-header-btn').addEventListener('click', () => {
-  document.getElementById('extra-headers-list').appendChild(makeHeaderRow('', ''));
+// ── Building the page ─────────────────────────────────────────────────────────
+// Reports a failed action in the section it belongs to (nothing awaits these).
+function reportTargetError(card) {
+  return (e) => { console.error(e); showTargetMsg(card, 'Something went wrong: ' + (e?.message || e), false); };
+}
+
+function addTarget(target, index) {
+  const card = document.getElementById('target-template').content.firstElementChild.cloneNode(true);
+  card.dataset.targetId = target.id;
+  card.id = 'target-' + target.id;
+  // In the template a label names its field (for="api_base", id="api_base").
+  // Each copy gets ids of its own here, before it enters the page, so the page
+  // never holds the same id twice.
+  card.querySelectorAll('label[for]').forEach(label => {
+    const input = field(card, label.htmlFor);
+    input.id = label.htmlFor + '-' + index;
+    label.htmlFor = input.id;
+  });
+  field(card, 'name').textContent = target.name;
+  field(card, 'name-2').textContent = target.name;
+  field(card, 'auth_mode').addEventListener('change', () => switchMode(card));
+  field(card, 'oauth_profile').addEventListener('change', () => switchProfile(card));
+  field(card, 'save-btn').addEventListener('click', () => { saveTarget(card).catch(reportTargetError(card)); });
+  field(card, 'clear-creds-btn').addEventListener('click', () => { clearCredentials(card).catch(reportTargetError(card)); });
+  field(card, 'add-header-btn').addEventListener('click', () => {
+    field(card, 'extra-headers-list').appendChild(makeHeaderRow('', ''));
+    markUnsaved(card, true);
+  });
+  // Anything typed or chosen in a section marks that section, and only it.
+  card.addEventListener('input', () => markUnsaved(card, true));
+  document.getElementById('targets').appendChild(card);
+  return card;
+}
+
+// The sections of this page: the user's company first, then the providers
+// they may use. null when the company itself could not be read.
+async function listTargets() {
+  // '' names no provider: the user's own company, whatever "Working on" says.
+  const [ownRes, listRes] = await Promise.all([
+    fetch('/v1/company', { headers: { 'X-Provider-Id': '' } }),
+    fetch('/v1/company/providers', {})
+  ]);
+  if (!ownRes.ok) return null;
+  const own = await ownRes.json();
+  if (!own.id) return null;
+  const list = [{ id: own.id, name: own.name || 'My company', provider: false }];
+  if (!listRes.ok) {
+    // Not "there are none": the list could not be read, and the page says so.
+    showMsg('The providers of your company could not be loaded. Only your own company is shown; reload the page to try again.', false);
+    return list;
+  }
+  const providers = (await listRes.json()).providers;
+  (Array.isArray(providers) ? providers : []).forEach(p => list.push({ id: p.id, name: p.name, provider: true }));
+  return list;
+}
+
+function openTarget(id) {
+  const card = document.getElementById('target-' + id);
+  if (!card) return;
+  card.open = true;
+  card.scrollIntoView({ block: 'start' });
+}
+
+async function buildPage() {
+  const list = await listTargets();
+  if (!list) { showMsg('Your company could not be loaded. Reload the page to try again.', false); return; }
+  // The section of the menu's "Working on" choice is the one opened.
+  const working = (typeof oscarSelectedProvider === 'function' && oscarSelectedProvider()) || null;
+  const current = list.some(t => t.id === working?.id) ? working.id : list[0].id;
+  const several = list.length > 1;
+  list.forEach((t, i) => {
+    targets.set(t.id, { name: t.name, provider: t.provider, company: null, creds: null });
+    const card = addTarget(t, i);
+    card.open = !several || t.id === current;
+    card.classList.toggle('current', several && t.id === current);
+  });
+  document.getElementById('page-hint').style.display = several ? 'block' : 'none';
+  document.getElementById('targets-summary').style.display = several ? 'block' : 'none';
+  document.getElementById('providers-link').style.display = (several && user.role === 'test_manager') ? 'block' : 'none';
+  renderSummary();
+  await Promise.all(list.map(t => loadTarget(document.getElementById('target-' + t.id))));
+  if (several && current !== list[0].id) openTarget(current);
+}
+
+document.getElementById('targets-summary-rows').addEventListener('click', (e) => {
+  const link = e.target.closest('a[data-open]');
+  if (!link) return;
+  e.preventDefault();
+  openTarget(link.dataset.open);
 });
 
-loadProfile();
+// Text typed in a section and not saved would be lost with the page (changing
+// "Working on" reloads it): ask first.
+window.addEventListener('beforeunload', (e) => {
+  if (document.querySelector('details.target[data-unsaved="1"]')) e.preventDefault();
+});
+
+buildPage().catch((e) => { console.error(e); showMsg('The page could not be loaded: ' + (e?.message || e), false); });
 </script>
 <footer class="site-footer">
   <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
@@ -513,5 +749,3 @@ loadProfile();
 </footer>
 </body>
 </html>
-
-

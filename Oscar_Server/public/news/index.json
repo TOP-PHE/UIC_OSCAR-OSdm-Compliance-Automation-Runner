@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-09-api-config-all-providers",
+    "date": "October 9, 2026",
+    "tag": "Improvement",
+    "title": "API Config shows your company and all its providers on one page",
+    "summary": "When your company has providers, API Config now lists them all: one section each, with its endpoint and your credentials for it, and a summary of what is still missing. You no longer switch \"Working on\" to configure each one.",
+    "content": "API Config used to show one thing at a time: your company, or the provider chosen in \"Working on\". To set up three providers you had to choose one, fill the page, choose the next, and nothing told you what the credentials on screen were for when the page was on your own company.\n\nThe page now has one section for your company and one for each provider you may use. A table at the top shows, for each, the endpoint and whether your credentials and the test data are set. Each section has its own Save button, named after it (\"Save configuration for Beta\"), and saving one section never changes another. A section with text you have not saved is marked.\n\n\"Working on\" still chooses what Test Config, New Run, the Dashboard and the reports show. On API Config it only decides which section is opened first.\n\nNothing to do: what you had entered is unchanged. If your company has no provider, the page looks as before, except that the credentials card now names your company."
+  },
+  {
     "id": "2026-10-08-stale-save-refused",
     "date": "October 8, 2026",
     "tag": "Improvement",

@@ -234,6 +234,37 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `tests/unit/profile-endpoint.test.js` runs an HTML page's own functions and
   `const` lines in a `vm`, the way `scenarios-load-guard.test.js` does for a
   script file.
+- **API Config is one page for the company and all its providers; "Working on"
+  is for the working pages only** (#580, v1.11.220, maintainer feedback from
+  the first real set-up). Configuration is a list: one section per company or
+  provider, each saved on its own. Before, the page followed the selector, and
+  the company's own card did not say what its credentials were for, so a
+  second provider's credentials were typed over the first. Page only, no route
+  changed. What holds it together:
+  - **Every request of a section names its company or provider**
+    (`inTarget(card)` adds `X-Provider-Id`). `nav.js` adds the selected
+    provider only to a request that names none, so a request that forgot the
+    header would silently act on whatever "Working on" says.
+  - **The own company is read with an empty `X-Provider-Id`.** The server
+    reads `''` as "names none" (`requestedProviderId`), and an empty header
+    still counts as "named" for `nav.js`. Both halves are pinned by a test;
+    change either and the company's section shows the selected provider.
+  - **A section's fields are found by `data-f` inside the section, never by
+    id.** The section is a `<template>` copied once per target, and
+    `getElementById` would return the first copy's field. The template does
+    carry ids, but only to tie each label to its field: Sonar types an input
+    without a static `id` and `<label for>` as a *bug*
+    (`Web:InputWithoutLabelCheck`, 12 of them failed the gate on the first
+    push), and tying them by script is invisible to it. `addTarget()` makes
+    those ids unique in each copy *before* the copy enters the page. Tests pin
+    it: every id in the template is a labelled field, the rewrite comes before
+    the insertion, and the script never looks a field up by id.
+  - **A save re-reads its own section only.** Text typed in another section
+    stays, and stays unsaved; that section is marked "not saved" and the page
+    asks before it is left.
+  - **A provider's name is text, never markup**: `textContent` in the section,
+    `esc()` in the summary table. Checked in a browser with a provider named
+    `Alpha <b>&`.
 - **Providers: one company, several OSDM systems** (#540, PR 1 = v1.11.216;
   PR 2 the UI, PR 3 scenario copy with trip re-mapping). A provider is a child
   company (`companies.parent_id`) and reuses every per-company table by its own

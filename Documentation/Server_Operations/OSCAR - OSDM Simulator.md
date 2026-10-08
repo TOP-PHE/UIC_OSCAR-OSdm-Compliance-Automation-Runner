@@ -151,27 +151,30 @@ runs must not see each other's.
 ## 6. Several providers for one distributor (#540)
 
 In OSCAR, one company or provider has one endpoint, and each user has one set
-of credentials for it. **API Config always shows the one named at its top and
-in the menu's *Working on* selector.** Credentials for `beta` entered while the
-page shows the company itself replace the ones entered for `alpha`: they are
-not added next to them.
+of credentials for it. A second simulated provider is therefore a second
+provider of the company, not a second set of credentials on the same one.
 
-To use a second simulated provider, a Test Manager adds it as a provider:
+A Test Manager sets it up like this:
 
 1. Menu **Providers** → *Add a provider*: a name (for example `Beta`) and the
    endpoint `https://<simulator-host>/beta`. Tick the testers who may use it.
-2. The menu bar now shows **Working on**. Choose `Beta`. The page reloads and
-   every page of that browser tab works on `Beta`.
-3. **API Config** now reads *Beta — Shared API Endpoint* and *Your Credentials
-   for Beta*. Enter the token URL `https://<simulator-host>/beta/oauth/token`
-   and a client of `beta` from `clients.json`. Each user does this for
-   themselves.
+2. **API Config** now has a section for `Beta`, next to the company's and the
+   other providers', and its table at the top shows what is still missing.
+   Open the `Beta` section, enter the token URL
+   `https://<simulator-host>/beta/oauth/token` and a client of `beta` from
+   `clients.json`, and press *Save configuration for Beta*. Each section is
+   saved on its own, and each user enters their own credentials.
+3. In the menu bar, set **Working on** to `Beta`. Test Config, New Run, the
+   Dashboard and the reports of that browser tab now work on `Beta`.
 4. **Test Config** → *Upload datafile*, the same file as in section 5: a
    provider has its own data file and Test Framework.
-5. Run a scenario. Switch *Working on* back to the company, or to another
+5. Run a scenario. Set **Working on** back to the company, or to another
    provider, to run there.
 
-Do the same for `gamma`. What this arrangement shows: a user who enters
+Do the same for `gamma`. Before v1.11.220, API Config showed one section only,
+the one chosen in **Working on**: on such a version, do step 3 before step 2.
+
+What this arrangement shows: a user who enters
 `alpha`'s client on the `Beta` provider gets no token, and a token of `alpha`
 sent to `beta` is refused with 401. A mix-up between providers is a failed run,
 not a passing one, and every identifier in a report starts with the name of the
