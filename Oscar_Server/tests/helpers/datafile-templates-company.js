@@ -46,7 +46,10 @@ function templatesCompany() {
     { algorithm: 'HS256', expiresIn: '1h' });
 
   function scenario(code, owner, base, shared = false) {
+    // #549: what the datafile schema requires, so that the upload accepts it.
     return {
+      collection: 'OTST_TEST', loggingType: 'INFO', scenarioType: 'SALE', scenarioAction: null,
+      osdmVersion: '3.8.0', overruleCode: null,
       code, shared, ...(owner ? { created_by: owner.email } : {}),
       tripRequirementId: base, passengersListId: base + 1, purchaserListId: base + 2,
       requestedFulfillmentOptionsListId: base + 3,
@@ -63,10 +66,12 @@ function templatesCompany() {
                  scenariosToRun: parts.map(([s]) => s.code), systemInfoParameters: { owner: 'company' } };
     for (const [s, tag] of parts) {
       df.scenarios.push(s);
-      df.tripRequirements.push({ id: s.tripRequirementId, tag });
-      df.passengersList.push({ id: s.passengersListId, tag, passengers: [{ firstName: 'Ada' }] });
-      df.purchaserList.push({ id: s.purchaserListId, tag });
-      df.requestedFulfillmentOptionsList.push({ id: s.requestedFulfillmentOptionsListId, tag });
+      df.tripRequirements.push({ id: s.tripRequirementId, tag, tripType: 'SEARCH' });
+      df.passengersList.push({ id: s.passengersListId, tag, passengers: [{ firstName: 'Ada',
+        reference: '1', dateOfBirth: '1990-01-01', lastName: 'L', phoneNumber: '+1', email: 'p@example.org', type: 'PERSON' }] });
+      df.purchaserList.push({ id: s.purchaserListId, tag, purchaser: [{ purchaserFirstName: 'P', purchaserLastName: 'Q', purchaserEmail: 'p@example.org' }] });
+      df.requestedFulfillmentOptionsList.push({ id: s.requestedFulfillmentOptionsListId, tag,
+        requestedFulfillmentOptions: [{ fulfillmentType: 'ETICKET', fulfillmentMedia: 'PDF_A4' }] });
     }
     if (legacy) {
       df.scenarios.find(s => s.code === 'SHARED_1').label = `shared ${TOKEN}`;

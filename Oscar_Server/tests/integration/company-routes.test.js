@@ -25,6 +25,7 @@ const jwt     = require('jsonwebtoken');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
+const { asValidDatafile } = require('../helpers/valid-datafile');
 const { run, get } = require('../../src/db/db');
 
 const app = buildAppWithRoute('/v1/company', '../../src/api/routes/company');
@@ -44,10 +45,11 @@ function makeToken(role, uid = testMgrId, cid = companyId) {
   );
 }
 
-const VALID_DATAFILE = {
+// #549: a whole data file, since an upload is checked against the schema.
+const VALID_DATAFILE = asValidDatafile({
   scenarios:    [{ code: 'OTST_BKG_CREATE_1ADT_1LEG', name: 'Create 1-leg booking' }],
   scenariosToRun: ['OTST_BKG_CREATE_1ADT_1LEG']
-};
+});
 
 beforeAll(() => {
   run(`INSERT OR IGNORE INTO companies (id, name, slug) VALUES (?, 'Company Route Test', 'company-route-test')`, [companyId]);

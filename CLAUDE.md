@@ -433,6 +433,38 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     documented use) and the two root keys only a Test Manager writes.
   - Two test files cover the routes because `datafileMutationLimiter` allows
     twenty writes per app instance: a test file that makes more gets 429.
+- **An upload replaces the data file and nothing else; Download JSON is the
+  stored file** (#549, v1.11.221). Rules that will bite:
+  - **The upload's schema check is the collection's, not JSON Schema.**
+    `utils/datafileSchema.js` re-states `validateDataFileJsonWithTemplate`
+    (`library-bruno/validators.js`): type, enum, min/maxLength, required,
+    `properties` only when `type` is the word `"object"`, `items` only when it
+    is `"array"`, and its list of field names whose null passes. No AJV, no
+    `minimum`: a stricter check would refuse files every run accepts.
+    `tests/unit/datafile-schema.test.js` runs both over 3,000 broken variants
+    of the sample files and fails on any disagreement, so change both or
+    neither. It reads the schema from `COLLECTION_PATH` at each upload (the
+    collection is refreshed without a restart), the repository copy as
+    fallback; a test that needs the real schema sets `COLLECTION_PATH` to the
+    repository's `Bruno_Collection`, because another test file briefly writes
+    a stub schema into the shared dummy one.
+  - **Uploaded bytes are stored as they are**, `knownDeviations` included, so
+    a Test Manager's download uploaded again leaves the hash unchanged. Do not
+    re-project or re-indent on upload.
+  - **A download that is not the stored file carries a root marker**
+    (`__oscarPersonalView` for a tester's view, `__oscarUnsavedEdits` for the
+    page's working copy) and the upload refuses it (`NOT_THE_COMPANY_FILE` in
+    `company.js`). A new export of a view or of unsaved state needs one too.
+  - **One previous file per company**, `{slug}-datafile.previous.json`,
+    encrypted, written only by an upload and a restore (never by Save &
+    Apply: the next auto-save would replace it), before the live file. Restore
+    swaps the two; delete removes both.
+  - **The page never writes the framework or test data on upload.** Creating
+    them from a file is `offerBuildFromUpload()`, asked, and only after a 404
+    framework or a Test Data list with no train (`loadForEdit`, #534). Every
+    upload test sends a schema-valid file: `tests/helpers/valid-datafile.js`.
+  - A parser refusal is answered by `parseUpload` (400, or 413 for size); the
+    global error handler only ever sees real errors.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
@@ -950,6 +982,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Oscar_Server/src/utils/scenarioCopy.js` | rules of copying scenarios between providers, #540 |
 | `Oscar_Server/public/js/trip-apply.js` | the one "Apply test data" implementation (browser + server), #540 |
 | `Oscar_Server/src/utils/datafileVersion.js` | the data file version (ETag) a Test Config save is checked against, #540 |
+| `Oscar_Server/src/utils/datafileSchema.js` | the upload's data file check: the collection's run-time schema rules, re-stated and pinned to `validators.js` by a test, #549 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |

@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.246",
+  "current_release": "2026.247",
   "releases": [
+    {
+      "release": "2026.247",
+      "date": "2026-10-09",
+      "server": "1.11.221",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#549): Test Config's \"Upload datafile\" and \"Download JSON\" are a safe round trip. Server and page; collection unchanged at OTST_V2.0.104.",
+        "An upload replaces the data file and nothing else. The page no longer rebuilds the Test Framework (it replaced the stored one, before the upload was sent) nor adds trains to Test Data; creating them from the file is offered only to a company that has none, and asked first.",
+        "POST /v1/company/datafile checks the file before replacing anything: the data file schema, with the collection's own rules (utils/datafileSchema.js, pinned to library-bruno/validators.js by a test over 3,000 variants), a download marked as a tester's personal view or as unsaved edits, and the template rule. Refusals are 400 with the reason and, for the schema, the list of problems. A wrong file type is 400 \"Only JSON files are accepted.\" (it was 500).",
+        "The file an upload replaces is kept, encrypted, one per company ({slug}-datafile.previous.json). GET /v1/company/datafile/previous describes it; POST /v1/company/datafile/previous/restore swaps it with the live file, so a restore can be undone. Test Managers only, under the per-company lock. A delete removes both.",
+        "GET /v1/company/datafile/download: for a Test Manager the stored file byte for byte, named {slug}-datafile-{date}.json, so a download uploaded again leaves the hash unchanged; for a tester their view, marked __oscarPersonalView and refused by the upload. The page's working copy has its own button, \"Download unsaved edits\", also marked and refused.",
+        "The page confirms an upload and a restore with the scenario counts now and after. Not checked against If-Match, on purpose (#540). How it was checked: route tests (round trip, refusals with the stored file unchanged, previous/restore, provider scope), page tests in the vm harness, a parity test against the collection's validator; 23 deliberate breaks, all caught; the whole flow in Chromium on a throwaway server."
+      ]
+    },
     {
       "release": "2026.246",
       "date": "2026-10-09",
