@@ -899,7 +899,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     name the folders; and `scenarioTarget` in a collection run repeats the
     same scenario without end; one scenario is `scenario_override`, as OSCAR
     does. Standalone and through OSCAR give the same checks (173 and 234),
-    plus the two of the token request standalone.
+    plus the two of the token request standalone. **`bru run` writes the
+    run's variables back into the environment file** (secret variables
+    excepted): check its size before committing it; #593's first push carried
+    918 lines of run state.
   - **`node --test` takes a glob, not a directory**, on Node 22 and later
     (`node --test "tests/*.test.js"`), and its lcov reporter does not create the
     destination directory. Sonar's coverage run starts from the repository root

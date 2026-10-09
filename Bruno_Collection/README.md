@@ -100,6 +100,11 @@ Name the folders: `bru run` on the whole collection leaves out
 `--env-var api_base=https://<simulator-host>/gamma` for the installed
 simulator, and `--reporter-json <file>` for Bruno's own results.
 
+**`bru run` writes the run's variables back into the environment file**
+(about 800 lines: the data file, the booking, the passengers; never the
+secret variables nor the token). Do not commit that; put the file back with
+`git checkout -- environments/OTST_Simulator_Env.yml` after a run.
+
 ### 5. What to expect
 
 `SIM_SALE_SEARCH_1ADT` and `SIM_SALE_SEARCH_2ADT_SAVER` pass with no failed

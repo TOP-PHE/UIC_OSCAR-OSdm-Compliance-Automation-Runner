@@ -83,7 +83,9 @@ unchanged (1.11.222). No request or validator changed.
     one scenario (`scenario_override`). Two things it warns about, both seen
     with `bru` 4.2.1: `bru run` on the whole collection leaves out
     `00-Access Token`, so the folders are named; and `scenarioTarget` repeats
-    the same scenario without end in a collection run.
+    the same scenario without end in a collection run. A third: `bru run`
+    writes the run's variables back into the environment file, which must not
+    be committed that way.
 
 ### Changed
 
@@ -111,7 +113,7 @@ unchanged (1.11.222). No request or validator changed.
 
 Issue #545, first of two pull requests: the Docker image installs a fixed
 Bruno CLI and starts from a fixed base image. Image and CI only; no server
-code change. Collection unchanged (OTST_V2.0.104).
+code change. Collection unchanged (OTST_V2.0.105).
 
 ### Changed
 
@@ -170,7 +172,7 @@ code change. Collection unchanged (OTST_V2.0.104).
 ## [server-1.11.221] — 2026-10-09
 
 Issue #549: "Upload datafile" and "Download JSON" in Test Config are a safe
-round trip. Server and page. Collection unchanged (OTST_V2.0.104).
+round trip. Server and page. Collection unchanged (OTST_V2.0.105).
 
 ### Fixed
 
