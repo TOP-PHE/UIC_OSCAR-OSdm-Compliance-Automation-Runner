@@ -183,10 +183,16 @@ test('a clients file is written with random secrets the simulator accepts, and i
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), written);
 });
 
-test('with a generated clients file, each client gets a token from its own provider only', async (t) => {
-  const file = path.join(tempDir(), 'clients.json');
-  makeClients.writeClientsFile(file, loadProviders(PROVIDERS_DIR), { managers: 3, testers: 3 });
-  const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+test('clients named this way each get a token from their own provider only', async (t) => {
+  // The ids are the script's; the secrets are made here and written to the
+  // file, never read back from it. (The file the script itself writes is
+  // checked against the simulator's loader in the test above.)
+  const secretOf = (id) => `secret-of-${id}-`.padEnd(48, '0');
+  const written = {};
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    written[key] = makeClients.clientIds(key, { managers: 3, testers: 3 }).map((id) => ({ client_id: id, client_secret: secretOf(id) }));
+  }
+  const file = writeClientsFile(written);
   t.mock.method(console, 'log', () => {});
   const server = start({ SIM_PORT: '0', SIM_CLIENTS_FILE: file }, baseDir);
   await listening(server);
