@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.245",
+  "current_release": "2026.246",
   "releases": [
+    {
+      "release": "2026.246",
+      "date": "2026-10-09",
+      "server": "1.11.220",
+      "collection": "OTST_V2.0.105",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#550): the booking validator pairs each part of the offer with its booked part by content, not by position. Collection only; server unchanged at 1.11.220.",
+        "OSDM gives a booked part no reference to the offer part it was made from and does not fix the order of the booked parts. A booking that listed the same five admissions in another order was compared ADULT against SENIOR and so on: up to 15 false failures per run, and a pass rate that changed from run to run with nothing changed at the provider.",
+        "bookings.js pairOfferParts(): every offer part / booked part pair gets a ranked score (same id > same passenger references > same passenger types > same products and trip coverage > same validity instant > same price > offerMode, isReservationRequired, after-sales conditions); the best pairs are taken first; ties are broken by the parts' own text, never by position. A reordered booking is logged once at INFO with the pairs.",
+        "An admission of the offer with no booked counterpart is one failure naming the part (once across the booking re-reads, as #383); its field checks are skipped. A missing reservation or ancillary part stays a WARNING, as before, because those parts can be optional. Booked parts that no part of the selected offer takes (a combined return booking, an added ancillary) are logged at INFO.",
+        "Tests: tests/unit/bruno-bookings-part-pairing.test.js (17). The same offer and booking give identical assertions and failures in all 120 orders of five parts; 15 of the 17 fail against the previous code (the two that pass: the fixture check, and a tie-break test that only means something for the new pairing), and 12 targeted mutations of the new code are each caught."
+      ]
+    },
     {
       "release": "2026.245",
       "date": "2026-10-09",
