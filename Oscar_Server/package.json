@@ -44,7 +44,7 @@
   "devDependencies": {
     "eslint": "~9.39.5",
     "jest": "^30.5.2",
-    "js-yaml": "^4.3.1",
+    "js-yaml": "^5.4.3",
     "supertest": "^7.3.1"
   },
   "_notes": "SQLite via built-in node:sqlite (Node.js 22+) — no native compilation needed",
