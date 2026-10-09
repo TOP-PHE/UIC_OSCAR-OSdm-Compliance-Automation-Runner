@@ -74,6 +74,17 @@ updates:
       - dependency-name: dotenv
         update-types:
           - version-update:semver-major
+      # js-yaml (dev): the unit tests use it as the parser the Bruno CLI uses,
+      # to prove that Bruno reads back the environment file worker/runner.js
+      # writes (CLAUDE.md, "Nothing reaches a run's child processes…"). That
+      # proof holds only on the same major as the pinned Bruno CLI, which
+      # ships js-yaml 4 (Oscar_Server/bruno-cli/package-lock.json). The
+      # "$js-yaml" override would also carry a v5 into the whole server tree.
+      # Move to v5 together with a Bruno CLI that uses it, not on its own
+      # (PR #606).
+      - dependency-name: js-yaml
+        update-types:
+          - version-update:semver-major
 
   # ── npm: the Bruno CLI (Oscar_Server/bruno-cli, #545) ───────────────────────
   # Its own directory, so Dependabot sees it as a separate project. A new
