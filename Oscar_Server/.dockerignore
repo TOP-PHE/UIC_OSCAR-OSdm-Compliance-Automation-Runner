@@ -10,3 +10,4 @@ oscar-user-management.ps1
 .claude/
 *.log
 *.md
+**/node_modules/

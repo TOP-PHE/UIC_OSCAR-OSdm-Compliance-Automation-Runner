@@ -62,6 +62,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.222] — 2026-10-09
+
+Issue #545, first of two pull requests: the Docker image installs a fixed
+Bruno CLI and starts from a fixed base image. Image and CI only; no server
+code change. Collection unchanged (OTST_V2.0.104).
+
+### Changed
+
+- **The Bruno CLI is installed from a lockfile.** The new
+  `Oscar_Server/bruno-cli/package.json` names `@usebruno/cli` **4.2.1**, the
+  version production already runs (assessment item N2), and its
+  `package-lock.json` fixes the whole tree with integrity hashes. The image
+  installs it with `npm ci` into `/opt/bruno-cli`; `/usr/local/bin/bru` is a
+  link to it, so `BRU_CMD` does not change. `ci-collection.yml` installs the
+  same lockfile, so CI and production run the same engine. Before, both ran
+  `npm install -g @usebruno/cli`: production went from Bruno 3 to 4 at a
+  rebuild between July and October without anyone deciding it.
+- **The hand patches of Bruno's tree are `overrides`** (#428, #532). The
+  Dockerfile unpacked axios, form-data, nanoid, @faker-js/faker and js-yaml
+  over every copy it found, because a global install has no root
+  `package.json` to carry overrides. Now: axios `^1.20.0`, form-data `^4.0.6`,
+  @faker-js/faker `^10.5.0`, js-yaml `^4.3.2` (installed 1.20.0, 4.0.6, 10.6.0,
+  4.3.2). nanoid needs none: Bruno 4.2.1 ships the patched 3.3.18. The ranges
+  are floors, not ceilings, so Dependabot can still move them.
+- **Both `FROM` lines name `node:22-slim` by digest**
+  (`sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`,
+  Node 22.23.3, published 2026-10-06; read from the registry through two
+  Docker Hub mirrors, which agree). Two builds of the same commit start from
+  the same image.
+- `npm ci --ignore-scripts`: the only install script in the Bruno tree is
+  protobufjs's postinstall, which prints a version-scheme warning and does
+  nothing else. Skipping it changes nothing, and a dependency added later
+  cannot run code at build time unnoticed.
+- Dependabot watches `Oscar_Server/bruno-cli` (npm, weekly). The docker
+  ecosystem already updates the digest.
+- `CONTRIBUTING.md` says how each pin is updated, and that a developer
+  machine should run the pinned Bruno version.
+
+### Checked
+
+- The Bruno stage built on the pinned base: `bru --version` gives 4.2.1 as
+  the `node` user, npm is removed afterwards, one copy each of axios 1.20.0,
+  form-data 4.0.6, @faker-js/faker 10.6.0, js-yaml 4.3.2. A request using a
+  faker variable (`{{$randomFirstName}}`) runs and passes.
+- Trivy (HIGH, CRITICAL, fixed only): no finding in the Bruno tree. The same
+  scan of Bruno 4.2.1 installed without the overrides reports axios 1.18.0,
+  form-data 4.0.4, @faker-js/faker 9.9.0 and js-yaml 4.3.1, so the scan does
+  see what the overrides fix.
+
+### Left open on purpose
+
+- `apt-get upgrade` still runs on every build: Debian security fixes arrive
+  between base-image rebuilds. The digest fixes the starting point, not the
+  packages that step adds.
+- The GitHub Actions pins (item 3 of #545) are a separate pull request.
+- Out of scope per #545: recording the Bruno version on each run, `engines`,
+  image signing, an SBOM.
+
+---
+
 ## [server-1.11.221] — 2026-10-09
 
 Issue #549: "Upload datafile" and "Download JSON" in Test Config are a safe

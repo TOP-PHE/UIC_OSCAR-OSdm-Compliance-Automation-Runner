@@ -513,6 +513,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   why, and revisit it whenever an advisory names that package. Symptom to
   recognise: a Dependabot alert that stays open with no PR, or a PR that
   changes nothing in the lockfile.
+- **The Bruno CLI and the base image are pinned** (#545, v1.11.222). The
+  CLI comes from `Oscar_Server/bruno-cli/package.json` + `package-lock.json`
+  (exact `@usebruno/cli`, 4.2.1 at that release), installed with `npm ci`
+  into `/opt/bruno-cli` by the Dockerfile and by `ci-collection.yml`, so CI
+  validates the collection against the engine production runs. Production
+  had moved from Bruno 3 to 4 at an unremarked rebuild; that is what this
+  stops. Things that will bite:
+  - **`/usr/local/bin/bru` is a symlink to `node_modules/.bin/bru`**, which
+    is itself one. Node resolves the chain to `bin/bru.js`, so its relative
+    requires work; `BRU_CMD` in `OSCAR_Deploy` names that path. Never `COPY`
+    the link out of a stage: `COPY` resolves it and copies only the shim.
+  - **The hand patches of #428/#532 are `overrides` now.** They failed with
+    `EOVERRIDE` before only because a global install has no root package and
+    axios was a *direct* dependency of the thing installed. Here the root's
+    one dependency is `@usebruno/cli`, so overriding its dependencies is
+    allowed. Keep them `^` floors. nanoid has none: 4.2.1 ships 3.3.18.
+  - **`--ignore-scripts`**: the one install script in the tree today is
+    protobufjs's postinstall, a warning printer. When a Bruno upgrade adds a
+    `hasInstallScript` to the lockfile, read that script before deciding;
+    a missing native build fails at `bru --version` in the image build.
+  - **Both `FROM` lines carry a digest.** Docker Hub rate-limits shared IPs
+    (429); `mirror.gcr.io/v2/library/node/manifests/22-slim` and
+    `public.ecr.aws` give the same index digest without an account. Read the
+    index digest, not one platform's.
+  - A new Bruno version is a server release (bump + `compatibility.json`),
+    even though no server code changes: it is the engine of every run.
 - **Several Dependabot npm PRs open at once: combine them** (2026-10-06, #547).
   `main` requires a branch to be up to date before merging, and every npm
   update touches `package-lock.json`, so five PRs mean five rounds of rebase

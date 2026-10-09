@@ -563,7 +563,13 @@ git pull origin Bruno-Enhancements
 
 ### 11.3 Upgrading Bruno CLI
 
-To update the Bruno CLI to the latest version:
+> **Docker deployments (v1.11.222+):** the image carries the Bruno CLI at the
+> version fixed in `Oscar_Server/bruno-cli/package-lock.json`. Do not update it
+> inside the container; a new version arrives with a new image (§15.24). On a
+> machine without Docker, install the same version:
+> `npm install -g @usebruno/cli@<version in Oscar_Server/bruno-cli/package.json>`.
+
+To update the Bruno CLI to the latest version (non-Docker installations only):
 
 ```powershell
 npm update -g @usebruno/cli
@@ -1604,3 +1610,20 @@ section, as before.
   certifiers are refused, as on every data file route.
 - Nothing to configure. The upload is still not checked against `If-Match`
   (§15.21): it replaces the file on purpose.
+
+### 15.24 v1.11.222 — the image installs a fixed Bruno CLI on a fixed base image (#545)
+
+Nothing to configure. What changes for an operator:
+
+- **The Bruno CLI version is decided by a pull request, not by the day of the
+  build.** The image installs Bruno CLI 4.2.1 (the version production already
+  ran) and its whole dependency tree from
+  `Oscar_Server/bruno-cli/package-lock.json`. `BRU_CMD=/usr/local/bin/bru`
+  still works: that path is now a link to `/opt/bruno-cli`. To see the version
+  of a running container: `sudo docker compose exec oscar bru --version`.
+- **The base image is named by digest** (`node:22-slim@sha256:…`), so
+  rebuilding the same release gives the same starting image. The Debian
+  security updates (`apt-get upgrade`) are still applied at each build.
+- A new Bruno or base image version reaches production only as a new server
+  release, after CI has validated the collection against it.
+
