@@ -39,6 +39,7 @@ const crypto  = require('crypto');
 const jwt     = require('jsonwebtoken');
 const request = require('supertest');
 const { buildAppWithRoute } = require('../helpers/test-app');
+const { asValidDatafile } = require('../helpers/valid-datafile');
 const { run, get } = require('../../src/db/db');
 const { encryptToFile, decryptFromFile } = require('../../src/utils/at-rest');
 
@@ -69,7 +70,9 @@ function makeToken(role, uid, cid = companyId) {
 }
 
 const BASELINE = { scenarios: [{ code: 'OTST_BASELINE_SENTINEL' }], scenariosToRun: ['OTST_BASELINE_SENTINEL'] };
-const HOSTILE  = { scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE' }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] };
+// #549: a whole data file, or the upload would be refused for its shape
+// rather than for who sent it.
+const HOSTILE  = asValidDatafile({ scenarios: [{ code: 'OTST_HOSTILE_OVERWRITE' }], scenariosToRun: ['OTST_HOSTILE_OVERWRITE'] });
 // What the editor sends for a tester's own new scenario: it always stamps their
 // email. Since v1.11.197 a tester's save is merged, not a whole-file replace, and
 // a scenario that does not carry their ownership is not stored as theirs.
@@ -263,7 +266,13 @@ describe('POST /v1/company/datafile by the test manager', () => {
     expect(sha256(after.plain)).toBe(after.hash);
     // Encrypted at rest — the plaintext upload never sits on disk.
     expect(after.bytes.toString('utf8')).not.toContain('OTST_HOSTILE_OVERWRITE');
-    expect(strayFiles()).toEqual([]);
+    // #549: the file it replaced is kept, encrypted like the live one, and
+    // nothing else is left behind.
+    expect(strayFiles()).toEqual([`${slug}-datafile.previous.json`]);
+    const previousPath = path.join(DATAFILES_DIR, `${slug}-datafile.previous.json`);
+    expect(decryptFromFile(previousPath).toString('utf8')).toContain('OTST_BASELINE_SENTINEL');
+    expect(fs.readFileSync(previousPath).toString('utf8')).not.toContain('OTST_BASELINE_SENTINEL');
+    expect(res.body.previous).toEqual({ hash: sha256(decryptFromFile(previousPath).toString('utf8')), scenarios_count: 1 });
   });
 });
 

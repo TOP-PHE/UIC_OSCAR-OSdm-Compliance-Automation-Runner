@@ -14,7 +14,11 @@ module.exports = {
   postCreateBookingResponse,
   validateFulfillments,
   alignPassengerIdsToSubmittedOrder,
-  isPostConfirmationStage
+  isPostConfirmationStage,
+  pairOfferParts,
+  // Not under its own name: offers.js exposes a different validateOfferParts
+  // on globalThis.
+  validateBookedOfferParts: validateOfferParts,
 };
 
 // ─── Passenger id ordering ───────────────────────────────────────────────────
@@ -404,18 +408,178 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
   });
 }
 
+// ─── Offer part ↔ booked part pairing (#550) ─────────────────────────────────
+// OSDM gives a booked part no reference to the offer part it was made from,
+// and does not require the booking to list its parts in the offer's order.
+// Pairing by position compared, e.g., the offer's ADULT admission with the
+// booking's SENIOR one. Parts are paired by content instead: every pair gets
+// a score, and the best-scoring pairs are taken first. The weights are
+// ranked (a higher criterion outweighs all lower ones together):
+//   same id > same passenger references > same passenger types >
+//   same products, same trip coverage > same validity > same price >
+//   same offerMode / isReservationRequired / after-sales conditions.
+// Ties are broken by the offer part's position and then by the booked part's
+// own text, never by its position, so the same booking listed in any order
+// gives the same pairs and therefore the same assertions.
+
+const _sortedJoin = (values) => values.filter((v) => v != null && v !== '').map(String).sort(_compareText).join('|');
+
+function _instant(value) {
+  if (!value) return '';
+  const t = new Date(value).getTime();
+  return Number.isNaN(t) ? String(value) : String(t);
+}
+
+function _passengerTypesOf(part) {
+  return Array.isArray(part.appliedPassengerTypes) ? part.appliedPassengerTypes.filter(Boolean) : [];
+}
+
+function _partSignature(part, refList) {
+  const pts = _passengerTypesOf(part);
+  const coverage = part.tripCoverage || {};
+  const products = Array.isArray(part.products) ? part.products.filter(Boolean) : [];
+  const conditions = part.afterSalesConditions || part.afterSaleConditions;
+  return {
+    id: part.id == null ? '' : String(part.id),
+    ptRefs: _sortedJoin(pts.map((pt) => pt.passengerRef)),
+    listRefs: _sortedJoin(Array.isArray(refList) ? refList : []),
+    types: _sortedJoin(pts.map((pt) => pt.type)),
+    products: [part.summaryProductId || '', _sortedJoin(products.map((p) => `${p.productId || ''}@${p.legId || ''}`))].join('#'),
+    coverage: [coverage.coveredTripId || '', _sortedJoin(Array.isArray(coverage.coveredLegIds) ? coverage.coveredLegIds : [])].join('#'),
+    validFrom: _instant(part.validFrom),
+    validUntil: _instant(part.validUntil),
+    price: part.price ? `${part.price.amount}|${part.price.currency}` : '',
+    offerMode: part.offerMode == null ? '' : String(part.offerMode),
+    isReservationRequired: part.isReservationRequired == null ? '' : String(part.isReservationRequired),
+    conditions: Array.isArray(conditions)
+      ? _sortedJoin(conditions.filter(Boolean).map((c) => `${c.condition}:${c.afterSaleFee ? c.afterSaleFee.amount : ''}`))
+      : '',
+  };
+}
+
+const _PAIR_WEIGHTS = [
+  ['id', 1e6], ['types', 1e4], ['products', 1e3], ['coverage', 1e3],
+  ['validFrom', 100], ['validUntil', 100], ['price', 10],
+  ['offerMode', 1], ['isReservationRequired', 1], ['conditions', 1],
+];
+const _NO_VALUE = new Set(['', '#']);
+
+function _pairScore(o, b) {
+  let score = 0;
+  // Passenger references: the same field on both sides, or the offer part's
+  // passengerRefs against the booked part's passengerIds.
+  if ((o.ptRefs && o.ptRefs === b.ptRefs) || (o.listRefs && o.listRefs === b.listRefs)) score += 1e5;
+  _PAIR_WEIGHTS.forEach(([key, weight]) => {
+    if (!_NO_VALUE.has(o[key]) && o[key] === b[key]) score += weight;
+  });
+  return score;
+}
+
+// Code-unit order, not localeCompare: two different texts never compare equal.
+function _compareText(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/**
+ * Pair the offer's parts with the booking's parts by content (#550).
+ *
+ * @param {Array} offerParts   e.g. selectedOffer.admissionOfferParts
+ * @param {Array} bookedParts  e.g. bookedOffers.flatMap(b => b.admissions)
+ * @returns {{pairs: Array<{offerIndex:number, bookedIndex:number, typesMatch:boolean}>,
+ *            missing: number[], extra: number[], reordered: boolean}}
+ *   `pairs` in offer order; `missing` = offer parts with no booked part left,
+ *   `extra` = booked parts no offer part took; `reordered` = some pair does
+ *   not sit at the same position on both sides.
+ */
+function pairOfferParts(offerParts, bookedParts) {
+  const offers = Array.isArray(offerParts) ? offerParts : [];
+  const booked = Array.isArray(bookedParts) ? bookedParts : [];
+  const oSig = offers.map((p) => _partSignature(p || {}, p?.passengerRefs));
+  const bSig = booked.map((p) => _partSignature(p || {}, p?.passengerIds));
+  const bText = booked.map((p) => JSON.stringify(p) || '');
+  const candidates = [];
+  offers.forEach((o, oi) => {
+    booked.forEach((b, bi) => {
+      if (o && b) candidates.push({ oi, bi, score: _pairScore(oSig[oi], bSig[bi]) });
+    });
+  });
+  candidates.sort((x, y) => (y.score - x.score)
+    || (x.oi - y.oi)
+    || _compareText(bText[x.bi], bText[y.bi])
+    || (x.bi - y.bi));
+  const offerTaken = new Array(offers.length).fill(-1);
+  const bookedTaken = new Array(booked.length).fill(false);
+  for (const c of candidates) {
+    if (offerTaken[c.oi] === -1 && !bookedTaken[c.bi]) {
+      offerTaken[c.oi] = c.bi;
+      bookedTaken[c.bi] = true;
+    }
+  }
+  const pairs = [];
+  const missing = [];
+  offerTaken.forEach((bi, oi) => {
+    if (bi === -1) { missing.push(oi); return; }
+    pairs.push({ offerIndex: oi, bookedIndex: bi, typesMatch: oSig[oi].types === bSig[bi].types });
+  });
+  const extra = [];
+  bookedTaken.forEach((taken, bi) => { if (!taken) extra.push(bi); });
+  return { pairs, missing, extra, reordered: pairs.some((p) => p.offerIndex !== p.bookedIndex) };
+}
+
+function _describePart(part) {
+  part = part || {};
+  const types = _passengerTypesOf(part).map((pt) => pt.type).filter(Boolean);
+  const typesText = types.length ? ', passenger types ' + types.join(', ') : '';
+  return `id=${part.id}${typesText}`;
+}
+
 // ─── Part-level orchestrator ─────────────────────────────────────────────────
 
 function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOffersStatus) {
   const _idsRaw = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
   const ids = Array.isArray(_idsRaw) ? _idsRaw : JSON.parse(_idsRaw || "[]");
 
-  offerParts.forEach((part, index) => {
-    const bookedPart = bookedParts[index];
-    if (!bookedPart) {
-      validationLogger(`[WARNING] No booked ${partType}[${index}] found for offer part id=${part.id}`);
+  const pairing = pairOfferParts(offerParts, bookedParts);
+  if (pairing.reordered) {
+    validationLogger(`[INFO] ${partType}: the booking lists its parts in another order than the offer; parts paired by content: `
+      + pairing.pairs.map((p) => `offer[${p.offerIndex}] ↔ booking[${p.bookedIndex}]`).join(', '));
+  }
+  pairing.pairs.filter((p) => !p.typesMatch).forEach((p) => {
+    validationLogger(`[WARNING] ${partType}[${p.offerIndex}]: no booked part carries the same passenger types as offer part ${_describePart(offerParts[p.offerIndex])}; compared with booking[${p.bookedIndex}] (${_describePart(bookedParts[p.bookedIndex])}), the closest remaining part.`);
+  });
+  pairing.missing.forEach((index) => {
+    const part = offerParts[index] || {};
+    // Every admission of the offer is booked. A reservation or an ancillary
+    // part can be optional (booked only when selected), so its absence stays
+    // a warning, as before.
+    if (partType !== 'admission') {
+      validationLogger(`[WARNING] No booked ${partType} found for offer ${partType}[${index}] (${_describePart(part)}); it may be an optional part that was not selected.`);
       return;
     }
+    const name = `${partType}[${index}] has a counterpart in the booking (offer part ${_describePart(part)})`;
+    // #383: one failing row per root cause across the booking re-reads.
+    recordFindingOnce(
+      `${partType}.missing|${part.id}`,
+      () => {
+        test(name, () => {
+          throw new Error(`The booking has no ${partType} for offer part ${_describePart(part)}: the offer has ${offerParts.length} ${partType} part(s), the booking ${bookedParts.length}. The field checks for this part are skipped.`);
+        });
+      },
+      `[WARNING] ${name}: defect already recorded at create-booking — still present at this read.`,
+    );
+  });
+  if (pairing.extra.length > 0) {
+    // Not a fault: a combined return booking holds the other direction's
+    // parts, and parts can be added after the sale.
+    validationLogger(`[INFO] ${partType}: the booking has ${pairing.extra.length} part(s) that no part of the selected offer pairs with: `
+      + pairing.extra.map((bi) => _describePart(bookedParts[bi])).join('; '));
+  }
+
+  pairing.pairs.forEach(({ offerIndex: index, bookedIndex }) => {
+    const part = offerParts[index];
+    const bookedPart = bookedParts[bookedIndex];
     ids.push(bookedPart.id);
 
     validatePartIntersectionFields(offerParts, bookedParts, partType, ['exchangeable', 'refundable']);

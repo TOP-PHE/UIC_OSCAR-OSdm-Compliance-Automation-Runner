@@ -18,6 +18,7 @@ on:
     branches: [main]
     paths:
       - 'Bruno_Collection/**'
+      - 'Oscar_Server/bruno-cli/**'
       - '.github/workflows/ci-collection.yml'
   pull_request:
     branches: [main]
@@ -41,7 +42,12 @@ jobs:
           node-version: '22'
 
       - name: Install Bruno CLI
-        run: npm install -g @usebruno/cli
+        # The same version and dependency tree as the Docker image: both
+        # install Oscar_Server/bruno-cli/package-lock.json with npm ci (#545).
+        working-directory: Oscar_Server/bruno-cli
+        run: |
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Bruno CLI version
         run: bru --version

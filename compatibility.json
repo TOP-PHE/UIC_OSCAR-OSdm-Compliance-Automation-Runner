@@ -1,8 +1,54 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.245",
+  "current_release": "2026.248",
   "releases": [
+    {
+      "release": "2026.248",
+      "date": "2026-10-09",
+      "server": "1.11.222",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "chore(#545): the Docker image installs a fixed Bruno CLI and starts from a fixed base image. Image only; no server code change; collection unchanged at OTST_V2.0.104.",
+        "Bruno CLI 4.2.1, the version production already runs, and its whole dependency tree with integrity hashes come from the new Oscar_Server/bruno-cli/package.json and package-lock.json, installed with npm ci. CI (ci-collection.yml) installs the same lockfile, so the collection is validated against the engine production runs. /usr/local/bin/bru is still the command (BRU_CMD unchanged). Dependabot proposes new versions as pull requests.",
+        "The five packages the Dockerfile used to replace by hand inside the Bruno tree (#428, #532) are now npm overrides in that package.json: axios ^1.20.0, form-data ^4.0.6, @faker-js/faker ^10.5.0, js-yaml ^4.3.2 (installed: 1.20.0, 4.0.6, 10.6.0, 4.3.2). nanoid needs none: Bruno 4.2.1 ships the patched 3.3.18. Trivy finds no fixable HIGH or CRITICAL in the Bruno tree; the same scan without the overrides finds axios, form-data, faker and js-yaml.",
+        "Both FROM lines name node:22-slim by digest (sha256:c3de60bf…978392, Node 22.23.3, published 2026-10-06). Dependabot's docker ecosystem proposes the new digest when the tag moves.",
+        "Left as before on purpose: apt-get upgrade on each build (Debian security fixes, not fixed by the digest); the GitHub Actions are pinned in a separate pull request."
+      ]
+    },
+    {
+      "release": "2026.247",
+      "date": "2026-10-09",
+      "server": "1.11.221",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#549): Test Config's \"Upload datafile\" and \"Download JSON\" are a safe round trip. Server and page; collection unchanged at OTST_V2.0.104.",
+        "An upload replaces the data file and nothing else. The page no longer rebuilds the Test Framework (it replaced the stored one, before the upload was sent) nor adds trains to Test Data; creating them from the file is offered only to a company that has none, and asked first.",
+        "POST /v1/company/datafile checks the file before replacing anything: the data file schema, with the collection's own rules (utils/datafileSchema.js, pinned to library-bruno/validators.js by a test over 3,000 variants), a download marked as a tester's personal view or as unsaved edits, and the template rule. Refusals are 400 with the reason and, for the schema, the list of problems. A wrong file type is 400 \"Only JSON files are accepted.\" (it was 500).",
+        "The file an upload replaces is kept, encrypted, one per company ({slug}-datafile.previous.json). GET /v1/company/datafile/previous describes it; POST /v1/company/datafile/previous/restore swaps it with the live file, so a restore can be undone. Test Managers only, under the per-company lock. A delete removes both.",
+        "GET /v1/company/datafile/download: for a Test Manager the stored file byte for byte, named {slug}-datafile-{date}.json, so a download uploaded again leaves the hash unchanged; for a tester their view, marked __oscarPersonalView and refused by the upload. The page's working copy has its own button, \"Download unsaved edits\", also marked and refused.",
+        "The page confirms an upload and a restore with the scenario counts now and after. Not checked against If-Match, on purpose (#540). How it was checked: route tests (round trip, refusals with the stored file unchanged, previous/restore, provider scope), page tests in the vm harness, a parity test against the collection's validator; 23 deliberate breaks, all caught; the whole flow in Chromium on a throwaway server."
+      ]
+    },
+    {
+      "release": "2026.246",
+      "date": "2026-10-09",
+      "server": "1.11.220",
+      "collection": "OTST_V2.0.105",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#550): the booking validator pairs each part of the offer with its booked part by content, not by position. Collection only; server unchanged at 1.11.220.",
+        "OSDM gives a booked part no reference to the offer part it was made from and does not fix the order of the booked parts. A booking that listed the same five admissions in another order was compared ADULT against SENIOR and so on: up to 15 false failures per run, and a pass rate that changed from run to run with nothing changed at the provider.",
+        "bookings.js pairOfferParts(): every offer part / booked part pair gets a ranked score (same id > same passenger references > same passenger types > same products and trip coverage > same validity instant > same price > offerMode, isReservationRequired, after-sales conditions); the best pairs are taken first; ties are broken by the parts' own text, never by position. A reordered booking is logged once at INFO with the pairs.",
+        "An admission of the offer with no booked counterpart is one failure naming the part (once across the booking re-reads, as #383); its field checks are skipped. A missing reservation or ancillary part stays a WARNING, as before, because those parts can be optional. Booked parts that no part of the selected offer takes (a combined return booking, an added ancillary) are logged at INFO.",
+        "Tests: tests/unit/bruno-bookings-part-pairing.test.js (17). The same offer and booking give identical assertions and failures in all 120 orders of five parts; 15 of the 17 fail against the previous code (the two that pass: the fixture check, and a tie-break test that only means something for the new pairing), and 12 targeted mutations of the new code are each caught."
+      ]
+    },
     {
       "release": "2026.245",
       "date": "2026-10-09",

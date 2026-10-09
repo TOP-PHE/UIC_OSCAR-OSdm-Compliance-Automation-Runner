@@ -1,0 +1,15 @@
+{
+  "name": "oscar-bruno-cli",
+  "private": true,
+  "description": "The Bruno CLI that runs OSCAR's collection: the Docker image and CI install it from this lockfile with npm ci",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@usebruno/cli": "4.2.1"
+  },
+  "overrides": {
+    "axios": "^1.20.0",
+    "form-data": "^4.0.6",
+    "@faker-js/faker": "^10.5.0",
+    "js-yaml": "^4.3.2"
+  }
+}

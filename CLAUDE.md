@@ -433,6 +433,38 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     documented use) and the two root keys only a Test Manager writes.
   - Two test files cover the routes because `datafileMutationLimiter` allows
     twenty writes per app instance: a test file that makes more gets 429.
+- **An upload replaces the data file and nothing else; Download JSON is the
+  stored file** (#549, v1.11.221). Rules that will bite:
+  - **The upload's schema check is the collection's, not JSON Schema.**
+    `utils/datafileSchema.js` re-states `validateDataFileJsonWithTemplate`
+    (`library-bruno/validators.js`): type, enum, min/maxLength, required,
+    `properties` only when `type` is the word `"object"`, `items` only when it
+    is `"array"`, and its list of field names whose null passes. No AJV, no
+    `minimum`: a stricter check would refuse files every run accepts.
+    `tests/unit/datafile-schema.test.js` runs both over 3,000 broken variants
+    of the sample files and fails on any disagreement, so change both or
+    neither. It reads the schema from `COLLECTION_PATH` at each upload (the
+    collection is refreshed without a restart), the repository copy as
+    fallback; a test that needs the real schema sets `COLLECTION_PATH` to the
+    repository's `Bruno_Collection`, because another test file briefly writes
+    a stub schema into the shared dummy one.
+  - **Uploaded bytes are stored as they are**, `knownDeviations` included, so
+    a Test Manager's download uploaded again leaves the hash unchanged. Do not
+    re-project or re-indent on upload.
+  - **A download that is not the stored file carries a root marker**
+    (`__oscarPersonalView` for a tester's view, `__oscarUnsavedEdits` for the
+    page's working copy) and the upload refuses it (`NOT_THE_COMPANY_FILE` in
+    `company.js`). A new export of a view or of unsaved state needs one too.
+  - **One previous file per company**, `{slug}-datafile.previous.json`,
+    encrypted, written only by an upload and a restore (never by Save &
+    Apply: the next auto-save would replace it), before the live file. Restore
+    swaps the two; delete removes both.
+  - **The page never writes the framework or test data on upload.** Creating
+    them from a file is `offerBuildFromUpload()`, asked, and only after a 404
+    framework or a Test Data list with no train (`loadForEdit`, #534). Every
+    upload test sends a schema-valid file: `tests/helpers/valid-datafile.js`.
+  - A parser refusal is answered by `parseUpload` (400, or 413 for size); the
+    global error handler only ever sees real errors.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
@@ -481,6 +513,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   why, and revisit it whenever an advisory names that package. Symptom to
   recognise: a Dependabot alert that stays open with no PR, or a PR that
   changes nothing in the lockfile.
+- **The Bruno CLI and the base image are pinned** (#545, v1.11.222). The
+  CLI comes from `Oscar_Server/bruno-cli/package.json` + `package-lock.json`
+  (exact `@usebruno/cli`, 4.2.1 at that release), installed with `npm ci`
+  into `/opt/bruno-cli` by the Dockerfile and by `ci-collection.yml`, so CI
+  validates the collection against the engine production runs. Production
+  had moved from Bruno 3 to 4 at an unremarked rebuild; that is what this
+  stops. Things that will bite:
+  - **`/usr/local/bin/bru` is a symlink to `node_modules/.bin/bru`**, which
+    is itself one. Node resolves the chain to `bin/bru.js`, so its relative
+    requires work; `BRU_CMD` in `OSCAR_Deploy` names that path. Never `COPY`
+    the link out of a stage: `COPY` resolves it and copies only the shim.
+  - **The hand patches of #428/#532 are `overrides` now.** They failed with
+    `EOVERRIDE` before only because a global install has no root package and
+    axios was a *direct* dependency of the thing installed. Here the root's
+    one dependency is `@usebruno/cli`, so overriding its dependencies is
+    allowed. Keep them `^` floors. nanoid has none: 4.2.1 ships 3.3.18.
+  - **`--ignore-scripts`**: the one install script in the tree today is
+    protobufjs's postinstall, a warning printer. When a Bruno upgrade adds a
+    `hasInstallScript` to the lockfile, read that script before deciding;
+    a missing native build fails at `bru --version` in the image build.
+  - **Both `FROM` lines carry a digest.** Docker Hub rate-limits shared IPs
+    (429); `mirror.gcr.io/v2/library/node/manifests/22-slim` and
+    `public.ecr.aws` give the same index digest without an account. Read the
+    index digest, not one platform's.
+  - A new Bruno version is a server release (bump + `compatibility.json`),
+    even though no server code changes: it is the engine of every run.
 - **Several Dependabot npm PRs open at once: combine them** (2026-10-06, #547).
   `main` requires a branch to be up to date before merging, and every npm
   update touches `package-lock.json`, so five PRs mean five rounds of rebase
@@ -787,6 +845,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   pre-booked parts). The other member is optional at every stage. At
   REFUNDED/EXCHANGED an `[INFO]` line shows confirmedPrice before/after —
   logged, not asserted (open OTST point, see §6).
+- **Offer parts and booked parts are paired by content, never by position**
+  (#550, OTST_V2.0.105). OSDM gives a booked part no reference to its offer
+  part and does not fix their order. `bookings.js` `pairOfferParts()` (pure)
+  scores each pair on ranked criteria (id > passenger refs > passenger types >
+  products / trip coverage > validity instant > price > the rest) and breaks
+  ties by the parts' own text, so any order of the booking gives the same
+  assertions. A missing *admission* is one failure naming it (once across
+  re-reads, `recordFindingOnce`); a missing reservation or ancillary stays a
+  WARNING because those parts can be optional. Any new offer↔booking
+  comparison goes through the pairs, never `bookedParts[i]`.
+  `tests/unit/bruno-bookings-part-pairing.test.js` runs the real validator and
+  records every assertion, with `tests/helpers/bruno-chai.js` standing in for
+  Bruno's chai `expect` (it covers only the chain `validateOfferParts` uses;
+  extend it as needed). Exported as `validateBookedOfferParts`, because
+  `offers.js` already puts a different `validateOfferParts` on `globalThis`.
+  `refunds.js` `getBookingRefundResponse` is called by no request (its
+  `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
+  if it is wired in).
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
@@ -932,6 +1008,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Oscar_Server/src/utils/scenarioCopy.js` | rules of copying scenarios between providers, #540 |
 | `Oscar_Server/public/js/trip-apply.js` | the one "Apply test data" implementation (browser + server), #540 |
 | `Oscar_Server/src/utils/datafileVersion.js` | the data file version (ETag) a Test Config save is checked against, #540 |
+| `Oscar_Server/src/utils/datafileSchema.js` | the upload's data file check: the collection's run-time schema rules, re-stated and pinned to `validators.js` by a test, #549 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |

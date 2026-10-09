@@ -62,6 +62,235 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.222] — 2026-10-09
+
+Issue #545, first of two pull requests: the Docker image installs a fixed
+Bruno CLI and starts from a fixed base image. Image and CI only; no server
+code change. Collection unchanged (OTST_V2.0.104).
+
+### Changed
+
+- **The Bruno CLI is installed from a lockfile.** The new
+  `Oscar_Server/bruno-cli/package.json` names `@usebruno/cli` **4.2.1**, the
+  version production already runs (assessment item N2), and its
+  `package-lock.json` fixes the whole tree with integrity hashes. The image
+  installs it with `npm ci` into `/opt/bruno-cli`; `/usr/local/bin/bru` is a
+  link to it, so `BRU_CMD` does not change. `ci-collection.yml` installs the
+  same lockfile, so CI and production run the same engine. Before, both ran
+  `npm install -g @usebruno/cli`: production went from Bruno 3 to 4 at a
+  rebuild between July and October without anyone deciding it.
+- **The hand patches of Bruno's tree are `overrides`** (#428, #532). The
+  Dockerfile unpacked axios, form-data, nanoid, @faker-js/faker and js-yaml
+  over every copy it found, because a global install has no root
+  `package.json` to carry overrides. Now: axios `^1.20.0`, form-data `^4.0.6`,
+  @faker-js/faker `^10.5.0`, js-yaml `^4.3.2` (installed 1.20.0, 4.0.6, 10.6.0,
+  4.3.2). nanoid needs none: Bruno 4.2.1 ships the patched 3.3.18. The ranges
+  are floors, not ceilings, so Dependabot can still move them.
+- **Both `FROM` lines name `node:22-slim` by digest**
+  (`sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`,
+  Node 22.23.3, published 2026-10-06; read from the registry through two
+  Docker Hub mirrors, which agree). Two builds of the same commit start from
+  the same image.
+- `npm ci --ignore-scripts`: the only install script in the Bruno tree is
+  protobufjs's postinstall, which prints a version-scheme warning and does
+  nothing else. Skipping it changes nothing, and a dependency added later
+  cannot run code at build time unnoticed.
+- Dependabot watches `Oscar_Server/bruno-cli` (npm, weekly). The docker
+  ecosystem already updates the digest.
+- `CONTRIBUTING.md` says how each pin is updated, and that a developer
+  machine should run the pinned Bruno version.
+
+### Checked
+
+- The Bruno stage built on the pinned base: `bru --version` gives 4.2.1 as
+  the `node` user, npm is removed afterwards, one copy each of axios 1.20.0,
+  form-data 4.0.6, @faker-js/faker 10.6.0, js-yaml 4.3.2. A request using a
+  faker variable (`{{$randomFirstName}}`) runs and passes.
+- Trivy (HIGH, CRITICAL, fixed only): no finding in the Bruno tree. The same
+  scan of Bruno 4.2.1 installed without the overrides reports axios 1.18.0,
+  form-data 4.0.4, @faker-js/faker 9.9.0 and js-yaml 4.3.1, so the scan does
+  see what the overrides fix.
+
+### Left open on purpose
+
+- `apt-get upgrade` still runs on every build: Debian security fixes arrive
+  between base-image rebuilds. The digest fixes the starting point, not the
+  packages that step adds.
+- The GitHub Actions pins (item 3 of #545) are a separate pull request.
+- Out of scope per #545: recording the Bruno version on each run, `engines`,
+  image signing, an SBOM.
+
+---
+
+## [server-1.11.221] — 2026-10-09
+
+Issue #549: "Upload datafile" and "Download JSON" in Test Config are a safe
+round trip. Server and page. Collection unchanged (OTST_V2.0.104).
+
+### Fixed
+
+- **An upload replaces the data file and nothing else.** The page rebuilt the
+  Test Framework from every uploaded file, replacing the stored one with a
+  default framework plus three values from the file, before the upload was even
+  sent and without a word; it also added trains to Test Data, near-duplicates
+  of hand-edited ones. Both are gone from the upload. Creating a framework and
+  trains from the file is offered afterwards, asked first, and only to a
+  company that has no framework, or no train; a failure is reported.
+- **The server checks the file before replacing anything** (`POST
+  /v1/company/datafile`): JSON, a JSON object, not a download marked as a
+  tester's personal view or as unsaved edits, the data file schema, then the
+  template rule (NEW-10). The schema check is `utils/datafileSchema.js`: the
+  rules of the collection's run-time check (`validateDataFileJsonWithTemplate`)
+  and no others, so a file refused here is one every run would refuse. It reads
+  the schema of the collection the runs use, at each upload, and answers 503
+  when it cannot (nothing replaced). A refusal answers 400 with the reason and
+  `problems` (at most 50).
+- **A wrong file type answers 400 "Only JSON files are accepted."** The upload
+  filter's error reached the global error handler and answered 500. A size
+  overrun is still 413; any other parser error is a 400.
+- **The previous file is kept and can be restored.** The file an upload
+  replaces is written, encrypted, to `{slug}-datafile.previous.json`, before
+  the live file is replaced (if that fails, nothing is). `GET
+  /v1/company/datafile/previous` describes it, `POST
+  /v1/company/datafile/previous/restore` swaps it with the live file, so a
+  restore is undone the same way. Test Managers only, under
+  `withDatafileLock`; the template rule applies to a restore. A delete removes
+  both files.
+- **Download JSON is the stored file.** It saved the page's working copy:
+  re-indented, with what the server adds when serving it and what the editor
+  fills in, and for a tester their personal view, always as `datafile.json`.
+  It now fetches `GET /v1/company/datafile/download`: for a Test Manager the
+  stored bytes, named `{slug}-datafile-{date}.json`, so uploading the download
+  leaves the hash unchanged; for a tester their view with a root
+  `__oscarPersonalView` key, named `…-personal-view-…`, which the upload
+  refuses. It follows the provider selected in the tab (#540).
+- **The page's working copy has its own button**, "Download unsaved edits",
+  shown while there are some: the copy a refused save (412) tells the user to
+  keep. It is marked `__oscarUnsavedEdits` and refused by the upload.
+- The page confirms an upload and a restore with the scenario counts now and
+  after, and names unsaved edits that would be lost. A refusal is shown in a
+  panel with every problem, instead of "Upload failed: Unknown error".
+
+### Left open on purpose
+
+- **The upload is not checked against `If-Match`** (#540): it replaces the
+  whole file on purpose.
+- **A restore swaps two files in two atomic writes.** A crash between them
+  leaves both holding the restored file; the one replaced is lost. Not worth a
+  third file for this window.
+- **Only one previous file**, written by an upload or a restore, not by Save &
+  Apply (or the next auto-save would replace it). Backups (#543) remain the way
+  back further.
+- **The uploaded `knownDeviations` are stored as uploaded**, as before; the
+  next findings change re-projects them. Re-projecting on upload would break
+  the byte-for-byte round trip.
+- **A tester could remove the marker from their download by hand.** The marker
+  stops the mistake the issue describes, not a deliberate edit by someone the
+  Test Manager then chooses to upload.
+- The schema check is not applied to Save & Apply, whose files the editor
+  builds; a run still checks every file.
+
+### Tests
+
+- `tests/integration/company-datafile-round-trip.test.js` (10): wrong type,
+  not a data file, a problem deep in the file, the round trip (bytes and hash,
+  framework and test data untouched), a tester's download refused, the unsaved
+  edits copy refused, previous and restore (and its undo), the roles, the
+  delete, a provider named by `X-Provider-Id`. Every refusal checks the stored
+  file, not only the status.
+- `tests/unit/datafile-schema.test.js` (13): the bundled sample data files and
+  3,000 broken variants of them run through both the new check and the
+  collection's own `validateDataFileJsonWithTemplate`, which must agree on the
+  verdict and the number of problems; seven small schemas for the rules the
+  current schema does not reach.
+- `tests/unit/scenarios-load-guard.test.js`: the page's upload, offer and
+  download functions in the `vm` harness (the old `extractFromDatafile` tests
+  are replaced). An upload with a framework and trains makes exactly one
+  request; a failed load offers nothing.
+- Existing upload tests now send schema-valid files
+  (`tests/helpers/valid-datafile.js`); the one that accepted `[1, 2, 3]` now
+  expects a refusal.
+- 23 deliberate breaks of the server, the schema check and the page, all
+  caught. The whole flow checked in Chromium on a throwaway server, as a Test
+  Manager and as a tester.
+
+---
+
+## [collection-OTST_V2.0.105] — 2026-10-09
+
+Issue #550, release 2026.246. Collection only; server unchanged (1.11.220).
+
+### Fixed
+
+- **The booking validator pairs offer parts with booked parts by content, not
+  by position.** OSDM gives a booked part no reference to the offer part it
+  was made from, and does not fix the order of the booked parts.
+  `validateOfferParts()` compared offer part *i* with booked part *i*, so a
+  booking that listed the same five admissions in another order was checked
+  ADULT against SENIOR, and so on: 15 false failures in one run, a different
+  pass rate from run to run with nothing changed at the provider, and nothing
+  a known deviation could absorb.
+  - `pairOfferParts()` (`library-bruno/bookings.js`, pure) scores every pair.
+    The criteria are ranked, each one outweighing all lower ones together:
+    same `id`, then the same passenger references (`appliedPassengerTypes[]
+    .passengerRef` on both sides, or the offer's `passengerRefs` against the
+    booking's `passengerIds`), then the same passenger types, then the same
+    products and trip coverage, then the same validity (as instants, so
+    `+02:00` and `Z` agree), then the same price, then `offerMode`,
+    `isReservationRequired` and the after-sales conditions. The best pairs
+    are taken first. Ties are broken by the offer part's position and the
+    booked part's own text, never by its position, so the same booking in any
+    order gives the same pairs.
+  - A reordered booking is logged once at `[INFO]`, with the pairs. A pair
+    whose passenger types differ (a real fault) is logged at `[WARNING]` and
+    its field checks then fail as before, on the closest part.
+  - An admission of the offer with no booked counterpart is **one** failure
+    that names the part (id and passenger types), recorded once across the
+    booking re-reads (#383); its field checks are skipped. Before, it was a
+    `[WARNING]`, and every part after it was compared with the wrong one.
+  - Left as before, on purpose: a missing **reservation or ancillary** part
+    is still a `[WARNING]`, because those parts can be optional and booked
+    only when selected. Telling a required reservation from an optional one
+    is not done here. Booked parts that no part of the selected offer takes
+    (a combined return booking, a part added after the sale) are logged at
+    `[INFO]`.
+  - The ids collected for the fulfillment and refund steps
+    (`admissionReservationAncillaryBookingPartsIds`) follow the offer's order,
+    as they did whenever the booking kept that order.
+- **Other position-based pairings checked** (step 4 of #550). None of them
+  compares an offer with a booking, so none changes here:
+  - `passengers.js` `patchMultiPassengerResponse`: pairs submitted passenger
+    data with `passengerIdList` by index. The list is already realigned by
+    `externalRef` (`alignPassengerIdsToSubmittedOrder`); without `externalRef`
+    the booking order is kept, as there is nothing else to pair on.
+  - `refunds.js` `getBookingRefundResponse`: looks for the part ids in
+    `bookedOffers[0]` only and takes `refundOffers[0]` as the flow's refund
+    offer. No request of the collection calls this function (`16. GET Booking
+    after Delete Refund` runs `postCreateBookingResponse`), so nothing in a
+    run is affected. To be fixed if it is ever wired in.
+  - `partialRefund.js` (leg axis without a passenger: `fulfillments[0]`) and
+    `requestsBuilder.js` (`tripLegCoverage[0]` in a place selection): these
+    build requests, they compare nothing. Out of scope here.
+  - `offers.js`: `offerCurrency` is read from `offers[0]`, not the selected
+    offer; one search answers in one currency in practice. Left as is.
+  - Already matched by id, type or set, no change: after-sales conditions and
+    applied passenger types inside a part (#389, #383), fulfillment booking
+    part ids, refund response parts.
+
+### Tests
+
+- `tests/unit/bruno-bookings-part-pairing.test.js` (17): runs the real
+  `validateOfferParts` and records every assertion. The same offer and
+  booking give identical assertions and failures in all 120 orders of five
+  parts, with and without a real fault; a missing admission fails once with
+  the part's name. 15 of the 17 fail against the previous code, and each of
+  12 targeted mutations of the new code (each scoring criterion, the
+  tie-break, the once-per-finding rule, the admission-only failure, position
+  pairing) is caught. `tests/helpers/bruno-chai.js` stands in for Bruno's
+  chai `expect`.
+
+---
+
 ## [server-1.11.220] — 2026-10-09
 
 Issue #580: API Config is one page for the company and all its providers.
