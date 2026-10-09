@@ -44,17 +44,23 @@ as an unprivileged user and has to read the checkout.
 # Ubuntu 24.04; on another system install Docker with its compose plugin, nginx and certbot your usual way
 apt-get update && apt-get install -y docker.io docker-compose-v2 nginx certbot python3-certbot-nginx git
 git clone --depth 1 https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner.git /opt/osdm-simulator
-cd /opt/osdm-simulator/OSDM_Simulator/deploy
 ```
 
+Everything the simulator needs on the host is in its deploy folder,
+`/opt/osdm-simulator/OSDM_Simulator/deploy`: the compose file and the clients
+file. The commands of this page name files by their full path, so they work
+from any folder. Only `docker compose` has to be run from the deploy folder,
+and each block that uses it starts with the `cd`. A new session on the host
+starts in your home folder, not there.
+
 Generate the clients file, with random secrets. It is written as
-`deploy/clients.json`, with access for its owner only, and an existing file is
-never replaced.
+`clients.json` in the deploy folder, with access for its owner only, and an
+existing file is never replaced.
 
 ```bash
 docker run --rm -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
   node scripts/make-clients.js deploy
-chown 1000:1000 clients.json
+chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json
 ```
 
 Each provider gets three clients for Test Managers and three for testers, and
@@ -76,6 +82,7 @@ simulator.
 Start the simulator and check it from the host:
 
 ```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
 docker compose up -d
 docker compose ps                      # STATUS must reach "healthy"
 curl -s http://127.0.0.1:3002/healthz  # {"status":"ok"}
@@ -84,7 +91,7 @@ curl -s http://127.0.0.1:3002/healthz  # {"status":"ok"}
 Put nginx in front and get the certificate (replace the host name twice):
 
 ```bash
-sed 's/simulator.example.org/<simulator-host>/' nginx-osdm-simulator.conf.example > /etc/nginx/sites-available/osdm-simulator
+sed 's/simulator.example.org/<simulator-host>/' /opt/osdm-simulator/OSDM_Simulator/deploy/nginx-osdm-simulator.conf.example > /etc/nginx/sites-available/osdm-simulator
 ln -s /etc/nginx/sites-available/osdm-simulator /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 certbot --nginx -d <simulator-host>
@@ -97,18 +104,22 @@ name instead.
 
 ## 4. Check it from outside
 
-The secrets are in `clients.json` on the host. Read the one you need there,
-by its id, without printing the whole file:
+The secrets are in the clients file on the simulator host. Read the one you
+need there, by its id, without printing the whole file:
 
 ```bash
-ID=alpha.tstmgr01; python3 -c "import json,sys;print(next(c['client_secret'] for p in json.load(open('clients.json')).values() for c in p if c['client_id']==sys.argv[1]))" "$ID"
+ID=alpha.tstmgr01; python3 -c "import json,sys;print(next(c['client_secret'] for p in json.load(open('/opt/osdm-simulator/OSDM_Simulator/deploy/clients.json')).values() for c in p if c['client_id']==sys.argv[1]))" "$ID"
 ```
 
 To hand out the clients of one provider, this lists each id with its secret:
 
 ```bash
-python3 -c "import json;[print(c['client_id'], c['client_secret']) for c in json.load(open('clients.json'))['alpha']]"
+python3 -c "import json;[print(c['client_id'], c['client_secret']) for c in json.load(open('/opt/osdm-simulator/OSDM_Simulator/deploy/clients.json'))['alpha']]"
 ```
+
+Both work from any folder. An id that is not in the file ends the first one
+with `StopIteration`, and a provider that is not in it ends the second with
+`KeyError`.
 
 Then, from any other machine, in two steps.
 
@@ -205,12 +216,19 @@ provider that answered.
 
 ## 7. Day to day
 
+The `docker compose` commands are run from the deploy folder. In a new session
+on the host, go there first:
+
+```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
+```
+
 | To do | How |
 |---|---|
 | See what is being called | `docker compose logs -f` (one line per request: time, method, path, status, provider, client; no header, no body) |
 | Update the simulator | `git -C /opt/osdm-simulator pull && docker compose restart` |
 | Replace all clients and secrets | see below |
-| Add a client | add an entry to `clients.json` (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
+| Add a client | add an entry to `clients.json` in the deploy folder (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
@@ -219,10 +237,10 @@ signs the tokens is drawn at start-up.
 
 **Replacing all clients and secrets**, for instance to move a simulator
 installed before the `provider.role` ids to them. The script never replaces a
-clients file, so the old one is put aside first. From
-`/opt/osdm-simulator/OSDM_Simulator/deploy`:
+clients file, so the old one is put aside first:
 
 ```bash
+cd /opt/osdm-simulator/OSDM_Simulator/deploy
 git -C /opt/osdm-simulator pull
 mv clients.json clients.json.old
 docker run --rm -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
@@ -234,8 +252,15 @@ docker compose restart
 From the restart on, the old ids and secrets no longer work: every OSCAR
 account that used one needs its new Client ID and Client Secret entered in API
 Config. Until then its runs fail at the token step, and the simulator's log
-shows `POST /<provider>/oauth/token 401`. Delete `clients.json.old` once the
-new ones are in place.
+shows `POST /<provider>/oauth/token 401`.
+
+The check of section 4, done with a new id and its secret, shows that the new
+file is the one in use: its first number is `200`. Once the new clients are in
+place, delete the old file:
+
+```bash
+rm /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json.old
+```
 
 ## 8. When something does not work
 
@@ -245,5 +270,6 @@ new ones are in place.
 | "Auth" fails at the start of a run, the simulator's log shows `POST /<provider>/oauth/token 401` | wrong secret, or the client belongs to another provider than the one in the token URL |
 | A request gets 401 in the middle of a run on `beta` | `beta`'s tokens last two minutes; OSCAR refreshes the token at the start of each scenario, so one scenario that lasts longer than that ends with an expired token |
 | 429 | more than 50 requests a second from one address (nginx), or 3,000 a minute (the simulator, `SIM_REQUESTS_PER_MINUTE`) |
-| The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing, or not readable by user 1000 (`chown 1000:1000 clients.json`) |
+| The container restarts in a loop, its log says "not started: the clients file cannot be read" | `clients.json` is missing from the deploy folder, or not readable by user 1000 (`chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json`) |
+| On the host, a command answers `No such file or directory` about `clients.json`, or `docker compose` answers `no configuration file provided: not found` | the command was run from another folder than the deploy one, which is where a new session starts. `cd /opt/osdm-simulator/OSDM_Simulator/deploy` first. |
 | A booking made a while ago answers 404 | bookings are dropped after one hour, when a client has more than 200 of them, and at every restart |
