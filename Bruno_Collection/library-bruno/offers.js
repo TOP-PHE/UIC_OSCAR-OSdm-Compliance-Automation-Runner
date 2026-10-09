@@ -42,7 +42,7 @@ module.exports = {
 // Returns the Warning list either way; a bare array is still read, with a
 // WARNING because it is not the OSDM shape.
 function envelopeWarnings(jsonData, log) {
-  const w = jsonData && jsonData.warnings;
+  const w = jsonData?.warnings;
   if (w && typeof w === "object" && !Array.isArray(w)) {
     return Array.isArray(w.warnings) ? w.warnings : [];
   }
@@ -834,6 +834,12 @@ function validateTripsAndLegs(jsonData) {
 }
 
 // Offer Parts validation
+function logMinimalBelowAllParts(minimalPrice, sumPartsPrice) {
+  if (minimalPrice < sumPartsPrice) {
+    validationLogger(`[INFO] Offer minimalPrice (${minimalPrice}) is below the sum of all listed parts (${sumPartsPrice}): expected when some reservations or ancillaries are optional.`);
+  }
+}
+
 function validateOfferParts(selectedOffer) {
   validationLogger("[DEBUG] ➤ validateOfferParts");
 
@@ -889,9 +895,7 @@ function validateOfferParts(selectedOffer) {
     validationLogger(`[DEBUG] Offer minimalPrice ${minimalPrice}; admissions ${admissionPrice}; all listed parts ${sumPartsPrice}`);
     expect(minimalPrice).to.be.at.least(admissionPrice);
   });
-  if (minimalPrice < sumPartsPrice) {
-    validationLogger(`[INFO] Offer minimalPrice (${minimalPrice}) is below the sum of all listed parts (${sumPartsPrice}): expected when some reservations or ancillaries are optional.`);
-  }
+  logMinimalBelowAllParts(minimalPrice, sumPartsPrice);
 
   // Flexibility consistency. The offer's overall flexibility is the MOST
   // RESTRICTIVE of its products (least-flexible leg governs the journey). When

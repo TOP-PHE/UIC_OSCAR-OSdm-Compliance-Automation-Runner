@@ -1134,7 +1134,7 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // #613 F2: the booking's own fulfillment list, kept apart from fulfillmentIds
   // (which validateFulfillments rewrites when it checks a refund offer's subset).
   if (Array.isArray(booking.fulfillments) && booking.fulfillments.length > 0) {
-    bru.setEnvVar("__bookingFulfillmentIds", JSON.stringify(booking.fulfillments.map((f) => f && f.id).filter(Boolean)));
+    bru.setEnvVar("__bookingFulfillmentIds", JSON.stringify(booking.fulfillments.map((f) => f?.id).filter(Boolean)));
   }
 
   // Check that booking has the same number of passengers as expected from the offer
@@ -1183,7 +1183,7 @@ function checkProvisionalPrice(prov, mini, booking) {
   if (!prov || typeof prov.amount !== 'number') return;
   const parts = (booking.bookedOffers || []).flatMap((bo) => [
     ...(bo.admissions || []), ...(bo.reservations || []), ...(bo.ancillaries || []),
-  ]).filter((p) => p && p.status === 'PREBOOKED');
+  ]).filter((p) => p?.status === 'PREBOOKED');
   const priced = parts.filter((p) => p.price && typeof p.price.amount === 'number' && p.price.currency === prov.currency);
   if (parts.length > 0 && priced.length === parts.length) {
     const sum = priced.reduce((acc, p) => acc + p.price.amount, 0);
@@ -1310,7 +1310,7 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     // In a sale the fulfillment is made from booking parts, and the spec says
     // the member "must be provided" then: its absence fails this check.
     const _fulfillmentPartIds = Array.isArray(fulfillment.bookingParts)
-      ? fulfillment.bookingParts.map(bp => bp && bp.id) : '(no bookingParts)';
+      ? fulfillment.bookingParts.map(bp => bp?.id) : '(no bookingParts)';
     test(`Fulfillment[${idx}] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [${bookedPartIds}], actual: [${_fulfillmentPartIds}]`, () => {
       expect(fulfillment.bookingParts, 'bookingParts must be provided for a fulfillment made from booking parts').to.be.an("array").that.is.not.empty;
       fulfillment.bookingParts.forEach(part => {

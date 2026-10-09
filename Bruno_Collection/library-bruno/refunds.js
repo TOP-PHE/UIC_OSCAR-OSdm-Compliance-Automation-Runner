@@ -84,8 +84,8 @@ const _readJson = (name, fallback) => {
   if (typeof raw !== "string") return raw;
   try { return JSON.parse(raw); } catch { return fallback; }
 };
-const _fulfillmentIdsOf = (refundOffer) => (Array.isArray(refundOffer && refundOffer.fulfillments) ? refundOffer.fulfillments : [])
-  .map((f) => f && f.id).filter((id) => typeof id === "string" && id !== "");
+const _fulfillmentIdsOf = (refundOffer) => (Array.isArray(refundOffer?.fulfillments) ? refundOffer.fulfillments : [])
+  .map((f) => f?.id).filter((id) => typeof id === "string" && id !== "");
 
 // F5: the amounts are stored when a refund offer is PROPOSED (keyed on the
 // refund offer's own status, which the old code never looked at) and compared
@@ -132,7 +132,7 @@ function refundScope(refundOffer) {
 // F2 (step 14): the refunded set comes from the confirmed refund offers.
 function isScopedRefundOnBooking(booking) {
   const refunded = _readJson("__refundedFulfillmentIds", []);
-  const ids = (booking && Array.isArray(booking.fulfillments) ? booking.fulfillments : []).map((f) => f && f.id);
+  const ids = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).map((f) => f?.id);
   return refunded.length > 0 && ids.some((id) => !refunded.includes(id));
 }
 
@@ -166,7 +166,7 @@ function checkRefundScopeOnBooking(booking) {
   (booking.bookedOffers || []).forEach((bo) => {
     ["admissions", "reservations", "ancillaries"].forEach((kind) => {
       (bo && Array.isArray(bo[kind]) ? bo[kind] : []).forEach((part) => {
-        if (!part || !part.id) return;
+        if (!part?.id) return;
         const inScope = refundedPartIds.has(part.id);
         test(`Booked ${kind.slice(0, -1)} ${part.id} ${inScope ? "is REFUNDED" : "is not REFUNDED (left out of the refund)"} - status: ${part.status}`, () => {
           if (inScope) expect(part.status).to.eql("REFUNDED");
@@ -711,8 +711,9 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
     }
     // #613 F5: the OSDM member is refundOfferBreakdown (the old name,
     // refundOfferBreakdownItems, is not in the spec, so this never ran).
-    const _breakdown = Array.isArray(refundOffer.refundOfferBreakdown) ? refundOffer.refundOfferBreakdown
-      : (Array.isArray(refundOffer.refundOfferBreakDown) ? refundOffer.refundOfferBreakDown : []);
+    let _breakdown = [];
+    if (Array.isArray(refundOffer.refundOfferBreakdown)) _breakdown = refundOffer.refundOfferBreakdown;
+    else if (Array.isArray(refundOffer.refundOfferBreakDown)) _breakdown = refundOffer.refundOfferBreakDown;
     if (_breakdown.length === 0 || _requestedPartIds.size === 0) {
       validationLogger(`[DEBUG] Partial-refund breakdown check skipped (no breakdown returned, or no bookingPartIds requested).`);
     } else {
