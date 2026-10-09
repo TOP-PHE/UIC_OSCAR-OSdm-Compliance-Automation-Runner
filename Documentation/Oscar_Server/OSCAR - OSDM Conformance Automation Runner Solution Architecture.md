@@ -667,6 +667,8 @@ Full `schema.sql` is generated as part of Phase 1 build.
 
 #### Phase 0 — Prerequisites ✅ COMPLETED 2026-04-04
 - [x] Bruno CLI confirmed: `@usebruno/cli@3.2.2` at `C:\Users\patri\AppData\Roaming\npm\bru.cmd`.
+  Since v1.11.221 the version is fixed in `Oscar_Server/bruno-cli/package.json`
+  (4.2.1 at that release), installed from its lockfile by the image and by CI (#545).
 - [x] Target folder confirmed: `C:\...\UIC-OSCAR\oscar-server\`.
 - [x] No pre-configured environments in UI — environment is generated dynamically per run from company profile inputs (see Section 14.3).
 - [x] Runner mode: `bru.cmd` called directly via Node.js `child_process` (PowerShell `.ps1` execution policy blocks `.ps1` in spawned contexts; `bru.cmd` has no such restriction).

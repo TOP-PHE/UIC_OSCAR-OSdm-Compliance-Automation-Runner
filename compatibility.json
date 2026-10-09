@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.245",
+  "current_release": "2026.247",
   "releases": [
+    {
+      "release": "2026.247",
+      "date": "2026-10-09",
+      "server": "1.11.221",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "chore(#545): the Docker image installs a fixed Bruno CLI and starts from a fixed base image. Image only; no server code change; collection unchanged at OTST_V2.0.104.",
+        "Bruno CLI 4.2.1, the version production already runs, and its whole dependency tree with integrity hashes come from the new Oscar_Server/bruno-cli/package.json and package-lock.json, installed with npm ci. CI (ci-collection.yml) installs the same lockfile, so the collection is validated against the engine production runs. /usr/local/bin/bru is still the command (BRU_CMD unchanged). Dependabot proposes new versions as pull requests.",
+        "The five packages the Dockerfile used to replace by hand inside the Bruno tree (#428, #532) are now npm overrides in that package.json: axios ^1.20.0, form-data ^4.0.6, @faker-js/faker ^10.5.0, js-yaml ^4.3.2 (installed: 1.20.0, 4.0.6, 10.6.0, 4.3.2). nanoid needs none: Bruno 4.2.1 ships the patched 3.3.18. Trivy finds no fixable HIGH or CRITICAL in the Bruno tree; the same scan without the overrides finds axios, form-data, faker and js-yaml.",
+        "Both FROM lines name node:22-slim by digest (sha256:c3de60bf…978392, Node 22.23.3, published 2026-10-06). Dependabot's docker ecosystem proposes the new digest when the tag moves.",
+        "Left as before on purpose: apt-get upgrade on each build (Debian security fixes, not fixed by the digest); the GitHub Actions are pinned in a separate pull request."
+      ]
+    },
     {
       "release": "2026.245",
       "date": "2026-10-09",

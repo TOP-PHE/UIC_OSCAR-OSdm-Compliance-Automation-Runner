@@ -8,7 +8,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Build stage — installs app dependencies (with native compilation for bcrypt)
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:22-slim AS builder
+# Both FROM lines name the base image by digest as well as by tag (#545): the
+# tag moves, the digest does not, so two builds of the same commit start from
+# the same image. Dependabot (docker ecosystem) proposes the new digest when
+# the tag moves. To update by hand, see CONTRIBUTING.md.
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS builder
 
 # Build deps for bcrypt native compilation
 RUN apt-get update && \
@@ -21,22 +25,15 @@ RUN npm ci --omit=dev
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Runtime stage — installs Bruno CLI in place, then strips npm
+# Runtime stage — installs Bruno CLI from its lockfile, then strips npm
 # ─────────────────────────────────────────────────────────────────────────────
-# We install Bruno CLI directly in the runtime stage rather than copying it
-# from the builder. Reason: `npm install -g` creates a symlink at
-# /usr/local/bin/bru pointing into /usr/local/lib/node_modules/@usebruno/cli/.
-# A `COPY --from=builder /usr/local/bin/bru` resolves the symlink and copies
-# only the shim file, breaking its relative require('../src') paths.
-# Installing in-place preserves the symlink + the full @usebruno/cli tree.
-#
-# After install, we drop npm (and corepack) to:
+# After the Bruno install, we drop npm (and corepack) to:
 #   1. Clear CVE-2026-33671 (picomatch ReDoS) flagged by Trivy inside the
 #      npm-vendored copy of picomatch.
 #   2. Shrink the runtime image by ~50 MB.
 # OSCAR never invokes npm at runtime — node_modules is already in place
 # (copied from the builder stage below).
-FROM node:22-slim
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 
 WORKDIR /app
 
@@ -61,105 +58,46 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g @usebruno/cli && \
-    # ── Clear HIGH CVEs in Bruno CLI's bundled deps (issue #428) ─────────────
-    # Bruno bundles vulnerable axios + form-data deep in its tree and pins them
-    # rigidly: axios 1.13.6 is a DIRECT dep of @usebruno/cli AND exact-pinned by
-    # @usebruno/js + @usebruno/requests. npm refuses to budge it — a `--no-save`
-    # reinstall is pruned back to the pin, and an `overrides` entry errors
-    # EOVERRIDE against the direct dependency. So we bypass npm resolution
-    # entirely and unpack the patched release tarball directly over every nested
-    # copy. axios/form-data's own runtime deps are hoisted in the tree with
-    # compatible semver ranges, so replacing just the package dir is safe;
-    # axios 1.x / form-data 4.0.x are API-stable drop-ins. Clears (all HIGH —
-    # in BRUNO's deps, not OSCAR's):
-    #   axios     1.13.6 -> 1.18.0  (CVE-2026-42033/-42035/-42043/-42264 +
-    #                                -44486/-44487/-44488/-44492/-44494/-44495/-44496)
-    #             1.18.0 -> 1.20.0  (#532: CVE-2026-101898/-101901/-101903/-101905/
-    #                                -101906/-101907/-101909, raised against 1.18.0)
-    #   form-data 4.0.4  -> 4.0.6   (CVE-2026-12143)
-    cd /tmp && \
-    npm pack axios@1.20.0 form-data@4.0.6 --silent && \
-    AXIOS_TGZ="$(ls axios-*.tgz)" && FORMDATA_TGZ="$(ls form-data-*.tgz)" && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
-      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$AXIOS_TGZ" -C "$d" --strip-components=1; \
-    done && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/form-data"); do \
-      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$FORMDATA_TGZ" -C "$d" --strip-components=1; \
-    done && \
-    rm -f /tmp/axios-*.tgz /tmp/form-data-*.tgz && \
-    # Fail the build immediately if any nested copy is still on the old version.
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/axios"); do \
-      v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "1.20.0" ] || { echo "UNPATCHED axios@$v at $d"; exit 1; }; \
-    done && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/form-data"); do \
-      v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "4.0.6" ] || { echo "UNPATCHED form-data@$v at $d"; exit 1; }; \
-    done && \
-    echo "Bruno CLI deps patched: axios=1.20.0, form-data=4.0.6 in all nested copies" && \
-    # ── Same shape, different day: nanoid (CVE-2026-67213/-67214, infinite loop
-    # in customAlphabet, both HIGH) is exact-pinned "3.3.8" as a DIRECT dep of
-    # FOUR Bruno sub-packages (@usebruno/converters, @usebruno/filestore,
-    # @usebruno/js, @usebruno/schema) — same EOVERRIDE dead end as axios above,
-    # same fix. Target 3.3.18, not the 5.x fixed line: nanoid 5 is ESM-only and
-    # a breaking API change; 3.3.18 is the API-stable drop-in on the same major.
-    # (Correction: an earlier pass at this fix targeted 3.3.17 believing it was
-    # the patched release — Trivy kept flagging CVE-2026-67213 against it
-    # afterwards, because the actual fix landed one patch release later, in
-    # 3.3.18. 3.3.17 was still vulnerable.)
-    npm pack nanoid@3.3.18 --silent && \
-    NANOID_TGZ="$(ls nanoid-*.tgz)" && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
-      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$NANOID_TGZ" -C "$d" --strip-components=1; \
-    done && \
-    rm -f /tmp/nanoid-*.tgz && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/nanoid"); do \
-      v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "3.3.18" ] || { echo "UNPATCHED nanoid@$v at $d"; exit 1; }; \
-    done && \
-    echo "Bruno CLI deps patched: nanoid=3.3.18 in all nested copies" && \
-    # ── @faker-js/faker (CVE-2026-73231, HIGH — arbitrary code execution via
-    # attacker-controlled fake templates) ships inside @usebruno/cli, which
-    # bundles it to power the `{{$faker.*}}` request-templating helper. Not an
-    # EOVERRIDE case (nothing pins it as a direct dep the way axios/nanoid are),
-    # but a plain `npm install` inside a stripped, no-package-lock global
-    # install is unreliable here too, so same tarball-unpack fix for
-    # consistency. 9.x -> 10.x is a major bump, but OSCAR's own collection
-    # never uses `{{$faker...}}` (grep confirms zero references in
-    # Bruno_Collection/), so there is no call surface in this project that a
-    # v10 breaking change could actually hit — it only needs to load cleanly.
-    npm pack @faker-js/faker@10.5.0 --silent && \
-    FAKER_TGZ="$(ls faker-js-faker-*.tgz)" && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/@faker-js/faker"); do \
-      rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$FAKER_TGZ" -C "$d" --strip-components=1; \
-    done && \
-    rm -f /tmp/faker-js-faker-*.tgz && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/@faker-js/faker"); do \
-      v="$(node -p "require('$d/package.json').version")"; \
-      [ "$v" = "10.5.0" ] || { echo "UNPATCHED @faker-js/faker@$v at $d"; exit 1; }; \
-    done && \
-    echo "Bruno CLI deps patched: @faker-js/faker=10.5.0 in all nested copies" && \
-    # ── js-yaml (#532: CVE-2026-84375, HIGH, denial of service in YAML
-    # parsing). Bruno CLI carries its own copy, 4.3.1 when this was written;
-    # 4.3.2 is the patched release on the same line. OSCAR's own js-yaml is
-    # handled by the lockfile, not here. Only a 4.x copy older than 4.3.2 is
-    # replaced. A 3.x copy is left alone, because js-yaml 4 removed safeLoad()
-    # and is not a drop-in for it; a newer copy is left alone too, so a Bruno
-    # release that ships 4.3.3 or 5.x is neither downgraded nor fails the build.
-    npm pack js-yaml@4.3.2 --silent && \
-    JSYAML_TGZ="$(ls js-yaml-*.tgz)" && \
-    JSYAML_CHECK="const [a,b,c]=require(process.argv[1]+'/package.json').version.split('.').map(Number);process.stdout.write(a===4&&(b<3||(b===3&&c<2))?'stale':'ok')" && \
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/js-yaml"); do \
-      [ "$(node -e "$JSYAML_CHECK" "$d")" = "ok" ] || { rm -rf "$d" && mkdir -p "$d" && tar -xzf "/tmp/$JSYAML_TGZ" -C "$d" --strip-components=1; }; \
-    done && \
-    rm -f /tmp/js-yaml-*.tgz && \
-    # Fail the build if any copy is still a 4.x older than 4.3.2, or unreadable.
-    for d in $(find /usr/local/lib/node_modules/@usebruno -type d -path "*/node_modules/js-yaml"); do \
-      [ "$(node -e "$JSYAML_CHECK" "$d")" = "ok" ] || { echo "UNPATCHED js-yaml at $d"; exit 1; }; \
-      echo "js-yaml@$(node -p "require('$d/package.json').version") at $d"; \
-    done && \
-    echo "Bruno CLI deps patched: js-yaml >= 4.3.2 in all nested 4.x copies" && \
+# ── Bruno CLI (#545) ─────────────────────────────────────────────────────────
+# One exact version, and its whole dependency tree with integrity hashes, come
+# from bruno-cli/package.json + package-lock.json. CI (ci-collection.yml)
+# installs the same lockfile, so the collection is validated against the
+# engine production runs. A new Bruno version is a pull request that changes
+# that lockfile (Dependabot proposes it); see CONTRIBUTING.md.
+#
+# The vulnerable copies Bruno bundles (axios, form-data, @faker-js/faker,
+# js-yaml; #428, #532) are replaced by the `overrides` in that package.json.
+# This used to be done here by unpacking tarballs over a global install,
+# because a global install has no root package.json to carry overrides, and
+# an override cannot change a direct dependency of the root. Here the root's
+# only dependency is @usebruno/cli, so overriding its own dependencies is
+# allowed. nanoid needs no override: Bruno 4.2.1 already ships 3.3.18.
+# What each override clears (all HIGH, in Bruno's tree, not OSCAR's):
+#   axios ^1.20.0       CVE-2026-42033/-42035/-42043/-42264/-44486/-44487/
+#                       -44488/-44492/-44494/-44495/-44496 (#428) and
+#                       CVE-2026-101898/-101901/-101903/-101905/-101906/
+#                       -101907/-101909 (#532); Bruno 4.2.1 ships 1.18.0
+#   form-data ^4.0.6    CVE-2026-12143; Bruno 4.2.1 ships 4.0.4 at the root
+#   @faker-js/faker ^10.5.0  CVE-2026-73231; a major above Bruno's 9.x, safe
+#                       because the collection never uses {{$faker...}}
+#   js-yaml ^4.3.2      CVE-2026-84375 (#532); Bruno 4.2.1 ships 4.3.1
+# The ranges are floors, not ceilings (CLAUDE.md, "an exact-version
+# overrides entry"): the lockfile fixes the version actually installed.
+#
+# --ignore-scripts: one package in the tree has an install script (the
+# lockfile marks it "hasInstallScript"): protobufjs, whose postinstall only
+# prints a warning about how its dependents spell its version. Skipping it
+# changes nothing, and a dependency added later cannot run code at build time
+# unnoticed.
+#
+# /usr/local/bin/bru is a symlink, as a global install made it, so
+# BRU_CMD=/usr/local/bin/bru (OSCAR_Deploy/docker-compose.yml) keeps working.
+# Node resolves the symlink chain to bin/bru.js, so its relative requires work.
+COPY bruno-cli/package.json bruno-cli/package-lock.json /opt/bruno-cli/
+RUN cd /opt/bruno-cli && \
+    npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+    ln -s /opt/bruno-cli/node_modules/.bin/bru /usr/local/bin/bru && \
+    bru --version && \
     cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
