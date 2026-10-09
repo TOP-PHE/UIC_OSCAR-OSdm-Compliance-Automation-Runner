@@ -88,19 +88,35 @@ without printing the whole file:
 python3 -c "import json;print(json.load(open('clients.json'))['alpha'][0]['client_secret'])"
 ```
 
-Then, from any other machine:
+Then, from any other machine, in two steps.
+
+First, on its own, this line. It stops at a prompt and waits: paste the secret
+of that client and press Enter. Nothing is shown while you paste.
 
 ```bash
-H=https://<simulator-host>
-ID=alpha-client-1
-read -rs SECRET     # paste the secret of that client; it is not shown
-curl -s $H/healthz
+H=https://<simulator-host>; ID=alpha-client-1; read -rsp "Secret of $ID: " SECRET; echo
+```
+
+Do not paste it together with the lines below: the terminal would then wait
+for the secret without saying so, and look frozen.
+
+Then the checks:
+
+```bash
+curl -s $H/healthz; echo
 # a token for alpha
-T=$(curl -s -d grant_type=client_credentials -d "client_id=$ID" --data-urlencode "client_secret=$SECRET" $H/alpha/oauth/token | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])")
+T=$(curl -s -d grant_type=client_credentials -d "client_id=$ID" --data-urlencode "client_secret=$SECRET" $H/alpha/oauth/token | python3 -c "import json,sys;print(json.load(sys.stdin).get('access_token',''))")
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/alpha/versions   # 200
 curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/beta/versions    # 401: alpha's token on beta
 curl -s -o /dev/null -w '%{http_code}\n' $H/alpha/versions                                 # 401: no token
 ```
+
+Expected: `{"status":"ok"}`, then `200`, `401`, `401`. If the first number is
+`401`, no token was issued: the secret is not the one of that client.
+
+What needs no secret can be checked at any time: `/healthz` answers
+`{"status":"ok"}` over https with a valid certificate, `/alpha/versions`
+without a token answers 401, and an unknown provider answers 404.
 
 ## 5. Point a company at it
 
@@ -134,11 +150,32 @@ runs must not see each other's.
 
 ## 6. Several providers for one distributor (#540)
 
-Each provider company gets the endpoint and the token URL of one simulated
-provider, and each tester the client of that provider. A tester who uses
-`alpha`'s credentials on the `beta` company gets no token, and a token of
-`alpha` sent to `beta` is refused with 401: a mix-up between providers shows as
-a failed run instead of a passing one.
+In OSCAR, one company or provider has one endpoint, and each user has one set
+of credentials for it. **API Config always shows the one named at its top and
+in the menu's *Working on* selector.** Credentials for `beta` entered while the
+page shows the company itself replace the ones entered for `alpha`: they are
+not added next to them.
+
+To use a second simulated provider, a Test Manager adds it as a provider:
+
+1. Menu **Providers** → *Add a provider*: a name (for example `Beta`) and the
+   endpoint `https://<simulator-host>/beta`. Tick the testers who may use it.
+2. The menu bar now shows **Working on**. Choose `Beta`. The page reloads and
+   every page of that browser tab works on `Beta`.
+3. **API Config** now reads *Beta — Shared API Endpoint* and *Your Credentials
+   for Beta*. Enter the token URL `https://<simulator-host>/beta/oauth/token`
+   and a client of `beta` from `clients.json`. Each user does this for
+   themselves.
+4. **Test Config** → *Upload datafile*, the same file as in section 5: a
+   provider has its own data file and Test Framework.
+5. Run a scenario. Switch *Working on* back to the company, or to another
+   provider, to run there.
+
+Do the same for `gamma`. What this arrangement shows: a user who enters
+`alpha`'s client on the `Beta` provider gets no token, and a token of `alpha`
+sent to `beta` is refused with 401. A mix-up between providers is a failed run,
+not a passing one, and every identifier in a report starts with the name of the
+provider that answered.
 
 ## 7. Day to day
 
