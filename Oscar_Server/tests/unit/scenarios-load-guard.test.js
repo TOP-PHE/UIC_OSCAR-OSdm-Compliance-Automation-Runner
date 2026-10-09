@@ -281,7 +281,7 @@ describe('upload (handleFileUpload): the data file and nothing else', () => {
       trip: { origin: 'urn:uic:stn:1', destination: 'urn:uic:stn:2', startDatetime: '%TRIP_DATE%T08:00:00+02:00', vehicleNumber: '123' },
     }],
   };
-  const NAMES = ['handleFileUpload', 'countScenarios', 'uploadConfirmText', 'uploadRefusalText', 'offerBuildFromUpload',
+  const NAMES = ['handleFileUpload', 'countScenarios', 'uploadConfirmText', 'uploadRefusalText', 'offerBuildFromUpload', 'buildOfferText',
     'loadForEdit', 'frameworkFromDatafile', 'trainFromTrip', 'trainsFromDatafile'];
 
   function setup({ uploadAnswer = response(200, { scenarios_count: 2, previous: { scenarios_count: 5 } }),
