@@ -80,6 +80,19 @@ refused. `scripts/make-clients.js` writes a file with random secrets, either
 next to `server.js` (`local`, the default) or in `deploy/` (`deploy`): two
 places git ignores. It takes no other path.
 
+The ids it creates say who each client is for:
+
+```
+<provider>.tstmgr01  <provider>.tstmgr02  <provider>.tstmgr03    Test Managers
+<provider>.tst01     <provider>.tst02     <provider>.tst03       testers
+```
+
+Three of each per provider by default; `node scripts/make-clients.js local 2 5`
+gives two and five. The role is in the name only: the simulator treats every
+client of a provider alike. One client per OSCAR account keeps their bookings
+apart. Any other id is accepted in a clients file written by hand, as long as
+it has no colon.
+
 Only a SHA-256 digest of each secret is kept in memory.
 
 ## Rules it keeps

@@ -1,11 +1,14 @@
 {
   "alpha": [
-    { "client_id": "alpha-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+    { "client_id": "alpha.tstmgr01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" },
+    { "client_id": "alpha.tst01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
   ],
   "beta": [
-    { "client_id": "beta-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+    { "client_id": "beta.tstmgr01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" },
+    { "client_id": "beta.tst01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
   ],
   "gamma": [
-    { "client_id": "gamma-client-1", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
+    { "client_id": "gamma.tstmgr01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" },
+    { "client_id": "gamma.tst01", "client_secret": "REPLACE-with-a-random-secret-of-32-characters-or-more" }
   ]
 }

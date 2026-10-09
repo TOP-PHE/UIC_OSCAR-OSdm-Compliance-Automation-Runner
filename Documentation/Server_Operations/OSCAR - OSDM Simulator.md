@@ -47,15 +47,31 @@ git clone --depth 1 https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automat
 cd /opt/osdm-simulator/OSDM_Simulator/deploy
 ```
 
-Generate the clients file: two clients per provider, with random secrets. It is
-written as `deploy/clients.json`, with access for its owner only, and an
-existing file is never replaced.
+Generate the clients file, with random secrets. It is written as
+`deploy/clients.json`, with access for its owner only, and an existing file is
+never replaced.
 
 ```bash
 docker run --rm -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
-  node scripts/make-clients.js deploy 2
+  node scripts/make-clients.js deploy
 chown 1000:1000 clients.json
 ```
+
+Each provider gets three clients for Test Managers and three for testers, and
+the id says which:
+
+| Client id | Meant for |
+|---|---|
+| `alpha.tstmgr01`, `alpha.tstmgr02`, `alpha.tstmgr03` | Test Managers, on `alpha` |
+| `alpha.tst01`, `alpha.tst02`, `alpha.tst03` | testers, on `alpha` |
+| `beta.…`, `gamma.…` | the same on `beta` and `gamma` |
+
+The command prints the ids it created (never a secret). For other numbers, add
+them after `deploy`: `deploy 2 5` gives two Test Manager clients and five
+tester clients per provider. The role is in the name only: the simulator
+treats every client of a provider alike. Give each OSCAR account a client of
+its own: two accounts that share one see each other's bookings on the
+simulator.
 
 Start the simulator and check it from the host:
 
@@ -82,10 +98,16 @@ name instead.
 ## 4. Check it from outside
 
 The secrets are in `clients.json` on the host. Read the one you need there,
-without printing the whole file:
+by its id, without printing the whole file:
 
 ```bash
-python3 -c "import json;print(json.load(open('clients.json'))['alpha'][0]['client_secret'])"
+ID=alpha.tstmgr01; python3 -c "import json,sys;print(next(c['client_secret'] for p in json.load(open('clients.json')).values() for c in p if c['client_id']==sys.argv[1]))" "$ID"
+```
+
+To hand out the clients of one provider, this lists each id with its secret:
+
+```bash
+python3 -c "import json;[print(c['client_id'], c['client_secret']) for c in json.load(open('clients.json'))['alpha']]"
 ```
 
 Then, from any other machine, in two steps.
@@ -94,7 +116,7 @@ First, on its own, this line. It stops at a prompt and waits: paste the secret
 of that client and press Enter. Nothing is shown while you paste.
 
 ```bash
-H=https://<simulator-host>; ID=alpha-client-1; read -rsp "Secret of $ID: " SECRET; echo
+H=https://<simulator-host>; ID=alpha.tstmgr01; read -rsp "Secret of $ID: " SECRET; echo
 ```
 
 Do not paste it together with the lines below: the terminal would then wait
@@ -130,8 +152,9 @@ rebuilds its Test Framework from the file.
    - Auth Profile: *Standard OAuth2 — credentials in Basic auth header*
      (*credentials in body* works as well);
    - Token URL: `https://<simulator-host>/alpha/oauth/token`
-   - Client ID and Client Secret: one entry of `alpha` in `clients.json`.
-     Scope is left empty.
+   - Client ID and Client Secret: one entry of `alpha` in `clients.json`,
+     a `tstmgr` one for a Test Manager and a `tst` one for a tester, and not
+     one somebody else already uses. Scope is left empty.
 3. **Test data** (Test Manager, Test Config → *Upload datafile*): upload
    [`OSDM_Simulator/oscar/datafile.json`](../../OSDM_Simulator/oscar/datafile.json).
    It holds two sale scenarios, shared with the company's testers:
@@ -186,13 +209,33 @@ provider that answered.
 |---|---|
 | See what is being called | `docker compose logs -f` (one line per request: time, method, path, status, provider, client; no header, no body) |
 | Update the simulator | `git -C /opt/osdm-simulator pull && docker compose restart` |
-| Replace all secrets | delete `clients.json`, generate it again (section 3), `docker compose restart`, hand the new secrets out |
-| Add a client | add an entry to `clients.json` (a secret of 32 characters or more), `docker compose restart` |
+| Replace all clients and secrets | see below |
+| Add a client | add an entry to `clients.json` (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
 | Clear every booking and end every token | `docker compose restart` |
 | Stop it when the campaign is over | `docker compose down`, and remove the nginx site |
 
 A restart clears everything: bookings are kept in memory only, and the key that
 signs the tokens is drawn at start-up.
+
+**Replacing all clients and secrets**, for instance to move a simulator
+installed before the `provider.role` ids to them. The script never replaces a
+clients file, so the old one is put aside first. From
+`/opt/osdm-simulator/OSDM_Simulator/deploy`:
+
+```bash
+git -C /opt/osdm-simulator pull
+mv clients.json clients.json.old
+docker run --rm -v /opt/osdm-simulator/OSDM_Simulator:/simulator -w /simulator node:22-slim \
+  node scripts/make-clients.js deploy
+chown 1000:1000 clients.json
+docker compose restart
+```
+
+From the restart on, the old ids and secrets no longer work: every OSCAR
+account that used one needs its new Client ID and Client Secret entered in API
+Config. Until then its runs fail at the token step, and the simulator's log
+shows `POST /<provider>/oauth/token 401`. Delete `clients.json.old` once the
+new ones are in place.
 
 ## 8. When something does not work
 
