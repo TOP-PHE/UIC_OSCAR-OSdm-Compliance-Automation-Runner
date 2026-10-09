@@ -79,11 +79,14 @@ function columnsOf(dbFile, table) {
   }
 }
 
-// Require db.js fresh against `dbFile` — this runs schema.sql + all migrations.
+// Require db.js fresh against `dbFile` — this runs schema.sql + all migrations —
+// then close the connection it opened. The migrations have run by then, and a
+// file that is still open cannot be removed on Windows: the clean-up above
+// used to leave every one of these databases behind there (#583).
 function bootDbAgainst(dbFile) {
   jest.isolateModules(() => {
     process.env.OSCAR_DB_PATH = dbFile;
-    require('../../src/db/db');
+    require('../../src/db/db').db.close();
   });
 }
 

@@ -17,18 +17,27 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-mig-'));
-afterAll(() => fs.rmSync(DIR, { recursive: true, force: true }));
+afterAll(() => {
+  fs.rmSync(DIR, { recursive: true, force: true });
+  // Not best-effort: a folder that stays means a database was left open.
+  expect(fs.existsSync(DIR)).toBe(false);
+});
 let n = 0;
 
-// Boot the real db.js on `file`.
+// Boot the real db.js on `file`, then close the connection it opened. The
+// migrations run while the module loads, so nothing is lost by closing it, and
+// a file that is still open cannot be removed on Windows: the clean-up above
+// then fails, and with it the whole suite (#583).
 function boot(file) {
   const prev = process.env.OSCAR_DB_PATH;
   process.env.OSCAR_DB_PATH = file;
   let err = null;
   jest.isolateModules(() => {
-    try { require('../../src/db/db'); } catch (e) { err = e; }
+    try { require('../../src/db/db').db.close(); } catch (e) { err = e; }
   });
-  process.env.OSCAR_DB_PATH = prev;
+  // Assigning undefined to an environment variable stores the text "undefined".
+  if (prev === undefined) delete process.env.OSCAR_DB_PATH;
+  else process.env.OSCAR_DB_PATH = prev;
   return err;
 }
 

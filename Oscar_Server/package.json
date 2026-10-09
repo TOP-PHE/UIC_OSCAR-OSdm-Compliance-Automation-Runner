@@ -17,6 +17,8 @@
     "testMatch": [
       "<rootDir>/tests/**/*.test.js"
     ],
+    "globalSetup": "<rootDir>/tests/global-setup.js",
+    "globalTeardown": "<rootDir>/tests/global-teardown.js",
     "setupFiles": [
       "<rootDir>/tests/setup.js"
     ],
