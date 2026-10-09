@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     1.9 GB had piled up on the maintainer's machine in four days.
   - The simulator's tests remove their temporary folders (6,134 had been left).
 
+### Changed
+
+- **OSDM simulator: client ids say provider and role** (#585, simulator 0.2.0).
+  `scripts/make-clients.js` now creates `<provider>.tstmgr01`…`03` for Test
+  Managers and `<provider>.tst01`…`03` for testers, three of each per provider
+  by default (`[local|deploy] [test-managers] [testers]`), and lists the ids it
+  created, never a secret. The role is in the name only. An installed
+  simulator keeps its old ids until its clients file is replaced; the
+  operations page gives the steps. No server or collection change.
+
 ### Added
 
 - **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a

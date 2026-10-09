@@ -149,19 +149,67 @@ test('not behind a proxy, a forwarded address is ignored: it cannot be used to d
   assert.deepEqual([await from('198.51.100.1'), await from('198.51.100.2'), await from('198.51.100.3')], [401, 401, 429]);
 });
 
+test('a client id says its provider, its role and its number: alpha.tstmgr01, alpha.tst01', () => {
+  assert.deepEqual(makeClients.clientIds('alpha', { managers: 3, testers: 3 }),
+    ['alpha.tstmgr01', 'alpha.tstmgr02', 'alpha.tstmgr03', 'alpha.tst01', 'alpha.tst02', 'alpha.tst03']);
+  assert.deepEqual(makeClients.clientIds('beta', { managers: 1, testers: 0 }), ['beta.tstmgr01']);
+  assert.deepEqual(makeClients.clientIds('gamma', { managers: 0, testers: 2 }), ['gamma.tst01', 'gamma.tst02']);
+  // Two digits, so that the ids sort in order, up to the 99th.
+  const many = makeClients.clientIds('alpha', { managers: 0, testers: 99 });
+  assert.equal(many[8], 'alpha.tst09');
+  assert.equal(many[9], 'alpha.tst10');
+  assert.equal(many[98], 'alpha.tst99');
+  assert.deepEqual([...many].sort(), many);
+});
+
 test('a clients file is written with random secrets the simulator accepts, and is never replaced', () => {
   const providers = loadProviders(PROVIDERS_DIR);
   const file = path.join(tempDir(), 'clients.json');
-  makeClients.writeClientsFile(file, providers, 2);
+  const created = makeClients.writeClientsFile(file, providers, { managers: 3, testers: 3 });
   const written = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(Object.keys(written), ['alpha', 'beta', 'gamma']);
+  for (const key of ['alpha', 'beta', 'gamma']) {
+    const ids = written[key].map((c) => c.client_id);
+    assert.deepEqual(ids, [`${key}.tstmgr01`, `${key}.tstmgr02`, `${key}.tstmgr03`, `${key}.tst01`, `${key}.tst02`, `${key}.tst03`]);
+    assert.deepEqual(created[key], ids);
+  }
   const secrets = Object.values(written).flat().map((c) => c.client_secret);
-  assert.equal(secrets.length, 6);
-  assert.equal(new Set(secrets).size, 6);
+  assert.equal(secrets.length, 18);
+  assert.equal(new Set(secrets).size, 18);
   for (const secret of secrets) assert.match(secret, /^[0-9a-f]{64}$/);
-  assert.ok(loadClients(file, providers).get('alpha').has('alpha-client-1'));
-  assert.throws(() => makeClients.writeClientsFile(file, providers, 2), { code: 'EEXIST' });
+  const loaded = loadClients(file, providers);
+  assert.deepEqual([...loaded.get('beta').keys()], written.beta.map((c) => c.client_id));
+  assert.throws(() => makeClients.writeClientsFile(file, providers, { managers: 3, testers: 3 }), { code: 'EEXIST' });
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), written);
+});
+
+test('with a generated clients file, each client gets a token from its own provider only', async (t) => {
+  const file = path.join(tempDir(), 'clients.json');
+  makeClients.writeClientsFile(file, loadProviders(PROVIDERS_DIR), { managers: 3, testers: 3 });
+  const written = JSON.parse(fs.readFileSync(file, 'utf8'));
+  t.mock.method(console, 'log', () => {});
+  const server = start({ SIM_PORT: '0', SIM_CLIENTS_FILE: file }, baseDir);
+  await listening(server);
+  t.after(() => closed(server));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  const withBasic = (provider, client) => fetch(`${base}/${provider}/oauth/token`, {
+    method: 'POST', headers: { ...form, Authorization: basic(client) }, body: 'grant_type=client_credentials',
+  }).then((res) => res.status);
+  const inBody = (provider, client) => fetch(`${base}/${provider}/oauth/token`, {
+    method: 'POST', headers: form, body: new URLSearchParams({ grant_type: 'client_credentials', ...client }).toString(),
+  }).then((res) => res.status);
+
+  const manager = written.alpha.find((c) => c.client_id === 'alpha.tstmgr01');
+  const tester = written.beta.find((c) => c.client_id === 'beta.tst03');
+  assert.equal(await withBasic('alpha', manager), 200);
+  assert.equal(await inBody('alpha', manager), 200);
+  assert.equal(await withBasic('beta', tester), 200);
+  assert.equal(await inBody('beta', tester), 200);
+  // The id names a provider, but it is the provider of the request that decides.
+  assert.equal(await withBasic('beta', manager), 401);
+  assert.equal(await inBody('alpha', tester), 401);
+  assert.equal(await withBasic('alpha', { ...manager, client_secret: tester.client_secret }), 401);
 });
 
 test('make-clients writes to one of two fixed places, both ignored by git, and prints no secret', (t) => {
@@ -177,13 +225,21 @@ test('make-clients writes to one of two fixed places, both ignored by git, and p
   t.mock.method(console, 'error', (line) => printed.push(line));
 
   assert.equal(makeClients.main([]), 0);
-  assert.equal(makeClients.main(['deploy', '1']), 0);
-  assert.deepEqual(writes.map((w) => w.file), [makeClients.LOCAL_FILE, makeClients.DEPLOY_FILE]);
-  assert.deepEqual(writes.map((w) => w.options), new Array(2).fill({ flag: 'wx', mode: 0o600 }));
-  assert.deepEqual(writes.map((w) => JSON.parse(w.content).alpha.length), [2, 1]);
+  assert.equal(makeClients.main(['deploy', '1', '2']), 0);
+  assert.equal(makeClients.main(['local', '0', '1']), 0);
+  assert.deepEqual(writes.map((w) => w.file), [makeClients.LOCAL_FILE, makeClients.DEPLOY_FILE, makeClients.LOCAL_FILE]);
+  assert.deepEqual(writes.map((w) => w.options), new Array(3).fill({ flag: 'wx', mode: 0o600 }));
+  const idsOf = (write, provider) => JSON.parse(write.content)[provider].map((c) => c.client_id);
+  // Three Test Managers and three testers per provider when nothing is asked.
+  assert.deepEqual(idsOf(writes[0], 'gamma'), ['gamma.tstmgr01', 'gamma.tstmgr02', 'gamma.tstmgr03', 'gamma.tst01', 'gamma.tst02', 'gamma.tst03']);
+  assert.deepEqual(idsOf(writes[1], 'alpha'), ['alpha.tstmgr01', 'alpha.tst01', 'alpha.tst02']);
+  assert.deepEqual(idsOf(writes[2], 'beta'), ['beta.tst01']);
+  // The ids are listed, so that they can be handed out; a secret never is.
+  const output = printed.join('\n');
+  assert.ok(output.includes('  gamma: gamma.tstmgr01 gamma.tstmgr02 gamma.tstmgr03 gamma.tst01 gamma.tst02 gamma.tst03'));
   for (const { content } of writes) {
     for (const client of Object.values(JSON.parse(content)).flat()) {
-      assert.equal(printed.join('\n').includes(client.client_secret), false, 'a secret must not be printed');
+      assert.equal(output.includes(client.client_secret), false, 'a secret must not be printed');
     }
   }
 });
@@ -194,7 +250,9 @@ test('make-clients refuses any other destination, a bad count, and a file that i
   t.mock.method(fs, 'writeFileSync', (file) => { writes.push(file); });
   t.mock.method(console, 'error', (line) => printed.push(line));
   const elsewhere = path.join(tempDir(), 'clients.json');
-  for (const args of [[elsewhere], ['../clients.json'], ['deploy/clients.json'], ['DEPLOY'], ['local', '0'], ['deploy', '51'], ['local', 'two']]) {
+  const refused = [[elsewhere], ['../clients.json'], ['deploy/clients.json'], ['DEPLOY'],
+    ['local', '0', '0'], ['deploy', '100'], ['deploy', '3', '100'], ['local', 'two'], ['local', '3', '-1'], ['local', '1.5'], ['local', '3', '']];
+  for (const args of refused) {
     assert.equal(makeClients.main(args), 1, args.join(' '));
   }
   assert.deepEqual(writes, [], 'nothing may be written for a refused request');
