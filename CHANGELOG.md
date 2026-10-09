@@ -37,6 +37,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.220] — 2026-10-09
+
+Issue #580: API Config is one page for the company and all its providers.
+Page only; no route changes. Collection unchanged (OTST_V2.0.104).
+
+### Changed
+
+- **API Config lists everything the user may use.** One section for the
+  company and one for each provider, each with the shared endpoint and
+  dedicated headers and the user's own credentials. A summary at the top
+  says, for each, whether the endpoint, the credentials and the test data are
+  set. Before, the page showed one of them at a time, the one chosen in the
+  menu's **Working on** selector.
+- **Each section is saved on its own**, with a button that names it ("Save
+  configuration for Beta"). Every request of a section names that section's
+  company or provider (`X-Provider-Id`), so **Working on** no longer decides
+  what API Config shows or saves; it only decides which section is opened.
+- **Every section says what its credentials are for**, the company's own
+  included ("Your Credentials for PENTEST"). Before, only a provider was
+  named; a first-time user typed a second provider's credentials over the
+  first.
+- A section with text that is not saved is marked, and the page asks before
+  it is left. A list of providers that cannot be read is said, not taken for
+  "none"; a provider that is no longer available says so in its own section
+  and the other sections keep working.
+- A company without providers sees one section, as before, with its name in
+  the credentials card.
+
+### Tests
+
+- `tests/unit/profile-endpoint.test.js`: the page's own functions, run with
+  fake sections. The #544 rule (only a Test Manager sends the endpoint) now
+  per section, and the #580 rules: every request names its section whatever
+  **Working on** says, saving one section sends nothing about another and
+  leaves what was typed there, a refused save stops in its section.
+- `tests/integration/provider-isolation.test.js`: the two things the page
+  relies on the server for. An empty `X-Provider-Id` is the own company, and
+  saving or clearing one section changes nothing stored for the company or
+  for another provider.
+- 24 mutations of the page and of the server rule, all caught. Checked in a
+  browser as a Test Manager with two providers, as a tester granted one, and
+  as a member of a company without providers.
+
+---
+
 ## [server-1.11.219] — 2026-10-08
 
 Issue #540, last item: a Test Config save made from a stale load is refused.

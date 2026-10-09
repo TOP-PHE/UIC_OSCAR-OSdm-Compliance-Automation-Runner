@@ -93,12 +93,18 @@ Framework, test resources, findings, runs and reports.
 
 - **Choosing what you work on.** When your company has providers you may use, the
   menu bar shows a **Working on** selector instead of the company name. Pick your
-  own company or a provider: every page of that browser tab then works on it,
-  including API Config, Test Config, New Run, the Dashboard and the reports.
-  Another tab can work on another provider at the same time.
-- **Credentials per provider.** On API Config, the card reads *Your Credentials
-  for <provider>*. Enter the credentials that provider gave you; they are used
-  only for runs on that provider. Your own company's credentials are unchanged.
+  own company or a provider: Test Config, New Run, the Dashboard and the reports
+  of that browser tab then work on it. Another tab can work on another provider
+  at the same time.
+- **API Config shows them all.** The page has one section for your company and
+  one for each provider you may use, and a table at the top that says, for
+  each, whether the endpoint, your credentials and the test data are set. Open
+  a section, enter the credentials that provider gave you, and save it with
+  its own button (*Save configuration for <provider>*). Each section is saved
+  on its own: saving one never changes another, and credentials entered for a
+  provider are used only for runs on that provider. A section with text you
+  have not saved is marked *not saved*. **Working on** only decides which
+  section is opened first.
 - **Who sees which provider.** Test Managers see every provider of the company.
   A tester sees the providers a Test Manager has granted. If access is withdrawn
   while you work on a provider, OSCAR tells you and switches the tab back to

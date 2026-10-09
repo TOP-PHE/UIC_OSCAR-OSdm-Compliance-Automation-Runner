@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.244",
+  "current_release": "2026.245",
   "releases": [
+    {
+      "release": "2026.245",
+      "date": "2026-10-09",
+      "server": "1.11.220",
+      "collection": "OTST_V2.0.104",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#580): API Config is one page for the company and all its providers. One section each, with the shared endpoint and dedicated headers and the user's own credentials; a summary at the top says, for each, whether the endpoint, the credentials and the test data are set. Page only; no route changes; collection unchanged at OTST_V2.0.104.",
+        "Each section is saved on its own, and every request of a section names that section's company or provider (X-Provider-Id). The menu's \"Working on\" choice no longer decides what API Config shows or saves; it only decides which section is opened. The own company is read with an empty X-Provider-Id, which the server has always read as \"the own company\" and nav.js leaves alone.",
+        "Every section says what its credentials are for, the company's own included (\"Your Credentials for PENTEST\", \"Save configuration for Beta\"). Before, only a provider was named, and a first-time user typed a second provider's credentials over the first.",
+        "A section with text that is not saved is marked, and the page asks before it is left. A list of providers that cannot be read is said, not taken for \"none\"; a provider that is no longer available says so in its section.",
+        "Tests: tests/unit/profile-endpoint.test.js runs the page's own functions (25 tests; the #544 rule per section, and the #580 rules); tests/integration/provider-isolation.test.js adds the two things the page relies on the server for (an empty X-Provider-Id is the own company; saving or clearing one section changes nothing stored for another). 24 mutations of the page and of the server rule, all caught. Checked in a browser as a Test Manager with two providers, as a tester granted one, and as a member of a company without providers."
+      ]
+    },
     {
       "release": "2026.244",
       "date": "2026-10-08",
