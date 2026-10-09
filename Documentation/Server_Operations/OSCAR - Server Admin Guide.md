@@ -563,9 +563,9 @@ git pull origin Bruno-Enhancements
 
 ### 11.3 Upgrading Bruno CLI
 
-> **Docker deployments (v1.11.221+):** the image carries the Bruno CLI at the
+> **Docker deployments (v1.11.222+):** the image carries the Bruno CLI at the
 > version fixed in `Oscar_Server/bruno-cli/package-lock.json`. Do not update it
-> inside the container; a new version arrives with a new image (§15.23). On a
+> inside the container; a new version arrives with a new image (§15.24). On a
 > machine without Docker, install the same version:
 > `npm install -g @usebruno/cli@<version in Oscar_Server/bruno-cli/package.json>`.
 
@@ -1580,7 +1580,7 @@ request, the id of the company or provider of the section concerned
 endpoints and credentials are unchanged. A company without providers sees one
 section, as before.
 
-### 15.23 v1.11.221 — the image installs a fixed Bruno CLI on a fixed base image (#545)
+### 15.24 v1.11.222 — the image installs a fixed Bruno CLI on a fixed base image (#545)
 
 Nothing to configure. What changes for an operator:
 

@@ -481,7 +481,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   why, and revisit it whenever an advisory names that package. Symptom to
   recognise: a Dependabot alert that stays open with no PR, or a PR that
   changes nothing in the lockfile.
-- **The Bruno CLI and the base image are pinned** (#545, v1.11.221). The
+- **The Bruno CLI and the base image are pinned** (#545, v1.11.222). The
   CLI comes from `Oscar_Server/bruno-cli/package.json` + `package-lock.json`
   (exact `@usebruno/cli`, 4.2.1 at that release), installed with `npm ci`
   into `/opt/bruno-cli` by the Dockerfile and by `ci-collection.yml`, so CI
@@ -813,6 +813,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   pre-booked parts). The other member is optional at every stage. At
   REFUNDED/EXCHANGED an `[INFO]` line shows confirmedPrice before/after —
   logged, not asserted (open OTST point, see §6).
+- **Offer parts and booked parts are paired by content, never by position**
+  (#550, OTST_V2.0.105). OSDM gives a booked part no reference to its offer
+  part and does not fix their order. `bookings.js` `pairOfferParts()` (pure)
+  scores each pair on ranked criteria (id > passenger refs > passenger types >
+  products / trip coverage > validity instant > price > the rest) and breaks
+  ties by the parts' own text, so any order of the booking gives the same
+  assertions. A missing *admission* is one failure naming it (once across
+  re-reads, `recordFindingOnce`); a missing reservation or ancillary stays a
+  WARNING because those parts can be optional. Any new offer↔booking
+  comparison goes through the pairs, never `bookedParts[i]`.
+  `tests/unit/bruno-bookings-part-pairing.test.js` runs the real validator and
+  records every assertion, with `tests/helpers/bruno-chai.js` standing in for
+  Bruno's chai `expect` (it covers only the chain `validateOfferParts` uses;
+  extend it as needed). Exported as `validateBookedOfferParts`, because
+  `offers.js` already puts a different `validateOfferParts` on `globalThis`.
+  `refunds.js` `getBookingRefundResponse` is called by no request (its
+  `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
+  if it is wired in).
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
