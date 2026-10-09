@@ -41,6 +41,18 @@ function liveDatafilePath(slug) {
   return p;
 }
 
+// The file an upload replaced (#549): one per company, next to the live one,
+// written encrypted like it. Only an upload and a restore write it; the Test
+// Config saves do not, or the file an upload replaced would be gone after the
+// next auto-save. Not served by /data/:filename (its name does not match).
+function previousDatafilePath(slug) {
+  const p = path.resolve(DATAFILES_DIR, `${slug}-datafile.previous.json`);
+  if (!p.startsWith(DATAFILES_DIR + path.sep)) {
+    throw new Error('Datafile path escaped the datafiles directory.');
+  }
+  return p;
+}
+
 /**
  * Store `datafile` (an object) as the live datafile of `company` ({ id, slug }).
  * Returns { hash, filePath }. Throws when the file cannot be written.
@@ -64,4 +76,4 @@ async function writeDatafile(company, datafile) {
   return { hash, filePath };
 }
 
-module.exports = { writeDatafile, liveDatafilePath, DATAFILES_DIR };
+module.exports = { writeDatafile, liveDatafilePath, previousDatafilePath, DATAFILES_DIR };

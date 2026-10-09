@@ -7,7 +7,8 @@
 
 # Dependabot configuration. Three ecosystems tracked:
 #   1. npm (Oscar_Server) — server runtime + dev deps, weekly
-#   2. docker (Oscar_Server/Dockerfile) — base image updates, weekly
+#      npm (Oscar_Server/bruno-cli) — the Bruno CLI the image and CI install, weekly
+#   2. docker (Oscar_Server/Dockerfile) — base image tag and digest, weekly
 #   3. github-actions (.github/workflows) — action versions, monthly
 #
 # All updates open as PRs against main. Combined with branch protection
@@ -74,6 +75,28 @@ updates:
         update-types:
           - version-update:semver-major
 
+  # ── npm: the Bruno CLI (Oscar_Server/bruno-cli, #545) ───────────────────────
+  # Its own directory, so Dependabot sees it as a separate project. A new
+  # @usebruno/cli is a PR that changes the engine every run uses: review it
+  # with the collection, and bump Oscar_Server/package.json for the release
+  # (CONTRIBUTING.md, "Pinned versions"). The `overrides` in that package.json
+  # are floors (^), so a patched axios/form-data/faker/js-yaml can come
+  # through as well.
+  - package-ecosystem: npm
+    directory: /Oscar_Server/bruno-cli
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - server
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
   # ── docker: base image (node:22-slim) ──────────────────────────────────────
   - package-ecosystem: docker
     directory: /Oscar_Server
@@ -97,6 +120,8 @@ updates:
           - version-update:semver-major
 
   # ── github-actions: action versions in workflows ───────────────────────────
+  # Every `uses:` is a commit SHA with the version in a trailing comment
+  # (#545); Dependabot updates both together.
   - package-ecosystem: github-actions
     directory: /
     schedule:
