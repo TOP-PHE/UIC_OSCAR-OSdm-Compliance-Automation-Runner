@@ -144,6 +144,10 @@ function setSaveBtnState(disabled, text) {
     btn.disabled = !!disabled;
     if (text != null) btn.textContent = text;
   });
+  // #549: "Download JSON" is the stored file; edits not yet saved have their
+  // own download, offered while there are some.
+  const edits = document.getElementById('btn-download-edits');
+  if (edits) edits.style.display = (dirty && state) ? '' : 'none';
 }
 
 function markDirty() {
@@ -324,6 +328,7 @@ async function loadDatafile() {
     await refreshAllSections();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('sections-container').style.display = '';
+    await refreshPreviousButton();
   } catch(e) {
     document.getElementById('loading').innerHTML = '❌ Error: ' + esc(e.message);
   }
@@ -376,7 +381,7 @@ function datafileSaveHeaders(version) {
 // The message for a save the server refused because the file changed meanwhile.
 function staleSaveMessage(detail) {
   return `${detail || 'The data file has changed since this page loaded it. Nothing was saved.'} `
-    + 'Your edits are still in this page: use Download JSON to keep a copy before you reload.';
+    + 'Your edits are still in this page: use "Download unsaved edits" to keep a copy before you reload.';
 }
 
 // ── Refresh all three sections from server ───────────────────────────────────
@@ -1046,192 +1051,231 @@ function renderWizardStep3InSection(targetEl) {
   tempDiv.remove();
 }
 
-// ── Handle file upload ───────────────────────────────────────────────────────
-async function handleFileUpload(input) {
-  if (!input.files?.[0]) return;
-  const loadEl = document.getElementById('loading');
-  document.getElementById('sections-container').style.display = 'none';
-  loadEl.textContent = '⏳ Uploading data file…';
-  loadEl.style.display = 'block';
-
-  try {
-    // First try to parse the JSON to extract framework/resources
-    const fileText = await input.files[0].text();
-    let parsed;
-    try { parsed = JSON.parse(fileText); } catch {
-      // Not valid JSON — upload as-is via FormData
-      parsed = null;
-    }
-
-    if (parsed) {
-      // Extract and save framework + resources from the datafile
-      await extractFromDatafile(parsed);
-    }
-
-    // Upload the raw datafile
-    const fd = new FormData();
-    fd.append('datafile', input.files[0]);
-    const res = await fetch('/v1/company/datafile', {
-      method: 'POST',
-      body: fd
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      loadEl.textContent = `Upload failed: ${data.detail || 'Unknown error'}`;
-      return;
-    }
-    showMsg('✅ Data file uploaded successfully.', true);
-    // Reload full state from server
-    await loadDatafile();
-  } catch(e) {
-    document.getElementById('loading').textContent = `Upload error: ${e.message}`;
-  }
-  input.value = '';
+// ── Upload a data file (#549) ────────────────────────────────────────────────
+// An upload replaces the data file and nothing else. Before 1.11.221 it first
+// rebuilt the Test Framework from the file (replacing the stored one, before
+// the upload was even sent) and added trains to Test Data. The server now
+// checks the file (the runs' schema, a tester's personal view, templates) and
+// keeps the file it replaces, which "Restore previous file" puts back.
+// Building a framework or trains from the file is offered afterwards, and only
+// to a company that has none (offerBuildFromUpload).
+function countScenarios(df) {
+  return Array.isArray(df?.scenarios) ? df.scenarios.length : null;
 }
 
-// ── Extract framework & resources from uploaded datafile ─────────────────────
-async function extractFromDatafile(datafile) {
+function uploadConfirmText(fileName, storedCount, fileCount, unsavedEdits) {
+  const lines = [`Replace the company data file with "${fileName}"?`, ''];
+  lines.push(storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`);
+  lines.push(fileCount === null ? 'After: the file has no "scenarios" list; the server will check it.' : `After: ${fileCount} scenario(s).`);
+  lines.push('', 'The Test Framework and Test Data are not changed.');
+  if (storedCount !== null) lines.push('The current file is kept: "Restore previous file" puts it back.');
+  if (unsavedEdits) lines.push('', 'This page has edits that are not saved: they will be lost.');
+  return lines.join('\n');
+}
+
+function uploadRefusalText(status, data) {
+  const detail = data?.detail || `The server answered ${status}.`;
+  const problems = Array.isArray(data?.problems) ? data.problems : [];
+  if (!problems.length) return detail;
+  const more = data.problems_truncated ? '\n• … and more' : '';
+  return `${detail}\n\n${problems.map(p => `• ${p}`).join('\n')}${more}`;
+}
+
+function showUploadError(text) {
+  document.getElementById('ue-detail').textContent = text;
+  document.getElementById('upload-error').style.display = 'block';
+}
+
+async function handleFileUpload(input) {
+  const file = input.files?.[0];
+  if (!file) return;
   try {
-    // a) Extract framework
-    const osdmVersion = datafile.osdmVersion || datafile.scenarios?.[0]?.osdmVersion || '3.4';
-    const scenarioTypes = new Set((datafile.scenarios||[]).map(s => s.scenarioType).filter(Boolean));
-    const salesFlows = [];
-    if (scenarioTypes.has('SALE')) salesFlows.push('SALE');
-    if (scenarioTypes.has('REFUND')) salesFlows.push('REFUND_FULL');
-    if (scenarioTypes.has('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
-
-    // Extract passenger types from passengersList
-    const passengerTypes = [...new Set(
-      (datafile.passengersList||[]).flatMap(pl =>
-        (pl.passengers||[]).map(p => {
-          // TODO: classify ADULT vs CHILD/SENIOR from p.dateOfBirth when
-          // age-based passenger types become required by OSDM.
-          // For now both branches return ADULT — Sonar S3923 simplified.
-          if (p.type === 'PERSON') return 'ADULT';
-          return p.type || 'ADULT';
-        })
-      )
-    )];
-
-    const fw = {
-      ...emptyFramework(),
-      osdmVersion,
-      salesFlows: salesFlows.length ? salesFlows : ['SALE'],
-      passengerTypes: passengerTypes.length ? passengerTypes : ['ADULT']
-    };
-
-    // b) Create train resources from tripRequirements
-    const trips = datafile.tripRequirements || [];
-    const trainResources = trips.map((trip, idx) => {
-      let origin = '', destination = '', departureTime = '', arrivalTime = '', vehicleNumber = '', operatorCode = '';
-      let pcRef = '', pcName = '', pcShortName = '';
-      const src = (trip.tripType === 'SPECIFICATION' && Array.isArray(trip.legs) && trip.legs.length > 0)
-        ? trip.legs[0]
-        : (trip.trip || null);
-      if (src) {
-        origin = src.origin || '';
-        destination = src.destination || '';
-        departureTime = (src.startDatetime || '').replace(/%TRIP_DATE%T/, '');
-        arrivalTime = (src.endDatetime || '').replace(/%TRIP_DATE%T/, '');
-        vehicleNumber = src.vehicleNumber || '';
-        operatorCode = src.operatorCode || '';
-        pcRef = src.productCategoryRef || '';
-        pcName = src.productCategoryName || '';
-        pcShortName = src.productCategoryShortName || '';
-      }
-
-      return {
-        label: `Train ${vehicleNumber || ('Trip-' + (idx+1))}`,
-        resource_type: 'TRAIN',
-        data: {
-          originURN: origin,
-          destinationURN: destination,
-          operatorCode,
-          productCategoryRef: pcRef,
-          productCategoryName: pcName,
-          productCategoryShortName: pcShortName,
-          daysOfWeek: [],
-          services: (vehicleNumber || departureTime || arrivalTime)
-            ? [{ vehicleNumber, departureTime, arrivalTime }]
-            : [],
-          ticketTypes: [],
-          travelClasses: [],
-          serviceClasses: [],
-          accommodations: [],
-          ancillaries: []
-        }
-      };
-    });
-
-    // Dedup key from a train resource's route + its first service (#136).
-    const trainDedupKey = (data) => {
-      const d = data || {};
-      const s = (Array.isArray(d.services) && d.services[0]) || {};
-      const veh = s.vehicleNumber || d.vehicleNumber || '';      // legacy fallback
-      const dep = s.departureTime || d.departureTime || '';
-      const arr = s.arrivalTime || d.arrivalTime || '';
-      return `${veh}|${d.originURN||''}|${d.destinationURN||''}|${dep}|${arr}`;
-    };
-
-    // Deduplicate trainResources from the datafile itself (same vehicle + route + times)
-    const seenTrainKeys = new Set();
-    const uniqueTrainResources = [];
-    for (const train of trainResources) {
-      const key = trainDedupKey(train.data);
-      if (!seenTrainKeys.has(key)) {
-        seenTrainKeys.add(key);
-        uniqueTrainResources.push(train);
-      }
+    let parsed = null;
+    try { parsed = JSON.parse(await file.text()); } catch { parsed = null; }
+    // A file that is not JSON goes to the server unconfirmed: it is refused
+    // there with the reason, and nothing is replaced.
+    if (parsed !== null) {
+      const storedCount = state ? countScenarios(state) : null;
+      if (!confirm(uploadConfirmText(file.name, storedCount, countScenarios(parsed), dirty))) return;
     }
-
-    // c) Save framework
-    await fetch('/v1/company/test-framework', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ config: fw })
-    }).catch(() => {});
-
-    // d) Save each train resource — skip duplicates
-    // Fetch existing resources to compare. #534: if that list cannot be loaded,
-    // duplicates cannot be told apart, so no train is added and the user is told.
-    const exLoad = await loadForEdit('/v1/company/test-resources', 'The existing test data');
-    if (exLoad.state === 'failed' || exLoad.state === 'signedOut') {
-      const why = exLoad.state === 'failed' ? exLoad.reason : 'The session has expired.';
-      oscarToast(`${why} The trains in the uploaded file were not added to Test Data. Upload the file again to add them.`, 'warning');
+    hidePanels();
+    const fd = new FormData();
+    fd.append('datafile', file);
+    const res = await fetch('/v1/company/datafile', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      showUploadError(uploadRefusalText(res.status, data));
       return;
     }
-    const existingResources = exLoad.state === 'loaded' ? exLoad.value : [];
-
-    const existingTrains = existingResources.filter(r => r.resource_type === 'TRAIN').map(r => {
-      const d = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || {});
-      return trainDedupKey(d);
-    });
-
-    let created = 0, skipped = 0;
-    for (const train of uniqueTrainResources) {
-      const key = trainDedupKey(train.data);
-      if (existingTrains.includes(key)) {
-        skipped++;
-        continue; // duplicate — skip
-      }
-      existingTrains.push(key); // prevent duplicates within the same import
-      await fetch('/v1/company/test-resources', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(train)
-      }).catch(() => {});
-      created++;
-    }
-    if (skipped > 0) console.log(`[extractFromDatafile] Skipped ${skipped} duplicate train resource(s), created ${created}`);
-
-  } catch(e) {
-    console.warn('[extractFromDatafile] Error extracting data:', e);
+    dirty = false;
+    await loadDatafile();
+    const kept = data.previous
+      ? ` The file it replaced (${data.previous.scenarios_count} scenario(s)) is kept: "Restore previous file" puts it back.`
+      : '';
+    showMsg(`✅ Data file uploaded: ${data.scenarios_count} scenario(s).${kept}`, true);
+    await offerBuildFromUpload(parsed);
+  } finally {
+    input.value = '';
   }
+}
+
+// ── A Test Framework and trains from an uploaded file, for a company with none ─
+// What the upload used to do on every upload, now asked for and only where it
+// cannot replace anything: a framework when the company has none (404), trains
+// when Test Data holds no train. A load that fails offers nothing (#534).
+function frameworkFromDatafile(datafile) {
+  const osdmVersion = datafile.osdmVersion || datafile.scenarios?.[0]?.osdmVersion || '3.4';
+  const scenarioTypes = new Set((datafile.scenarios || []).map(s => s?.scenarioType).filter(Boolean));
+  const salesFlows = [];
+  if (scenarioTypes.has('SALE')) salesFlows.push('SALE');
+  if (scenarioTypes.has('REFUND')) salesFlows.push('REFUND_FULL');
+  if (scenarioTypes.has('EXCHANGE')) salesFlows.push('EXCHANGE_FULL');
+  // Every passenger type of the file; a PERSON counts as an adult.
+  const passengerTypes = [...new Set(
+    (datafile.passengersList || []).flatMap(pl =>
+      (pl?.passengers || []).map(p => (p?.type && p.type !== 'PERSON') ? p.type : 'ADULT'))
+  )];
+  return {
+    ...emptyFramework(),
+    osdmVersion,
+    salesFlows: salesFlows.length ? salesFlows : ['SALE'],
+    passengerTypes: passengerTypes.length ? passengerTypes : ['ADULT']
+  };
+}
+
+function trainFromTrip(trip, idx) {
+  const legs = Array.isArray(trip?.legs) ? trip.legs : [];
+  const src = (trip?.tripType === 'SPECIFICATION' && legs.length > 0) ? legs[0] : (trip?.trip || {});
+  const vehicleNumber = src.vehicleNumber || '';
+  const departureTime = (src.startDatetime || '').replace(/%TRIP_DATE%T/, '');
+  const arrivalTime = (src.endDatetime || '').replace(/%TRIP_DATE%T/, '');
+  return {
+    label: `Train ${vehicleNumber || ('Trip-' + (idx + 1))}`,
+    resource_type: 'TRAIN',
+    data: {
+      originURN: src.origin || '',
+      destinationURN: src.destination || '',
+      operatorCode: src.operatorCode || '',
+      productCategoryRef: src.productCategoryRef || '',
+      productCategoryName: src.productCategoryName || '',
+      productCategoryShortName: src.productCategoryShortName || '',
+      daysOfWeek: [],
+      services: (vehicleNumber || departureTime || arrivalTime) ? [{ vehicleNumber, departureTime, arrivalTime }] : [],
+      ticketTypes: [],
+      travelClasses: [],
+      serviceClasses: [],
+      accommodations: [],
+      ancillaries: []
+    }
+  };
+}
+
+// One train per trip, the same route, vehicle and times counted once (#136).
+function trainsFromDatafile(datafile) {
+  const seen = new Set();
+  const trains = [];
+  (Array.isArray(datafile.tripRequirements) ? datafile.tripRequirements : []).forEach((trip, idx) => {
+    const train = trainFromTrip(trip, idx);
+    const s = train.data.services[0] || {};
+    const key = `${s.vehicleNumber || ''}|${train.data.originURN}|${train.data.destinationURN}|${s.departureTime || ''}|${s.arrivalTime || ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    trains.push(train);
+  });
+  return trains;
+}
+
+async function offerBuildFromUpload(datafile) {
+  if (!datafile || typeof datafile !== 'object' || Array.isArray(datafile)) return;
+  const [fwLoad, resLoad] = await Promise.all([
+    loadForEdit('/v1/company/test-framework', 'The Test Framework'),
+    loadForEdit('/v1/company/test-resources', 'The test data'),
+  ]);
+  const buildFramework = fwLoad.state === 'none';
+  const noTrains = resLoad.state === 'loaded' && Array.isArray(resLoad.value)
+    && !resLoad.value.some(r => r?.resource_type === 'TRAIN');
+  const trains = noTrains ? trainsFromDatafile(datafile) : [];
+  if (!buildFramework && !trains.length) return;
+
+  const what = [];
+  if (buildFramework) what.push('a Test Framework: the OSDM version, sales flows and passenger types found in the file, everything else at its default');
+  if (trains.length) what.push(`${trains.length} train(s) in Test Data, one per trip of the file`);
+  const missing = [buildFramework ? 'Test Framework' : '', trains.length ? 'trains in Test Data' : ''].filter(Boolean).join(' and no ');
+  if (!confirm(`This company has no ${missing} yet. Create from the uploaded file:\n\n• ${what.join('\n• ')}\n\nYou can change them afterwards. Cancel creates nothing.`)) return;
+
+  const failed = [];
+  if (buildFramework) {
+    const r = await fetch('/v1/company/test-framework', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: frameworkFromDatafile(datafile) })
+    }).catch(() => null);
+    if (!r?.ok) failed.push('the Test Framework');
+  }
+  const added = (await Promise.all(trains.map(train => fetch('/v1/company/test-resources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(train)
+  }).then(r => r.ok, () => false)))).filter(Boolean).length;
+  if (added < trains.length) failed.push(`${trains.length - added} of ${trains.length} train(s)`);
+
+  if (failed.length) oscarToast(`Not created: ${failed.join(', ')}. The data file itself was uploaded.`, 'warning');
+  else oscarToast('Created from the uploaded file. Check them in Test Framework and Test Data.', 'success');
+  await loadDatafile();
+}
+
+// ── The file the last upload replaced (#549) ─────────────────────────────────
+// Test Managers only, as on the server. "Restore previous file" swaps the two
+// files, so a restore can itself be undone the same way.
+let previousDatafile = null;
+
+async function refreshPreviousButton() {
+  const btn = document.getElementById('btn-restore-previous');
+  if (!btn) return;
+  previousDatafile = null;
+  btn.style.display = 'none';
+  if (user.role !== 'test_manager') return;
+  try {
+    const res = await fetch('/v1/company/datafile/previous');
+    const info = res.ok ? await res.json() : null;
+    if (!info?.exists) return;
+    previousDatafile = info;
+    btn.title = `The file the last upload replaced (${info.scenarios_count} scenario(s), replaced ${new Date(info.replaced_at).toLocaleString()}).`;
+    btn.style.display = '';
+  } catch {
+    // No button: the restore stays possible after a reload.
+  }
+}
+
+function restoreConfirmText(previous, storedCount, unsavedEdits) {
+  const lines = ['Restore the previous data file?', ''];
+  lines.push(storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`);
+  lines.push(`After: ${previous.scenarios_count} scenario(s), the file replaced on ${new Date(previous.replaced_at).toLocaleString()}.`);
+  lines.push('', 'The current file becomes the previous one, so this can be undone the same way.');
+  if (unsavedEdits) lines.push('', 'This page has edits that are not saved: they will be lost.');
+  return lines.join('\n');
+}
+
+async function restorePreviousDatafile() {
+  if (!previousDatafile) return;
+  if (!confirm(restoreConfirmText(previousDatafile, state ? countScenarios(state) : null, dirty))) return;
+  hidePanels();
+  const res = await fetch('/v1/company/datafile/previous/restore', { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { logout(); return; }
+  if (!res.ok) {
+    showUploadError(data.detail || `The server answered ${res.status}.`);
+    return;
+  }
+  dirty = false;
+  await loadDatafile();
+  showMsg(`✅ Previous data file restored: ${data.scenarios_count} scenario(s).`, true);
 }
 
 // ── Delete data file ──────────────────────────────────────────────────────────
 async function deleteDatafile() {
-  if (!confirm('Delete the current test configuration?\n\nThis will remove the data file from the server. This cannot be undone.')) return;
+  if (!confirm('Delete the current test configuration?\n\nThis will remove the data file from the server, and the previous file kept by the last upload. This cannot be undone.')) return;
   try {
     const res = await fetch('/v1/company/datafile', { method: 'DELETE',
       });
@@ -3059,6 +3103,7 @@ function showMsg(text, isOk) {
 function hidePanels() {
   document.getElementById('save-confirm').style.display = 'none';
   document.getElementById('save-error').style.display = 'none';
+  document.getElementById('upload-error').style.display = 'none';
 }
 
 function showSaveError(detail) {
@@ -3182,16 +3227,64 @@ async function saveDatafile() {
   }
 }
 
-// ── Download JSON ─────────────────────────────────────────────────────────────
-function downloadJson() {
-  if (!state) return;
-  const blob = new Blob([JSON.stringify(state, null, 4)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
+// ── Download JSON (#549) ──────────────────────────────────────────────────────
+// The server's file, not this page's working copy: for a Test Manager the
+// stored file byte for byte, which uploads back unchanged; for a tester their
+// personal view, marked so that the upload refuses it. The server names it
+// (company, date, and "personal-view" for a tester). Fetched rather than
+// linked, so that it follows the provider selected in this tab (#540).
+function downloadFileName(contentDisposition, fallback) {
+  const m = /filename="([\w.-]+)"/.exec(contentDisposition || '');
+  return m ? m[1] : fallback;
+}
+
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
   a.href     = url;
-  a.download = 'datafile.json';
+  a.download = name;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function downloadJson() {
+  let res;
+  try {
+    res = await fetch('/v1/company/datafile/download');
+  } catch (e) {
+    showMsg(`Download failed: the server could not be reached (${e.message}).`, false);
+    return;
+  }
+  if (res.status === 401) { logout(); return; }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    showMsg(`Download failed: ${data.detail || `the server answered ${res.status}`}`, false);
+    return;
+  }
+  saveBlob(await res.blob(), downloadFileName(res.headers.get('Content-Disposition'), 'datafile.json'));
+  if (isTester) {
+    showMsg('⬇ Downloaded your personal view of the data file: your scenarios, the shared ones and your run list. It cannot be uploaded as the company data file.', true);
+  } else if (dirty) {
+    showMsg('⬇ Downloaded the data file as stored on the server. The edits not yet saved on this page are not in it.', true);
+  }
+}
+
+// This page's working copy, edits not yet saved included: a copy to keep when a
+// save was refused (staleSaveMessage). It is not the stored file and carries
+// what the page adds, so it is marked and the upload refuses it.
+function downloadUnsavedEdits() {
+  if (!state) return;
+  const marked = {
+    __oscarUnsavedEdits: {
+      note: 'A copy of the Test Config page with edits that were not saved. It is not the stored data file and cannot be uploaded as it.',
+      exported_by: user.email,
+      exported_at: new Date().toISOString(),
+    },
+    ...state,
+  };
+  const slug = wizProfile?.slug || 'company';
+  const blob = new Blob([JSON.stringify(marked, null, 4)], { type: 'application/json' });
+  saveBlob(blob, `${slug}-datafile-unsaved-edits-${new Date().toISOString().slice(0, 10)}.json`);
 }
 
 // ── Warn on unsaved changes ───────────────────────────────────────────────────
@@ -6244,7 +6337,11 @@ document.body.addEventListener('click', function(e) {
   switch (action) {
     // ── Static / section actions ──────────────────────────────────────────────
     case 'download-json':
-      downloadJson(); break;
+      downloadJson().catch(reportActionError); break;
+    case 'download-edits':
+      downloadUnsavedEdits(); break;
+    case 'restore-previous':
+      restorePreviousDatafile().catch(reportActionError); break;
     case 'save-datafile':
       saveDatafile().catch(reportActionError); break;
     case 'toggle-section':

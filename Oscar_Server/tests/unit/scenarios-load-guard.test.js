@@ -270,47 +270,166 @@ describe('wizGenerateScenario (the path that wrote over the stored datafile)', (
   });
 });
 
-describe('extractFromDatafile (trains copied into Test Data on upload)', () => {
-  const uploaded = {
+// ── #549: an upload changes the data file and nothing else ───────────────────
+describe('upload (handleFileUpload): the data file and nothing else', () => {
+  const writesOf = (calls) => calls.filter(c => !c.startsWith('GET '));
+  const UPLOADED = {
     osdmVersion: '3.8',
-    scenarios: [{ scenarioType: 'SALE' }],
+    scenarios: [{ code: 'A', scenarioType: 'SALE' }, { code: 'B', scenarioType: 'REFUND' }],
     tripRequirements: [{
       id: 1, tripType: 'SEARCH',
       trip: { origin: 'urn:uic:stn:1', destination: 'urn:uic:stn:2', startDatetime: '%TRIP_DATE%T08:00:00+02:00', vehicleNumber: '123' },
     }],
   };
-  function setup(resourcesAnswer) {
-    const toasts = [];
+  const NAMES = ['handleFileUpload', 'countScenarios', 'uploadConfirmText', 'uploadRefusalText', 'offerBuildFromUpload',
+    'loadForEdit', 'frameworkFromDatafile', 'trainFromTrip', 'trainsFromDatafile'];
+
+  function setup({ uploadAnswer = response(200, { scenarios_count: 2, previous: { scenarios_count: 5 } }),
+    framework = response(200, { config: { osdmVersion: '3.9.0' } }), resources = response(200, [{ resource_type: 'TRAIN' }]),
+    answers = [], fileText = JSON.stringify(UPLOADED), stored = { scenarios: [1, 2, 3, 4, 5] }, dirty = false } = {}) {
     const { fetch, calls } = fakeFetch({
+      [`POST ${DATAFILE}`]: uploadAnswer,
+      [`GET ${FRAMEWORK}`]: framework,
+      [`GET ${RESOURCES}`]: resources,
       [`PUT ${FRAMEWORK}`]: response(200, {}),
-      [`GET ${RESOURCES}`]: resourcesAnswer,
       [`POST ${RESOURCES}`]: response(201, {}),
     });
-    const ctx = page(['loadForEdit', 'extractFromDatafile'], {
-      fetch,
-      emptyFramework: () => ({}),
-      oscarToast: (message, kind) => toasts.push([kind, message]),
-      console: { log() {}, warn() {} },
+    const input = { files: [{ name: 'mine.json', text: async () => fileText }], value: 'C:\\fakepath\\mine.json' };
+    const ctx = page(NAMES, {
+      fetch, state: stored, dirty, asked: [], messages: [], errors: [], toasts: [], reloads: 0, loggedOut: 0,
+      confirm(text) { ctx.asked.push(text); return answers.length ? answers.shift() : true; },
+      FormData: class { append() {} },
+      emptyFramework: () => ({ fulfillmentTypes: ['ETICKET'] }),
+      hidePanels() {}, logout() { ctx.loggedOut++; },
+      loadDatafile: async () => { ctx.reloads++; },
+      showMsg(m, ok) { ctx.messages.push([ok, m]); },
+      showUploadError(m) { ctx.errors.push(m); },
+      oscarToast(m, k) { ctx.toasts.push([k, m]); },
     });
-    return { ctx, calls, toasts };
+    return { ctx, calls, input };
   }
-  const posts = (calls) => calls.filter(c => c === `POST ${RESOURCES}`).length;
 
-  test('the existing list loads and is empty: the train is added', async () => {
-    const t = setup(response(200, []));
-    await t.ctx.extractFromDatafile(uploaded);
-    expect(posts(t.calls)).toBe(1);
-    expect(t.toasts).toEqual([]);
+  test('with a framework and trains: one request, the upload, and nothing written elsewhere', async () => {
+    const t = setup();
+    await t.ctx.handleFileUpload(t.input);
+    expect(writesOf(t.calls)).toEqual([`POST ${DATAFILE}`]);
+    expect(t.ctx.asked).toHaveLength(1);
+    expect(t.ctx.asked[0]).toContain('Now: 5 scenario(s).');
+    expect(t.ctx.asked[0]).toContain('After: 2 scenario(s).');
+    expect(t.ctx.asked[0]).toContain('The Test Framework and Test Data are not changed.');
+    expect(t.ctx.messages[0][1]).toContain('Restore previous file');
+    expect(t.ctx.dirty).toBe(false);
+    expect(t.input.value).toBe('');
   });
 
-  test.each(FAILURES)('after %s no train is added, and the user is told', async (_label, r, expected) => {
-    const t = setup(r);
-    await t.ctx.extractFromDatafile(uploaded);
-    expect(posts(t.calls)).toBe(0);
-    expect(t.toasts).toHaveLength(1);
-    expect(t.toasts[0][0]).toBe('warning');
-    expect(t.toasts[0][1]).toContain(expected);
-    expect(t.toasts[0][1]).toContain('were not added to Test Data');
+  test('cancelled at the confirmation: no request at all', async () => {
+    const t = setup({ answers: [false] });
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.calls).toEqual([]);
+    expect(t.input.value).toBe('');
+  });
+
+  test('unsaved edits are named in the confirmation', async () => {
+    const t = setup({ dirty: true, answers: [false] });
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.ctx.asked[0]).toContain('edits that are not saved');
+  });
+
+  test('a refusal shows the reason and every problem, and nothing else happens', async () => {
+    const t = setup({ uploadAnswer: response(400, { detail: 'This file is not a valid data file.', problems: ["'scenarios' is missing."], problems_truncated: true }) });
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.calls).toEqual([`POST ${DATAFILE}`]);
+    expect(t.ctx.errors).toEqual(["This file is not a valid data file.\n\n• 'scenarios' is missing.\n• … and more"]);
+    expect(t.ctx.reloads).toBe(0);
+  });
+
+  test('a file that is not JSON goes to the server unconfirmed, and its refusal is shown', async () => {
+    const t = setup({ fileText: '{ nope', uploadAnswer: response(400, { detail: 'Uploaded file is not valid JSON.' }) });
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.ctx.asked).toEqual([]);
+    expect(t.ctx.errors).toEqual(['Uploaded file is not valid JSON.']);
+  });
+
+  test('a company with no framework is offered one, built only on a yes', async () => {
+    const yes = setup({ framework: response(404, {}) });
+    await yes.ctx.handleFileUpload(yes.input);
+    expect(writesOf(yes.calls)).toEqual([`POST ${DATAFILE}`, `PUT ${FRAMEWORK}`]);
+    expect(yes.ctx.asked[1]).toContain('no Test Framework yet');
+    expect(yes.ctx.toasts[0][0]).toBe('success');
+
+    const no = setup({ framework: response(404, {}), answers: [true, false] });
+    await no.ctx.handleFileUpload(no.input);
+    expect(writesOf(no.calls)).toEqual([`POST ${DATAFILE}`]);
+  });
+
+  test('Test Data with no train is offered the trains of the file; with any train, nothing', async () => {
+    const t = setup({ resources: response(200, [{ resource_type: 'PASSENGER' }]) });
+    await t.ctx.handleFileUpload(t.input);
+    expect(writesOf(t.calls)).toEqual([`POST ${DATAFILE}`, `POST ${RESOURCES}`]);
+    expect(t.ctx.asked[1]).toContain('1 train(s) in Test Data');
+  });
+
+  test.each(FAILURES)('after %s of the framework or test data, nothing is offered or written', async (_label, r) => {
+    const t = setup({ framework: r, resources: r });
+    await t.ctx.handleFileUpload(t.input);
+    expect(writesOf(t.calls)).toEqual([`POST ${DATAFILE}`]);
+    expect(t.ctx.asked).toHaveLength(1);
+  });
+
+  test('a failed creation is reported, not swallowed', async () => {
+    const t = setup({ framework: response(404, {}) });
+    t.ctx.fetch = fakeFetch({
+      [`POST ${DATAFILE}`]: response(200, { scenarios_count: 2, previous: null }),
+      [`GET ${FRAMEWORK}`]: response(404, {}),
+      [`GET ${RESOURCES}`]: response(200, []),
+      [`PUT ${FRAMEWORK}`]: response(500, {}),
+      [`POST ${RESOURCES}`]: new TypeError('Failed to fetch'),
+    }).fetch;
+    await t.ctx.handleFileUpload(t.input);
+    expect(t.ctx.toasts).toEqual([['warning', 'Not created: the Test Framework, 1 of 1 train(s). The data file itself was uploaded.']]);
+  });
+
+  test('the framework built from a file: version, flows, passenger types, the rest at the default', () => {
+    const ctx = page(['frameworkFromDatafile'], { emptyFramework: () => ({ fulfillmentTypes: ['ETICKET'], salesFlows: [] }) });
+    const fw = ctx.frameworkFromDatafile({ ...UPLOADED, passengersList: [{ passengers: [{ type: 'PERSON' }, { type: 'DOG' }] }] });
+    expect(JSON.parse(JSON.stringify(fw))).toEqual({ fulfillmentTypes: ['ETICKET'], osdmVersion: '3.8', salesFlows: ['SALE', 'REFUND_FULL'], passengerTypes: ['ADULT', 'DOG'] });
+  });
+});
+
+describe('Download JSON (downloadJson): the server\'s file, never the page\'s copy', () => {
+  function setup(answer) {
+    const { fetch, calls } = fakeFetch({ [`GET ${DATAFILE}/download`]: answer });
+    const ctx = page(['downloadJson', 'downloadFileName'], {
+      fetch, isTester: false, dirty: true, saved: [], messages: [], loggedOut: 0,
+      state: { scenarios: ['what the page holds'] },
+      saveBlob(blob, name) { ctx.saved.push([blob, name]); },
+      showMsg(m, ok) { ctx.messages.push([ok, m]); },
+      logout() { ctx.loggedOut++; },
+    });
+    return { ctx, calls };
+  }
+  const file = (status, bytes, disposition) => ({ ...response(status, {}), blob: async () => bytes,
+    headers: { get: h => (h === 'Content-Disposition' ? disposition : null) } });
+
+  test('saves what the server sends, under the name it gives', async () => {
+    const t = setup(file(200, 'stored bytes', 'attachment; filename="acme-datafile-2026-10-09.json"'));
+    await t.ctx.downloadJson();
+    expect(t.calls).toEqual([`GET ${DATAFILE}/download`]);
+    expect(t.ctx.saved).toEqual([['stored bytes', 'acme-datafile-2026-10-09.json']]);
+    expect(t.ctx.messages[0][1]).toContain('not yet saved on this page are not in it');
+  });
+
+  test('a refusal is shown, and nothing is saved', async () => {
+    const t = setup(response(404, { detail: 'No data file uploaded yet.' }));
+    await t.ctx.downloadJson();
+    expect(t.ctx.saved).toEqual([]);
+    expect(t.ctx.messages).toEqual([[false, 'Download failed: No data file uploaded yet.']]);
+  });
+
+  test('a name that is not a plain file name is not used', () => {
+    const ctx = page(['downloadFileName'], {});
+    expect(ctx.downloadFileName('attachment; filename="../x/y.json"', 'datafile.json')).toBe('datafile.json');
+    expect(ctx.downloadFileName(null, 'datafile.json')).toBe('datafile.json');
   });
 });
 
@@ -365,7 +484,7 @@ describe('stale-save guard (the version a save sends back)', () => {
     expect(t.calls).toEqual([`PUT ${DATAFILE}/json`]);
     expect(t.ctx.errors).toHaveLength(1);
     expect(t.ctx.errors[0]).toContain('changed since this page loaded it');
-    expect(t.ctx.errors[0]).toContain('Download JSON');
+    expect(t.ctx.errors[0]).toContain('Download unsaved edits');
     expect(t.ctx.dirty).toBe(true);
     expect(t.ctx.refreshed).toBe(0);
   });
