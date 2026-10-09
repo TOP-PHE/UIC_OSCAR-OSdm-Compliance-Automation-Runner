@@ -550,6 +550,26 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     inject it mock `fs.renameSync` / `fs.promises.rename` (see
     `tests/unit/at-rest-rename-retry.test.js`), and read the schedule from the
     exported `RENAME_RETRY_DELAYS_MS` rather than restating it.
+  - **A test that opens a file must close it before removing it, and the test
+    databases are removed by Jest's global teardown** (#583). Windows does not
+    let an open file be removed; Linux does, so CI never showed it. Three
+    places had it wrong, and on the maintainer's PC four days of work had left
+    2 GB in the temporary folder. `db-migration29.test.js` and
+    `db-migrations.test.js` boot the real `db.js`, which opens its database and
+    never closes it: they now call `.db.close()` on what they required (the
+    migrations have run by then). The first of the two used to fail as "Test
+    suite failed to run" on Windows, on every branch. `tests/setup.js` removes
+    the per-file database in `process.on('exit')`, while it is still open:
+    that works on Linux only. So `tests/global-setup.js` names the run
+    (`OSCAR_TEST_RUN`, in the database's file name) and sweeps leftovers older
+    than six hours, and `tests/global-teardown.js` removes the run's databases
+    after the workers have ended. `tests/helpers/temp-files.js` holds the rule
+    for "this entry is ours"; `oscar-test-collection` is not, and the test says
+    so. With `--runInBand`, and when a single test file is run (Jest then runs
+    it in its own process), the database is still open at teardown on Windows
+    and waits for the next sweep: checked, one file left per such run. The
+    simulator's tests keep their temporary folders under one root per process,
+    removed at exit.
   - **Mutation-check any test written as a regression guard** — assert it
     actually fails against the bug it claims to catch, before trusting it.
     Live example (#492): a `GET /` test written to catch the wrong SPA

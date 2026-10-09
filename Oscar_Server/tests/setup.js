@@ -37,8 +37,11 @@ process.env.LOG_LEVEL       = 'silent';   // keep test output clean
 // store/use-time route tests.
 process.env.ALLOW_PRIVATE_TARGETS = '1';
 
-// Unique DB per test process (jest runs files in parallel by default)
-const tmpDb = path.join(os.tmpdir(), `oscar-test-${process.pid}-${Date.now()}.db`);
+// Unique DB per test file (jest runs files in parallel by default). The name
+// carries the run's id (tests/global-setup.js), so that the global teardown
+// removes the databases of this run and of no other (#583). "solo" is a test
+// file run without Jest's global setup.
+const tmpDb = path.join(os.tmpdir(), `oscar-test-${process.env.OSCAR_TEST_RUN || 'solo'}-${process.pid}-${Date.now()}.db`);
 process.env.OSCAR_DB_PATH = tmpDb;
 
 // Ensure dummy collection dir exists so module load doesn't fail
@@ -46,7 +49,9 @@ if (!fs.existsSync(process.env.COLLECTION_PATH)) {
   fs.mkdirSync(process.env.COLLECTION_PATH, { recursive: true });
 }
 
-// Cleanup: remove the test DB after the process exits
+// Cleanup: remove the test DB after the process exits. This works on Linux.
+// On Windows the database is still open at this point and cannot be removed:
+// there, tests/global-teardown.js removes it once the process has ended.
 process.on('exit', () => {
   try { fs.unlinkSync(tmpDb); } catch (_) { /* ignore */ }
   try { fs.unlinkSync(tmpDb + '-journal'); } catch (_) { /* ignore */ }

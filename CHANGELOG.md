@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The test suites no longer leave their temporary files behind on Windows,
+  and `db-migration29.test.js` runs there** (#583). Tests only: no server or
+  collection change, nothing to release.
+  - The two migration tests close the database they opened before removing
+    it. On Windows the first one failed as "Test suite failed to run" (its two
+    tests passing), on `main` and on every branch; the second left its files.
+  - The per-file test databases are removed by a Jest global teardown, once
+    the worker processes have ended, and a global setup sweeps what earlier
+    runs left (older than six hours). Before, the removal was attempted while
+    the database was still open, which only works on Linux: 3,648 files and
+    1.9 GB had piled up on the maintainer's machine in four days.
+  - The simulator's tests remove their temporary folders (6,134 had been left).
+
 ### Added
 
 - **OSDM provider simulator** (#575), in the new `OSDM_Simulator/` folder: a

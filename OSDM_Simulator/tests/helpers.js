@@ -33,8 +33,17 @@ const SECRETS = {
   ],
 };
 
+// Every temporary folder of a test process lives under one root, which is
+// removed when the process ends. Each test file runs in a process of its own,
+// and nothing in these folders is held open, so this works on every system
+// (#583: before, each call left a folder behind for good).
+const TEMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'osdm-sim-'));
+process.on('exit', () => {
+  try { fs.rmSync(TEMP_ROOT, { recursive: true, force: true }); } catch { /* best effort: it is the temporary folder */ }
+});
+
 function tempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'osdm-sim-'));
+  return fs.mkdtempSync(path.join(TEMP_ROOT, 't-'));
 }
 
 function writeClientsFile(content = SECRETS) {
