@@ -863,6 +863,45 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refunds.js` `getBookingRefundResponse` is called by no request (its
   `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
   if it is wired in).
+- **A check follows the specification of the version it reads, and an
+  extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
+  collection against OSDM 3.8 found checks that failed conformant answers,
+  checks that never ran, and two that could not fail. What it established:
+  - **Most OSDM code lists are `x-extensible-enum` ("listed values are
+    examples")**: PassengerType, FulfillmentSummaryStatus, service classes,
+    and others. Grade them with `checkExtensibleCode()` (`osdmEnums.js`):
+    FAIL only when the value is not text, WARNING when it is outside the list.
+    A closed `enum` (FulfillmentStatus) is checked exactly. Read which one it
+    is in the spec before writing the check.
+  - **Spellings change between versions.** 3.5 (`json_validator/openapi3_0.json`)
+    has `COMPANION_DOG`/`MOTORCYCLE`, 3.8 `ACCOMP_DOG`/`MOTOCYCLE`. An older
+    "fix" renamed one into the other; both are listed now. Check both spec
+    files before calling a value wrong.
+  - **A script in the wrong place in a request file is silently dropped.**
+    `11. GET Refund Offer.yml` had its after-response script under
+    `http.headers` for months. `tests/unit/bruno-request-files.test.js` reads
+    every request file with js-yaml and fails on that layout.
+  - **The optional read-only requests are an exact-name set**,
+    `OPTIONAL_READ_PROBES` in `auth.js`, as `CAPABILITY_PROBE_ENDPOINTS` is in
+    the report. A 403 there does not stop the run (the #488 rule), and a 401
+    still does. Add a new optional GET to that set and to the #488 classifier
+    together.
+  - **A refund is checked against what it covered.** `refunds.js` records the
+    PROPOSED amounts per refund offer (`__refundProposed`), and the
+    fulfillments a CONFIRMED offer held (`__refundedFulfillmentIds`). Step 14
+    expects those REFUNDED and every other one unchanged.
+    `__bookingFulfillmentIds` keeps the booking's own list, because
+    `validateFulfillments` rewrites `fulfillmentIds` when it checks a refund
+    offer's subset. New env vars go in both reset lists (`opencollection.yml`
+    and `scenarioParser.js`).
+  - **Never read a member outside `test()`** in a title or a `const` before
+    it: a missing optional member then throws and aborts the step before its
+    routing. Read it inside the check, or guard it.
+  - **`tests/unit/bruno-osdm38-checks.test.js` runs the real validators** with
+    `tests/helpers/bruno-chai.js`, now extended with `equal`, `oneOf`,
+    `property`, `at.least`/`at.most`, `true`/`false`. A chain it lacks throws
+    inside the check and is recorded as a failure, so assert on the check
+    you mean by name.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
@@ -1075,8 +1114,8 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
   it resumes. `library-bruno/` is only partly tested: twelve
   `tests/unit/bruno-*.test.js` files reach about half of its 28 modules
   (`requestsBuilder`, `scenarioParser`, `osdmCompliance`, `partialRefund`…);
-  `reportGenerator`, `mergeReport`, `refunds`, `exchanges`, `fulfillments`
-  and `validators` have none (checked 2026-10-05).
+  `reportGenerator`, `mergeReport` and `validators` have none; `refunds` and
+  `exchanges` are partly covered since #613 (checked 2026-10-09).
 - **Issue backlog was swept and cross-checked against the code 2026-07-02**
   (the list below is freshly verified, not inherited guesswork — re-check
   with `gh issue list --state open` if much time has passed):

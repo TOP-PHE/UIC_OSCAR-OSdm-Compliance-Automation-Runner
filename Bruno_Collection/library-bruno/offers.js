@@ -11,12 +11,13 @@
 require('./displays.js');
 require('./requestsBuilder.js');
 const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
-const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
+const { OSDM_PASSENGER_TYPES, checkExtensibleCode } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
 const { processRequestedInformation } = require('./requestedInformation.js');
 
 module.exports = {
   checkWarningsAndProblems,
+  envelopeWarnings,
   postOfferResponsePreRequest,
   ensureAuthorizationOr403,
   postOfferResponse,
@@ -34,6 +35,25 @@ module.exports = {
   deriveOfferFlexibilityFromProducts,
   offerFlexibility
 };
+
+// The envelope `warnings` member (#613 F10). From OSDM 3.5 on it is a
+// WarningCollection object, `{ warnings: Warning[] }`, deprecated in 3.8; it
+// used to be read as a bare array, so a conformant object was never read.
+// Returns the Warning list either way; a bare array is still read, with a
+// WARNING because it is not the OSDM shape.
+function envelopeWarnings(jsonData, log) {
+  const w = jsonData && jsonData.warnings;
+  if (w && typeof w === "object" && !Array.isArray(w)) {
+    return Array.isArray(w.warnings) ? w.warnings : [];
+  }
+  if (Array.isArray(w)) {
+    if (w.length > 0 && typeof log === "function") {
+      log(`[WARNING] Response envelope 'warnings' is a bare array; OSDM (3.5 and later) defines it as a WarningCollection object { "warnings": [ … ] }.`);
+    }
+    return w;
+  }
+  return [];
+}
 
 // Check the OSDM response ENVELOPE for warnings[] / problems[] — both can
 // accompany a 2xx payload (partial success, deprecation notices, …).
@@ -62,7 +82,7 @@ function checkWarningsAndProblems(jsonData) {
         .map((k) => `${k}=${JSON.stringify(p[k])}`);
       return parts.length ? parts.join(", ") : JSON.stringify(p);
     };
-    const warnings = Array.isArray(jsonData.warnings) ? jsonData.warnings : [];
+    const warnings = envelopeWarnings(jsonData, validationLogger);
     const problems = Array.isArray(jsonData.problems) ? jsonData.problems : [];
 
     warnings.forEach((w, i) => {
@@ -270,7 +290,7 @@ function postOfferResponse(jsonData) {
     // of claiming zero.
     const _paxArr = [jsonData.passengers, jsonData.anonymousPassengerSpecifications, jsonData.passengersList].find(Array.isArray);
     const _paxTxt = _paxArr ? `${_paxArr.length} passenger(s)` : 'no echoed passenger list';
-    const _wrn   = Array.isArray(jsonData.warnings)   ? jsonData.warnings.length   : 0;
+    const _wrn   = envelopeWarnings(jsonData).length;
     const _prb   = Array.isArray(jsonData.problems)   ? jsonData.problems.length   : 0;
     // #355: no standalone validationLogger before the throw — the caller
     // re-throws inside bruTest("Offers found in response", …) whose failure
@@ -631,14 +651,15 @@ function validateOfferSummary(selectedOffer) {
     });
   }
 
-  // Check all price fields (amount, currency, scale) exist in minimalPrice
-  test(`Price fields exist (currency, scale) exist in minimalPrice`, () => {
+  // minimalPrice has a currency. `scale` is optional in OSDM (Price.scale,
+  // default 2): its absence is logged, not failed (#613 F11).
+  test(`Price fields exist (currency) in minimalPrice`, () => {
     expect(mini, 'minimalPrice is missing').to.exist;
-    validationLogger(`[DEBUG] Price fields (currency, scale) are present in minimalPrice`);
-    ['currency', 'scale'].forEach(field => {
-      expect(mini[field], `minimalPrice.${field} missing`).to.exist;
-    });
+    expect(mini.currency, 'minimalPrice.currency missing').to.exist;
   });
+  if (mini && mini.scale == null) {
+    validationLogger(`[INFO] minimalPrice.scale is absent: optional in OSDM, the default scale 2 applies.`);
+  }
 
   // Overall flexibility validation
   bru.setEnvVar("overallFlexibility", overallFlexibility);
@@ -715,11 +736,10 @@ function validatePassengers(jsonData) {
       expect(p.externalRef, "externalRef should exist").to.exist.and.be.a("string");
     });
 
-    // type is a known OSDM value
-    test(`Passenger ${i + 1} type is a known OSDM value - type: ${p.type}`, function () {
-      validationLogger(`[DEBUG] Passenger ${i + 1} type valid value check: ${p.type}`);
-      expect(p.type).to.be.oneOf(["YOUNG_CHILD", "CHILD", "YOUTH", "ADULT", "SENIOR", "FAMILY_CHILD", "ACCOMP_PRM", "PRM_CHILD", "WHEELCHAIR", "PERSON", "PRM", "DOG", "PET", "LUGGAGE", "BICYCLE", "PRAM", "COMPANION_DOG", "CAR", "MOTORCYCLE", "TRAILER"]);
-    });
+    // type: an extensible OSDM code list (#613 F4). FAIL only when missing or
+    // not text; a value outside the listed ones is a WARNING.
+    checkExtensibleCode({ test, expect, log: validationLogger },
+      `Passenger ${i + 1} type`, p.type, OSDM_PASSENGER_TYPES, 'PassengerType');
 
     // dateOfBirth is a valid date in the past (if present)
     if (p.dateOfBirth) {
@@ -733,11 +753,9 @@ function validatePassengers(jsonData) {
       validationLogger(`[DEBUG] Passenger ${i + 1} no dateOfBirth → test skipped`);
     }
 
-    const reductionCards = p.appliedReductionCardTypes || [];
-    test(`Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`, function () {
-      validationLogger(`[DEBUG] Passenger ${i + 1} reduction cards - reductionCards: ${JSON.stringify(reductionCards)}`);
-      expect(Array.isArray(reductionCards), "appliedReductionCardTypes should be an array").to.be.true;
-    });
+    // #613 F15: the old "reduction cards" check read appliedReductionCardTypes,
+    // which AnonymousPassengerSpecification does not have, and defaulted it to
+    // [] — it could never fail. Reduction cards are checked by #597.
   });
 }
 
@@ -780,11 +798,16 @@ function validateTripsAndLegs(jsonData) {
       validationLogger(`[WARNING] Trip ${tripIndex + 1}: startTime or endTime is not a valid date → A7 test skipped`);
     }
 
-    // direction is a known OSDM value
-    test(`Trip ${tripIndex + 1} direction is a known value - direction: ${trip.direction}`, function () {
-      validationLogger(`[DEBUG] Trip ${tripIndex + 1} direction: ${trip.direction}`);
-      expect(trip.direction).to.be.oneOf(["OUT_BOUND", "IN_BOUND"]);
-    });
+    // direction is optional in OSDM (Trip.direction, with a default); when
+    // present it is one of the two values (#613 F11).
+    if (trip.direction != null) {
+      test(`Trip ${tripIndex + 1} direction is a known value - direction: ${trip.direction}`, function () {
+        validationLogger(`[DEBUG] Trip ${tripIndex + 1} direction: ${trip.direction}`);
+        expect(trip.direction).to.be.oneOf(["OUT_BOUND", "IN_BOUND"]);
+      });
+    } else {
+      validationLogger(`[DEBUG] Trip ${tripIndex + 1} direction absent (optional in OSDM) → check skipped`);
+    }
 
     if (legs.length > 0) {
       test(`Trip ${tripIndex + 1} has legs - length: ${legs.length}`, function () {
@@ -858,10 +881,17 @@ function validateOfferParts(selectedOffer) {
 
   const sumPartsPrice = sumPrice(offerParts);
 
-  test(`Offer minimalPrice >= sum of offerParts price - minimalPrice: ${minimalPrice}, sumPartsPrice: ${sumPartsPrice}`, function () {
-    validationLogger(`[DEBUG] Offer minimalPrice >= sum of offerParts price - minimalPrice: ${minimalPrice}, sumPartsPrice: ${sumPartsPrice}`);
-    expect(minimalPrice).to.be.at.least(sumPartsPrice);
+  // #613 F11: the minimal price is what the offer costs at least, so it covers
+  // the admissions. It used to be compared with the sum of every part, which
+  // adds optional reservations and ancillaries and failed conformant offers.
+  // OSDM gives no formula beyond that, so the full sum is only logged.
+  test(`Offer minimalPrice >= sum of admission parts price - minimalPrice: ${minimalPrice}, admissions: ${admissionPrice}`, function () {
+    validationLogger(`[DEBUG] Offer minimalPrice ${minimalPrice}; admissions ${admissionPrice}; all listed parts ${sumPartsPrice}`);
+    expect(minimalPrice).to.be.at.least(admissionPrice);
   });
+  if (minimalPrice < sumPartsPrice) {
+    validationLogger(`[INFO] Offer minimalPrice (${minimalPrice}) is below the sum of all listed parts (${sumPartsPrice}): expected when some reservations or ancillaries are optional.`);
+  }
 
   // Flexibility consistency. The offer's overall flexibility is the MOST
   // RESTRICTIVE of its products (least-flexible leg governs the journey). When
@@ -1017,10 +1047,9 @@ function validateAdmissions(selectedOffer) {
       let type = "NRT"; // Default: Non Reserved Ticket
       if (admission.isReservationRequired && Array.isArray(admission.reservations) && admission.reservations.length > 0) type = "IRT";
 
-      test(`AdmissionOfferPart ${i + 1} type: ${type}`, function () {
-        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} type: ${type}`);
-        expect(["NRT", "TLT", "IRT"]).to.include(type);
-      });
+      // #613 F15: logged, not a check — the value is computed here, so a check
+      // on it could never fail.
+      validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} business type: ${type}`);
 
       // validFrom is a valid date
       if (admission.validFrom) {
@@ -1031,12 +1060,16 @@ function validateAdmissions(selectedOffer) {
         });
       }
 
-      // validUntil must be in the future
-      const validUntil = new Date(admission.validUntil);
-      test(`AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${validUntil}`, function () {
-        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${validUntil}`);
-        expect(validUntil.getTime()).to.be.above(Date.now());
-      });
+      // validUntil is optional in OSDM; when present it is in the future (#613 F11).
+      if (admission.validUntil != null) {
+        const validUntil = new Date(admission.validUntil);
+        test(`AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${admission.validUntil}`, function () {
+          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validUntil is in the future - validUntil: ${admission.validUntil}`);
+          expect(validUntil.getTime()).to.be.above(Date.now());
+        });
+      } else {
+        validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} validUntil absent (optional in OSDM) → check skipped`);
+      }
 
       // price structure is valid
       test(`AdmissionOfferPart ${i + 1} price structure is valid - amount: ${admission.price?.amount}, currency: ${admission.price?.currency}`, function () {
@@ -1082,13 +1115,14 @@ function validateAdmissions(selectedOffer) {
           validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} appliedPassengerTypes count: ${appliedPassengerTypes.length}`);
           appliedPassengerTypes.forEach((apt, aptIdx) => {
             expect(apt.passengerRef, `appliedPassengerTypes[${aptIdx}].passengerRef should exist`).to.be.a("string");
-            // Use the shared OSDM PassengerType enum from osdmEnums.js so this
-            // check stays in lockstep with passengers.js. The previous inline
-            // 6-value list (ADULT/YOUTH/SENIOR/CHILD/INFANT/PERSON) wrongly
-            // rejected valid OSDM values like YOUNG_CHILD, DOG, BICYCLE, CAR
-            // — which appear in family, pet-friendly, and auto-train offers.
-            expect(apt.type, `appliedPassengerTypes[${aptIdx}].type should be a known value`).to.be.oneOf(OSDM_PASSENGER_TYPES);
           });
+        });
+        // type: ActualPassengerType is an extensible OSDM code list (#613 F4).
+        // FAIL only when missing or not text; a value outside the listed ones
+        // (a provider's own code such as 'A') is a WARNING.
+        appliedPassengerTypes.forEach((apt, aptIdx) => {
+          checkExtensibleCode({ test, expect, log: validationLogger },
+            `AdmissionOfferPart ${i + 1} appliedPassengerTypes[${aptIdx}].type`, apt.type, OSDM_PASSENGER_TYPES, 'PassengerType');
         });
       }
 

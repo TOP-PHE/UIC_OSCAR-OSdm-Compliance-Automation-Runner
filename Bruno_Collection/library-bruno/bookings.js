@@ -9,10 +9,13 @@
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const { processRequestedInformation, summariseRequestedInformation } = require('./requestedInformation.js');
+const { checkExtensibleCode } = require('./osdmEnums.js');
 
 module.exports = {
   postCreateBookingResponse,
   validateFulfillments,
+  checkFulfillmentSummaryStatus,
+  checkProvisionalPrice,
   alignPassengerIdsToSubmittedOrder,
   isPostConfirmationStage,
   pairOfferParts,
@@ -784,13 +787,9 @@ function isPostConfirmationStage(expectedBookedOffersStatus) {
 function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffersStatus, expectedFulfillmentStatus, requireFulfillments = false) {
   validationLogger("[DEBUG] ► postCreateBookingResponse");
 
-  if (jsonData.warnings !== undefined && jsonData.warnings !== null && !Array.isArray(jsonData.warnings)) {
-    validationLogger(
-      `[WARNING] booking response 'warnings' is not an array (got ${typeof jsonData.warnings}) — ` +
-      `OSDM expects Warning[] at the response root. Provider returned a non-standard structure: ` +
-      `${JSON.stringify(jsonData.warnings).slice(0, 300)}`
-    );
-  }
+  // #613 F10: `warnings` is a WarningCollection object in OSDM 3.5+; the old
+  // "not an array" WARNING here was the wrong way round. checkWarningsAndProblems
+  // (offers.js) reads both shapes.
   if (typeof checkWarningsAndProblems === 'function') {
     checkWarningsAndProblems(jsonData);
   }
@@ -1027,7 +1026,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
 
   // Price structure checks
   const prov      = booking.provisionalPrice;
-  const mini      = selectedOffer.offerSummary.minimalPrice;
+  // #613 F7: offerSummary is optional in OSDM; reading through it unguarded
+  // threw before any check ran and stopped the step before its routing.
+  const mini      = selectedOffer?.offerSummary?.minimalPrice;
   const confirmed = booking.confirmedPrice;
 
   // #375 / #496: price members are LIFECYCLE-scoped in OSDM — provisionalPrice
@@ -1102,14 +1103,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     });
   }
 
-  const requestName = req?.getName?.() ?? "";
+  const requestName = (typeof req !== "undefined" && req?.getName?.()) || "";
   if (requestName === "02. POST Create Booking" || requestName === "05. GET Booking before Fulfillments") {
-    test(`provisionalPrice matches minimalPrice: ${prov.amount} ${prov.currency} (scale: ${prov.scale})`, () => {
-      expect(prov.amount).to.eql(mini.amount);
-      expect(prov.currency).to.eql(mini.currency);
-      expect(prov.scale).to.eql(mini.scale);
-      validationLogger(`[DEBUG] provisionalPrice matches minimalPrice: ${prov.amount} ${prov.currency} (scale: ${prov.scale})`);
-    });
+    checkProvisionalPrice(prov, mini, booking);
   }
 
   // Validate booked offer parts
@@ -1135,6 +1131,11 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // #253: pass the sibling Booking.fulfillmentDocuments[] (v3.8) so each
   // fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
   validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus, requireFulfillments, booking.fulfillmentDocuments);
+  // #613 F2: the booking's own fulfillment list, kept apart from fulfillmentIds
+  // (which validateFulfillments rewrites when it checks a refund offer's subset).
+  if (Array.isArray(booking.fulfillments) && booking.fulfillments.length > 0) {
+    bru.setEnvVar("__bookingFulfillmentIds", JSON.stringify(booking.fulfillments.map((f) => f && f.id).filter(Boolean)));
+  }
 
   // Check that booking has the same number of passengers as expected from the offer
   const expectedPassengerCount = Number(bru.getEnvVar("passengerCount") || 0);
@@ -1149,20 +1150,56 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     }
   });
 
-  // C2: fulfillmentStatus (OSDM v3.8 new field) must be a valid FulfillmentSummaryStatus enum when present.
-  // #337: guard was `!== undefined`, which let the JSON-literal-null case through
-  // and stringified it into a nonsense test title like `'null' is a valid
-  // FulfillmentSummaryStatus`. Treat null AND undefined as "absent" — the field is
-  // optional in OSDM v3.8 and absence is encoded either way in practice.
-  const _validFulfillmentSummaryStatuses = ['UNISSUED','PARTIALLY_ISSUED','ISSUED',
-    'PARTIALLY_USED','COMPLETELY_USED','REFUNDED','CANCELLED','EXPIRED'];
+  // C2: fulfillmentStatus (new in OSDM 3.8, optional) is a FulfillmentSummaryStatus:
+  // an x-extensible-enum PENDING / CREATED / COMPLETE (spec 3.8, FulfillmentSummaryStatus).
+  // #613 F3: the list used to be UNISSUED/ISSUED/…, which is not the 3.8 one and
+  // failed every provider sending the 3.8 values. Extensible: FAIL only when the
+  // value is not text, WARNING when it is outside the listed values.
+  // #337: null and undefined both mean "absent".
+  checkFulfillmentSummaryStatus(booking);
+}
+
+// #613 F7: provisionalPrice is "the price of all unconfirmed pre-booked parts
+// in the booking" (OSDM Booking.provisionalPrice). It used to be required to
+// EQUAL the offer's minimalPrice, which is false as soon as a reservation or an
+// ancillary is added, or a return books two offers. What holds instead: it is
+// not below the minimal price of the selected offer (same currency and scale),
+// and it matches the sum of the pre-booked parts, unless fees explain the
+// difference (logged, not failed). The values are read inside the check, so a
+// missing member fails the check instead of throwing in the title.
+function checkProvisionalPrice(prov, mini, booking) {
+  test(`provisionalPrice is not below the offer's minimalPrice - provisional: ${prov?.amount} ${prov?.currency}, minimal: ${mini?.amount} ${mini?.currency}`, () => {
+    expect(prov, 'provisionalPrice missing').to.exist;
+    if (!mini) {
+      validationLogger(`[INFO] The selected offer has no offerSummary.minimalPrice (optional): only provisionalPrice's presence is checked.`);
+      return;
+    }
+    expect(prov.currency, 'provisionalPrice and minimalPrice differ in currency').to.eql(mini.currency);
+    const ps = prov.scale == null ? 2 : prov.scale;
+    const ms = mini.scale == null ? 2 : mini.scale;
+    expect(ps, 'provisionalPrice and minimalPrice differ in scale').to.eql(ms);
+    expect(prov.amount, 'provisionalPrice is below the minimal price of the offer').to.be.at.least(mini.amount);
+  });
+  if (!prov || typeof prov.amount !== 'number') return;
+  const parts = (booking.bookedOffers || []).flatMap((bo) => [
+    ...(bo.admissions || []), ...(bo.reservations || []), ...(bo.ancillaries || []),
+  ]).filter((p) => p && p.status === 'PREBOOKED');
+  const priced = parts.filter((p) => p.price && typeof p.price.amount === 'number' && p.price.currency === prov.currency);
+  if (parts.length > 0 && priced.length === parts.length) {
+    const sum = priced.reduce((acc, p) => acc + p.price.amount, 0);
+    if (sum !== prov.amount) {
+      validationLogger(`[WARNING] provisionalPrice ${prov.amount} ${prov.currency} differs from the sum of the pre-booked parts (${sum}): OSDM defines it as the price of all unconfirmed pre-booked parts. Booking fees, if any, would explain the difference.`);
+    } else {
+      validationLogger(`[DEBUG] provisionalPrice ${prov.amount} = sum of the ${parts.length} pre-booked part(s)`);
+    }
+  }
+}
+
+const FULFILLMENT_SUMMARY_STATUSES = ['PENDING', 'CREATED', 'COMPLETE'];
+function checkFulfillmentSummaryStatus(booking) {
   if (booking.fulfillmentStatus != null) {
-    test(`booking.fulfillmentStatus '${booking.fulfillmentStatus}' is a valid FulfillmentSummaryStatus (OSDM v3.8)`, () => {
-      expect(_validFulfillmentSummaryStatuses).to.include(booking.fulfillmentStatus,
-        `'${booking.fulfillmentStatus}' is not a valid FulfillmentSummaryStatus. ` +
-        `Valid OSDM v3.8 values: [${_validFulfillmentSummaryStatuses.join(', ')}].`);
-      validationLogger(`[DEBUG] booking.fulfillmentStatus: ${booking.fulfillmentStatus}`);
-    });
+    checkExtensibleCode({ test, expect, log: validationLogger },
+      'booking.fulfillmentStatus', booking.fulfillmentStatus, FULFILLMENT_SUMMARY_STATUSES, 'FulfillmentSummaryStatus');
   } else {
     validationLogger(`[DEBUG] booking.fulfillmentStatus absent (null or undefined; optional in OSDM v3.8) → test skipped`);
   }
@@ -1249,12 +1286,11 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       }
     });
 
-    // D1: status must be a valid OSDM FulfillmentStatus enum value.
-    // #337: aligned with fulfillments.js (which already accepts FULFILLED). The
-    // bookings.js enum was missing FULFILLED, producing a false-positive
-    // failure on every FULFILLED fulfillment under a v3.8 booking.
-    const _validFulfillmentStatuses = ['AVAILABLE','USED','PARTIALLY_USED','RESERVED',
-      'EXCHANGED','REFUNDED','RELEASED','CANCELLED','EXPIRED','ON_HOLD','CONFIRMED','FULFILLED'];
+    // D1: status must be an OSDM FulfillmentStatus. This one is a closed enum,
+    // identical in 3.5 and 3.8 (#613 F3: CHECKEDIN was missing; USED,
+    // PARTIALLY_USED and RESERVED are not OSDM values and were accepted).
+    const _validFulfillmentStatuses = ['AVAILABLE', 'ON_HOLD', 'CONFIRMED', 'FULFILLED', 'CHECKEDIN',
+      'CANCELLED', 'RELEASED', 'REFUNDED', 'EXCHANGED', 'EXPIRED'];
     test(`Fulfillment[${idx}].status '${fulfillment.status}' is a valid OSDM FulfillmentStatus`, () => {
       expect(_validFulfillmentStatuses).to.include(fulfillment.status,
         `'${fulfillment.status}' is not a valid FulfillmentStatus enum value. ` +
@@ -1269,8 +1305,14 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
       validationLogger(`[DEBUG] Fulfillment[${idx}] controlNumber is absent (expected for CONFIRMED without document issuance yet)`);
     }
 
-    test(`Fulfillment[${idx}] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [${bookedPartIds}], actual: [${fulfillment.bookingParts.map(bp => bp.id)}]`, () => {
-      expect(fulfillment.bookingParts).to.be.an("array").that.is.not.empty;
+    // #613 F8: bookingParts is optional in the schema, so the title must not
+    // assume it (a missing member used to throw here and abort the whole step).
+    // In a sale the fulfillment is made from booking parts, and the spec says
+    // the member "must be provided" then: its absence fails this check.
+    const _fulfillmentPartIds = Array.isArray(fulfillment.bookingParts)
+      ? fulfillment.bookingParts.map(bp => bp && bp.id) : '(no bookingParts)';
+    test(`Fulfillment[${idx}] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [${bookedPartIds}], actual: [${_fulfillmentPartIds}]`, () => {
+      expect(fulfillment.bookingParts, 'bookingParts must be provided for a fulfillment made from booking parts').to.be.an("array").that.is.not.empty;
       fulfillment.bookingParts.forEach(part => {
         validationLogger(`[DEBUG] Fulfillment[${idx}] bookingPart.id: ${part.id} exists in admissionReservationAncillaryBookingPartsIds`);
         expect(bookedPartIds).to.include(part.id);

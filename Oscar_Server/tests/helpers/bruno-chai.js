@@ -8,7 +8,8 @@
 'use strict';
 
 /**
- * The part of chai's BDD `expect` that bookings.js validateOfferParts uses,
+ * The part of chai's BDD `expect` that the tested validators use (bookings.js,
+ * offers.js, exchanges.js, osdmEnums.js),
  * for running a validator's own assertions in a unit test (extend it as other
  * validators need). Bruno supplies chai inside its sandbox; the server has no
  * chai dependency.
@@ -39,14 +40,21 @@ function chaiExpect(actual, message) {
     above: (n) => check(actual > n, `to be above ${n}`),
     members: (arr) => check(Array.isArray(actual) && isDeepStrictEqual(sorted(actual), sorted(arr)), `to have members ${JSON.stringify(arr)}`),
     lengthOf: (n) => check(actual != null && actual.length === n, `to have length ${n}`),
+    equal: (v, m) => { if (m) message = m; return check(actual === v, `to equal ${JSON.stringify(v)}`); },
+    oneOf: (list, m) => { if (m) message = m; return check(Array.isArray(list) && list.includes(actual), `to be one of ${JSON.stringify(list)}`); },
+    property: (name) => check(actual != null && Object.prototype.hasOwnProperty.call(actual, name), `to have property ${name}`),
+    least: (n, m) => { if (m) message = m; return check(actual >= n, `to be at least ${n}`); },
+    most: (n, m) => { if (m) message = m; return check(actual <= n, `to be at most ${n}`); },
   };
   api.an = api.a;
   const getters = {
     exist: () => check(actual != null, 'to exist'),
     empty: () => check(actual != null && actual.length === 0, 'to be empty'),
+    true: () => check(actual === true, 'to be true'),
+    false: () => check(actual === false, 'to be false'),
     not: () => { negate = !negate; return api; },
   };
-  ['to', 'be', 'and', 'have', 'with'].forEach((w) => { getters[w] = () => api; });
+  ['to', 'be', 'and', 'have', 'with', 'at', 'that', 'is', 'of'].forEach((w) => { getters[w] = () => api; });
   Object.entries(getters).forEach(([name, get]) => Object.defineProperty(api, name, { get }));
   return api;
 }

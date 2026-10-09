@@ -62,6 +62,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.107] — 2026-10-09
+
+Issue #613, release 2026.251. Collection only; server unchanged (1.11.223).
+Checks of the collection that disagreed with the OSDM specification (3.5, in
+`json_validator/openapi3_0.json`, and 3.8, in
+`Documentation/Test_Coverage/OSDM_reference/`), found by a review of the
+collection against 3.8.
+
+### Fixed
+
+- **Checks that never ran.**
+  - `03-Refund/11. GET Refund Offer.yml` had its after-response script under
+    `http.headers`. Bruno read it as a header with no name and loaded no
+    script, so the step ran without a check. A 405 or a 500 on that step
+    passed unseen.
+  - The refund breakdown was read as `refundOfferBreakDown` /
+    `refundOfferBreakdownItems`. The OSDM name is `refundOfferBreakdown`, and
+    its items have no `fulfillmentId`. The misspelt name is still read, with a
+    WARNING.
+  - "Confirmed with the amounts it was proposed at" keyed the proposed amounts
+    on the fulfillment status, which is never `PROPOSED`. It now keys them on
+    the refund offer's own status.
+- **False failures on answers the specification allows.**
+  - Refund step 14 expected every fulfillment and booking part `REFUNDED`.
+    Now only what the confirmed refund offers held must be `REFUNDED`, and
+    everything else must be unchanged. This covers partial refunds and one
+    fulfillment of several (#595, #610). The schedule decode, which reads the
+    whole offer, is skipped for such a scoped refund.
+  - `booking.fulfillmentStatus` uses the 3.8 values `PENDING`, `CREATED`,
+    `COMPLETE`; the list is extensible, so another value is a WARNING.
+    `FulfillmentStatus` is exactly the OSDM list: `CHECKEDIN` added, and
+    `USED`, `PARTIALLY_USED`, `RESERVED` (not OSDM) refused.
+  - PassengerType is an extensible code list in every version. A value
+    outside it is a WARNING (a provider code such as `A`), not a FAIL. Two
+    values changed spelling between versions, and both are accepted:
+    `COMPANION_DOG`/`MOTORCYCLE` in 3.5, `ACCOMP_DOG`/`MOTOCYCLE` in 3.8. The
+    data file schema accepts both too. One helper,
+    `checkExtensibleCode()` in `osdmEnums.js`, grades both lists.
+  - Optional members are checked only when present: `trip.direction`,
+    admission `validUntil`, `Price.scale` (default 2).
+  - `minimalPrice` is compared with the admissions only, not with optional
+    reservations and ancillaries.
+  - `provisionalPrice` must not be below the offer's `minimalPrice` (same
+    currency and scale); it used to have to equal it, which failed after an
+    added reservation or ancillary. A difference from the sum of the
+    pre-booked parts is a WARNING.
+  - Exchange offer: the required members are those of the spec. `offerSummary`
+    is optional; `createdOn`, `passengerRefs`, `fulfillments` and
+    `preBookableUntil` are required.
+  - `warnings` is read as a `WarningCollection` object, as OSDM defines it
+    since 3.5; a bare array is still read, with a WARNING.
+- **Runs that stopped or aborted.**
+  - A 403 on an optional read-only request no longer stops a `HARD_STOP` run.
+    These requests are the System-Info GETs, GET Passenger, GET Refund Offer
+    and GET Exchange Offer. #488 classifies them as "not implemented by this
+    provider", and the authentication guard contradicted that. A 401 still
+    stops the run. A non-JSON body on such a request is a WARNING.
+  - The generic Problem check requires `status` only when the body has it:
+    `Problem` has no required member in 3.8.
+  - A fulfillment without `bookingParts`, or an offer without `offerSummary`
+    or a booking without `provisionalPrice`, now fails a check instead of
+    throwing and aborting the step.
+- **Requests.**
+  - The passenger PATCH builds its body and leaves out an unset
+    `dateOfBirth`, `gender`, `email` or `phoneNumber` instead of sending `""`.
+    It routes to `04. GET Passenger`; it named `06. GET Passenger`, which does
+    not exist.
+  - DELETE of a confirmed refund offer expects 409 (it expected 404) and sends
+    no body. That step is reached only by a scenario that deletes after
+    confirming, which comes with #595.
+
+### Removed
+
+- Two checks that could not fail: the admission "NRT/IRT" label (computed by
+  the check itself), and "reduction cards" on the offer's passengers (a member
+  `AnonymousPassengerSpecification` does not have). Reduction cards come with
+  #597.
+- Two validators no request called: `library-bruno/fulfillments.js` and
+  `getBookingRefundResponse` in `refunds.js`.
+
+### Not changed
+
+- The booking `externalRef` (`"00001"`, not sent to one provider). The review
+  suspected it of causing 409s on `POST /bookings`. On evidence it does not:
+  - `BookingRequest.externalRef` has no uniqueness rule;
+  - `Booking.externalRef` in the answer is the provider's own reference, not
+    an echo of ours;
+  - the 409 seen in the recorded runs was a seat-availability refusal.
+
+  The host-name test behind the exception stays until the Test Framework can
+  declare it.
+
+### Checked
+
+- **Server suite:** 2,516 tests pass, including two new files.
+  - `tests/unit/bruno-osdm38-checks.test.js` (46) runs the real validators.
+    Each test fails against the previous code, except the guards that check a
+    real defect still fails.
+  - `tests/unit/bruno-request-files.test.js` loads every request file and
+    fails on a script Bruno would not load. It fails on the previous
+    `11. GET Refund Offer.yml`.
+- **Simulator runs** (the two sale scenarios on `gamma`), standalone and
+  through a throw-away OSCAR server: no failed check.
+  - Standalone: 173 and 212 checks. Through OSCAR: 171 and 230.
+  - The only difference from OTST_V2.0.106 is the two removed checks: one per
+    passenger, one per admission.
+- **Not checked:**
+  - the refund and exchange changes, on a run (the simulator answers 501 there
+    until #595);
+  - the 403 change, on a real sandbox;
+  - any real sandbox at all.
+
+---
+
 ## [server-1.11.223] — 2026-10-09
 
 Issue #549, follow-up: the code smells SonarCloud reported on the new upload

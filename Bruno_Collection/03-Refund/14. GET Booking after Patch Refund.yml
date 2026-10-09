@@ -62,11 +62,19 @@ runtime:
             loopbackOrStop("GET Booking after Patch Refund (missing booking)");
             return;
         }
+        // #613 F2: a refund that leaves fulfillments out (partial, or one
+        // fulfillment of several) must not expect the whole booking REFUNDED.
+        // The generic checks then accept either state, and the scope check
+        // below says exactly which fulfillment and part must be REFUNDED.
+        const { isScopedRefundOnBooking, checkRefundScopeOnBooking } = require(bru.getEnvVar("library_base") + "refunds.js");
+        const _scopedRefund = isScopedRefundOnBooking(jsonData.booking);
+        const _afterRefund = _scopedRefund ? ["REFUNDED", "FULFILLED", "CONFIRMED"] : ["REFUNDED"];
         postCreateBookingResponse(
         bru.getEnvVar("offer"),
         jsonData,
-        ["REFUNDED"],
-        ["REFUNDED"]);
+        _afterRefund,
+        _afterRefund);
+        checkRefundScopeOnBooking(jsonData.booking);
 
         displayFulFilledBooking(jsonData);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────
