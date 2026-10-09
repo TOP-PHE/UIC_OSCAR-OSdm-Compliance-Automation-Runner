@@ -62,6 +62,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.221] — 2026-10-09
+
+Issue #549: "Upload datafile" and "Download JSON" in Test Config are a safe
+round trip. Server and page. Collection unchanged (OTST_V2.0.104).
+
+### Fixed
+
+- **An upload replaces the data file and nothing else.** The page rebuilt the
+  Test Framework from every uploaded file, replacing the stored one with a
+  default framework plus three values from the file, before the upload was even
+  sent and without a word; it also added trains to Test Data, near-duplicates
+  of hand-edited ones. Both are gone from the upload. Creating a framework and
+  trains from the file is offered afterwards, asked first, and only to a
+  company that has no framework, or no train; a failure is reported.
+- **The server checks the file before replacing anything** (`POST
+  /v1/company/datafile`): JSON, a JSON object, not a download marked as a
+  tester's personal view or as unsaved edits, the data file schema, then the
+  template rule (NEW-10). The schema check is `utils/datafileSchema.js`: the
+  rules of the collection's run-time check (`validateDataFileJsonWithTemplate`)
+  and no others, so a file refused here is one every run would refuse. It reads
+  the schema of the collection the runs use, at each upload, and answers 503
+  when it cannot (nothing replaced). A refusal answers 400 with the reason and
+  `problems` (at most 50).
+- **A wrong file type answers 400 "Only JSON files are accepted."** The upload
+  filter's error reached the global error handler and answered 500. A size
+  overrun is still 413; any other parser error is a 400.
+- **The previous file is kept and can be restored.** The file an upload
+  replaces is written, encrypted, to `{slug}-datafile.previous.json`, before
+  the live file is replaced (if that fails, nothing is). `GET
+  /v1/company/datafile/previous` describes it, `POST
+  /v1/company/datafile/previous/restore` swaps it with the live file, so a
+  restore is undone the same way. Test Managers only, under
+  `withDatafileLock`; the template rule applies to a restore. A delete removes
+  both files.
+- **Download JSON is the stored file.** It saved the page's working copy:
+  re-indented, with what the server adds when serving it and what the editor
+  fills in, and for a tester their personal view, always as `datafile.json`.
+  It now fetches `GET /v1/company/datafile/download`: for a Test Manager the
+  stored bytes, named `{slug}-datafile-{date}.json`, so uploading the download
+  leaves the hash unchanged; for a tester their view with a root
+  `__oscarPersonalView` key, named `…-personal-view-…`, which the upload
+  refuses. It follows the provider selected in the tab (#540).
+- **The page's working copy has its own button**, "Download unsaved edits",
+  shown while there are some: the copy a refused save (412) tells the user to
+  keep. It is marked `__oscarUnsavedEdits` and refused by the upload.
+- The page confirms an upload and a restore with the scenario counts now and
+  after, and names unsaved edits that would be lost. A refusal is shown in a
+  panel with every problem, instead of "Upload failed: Unknown error".
+
+### Left open on purpose
+
+- **The upload is not checked against `If-Match`** (#540): it replaces the
+  whole file on purpose.
+- **A restore swaps two files in two atomic writes.** A crash between them
+  leaves both holding the restored file; the one replaced is lost. Not worth a
+  third file for this window.
+- **Only one previous file**, written by an upload or a restore, not by Save &
+  Apply (or the next auto-save would replace it). Backups (#543) remain the way
+  back further.
+- **The uploaded `knownDeviations` are stored as uploaded**, as before; the
+  next findings change re-projects them. Re-projecting on upload would break
+  the byte-for-byte round trip.
+- **A tester could remove the marker from their download by hand.** The marker
+  stops the mistake the issue describes, not a deliberate edit by someone the
+  Test Manager then chooses to upload.
+- The schema check is not applied to Save & Apply, whose files the editor
+  builds; a run still checks every file.
+
+### Tests
+
+- `tests/integration/company-datafile-round-trip.test.js` (10): wrong type,
+  not a data file, a problem deep in the file, the round trip (bytes and hash,
+  framework and test data untouched), a tester's download refused, the unsaved
+  edits copy refused, previous and restore (and its undo), the roles, the
+  delete, a provider named by `X-Provider-Id`. Every refusal checks the stored
+  file, not only the status.
+- `tests/unit/datafile-schema.test.js` (13): the bundled sample data files and
+  3,000 broken variants of them run through both the new check and the
+  collection's own `validateDataFileJsonWithTemplate`, which must agree on the
+  verdict and the number of problems; seven small schemas for the rules the
+  current schema does not reach.
+- `tests/unit/scenarios-load-guard.test.js`: the page's upload, offer and
+  download functions in the `vm` harness (the old `extractFromDatafile` tests
+  are replaced). An upload with a framework and trains makes exactly one
+  request; a failed load offers nothing.
+- Existing upload tests now send schema-valid files
+  (`tests/helpers/valid-datafile.js`); the one that accepted `[1, 2, 3]` now
+  expects a refusal.
+- 23 deliberate breaks of the server, the schema check and the page, all
+  caught. The whole flow checked in Chromium on a throwaway server, as a Test
+  Manager and as a tester.
+
+---
+
 ## [server-1.11.220] — 2026-10-09
 
 Issue #580: API Config is one page for the company and all its providers.

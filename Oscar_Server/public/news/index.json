@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-09-datafile-round-trip",
+    "date": "October 9, 2026",
+    "tag": "Fix",
+    "title": "Uploading a data file no longer changes your Test Framework",
+    "summary": "Upload datafile now replaces the data file and nothing else, checks it first, and keeps the file it replaces so you can restore it. Download JSON saves the file as stored on the server.",
+    "content": "Uploading a data file in Test Config used to rebuild your Test Framework from the file, losing what you had configured, and to add trains to Test Data. It no longer does: an upload replaces the data file and nothing else. If your company has no Test Framework or no train yet, the page offers to create them from the file, and asks first.\n\nBefore replacing anything, OSCAR asks you to confirm, with the number of scenarios now and after, and checks the file the way every run does. A file that is not a data file is refused with the list of problems, and nothing changes.\n\nThe file an upload replaces is kept: \"Restore previous file\" puts it back.\n\nDownload JSON now saves the data file as the server stores it, named after your company and the day, so a Test Manager can download it and upload it again without changing anything. A tester's download is their personal view (their scenarios, the shared ones and their run list); it is marked as such and cannot be uploaded as the company's file. While you have edits that are not saved, \"Download unsaved edits\" keeps a copy of them."
+  },
+  {
     "id": "2026-10-09-api-config-all-providers",
     "date": "October 9, 2026",
     "tag": "Improvement",

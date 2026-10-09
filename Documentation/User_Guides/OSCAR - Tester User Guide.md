@@ -13,6 +13,7 @@
 1. [Concepts & roles](#1-concepts--roles)
 2. [One‑time setup](#2-one-time-setup)
    - 2.1 Several providers in one company (distributors)
+   - 2.2 Downloading and uploading the data file
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
 4. [Authoring a scenario](#4-authoring-a-scenario)
@@ -132,9 +133,42 @@ Framework, test resources, findings, runs and reports.
 - **"The data file has changed since this page loaded it."** Test Config
   refuses a save when the data file changed after you opened the page: in
   another tab, by your Test Manager, or by a copy. Nothing is saved. Your edits
-  are still on the page: use **Download JSON** to keep a copy, reload, and make
-  your change again. A colleague saving their own private scenarios does not
+  are still on the page: use **⬇ Download unsaved edits** to keep a copy,
+  reload, and make your change again. A colleague saving their own private scenarios does not
   cause this; a change to anything you can see does.
+
+### 2.2 Downloading and uploading the data file
+
+Since 1.11.221 (#549), the buttons at the top of Test Config work as an export
+and an import of the same file:
+
+- **⬇ Download JSON** saves the data file **as the server stores it**, named
+  after the company and the day (`<company>-datafile-<date>.json`). For a Test
+  Manager it is the stored file byte for byte: uploading it again changes
+  nothing. Edits you have not saved are not in it.
+- For a **tester**, the download is your **personal view**
+  (`…-datafile-personal-view-<date>.json`): your scenarios, the shared ones and
+  your own run list, without other testers' private scenarios. It is marked as
+  such, and the upload refuses it: it cannot replace the company's file.
+- **⬇ Download unsaved edits** appears while the page has edits that are not
+  saved. It saves the page's working copy, to keep your work when a save is
+  refused. It is marked too, and cannot be uploaded as the data file.
+- **📤 Upload datafile** (Test Managers) replaces the data file **and nothing
+  else**: the Test Framework and Test Data are not touched. The page first asks
+  for confirmation, with the number of scenarios now and after. The server then
+  checks the file against the data file schema, the same check every run makes,
+  and refuses it with the list of problems if it does not pass; nothing is
+  replaced. A file that is not `.json` is refused with "Only JSON files are
+  accepted."
+- If the company has **no Test Framework**, or **no train in Test Data**, the
+  page then offers to create them from the uploaded file (OSDM version, sales
+  flows and passenger types; one train per trip). Cancel creates nothing. A
+  company that has them is never asked.
+- The file an upload replaces is **kept**. **↩ Restore previous file** (Test
+  Managers) puts it back; the file it replaces becomes the previous one, so a
+  restore can be undone the same way. Only one previous file is kept, and only
+  an upload or a restore makes one: **Save & Apply** does not. **🗑 Delete data
+  file** removes both.
 
 ---
 
