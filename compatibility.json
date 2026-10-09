@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.249",
+  "current_release": "2026.250",
   "releases": [
+    {
+      "release": "2026.250",
+      "date": "2026-10-09",
+      "server": "1.11.223",
+      "collection": "OTST_V2.0.106",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "refactor(#549): the code smells SonarCloud reported on the data file upload code of 1.11.221 are cleared. Behaviour-neutral; no route, rule or text shown to users changed; collection unchanged at OTST_V2.0.106.",
+        "utils/datafileSchema.js: the null and value rules move into small functions (cognitive complexity) and use Object.hasOwn. The parity test against library-bruno/validators.js (3,000 broken variants of the sample files) still finds no disagreement.",
+        "public/js/scenarios.js: the upload and restore confirmation texts are built with one push per list and no nested template literal; the text of the offer to build a Test Framework and trains from an uploaded file is its own function, buildOfferText(). Same text, character for character."
+      ]
+    },
     {
       "release": "2026.249",
       "date": "2026-10-09",

@@ -62,6 +62,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.223] — 2026-10-09
+
+Issue #549, follow-up: the code smells SonarCloud reported on the new upload
+code of 1.11.221. Behaviour-neutral. Collection unchanged (OTST_V2.0.106).
+
+### Changed
+
+- **`utils/datafileSchema.js`**: the null rule and the value rules (type,
+  enum, length) move into small functions, which brings the check under the
+  cognitive-complexity limit, and own-property tests use `Object.hasOwn`. The
+  parity test with `library-bruno/validators.js` (3,000 broken variants of the
+  sample files) still finds no disagreement.
+- **`public/js/scenarios.js`**: the upload and restore confirmation texts push
+  each list in one call and nest no template literal; the text of the offer to
+  build a Test Framework and trains from an uploaded file is its own function,
+  `buildOfferText()`. Old and new functions were run side by side on 47
+  inputs: same text, character for character.
+
+---
+
 ## [collection-OTST_V2.0.106] — 2026-10-09
 
 Issue #593, release 2026.249. Collection and documentation only; server
