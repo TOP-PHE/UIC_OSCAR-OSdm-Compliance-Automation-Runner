@@ -62,6 +62,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.106] — 2026-10-09
+
+Issue #593, release 2026.247. Collection and documentation only; server
+unchanged (1.11.220). No request or validator changed.
+
+### Added
+
+- **Run the collection standalone against the OSDM simulator.** Bruno on a PC,
+  from the collection folder, with the same data file and the same checks as a
+  run through OSCAR. This is how each new scenario of #592 is developed before
+  it meets a real sandbox.
+  - `environments/OTST_Simulator_Env.yml`: `api_base` on the simulator's
+    `gamma` provider (`http://127.0.0.1:3002/gamma` as committed), `client_id`
+    and `client_secret` as secret variables with no value in the file.
+  - `00-Access Token/Simulator Access Token.yml`: `client_credentials` on
+    `{{api_base}}/oauth/token`, through the shared `auth.js` handler.
+  - `Bruno_Collection/README.md`: what the folders are, and the standalone
+    steps for Bruno desktop and for `bru run`, for the scenario list and for
+    one scenario (`scenario_override`). Two things it warns about, both seen
+    with `bru` 4.2.1: `bru run` on the whole collection leaves out
+    `00-Access Token`, so the folders are named; and `scenarioTarget` repeats
+    the same scenario without end in a collection run.
+
+### Changed
+
+- **One data file for the simulator.** `OSDM_Simulator/oscar/datafile.json`
+  moved to `Bruno_Collection/data_base/simulator_datafile.json`: the file a
+  Test Manager uploads in OSCAR and the one a standalone run reads. The
+  simulator's test reads it there (simulator 0.2.1). Its `scenariosToRun` now
+  lists both scenarios, so a standalone run of the list runs both; through
+  OSCAR this is only the company's default list.
+
+### Checked
+
+- With `bru` 4.2.1 against a local simulator, provider `gamma`: standalone,
+  `SIM_SALE_SEARCH_1ADT` 175 checks and `SIM_SALE_SEARCH_2ADT_SAVER` 236, none
+  failed; through a throw-away OSCAR server (`ALLOW_PRIVATE_TARGETS=1`), 173
+  and 234, none failed. The two extra checks standalone are the token
+  request's, which OSCAR does not run. Not checked: Bruno desktop, the
+  simulator installed on the VPS, any real sandbox.
+
+---
+
 ## [collection-OTST_V2.0.105] — 2026-10-09
 
 Issue #550, release 2026.246. Collection only; server unchanged (1.11.220).

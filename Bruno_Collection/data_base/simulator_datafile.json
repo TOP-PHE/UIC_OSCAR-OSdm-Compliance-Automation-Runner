@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT", "SIM_SALE_SEARCH_2ADT_SAVER"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [

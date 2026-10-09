@@ -1,0 +1,918 @@
+name: OTST_Simulator_Env
+variables:
+  - secret: true
+    name: client_id
+  - secret: true
+    name: client_secret
+  - secret: true
+    name: access_token
+  - name: api_base
+    value: http://127.0.0.1:3002/gamma
+  - name: library_base
+    value: ./library-bruno/
+  - name: data_base
+    value: http://localhost:8080/Bruno_Collection/data_base/simulator_datafile.json
+  - name: json_schema
+    value: http://localhost:8080/Bruno_Collection/json_validator/datafile.schema.json
+  - name: scenariosToRunIndex
+    value: "1"
+  - name: __loopback
+    value: ""
+  - name: data_base_tmp
+    value:
+      type: object
+      data: |-
+        {
+          "scenariosToRun": [
+            "SIM_SALE_SEARCH_1ADT",
+            "SIM_SALE_SEARCH_2ADT_SAVER"
+          ],
+          "systemInfoParameters": {
+            "coachId": null,
+            "productId": null
+          },
+          "knownDeviations": [],
+          "scenarios": [
+            {
+              "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+              "loggingType": "INFO",
+              "code": "SIM_SALE_SEARCH_1ADT",
+              "description": "Simulated provider: sale of a searched trip for one adult, passenger details updated after booking.",
+              "scenarioType": "SALE",
+              "scenarioAction": null,
+              "osdmVersion": "3.8.0",
+              "desiredFlexibility": "FULL_FLEXIBLE",
+              "overruleCode": null,
+              "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+              },
+              "placeSelectionMode": null,
+              "tripRequirementId": 1,
+              "passengersListId": 1,
+              "purchaserListId": 1,
+              "requestedFulfillmentOptionsListId": 1,
+              "offerSearchCriteriaListId": 1,
+              "shared": true,
+              "version": "1.0",
+              "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": null,
+                "requestedOfferParts": []
+              }
+            },
+            {
+              "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+              "loggingType": "INFO",
+              "code": "SIM_SALE_SEARCH_2ADT_SAVER",
+              "description": "Simulated provider: sale of a searched trip for two adults on the non-flexible offer.",
+              "scenarioType": "SALE",
+              "scenarioAction": null,
+              "osdmVersion": "3.8.0",
+              "desiredFlexibility": "NON_FLEXIBLE",
+              "overruleCode": null,
+              "salesFlowActions": {
+                "patchPassengers": true,
+                "placeSelection": false,
+                "addAncillary": false,
+                "getBooking": false,
+                "deleteAncillary": false
+              },
+              "placeSelectionMode": null,
+              "tripRequirementId": 2,
+              "passengersListId": 2,
+              "purchaserListId": 1,
+              "requestedFulfillmentOptionsListId": 1,
+              "offerSearchCriteriaListId": 1,
+              "shared": true,
+              "version": "1.0",
+              "offerSearchCriteria": {
+                "serviceClass": [],
+                "travelClass": [],
+                "flexibilities": [],
+                "offerMode": null,
+                "requestedOfferParts": []
+              }
+            }
+          ],
+          "offerSearchCriteriaList": [
+            {
+              "id": 1,
+              "offerSearchCriteria": [
+                {
+                  "currency": "EUR",
+                  "offerMode": "INDIVIDUAL",
+                  "requestedOfferParts": [
+                    "ADMISSION"
+                  ],
+                  "flexibilities": [],
+                  "serviceClass": [],
+                  "travelClass": [],
+                  "requiresPlaceSelection": false
+                }
+              ]
+            }
+          ],
+          "requestedFulfillmentOptionsList": [
+            {
+              "id": 1,
+              "requestedFulfillmentOptions": [
+                {
+                  "fulfillmentMedia": "PDF_A4",
+                  "fulfillmentType": "ETICKET"
+                }
+              ]
+            }
+          ],
+          "tripRequirements": [
+            {
+              "id": 1,
+              "tripType": "SEARCH",
+              "trip": {
+                "origin": "urn:uic:stn:0000001",
+                "destination": "urn:uic:stn:0000002",
+                "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+                "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+                "vehicleNumber": "",
+                "operatorCode": "",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "description": "Simulated trip, station 0000001 to station 0000002"
+              }
+            },
+            {
+              "id": 2,
+              "tripType": "SEARCH",
+              "trip": {
+                "origin": "urn:uic:stn:0000003",
+                "destination": "urn:uic:stn:0000001",
+                "startDatetime": "%TRIP_DATE%T14:30:00+01:00",
+                "endDatetime": "%TRIP_DATE%T19:00:00+01:00",
+                "vehicleNumber": "",
+                "operatorCode": "",
+                "productCategoryRef": "",
+                "productCategoryName": "",
+                "productCategoryShortName": "",
+                "description": "Simulated trip, station 0000003 to station 0000001"
+              }
+            }
+          ],
+          "purchaserList": [
+            {
+              "id": 1,
+              "purchaser": [
+                {
+                  "purchaserFirstName": "Paula",
+                  "purchaserLastName": "Purchaser",
+                  "purchaserPhoneNumber": "+33199000010",
+                  "purchaserEmail": "paula.purchaser@example.org"
+                }
+              ]
+            }
+          ],
+          "passengersList": [
+            {
+              "id": 1,
+              "passengers": [
+                {
+                  "reference": "00001",
+                  "dateOfBirth": "1990-01-15",
+                  "firstName": "Alex",
+                  "lastName": "Example",
+                  "phoneNumber": "+33199000001",
+                  "email": "alex.example@example.org",
+                  "gender": "X",
+                  "updateFirstName": "Alexis",
+                  "updateLastName": "Sample",
+                  "updateDateOfBirth": "1990-01-16",
+                  "updatePhoneNumber": "+33199000002",
+                  "updateEmail": "alexis.sample@example.org",
+                  "type": "PERSON"
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "passengers": [
+                {
+                  "reference": "00001",
+                  "dateOfBirth": "1985-06-01",
+                  "firstName": "Sam",
+                  "lastName": "Example",
+                  "phoneNumber": "+33199000003",
+                  "email": "sam.example@example.org",
+                  "gender": "X",
+                  "updateFirstName": "Samuel",
+                  "updateLastName": "Sample",
+                  "updateDateOfBirth": "1985-06-02",
+                  "updatePhoneNumber": "+33199000004",
+                  "updateEmail": "samuel.sample@example.org",
+                  "type": "PERSON"
+                },
+                {
+                  "reference": "00002",
+                  "dateOfBirth": "1987-03-20",
+                  "firstName": "Robin",
+                  "lastName": "Example",
+                  "phoneNumber": "+33199000005",
+                  "email": "robin.example@example.org",
+                  "gender": "X",
+                  "updateFirstName": "Robyn",
+                  "updateLastName": "Sample",
+                  "updateDateOfBirth": "1987-03-21",
+                  "updatePhoneNumber": "+33199000006",
+                  "updateEmail": "robyn.sample@example.org",
+                  "type": "PERSON"
+                }
+              ]
+            }
+          ]
+        }
+  - name: coachId
+    value: ""
+  - name: productId
+    value: ""
+  - name: __knownDeviations
+    value: "[]"
+  - name: __knownDeviationHits
+    value: "0"
+  - name: __knownDeviationsSeen
+    value: "[]"
+  - name: __scenariosList
+    value: '["SIM_SALE_SEARCH_2ADT_SAVER"]'
+  - name: __unitaryLoadedIdx
+    value: "1"
+  - name: osdmVersion
+    value: 3.8.0
+  - name: loggingType
+    value: INFO
+  - name: stepFailurePolicy
+    value: HARD_STOP
+  - name: scenarioCode
+    value: SIM_SALE_SEARCH_2ADT_SAVER
+  - name: scenarioType
+    value: SALE
+  - name: scenarioAction
+    value: ""
+  - name: requestedInformationProbe
+    value: off
+  - name: bookingPurchaserMode
+    value: inline
+  - name: expiredBookingTest
+    value: "false"
+  - name: expiredBookingMaxWaitMinutes
+    value: ""
+  - name: expiredOfferTest
+    value: "false"
+  - name: expiredOfferMaxWaitMinutes
+    value: ""
+  - name: expiredAddReservationOfferTest
+    value: "false"
+  - name: expiredAddReservationOfferMaxWaitMinutes
+    value: ""
+  - name: expiredAddAncillaryOfferTest
+    value: "false"
+  - name: expiredAddAncillaryOfferMaxWaitMinutes
+    value: ""
+  - name: expiredRefundOfferTest
+    value: "false"
+  - name: expiredRefundOfferMaxWaitMinutes
+    value: ""
+  - name: expiredExchangeOfferTest
+    value: "false"
+  - name: expiredExchangeOfferMaxWaitMinutes
+    value: ""
+  - name: desiredFlexibility
+    value: NON_FLEXIBLE
+  - name: bookMandatoryReservations
+    value: "false"
+  - name: placeSelectionProbes
+    value: "[]"
+  - name: __placeProbeIndex
+    value: "0"
+  - name: overruleCode
+    value: ""
+  - name: partialRefundByLeg
+    value: "false"
+  - name: partialRefundByPax
+    value: "false"
+  - name: partialRefundLegSelection
+    value: ""
+  - name: partialRefundPaxSelection
+    value: ""
+  - name: salesFlow_patchPassengers
+    value: "true"
+  - name: salesFlow_placeSelection
+    value: "false"
+  - name: salesFlow_addAncillary
+    value: "false"
+  - name: salesFlow_getBooking
+    value: "false"
+  - name: salesFlow_deleteAncillary
+    value: "false"
+  - name: placeSelectionMode
+    value: ""
+  - name: __expiredFlowQueue
+    value: "[]"
+  - name: __expiredFlowQueueIndex
+    value: "0"
+  - name: TripType
+    value: SEARCH
+  - name: tripStartStopPlaceRef
+    value: urn:uic:stn:0000003
+  - name: tripEndStopPlaceRef
+    value: urn:uic:stn:0000001
+  - name: tripStartDatetime
+    value: 2026-10-19T14:30:00+01:00
+  - name: tripEndDatetime
+    value: 2026-10-19T19:00:00+01:00
+  - name: tripVehicleNumber
+    value: ""
+  - name: tripOperatorCode
+    value: ""
+  - name: tripProductCategoryRef
+    value: ""
+  - name: tripProductCategoryName
+    value: ""
+  - name: tripProductCategoryShortName
+    value: ""
+  - name: offerTripSearchCriteria
+    value: '{"departureTime":"2026-10-19T14:30:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0000003"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0000001"}}'
+  - name: bookingPurchaserSpecifications
+    value: '{"detail":{"firstName":"Paula","lastName":"Purchaser","contact":{"email":"paula.purchaser@example.org","phoneNumber":"+33199000010"}}}'
+  - name: offerPassengerNumber
+    value:
+      type: number
+      data: "2"
+  - name: offerPassengerSpecifications
+    value: '[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1985-06-01","gender":"X"},{"externalRef":"00002","type":"PERSON","dateOfBirth":"1987-03-20","gender":"X"}]'
+  - name: bookingPassengerSpecifications
+    value: '[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1985-06-01","gender":"X","detail":{"firstName":"Sam","lastName":"Example","contact":{"email":"sam.example@example.org","phoneNumber":"+33199000003"}}},{"externalRef":"00002","type":"PERSON","dateOfBirth":"1987-03-20","gender":"X","detail":{"firstName":"Robin","lastName":"Example","contact":{"email":"robin.example@example.org","phoneNumber":"+33199000005"}}}]'
+  - name: bookingPassengerReferences
+    value: '["00001","00002"]'
+  - name: passengerAdditionalData
+    value: '[{"updateFirstName":"Samuel","updateLastName":"Sample","updateDateOfBirth":"1985-06-02","updateEmail":"samuel.sample@example.org","updatePhoneNumber":"+33199000004","updateGender":"X"},{"updateFirstName":"Robyn","updateLastName":"Sample","updateDateOfBirth":"1987-03-21","updateEmail":"robyn.sample@example.org","updatePhoneNumber":"+33199000006","updateGender":"X"}]'
+  - name: updateFirstName_0
+    value: Samuel
+  - name: updateLastName_0
+    value: Sample
+  - name: updateDateOfBirth_0
+    value: 1985-06-02
+  - name: updateEmail_0
+    value: samuel.sample@example.org
+  - name: updatePhoneNumber_0
+    value: "+33199000004"
+  - name: updateGender_0
+    value: X
+  - name: offerSearchCriteria
+    value: "{}"
+  - name: offerFulfillmentOptions
+    value: '[{"type":"ETICKET","media":"PDF_A4"}]'
+  - name: __reportInitDone
+    value: "true"
+  - name: __envSanityAnnounced
+    value: "true"
+  - name: coachListHasValidData
+    value: "false"
+  - name: coachListCandidateIds
+    value: "[]"
+  - name: apiVersionsAvailable
+    value: 3.7.0
+  - name: systemVersionCheckCompleted
+    value: "true"
+  - name: productListHasValidData
+    value: "false"
+  - name: productListCandidateIds
+    value: "[]"
+  - name: offerCurrency
+    value: CZK
+  - name: bookingConfirmationTimeLimit
+    value: ""
+  - name: patchType
+    value: PERSON
+  - name: updateFirstName_1
+    value: Robyn
+  - name: updateLastName_1
+    value: Sample
+  - name: updateDateOfBirth_1
+    value: 1987-03-21
+  - name: updateEmail_1
+    value: robyn.sample@example.org
+  - name: updatePhoneNumber_1
+    value: "+33199000006"
+  - name: updateGender_1
+    value: X
+  - name: __unitaryLoadedTarget
+    value: SIM_SALE_SEARCH_2ADT_SAVER
+  - name: offerValidUntil
+    value: 2026-10-09T12:15:23.832Z
+  - name: offerValidUntilSource
+    value: selectedOffer.preBookableUntil
+  - name: __offerRetryCount
+    value: "0"
+  - name: OfferCollectionRequest
+    value: '{"tripSearchCriteria":{"departureTime":"2026-10-19T14:30:00","origin":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0000003"},"destination":{"objectType":"StopPlaceRef","stopPlaceRef":"urn:uic:stn:0000001"}},"anonymousPassengerSpecifications":[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1985-06-01","gender":"X"},{"externalRef":"00002","type":"PERSON","dateOfBirth":"1987-03-20","gender":"X"}],"offerSearchCriteria":{},"requestedFulfillmentOptions":[{"type":"ETICKET","media":"PDF_A4"}]}'
+  - name: offer
+    value:
+      type: object
+      data: |-
+        {
+          "offerId": "GAMMA-OFR-5dca6bcf9f6244c3",
+          "summary": "Gamma Express Saver, Standard class",
+          "offerSummary": {
+            "minimalPrice": {
+              "amount": 469536,
+              "currency": "CZK",
+              "scale": 2
+            },
+            "overallServiceClass": {
+              "type": "STANDARD",
+              "name": "Standard"
+            },
+            "overallTravelClass": "SECOND",
+            "overallFlexibility": "NON_FLEXIBLE"
+          },
+          "createdOn": "2026-10-09T11:45:23.832Z",
+          "preBookableUntil": "2026-10-09T12:15:23.832Z",
+          "passengerRefs": [
+            "00001",
+            "00002"
+          ],
+          "products": [
+            {
+              "id": "GAMMA-PRD-NON_FLEXIBLE-SECOND",
+              "code": "GAMMA-NON_FLEXIBLE-SECOND",
+              "summary": "Gamma Express Saver",
+              "type": "ADMISSION",
+              "owner": "urn:x_osdm_simulator:carrier:gamma",
+              "flexibility": "NON_FLEXIBLE",
+              "serviceClass": {
+                "type": "STANDARD",
+                "name": "Standard"
+              },
+              "travelClass": "SECOND",
+              "isTrainBound": true
+            }
+          ],
+          "tripCoverage": {
+            "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+            "coveredLegIds": [
+              "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+            ]
+          },
+          "admissionOfferParts": [
+            {
+              "objectType": "AdmissionOfferPart",
+              "id": "GAMMA-ADM-6046c069c02615f1",
+              "summary": "Gamma Express Saver, Standard class",
+              "createdOn": "2026-10-09T11:45:23.832Z",
+              "validFrom": "2026-10-19T14:30:00+02:00",
+              "validUntil": "2026-10-19T18:21:00+02:00",
+              "price": {
+                "amount": 234768,
+                "currency": "CZK",
+                "scale": 2
+              },
+              "tripCoverage": {
+                "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                "coveredLegIds": [
+                  "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                ]
+              },
+              "offerMode": "INDIVIDUAL",
+              "isReusable": false,
+              "passengerRefs": [
+                "00001"
+              ],
+              "refundable": "NO",
+              "exchangeable": "NO",
+              "summaryProductId": "GAMMA-PRD-NON_FLEXIBLE-SECOND",
+              "products": [
+                {
+                  "productId": "GAMMA-PRD-NON_FLEXIBLE-SECOND",
+                  "legIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                }
+              ],
+              "availableFulfillmentOptions": [
+                {
+                  "type": "ETICKET",
+                  "media": "PDF_A4"
+                }
+              ],
+              "isReservationRequired": false
+            },
+            {
+              "objectType": "AdmissionOfferPart",
+              "id": "GAMMA-ADM-80e97792e00a3230",
+              "summary": "Gamma Express Saver, Standard class",
+              "createdOn": "2026-10-09T11:45:23.832Z",
+              "validFrom": "2026-10-19T14:30:00+02:00",
+              "validUntil": "2026-10-19T18:21:00+02:00",
+              "price": {
+                "amount": 234768,
+                "currency": "CZK",
+                "scale": 2
+              },
+              "tripCoverage": {
+                "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                "coveredLegIds": [
+                  "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                ]
+              },
+              "offerMode": "INDIVIDUAL",
+              "isReusable": false,
+              "passengerRefs": [
+                "00002"
+              ],
+              "refundable": "NO",
+              "exchangeable": "NO",
+              "summaryProductId": "GAMMA-PRD-NON_FLEXIBLE-SECOND",
+              "products": [
+                {
+                  "productId": "GAMMA-PRD-NON_FLEXIBLE-SECOND",
+                  "legIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                }
+              ],
+              "availableFulfillmentOptions": [
+                {
+                  "type": "ETICKET",
+                  "media": "PDF_A4"
+                }
+              ],
+              "isReservationRequired": false
+            }
+          ]
+        }
+  - name: offerId
+    value: GAMMA-OFR-5dca6bcf9f6244c3
+  - name: offers
+    value:
+      type: object
+      data: |-
+        [
+          {
+            "offerId": "GAMMA-OFR-3f49cfdda468c22f",
+            "summary": "Gamma Express Flex, Standard class",
+            "offerSummary": {
+              "minimalPrice": {
+                "amount": 751258,
+                "currency": "CZK",
+                "scale": 2
+              },
+              "overallServiceClass": {
+                "type": "STANDARD",
+                "name": "Standard"
+              },
+              "overallTravelClass": "SECOND",
+              "overallFlexibility": "FULL_FLEXIBLE"
+            },
+            "createdOn": "2026-10-09T11:45:23.832Z",
+            "preBookableUntil": "2026-10-09T12:15:23.832Z",
+            "passengerRefs": [
+              "00001",
+              "00002"
+            ],
+            "products": [
+              {
+                "id": "GAMMA-PRD-FULL_FLEXIBLE-SECOND",
+                "code": "GAMMA-FULL_FLEXIBLE-SECOND",
+                "summary": "Gamma Express Flex",
+                "type": "ADMISSION",
+                "owner": "urn:x_osdm_simulator:carrier:gamma",
+                "flexibility": "FULL_FLEXIBLE",
+                "serviceClass": {
+                  "type": "STANDARD",
+                  "name": "Standard"
+                },
+                "travelClass": "SECOND",
+                "isTrainBound": false
+              }
+            ],
+            "tripCoverage": {
+              "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+              "coveredLegIds": [
+                "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+              ]
+            },
+            "admissionOfferParts": [
+              {
+                "objectType": "AdmissionOfferPart",
+                "id": "GAMMA-ADM-4793db80db09aae4",
+                "summary": "Gamma Express Flex, Standard class",
+                "createdOn": "2026-10-09T11:45:23.832Z",
+                "validFrom": "2026-10-19T14:30:00+02:00",
+                "validUntil": "2026-10-19T18:21:00+02:00",
+                "price": {
+                  "amount": 375629,
+                  "currency": "CZK",
+                  "scale": 2
+                },
+                "tripCoverage": {
+                  "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                  "coveredLegIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                },
+                "offerMode": "INDIVIDUAL",
+                "isReusable": false,
+                "passengerRefs": [
+                  "00001"
+                ],
+                "refundable": "YES",
+                "exchangeable": "YES",
+                "summaryProductId": "GAMMA-PRD-FULL_FLEXIBLE-SECOND",
+                "products": [
+                  {
+                    "productId": "GAMMA-PRD-FULL_FLEXIBLE-SECOND",
+                    "legIds": [
+                      "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                    ]
+                  }
+                ],
+                "availableFulfillmentOptions": [
+                  {
+                    "type": "ETICKET",
+                    "media": "PDF_A4"
+                  }
+                ],
+                "isReservationRequired": false
+              },
+              {
+                "objectType": "AdmissionOfferPart",
+                "id": "GAMMA-ADM-c6341b41620c3179",
+                "summary": "Gamma Express Flex, Standard class",
+                "createdOn": "2026-10-09T11:45:23.832Z",
+                "validFrom": "2026-10-19T14:30:00+02:00",
+                "validUntil": "2026-10-19T18:21:00+02:00",
+                "price": {
+                  "amount": 375629,
+                  "currency": "CZK",
+                  "scale": 2
+                },
+                "tripCoverage": {
+                  "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                  "coveredLegIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                },
+                "offerMode": "INDIVIDUAL",
+                "isReusable": false,
+                "passengerRefs": [
+                  "00002"
+                ],
+                "refundable": "YES",
+                "exchangeable": "YES",
+                "summaryProductId": "GAMMA-PRD-FULL_FLEXIBLE-SECOND",
+                "products": [
+                  {
+                    "productId": "GAMMA-PRD-FULL_FLEXIBLE-SECOND",
+                    "legIds": [
+                      "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                    ]
+                  }
+                ],
+                "availableFulfillmentOptions": [
+                  {
+                    "type": "ETICKET",
+                    "media": "PDF_A4"
+                  }
+                ],
+                "isReservationRequired": false
+              }
+            ]
+          },
+          {
+            "offerId": "GAMMA-OFR-3d22a5aadc8a1b96",
+            "summary": "Gamma Express Semi-flex, Standard class",
+            "offerSummary": {
+              "minimalPrice": {
+                "amount": 610396,
+                "currency": "CZK",
+                "scale": 2
+              },
+              "overallServiceClass": {
+                "type": "STANDARD",
+                "name": "Standard"
+              },
+              "overallTravelClass": "SECOND",
+              "overallFlexibility": "SEMI_FLEXIBLE"
+            },
+            "createdOn": "2026-10-09T11:45:23.832Z",
+            "preBookableUntil": "2026-10-09T12:15:23.832Z",
+            "passengerRefs": [
+              "00001",
+              "00002"
+            ],
+            "products": [
+              {
+                "id": "GAMMA-PRD-SEMI_FLEXIBLE-SECOND",
+                "code": "GAMMA-SEMI_FLEXIBLE-SECOND",
+                "summary": "Gamma Express Semi-flex",
+                "type": "ADMISSION",
+                "owner": "urn:x_osdm_simulator:carrier:gamma",
+                "flexibility": "SEMI_FLEXIBLE",
+                "serviceClass": {
+                  "type": "STANDARD",
+                  "name": "Standard"
+                },
+                "travelClass": "SECOND",
+                "isTrainBound": false
+              }
+            ],
+            "tripCoverage": {
+              "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+              "coveredLegIds": [
+                "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+              ]
+            },
+            "admissionOfferParts": [
+              {
+                "objectType": "AdmissionOfferPart",
+                "id": "GAMMA-ADM-4d64adaa7ae94790",
+                "summary": "Gamma Express Semi-flex, Standard class",
+                "createdOn": "2026-10-09T11:45:23.832Z",
+                "validFrom": "2026-10-19T14:30:00+02:00",
+                "validUntil": "2026-10-19T18:21:00+02:00",
+                "price": {
+                  "amount": 305198,
+                  "currency": "CZK",
+                  "scale": 2
+                },
+                "tripCoverage": {
+                  "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                  "coveredLegIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                },
+                "offerMode": "INDIVIDUAL",
+                "isReusable": false,
+                "passengerRefs": [
+                  "00001"
+                ],
+                "refundable": "WITH_CONDITION",
+                "exchangeable": "WITH_CONDITION",
+                "summaryProductId": "GAMMA-PRD-SEMI_FLEXIBLE-SECOND",
+                "products": [
+                  {
+                    "productId": "GAMMA-PRD-SEMI_FLEXIBLE-SECOND",
+                    "legIds": [
+                      "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                    ]
+                  }
+                ],
+                "availableFulfillmentOptions": [
+                  {
+                    "type": "ETICKET",
+                    "media": "PDF_A4"
+                  }
+                ],
+                "isReservationRequired": false
+              },
+              {
+                "objectType": "AdmissionOfferPart",
+                "id": "GAMMA-ADM-a5d0ef5160ce4bb5",
+                "summary": "Gamma Express Semi-flex, Standard class",
+                "createdOn": "2026-10-09T11:45:23.832Z",
+                "validFrom": "2026-10-19T14:30:00+02:00",
+                "validUntil": "2026-10-19T18:21:00+02:00",
+                "price": {
+                  "amount": 305198,
+                  "currency": "CZK",
+                  "scale": 2
+                },
+                "tripCoverage": {
+                  "coveredTripId": "GAMMA-TRIP-6c6ff4d9b4e9",
+                  "coveredLegIds": [
+                    "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                  ]
+                },
+                "offerMode": "INDIVIDUAL",
+                "isReusable": false,
+                "passengerRefs": [
+                  "00002"
+                ],
+                "refundable": "WITH_CONDITION",
+                "exchangeable": "WITH_CONDITION",
+                "summaryProductId": "GAMMA-PRD-SEMI_FLEXIBLE-SECOND",
+                "products": [
+                  {
+                    "productId": "GAMMA-PRD-SEMI_FLEXIBLE-SECOND",
+                    "legIds": [
+                      "GAMMA-TRIP-6c6ff4d9b4e9-L1"
+                    ]
+                  }
+                ],
+                "availableFulfillmentOptions": [
+                  {
+                    "type": "ETICKET",
+                    "media": "PDF_A4"
+                  }
+                ],
+                "isReservationRequired": false
+              }
+            ]
+          },
+          "[Circular Reference]"
+        ]
+  - name: overallFlexibility
+    value: NON_FLEXIBLE
+  - name: passengerCount
+    value:
+      type: number
+      data: "2"
+  - name: referencedAncillaryIds
+    value: "[]"
+  - name: minimalPrice
+    value:
+      type: number
+      data: "469536"
+  - name: admissionPartsPrice
+    value:
+      type: number
+      data: "469536"
+  - name: reservationPartsPrice
+    value:
+      type: number
+      data: "0"
+  - name: ancillaryPartsPrice
+    value:
+      type: number
+      data: "0"
+  - name: coveredTripId
+    value: GAMMA-TRIP-6c6ff4d9b4e9
+  - name: admissionReservationAncillaryOfferPartsIds
+    value:
+      type: object
+      data: |-
+        [
+          "GAMMA-ADM-6046c069c02615f1",
+          "GAMMA-ADM-80e97792e00a3230"
+        ]
+  - name: placeSelections
+    value: "[]"
+  - name: BookingRequest
+    value: '{"offers":[{"offerId":"GAMMA-OFR-5dca6bcf9f6244c3","passengerRefs":["00001","00002"]}],"passengerSpecifications":[{"externalRef":"00001","type":"PERSON","dateOfBirth":"1985-06-01","gender":"X","detail":{"firstName":"Sam","lastName":"Example","contact":{"email":"sam.example@example.org","phoneNumber":"+33199000003"}}},{"externalRef":"00002","type":"PERSON","dateOfBirth":"1987-03-20","gender":"X","detail":{"firstName":"Robin","lastName":"Example","contact":{"email":"robin.example@example.org","phoneNumber":"+33199000005"}}}],"purchaser":{"detail":{"firstName":"Paula","lastName":"Purchaser","contact":{"email":"paula.purchaser@example.org","phoneNumber":"+33199000010"}}},"externalRef":"00001"}'
+  - name: bookingId
+    value: GAMMA-BKG-dbad596211a7f109
+  - name: passengerIdList
+    value:
+      type: object
+      data: |-
+        [
+          "GAMMA-PAX-661faa580328f5c6",
+          "GAMMA-PAX-c5aabab70db1df00"
+        ]
+  - name: bookedOfferId
+    value: GAMMA-OFR-5dca6bcf9f6244c3
+  - name: provisionalPriceAmount
+    value:
+      type: number
+      data: "0"
+  - name: admissionReservationAncillaryBookingPartsIds
+    value:
+      type: object
+      data: |-
+        [
+          "GAMMA-ADM-6046c069c02615f1",
+          "GAMMA-ADM-80e97792e00a3230",
+          "GAMMA-ADM-6046c069c02615f1",
+          "GAMMA-ADM-80e97792e00a3230",
+          "GAMMA-ADM-6046c069c02615f1",
+          "GAMMA-ADM-80e97792e00a3230"
+        ]
+  - name: passengerId
+    value: GAMMA-PAX-c5aabab70db1df00
+  - name: passengerSpecificationExternalRef
+    value: "00002"
+  - name: patchDateOfBirth
+    value: 1987-03-21
+  - name: patchFirstName
+    value: Robyn
+  - name: patchLastName
+    value: Sample
+  - name: patchEmail
+    value: robyn.sample@example.org
+  - name: patchPhoneNumber
+    value: "+33199000006"
+  - name: patchGender
+    value: X
+  - name: currentPassengerIndex
+    value:
+      type: number
+      data: "2"
+  - name: fulfillmentIds
+    value: '["GAMMA-FUL-c5e7a99cdb6274bc"]'
+  - name: confirmedPriceAmount
+    value:
+      type: number
+      data: "469536"

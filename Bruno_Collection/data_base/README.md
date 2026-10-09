@@ -16,6 +16,7 @@ Each data file corresponds to a specific **implementor sandbox** and defines the
 | `paxone_datafile.json` | Paxone | 3.5 | EUR |
 | `sqills_datafile.json` | Sqills | 3.4 | EUR |
 | `turnit_datafile.json` | Turnit | 3.0.5 | EUR |
+| `simulator_datafile.json` | OSDM simulator (`OSDM_Simulator/`), provider `gamma` | 3.8.0 (`gamma` reports 3.7.0) | any |
 | `datafile_template.md` | — | — | Template reference |
 
 ---

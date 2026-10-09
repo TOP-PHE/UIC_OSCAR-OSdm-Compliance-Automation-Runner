@@ -18,7 +18,7 @@ const { buildOfferCollection } = require('../src/osdm/offers');
 const { PROVIDERS_DIR } = require('./helpers');
 
 const collection = path.join(__dirname, '..', '..', 'Bruno_Collection');
-const datafile = require('../oscar/datafile.json');
+const datafile = require(path.join(collection, 'data_base', 'simulator_datafile.json'));
 
 test('the ready-made data file is valid against the collection\'s data file schema', () => {
   // Checked with the copy of Ajv that the collection carries, so the simulator
