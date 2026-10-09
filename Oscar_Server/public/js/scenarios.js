@@ -1065,9 +1065,10 @@ function countScenarios(df) {
 
 function uploadConfirmText(fileName, storedCount, fileCount, unsavedEdits) {
   const lines = [`Replace the company data file with "${fileName}"?`, ''];
-  lines.push(storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`);
-  lines.push(fileCount === null ? 'After: the file has no "scenarios" list; the server will check it.' : `After: ${fileCount} scenario(s).`);
-  lines.push('', 'The Test Framework and Test Data are not changed.');
+  lines.push(
+    storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`,
+    fileCount === null ? 'After: the file has no "scenarios" list; the server will check it.' : `After: ${fileCount} scenario(s).`,
+    '', 'The Test Framework and Test Data are not changed.');
   if (storedCount !== null) lines.push('The current file is kept: "Restore previous file" puts it back.');
   if (unsavedEdits) lines.push('', 'This page has edits that are not saved: they will be lost.');
   return lines.join('\n');
@@ -1078,7 +1079,8 @@ function uploadRefusalText(status, data) {
   const problems = Array.isArray(data?.problems) ? data.problems : [];
   if (!problems.length) return detail;
   const more = data.problems_truncated ? '\n• … and more' : '';
-  return `${detail}\n\n${problems.map(p => `• ${p}`).join('\n')}${more}`;
+  const list = problems.map(p => '• ' + p).join('\n');
+  return `${detail}\n\n${list}${more}`;
 }
 
 function showUploadError(text) {
@@ -1186,6 +1188,20 @@ function trainsFromDatafile(datafile) {
   return trains;
 }
 
+function buildOfferText(buildFramework, trainCount) {
+  const what = [];
+  const missing = [];
+  if (buildFramework) {
+    what.push('a Test Framework: the OSDM version, sales flows and passenger types found in the file, everything else at its default');
+    missing.push('Test Framework');
+  }
+  if (trainCount) {
+    what.push(`${trainCount} train(s) in Test Data, one per trip of the file`);
+    missing.push('trains in Test Data');
+  }
+  return `This company has no ${missing.join(' and no ')} yet. Create from the uploaded file:\n\n• ${what.join('\n• ')}\n\nYou can change them afterwards. Cancel creates nothing.`;
+}
+
 async function offerBuildFromUpload(datafile) {
   if (!datafile || typeof datafile !== 'object' || Array.isArray(datafile)) return;
   const [fwLoad, resLoad] = await Promise.all([
@@ -1198,11 +1214,7 @@ async function offerBuildFromUpload(datafile) {
   const trains = noTrains ? trainsFromDatafile(datafile) : [];
   if (!buildFramework && !trains.length) return;
 
-  const what = [];
-  if (buildFramework) what.push('a Test Framework: the OSDM version, sales flows and passenger types found in the file, everything else at its default');
-  if (trains.length) what.push(`${trains.length} train(s) in Test Data, one per trip of the file`);
-  const missing = [buildFramework ? 'Test Framework' : '', trains.length ? 'trains in Test Data' : ''].filter(Boolean).join(' and no ');
-  if (!confirm(`This company has no ${missing} yet. Create from the uploaded file:\n\n• ${what.join('\n• ')}\n\nYou can change them afterwards. Cancel creates nothing.`)) return;
+  if (!confirm(buildOfferText(buildFramework, trains.length))) return;
 
   const failed = [];
   if (buildFramework) {
@@ -1250,9 +1262,10 @@ async function refreshPreviousButton() {
 
 function restoreConfirmText(previous, storedCount, unsavedEdits) {
   const lines = ['Restore the previous data file?', ''];
-  lines.push(storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`);
-  lines.push(`After: ${previous.scenarios_count} scenario(s), the file replaced on ${new Date(previous.replaced_at).toLocaleString()}.`);
-  lines.push('', 'The current file becomes the previous one, so this can be undone the same way.');
+  lines.push(
+    storedCount === null ? 'Now: no data file.' : `Now: ${storedCount} scenario(s).`,
+    `After: ${previous.scenarios_count} scenario(s), the file replaced on ${new Date(previous.replaced_at).toLocaleString()}.`,
+    '', 'The current file becomes the previous one, so this can be undone the same way.');
   if (unsavedEdits) lines.push('', 'This page has edits that are not saved: they will be lost.');
   return lines.join('\n');
 }
@@ -3258,7 +3271,8 @@ async function downloadJson() {
   if (res.status === 401) { logout(); return; }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    showMsg(`Download failed: ${data.detail || `the server answered ${res.status}`}`, false);
+    const why = data.detail || `the server answered ${res.status}`;
+    showMsg(`Download failed: ${why}`, false);
     return;
   }
   saveBlob(await res.blob(), downloadFileName(res.headers.get('Content-Disposition'), 'datafile.json'));

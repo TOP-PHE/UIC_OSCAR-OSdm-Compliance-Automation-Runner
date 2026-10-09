@@ -92,7 +92,36 @@ function valueText(value) {
   return text.length > MAX_VALUE_TEXT ? `${text.slice(0, MAX_VALUE_TEXT)}…` : text;
 }
 
-const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+// The place of a value: `parent.key`, `parent` for a list item (key ''), or
+// `key` at the root.
+function placeOf(parent, key) {
+  if (!parent) return key;
+  return key ? `${parent}.${key}` : parent;
+}
+
+// What the collection says about a present null, or null when it passes.
+function nullProblem(key, propSchema, place, types) {
+  const nullable = types.includes('null')
+    || (Array.isArray(propSchema.enum) && propSchema.enum.includes(null));
+  if (nullable || LEGACY_NULLABLE.has(key)) return null;
+  return `'${place}' is null, which its type (${types.join(', ')}) does not allow.`;
+}
+
+// Enum and length problems of a value whose type is right.
+function valueProblems(value, propSchema, place) {
+  const out = [];
+  if (propSchema.enum && !propSchema.enum.includes(value)) {
+    out.push(`'${place}' is '${valueText(value)}', which is not one of: ${propSchema.enum.join(', ')}.`);
+  }
+  if (typeof value !== 'string') return out;
+  if (propSchema.minLength && value.length < propSchema.minLength) {
+    out.push(`'${place}' is too short (at least ${propSchema.minLength} characters).`);
+  }
+  if (propSchema.maxLength && value.length > propSchema.maxLength) {
+    out.push(`'${place}' is too long (at most ${propSchema.maxLength} characters).`);
+  }
+  return out;
+}
 
 /**
  * The problems that would make a run refuse `datafile`, as sentences naming
@@ -114,31 +143,18 @@ function schemaProblems(datafile, schema) {
 
   function checkValue(key, value, propSchema, parent) {
     if (full()) return;
-    const place = parent ? (key ? `${parent}.${key}` : parent) : key;
+    const place = placeOf(parent, key);
     const types = typesOf(propSchema);
     if (value == null) {
-      const nullable = types.includes('null')
-        || (Array.isArray(propSchema.enum) && propSchema.enum.includes(null));
-      if (!nullable && !LEGACY_NULLABLE.has(key)) {
-        add(`'${place}' is null, which its type (${types.join(', ')}) does not allow.`);
-      }
+      const problem = nullProblem(key, propSchema, place, types);
+      if (problem) add(problem);
       return;
     }
     if (!types.some(t => hasType(t, value))) {
       add(`'${place}' has the wrong type: expected ${types.join(', ')}.`);
       return;
     }
-    if (propSchema.enum && !propSchema.enum.includes(value)) {
-      add(`'${place}' is '${valueText(value)}', which is not one of: ${propSchema.enum.join(', ')}.`);
-    }
-    if (typeof value === 'string') {
-      if (propSchema.minLength && value.length < propSchema.minLength) {
-        add(`'${place}' is too short (at least ${propSchema.minLength} characters).`);
-      }
-      if (propSchema.maxLength && value.length > propSchema.maxLength) {
-        add(`'${place}' is too long (at most ${propSchema.maxLength} characters).`);
-      }
-    }
+    valueProblems(value, propSchema, place).forEach(add);
     if (propSchema.type === 'object' && propSchema.properties) {
       checkObject(value, propSchema, place);
     }
@@ -151,7 +167,7 @@ function schemaProblems(datafile, schema) {
 
   function checkObject(obj, objSchema, place) {
     for (const key of Object.keys(objSchema.properties || {})) {
-      if (own(obj, key)) checkValue(key, obj[key], objSchema.properties[key], place);
+      if (Object.hasOwn(obj, key)) checkValue(key, obj[key], objSchema.properties[key], place);
     }
     for (const key of objSchema.required || []) {
       if (!(key in obj)) add(`'${place ? place + '.' : ''}${key}' is missing.`);
@@ -163,7 +179,7 @@ function schemaProblems(datafile, schema) {
     if (!(key in datafile)) add(`'${key}' is missing.`);
   }
   for (const key of Object.keys(schema.properties || {})) {
-    if (own(datafile, key)) checkValue(key, datafile[key], schema.properties[key], '');
+    if (Object.hasOwn(datafile, key)) checkValue(key, datafile[key], schema.properties[key], '');
   }
   return { problems, more: full() };
 }

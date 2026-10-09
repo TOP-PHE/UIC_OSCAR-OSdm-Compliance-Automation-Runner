@@ -1627,3 +1627,9 @@ Nothing to configure. What changes for an operator:
 - A new Bruno or base image version reaches production only as a new server
   release, after CI has validated the collection against it.
 
+### 15.25 v1.11.223 — code clean-up of the data file upload (#549)
+
+Nothing to configure and nothing changes in behaviour: the upload's schema
+check and the Test Config confirmation texts were restructured to clear code
+quality findings. Same checks, same answers, same texts.
+
