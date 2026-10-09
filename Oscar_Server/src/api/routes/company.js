@@ -16,6 +16,9 @@
  * PUT    /v1/company/datafile/json  — save the data file from the scenario editor
  * DELETE /v1/company/datafile       — remove the data file
  * GET    /v1/company/datafile       — serve data file download for browser
+ * GET    /v1/company/datafile/download         — the file to save: stored bytes, or a tester's marked view (#549)
+ * GET    /v1/company/datafile/previous         — what an upload replaced, if anything (#549)
+ * POST   /v1/company/datafile/previous/restore — put it back (#549)
  */
 
 const express   = require('express');
@@ -35,6 +38,7 @@ const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
 const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafileVersion');
+const { schemaProblems, loadDatafileSchema } = require('../../utils/datafileSchema');
 const log = require('../../utils/logger').child({ module: 'company' });
 
 const router = express.Router();
@@ -67,7 +71,7 @@ const datafileReadLimiter = rateLimit({
 // ── Datafile location ─────────────────────────────────────────────────────────
 // One live file per company, data/datafiles/{slug}-datafile.json: see
 // utils/datafileWrite.js, which also stores the files the server builds.
-const { writeDatafile, liveDatafilePath, DATAFILES_DIR } = require('../../utils/datafileWrite');
+const { writeDatafile, liveDatafilePath, previousDatafilePath, DATAFILES_DIR } = require('../../utils/datafileWrite');
 
 // ── Datafile write authorisation (S2 / S3, v1.11.195) ─────────────────────────
 // Who may write a company's datafile, mounted as middleware so it runs BEFORE
@@ -136,10 +140,60 @@ const upload = multer({
     if (file.mimetype === 'application/json' || file.originalname.endsWith('.json')) {
       cb(null, true);
     } else {
-      cb(new Error('Only JSON files are accepted.'));
+      cb(new UploadRefusal('Only JSON files are accepted.'));
     }
   }
 });
+
+// #549: a refusal of the parser is the client's mistake and is answered 400
+// with its reason. It used to reach the global error handler, which only knows
+// the size limit, and answered 500 "Internal Server Error".
+class UploadRefusal extends Error {}
+
+function parseUpload(req, res, next) {
+  upload.single('datafile')(req, res, err => {
+    if (!err) return next();
+    if (err instanceof UploadRefusal) {
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: err.message });
+    }
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ status: 413, title: 'File Too Large', detail: 'Maximum upload size is 5 MB.' });
+      }
+      return res.status(400).json({ status: 400, title: 'Bad Request', detail: `The upload could not be read (${err.code}). Send one file in the field "datafile".` });
+    }
+    return next(err);
+  });
+}
+
+// ── What a download that is not the stored file carries (#549) ───────────────
+// A tester's download is their view of the file (utils/datafileOwnership):
+// their scenarios, the shared ones and their own run list. Uploaded as the
+// company's file it would remove colleagues' private scenarios and replace the
+// company run list, so it carries this root key and the upload refuses it.
+// The schema allows extra root keys, and a tester's save never writes a
+// company-level key, so the marker goes nowhere else.
+const PERSONAL_VIEW_KEY = '__oscarPersonalView';
+// Test Config's "Download unsaved edits" (public/js/scenarios.js) marks its
+// copy of the page the same way: it is not the stored file either.
+const NOT_THE_COMPANY_FILE = Object.freeze({
+  [PERSONAL_VIEW_KEY]: 'This file is a tester\'s personal view of the data file, downloaded from Test Config: it leaves out other testers\' private scenarios and carries one person\'s run list. It cannot replace the company data file. Download the file as a Test Manager instead.',
+  __oscarUnsavedEdits: 'This file is a copy of the Test Config page with edits that were not saved, not a data file downloaded from the server. It cannot replace the company data file. Save the edits in Test Config instead.',
+});
+
+function notTheCompanyFile(uploaded) {
+  if (!uploaded || typeof uploaded !== 'object' || Array.isArray(uploaded)) return null;
+  const key = Object.keys(NOT_THE_COMPANY_FILE).find(k => Object.hasOwn(uploaded, k));
+  return key ? NOT_THE_COMPANY_FILE[key] : null;
+}
+
+function utcDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function scenarioCount(datafile) {
+  return Array.isArray(datafile?.scenarios) ? datafile.scenarios.length : 0;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Dedicated-header values are vendor secrets (S6). They are decrypted here only
@@ -404,17 +458,74 @@ async function storedVersion(companyId, viewer) {
   }
 }
 
+// ── The stored file, read for a write that replaces it (#549) ────────────────
+// { plain, parsed }: plain is null when there is no file, parsed is {} when it
+// is not a JSON object (the template rule then looks at the write whole). A
+// file that cannot be decrypted throws, unless `unreadableIsNone`.
+async function currentDatafile(companyId, unreadableIsNone) {
+  const current = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
+  let plain = null;
+  if (current?.datafile_path && fs.existsSync(current.datafile_path)) {
+    try { plain = await decryptFromFileAsync(current.datafile_path); }
+    catch (err) {
+      if (!unreadableIsNone) throw err;
+      log.warn({ err, companyId }, 'datafile upload: the file replaced cannot be read and is not kept');
+    }
+  }
+  let parsed = {};
+  try { if (plain) parsed = JSON.parse(plain.toString('utf8')); } catch { parsed = {}; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) parsed = {};
+  return { plain, parsed };
+}
+
+// The write of an upload, under the lock: the template rule (NEW-10), then the
+// file replaced is kept, then the upload is stored. Keeping comes first: if it
+// fails, nothing is replaced. Atomic temp+rename inside the writer: a crash
+// mid-write leaves the previous datafile intact, which matters because Bruno
+// reads it during runs. Returns { refusal } or { previous }.
+async function storeUpload(company, plaintext, uploaded, hash) {
+  const current = await currentDatafile(company.id, true);
+  const refusal = saveRefusal(templatesAddedBy(current.parsed, uploaded));
+  if (refusal) return { refusal };
+  let previous = null;
+  fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+  if (current.plain) {
+    await encryptToFileAsync(current.plain, previousDatafilePath(company.slug));
+    previous = {
+      hash: crypto.createHash('sha256').update(current.plain).digest('hex'),
+      scenarios_count: scenarioCount(current.parsed),
+    };
+  }
+  const livePath = liveDatafilePath(company.slug);
+  await encryptToFileAsync(plaintext, livePath);
+  run(
+    `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    [livePath, hash, company.id]
+  );
+  return { previous };
+}
+
 // ── POST /v1/company/datafile ─────────────────────────────────────────────────
-// Order matters: authorizeDatafileWrite runs before upload.single, so nothing
+// Order matters: authorizeDatafileWrite runs before the parser, so nothing
 // is parsed, buffered or written for a caller who may not write (S2).
-router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), upload.single('datafile'), async (req, res) => {
+//
+// #549: an upload replaces the data file and nothing else, and only with a
+// data file. Before anything is replaced it must be JSON, not a download that
+// is not the stored file (NOT_THE_COMPANY_FILE), pass the checks the runs apply
+// (utils/datafileSchema) and add no template (NEW-10). The file it replaces is
+// kept as the company's previous file, which GET /datafile/previous describes
+// and POST /datafile/previous/restore puts back. The uploaded bytes are stored
+// as they are, so a Test Manager's download uploaded again changes nothing,
+// hash included. Not checked against If-Match (#540): an upload replaces the
+// whole file on purpose.
+router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), parseUpload, async (req, res) => {
   const company = req.datafileCompany;
+  const refuse = (detail, extra) => res.status(400).json({ status: 400, title: 'Bad Request', detail, ...extra });
 
   if (!req.file) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'No file uploaded. Use field name "datafile".' });
+    return refuse('No file uploaded. Use field name "datafile".');
   }
 
-  // Validate it's parseable JSON, hash the plaintext, then encrypt-and-store.
   // The hash is computed on plaintext so testers can independently verify
   // the contents (sha256 of the file they uploaded — the encryption is
   // transparent to them). The file on disk is the OSCAR1 envelope.
@@ -422,46 +533,175 @@ router.post('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploadP
   let uploaded;
   try {
     uploaded = JSON.parse(plaintext.toString('utf8'));
-  } catch (_e) {
+  } catch {
     // Nothing was written, so there is nothing to clean up — the previous
     // datafile is still the live one.
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Uploaded file is not valid JSON.' });
+    return refuse('Uploaded file is not valid JSON.');
+  }
+  const markedRefusal = notTheCompanyFile(uploaded);
+  if (markedRefusal) return refuse(markedRefusal);
+
+  let schema;
+  try {
+    schema = loadDatafileSchema();
+  } catch (err) {
+    log.error({ err, companyId: company.id }, 'datafile upload: schema not readable — refusing the upload');
+    return res.status(503).json({ status: 503, title: 'Service Unavailable',
+      detail: 'The data file schema could not be read, so the file cannot be checked. Nothing was changed.' });
+  }
+  const { problems, more } = schemaProblems(uploaded, schema);
+  if (problems.length) {
+    return refuse(`This file is not a valid data file: ${problems.length}${more ? ' or more' : ''} problem(s), the first being: ${problems[0]} Nothing was changed.`,
+      { problems, problems_truncated: more });
   }
 
   const hash = crypto.createHash('sha256').update(plaintext).digest('hex');
-  fs.mkdirSync(DATAFILES_DIR, { recursive: true });
   const livePath = liveDatafilePath(company.slug);
-  // Atomic temp+rename inside the helper: a crash mid-write leaves the
-  // previous datafile intact, which matters because Bruno reads it during runs.
   // Under the per-company lock so it cannot interleave with a tester's merge.
-  let refusal = null;
+  let outcome;
   try {
-    await withDatafileLock(company.id, async () => {
-      // NEW-10: the upload may not add a double-brace template to scenario text.
-      refusal = saveRefusal(templatesAddedBy(await storedDatafileOrEmpty(company.id), uploaded));
-      if (refusal) return;
-      await encryptToFileAsync(plaintext, livePath);
-      run(
-        `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-        [livePath, hash, company.id]
-      );
-    });
+    outcome = await withDatafileLock(company.id, () => storeUpload(company, plaintext, uploaded, hash));
   } catch (err) {
     log.error({ err, companyId: company.id }, 'Failed to encrypt-write datafile');
     return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file.' });
   }
-  if (refusal) {
-    return res.status(400).json({ status: 400, title: 'Bad Request', detail: refusal });
+  if (outcome.refusal) {
+    return refuse(outcome.refusal);
   }
 
   auditLog(req.user.id, company.id, req.user.email, 'datafile_uploaded');
 
   return res.json({
-    filename:   path.basename(livePath),
-    size:       plaintext.length,
+    filename:        path.basename(livePath),
+    size:            plaintext.length,
     hash,
-    uploaded_at: new Date().toISOString()
+    uploaded_at:     new Date().toISOString(),
+    scenarios_count: scenarioCount(uploaded),
+    // What the upload replaced, now the previous file; null when there was none.
+    previous:        outcome.previous,
   });
+});
+
+// ── GET /v1/company/datafile/download (#549) ─────────────────────────────────
+// The file Test Config's "Download JSON" saves. For a Test Manager, the stored
+// file byte for byte: no annotation, no re-indenting, so uploading it again
+// changes nothing. For a tester, their view (as GET /datafile gives it, without
+// the annotation), marked as a personal view so that the upload refuses it.
+// The name says which company, which day and, for a tester, that it is a view.
+router.get('/datafile/download', datafileReadLimiter, authorizeDatafileWrite(savePolicy), async (req, res) => {
+  const { id: companyId, slug } = req.datafileCompany;
+  const current = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
+  if (!current?.datafile_path || !fs.existsSync(current.datafile_path)) {
+    return res.status(404).json({ status: 404, title: 'Not Found', detail: 'No data file uploaded yet.' });
+  }
+  let bytes;
+  try { bytes = await decryptFromFileAsync(current.datafile_path); }
+  catch (err) {
+    log.error({ err, companyId }, 'Failed to decrypt datafile');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Datafile decryption failed.' });
+  }
+  let filename = `${slug}-datafile-${utcDate()}.json`;
+  if (req.user.role === 'company_user') {
+    let parsed = null;
+    try { parsed = JSON.parse(bytes.toString('utf8')); } catch { parsed = null; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      // Never the raw file for a tester: it holds what their view leaves out.
+      return res.status(409).json({ status: 409, title: 'Conflict',
+        detail: 'The stored data file cannot be read. Ask your Test Manager to check it.' });
+    }
+    const view = viewForTester(parsed, req.user.email, getRunSelection(companyId, req.user.id));
+    const marked = {
+      [PERSONAL_VIEW_KEY]: {
+        note: 'A tester\'s personal view of the company data file: their own scenarios, the shared ones and their own run list. It cannot be uploaded as the company data file.',
+        company: slug,
+        downloaded_by: req.user.email,
+        downloaded_at: new Date().toISOString(),
+      },
+      ...view,
+    };
+    bytes = Buffer.from(JSON.stringify(marked, null, 4), 'utf8');
+    filename = `${slug}-datafile-personal-view-${utcDate()}.json`;
+  }
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Length', String(bytes.length));
+  return res.end(bytes);
+});
+
+// ── The previous data file (#549) ─────────────────────────────────────────────
+// What the last upload (or restore) replaced. Test Managers only, like the
+// upload. Read under the lock, as every writer of these files holds it.
+async function readPreviousDatafile(slug) {
+  const file = previousDatafilePath(slug);
+  if (!fs.existsSync(file)) return null;
+  const plain = await decryptFromFileAsync(file);
+  let parsed = null;
+  try { parsed = JSON.parse(plain.toString('utf8')); } catch { parsed = null; }
+  return { plain, parsed, replacedAt: fs.statSync(file).mtime.toISOString() };
+}
+
+router.get('/datafile/previous', datafileReadLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
+  const { id: companyId, slug } = req.datafileCompany;
+  let prev;
+  try { prev = await withDatafileLock(companyId, () => readPreviousDatafile(slug)); }
+  catch (err) {
+    log.error({ err, companyId }, 'previous datafile unreadable');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The previous data file cannot be read.' });
+  }
+  if (!prev) return res.json({ exists: false });
+  return res.json({
+    exists:          true,
+    hash:            crypto.createHash('sha256').update(prev.plain).digest('hex'),
+    size:            prev.plain.length,
+    replaced_at:     prev.replacedAt,
+    scenarios_count: scenarioCount(prev.parsed),
+  });
+});
+
+// Restoring swaps the two files, so a restore can itself be undone. The file
+// restored was the company's file once and is put back as it was (bytes and
+// hash); the template rule (NEW-10) still applies, as to every write. Under
+// the lock; returns { status, detail } or the restored file's summary.
+async function restorePrevious(companyId, slug) {
+  const prev = await readPreviousDatafile(slug);
+  if (!prev) return { status: 404, detail: 'There is no previous data file to restore.' };
+  if (!prev.parsed || typeof prev.parsed !== 'object' || Array.isArray(prev.parsed)) {
+    return { status: 409, detail: 'The previous data file is not a JSON object and cannot be restored.' };
+  }
+  const current = await currentDatafile(companyId, false);
+  const refusal = saveRefusal(templatesAddedBy(current.parsed, prev.parsed));
+  if (refusal) return { status: 400, detail: refusal };
+
+  const livePath = liveDatafilePath(slug);
+  const prevPath = previousDatafilePath(slug);
+  fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+  await encryptToFileAsync(prev.plain, livePath);
+  if (current.plain) await encryptToFileAsync(current.plain, prevPath);
+  else fs.rmSync(prevPath, { force: true });
+  const hash = crypto.createHash('sha256').update(prev.plain).digest('hex');
+  run(
+    `UPDATE companies SET datafile_path = ?, datafile_hash = ?, datafile_updated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    [livePath, hash, companyId]
+  );
+  return { status: 200, hash, scenarios_count: scenarioCount(prev.parsed), previous_kept: !!current.plain };
+}
+
+router.post('/datafile/previous/restore', datafileMutationLimiter, authorizeDatafileWrite(uploadPolicy), async (req, res) => {
+  const { id: companyId, slug } = req.datafileCompany;
+  let outcome;
+  try {
+    outcome = await withDatafileLock(companyId, () => restorePrevious(companyId, slug));
+  } catch (err) {
+    log.error({ err, companyId }, 'Failed to restore the previous datafile');
+    return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'The previous data file could not be restored.' });
+  }
+  if (outcome.status !== 200) {
+    const title = { 400: 'Bad Request', 404: 'Not Found', 409: 'Conflict' }[outcome.status];
+    return res.status(outcome.status).json({ status: outcome.status, title, detail: outcome.detail });
+  }
+  auditLog(req.user.id, companyId, req.user.email, 'datafile_restored');
+  return res.json({ restored: true, hash: outcome.hash, scenarios_count: outcome.scenarios_count, previous_kept: outcome.previous_kept });
 });
 
 // ── PUT /v1/company/datafile/json — save datafile as JSON body from UI ────────
@@ -612,6 +852,10 @@ router.delete('/datafile', datafileMutationLimiter, authorizeDatafileWrite(uploa
     if (company.datafile_path && fs.existsSync(company.datafile_path)) {
       try { fs.unlinkSync(company.datafile_path); } catch (_) { /* ignore */ }
     }
+    // #549: and the file an upload replaced. A delete is a delete; the dialog
+    // says it cannot be undone.
+    fs.rmSync(previousDatafilePath(req.datafileCompany.slug), { force: true });
+
 
     // Clear DB columns
     run(

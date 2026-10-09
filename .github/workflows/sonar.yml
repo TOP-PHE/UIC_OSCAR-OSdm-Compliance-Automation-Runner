@@ -47,14 +47,14 @@ jobs:
 
     steps:
       - name: Checkout (full history for blame)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Sonar needs the full Git history to attribute issues to commits
           # for the "new code" period. Shallow clones produce blank blame.
           fetch-depth: 0
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -100,7 +100,7 @@ jobs:
 
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}
-        uses: SonarSource/sonarcloud-github-action@v5
+        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           # Provided automatically by GitHub for PR decoration (commit
           # statuses, PR comments). Read-only.
@@ -118,7 +118,7 @@ jobs:
       # a slow SonarCloud gate computation can burn before we give up.
       - name: SonarQube Quality Gate check
         if: ${{ github.actor != 'dependabot[bot]' }}
-        uses: SonarSource/sonarqube-quality-gate-action@v1
+        uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1.2.1
         with:
           pollingTimeoutSec: 600
         env:

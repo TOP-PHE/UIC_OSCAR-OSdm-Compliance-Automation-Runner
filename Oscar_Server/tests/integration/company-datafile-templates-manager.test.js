@@ -89,9 +89,9 @@ describe('POST /v1/company/datafile (upload)', () => {
     expect((await uploadAs(TM, storedFile({ legacy: true }))).status).toBe(200);
   });
 
-  test('a clean file is accepted, and so is JSON that is not a datafile', async () => {
+  test('a clean file is accepted; JSON that is not a datafile no longer is (#549)', async () => {
     expect((await uploadAs(TM, storedFile())).status).toBe(200);
-    expect((await uploadAs(TM, '[1, 2, 3]')).status).toBe(200);     // as before: any valid JSON
+    expect((await uploadAs(TM, '[1, 2, 3]')).status).toBe(400);
   });
 
   test('a first upload, with nothing stored, is looked at whole', async () => {

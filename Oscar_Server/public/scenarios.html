@@ -47,7 +47,9 @@ Copyright [2026] [International Union of Railways (UIC)]
         📤 Upload datafile
         <input type="file" id="df-upload-input" accept=".json,application/json" style="display:none" data-action="file-upload">
       </label>
+      <button class="btn btn-secondary" data-action="restore-previous" id="btn-restore-previous" style="display:none">↩ Restore previous file</button>
       <button class="btn btn-secondary" data-action="download-json" id="btn-download" style="display:none">⬇ Download JSON</button>
+      <button class="btn btn-secondary" data-action="download-edits" id="btn-download-edits" style="display:none" title="This page's working copy, with the edits not yet saved">⬇ Download unsaved edits</button>
       <button class="btn btn-success save-btn" id="save-btn" data-action="save-datafile" disabled>💾 Save &amp; Apply</button>
     </div>
   </div>
@@ -71,6 +73,10 @@ Copyright [2026] [International Union of Railways (UIC)]
   <div id="save-error" class="save-error">
     <div class="save-error-title">⚠️ Save failed — changes were NOT applied to your next run</div>
     <div class="save-error-body" id="se-detail"></div>
+  </div>
+  <div id="upload-error" class="save-error">
+    <div class="save-error-title">⚠️ Not done — the data file was not changed</div>
+    <div class="save-error-body" id="ue-detail" style="white-space:pre-line"></div>
   </div>
 
   <!-- loading spinner -->

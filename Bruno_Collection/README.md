@@ -22,8 +22,8 @@ instead and enter the credentials it gave you.
 ### 1. What you need
 
 - Bruno: the desktop app, or the command line, `npm install -g @usebruno/cli`
-  (OSCAR's image uses the version in `Oscar_Server/Dockerfile`; 4.2.1 when this
-  was written).
+  at the version OSCAR runs, the one in `Oscar_Server/bruno-cli/package.json`
+  (4.2.1 when this was written).
 - Python 3 or any other static file server: the collection reads its data file
   and schema over HTTP.
 - The simulator, either the one installed for your team
