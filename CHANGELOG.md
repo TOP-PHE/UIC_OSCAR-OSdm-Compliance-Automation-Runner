@@ -156,6 +156,81 @@ round trip. Server and page. Collection unchanged (OTST_V2.0.104).
 
 ---
 
+## [collection-OTST_V2.0.105] — 2026-10-09
+
+Issue #550, release 2026.246. Collection only; server unchanged (1.11.220).
+
+### Fixed
+
+- **The booking validator pairs offer parts with booked parts by content, not
+  by position.** OSDM gives a booked part no reference to the offer part it
+  was made from, and does not fix the order of the booked parts.
+  `validateOfferParts()` compared offer part *i* with booked part *i*, so a
+  booking that listed the same five admissions in another order was checked
+  ADULT against SENIOR, and so on: 15 false failures in one run, a different
+  pass rate from run to run with nothing changed at the provider, and nothing
+  a known deviation could absorb.
+  - `pairOfferParts()` (`library-bruno/bookings.js`, pure) scores every pair.
+    The criteria are ranked, each one outweighing all lower ones together:
+    same `id`, then the same passenger references (`appliedPassengerTypes[]
+    .passengerRef` on both sides, or the offer's `passengerRefs` against the
+    booking's `passengerIds`), then the same passenger types, then the same
+    products and trip coverage, then the same validity (as instants, so
+    `+02:00` and `Z` agree), then the same price, then `offerMode`,
+    `isReservationRequired` and the after-sales conditions. The best pairs
+    are taken first. Ties are broken by the offer part's position and the
+    booked part's own text, never by its position, so the same booking in any
+    order gives the same pairs.
+  - A reordered booking is logged once at `[INFO]`, with the pairs. A pair
+    whose passenger types differ (a real fault) is logged at `[WARNING]` and
+    its field checks then fail as before, on the closest part.
+  - An admission of the offer with no booked counterpart is **one** failure
+    that names the part (id and passenger types), recorded once across the
+    booking re-reads (#383); its field checks are skipped. Before, it was a
+    `[WARNING]`, and every part after it was compared with the wrong one.
+  - Left as before, on purpose: a missing **reservation or ancillary** part
+    is still a `[WARNING]`, because those parts can be optional and booked
+    only when selected. Telling a required reservation from an optional one
+    is not done here. Booked parts that no part of the selected offer takes
+    (a combined return booking, a part added after the sale) are logged at
+    `[INFO]`.
+  - The ids collected for the fulfillment and refund steps
+    (`admissionReservationAncillaryBookingPartsIds`) follow the offer's order,
+    as they did whenever the booking kept that order.
+- **Other position-based pairings checked** (step 4 of #550). None of them
+  compares an offer with a booking, so none changes here:
+  - `passengers.js` `patchMultiPassengerResponse`: pairs submitted passenger
+    data with `passengerIdList` by index. The list is already realigned by
+    `externalRef` (`alignPassengerIdsToSubmittedOrder`); without `externalRef`
+    the booking order is kept, as there is nothing else to pair on.
+  - `refunds.js` `getBookingRefundResponse`: looks for the part ids in
+    `bookedOffers[0]` only and takes `refundOffers[0]` as the flow's refund
+    offer. No request of the collection calls this function (`16. GET Booking
+    after Delete Refund` runs `postCreateBookingResponse`), so nothing in a
+    run is affected. To be fixed if it is ever wired in.
+  - `partialRefund.js` (leg axis without a passenger: `fulfillments[0]`) and
+    `requestsBuilder.js` (`tripLegCoverage[0]` in a place selection): these
+    build requests, they compare nothing. Out of scope here.
+  - `offers.js`: `offerCurrency` is read from `offers[0]`, not the selected
+    offer; one search answers in one currency in practice. Left as is.
+  - Already matched by id, type or set, no change: after-sales conditions and
+    applied passenger types inside a part (#389, #383), fulfillment booking
+    part ids, refund response parts.
+
+### Tests
+
+- `tests/unit/bruno-bookings-part-pairing.test.js` (17): runs the real
+  `validateOfferParts` and records every assertion. The same offer and
+  booking give identical assertions and failures in all 120 orders of five
+  parts, with and without a real fault; a missing admission fails once with
+  the part's name. 15 of the 17 fail against the previous code, and each of
+  12 targeted mutations of the new code (each scoring criterion, the
+  tie-break, the once-per-finding rule, the admission-only failure, position
+  pairing) is caught. `tests/helpers/bruno-chai.js` stands in for Bruno's
+  chai `expect`.
+
+---
+
 ## [server-1.11.220] — 2026-10-09
 
 Issue #580: API Config is one page for the company and all its providers.

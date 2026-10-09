@@ -8,6 +8,14 @@
     "content": "Uploading a data file in Test Config used to rebuild your Test Framework from the file, losing what you had configured, and to add trains to Test Data. It no longer does: an upload replaces the data file and nothing else. If your company has no Test Framework or no train yet, the page offers to create them from the file, and asks first.\n\nBefore replacing anything, OSCAR asks you to confirm, with the number of scenarios now and after, and checks the file the way every run does. A file that is not a data file is refused with the list of problems, and nothing changes.\n\nThe file an upload replaces is kept: \"Restore previous file\" puts it back.\n\nDownload JSON now saves the data file as the server stores it, named after your company and the day, so a Test Manager can download it and upload it again without changing anything. A tester's download is their personal view (their scenarios, the shared ones and their run list); it is marked as such and cannot be uploaded as the company's file. While you have edits that are not saved, \"Download unsaved edits\" keeps a copy of them."
   },
   {
+    "id": "2026-10-09-booking-parts-paired-by-content",
+    "date": "October 9, 2026",
+    "tag": "Bug Fix",
+    "title": "Booking checks no longer depend on the order of the booked parts",
+    "summary": "When a provider listed a booking's parts in another order than the offer, OSCAR compared parts that do not belong together and reported failures that were not the provider's. Parts are now paired by what they contain.",
+    "content": "After a booking, OSCAR checks each part of the offer (each admission, reservation and ancillary) against the matching part of the booking: passenger types, validity, after-sales conditions and so on. Until now, \"matching\" meant \"in the same position\". OSDM does not require a provider to keep the offer's order, so a booking that listed the same five admissions in another order was checked, for example, ADULT against SENIOR. The same scenario could then pass one run and fail the next with nothing changed at the provider.\n\nOSCAR now pairs each part of the offer with the booked part that carries the same identifier, passengers, passenger types, product, trip and validity. When the provider uses another order, the run log says so in one INFO line and the checks are the same as for a booking in the offer's order.\n\nIf an admission of the offer is really missing from the booking, the report now shows one failure that names it, instead of a series of field failures on the parts after it.\n\nNo action is required. Expect fewer failures on providers that reorder booked parts; a known deviation you may have recorded for such failures can be removed."
+  },
+  {
     "id": "2026-10-09-api-config-all-providers",
     "date": "October 9, 2026",
     "tag": "Improvement",
