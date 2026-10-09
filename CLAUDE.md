@@ -280,8 +280,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     from `idAllocator()` (`datafileOwnership.js`, rule J, shared with the
     merge): not max+1 per list, which lands on a dangling reference. The
     write goes through `utils/datafileWrite.js`, shared with the Test Config
-    save. Still open from #540: the server does not yet refuse a datafile save
-    made from a stale load (needs an `If-Match` on every Test Config writer).
+    save.
+  - **A save from a stale load is refused (v1.11.219)**: `GET /datafile` sends
+    an `ETag`, `PUT /datafile/json` takes `If-Match` / `If-None-Match: *` and
+    answers 412 (`utils/datafileVersion.js`, pure). The version is of what the
+    person sees: a tester's view with their run list, so colleagues' private
+    saves do not conflict; `knownDeviations` left out, since the server
+    rewrites it. **No header = go ahead**, for pages loaded before 1.11.219;
+    do not make it required without a reason. The page sends it from
+    `datafileSaveHeaders(datafileLoadedVersion)` (or the wizard's own load);
+    a new save site in `scenarios.js` must too, and
+    `scenarios-load-guard.test.js` counts the PUT sites. Upload, delete and the
+    scenario copy are not checked, on purpose.
 - **Nothing reaches a run's child processes or its environment file
   unfiltered** (tracker PR-03 = NEW-01 + NEW-02, v1.11.208 / OTST_V2.0.102).
   `worker/runner.js` starts two children: the Bruno CLI, and the collection's
@@ -407,9 +417,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     throws on a failed load, before it touches `state` or `wizData`; all its
     callers already show `e.message`. Keep that order when adding a read.
   - **Anything that reads-then-writes must stop on `failed`**, as
-    `wizGenerateScenario()` now does. The server still accepts the write; a
-    server-side "the client saw the current file" check would be the stronger
-    guard and has not been built.
+    `wizGenerateScenario()` now does. Since v1.11.219 the server also refuses
+    a save whose `If-Match` is not the current version (#540, the provider
+    bullet above).
   - **Page functions can be tested without a browser.**
     `tests/unit/scenarios-load-guard.test.js` lifts the real functions out of
     `scenarios.js` and runs them in a `vm` context with a fake `fetch` and
@@ -870,6 +880,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Oscar_Server/public/providers.html` | Providers page (Test Managers): add/rename, endpoint, tester access, #540 |
 | `Oscar_Server/src/utils/scenarioCopy.js` | rules of copying scenarios between providers, #540 |
 | `Oscar_Server/public/js/trip-apply.js` | the one "Apply test data" implementation (browser + server), #540 |
+| `Oscar_Server/src/utils/datafileVersion.js` | the data file version (ETag) a Test Config save is checked against, #540 |
 | `Oscar_Server/src/utils/testerCredentials.js` | a tester's OSDM credentials per (user, company), #540 |
 | `Oscar_Server/src/utils/runSelections.js` | a tester's personal run list (`run_selections` table), v1.11.197 |
 | `Oscar_Server/src/utils/datafileLock.js` | per-company lock every datafile writer takes, v1.11.197 |

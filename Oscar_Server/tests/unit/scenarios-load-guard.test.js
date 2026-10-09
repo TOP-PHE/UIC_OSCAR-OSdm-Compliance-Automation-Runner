@@ -128,7 +128,7 @@ describe('refreshAllSections (page load and every refresh)', () => {
       framework: { marker: 'framework before the refresh' },
       resources: [{ marker: 'resources before the refresh' }],
     };
-    const ctx = page(['loadForEdit', 'refreshAllSections'], {
+    const ctx = page(['loadForEdit', 'loadedVersion', 'refreshAllSections'], {
       fetch,
       loggedOut: 0,
       logout() { ctx.loggedOut++; },
@@ -168,6 +168,7 @@ describe('refreshAllSections (page load and every refresh)', () => {
     const t = setup(present);
     await t.ctx.refreshAllSections();
     expect(t.ctx.state).toEqual({ scenarios: [{ code: 'A' }], scenariosToRun: ['A'] });
+    expect(t.ctx.datafileLoadedVersion).toBeUndefined();    // no ETag in this answer: a later save sends no version
     expect(t.ctx.wizData.framework).toEqual({ osdmVersion: '3.8' });
     expect(t.ctx.wizData.resources).toEqual([{ id: 7, resource_type: 'TRAIN' }]);
     expect(t.rendered.map(r => r[0])).toEqual(['framework', 'data', 'scenarios']);
@@ -186,6 +187,7 @@ describe('refreshAllSections (page load and every refresh)', () => {
     expect(t.ctx.wizData.resources).toEqual([]);
     expect(t.rendered).toEqual([['framework', null], ['data', []], ['scenarios', null]]);
     expect(t.elements['btn-download'].style.display).toBe('none');
+    expect(t.ctx.datafileLoadedVersion).toBeNull();         // #540: the next save says "there was none"
   });
 
   describe.each([
@@ -309,5 +311,71 @@ describe('extractFromDatafile (trains copied into Test Data on upload)', () => {
     expect(t.toasts[0][0]).toBe('warning');
     expect(t.toasts[0][1]).toContain(expected);
     expect(t.toasts[0][1]).toContain('were not added to Test Data');
+  });
+});
+
+// ── #540: a save names the version of the file it was made from ──────────────
+describe('stale-save guard (the version a save sends back)', () => {
+  const withEtag = (status, body, tag) => ({ ...response(status, body), headers: { get: (h) => (h === 'ETag' ? tag : null) } });
+
+  test('loadForEdit keeps the ETag of a loaded file as its version', async () => {
+    const ctx = page(['loadForEdit'], { fetch: fakeFetch({ [`GET ${DATAFILE}`]: withEtag(200, { scenarios: [] }, '"v1"') }).fetch });
+    const out = await ctx.loadForEdit(DATAFILE, 'The test configuration');
+    expect(out).toEqual({ state: 'loaded', value: { scenarios: [] }, version: '"v1"' });
+  });
+
+  test('loadedVersion / datafileSaveHeaders: If-Match for a loaded file, If-None-Match for none, nothing when unknown', () => {
+    const ctx = page(['loadedVersion', 'datafileSaveHeaders'], {});
+    expect(ctx.loadedVersion({ state: 'loaded', version: '"v1"' })).toBe('"v1"');
+    expect(ctx.loadedVersion({ state: 'loaded' })).toBeUndefined();
+    expect(ctx.loadedVersion({ state: 'none' })).toBeNull();
+    expect(ctx.loadedVersion({ state: 'failed' })).toBeUndefined();
+    expect({ ...ctx.datafileSaveHeaders('"v1"') }).toEqual({ 'Content-Type': 'application/json', 'If-Match': '"v1"' });
+    expect({ ...ctx.datafileSaveHeaders(null) }).toEqual({ 'Content-Type': 'application/json', 'If-None-Match': '*' });
+    expect({ ...ctx.datafileSaveHeaders(undefined) }).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  function saving(putAnswer) {
+    const sent = [];
+    const { fetch, calls } = fakeFetch({
+      [`PUT ${DATAFILE}/json`]: (opts) => { sent.push(opts.headers); return putAnswer; },
+      [`GET ${DATAFILE}`]: withEtag(200, { scenarios: [], scenariosToRun: [] }, '"v2"'),
+    });
+    const ctx = page(['saveDatafile', 'datafileSaveHeaders', 'staleSaveMessage'], {
+      fetch, state: { scenarios: [], scenariosToRun: [] }, dirty: true, isTestManager: false,
+      datafileLoadedVersion: '"v1"', errors: [], confirmed: 0, refreshed: 0,
+      setSaveBtnState() {}, hidePanels() {}, logout() {}, incrementVersion: (v) => v,
+      showSaveError(m) { ctx.errors.push(m); }, showSaveConfirm() { ctx.confirmed++; },
+      refreshAllSections: async () => { ctx.refreshed++; },
+    });
+    return { ctx, calls, sent };
+  }
+
+  test('saveDatafile sends the version it loaded', async () => {
+    const t = saving(response(200, { to_run: [] }));
+    await t.ctx.saveDatafile();
+    expect(t.sent[0]['If-Match']).toBe('"v1"');
+    expect(t.ctx.confirmed).toBe(1);
+    expect(t.ctx.dirty).toBe(false);
+  });
+
+  test('a 412 is shown as "changed since loaded", the edits stay, and nothing is re-read', async () => {
+    const t = saving(response(412, { detail: 'The data file has changed since this page loaded it.' }));
+    await t.ctx.saveDatafile();
+    expect(t.calls).toEqual([`PUT ${DATAFILE}/json`]);
+    expect(t.ctx.errors).toHaveLength(1);
+    expect(t.ctx.errors[0]).toContain('changed since this page loaded it');
+    expect(t.ctx.errors[0]).toContain('Download JSON');
+    expect(t.ctx.dirty).toBe(true);
+    expect(t.ctx.refreshed).toBe(0);
+  });
+
+  test('every data file save in the page sends a version', () => {
+    const text = SOURCE.join('\n');
+    const puts = text.split("fetch('/v1/company/datafile/json'").slice(1).map(s => s.slice(0, 200));
+    expect(puts).toHaveLength(3);
+    for (const p of puts) expect(p).toMatch(/headers: datafileSaveHeaders\(/);
+    expect(text).toContain('headers: datafileSaveHeaders(loadedVersion(dfLoad))');           // the wizard: its own load
+    expect(text).toContain('datafileLoadedVersion = loadedVersion(dfLoad);');                  // refreshAllSections
   });
 });

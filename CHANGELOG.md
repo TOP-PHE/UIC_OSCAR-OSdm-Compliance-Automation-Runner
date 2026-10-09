@@ -37,6 +37,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.219] — 2026-10-08
+
+Issue #540, last item: a Test Config save made from a stale load is refused.
+Collection unchanged (OTST_V2.0.104).
+
+### Added
+
+- **Stale-save refusal.** `GET /v1/company/datafile` sends an `ETag`, the
+  version of the file as that person sees it: a tester's view with their run
+  list, without `knownDeviations` (rewritten by the server whenever a finding is
+  baselined). `PUT /v1/company/datafile/json` takes it back as `If-Match`, or
+  `If-None-Match: *` when the page loaded no file, and answers **412** when the
+  file is no longer that version. Nothing is written. A save with neither header
+  goes ahead, so a page left open across the upgrade keeps working.
+- Test Config sends the version on its three saves (Save & Apply, the scenario
+  wizard, removing a deleted train's scenarios). A 412 keeps the edits on the
+  page and points to Download JSON before reloading.
+
+### Fixed
+
+- Deleting a train whose scenarios could not then be removed from the data file
+  reported success; it now says the scenarios were not removed.
+
+### Tests
+
+- Unit tests of `utils/datafileVersion.js`, route tests of the two-tab case,
+  a colleague's private save (no conflict), a change a tester can see
+  (conflict), known deviations, first file and deleted file; page tests in
+  the `vm` harness. Ten guards broken in turn: nine caught, the tenth an
+  equivalent path, removed.
+
+---
+
 ## [server-1.11.218] — 2026-10-08
 
 Issue #540, PR 3 of 3: copy scenarios between the companies and providers of a
