@@ -496,8 +496,8 @@ function _compareText(a, b) {
 function pairOfferParts(offerParts, bookedParts) {
   const offers = Array.isArray(offerParts) ? offerParts : [];
   const booked = Array.isArray(bookedParts) ? bookedParts : [];
-  const oSig = offers.map((p) => _partSignature(p || {}, p && p.passengerRefs));
-  const bSig = booked.map((p) => _partSignature(p || {}, p && p.passengerIds));
+  const oSig = offers.map((p) => _partSignature(p || {}, p?.passengerRefs));
+  const bSig = booked.map((p) => _partSignature(p || {}, p?.passengerIds));
   const bText = booked.map((p) => JSON.stringify(p) || '');
   const candidates = [];
   offers.forEach((o, oi) => {
