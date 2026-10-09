@@ -33,7 +33,12 @@ To run the OSCAR collection against a local simulator, start OSCAR with
 `ALLOW_PRIVATE_TARGETS=1` (development only: it lets an endpoint be
 `http://127.0.0.1:3002/alpha`), set the company's OSDM endpoint and a tester's
 OAuth2 credentials as described in the operations page, and load
-`oscar/datafile.json` as the company's data file.
+[`Bruno_Collection/data_base/simulator_datafile.json`](../Bruno_Collection/data_base/simulator_datafile.json)
+as the company's data file.
+
+To run the collection against it without OSCAR (Bruno on your PC), see
+[Run standalone](../Bruno_Collection/README.md#run-standalone) in the
+collection's README: same data file, same checks.
 
 ## What it answers
 
@@ -143,6 +148,5 @@ All optional, read from the environment.
 | `src/osdm/offers.js` | the answer to `POST /offers` |
 | `src/osdm/bookings.js` | bookings, passengers, purchaser, tickets |
 | `providers/` | the provider profiles |
-| `oscar/datafile.json` | a ready-made OSCAR data file with two sale scenarios |
 | `deploy/` | compose file and reverse-proxy example |
 | `tests/` | `node --test` |

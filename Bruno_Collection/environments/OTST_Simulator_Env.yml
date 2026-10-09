@@ -1,0 +1,18 @@
+name: OTST_Simulator_Env
+variables:
+  - secret: true
+    name: client_id
+  - secret: true
+    name: client_secret
+  - secret: true
+    name: access_token
+  - name: api_base
+    value: http://127.0.0.1:3002/gamma
+  - name: library_base
+    value: ./library-bruno/
+  - name: data_base
+    value: http://localhost:8080/Bruno_Collection/data_base/simulator_datafile.json
+  - name: json_schema
+    value: http://localhost:8080/Bruno_Collection/json_validator/datafile.schema.json
+  - name: scenariosToRunIndex
+    value: "0"

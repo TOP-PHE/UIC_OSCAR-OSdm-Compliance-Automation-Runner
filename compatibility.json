@@ -1,17 +1,31 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.248",
+  "current_release": "2026.249",
   "releases": [
+    {
+      "release": "2026.249",
+      "date": "2026-10-09",
+      "server": "1.11.222",
+      "collection": "OTST_V2.0.106",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#593): the collection runs standalone (Bruno on a PC) against the OSDM simulator, as it already did through OSCAR. Collection and documentation only; server unchanged at 1.11.222; no request or validator changed.",
+        "New: environments/OTST_Simulator_Env.yml (api_base on the gamma provider, client_id and client_secret as secret variables with no value), 00-Access Token/Simulator Access Token.yml (client_credentials on {{api_base}}/oauth/token) and Bruno_Collection/README.md, which says how to run standalone from Bruno desktop and from bru run, for the list and for one scenario.",
+        "The simulator's data file moved to Bruno_Collection/data_base/simulator_datafile.json, the one copy for OSCAR and for a standalone run; OSDM_Simulator/oscar/datafile.json is gone and the simulator's test reads the new place. Its scenariosToRun now lists both scenarios.",
+        "Checked with bru 4.2.1 against a local simulator on gamma: standalone, SIM_SALE_SEARCH_1ADT 175 checks and SIM_SALE_SEARCH_2ADT_SAVER 236, none failed; through a throw-away OSCAR server, 173 and 234, none failed. The difference is the two checks of the token request, which OSCAR does not run."
+      ]
+    },
     {
       "release": "2026.248",
       "date": "2026-10-09",
       "server": "1.11.222",
-      "collection": "OTST_V2.0.104",
+      "collection": "OTST_V2.0.105",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "chore(#545): the Docker image installs a fixed Bruno CLI and starts from a fixed base image. Image only; no server code change; collection unchanged at OTST_V2.0.104.",
+        "chore(#545): the Docker image installs a fixed Bruno CLI and starts from a fixed base image. Image only; no server code change; collection unchanged at OTST_V2.0.105.",
         "Bruno CLI 4.2.1, the version production already runs, and its whole dependency tree with integrity hashes come from the new Oscar_Server/bruno-cli/package.json and package-lock.json, installed with npm ci. CI (ci-collection.yml) installs the same lockfile, so the collection is validated against the engine production runs. /usr/local/bin/bru is still the command (BRU_CMD unchanged). Dependabot proposes new versions as pull requests.",
         "The five packages the Dockerfile used to replace by hand inside the Bruno tree (#428, #532) are now npm overrides in that package.json: axios ^1.20.0, form-data ^4.0.6, @faker-js/faker ^10.5.0, js-yaml ^4.3.2 (installed: 1.20.0, 4.0.6, 10.6.0, 4.3.2). nanoid needs none: Bruno 4.2.1 ships the patched 3.3.18. Trivy finds no fixable HIGH or CRITICAL in the Bruno tree; the same scan without the overrides finds axios, form-data, faker and js-yaml.",
         "Both FROM lines name node:22-slim by digest (sha256:c3de60bf…978392, Node 22.23.3, published 2026-10-06). Dependabot's docker ecosystem proposes the new digest when the tag moves.",
@@ -22,11 +36,11 @@
       "release": "2026.247",
       "date": "2026-10-09",
       "server": "1.11.221",
-      "collection": "OTST_V2.0.104",
+      "collection": "OTST_V2.0.105",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "fix(#549): Test Config's \"Upload datafile\" and \"Download JSON\" are a safe round trip. Server and page; collection unchanged at OTST_V2.0.104.",
+        "fix(#549): Test Config's \"Upload datafile\" and \"Download JSON\" are a safe round trip. Server and page; collection unchanged at OTST_V2.0.105.",
         "An upload replaces the data file and nothing else. The page no longer rebuilds the Test Framework (it replaced the stored one, before the upload was sent) nor adds trains to Test Data; creating them from the file is offered only to a company that has none, and asked first.",
         "POST /v1/company/datafile checks the file before replacing anything: the data file schema, with the collection's own rules (utils/datafileSchema.js, pinned to library-bruno/validators.js by a test over 3,000 variants), a download marked as a tester's personal view or as unsaved edits, and the template rule. Refusals are 400 with the reason and, for the schema, the list of problems. A wrong file type is 400 \"Only JSON files are accepted.\" (it was 500).",
         "The file an upload replaces is kept, encrypted, one per company ({slug}-datafile.previous.json). GET /v1/company/datafile/previous describes it; POST /v1/company/datafile/previous/restore swaps it with the live file, so a restore can be undone. Test Managers only, under the per-company lock. A delete removes both.",

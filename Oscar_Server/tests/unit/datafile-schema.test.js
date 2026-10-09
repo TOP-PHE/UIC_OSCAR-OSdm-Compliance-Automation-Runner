@@ -37,10 +37,10 @@ const { validateDataFileJsonWithTemplate } = require(path.join(COLLECTION, 'libr
 const { schemaProblems, loadDatafileSchema, MAX_PROBLEMS } = require('../../src/utils/datafileSchema');
 
 const SCHEMA = JSON.parse(fs.readFileSync(path.join(COLLECTION, 'json_validator/datafile.schema.json'), 'utf8'));
-const SAMPLES = [
-  path.join(COLLECTION, 'data_base'),
-  path.resolve(__dirname, '../../../OSDM_Simulator/oscar'),
-].flatMap(dir => fs.readdirSync(dir).filter(f => f.endsWith('datafile.json')).map(f => path.join(dir, f)));
+// The simulator's data file is one of them (simulator_datafile.json, #593).
+const SAMPLES = fs.readdirSync(path.join(COLLECTION, 'data_base'))
+  .filter(f => f.endsWith('datafile.json'))
+  .map(f => path.join(COLLECTION, 'data_base', f));
 
 // What the collection's check says about `datafile`: passed, and the number of
 // problem lines it printed. Its `test` and `expect` are Bruno's, so Jest's are set aside for

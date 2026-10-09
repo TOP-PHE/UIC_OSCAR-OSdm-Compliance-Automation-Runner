@@ -62,11 +62,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.106] — 2026-10-09
+
+Issue #593, release 2026.249. Collection and documentation only; server
+unchanged (1.11.222). No request or validator changed.
+
+### Added
+
+- **Run the collection standalone against the OSDM simulator.** Bruno on a PC,
+  from the collection folder, with the same data file and the same checks as a
+  run through OSCAR. This is how each new scenario of #592 is developed before
+  it meets a real sandbox.
+  - `environments/OTST_Simulator_Env.yml`: `api_base` on the simulator's
+    `gamma` provider (`http://127.0.0.1:3002/gamma` as committed), `client_id`
+    and `client_secret` as secret variables with no value in the file.
+  - `00-Access Token/Simulator Access Token.yml`: `client_credentials` on
+    `{{api_base}}/oauth/token`, through the shared `auth.js` handler.
+  - `Bruno_Collection/README.md`: what the folders are, and the standalone
+    steps for Bruno desktop and for `bru run`, for the scenario list and for
+    one scenario (`scenario_override`). Two things it warns about, both seen
+    with `bru` 4.2.1: `bru run` on the whole collection leaves out
+    `00-Access Token`, so the folders are named; and `scenarioTarget` repeats
+    the same scenario without end in a collection run. A third: `bru run`
+    writes the run's variables back into the environment file, which must not
+    be committed that way.
+
+### Changed
+
+- **One data file for the simulator.** `OSDM_Simulator/oscar/datafile.json`
+  moved to `Bruno_Collection/data_base/simulator_datafile.json`: the file a
+  Test Manager uploads in OSCAR and the one a standalone run reads. The
+  simulator's test reads it there (simulator 0.2.1). Its `scenariosToRun` now
+  lists both scenarios, so a standalone run of the list runs both; through
+  OSCAR this is only the company's default list.
+  `Oscar_Server/tests/unit/datafile-schema.test.js` (#549), which read the
+  old folder, now finds it among the collection's data files (test only).
+
+### Checked
+
+- With `bru` 4.2.1 against a local simulator, provider `gamma`: standalone,
+  `SIM_SALE_SEARCH_1ADT` 175 checks and `SIM_SALE_SEARCH_2ADT_SAVER` 236, none
+  failed; through a throw-away OSCAR server (`ALLOW_PRIVATE_TARGETS=1`), 173
+  and 234, none failed. The two extra checks standalone are the token
+  request's, which OSCAR does not run. Not checked: Bruno desktop, the
+  simulator installed on the VPS, any real sandbox.
+
+---
+
 ## [server-1.11.222] — 2026-10-09
 
 Issue #545, first of two pull requests: the Docker image installs a fixed
 Bruno CLI and starts from a fixed base image. Image and CI only; no server
-code change. Collection unchanged (OTST_V2.0.104).
+code change. Collection unchanged (OTST_V2.0.105).
 
 ### Changed
 
@@ -125,7 +172,7 @@ code change. Collection unchanged (OTST_V2.0.104).
 ## [server-1.11.221] — 2026-10-09
 
 Issue #549: "Upload datafile" and "Download JSON" in Test Config are a safe
-round trip. Server and page. Collection unchanged (OTST_V2.0.104).
+round trip. Server and page. Collection unchanged (OTST_V2.0.105).
 
 ### Fixed
 

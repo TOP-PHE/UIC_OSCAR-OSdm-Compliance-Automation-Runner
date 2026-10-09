@@ -167,12 +167,16 @@ rebuilds its Test Framework from the file.
      a `tstmgr` one for a Test Manager and a `tst` one for a tester, and not
      one somebody else already uses. Scope is left empty.
 3. **Test data** (Test Manager, Test Config → *Upload datafile*): upload
-   [`OSDM_Simulator/oscar/datafile.json`](../../OSDM_Simulator/oscar/datafile.json).
+   [`Bruno_Collection/data_base/simulator_datafile.json`](../../Bruno_Collection/data_base/simulator_datafile.json).
    It holds two sale scenarios, shared with the company's testers:
    `SIM_SALE_SEARCH_1ADT` and `SIM_SALE_SEARCH_2ADT_SAVER`.
 4. **Run** one of them. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider", and no check fails.
+
+The same data file runs without OSCAR too, with Bruno on a PC: see
+[Run standalone](../../Bruno_Collection/README.md#run-standalone) in the
+collection's README.
 
 The data file works unchanged on the three providers. On `gamma` the run shows
 one warning, on purpose: the data file asks for OSDM 3.8.0 and `gamma` reports
