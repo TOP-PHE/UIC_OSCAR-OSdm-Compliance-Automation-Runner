@@ -94,6 +94,29 @@ The auto-tag workflow detects version bumps in `Oscar_Server/package.json`
 or in `compatibility.json` and creates the matching Git tag automatically.
 Contributors don't need to tag anything manually.
 
+## Pinned GitHub Actions
+
+Every `uses:` in `.github/workflows/` names a full commit SHA, with the
+release it is in a trailing comment (#545):
+
+```yaml
+uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+```
+
+A tag can be moved by whoever controls the action's repository; a commit
+cannot. Dependabot (`github-actions` ecosystem, monthly) proposes new
+releases and updates the SHA and the comment together. To pin or update one
+by hand, take the commit the tag points to, not the tag object:
+
+```bash
+git ls-remote --tags https://github.com/actions/checkout 'v7.0.1*'
+# an annotated tag lists two lines: use the one ending in ^{} (the commit)
+```
+
+Name the most precise release that points at that commit in the comment
+(`# v7.0.1`, not `# v7`), so Dependabot and a reader see the same version.
+A new action is added pinned the same way.
+
 ## Questions
 
 Open a `question`-labelled issue or ping the maintainers in the discussion

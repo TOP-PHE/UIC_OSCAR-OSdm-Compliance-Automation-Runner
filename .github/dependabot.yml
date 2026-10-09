@@ -97,6 +97,8 @@ updates:
           - version-update:semver-major
 
   # ── github-actions: action versions in workflows ───────────────────────────
+  # Every `uses:` is a commit SHA with the version in a trailing comment
+  # (#545); Dependabot updates both together.
   - package-ecosystem: github-actions
     directory: /
     schedule:
