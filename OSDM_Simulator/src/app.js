@@ -73,6 +73,16 @@ function requireMethod(req, ...allowed) {
 }
 
 // An error answer of the token endpoint (RFC 6749 section 5.2).
+// GET /products, GET /products/{id} (#598)
+function productRoute(req, provider, productId) {
+  requireMethod(req, 'GET');
+  const products = productsOf(provider);
+  if (productId === undefined) return { products };
+  const product = products.find((p) => p.id === productId);
+  if (!product) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  return { product };
+}
+
 function oauthError(res, status, error, description, headers) {
   sendJson(res, status, { error, error_description: description }, { Pragma: 'no-cache', ...headers });
 }
@@ -214,16 +224,6 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (part === 'purchaser' && partId === undefined) return purchaser(req, scope, bookingId);
     if (part === 'refund-offers') return refundOffers(req, provider, scope, bookingId, partId);
     throw notFound();
-  }
-
-  // GET /products, GET /products/{id}
-  function productRoute(req, provider, productId) {
-    requireMethod(req, 'GET');
-    const products = productsOf(provider);
-    if (productId === undefined) return { products };
-    const product = products.find((p) => p.id === productId);
-    if (!product) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
-    return { product };
   }
 
   // POST /offers
