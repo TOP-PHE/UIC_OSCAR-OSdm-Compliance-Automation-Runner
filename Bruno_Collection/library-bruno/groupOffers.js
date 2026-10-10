@@ -76,8 +76,8 @@ function checkCollectiveOffer(offer, passengerRefs) {
     checks.push({ name: 'Group offer: the passenger types applied to the group are given', ok: false, level: 'warn', message: 'no COLLECTIVE admission gives appliedPassengerTypes' });
   }
   for (const part of typed) {
-    const named = part.appliedPassengerTypes.map((t) => t?.passengerRef);
-    const missing = listOf(part.passengerRefs).filter((ref) => !named.includes(ref));
+    const named = new Set(part.appliedPassengerTypes.map((t) => t?.passengerRef));
+    const missing = listOf(part.passengerRefs).filter((ref) => !named.has(ref));
     const types = part.appliedPassengerTypes.map((t) => `${t?.passengerRef}: ${t?.type}`).join(', ');
     checks.push({
       name: `Group offer: admission ${part.id} names the passenger type of each passenger — ${types}`,
@@ -115,7 +115,7 @@ function compareGroupWithIndividual(groupOffer, body) {
   const sameFlexibility = sameClass.filter((o) => flexibilityOf(o) === flexibilityOf(groupOffer));
   const candidates = sameFlexibility.length > 0 ? sameFlexibility : sameClass;
   if (candidates.length === 0) return warn(`the INDIVIDUAL search gave no offer in ${travelClassOf(groupOffer) || 'the same class'} and ${group.currency}; not compared`);
-  const cheapest = candidates.reduce((best, o) => (priceOf(o).amount < priceOf(best).amount ? o : best));
+  const cheapest = candidates.slice(1).reduce((best, o) => (priceOf(o).amount < priceOf(best).amount ? o : best), candidates[0]);
   const alone = priceOf(cheapest).amount;
   const what = `group ${group.amount} ${group.currency}, alone ${alone} (offer ${cheapest.offerId}${sameFlexibility.length > 0 ? '' : ', another flexibility'})`;
   if (group.amount > alone) return [{ name: `${name} — ${what}`, ok: false, message: 'the group offer costs more than the same passengers alone' }];

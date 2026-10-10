@@ -2064,7 +2064,7 @@ function checkGroupOffer() {
   recordChecks(checkCollectiveOffer(chosenOffer(), refs));
 }
 
-const listOfRefs = (specs) => (Array.isArray(specs) ? specs.map((p) => p && p.externalRef).filter(Boolean) : []);
+const listOfRefs = (specs) => (Array.isArray(specs) ? specs.map((p) => p?.externalRef).filter(Boolean) : []);
 
 // Whether the outbound group offer is still to be compared with the same
 // search in the INDIVIDUAL mode (01d).
