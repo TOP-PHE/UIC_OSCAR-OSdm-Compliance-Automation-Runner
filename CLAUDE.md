@@ -876,6 +876,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refundSpecifications` with `bookingPartIds` / `passengerIds`. A partial
   refund is armed by any of `partialRefundArmed()`'s three flags; use it
   instead of reading the leg and passenger flags.
+- **An overrule code is a technical cancellation: everything back, no fee**
+  (#596, 1.11.227 / OTST_V2.0.111). One refund offer is compared with
+  `confirmedPrice` in `validateRefundableAmount`; several (one per
+  fulfillment) are added up by `checkOverruleTotal()` at step 10, each also
+  checked for a zero fee. `CODE_DOES_NOT_EXIST` and `"null"` count as no code
+  (`_overruleCodeSent()`). `overruleCodeExpectRejection` is the negative test:
+  step 10 grades the refusal with `validateProblemResponse` and ends the
+  scenario before any status check; while it is on, Test Config offers every
+  listed code (`overruleCodeChoices()`), since the point is a code the
+  framework does not declare. The simulator restricts codes per provider
+  (`overruleCodes` in the profile, `gamma` only), so `alpha` is where the
+  refusal test is seen to fail.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

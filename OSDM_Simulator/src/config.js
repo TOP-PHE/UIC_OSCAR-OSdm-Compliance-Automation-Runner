@@ -27,6 +27,8 @@ const MIN_SECRET_LENGTH = 32;
 // Printable ASCII without the colon: a client id travels in a Basic header as
 // "id:secret", and a colon in it would shift the split.
 const CLIENT_ID = /^[\x21-\x39\x3B-\x7E]{3,64}$/;
+const OVERRULE_CODE = /^[A-Z][A-Z0-9_]{1,59}$/;
+const MAX_OVERRULE_CODES = 30;
 
 class ConfigError extends Error {}
 
@@ -58,6 +60,7 @@ function checkProvider(key, raw) {
   if (!isText(raw.idPrefix, 1, 12) || !/^[A-Z0-9]+$/.test(raw.idPrefix)) throw bad('idPrefix');
   if (typeof raw.utcOffset !== 'string' || !/^[+-]\d{2}:\d{2}$/.test(raw.utcOffset)) throw bad('utcOffset');
   if (!Number.isInteger(raw.tokenLifetimeSeconds) || raw.tokenLifetimeSeconds < 30 || raw.tokenLifetimeSeconds > 86400) throw bad('tokenLifetimeSeconds');
+  const overruleCodes = checkOverruleCodes(raw.overruleCodes, bad);
   return {
     key,
     name: raw.name,
@@ -68,7 +71,17 @@ function checkProvider(key, raw) {
     idPrefix: raw.idPrefix,
     utcOffset: raw.utcOffset,
     tokenLifetimeSeconds: raw.tokenLifetimeSeconds,
+    ...(overruleCodes ? { overruleCodes } : {}),
   };
+}
+
+// The overrule codes a provider accepts in a refund request (#596). Absent:
+// any code is accepted, as before.
+function checkOverruleCodes(codes, bad) {
+  if (codes === undefined) return null;
+  if (!Array.isArray(codes) || codes.length === 0 || codes.length > MAX_OVERRULE_CODES) throw bad('overruleCodes');
+  if (!codes.every((c) => typeof c === 'string' && OVERRULE_CODE.test(c)) || new Set(codes).size !== codes.length) throw bad('overruleCodes');
+  return [...codes];
 }
 
 /** Every `<key>.json` of the directory, as a Map key → profile. */

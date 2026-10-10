@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.255",
+  "current_release": "2026.256",
   "releases": [
+    {
+      "release": "2026.256",
+      "date": "2026-10-10",
+      "server": "1.11.227",
+      "collection": "OTST_V2.0.111",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#596): technical cancellation with an overrule code. With a code, the refund gives back the whole price with no fee; when the provider answers with one refund offer per fulfillment, a new check adds them up: together they must give back the booking's confirmedPrice (before, each offer was only checked for a zero fee).",
+        "New negative test: overruleCodeExpectRejection. On, the provider must refuse the scenario's overrule code at 10. POST Refund Offers with a 4xx RFC 9457 Problem (graded like the other probes, the field name a warning), and the scenario ends there. Without a code the flag is ignored with a warning.",
+        "Server 1.11.227: Test Config has \"Overrule code refused\" next to the overrule code; while it is on, every listed code is offered, so that one the provider does not support can be picked. The data file schema accepts the field.",
+        "Simulator 0.6.0 (not part of a release): gamma accepts the four overrule codes CONNECTION_BROKEN, PAYMENT_FAILURE, SALES_STAFF_ERROR and TECHNICAL_FAILURE (overruleCodes in its profile) and refuses any other with OVERRULE_CODE_NOT_SUPPORTED; alpha and beta accept any. Its data file has one technical cancellation per code and the refusal of STRIKE, on 3.8."
+      ]
+    },
     {
       "release": "2026.255",
       "date": "2026-10-10",

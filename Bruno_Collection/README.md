@@ -114,7 +114,11 @@ sales there are return journeys (#594): `SIM_RETURN_SEPARATE_1ADT` on every
 version, and `SIM_RETURN_COMBINED_1ADT` (one offer for both directions) from
 3.7, so not on `alpha`. Refunds of a return (#595), on every version:
 `SIM_REFUND_RETURN_1ADT` (full refund, every refund offer confirmed) and
-`SIM_REFUND_INBOUND_1ADT` (the inbound ticket only).
+`SIM_REFUND_INBOUND_1ADT` (the inbound ticket only). Technical cancellations
+(#596), on `gamma` only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
+it accepts (`CONNECTION_BROKEN`, `PAYMENT_FAILURE`, `SALES_STAFF_ERROR`,
+`TECHNICAL_FAILURE`), and `SIM_REFUND_OVERRULE_REFUSED_38`, which sends
+`STRIKE` and expects the refusal.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional

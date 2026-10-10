@@ -22,6 +22,9 @@ module.exports = {
   rememberRefundOffersToConfirm,
   nextRefundOfferToConfirm,
   checkFullRefundDone,
+  checkOverruleTotal,
+  overruleRejectionArmed,
+  checkOverruleRejected,
 };
 
 // Function to validate refund offers response
@@ -179,6 +182,60 @@ function checkFullRefundDone(booking) {
   test(`Full refund: every fulfillment of the booking is refunded (${bookingIds.length - left.length}/${bookingIds.length})`, () => {
     if (left.length > 0) throw new Error(`not refunded by any confirmed refund offer: [${left.join(", ")}]`);
   });
+}
+
+// An overrule code was sent: a real code, not the "no code" placeholder.
+function _overruleCodeSent() {
+  const code = bru.getEnvVar("overruleCode");
+  return code && code !== "null" && code !== "CODE_DOES_NOT_EXIST" ? code : null;
+}
+
+// #596: a refund requested with an overrule code gives back what was paid.
+// When the provider answers with one refund offer per fulfillment, each offer
+// is checked for its fee (validateRefundableAmount) and the offers together
+// for the amount, here. One offer alone is checked against the price there.
+function checkOverruleTotal(refundOffers) {
+  const code = _overruleCodeSent();
+  const offers = Array.isArray(refundOffers) ? refundOffers : [];
+  if (!code || offers.length < 2) return;
+  if (partialRefundArmed() && String(bru.getEnvVar("__partialRefundDegradedToFull")) !== "true") return;
+  const paid = Number(bru.getEnvVar("confirmedPriceAmount"));
+  const amounts = offers.map((o) => o?.refundableAmount?.amount);
+  const total = amounts.every((a) => typeof a === "number") ? amounts.reduce((sum, a) => sum + a, 0) : null;
+  test(`Refund WITH overrule (${code}): the ${offers.length} refund offers together give back what was paid — ${total} of ${paid}`, () => {
+    if (total === null) throw new Error(`a refund offer has no refundableAmount.amount: [${amounts.join(", ")}]`);
+    if (total !== paid) throw new Error(`Provider did NOT honour overrule(${code}): the refund offers give back ${total}, the booking's confirmedPrice was ${paid}.`);
+  });
+}
+
+// #596: the scenario sends an overrule code the provider does not support and
+// expects the refund offer request to be refused. Without a code there is
+// nothing to probe, and the refund runs as usual.
+function overruleRejectionArmed() {
+  if (String(bru.getEnvVar("overruleCodeExpectRejection")) !== "true") return false;
+  if (_overruleCodeSent()) return true;
+  validationLogger("[WARNING] Overrule code probe: the scenario expects a refusal but sends no overrule code — the probe is ignored and the refund runs as usual.");
+  return false;
+}
+
+// #596: grade the answer to the probe as the other negative probes are graded:
+// a 4xx with an RFC 9457 Problem, which should name the overrule code.
+function checkOverruleRejected(status, body) {
+  const code = _overruleCodeSent();
+  const { validateProblemResponse } = require("./requestedInformation.js");
+  validationLogger(`[INFO] 🧪 Overrule code probe — expecting POST /refund-offers to refuse overruleCode '${code}'.`);
+  validateProblemResponse({
+    status,
+    body,
+    targets: [{ scenarioField: "overruleCode" }],
+    prefix: "🧪 Overrule code probe",
+    label: code,
+    assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+    log: (level, msg) => validationLogger(`[${level}] ${msg}`),
+  });
+  if (typeof status === "number" && status < 300) {
+    validationLogger(`[WARNING] Overrule code probe: the provider accepted '${code}'. Its refund offer(s) are left PROPOSED and not confirmed.`);
+  }
 }
 
 // #595: this refund offer leaves out some of the booking's fulfillments, so

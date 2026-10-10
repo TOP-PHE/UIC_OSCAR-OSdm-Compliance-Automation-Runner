@@ -310,7 +310,7 @@ to exercise them.
 | Type | Flow exercised |
 |---|---|
 | **SALE** | Offer → booking → (optional steps) → fulfillment. The default. |
-| **REFUND** | Sale, then refund‑offer → refund. Needs an `overruleCode` (`PAYMENT_FAILURE` / `DISRUPTION`). |
+| **REFUND** | Sale, then refund‑offer → refund. An `overruleCode` makes it a technical cancellation (§4.10). |
 | **EXCHANGE** | Sale, then exchange‑offer → exchange operation. |
 
 ### 4.3 Offer criteria (optional)
@@ -765,7 +765,33 @@ When partial refund is degraded: the standard full-refund financial-identity che
 
 > **One scenario, one shape today.** A scenario can either run a full refund OR a partial refund. To test "first-leg refund AND second-leg refund AND full refund" on the same booking, duplicate the scenario in the wizard with different `partialRefund*` settings — same auto-expansion pattern as the expired-X family, except today it's scenario-level (no `NHF_*` prefix for partial refunds).
 
-### 4.10 Logging verbosity (`loggingType`, optional)
+### 4.10 Technical cancellation (`overruleCode` / `overruleCodeExpectRejection`) — issue #596
+
+For **REFUND** scenarios. An `overruleCode` (for example `CONNECTION_BROKEN`,
+`PAYMENT_FAILURE`, `SALES_STAFF_ERROR`, `TECHNICAL_FAILURE`) is sent in the
+refund-offer request: the refund is then a technical cancellation, the whole
+price is given back and no fee is kept, whatever the product's own refund
+conditions. The picker shows the codes the Test Framework declares for refunds
+(Refund → IROPS). Make one scenario per code the provider supports.
+
+What OSCAR checks with a code:
+
+| Check | When |
+|---|---|
+| `appliedOverruleCode` is the code sent | every refund offer |
+| `refundFee` = 0 | every refund offer |
+| `refundableAmount` = the booking's `confirmedPrice` | one refund offer for the booking |
+| the refund offers together give back the `confirmedPrice` | one refund offer per fulfillment (#595) |
+
+**A code the provider does not support.** Set **Overrule code refused**
+(`overruleCodeExpectRejection`) to `on` and pick a code the provider does not
+support; while it is on, the picker offers every listed code. OSCAR then expects
+`10. POST Refund Offers` to answer **4xx with an RFC-9457 Problem**, which should
+name `overruleCode` (a warning if it does not), and the scenario ends there.
+A provider that accepts the code fails the scenario; its refund offer is left
+proposed. Without an overrule code the flag is ignored with a warning.
+
+### 4.11 Logging verbosity (`loggingType`, optional)
 
 Per‑scenario verbosity for the execution log embedded in the report. Affects
 log volume only — never assertion outcomes.
@@ -868,7 +894,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Requested offer parts | `ADMISSION` `RESERVATION` `ANCILLARY` `FARE_*` `CONTINUOUS_SERVICE` `ALL` | `offerSearchCriteria` |
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |
-| Overrule code | `PAYMENT_FAILURE` `DISRUPTION` | refund/exchange request |
+| Overrule code | the codes the Test Framework declares (§4.10) | refund/exchange request |
 | Sales‑flow actions | patchPassengers, placeSelection, addAncillary, getBooking, deleteAncillary | inserts the matching step |
 | Seat‑selection mode | `SEATMAP_AT_OFFER` / `ADD_TO_BOOKING` | seat‑map step + `placeSelections` |
 | Passenger type | `PERSON` `BICYCLE` `DOG` `PRM` … | passenger specs |
@@ -891,7 +917,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `partialRefundLegSelection` | `first` / `last` / `outbound` / `inbound` | which leg (§4.9) |
 | `partialRefundByPax` | `off` / `on` | scope refund to one passenger via `RefundSpecification.passengerIds` (§4.9). REFUND scenarios only |
 | `partialRefundPaxSelection` | `first` / `last` | which passenger (§4.9) |
-| `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.10) |
+| `loggingType` | `FULL` / `INFO` / `DEBUG` / `ERROR` | execution‑log verbosity (§4.11) |
 
 ### 7.2 Sale‑flow step → OSDM request
 

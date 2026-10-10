@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-technical-cancellation",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Refunds: technical cancellation with an overrule code, and a test for a code the provider refuses",
+    "summary": "A refund asked with an overrule code must give back the whole price with no fee, now also when the provider answers with one refund offer per fulfillment. A new negative test checks that a provider refuses an overrule code it does not support.",
+    "content": "An overrule code (for example CONNECTION_BROKEN, PAYMENT_FAILURE, SALES_STAFF_ERROR or TECHNICAL_FAILURE) turns a refund into a technical cancellation: the whole price is given back and no fee is kept. OSCAR already checked this when the provider answered with one refund offer. When it answers with one refund offer per fulfillment, OSCAR now also adds the offers up: together they must give back what was paid.\n\nA refund scenario has a new option in Test Config, next to the overrule code: \"Overrule code refused\". When it is on, pick a code the provider does not support (every listed code is offered while the option is on). OSCAR then expects the refund offer request to be refused with an error (a 4xx answer with a Problem body), and the scenario ends there. A provider that accepts the code fails the test.\n\nThe Tester User Guide explains both in a new section, \"Technical cancellation\"."
+  },
+  {
     "id": "2026-10-10-refund-per-fulfillment",
     "date": "October 10, 2026",
     "tag": "New",

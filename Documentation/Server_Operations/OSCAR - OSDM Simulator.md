@@ -178,7 +178,10 @@ rebuilds its Test Framework from the file.
    `SIM_RETURN_COMBINED_1ADT_…` (one offer for both directions) on 3.7 and 3.8,
    and refunds of a return (#595): `SIM_REFUND_RETURN_1ADT_…` (full: each
    refund offer, one per ticket, is confirmed) and `SIM_REFUND_INBOUND_1ADT_…`
-   (the inbound ticket only) on each version.
+   (the inbound ticket only) on each version, and technical cancellations
+   (#596) on 3.8 only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
+   `gamma` accepts and `SIM_REFUND_OVERRULE_REFUSED_38`, which expects the
+   refusal of a code it does not accept.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer

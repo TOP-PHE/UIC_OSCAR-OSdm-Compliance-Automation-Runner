@@ -62,6 +62,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.227] / [collection-OTST_V2.0.111] — 2026-10-10
+
+Issue #596, release 2026.256. Simulator 0.6.0.
+
+### Added
+
+- **Technical cancellation: the refund offers together give back the price.**
+  A refund requested with an `overruleCode` gives back the whole price with no
+  fee. One refund offer was already compared with the booking's
+  `confirmedPrice`; when the provider answers with one refund offer per
+  fulfillment (#595), each offer was only checked for a zero fee. Now
+  `checkOverruleTotal()` (`refunds.js`, called at `10. POST Refund Offers`)
+  adds the offers up: their `refundableAmount` must equal the `confirmedPrice`.
+  An offer without an amount fails rather than counting as zero. Not for a
+  partial refund that did not degrade.
+- **Negative test `overruleCodeExpectRejection`.** On, the provider must
+  refuse the scenario's overrule code: `10. POST Refund Offers` is graded like
+  the other negative probes (`validateProblemResponse`): a 4xx and an RFC 9457
+  Problem are required, naming `overruleCode` is a warning. The scenario ends
+  there. A provider that accepts the code fails it, and is told that its
+  refund offers stay proposed. Without an overrule code the flag is ignored
+  with a warning. Both reset lists carry the new variable.
+- **Test Config**: "Overrule code refused" next to the overrule code, for
+  refund scenarios (the probe is graded at a refund step). While it
+  is on, the picker offers every listed code instead of the framework's, so a
+  code the provider does not support can be picked; turning it off clears a
+  code the framework does not declare. `datafile.schema.json` accepts the field
+  (on/off, true/false). The Test Framework's code list is unchanged.
+- **Simulator 0.6.0**: a provider profile may list its `overruleCodes`.
+  `gamma` lists `CONNECTION_BROKEN`, `PAYMENT_FAILURE`, `SALES_STAFF_ERROR` and
+  `TECHNICAL_FAILURE` and refuses any other code with a 400
+  `OVERRULE_CODE_NOT_SUPPORTED` Problem naming it; `alpha` and `beta` accept
+  any code, as before. The data file has, on 3.8 only,
+  `SIM_REFUND_OVERRULE_<code>_38` for each of the four codes (a semi-flexible
+  return, so that the fee the code waives exists) and
+  `SIM_REFUND_OVERRULE_REFUSED_38`, which sends `STRIKE` and expects the
+  refusal. They are in the run list.
+
+### Changed
+
+- The Tester User Guide has a section on technical cancellation (§4.10;
+  logging becomes §4.11), and no longer says that a refund needs an overrule
+  code or that the codes are `PAYMENT_FAILURE` / `DISRUPTION`.
+
+Checked: the five scenarios standalone against the simulator (444 checks for
+each code, 245 for the refusal, none failed) and through OSCAR (442 and 243),
+and `SIM_REFUND_RETURN_1ADT_38` through OSCAR unchanged (438). The refusal
+scenario run against `alpha`, which accepts any code, fails as it should.
+Not yet run against a real provider. The semi-flexible tickets of the
+simulator declare `refundable: WITH_CONDITION` without after-sales conditions,
+which the collection reports as two warnings per run; left as it is.
+
+---
+
 ## [server-1.11.226] — 2026-10-10
 
 Issue #621: three moderate advisories in the Bruno CLI tree. Dependencies of
