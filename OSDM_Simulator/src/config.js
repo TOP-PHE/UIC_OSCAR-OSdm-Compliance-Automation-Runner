@@ -31,6 +31,7 @@ const OVERRULE_CODE = /^[A-Z][A-Z0-9_]{1,59}$/;
 const MAX_OVERRULE_CODES = 30;
 const MAX_REDUCTION_CARDS = 20;
 const MAX_PRODUCTS = 10;
+const MAX_GROUP_PASSENGERS = 19;
 const FLEXIBILITY_KEYS = new Set(['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE']);
 
 class ConfigError extends Error {}
@@ -84,14 +85,47 @@ function checkProvider(key, raw) {
 
 // The named products a provider sells (#598): a code, a name, a flexibility,
 // a price factor and whether it is bound to the train. Absent: one product
-// per flexibility, as before.
+// per flexibility, as before. A group product (#599) adds its `group` rules.
 function checkProducts(products, bad) {
   if (products === undefined) return null;
   if (!Array.isArray(products) || products.length === 0 || products.length > MAX_PRODUCTS) throw bad('products');
   const ok = (p) => p && OVERRULE_CODE.test(p.code) && isText(p.name, 1, 80) && FLEXIBILITY_KEYS.has(p.flexibility)
     && Number.isFinite(p.factor) && p.factor >= 0.5 && p.factor <= 3 && typeof p.isTrainBound === 'boolean';
   if (!products.every(ok) || new Set(products.map((p) => p.code)).size !== products.length) throw bad('products');
-  return products.map((p) => ({ code: p.code, name: p.name, flexibility: p.flexibility, factor: p.factor, isTrainBound: p.isTrainBound }));
+  return products.map((p) => ({
+    code: p.code, name: p.name, flexibility: p.flexibility, factor: p.factor, isTrainBound: p.isTrainBound,
+    ...(p.group === undefined ? {} : { group: checkGroup(p.group, bad) }),
+  }));
+}
+
+// The rules of a group product (#599): how many passengers, how many of them
+// aged 15 or more, whether only on a Saturday or a Sunday, only in second
+// class, on one ticket for every direction; and its price: the full fare of a
+// fixed number of passengers (`pricedPassengers`), or the full fare for the
+// first and a percentage of it for each other one (`followerPercent`).
+function checkGroup(group, bad) {
+  const count = (v) => Number.isInteger(v) && v >= 0 && v <= MAX_GROUP_PASSENGERS;
+  const flag = (v) => typeof v === 'boolean';
+  const ok = group && typeof group === 'object'
+    && count(group.minPassengers) && group.minPassengers >= 1
+    && count(group.maxPassengers) && group.maxPassengers >= group.minPassengers
+    && (group.maxOver15 === undefined || count(group.maxOver15))
+    && flag(group.weekendOnly) && flag(group.secondClassOnly) && flag(group.oneFulfillment)
+    && ((group.pricedPassengers === undefined) !== (group.followerPercent === undefined))
+    && (group.pricedPassengers === undefined || (count(group.pricedPassengers) && group.pricedPassengers >= 1))
+    && (group.followerPercent === undefined || (Number.isInteger(group.followerPercent) && group.followerPercent >= 1 && group.followerPercent <= 100));
+  if (!ok) throw bad('products');
+  const out = {
+    minPassengers: group.minPassengers,
+    maxPassengers: group.maxPassengers,
+    weekendOnly: group.weekendOnly,
+    secondClassOnly: group.secondClassOnly,
+    oneFulfillment: group.oneFulfillment,
+  };
+  if (group.maxOver15 !== undefined) out.maxOver15 = group.maxOver15;
+  if (group.pricedPassengers === undefined) out.followerPercent = group.followerPercent;
+  else out.pricedPassengers = group.pricedPassengers;
+  return out;
 }
 
 // The reduction cards a provider knows (#597): a code, a name and the

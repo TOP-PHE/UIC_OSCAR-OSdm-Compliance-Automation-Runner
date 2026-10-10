@@ -289,7 +289,7 @@ request:
                 "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
                 "selectedAccommodation",
                 "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered",
+                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
                 "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
                 "tripProductCategoryName", "tripProductCategoryShortName",

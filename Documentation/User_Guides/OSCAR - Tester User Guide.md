@@ -332,11 +332,27 @@ framework authorised.
   flexibility. No offer holding it fails the scenario, with the list of
   products offered, and stops it. After fulfillment, the booking must hold the
   product and each fulfillment must cover a part of it.
+- **Expected product absent** (#599) — the negative test: on, no offer may
+  hold the expected product (a group its rules exclude: too many passengers,
+  too many adults, a weekday). It passes when none does and fails when one
+  does; the scenario ends after the offer either way.
 - **Offer mode** — `INDIVIDUAL`, `COLLECTIVE`. The OSDM spec defines:
   - `INDIVIDUAL` — each passenger gets their **own** admission/reservation (N admissions for N passengers). Refund of a **single passenger** is possible.
   - `COLLECTIVE` — the admissions/reservations are **shared across the group** (one admission with N `passengerRefs`). The group is **atomic** — you cannot refund an individual passenger; the whole booking moves together.
   - If a provider does **not support** the requested mode, the spec mandates that it **fall back** to the supported mode and emit a **warning** in the response.
   - With only **one passenger**, `COLLECTIVE` is semantically degenerate ("collective of one"). Depending on the provider, OSCAR may see the request **accepted as-is**, **silently fallen back to INDIVIDUAL** (with a warning), or **rejected** with an error (e.g. minimum group size). Today OSCAR doesn't constrain or fully assert this — see #222 for the broader test build-out.
+  - **Group tariffs** (#599). Ask `COLLECTIVE` and name the group product in
+    **Expected product**. OSCAR then checks the chosen offer: on each trip it
+    covers, one `COLLECTIVE` admission for the whole group, naming the
+    passenger type applied to each passenger (`appliedPassengerTypes`; a
+    warning when the provider gives none, since OSDM does not require it). It
+    then sends the same request in the `INDIVIDUAL` mode (step
+    `01d. POST Get Offer Individual`) and compares: a group dearer than the
+    cheapest offer of the same class (and flexibility) for the same passengers
+    alone fails, the same price is a warning. For a weekend group that is a
+    return on one ticket, set the return model to both directions in one offer
+    and **Return fulfillments** to one. Use **Departure day** on the trip to
+    travel on a Saturday or a Sunday.
 
 ### 4.4 Return trip (optional)
 
@@ -909,6 +925,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Requested offer parts | `ADMISSION` `RESERVATION` `ANCILLARY` `FARE_*` `CONTINUOUS_SERVICE` `ALL` | `offerSearchCriteria` |
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
 | Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |
+| Expected product absent | `off` / `on` | negative test: no offer may hold the product |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |
 | Overrule code | the codes the Test Framework declares (§4.10) | refund/exchange request |
 | Sales‑flow actions | patchPassengers, placeSelection, addAncillary, getBooking, deleteAncillary | inserts the matching step |

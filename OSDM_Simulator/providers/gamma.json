@@ -61,6 +61,37 @@
       "flexibility": "NON_FLEXIBLE",
       "factor": 1.0,
       "isTrainBound": true
+    },
+    {
+      "code": "SIM_WEEKEND_GROUP",
+      "name": "Weekend group ticket",
+      "flexibility": "NON_FLEXIBLE",
+      "factor": 1.0,
+      "isTrainBound": false,
+      "group": {
+        "minPassengers": 2,
+        "maxPassengers": 5,
+        "maxOver15": 2,
+        "weekendOnly": true,
+        "secondClassOnly": false,
+        "oneFulfillment": true,
+        "pricedPassengers": 2
+      }
+    },
+    {
+      "code": "SIM_GROUP",
+      "name": "Group ticket",
+      "flexibility": "SEMI_FLEXIBLE",
+      "factor": 1.3,
+      "isTrainBound": false,
+      "group": {
+        "minPassengers": 2,
+        "maxPassengers": 19,
+        "weekendOnly": false,
+        "secondClassOnly": true,
+        "oneFulfillment": false,
+        "followerPercent": 60
+      }
     }
   ]
 }

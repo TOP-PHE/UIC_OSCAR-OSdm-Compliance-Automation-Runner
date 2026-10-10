@@ -62,6 +62,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.230] / [collection-OTST_V2.0.114] — 2026-10-10
+
+Issue #599, release 2026.259. Simulator 0.9.0.
+
+### Added
+
+- **Group tariffs.** A scenario asks for a group tariff with the `COLLECTIVE`
+  offer mode of its offer search criteria and names the group product with
+  `expectedProduct` (#598). `library-bruno/groupOffers.js` holds the rules
+  (pure).
+  - **Offer steps** (`01`, and `01b` for a return): the chosen offer must hold,
+    on each trip it covers, one `COLLECTIVE` admission whose `passengerRefs`
+    are the whole group; a failure names what was found. Every passenger must
+    be named in that admission's `appliedPassengerTypes`; when no collective
+    admission gives them, it is a warning, as OSDM does not require them.
+  - **`01d. POST Get Offer Individual`**, new: after the outbound offer of a
+    `COLLECTIVE` request, the same request in the `INDIVIDUAL` mode. The group
+    offer is compared with the cheapest offer of the same travel class (and the
+    same flexibility, when there is one) for the same passengers: dearer fails,
+    the same price is a warning, an answer that cannot be compared is a
+    warning. `routeAfterOfferStep()` sends there once (`__groupPriceCompareDone`)
+    and goes on as before afterwards.
+  - **`expectedProductAbsent`** (`on`/`off`), the negative test: no offer may
+    hold the expected product (a group the product's rules exclude). Passes
+    when none does, fails naming the offers that do; the scenario ends after
+    the offer either way. The stop label is now "expected product check".
+  - A weekend group on one ticket for both directions is a return in the
+    both-directions model with **Return fulfillments** set to one (#594).
+- **Test Config**: "Expected product absent" next to the expected product.
+  `datafile.schema.json` accepts `expectedProductAbsent`.
+- **Simulator 0.9.0**: a product of a provider profile may carry `group` rules
+  (passenger count, passengers aged 15 or more on the day of travel, weekend
+  only, second class only, one ticket for the whole booking, and a price of
+  N full fares or the first full and a percentage for the others). A group
+  product is offered only to a `COLLECTIVE` request whose group meets its
+  rules, as one `COLLECTIVE` admission per direction for the whole group,
+  naming each passenger `ADULT` or `CHILD`, without card reductions; otherwise
+  the answer holds the individual offers and a `COLLECTIVE_OFFER_NOT_AVAILABLE`
+  Problem saying why, as OSDM asks of a provider that falls back. `gamma` sells
+  `SIM_WEEKEND_GROUP` (2 to 5 passengers, at most 2 aged 15 or more, Saturday
+  or Sunday, one ticket, the price of two) and `SIM_GROUP` (2 to 19, second
+  class only, 60 % for the second and each further passenger). Offers and
+  bookings take up to 19 passengers (9 before). Public holidays are not
+  simulated. The data file has, on 3.8 only, `SIM_GROUP_WEEKEND_2ADT_2CHD_38`,
+  `SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38`, `SIM_GROUP_6ADT_38`, and the
+  negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
+  `SIM_GROUP_WEEKEND_3ADT_ABSENT_38`, with a trip on a Saturday.
+
+Checked: the five group scenarios standalone against the simulator (370, 500,
+442, 172 and 142 checks) and through OSCAR (two fewer each, those of the token
+request): none failed. Sale, card, product, return, refund and overrule
+scenarios on gamma, a sale on alpha and a refund on beta: no failure, and the
+same number of checks as before where compared. Counter-checks: the weekend
+group scenario run against `alpha`, which sells no group product, fails the
+one product check and stops after the offer step; with `gamma`'s weekend group
+priced at five full fares, only the price comparison fails. Not yet run
+against a real provider.
+
+---
+
 ## [server-1.11.229] / [collection-OTST_V2.0.113] — 2026-10-10
 
 Issue #598, release 2026.258. Simulator 0.8.0.

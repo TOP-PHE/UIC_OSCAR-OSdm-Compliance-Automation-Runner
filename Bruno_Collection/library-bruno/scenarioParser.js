@@ -92,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -705,6 +705,8 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
       // #598: the product (tariff) the scenario expects: a code, or words of its name.
       bru.setEnvVar("expectedProduct", typeof scenario.expectedProduct === "string" && scenario.expectedProduct.trim() ? scenario.expectedProduct.trim() : null);
+      // #599: the expected product must NOT be offered (a group its rules exclude).
+      bru.setEnvVar("expectedProductAbsent", (scenario.expectedProductAbsent === true || ["true", "on", "yes"].includes(String(scenario.expectedProductAbsent).toLowerCase())) ? "true" : "false");
       // #596: negative probe — the provider is expected to refuse this overrule code.
       bru.setEnvVar("overruleCodeExpectRejection", (scenario.overruleCodeExpectRejection === true || ["true", "on", "yes"].includes(String(scenario.overruleCodeExpectRejection).toLowerCase())) ? "true" : "false");
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);

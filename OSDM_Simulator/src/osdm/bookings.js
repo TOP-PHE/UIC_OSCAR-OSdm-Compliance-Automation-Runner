@@ -21,7 +21,7 @@ const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
 
 const MAX_OFFERS_PER_BOOKING = 4;
-const MAX_PASSENGERS = 9;
+const MAX_PASSENGERS = 19;
 const MAX_TEXT = 200;
 const CONFIRMATION_DELAY_MS = 30 * 60 * 1000;
 
@@ -63,6 +63,10 @@ function passengerFrom(spec, externalRef, provider) {
   if (cards.length > 0) passenger.cards = cards;
   return passenger;
 }
+
+// A booking whose tickets are one for every direction (#599, a weekend group):
+// a hidden property, never sent back with the booking.
+const ONE_FULFILLMENT = Symbol('one fulfillment');
 
 const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total + p.amount, 0), currency, scale: 2 });
 const admissionsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.admissions);
@@ -124,8 +128,10 @@ function createBooking(body, findOffer, provider, nowMs) {
   const trips = new Map();
   const bookedOffers = [];
 
+  let oneFulfillment = true;
   for (const selection of selections) {
-    const { offer, trips: offerTrips } = bookableOffer(selection, findOffer, nowMs);
+    const { offer, trips: offerTrips, oneFulfillment: single } = bookableOffer(selection, findOffer, nowMs);
+    oneFulfillment = oneFulfillment && single === true;
     for (const trip of offerTrips) trips.set(trip.id, trip);
     for (const externalRef of offer.passengerRefs) {
       if (!passengers.has(externalRef)) passengers.set(externalRef, passengerFrom(specByRef.get(externalRef), externalRef, provider));
@@ -157,6 +163,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
   booking.provisionalPrice = sumOf(admissionsOf(booking).map((a) => a.price), provider.currency);
+  Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   return booking;
 }
 
@@ -173,7 +180,8 @@ function admissionsByTrip(booking) {
 }
 
 /**
- * Confirm the booking and issue its fulfilments, one per trip it covers.
+ * Confirm the booking and issue its fulfilments, one per trip it covers, or
+ * one for the whole booking when its offers are sold so (#599).
  * Asked again on a booking that is already confirmed, it gives the fulfilments
  * it issued the first time.
  */
@@ -192,7 +200,8 @@ function confirmBooking(booking, provider, nowMs) {
   booking.confirmedPrice = sumOf(admissions.map((a) => a.price), provider.currency);
   booking.provisionalPrice = { amount: 0, currency: provider.currency, scale: 2 };
   delete booking.confirmationTimeLimit;
-  booking.fulfillments = admissionsByTrip(booking).map((group) => ({
+  const groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
+  booking.fulfillments = groups.map((group) => ({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
     bookingRef: booking.id,

@@ -98,6 +98,21 @@ describe('the offer step chooses the offer holding the product', () => {
     expect(envStore.__productNotOffered).toBe('true');
   });
 
+  test('#599 expected absent: none holding it passes, one holding it fails naming it; the step stops either way', () => {
+    envStore.expectedProduct = 'GROUP';
+    envStore.expectedProductAbsent = 'true';
+    select();
+    const absent = mockResults.find((r) => r.name.startsWith('Offer: no offer holds the product'));
+    expect(absent).toMatchObject({ ok: true, name: 'Offer: no offer holds the product "GROUP", as the scenario expects — 0 offer(s)' });
+    expect(envStore.__productNotOffered).toBe('true');
+    envStore = { expectedProduct: 'ALL_DAY', expectedProductAbsent: 'true' };
+    mockResults = [];
+    select();
+    expect(mockResults.find((r) => r.name.startsWith('Offer: no offer holds the product'))).toMatchObject({ ok: false, message: 'offered by: [O2]' });
+    expect(mockResults.some((r) => r.name.startsWith('Offer: an offer holds'))).toBe(false);
+    expect(envStore.__productNotOffered).toBe('true');
+  });
+
   test('no expected product: chosen on the flexibility as before, no product check', () => {
     envStore.desiredFlexibility = 'SEMI_FLEXIBLE';
     select();
@@ -141,11 +156,11 @@ describe('the steps and the parser', () => {
     const path = require('node:path');
     const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
     const step = (name) => fs.readFileSync(path.join(root, '02-Common Requests', name), 'utf8');
-    expect(step('01. POST Get Offer.yml')).toMatch(/__productNotOffered[\s\S]*loopbackOrStop\("POST Get Offer \(expected product not offered\)"\)/);
-    expect(step('01b. POST Get Return Offer.yml')).toMatch(/__productNotOffered[\s\S]*loopbackOrStop\("POST Get Return Offer \(expected product not offered\)"\)/);
+    expect(step('01. POST Get Offer.yml')).toMatch(/__productNotOffered[\s\S]*loopbackOrStop\("POST Get Offer \(expected product check\)"\)/);
+    expect(step('01b. POST Get Return Offer.yml')).toMatch(/__productNotOffered[\s\S]*loopbackOrStop\("POST Get Return Offer \(expected product check\)"\)/);
     expect(step('07. GET Booking after Fulfillments.yml')).toMatch(/checkBookingProduct\(/);
     for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
-      expect(fs.readFileSync(file, 'utf8')).toMatch(/"expectedProduct", "__productNotOffered"/);
+      expect(fs.readFileSync(file, 'utf8')).toMatch(/"expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual"/);
     }
   });
 });

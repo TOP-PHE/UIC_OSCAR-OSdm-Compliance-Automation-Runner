@@ -184,6 +184,8 @@ test('products: gamma lists its named products in both classes and gives one by 
   assert.deepEqual(list.body.products.map((p) => p.id), [
     'GAMMA-PRD-SIM_FLEXI_BASIC-SECOND', 'GAMMA-PRD-SIM_FLEXI_BASIC-FIRST', 'GAMMA-PRD-SIM_ALL_DAY-SECOND', 'GAMMA-PRD-SIM_ALL_DAY-FIRST',
     'GAMMA-PRD-SIM_FLEXI_SAVER-SECOND', 'GAMMA-PRD-SIM_FLEXI_SAVER-FIRST', 'GAMMA-PRD-SIM_TRAIN_BOUND-SECOND', 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST',
+    // #599: the weekend group in both classes, the group in second class only.
+    'GAMMA-PRD-SIM_WEEKEND_GROUP-SECOND', 'GAMMA-PRD-SIM_WEEKEND_GROUP-FIRST', 'GAMMA-PRD-SIM_GROUP-SECOND',
   ]);
   for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
   const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');
@@ -636,7 +638,7 @@ test('a booking request the simulator cannot serve is refused with a Problem', a
     [{}, 400],
     [{ offers: [] }, 400],
     [{ offers: new Array(5).fill({ offerId: offer.offerId }) }, 400],
-    [{ offers: [{ offerId: offer.offerId }], passengerSpecifications: new Array(10).fill({ externalRef: 'x' }) }, 400],
+    [{ offers: [{ offerId: offer.offerId }], passengerSpecifications: new Array(20).fill({ externalRef: 'x' }) }, 400],
     [{ offers: [{ offerId: 'ALPHA-OFR-unknown' }] }, 404],
     [{ offers: [{ offerId: 42 }] }, 404],
     [{ offers: [null] }, 404],
@@ -736,4 +738,33 @@ test('the log names the provider and the client, also for a refusal, and never a
   for (const secret of [token, alphaOne.client_secret, 'in-the-query', 'urn:uic:stn']) {
     assert.equal(written.includes(secret), false, `the log must not contain ${secret.slice(0, 12)}`);
   }
+});
+
+// ── group products (#599) ─────────────────────────────────────────────────
+
+test('weekend group, both directions: one COLLECTIVE admission per direction, one ticket for the whole booking', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const passengers = [
+    { externalRef: 'P1', type: 'PERSON', dateOfBirth: '1980-05-05' },
+    { externalRef: 'P2', type: 'PERSON', dateOfBirth: '2016-05-05' },
+  ];
+  const collective = { offerMode: 'COLLECTIVE' };
+  const outboundRequest = offerRequest({ anonymousPassengerSpecifications: passengers, offerSearchCriteria: collective });
+  outboundRequest.tripSearchCriteria.departureTime = '2026-11-21T08:00:00';
+  const outbound = (await call(sim.base, token, 'POST', '/gamma/offers', outboundRequest)).body;
+  const request = inboundRequest({ outboundTripIds: [outbound.trips[0].id] });
+  request.anonymousPassengerSpecifications = passengers;
+  request.offerSearchCriteria = collective;
+  const both = (await call(sim.base, token, 'POST', '/gamma/offers', request)).body;
+  const weekend = both.offers.find((o) => o.products[0].code === 'SIM_WEEKEND_GROUP');
+  assert.deepEqual(weekend.admissionOfferParts.map((p) => [p.offerMode, p.passengerRefs.length]), [['COLLECTIVE', 2], ['COLLECTIVE', 2]]);
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(weekend))).body.booking;
+  assert.deepEqual(booking.bookedOffers[0].admissions.map((a) => [a.offerMode, a.passengerIds.length]), [['COLLECTIVE', 2], ['COLLECTIVE', 2]]);
+  const fulfillments = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(fulfillments.length, 1);
+  assert.deepEqual(fulfillments[0].bookingParts.map((p) => p.id), booking.bookedOffers[0].admissions.map((a) => a.id));
+  // The group ticket, not sold on one ticket, keeps one per direction.
+  const group = both.offers.find((o) => o.products[0].code === 'SIM_GROUP');
+  const other = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(group))).body.booking;
+  assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${other.id}/fulfillments`, {})).body.fulfillments.length, 2);
 });

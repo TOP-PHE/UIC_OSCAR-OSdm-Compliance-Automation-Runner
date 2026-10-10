@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-group-tariffs",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Group tariffs: one collective offer for the group, checked against single tickets",
+    "summary": "A scenario can now test a group tariff: OSCAR checks that the offer is one collective admission for the whole group, with each passenger's type, and that the group pays less than the same passengers alone. A negative test checks a group the rules exclude gets no group offer.",
+    "content": "Ask for a group tariff with the offer mode COLLECTIVE in the offer search criteria, and name the group product in \"Expected product\".\n\nOSCAR then checks the chosen offer: on each trip, one collective admission for the whole group, naming the passenger type the provider applied to each passenger. It sends the same request again in the INDIVIDUAL mode (new step 01d) and compares: a group that costs more than the same passengers alone fails; the same price is a warning.\n\nTo check that a group the rules exclude (too many passengers, too many adults, a weekday) gets no group offer, turn on \"Expected product absent\": the scenario passes when no offer holds the product, and ends after the offer.\n\nA weekend group on one ticket for both directions is a return with one offer for both directions and \"Return fulfillments\" set to one. Use \"Departure day\" on the trip to travel on a Saturday or a Sunday."
+  },
+  {
     "id": "2026-10-10-expected-product",
     "date": "October 10, 2026",
     "tag": "New",
