@@ -15,7 +15,9 @@ module.exports = {
   validateRefundFee: validateRefundFeeLocal,
   validateRefundableAmount: validateRefundableAmountLocal,
   validateRefundAppliedOverruleCode,
-  getBookingRefundResponse
+  refundScope,
+  isScopedRefundOnBooking,
+  checkRefundScopeOnBooking,
 };
 
 // Function to validate refund offers response
@@ -48,6 +50,8 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
     validateRefundOfferResponse(refundOffer, index, expectedRefundOperationStatus, expectedFulfillmentStatus);
   });
 
+  recordRefundOfferStates(jsonData.refundOffers);
+
   // Store first offer ID
   bru.setEnvVar("refundOffersOfferId", jsonData.refundOffers[0].id);
   validationLogger(`[DEBUG] Stored refundOffersOfferId: ${jsonData.refundOffers[0].id}`);
@@ -71,6 +75,106 @@ function postPatchRefundOfferResponse(jsonData, expectedRefundOperationStatus, e
       validationLogger(`[INFO] Captured refundOffer validUntil = ${_firstRefundOffer.validUntil}`);
     }
   }
+}
+
+// ─── #613: what a refund covered, and the amounts it was proposed at ───────
+const _readJson = (name, fallback) => {
+  const raw = bru.getEnvVar(name);
+  if (raw == null || raw === "") return fallback;
+  if (typeof raw !== "string") return raw;
+  try { return JSON.parse(raw); } catch { return fallback; }
+};
+const _fulfillmentIdsOf = (refundOffer) => (Array.isArray(refundOffer?.fulfillments) ? refundOffer.fulfillments : [])
+  .map((f) => f?.id).filter((id) => typeof id === "string" && id !== "");
+
+// F5: the amounts are stored when a refund offer is PROPOSED (keyed on the
+// refund offer's own status, which the old code never looked at) and compared
+// when the same offer comes back CONFIRMED. F6/F2: a CONFIRMED offer sets
+// isRefundConfirmed and adds its fulfillments to the refunded set.
+function recordRefundOfferStates(refundOffers) {
+  const proposed = _readJson("__refundProposed", {});
+  const refunded = new Set(_readJson("__refundedFulfillmentIds", []));
+  (refundOffers || []).forEach((ro, index) => {
+    if (!ro || typeof ro.id !== "string") return;
+    const amounts = {
+      refundable: ro.refundableAmount && typeof ro.refundableAmount.amount === "number" ? ro.refundableAmount.amount : null,
+      fee: ro.refundFee && typeof ro.refundFee.amount === "number" ? ro.refundFee.amount : null,
+    };
+    if (ro.status === "PROPOSED") {
+      proposed[ro.id] = amounts;
+    } else if (ro.status === "CONFIRMED") {
+      const before = proposed[ro.id];
+      if (before) {
+        test(`Refund offer[${index}] confirmed with the amounts it was proposed at - proposed: refundable ${before.refundable}, fee ${before.fee}; confirmed: refundable ${amounts.refundable}, fee ${amounts.fee}`, () => {
+          expect(amounts.refundable, "refundableAmount changed between PROPOSED and CONFIRMED").to.eql(before.refundable);
+          expect(amounts.fee, "refundFee changed between PROPOSED and CONFIRMED").to.eql(before.fee);
+        });
+      }
+      _fulfillmentIdsOf(ro).forEach((id) => refunded.add(id));
+      bru.setEnvVar("isRefundConfirmed", "true");
+    }
+  });
+  bru.setEnvVar("__refundProposed", JSON.stringify(proposed));
+  bru.setEnvVar("__refundedFulfillmentIds", JSON.stringify([...refunded]));
+}
+
+// F2: a refund is scoped when it leaves at least one of the booking's
+// fulfillments out, or when a partial refund was asked for and not degraded.
+function refundScope(refundOffer) {
+  const refundedIds = _fulfillmentIdsOf(refundOffer);
+  const bookingIds = _readJson("__bookingFulfillmentIds", []);
+  const partialArmed = String(bru.getEnvVar("partialRefundByLeg")) === "true" || String(bru.getEnvVar("partialRefundByPax")) === "true";
+  const degraded = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
+  const leavesOut = bookingIds.length > 0 && refundedIds.length > 0 && bookingIds.some((id) => !refundedIds.includes(id));
+  return { scoped: leavesOut || (partialArmed && !degraded), refundedIds, bookingIds };
+}
+
+// F2 (step 14): the refunded set comes from the confirmed refund offers.
+function isScopedRefundOnBooking(booking) {
+  const refunded = _readJson("__refundedFulfillmentIds", []);
+  const ids = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).map((f) => f?.id);
+  return refunded.length > 0 && ids.some((id) => !refunded.includes(id));
+}
+
+// F2 (step 14): each fulfillment the confirmed refund offers held is REFUNDED,
+// and so are its booking parts; every other fulfillment and part is not.
+function checkRefundScopeOnBooking(booking) {
+  const refunded = _readJson("__refundedFulfillmentIds", []);
+  if (refunded.length === 0) {
+    validationLogger("[DEBUG] Refund scope check skipped — no confirmed refund offer named its fulfillments.");
+    return;
+  }
+  const fulfillments = booking && Array.isArray(booking.fulfillments) ? booking.fulfillments : [];
+  const refundedPartIds = new Set();
+  let partsKnown = true;
+  fulfillments.forEach((f) => {
+    if (!f) return;
+    const isRefunded = refunded.includes(f.id);
+    if (isRefunded) {
+      if (Array.isArray(f.bookingParts)) f.bookingParts.forEach((bp) => bp && refundedPartIds.add(bp.id));
+      else partsKnown = false;
+    }
+    test(`Fulfillment ${f.id} ${isRefunded ? "is REFUNDED (held by the confirmed refund offer)" : "is not REFUNDED (left out of the refund)"} - status: ${f.status}`, () => {
+      if (isRefunded) expect(f.status).to.eql("REFUNDED");
+      else expect(f.status, `fulfillment ${f.id} was not part of the refund`).to.not.eql("REFUNDED");
+    });
+  });
+  if (!partsKnown) {
+    validationLogger("[INFO] Refund scope: a refunded fulfillment does not list its booking parts — the part-level scope check is skipped.");
+    return;
+  }
+  (booking.bookedOffers || []).forEach((bo) => {
+    ["admissions", "reservations", "ancillaries"].forEach((kind) => {
+      (bo && Array.isArray(bo[kind]) ? bo[kind] : []).forEach((part) => {
+        if (!part?.id) return;
+        const inScope = refundedPartIds.has(part.id);
+        test(`Booked ${kind.slice(0, -1)} ${part.id} ${inScope ? "is REFUNDED" : "is not REFUNDED (left out of the refund)"} - status: ${part.status}`, () => {
+          if (inScope) expect(part.status).to.eql("REFUNDED");
+          else expect(part.status, `booking part ${part.id} was not part of the refund`).to.not.eql("REFUNDED");
+        });
+      });
+    });
+  });
 }
 
 // Function to validate a single refund offer
@@ -110,6 +214,13 @@ function validateRefundPermissibility(refundOffer, index) {
     return;
   }
 
+  // #613 F2: Gates 2 and 3 compare the refund with every part of the selected
+  // offer, which is right only when the refund covers the whole booking.
+  const _scope = refundScope(refundOffer);
+  const _scopeNote = _scope.scoped
+    ? ` The refund is scoped (fulfillments [${_scope.refundedIds.join(", ")}] of [${_scope.bookingIds.join(", ")}]), so the value gate and the schedule decode, which read the whole offer, are skipped.`
+    : "";
+
   const now = Date.now();
   const analyses = parts.map((p) => effectiveRefundability(p, now, "REFUND"));
   const effLabels = analyses.map((a) => (a.effective === "FLAG" ? `flag:${a.flagLabel}` : `schedule:${a.effective}`));
@@ -126,6 +237,10 @@ function validateRefundPermissibility(refundOffer, index) {
 
   // Gate 2 (#389, now effective-keyed) — refunded value must stay within the
   // parts that effectively PERMIT a refund.
+  if (_scope.scoped) {
+    validationLogger(`[INFO] Refund offer[${index}] permissibility: at least one part permits a refund.${_scopeNote}`);
+    return;
+  }
   const lockedParts = parts.filter((p, k) => !permits(analyses[k]) && p.price && typeof p.price.amount === "number" && p.price.amount > 0);
   if (lockedParts.length > 0 && refundOffer && refundOffer.refundableAmount && typeof refundOffer.refundableAmount.amount === "number") {
     const _amounts = parts.filter((p) => p.price).map((p) => p.price)
@@ -340,7 +455,11 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     if (expectedFulfillmentStatuses.includes("CONFIRMED") || expectedFulfillmentStatuses.includes("FULFILLED")) {
       const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
       validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPriceAmount);
-    } else if (expectedFulfillmentStatuses.includes("PROPOSED")) {
+    }
+    // #613 F5: the PROPOSED amounts are recorded by recordRefundOfferStates(),
+    // keyed on the refund offer's status; the old branch here keyed them on the
+    // fulfillment status, which never is PROPOSED.
+    if (refundOffer.status === "PROPOSED") {
       bru.setEnvVar("refundRefundAmount", refundOffer.refundableAmount.amount);
       bru.setEnvVar("refundFee", refundOffer.refundFee?.amount);
     }
@@ -392,44 +511,33 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     validationLogger(`[DEBUG] reimbursementStatus is not present in refund offer[${index}] → test skipped`);
   }
 
-  // Validate refundOfferBreakDown
-  if (Array.isArray(refundOffer.refundOfferBreakDown) && refundOffer.refundOfferBreakDown.length > 0) {
-    test(`Refund offer[${index}] has ${refundOffer.refundOfferBreakDown.length} breakdown(s)`, () => {
-      expect(refundOffer.refundOfferBreakDown).to.be.an('array').that.is.not.empty;
-      validationLogger(`[DEBUG] Refund offer[${index}] has ${refundOffer.refundOfferBreakDown.length} breakdown(s)`);
-    });
-
-    refundOffer.refundOfferBreakDown.forEach((breakdown, bdIndex) => {
-      const bdLabel = `refundFee amount: ${breakdown.refundFee?.amount}, refundableAmount amount: ${breakdown.refundableAmount?.amount}`;
+  // Refund breakdown (#613 F5): the OSDM member is `refundOfferBreakdown`
+  // (RefundOffer, 3.8); the old code read `refundOfferBreakDown`, so these
+  // checks never ran on a conformant provider. The misspelt member is still
+  // read, with a WARNING. RefundOfferBreakdownItem requires refundFee,
+  // refundableAmount and bookingParts; it has no fulfillmentId.
+  let _breakdown = refundOffer.refundOfferBreakdown;
+  if (!Array.isArray(_breakdown) && Array.isArray(refundOffer.refundOfferBreakDown)) {
+    _breakdown = refundOffer.refundOfferBreakDown;
+    validationLogger(`[WARNING] Refund offer[${index}] carries 'refundOfferBreakDown'; the OSDM member name is 'refundOfferBreakdown'.`);
+  }
+  if (Array.isArray(_breakdown) && _breakdown.length > 0) {
+    _breakdown.forEach((breakdown, bdIndex) => {
+      const bdLabel = `refundFee amount: ${breakdown?.refundFee?.amount}, refundableAmount amount: ${breakdown?.refundableAmount?.amount}`;
       test(`Refund offer[${index}] breakdown[${bdIndex}] is valid, ${bdLabel}`, () => {
-        // Validate refundFee
-        validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] refundFee: ${breakdown.refundFee.amount} ${breakdown.refundFee.currency}`);
-        expect(breakdown.refundFee).to.exist;
+        expect(breakdown.refundFee, 'breakdown.refundFee is required').to.exist;
         expect(breakdown.refundFee.amount).to.be.a('number').and.at.least(0);
         expect(breakdown.refundFee.currency).to.be.a('string');
         expectTypeOrNull(breakdown.refundFee.scale, "number", 'breakdown.refundFee.scale should be a number or null (nullable per OSDM)');
-
-        // Validate refundableAmount
-        expect(breakdown.refundableAmount).to.exist;
+        expect(breakdown.refundableAmount, 'breakdown.refundableAmount is required').to.exist;
         expect(breakdown.refundableAmount.amount).to.be.a('number');
         expect(breakdown.refundableAmount.currency).to.be.a('string');
         expectTypeOrNull(breakdown.refundableAmount.scale, "number", 'breakdown.refundableAmount.scale should be a number or null (nullable per OSDM)');
-
-        // Validate bookingParts
-        expect(breakdown.bookingParts).to.be.an('array').that.is.not.empty;
-
-        // Validate fulfillmentId
-        expect(breakdown.fulfillmentId).to.be.a('string').and.not.be.empty;
-
-        validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] is valid, refundFee amount: ${breakdown.refundFee.amount}, refundableAmount amount: ${breakdown.refundableAmount.amount} bookingParts=${breakdown.bookingParts.length}, fulfillmentId=${breakdown.fulfillmentId}`);
+        expect(breakdown.bookingParts, 'breakdown.bookingParts is required').to.be.an('array').that.is.not.empty;
       });
-
-      // Store bookingParts IDs for later validation (log only; storage optional)
-      const partRefs = breakdown.bookingParts.map(bp => bp.id);
-      validationLogger(`[DEBUG] Refund offer[${index}] breakdown[${bdIndex}] bookingParts IDs: ${partRefs.join(', ')}`);
     });
   } else {
-    validationLogger(`[DEBUG] No refundOfferBreakDown found for refund offer[${index}]`);
+    validationLogger(`[DEBUG] No refundOfferBreakdown in refund offer[${index}] (optional)`);
   }
 
   // Validate fulfillments
@@ -589,7 +697,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
   }
 
   // Partial-scope structural check: when partial is armed and not degraded,
-  // the refundOfferBreakdownItems[].bookingParts referenced by the response
+  // the refundOfferBreakdown[].bookingParts referenced by the response
   // should be a SUBSET of the parts we asked to refund. If the response has
   // no breakdown (some providers omit it) we log INFO instead of failing.
   if (_isPartial) {
@@ -601,8 +709,11 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
     for (const s of _resolved) {
       for (const pid of (s.bookingPartIds || [])) _requestedPartIds.add(pid);
     }
-    const _breakdown = Array.isArray(refundOffer.refundOfferBreakdownItems)
-      ? refundOffer.refundOfferBreakdownItems : [];
+    // #613 F5: the OSDM member is refundOfferBreakdown (the old name,
+    // refundOfferBreakdownItems, is not in the spec, so this never ran).
+    let _breakdown = [];
+    if (Array.isArray(refundOffer.refundOfferBreakdown)) _breakdown = refundOffer.refundOfferBreakdown;
+    else if (Array.isArray(refundOffer.refundOfferBreakDown)) _breakdown = refundOffer.refundOfferBreakDown;
     if (_breakdown.length === 0 || _requestedPartIds.size === 0) {
       validationLogger(`[DEBUG] Partial-refund breakdown check skipped (no breakdown returned, or no bookingPartIds requested).`);
     } else {
@@ -613,7 +724,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
         }
       }
       const _outOfScope = [..._responsePartIds].filter((id) => !_requestedPartIds.has(id));
-      test(`Partial refund: response.refundOfferBreakdownItems[].bookingParts is a subset of the requested bookingPartIds (no extra parts refunded)`, () => {
+      test(`Partial refund: response.refundOfferBreakdown[].bookingParts is a subset of the requested bookingPartIds (no extra parts refunded)`, () => {
         expect(_outOfScope, `Response includes booking parts that were NOT in refundSpecifications: [${_outOfScope.join(", ")}]`).to.be.empty;
         validationLogger(`[DEBUG] Partial-refund scope conformance: response parts=[${[..._responsePartIds].join(", ")}] ⊆ requested=[${[..._requestedPartIds].join(", ")}]`);
       });
@@ -641,110 +752,6 @@ function validateRefundAppliedOverruleCode(appliedOverruleCode, expectedOverrule
   test(title, () => {
     expect(normalisedApplied).to.equal(expectedOverruleCode);
   });
-}
-
-// Function to validate booking response for refund
-function getBookingRefundResponse(response, scenarioType) {
-  // Response status check (Bruno)
-  if (typeof res !== "undefined" && typeof res.getStatus === "function") {
-    const status = res.getStatus();
-    if (status !== 200) {
-      throw new Error(`Exiting script due to wrong response status: ${status}`);
-    }
-    test('Successfully received booking', () => expect(status).to.eql(200));
-  }
-
-  if (!response.booking) {
-    throw new Error("⛔ Exiting script, no booking available in the response");
-  }
-
-  const booking = response.booking;
-
-  if (["postRefund", "patchRefund"].includes(scenarioType)) {
-    const _refsRaw = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
-    const idsAdmissionAncillariesReservationReference = Array.isArray(_refsRaw) ? _refsRaw : JSON.parse(_refsRaw || "[]");
-    validationLogger(`[DEBUG] Reference for admissions, ancillaries and reservations: ${idsAdmissionAncillariesReservationReference}`);
-
-    idsAdmissionAncillariesReservationReference.forEach(refId => {
-      const admissions = booking.bookedOffers?.[0]?.admissions || [];
-      const reservations = booking.bookedOffers?.[0]?.reservations || [];
-      const ancillaries = booking.bookedOffers?.[0]?.ancillaries || [];
-
-      const matchedAdmission = admissions.find(admission => admission.id === refId);
-      const matchedReservation = reservations.find(reservation => reservation.id === refId);
-      const matchedAncillary = ancillaries.find(ancillary => ancillary.id === refId);
-
-      if (matchedAdmission || matchedReservation || matchedAncillary) {
-        test(`RefundOfferPart '${refId}' found in booking`, () => {
-          expect(true).to.be.true;
-        });
-      } else {
-        test(`RefundOfferPart '${refId}' NOT found in booking`, () => {
-          expect.fail(`[ERROR] ID '${refId}' not found in admissions or reservations or ancillaries`);
-        });
-      }
-    });
-
-    test("Booking is present and Booking ID is valid", () => {
-      expect(response).to.have.property('booking');
-      expect(booking).to.have.property('id').that.is.a('string').and.not.empty;
-    });
-
-    const validUntilRefundOffers = new Date(booking.refundOffers?.[0]?.validUntil);
-    const currentDate = new Date();
-
-    test("Valid until is set and still valid for the RefundOffers", () => {
-      expect(validUntilRefundOffers).to.exist;
-      expect(validUntilRefundOffers.getTime()).to.be.above(currentDate.getTime());
-    });
-
-    test("Refund offers are valid", () => {
-      expect(booking).to.have.property('refundOffers').that.is.an('array').with.length.above(0);
-      const refundOffer = booking.refundOffers[0];
-
-      expect(refundOffer).to.have.property('id').that.is.a('string').and.not.empty;
-
-      const expectedStatus = scenarioType === "postRefund" ? 'PROPOSED' : 'CONFIRMED';
-      if (expectedStatus === 'CONFIRMED') {
-        bru.setEnvVar("isRefundConfirmed", true);
-      }
-
-      if (typeof validateFulfillments === "function") {
-        // Signature handling as above
-        // #253: pass refundOffer.fulfillmentDocuments[] (v3.8 sibling) for ref→id integrity.
-        if (validateFulfillments.length >= 3) {
-          validateFulfillments(refundOffer.fulfillments, 0, expectedStatus, false, refundOffer.fulfillmentDocuments);
-        } else {
-          validateFulfillments(refundOffer.fulfillments, expectedStatus);
-        }
-      }
-
-      validateRefundFeeLocal(refundOffer.refundFee);
-
-      const overruleCode = bru.getEnvVar("overruleCode");
-      const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
-      validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPriceAmount);
-    });
-  } else if (scenarioType === "deleteRefund") {
-    test("Refund offers are not present, empty array returned", () => {
-      expect(booking).to.have.property("refundOffers").that.is.an("array");
-      expect(booking.refundOffers).to.be.empty;
-    });
-    // E4: After a confirmed refund, affected booking parts must have transitioned to REFUNDED status
-    if (bru.getEnvVar("isRefundConfirmed") === "true") {
-      const _allParts = (booking.bookedOffers || [])
-        .flatMap(bo => [...(bo.admissions||[]), ...(bo.reservations||[]), ...(bo.ancillaries||[])]);
-      if (_allParts.length > 0) {
-        test(`All booked offer parts are in REFUNDED or FULFILLED status after confirmed refund (OSDM: status transition)`, () => {
-          _allParts.forEach((part, i) => {
-            expect(['REFUNDED','FULFILLED'], `Part[${i}] status should be REFUNDED, got '${part.status}'`)
-              .to.include(part.status);
-          });
-          validationLogger(`[DEBUG] All ${_allParts.length} parts verified as post-refund status`);
-        });
-      }
-    }
-  }
 }
 
 // Expose to global for convenience (optional)

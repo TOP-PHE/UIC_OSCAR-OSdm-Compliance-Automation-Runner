@@ -15,6 +15,12 @@ http:
       value: application/json
     - name: Requestor
       value: "{{requestor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");

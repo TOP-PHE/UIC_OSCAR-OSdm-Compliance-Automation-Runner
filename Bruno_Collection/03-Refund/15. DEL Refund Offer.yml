@@ -15,9 +15,6 @@ http:
       value: application/json
     - name: Requestor
       value: "{{requestor}}"
-  body:
-    type: json
-    data: "{}"
   auth: inherit
 
 runtime:
@@ -26,9 +23,12 @@ runtime:
       code: 'require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);'
     - type: after-response
       code: |-
-        if(bru.getEnvVar("isRefundConfirmed")) {
-            test("Status code is 404, refund offer has been confirmed", function () {
-                expect(res.getStatus()).to.equal(404);
+        // #613 F6: a confirmed refund offer cannot be deleted. OSDM answers 409
+        // (DELETE /bookings/{id}/refund-offers/{id}); the old check expected 404.
+        // The env var is the string "true" once 13. PATCH Refund Offer confirmed it.
+        if (String(bru.getEnvVar("isRefundConfirmed")) === "true") {
+            test("Status code is 409, refund offer has been confirmed", function () {
+                expect(res.getStatus()).to.equal(409);
             });
         } else {
             test("Status code is 204, offer is deleted", function () {

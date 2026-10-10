@@ -1,8 +1,25 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.250",
+  "current_release": "2026.251",
   "releases": [
+    {
+      "release": "2026.251",
+      "date": "2026-10-09",
+      "server": "1.11.223",
+      "collection": "OTST_V2.0.107",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#613): checks of the collection that disagreed with the OSDM specification (3.5 and 3.8). Collection only; server unchanged at 1.11.223 (two new unit-test files and the test chai stand-in).",
+        "Checks that never ran now run: the after-response script of 03-Refund/11. GET Refund Offer (it sat under http.headers, so Bruno loaded no script); the refund breakdown, read under its OSDM name refundOfferBreakdown; 'confirmed with the amounts it was proposed at', keyed on the refund offer's own status. A unit test now loads every request file and fails when a script is not where Bruno reads it.",
+        "False failures on conformant answers removed: refund step 14 expected every fulfillment and part REFUNDED, now only what the confirmed refund offers held, the rest must be unchanged (partial refunds, one fulfillment of several); the schedule decode is skipped for such a scoped refund; booking.fulfillmentStatus uses the 3.8 values PENDING/CREATED/COMPLETE (extensible); FulfillmentStatus is exactly the OSDM list (CHECKEDIN added; USED, PARTIALLY_USED, RESERVED refused); PassengerType accepts both spellings (COMPANION_DOG/MOTORCYCLE in 3.5, ACCOMP_DOG/MOTOCYCLE in 3.8) and a value outside the list is a WARNING, not a FAIL, as the type is an extensible code list; trip.direction, admission validUntil and Price.scale are optional; minimalPrice is compared with the admissions only; provisionalPrice must not be below minimalPrice instead of equal to it; the exchange offer's required members are those of the spec (offerSummary optional; createdOn, passengerRefs, fulfillments, preBookableUntil required); warnings is read as a WarningCollection.",
+        "Runs that stopped or crashed: a 403 on an optional read-only request (System-Info GETs, GET Passenger, GET Refund/Exchange Offer) no longer stops a HARD_STOP run, and a non-JSON body there is a WARNING; the generic Problem check requires status only when present; two script errors (missing bookingParts on a fulfillment, missing offerSummary or provisionalPrice) are now failing checks instead of aborted steps.",
+        "Requests: the passenger PATCH leaves unset dateOfBirth, gender, email and phone out instead of sending empty strings, and routes to 04. GET Passenger (it named a request that does not exist); DELETE of a confirmed refund offer expects 409 (it expected 404) and sends no body. Removed: two checks that could not fail and two validators no request called (library-bruno/fulfillments.js, getBookingRefundResponse).",
+        "Not changed, on evidence: the booking externalRef (F14). BookingRequest.externalRef has no uniqueness rule, Booking.externalRef is the provider's own reference, and the 409 seen on POST /bookings was a seat-availability refusal.",
+        "Checked: 2,516 server tests including 46 new ones that run the real validators (each fails against the previous code, except the guards that a real defect still fails); standalone and OSCAR runs of the two simulator sale scenarios on gamma, no failed check, 173/212 and 171/230 checks, the difference with OTST_V2.0.106 being exactly the two removed checks."
+      ]
+    },
     {
       "release": "2026.250",
       "date": "2026-10-09",

@@ -98,6 +98,43 @@ function handleAccessTokenResponse(res, opts) {
  * @param {string} reqName  the current request's name
  * @returns {boolean} true when an auth rejection was detected (run stopped)
  */
+// The optional, read-only requests that osdmCompliance.js classifies as "not
+// implemented by this provider" on 403/404/405/500/501 (#488/#489): the
+// System-Info GETs, GET Passenger, GET Refund Offer and GET Exchange Offer.
+// Exact request names, like the report's CAPABILITY_PROBE_ENDPOINTS, so a
+// business request can never be mistaken for one. #613 F9.
+const OPTIONAL_READ_PROBES = new Set([
+  '00. GET System Version Check', '01. GET Coach', '02. GET Coach By Id',
+  '04. GET Passenger Categories', '05. GET Promotion Codes', '06. GET Reduction Cards',
+  '07. GET Zones', '08. GET Products', '09. GET Product By ProductId', '10. GET Product Tags',
+  '04. GET Passenger', '11. GET Refund Offer', '12. GET Exchange Offer',
+]);
+function isOptionalReadProbe(reqName) {
+  return OPTIONAL_READ_PROBES.has(String(reqName || '').trim());
+}
+
+// Why a 401/403 does not stop the run, or null when it does (#430, #613 F9).
+function authRejectionExemption(status, reqName, reqUrl, name) {
+  const url = String(reqUrl || '').toLowerCase();
+  if (/\/versions(\?|$)/.test(url) || name.includes('system version') || name.includes('version check')) {
+    return 'GET /versions is an optional capability probe';
+  }
+  // #613 F9: a 403 on an optional read-only request is classified as "not
+  // implemented by this provider" (#488); stopping the run on it contradicted
+  // that rule. A 401 still stops: it means the token, not the endpoint.
+  if (status === 403 && isOptionalReadProbe(reqName)) {
+    return 'a 403 on an optional read-only request is treated as "not implemented by this provider"';
+  }
+  if (String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase() !== 'HARD_STOP') {
+    return 'step-failure policy is CONTINUE';
+  }
+  try {
+    const { knownDeviationFor } = require(bru.getEnvVar('library_base') + 'loopback.js');
+    if (knownDeviationFor(reqName, status)) return 'this status is a documented known deviation';
+  } catch (_e) { /* loopback unavailable — treat as not a known deviation */ }
+  return null;
+}
+
 function checkAuthRejection(res, reqName, reqUrl) {
   const name = String(reqName || '').toLowerCase();
   if (name.includes('token') || name.includes('access')) return false; // token step handles itself
@@ -116,21 +153,10 @@ function checkAuthRejection(res, reqName, reqUrl) {
   //       business request, one step later;
   //   (b) the active step-failure policy is not HARD_STOP (the tester chose
   //       CONTINUE to see the whole flow despite failures); or
-  //   (c) the tester has baselined this step+status as a known deviation.
-  const url = String(reqUrl || '').toLowerCase();
-  const isVersionsProbe = /\/versions(\?|$)/.test(url)
-    || name.includes('system version') || name.includes('version check');
-  const policy = String(bru.getEnvVar('stepFailurePolicy') || 'HARD_STOP').toUpperCase();
-  let isKnownDeviation = false;
-  try {
-    const { knownDeviationFor } = require(bru.getEnvVar('library_base') + 'loopback.js');
-    isKnownDeviation = !!knownDeviationFor(reqName, status);
-  } catch (_e) { /* loopback unavailable — treat as not a known deviation */ }
-
-  if (isVersionsProbe || policy !== 'HARD_STOP' || isKnownDeviation) {
-    const why = isVersionsProbe ? 'GET /versions is an optional capability probe'
-      : isKnownDeviation ? 'this status is a documented known deviation'
-      : 'step-failure policy is CONTINUE';
+  //   (c) the tester has baselined this step+status as a known deviation; or
+  //   (d) a 403 on an optional read-only request (#613 F9, see above).
+  const why = authRejectionExemption(status, reqName, reqUrl, name);
+  if (why) {
     validationLogger(`[WARNING] ⚠️ HTTP ${status} on "${reqName || 'request'}" — run continues (${why}). `
       + `If this is an expired/invalid token rather than an unsupported endpoint, the following requests will also 401/403.`);
     return false; // flagged, but no hard stop
@@ -228,7 +254,7 @@ async function refreshAccessTokenIfNeeded(opts) {
   }
 }
 
-module.exports = { handleAccessTokenResponse, checkAuthRejection, refreshAccessTokenIfNeeded };
+module.exports = { handleAccessTokenResponse, checkAuthRejection, refreshAccessTokenIfNeeded, isOptionalReadProbe };
 
 // Expose to global for the eval/require loader flows (matches the other modules).
 try {

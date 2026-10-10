@@ -116,18 +116,15 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
     expect(exchangeOffer.offerId).to.exist;
   });
 
-  // F2: preBookableUntil must be a valid future datetime (OSDM: ExchangeOffer.preBookableUntil required)
-  if (exchangeOffer.preBookableUntil) {
-    const _pbu = new Date(exchangeOffer.preBookableUntil);
-    test(`Exchange offer[${index}].preBookableUntil is a valid future datetime (OSDM: required)`, () => {
-      expect(isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
-      expect(_pbu.getTime()).to.be.above(Date.now(),
-        `preBookableUntil is in the past: ${exchangeOffer.preBookableUntil}`);
-      validationLogger(`[DEBUG] Exchange offer[${index}].preBookableUntil: ${exchangeOffer.preBookableUntil} ✓`);
-    });
-  } else {
-    validationLogger(`[DEBUG] Exchange offer[${index}].preBookableUntil absent → test skipped`);
-  }
+  // F2: preBookableUntil is required (ExchangeOffer, OSDM 3.5 to 3.8) and in the future.
+  // #613 F12: its absence used to be skipped.
+  const _pbu = new Date(exchangeOffer.preBookableUntil);
+  test(`Exchange offer[${index}].preBookableUntil is a valid future datetime (OSDM: required)`, () => {
+    expect(exchangeOffer.preBookableUntil, 'preBookableUntil is required').to.be.a('string');
+    expect(isNaN(_pbu.getTime()), `preBookableUntil is not a valid date: ${exchangeOffer.preBookableUntil}`).to.be.false;
+    expect(_pbu.getTime()).to.be.above(Date.now(),
+      `preBookableUntil is in the past: ${exchangeOffer.preBookableUntil}`);
+  });
 
   // F4: admissionOfferParts must be non-empty (OSDM: ExchangeOffer.admissionOfferParts required)
   test(`Exchange offer[${index}].admissionOfferParts is a non-empty array (OSDM: required field)`, () => {
@@ -136,12 +133,15 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
     validationLogger(`[DEBUG] Exchange offer[${index}] has ${exchangeOffer.admissionOfferParts?.length} admissionOfferPart(s)`);
   });
 
-  // Validate offer structure
-  test(`Exchange offer[${index}] has required properties offerSummary, exchangeFee, exchangePrice`, () => {
-    validationLogger(`[DEBUG] Exchange offer[${index}] has required properties offerSummary, exchangeFee, exchangePrice`);
-    expect(exchangeOffer).to.have.property('offerSummary');
+  // Required members of ExchangeOffer (identical in OSDM 3.5 and 3.8).
+  // #613 F12: offerSummary is optional and used to be required here, while
+  // createdOn, passengerRefs and fulfillments, which are required, were not checked.
+  test(`Exchange offer[${index}] has required properties exchangeFee, exchangePrice, createdOn, passengerRefs, fulfillments`, () => {
     expect(exchangeOffer).to.have.property('exchangeFee');
     expect(exchangeOffer).to.have.property('exchangePrice');
+    expect(exchangeOffer.createdOn, 'createdOn is required').to.be.a('string');
+    expect(exchangeOffer.passengerRefs, 'passengerRefs is required').to.be.an('array').that.is.not.empty;
+    expect(exchangeOffer.fulfillments, 'fulfillments is required').to.be.an('array');
   });
 
   // Validate offer summary
@@ -154,7 +154,7 @@ function validateExchangeOfferResponse(exchangeOffer, index, expectedFulfillment
       expect(exchangeOffer.offerSummary.minimalPrice.amount).to.be.a('number');
     });
   } else {
-    validationLogger(`[WARN] Exchange offer[${index}] offerSummary is missing`);
+    validationLogger(`[DEBUG] Exchange offer[${index}] offerSummary absent (optional in OSDM)`);
   }
 
   // Validate amountToBePaid if present

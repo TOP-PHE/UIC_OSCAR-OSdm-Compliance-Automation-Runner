@@ -7,7 +7,7 @@
  */
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
-const { OSDM_PASSENGER_TYPES } = require('./osdmEnums.js');
+const { OSDM_PASSENGER_TYPES, checkExtensibleCode } = require('./osdmEnums.js');
 
 module.exports = {
   patchMultiPassengerResponse
@@ -38,13 +38,12 @@ function patchMultiPassengerResponse(response, passengerIndex) {
     return;
   }
 
-  // G2: passenger.type must be a valid OSDM PassengerType enum value (OSDM: Passenger.type)
+  // G2: passenger.type is an extensible OSDM code list (#613 F4): FAIL only
+  // when it is not text; a value outside the listed ones is a WARNING.
   const _passengerType = response.passenger?.type;
   if (_passengerType !== undefined) {
-    test(`Passenger ${passengerIndex} - type '${_passengerType}' is a valid OSDM PassengerType`, () => {
-      expect(OSDM_PASSENGER_TYPES).to.include(_passengerType,
-        `'${_passengerType}' is not a valid OSDM PassengerType`);
-    });
+    checkExtensibleCode({ test, expect, log: validationLogger },
+      `Passenger ${passengerIndex} - type`, _passengerType, OSDM_PASSENGER_TYPES, 'PassengerType');
   }
 
   // G1: passenger.id must remain a non-empty string after PATCH (OSDM: id must not change)

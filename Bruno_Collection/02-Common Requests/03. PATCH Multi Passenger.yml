@@ -114,6 +114,27 @@ runtime:
         bru.setEnvVar("patchPhoneNumber",  data.updatePhoneNumber  || "");
         bru.setEnvVar("patchGender",       data.updateGender || passengerGender.gender);
         bru.setEnvVar("patchType",         (passengerGender && passengerGender.type) || "PERSON");
+
+        // #613 F13: the body template sent "" for a member the scenario does not
+        // set, and "" is neither a date nor a Gender value, so the provider's 400
+        // was the request's fault. Build the body here and leave unset optional
+        // members out (dateOfBirth, gender, contact email/phone).
+        const _set = (v) => v !== undefined && v !== null && String(v) !== "";
+        const _patch = {
+            id: passengerId,
+            externalRef: passengersRef,
+            type: (passengerGender && passengerGender.type) || "PERSON",
+            detail: { firstName: data.updateFirstName || "", lastName: data.updateLastName || "" },
+        };
+        const _dob = data.updateDateOfBirth;
+        const _gender = data.updateGender || (passengerGender && passengerGender.gender);
+        if (_set(_dob)) _patch.dateOfBirth = _dob;
+        if (_set(_gender)) _patch.gender = _gender;
+        const _contact = {};
+        if (_set(data.updateEmail)) _contact.email = data.updateEmail;
+        if (_set(data.updatePhoneNumber)) _contact.phoneNumber = data.updatePhoneNumber;
+        if (Object.keys(_contact).length > 0) _patch.detail.contact = _contact;
+        req.setBody(_patch);
     - type: after-response
       code: |-
         const { patchMultiPassengerResponse } = require(bru.getEnvVar("library_base") + "passengers.js");
@@ -182,7 +203,7 @@ runtime:
           // #383: the status test above already recorded this failure once —
           // a second identical registration only double-counted it.
           const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
-          failStepOrContinue("PATCH Multi Passenger", "06. GET Passenger");
+          failStepOrContinue("PATCH Multi Passenger", "04. GET Passenger");
           return;
         }
 
@@ -195,7 +216,7 @@ runtime:
               throw new Error("No passenger in the 200 response body — see the HTTP-traffic viewer.");
             });
             const { failStepOrContinue } = require(bru.getEnvVar("library_base") + "loopback.js");
-            failStepOrContinue("PATCH Multi Passenger", "06. GET Passenger");
+            failStepOrContinue("PATCH Multi Passenger", "04. GET Passenger");
             return;
         }
 
@@ -211,7 +232,7 @@ runtime:
         if (currentIndex < totalPassengers) {
             bru.runner.setNextRequest(req.getName());
         } else {
-            bru.runner.setNextRequest("06. GET Passenger");
+            bru.runner.setNextRequest("04. GET Passenger");
             bru.setEnvVar("currentPassengerIndex", 0);
         }
 

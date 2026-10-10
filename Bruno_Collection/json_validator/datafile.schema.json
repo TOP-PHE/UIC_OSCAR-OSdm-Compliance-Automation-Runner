@@ -602,6 +602,7 @@
                     "PRM_CHILD",
                     "WHEELCHAIR",
                     "ACCOMP_PRM",
+                    "ACCOMP_DOG",
                     "COMPANION_DOG",
                     "DOG",
                     "PET",
@@ -609,6 +610,7 @@
                     "BICYCLE",
                     "PRAM",
                     "CAR",
+                    "MOTOCYCLE",
                     "MOTORCYCLE",
                     "TRAILER"
                   ]

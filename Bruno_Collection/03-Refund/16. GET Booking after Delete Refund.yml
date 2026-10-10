@@ -64,13 +64,16 @@ runtime:
             return;
         }
 
-        if(bru.getEnvVar("isRefundConfirmed")) {
-            // Refund was confirmed (PATCH done) then deleted → parts back to FULFILLED, fulfillment REFUNDED then back
+        if (String(bru.getEnvVar("isRefundConfirmed")) === "true") {
+            // #613 F6: the refund was confirmed, so the DELETE was refused (409)
+            // and the refund stands: what it covered stays REFUNDED.
+            const { checkRefundScopeOnBooking } = require(bru.getEnvVar("library_base") + "refunds.js");
             postCreateBookingResponse(
             bru.getEnvVar("offer"),
             jsonData,
-            ["FULFILLED", "CONFIRMED"],
-            ["FULFILLED", "CONFIRMED", "REFUNDED"]);
+            ["REFUNDED", "FULFILLED", "CONFIRMED"],
+            ["REFUNDED", "FULFILLED", "CONFIRMED"]);
+            checkRefundScopeOnBooking(jsonData.booking);
         } else {
             // Refund was never confirmed (DELETE before PATCH) → parts still FULFILLED, fulfillment unchanged
             postCreateBookingResponse(

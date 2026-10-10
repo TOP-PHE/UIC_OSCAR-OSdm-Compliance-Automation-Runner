@@ -336,7 +336,7 @@ request:
                 // Exchange / Refund
                 "exchangeOffersOfferId", "exchangeOperationId",
                 "requestExchangeOffersBodyData", "requestExchangeOperationsBodyData",
-                "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed",
+                "refundOffersOfferId", "refundRefundAmount", "refundFee", "isRefundConfirmed", "__refundProposed", "__refundedFulfillmentIds", "__bookingFulfillmentIds",
                 "requestRefundOffersBodyData",
                 // Partial refund (#218) — runtime-only side channels
                 "__bookingForRefund",
@@ -582,9 +582,22 @@ request:
             const _ct = (res.headers || {})['content-type'] || (res.headers || {})['Content-Type'] || '';
             const _mediaType = String(_ct).split(';')[0].trim().toLowerCase();
             const _isJson = /^application\/(.*\+)?json$/.test(_mediaType);
-            _bruTest(`[OSDM] Content-Type is JSON`, () => {
-              expect(_isJson, `Expected a JSON media type (application/json or application/...+json), got: '${_ct}'`).to.be.true;
-            });
+            // #613 F9: an optional read-only request answered 403/404/405/500/501
+            // is "not implemented by this provider" (#488); a non-JSON body there
+            // is a WARNING, not a failure that turns the skip into a FAIL.
+            let _optionalSkip = false;
+            try {
+              const { isOptionalReadProbe } = require(bru.getEnvVar("library_base") + "auth.js");
+              _optionalSkip = [403, 404, 405, 500, 501].includes(_rptStatus)
+                && isOptionalReadProbe((req && typeof req.getName === 'function') ? req.getName() : '');
+            } catch (_oe) { _optionalSkip = false; }
+            if (!_isJson && _optionalSkip) {
+              console.log(`[WARNING] HTTP ${_rptStatus} body is not JSON (Content-Type '${_ct}'). The request is optional and was treated as not implemented; OSDM error bodies are application/problem+json.`);
+            } else {
+              _bruTest(`[OSDM] Content-Type is JSON`, () => {
+                expect(_isJson, `Expected a JSON media type (application/json or application/...+json), got: '${_ct}'`).to.be.true;
+              });
+            }
           }
 
           // H2: RFC 9457 Problem object on error responses (OSDM spec)
@@ -594,7 +607,9 @@ request:
             if (_eb && typeof _eb === 'object') {
               _bruTest(`[OSDM] Error body (${_rptStatus}) is a valid RFC 9457 Problem object`, () => {
                 expect(_eb).to.be.an('object');
-                expect(_eb.status).to.be.a('number');
+                // #613 F9: Problem has no required member in OSDM 3.8; status
+                // is checked only when the body carries it.
+                if (_eb.status !== undefined && _eb.status !== null) expect(_eb.status).to.be.a('number');
                 if (_eb.title !== undefined) expect(_eb.title).to.be.a('string').and.not.be.empty;
               });
             }
