@@ -132,8 +132,9 @@ function checkLegClasses(label, holder, trips, expected) {
   }
   return legs.map((leg, i) => {
     const how = leg.form === 'upgrade' ? 'with a supplement on this leg' : 'by its admission';
+    const found = leg.travelClass ? leg.travelClass + ', ' + how : 'no class';
     return {
-      name: `${label}: leg ${i + 1} (${leg.legId}) in ${expected[i]} class — ${leg.travelClass ? `${leg.travelClass}, ${how}` : 'no class'}`,
+      name: `${label}: leg ${i + 1} (${leg.legId}) in ${expected[i]} class — ${found}`,
       ok: leg.travelClass === expected[i],
       message: leg.travelClass === expected[i] ? undefined : `got ${leg.travelClass || 'no part covering the leg'}`,
     };
