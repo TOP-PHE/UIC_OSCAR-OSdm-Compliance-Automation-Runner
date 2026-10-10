@@ -43,6 +43,39 @@ const FLEXIBILITIES = [
   { key: 'NON_FLEXIBLE', label: 'Saver', factor: 1, refundable: 'NO', exchangeable: 'NO' },
 ];
 const TRAVEL_CLASSES = { SECOND: 1, FIRST: 1.5 };
+
+// The tariffs a provider sells (#598): its named products when its profile
+// lists them, else one per flexibility, as before. A named product takes its
+// refund and exchange conditions from its flexibility.
+function tariffsOf(provider) {
+  if (!provider.products) return FLEXIBILITIES;
+  return provider.products.map((p) => {
+    const flexibility = FLEXIBILITIES.find((f) => f.key === p.flexibility);
+    return { ...flexibility, label: p.name, factor: p.factor, code: p.code, name: p.name, isTrainBound: p.isTrainBound };
+  });
+}
+
+// The OSDM product of a tariff in a travel class.
+function productOf(tariff, travelClass, provider) {
+  const serviceClass = travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' };
+  const named = tariff.code !== undefined;
+  return {
+    id: named ? `${provider.idPrefix}-PRD-${tariff.code}-${travelClass}` : `${provider.idPrefix}-PRD-${tariff.key}-${travelClass}`,
+    code: named ? tariff.code : `${provider.idPrefix}-${tariff.key}-${travelClass}`,
+    summary: named ? tariff.name : `${provider.name} ${tariff.label}`,
+    type: 'ADMISSION',
+    owner: provider.carrier.ref,
+    flexibility: tariff.key,
+    serviceClass,
+    travelClass,
+    isTrainBound: named ? tariff.isTrainBound : tariff.key === 'NON_FLEXIBLE',
+  };
+}
+
+/** The products of a provider, for GET /products: each tariff in each class. */
+function productsOf(provider) {
+  return tariffsOf(provider).flatMap((tariff) => Object.keys(TRAVEL_CLASSES).map((c) => productOf(tariff, c, provider)));
+}
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
 // An offer that covers both directions costs this share of two single ones.
@@ -261,18 +294,8 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
   const total = directions.reduce((sum, t) => sum + passengers.reduce((s, p) => s + priceFor(t, p), 0), 0);
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
-  const serviceClass = travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' };
-  const product = {
-    id: `${provider.idPrefix}-PRD-${flexibility.key}-${travelClass}`,
-    code: `${provider.idPrefix}-${flexibility.key}-${travelClass}`,
-    summary: `${provider.name} ${flexibility.label}`,
-    type: 'ADMISSION',
-    owner: provider.carrier.ref,
-    flexibility: flexibility.key,
-    serviceClass,
-    travelClass,
-    isTrainBound: flexibility.key === 'NON_FLEXIBLE',
-  };
+  const product = productOf(flexibility, travelClass, provider);
+  const { serviceClass } = product;
   const admissionOfferParts = directions.flatMap((t) => passengers.map((passenger) => ({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
@@ -366,7 +389,7 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   const criteria = body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
-  const flexibilities = FLEXIBILITIES.filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
+  const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
   const classes = wanted(criteria, 'travelClass', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const offers = [];
@@ -394,4 +417,4 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   return { response, remembered, trips: allTrips };
 }
 
-module.exports = { buildOfferCollection, OFFER_LIFETIME_MS };
+module.exports = { buildOfferCollection, productsOf, OFFER_LIFETIME_MS };

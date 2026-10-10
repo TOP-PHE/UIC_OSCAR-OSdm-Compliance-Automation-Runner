@@ -62,6 +62,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.229] / [collection-OTST_V2.0.113] — 2026-10-10
+
+Issue #598, release 2026.258. Simulator 0.8.0.
+
+### Added
+
+- **A scenario can name the product (tariff) it expects**, `expectedProduct`:
+  a product code, matched exactly, or else words of the product's name
+  (`summary`, then `description`, without case). A code match anywhere in the
+  answer wins over a name match, so a name never pulls in an offer the code
+  would not. `library-bruno/products.js` holds the rules (pure).
+  - **Offer step.** `selectAndSetOffer()` keeps the offers that hold the
+    product, then applies the flexibility as before. When none holds it, the
+    check "an offer holds the expected product" fails, naming each product
+    offered (code and name), and `01. POST Get Offer` stops the scenario
+    (`__productNotOffered`): booking another tariff would test nothing. The
+    same holds for the inbound offer of a return (`01b`).
+  - **Fulfilled booking** (`07. GET Booking after Fulfillments`): a booked
+    offer must hold the product, and each fulfillment must cover a booked
+    part (by `summaryProductId` or `products[].productId`) of it.
+  - Without `expectedProduct`, the offer is chosen as before.
+- **Test Config**: an "Expected product" text field next to the flexibility.
+  `datafile.schema.json` accepts `expectedProduct`.
+- **Simulator 0.8.0**: a provider profile may list named `products`
+  (`{ code, name, flexibility, factor, isTrainBound }`), one offer each; the
+  refund and exchange conditions follow the flexibility. `gamma` sells
+  `SIM_FLEXI_BASIC`, `SIM_ALL_DAY`, `SIM_FLEXI_SAVER` and `SIM_TRAIN_BOUND`,
+  in that order, and answers `GET /products` (each product in both classes)
+  and `GET /products/{id}` (404 for an unknown id); `alpha` and `beta` are
+  unchanged. Flexi basic has the factor the fully flexible offer had, so the
+  existing gamma scenarios choose an offer of the same price. The group
+  tariffs come with #599. The data file has, on 3.8 only,
+  `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38` and `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38`
+  (by code; all-day is not the first fully flexible offer) and
+  `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38` (by name).
+
+Checked: the three product scenarios standalone against the simulator (227
+checks each, none failed) and through OSCAR (225 each). Sale, return, refund,
+card and overrule scenarios on gamma, a return on alpha and a refund on beta:
+no failure (gamma gains the checks of `GET /products` and of a fourth offer).
+The all-day scenario run against `alpha`, which does not sell it, fails the
+one product check, lists alpha's three products and stops after the offer
+step. Not yet run against a real provider.
+
+---
+
 ## [server-1.11.228] / [collection-OTST_V2.0.112] — 2026-10-10
 
 Issue #597, release 2026.257. Simulator 0.7.0.

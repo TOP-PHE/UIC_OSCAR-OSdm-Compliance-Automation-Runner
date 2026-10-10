@@ -532,6 +532,19 @@ function selectAndSetOffer(jsonData) {
     validationLogger("[DEBUG] No accommodation filter applied");
   }
 
+  // #598: the product the scenario expects. No offer holding it fails the
+  // scenario, which the offer step then stops (__productNotOffered).
+  const expectedProduct = bru.getEnvVar("expectedProduct");
+  if (expectedProduct) {
+    const { offersWithProduct, offeredProducts } = require('./products.js');
+    const holding = offersWithProduct(filteredOffers, expectedProduct);
+    test(`Offer: an offer holds the expected product "${expectedProduct}" — ${holding.length} offer(s)`, () => {
+      if (holding.length === 0) throw new Error(`no offer holds it; offered: [${offeredProducts(jsonData.offers).join(", ")}]`);
+    });
+    if (holding.length === 0) bru.setEnvVar("__productNotOffered", "true");
+    else filteredOffers = holding;
+  }
+
   // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
   // when a provider omits it we derive the offer's overall flexibility from its
   // products (most restrictive wins) instead of dropping every offer. (#223)

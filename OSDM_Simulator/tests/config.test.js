@@ -80,6 +80,16 @@ test('reduction cards: gamma lists three; a wrong list stops the start (#597)', 
   }
 });
 
+test('products: gamma sells four named products; a wrong list stops the start (#598)', () => {
+  const providers = loadProviders(PROVIDERS_DIR);
+  assert.deepEqual(providers.get('gamma').products.map((p) => p.code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND']);
+  assert.equal(providers.get('alpha').products, undefined);
+  const good = { code: 'P_A', name: 'Product A', flexibility: 'FULL_FLEXIBLE', factor: 1, isTrainBound: false };
+  for (const wrong of [[], [{ ...good, code: 'a' }], [{ ...good, flexibility: 'ANY' }], [{ ...good, factor: 4 }], [{ ...good, isTrainBound: 'no' }], [good, good]]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ products: wrong }) })), /products/, JSON.stringify(wrong));
+  }
+});
+
 test('a provider key that the router keeps for itself, or that is not a plain name, is refused', () => {
   assert.throws(() => loadProviders(providersDir({ 'healthz.json': profile() })), /not a usable provider key/);
   assert.throws(() => loadProviders(providersDir({ 'Bad Key.json': profile() })), /not a usable provider key/);

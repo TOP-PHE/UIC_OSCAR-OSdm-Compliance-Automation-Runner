@@ -325,6 +325,13 @@ framework authorised.
 - **Requested offer parts** — `ADMISSION`, `RESERVATION`, `ANCILLARY`, `FARE_*`,
   `CONTINUOUS_SERVICE`, `ALL`. (Include `RESERVATION` if you intend to pick seats.)
 - **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`.
+- **Expected product** (#598) — the product (tariff) the offer must hold: its
+  code, as `GET /products` or an offer lists it (matched exactly), or else
+  words of its name (matched in the product's summary, then description,
+  without case). The offer is chosen among those that hold it, then on the
+  flexibility. No offer holding it fails the scenario, with the list of
+  products offered, and stops it. After fulfillment, the booking must hold the
+  product and each fulfillment must cover a part of it.
 - **Offer mode** — `INDIVIDUAL`, `COLLECTIVE`. The OSDM spec defines:
   - `INDIVIDUAL` — each passenger gets their **own** admission/reservation (N admissions for N passengers). Refund of a **single passenger** is possible.
   - `COLLECTIVE` — the admissions/reservations are **shared across the group** (one admission with N `passengerRefs`). The group is **atomic** — you cannot refund an individual passenger; the whole booking moves together.
@@ -901,6 +908,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Travel class | `FIRST` `SECOND` `ANY_CLASS` | `offerSearchCriteria` |
 | Requested offer parts | `ADMISSION` `RESERVATION` `ANCILLARY` `FARE_*` `CONTINUOUS_SERVICE` `ALL` | `offerSearchCriteria` |
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
+| Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |
 | Overrule code | the codes the Test Framework declares (§4.10) | refund/exchange request |
 | Sales‑flow actions | patchPassengers, placeSelection, addAncillary, getBooking, deleteAncillary | inserts the matching step |

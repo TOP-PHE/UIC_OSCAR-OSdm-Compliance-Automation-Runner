@@ -92,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -703,6 +703,8 @@ function parseScenarioData(jsonData) {
       }
       bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
+      // #598: the product (tariff) the scenario expects: a code, or words of its name.
+      bru.setEnvVar("expectedProduct", typeof scenario.expectedProduct === "string" && scenario.expectedProduct.trim() ? scenario.expectedProduct.trim() : null);
       // #596: negative probe — the provider is expected to refuse this overrule code.
       bru.setEnvVar("overruleCodeExpectRejection", (scenario.overruleCodeExpectRejection === true || ["true", "on", "yes"].includes(String(scenario.overruleCodeExpectRejection).toLowerCase())) ? "true" : "false");
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);

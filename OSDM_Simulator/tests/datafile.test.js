@@ -58,7 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596) and the reduction cards (#597) are gamma's only.
+  // The overrule codes (#596), reduction cards (#597) and products (#598) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -70,7 +70,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !s.startsWith('SIM_REFUND_OVERRULE_') && !s.startsWith('SIM_SALE_CARD_'));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -144,6 +144,20 @@ test('the reduction card scenarios: each card gamma lists, on a passenger of its
     const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
     assert.ok(list.passengers.every((p) => !p.reductionCards), `${scenario.code} holds no card`);
   }
+});
+
+test('the product scenarios: each names a product gamma sells, by code or by name (#598)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const named = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_PRODUCT_'));
+  assert.equal(named.length, 3);
+  for (const scenario of named) {
+    const wanted = scenario.expectedProduct.toLowerCase();
+    const product = gamma.products.find((p) => p.code.toLowerCase() === wanted || p.name.toLowerCase().includes(wanted));
+    assert.ok(product, `${scenario.code}: ${scenario.expectedProduct}`);
+    assert.equal(scenario.desiredFlexibility, product.flexibility, `${scenario.code}: the flexibility agrees with the product`);
+  }
+  assert.ok(named.some((s) => !gamma.products.some((p) => p.code === s.expectedProduct)), 'one names the product by its name');
+  for (const scenario of datafile.scenarios.filter((s) => !named.includes(s))) assert.equal(scenario.expectedProduct, undefined, scenario.code);
 });
 
 test('the data file holds no real person, station or template', () => {

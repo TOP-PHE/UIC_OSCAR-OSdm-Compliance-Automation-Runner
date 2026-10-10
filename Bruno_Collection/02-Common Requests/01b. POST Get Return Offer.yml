@@ -89,6 +89,13 @@ runtime:
         }
         displayOfferResponse(jsonData);
 
+        // #598: no inbound offer holds the expected product: stop, as at 01.
+        if (bru.getEnvVar("__productNotOffered") === "true") {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Return Offer (expected product not offered)");
+          return;
+        }
+
         // #594: the inbound response against the outbound call: a trip back,
         // the same passengers, and what each model's offers must cover.
         const { checkReturnOffers } = require(bru.getEnvVar("library_base") + "returnJourney.js");

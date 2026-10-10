@@ -1532,6 +1532,8 @@ function buildDetailHTML(idx) {
         ${buildSelect(idx, 'desiredFlexibility', 'Desired Flexibility',
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), wizData.framework?.offerCriteria?.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
+        ${buildText(idx, 'expectedProduct', 'Expected product', 'code or name, e.g. a code from GET /products',
+          'The product (tariff) the offer must hold (#598): its code, or words of its name. No offer holding it fails the scenario and stops it; the fulfilled booking must hold it. Empty: chosen on the flexibility only.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE

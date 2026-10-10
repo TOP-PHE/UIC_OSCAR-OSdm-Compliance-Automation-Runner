@@ -30,6 +30,8 @@ const CLIENT_ID = /^[\x21-\x39\x3B-\x7E]{3,64}$/;
 const OVERRULE_CODE = /^[A-Z][A-Z0-9_]{1,59}$/;
 const MAX_OVERRULE_CODES = 30;
 const MAX_REDUCTION_CARDS = 20;
+const MAX_PRODUCTS = 10;
+const FLEXIBILITY_KEYS = new Set(['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE']);
 
 class ConfigError extends Error {}
 
@@ -63,6 +65,7 @@ function checkProvider(key, raw) {
   if (!Number.isInteger(raw.tokenLifetimeSeconds) || raw.tokenLifetimeSeconds < 30 || raw.tokenLifetimeSeconds > 86400) throw bad('tokenLifetimeSeconds');
   const overruleCodes = checkOverruleCodes(raw.overruleCodes, bad);
   const reductionCards = checkReductionCards(raw.reductionCards, bad);
+  const products = checkProducts(raw.products, bad);
   return {
     key,
     name: raw.name,
@@ -75,7 +78,20 @@ function checkProvider(key, raw) {
     tokenLifetimeSeconds: raw.tokenLifetimeSeconds,
     ...(overruleCodes ? { overruleCodes } : {}),
     ...(reductionCards ? { reductionCards } : {}),
+    ...(products ? { products } : {}),
   };
+}
+
+// The named products a provider sells (#598): a code, a name, a flexibility,
+// a price factor and whether it is bound to the train. Absent: one product
+// per flexibility, as before.
+function checkProducts(products, bad) {
+  if (products === undefined) return null;
+  if (!Array.isArray(products) || products.length === 0 || products.length > MAX_PRODUCTS) throw bad('products');
+  const ok = (p) => p && OVERRULE_CODE.test(p.code) && isText(p.name, 1, 80) && FLEXIBILITY_KEYS.has(p.flexibility)
+    && Number.isFinite(p.factor) && p.factor >= 0.5 && p.factor <= 3 && typeof p.isTrainBound === 'boolean';
+  if (!products.every(ok) || new Set(products.map((p) => p.code)).size !== products.length) throw bad('products');
+  return products.map((p) => ({ code: p.code, name: p.name, flexibility: p.flexibility, factor: p.factor, isTrainBound: p.isTrainBound }));
 }
 
 // The reduction cards a provider knows (#597): a code, a name and the

@@ -238,3 +238,28 @@ test('cards that are not a list of typed cards are refused', () => {
     assert.throws(() => build(withCards(cards), 'gamma'), (error) => error instanceof HttpError && error.status === 400 && /cards/.test(error.detail), JSON.stringify(cards));
   }
 });
+
+// ── named products (#598) ─────────────────────────────────────────────────
+
+test('gamma sells named products, one offer each; alpha one per flexibility, as before', () => {
+  const gamma = build(offerRequest(), 'gamma');
+  assert.deepEqual(gamma.offers.map((o) => [o.products[0].code, o.products[0].summary, o.offerSummary.overallFlexibility, o.products[0].isTrainBound]), [
+    ['SIM_FLEXI_BASIC', 'Flexi basic', 'FULL_FLEXIBLE', false],
+    ['SIM_ALL_DAY', 'All-day ticket', 'FULL_FLEXIBLE', false],
+    ['SIM_FLEXI_SAVER', 'Flexi saver', 'SEMI_FLEXIBLE', false],
+    ['SIM_TRAIN_BOUND', 'Train-bound saver', 'NON_FLEXIBLE', true],
+  ]);
+  for (const offer of gamma.offers) {
+    assert.equal(offer.products[0].id, `GAMMA-PRD-${offer.products[0].code}-SECOND`);
+    assert.ok(offer.admissionOfferParts.every((p) => p.summaryProductId === offer.products[0].id));
+  }
+  const [basic, allDay, saver, bound] = gamma.offers.map((o) => o.offerSummary.minimalPrice.amount);
+  assert.ok(allDay > basic && basic > saver && saver > bound);
+  assert.equal(gamma.offers[3].admissionOfferParts[0].refundable, 'NO', 'conditions follow the flexibility');
+  assert.deepEqual(build(offerRequest()).offers.map((o) => o.products[0].code), ['ALPHA-FULL_FLEXIBLE-SECOND', 'ALPHA-SEMI_FLEXIBLE-SECOND', 'ALPHA-NON_FLEXIBLE-SECOND']);
+});
+
+test('asking a flexibility gives the named products of that flexibility', () => {
+  const request = offerRequest({ offerSearchCriteria: { flexibilities: ['FULL_FLEXIBLE'] } });
+  assert.deepEqual(build(request, 'gamma').offers.map((o) => o.products[0].code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY']);
+});

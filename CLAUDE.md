@@ -900,6 +900,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   through it, not copy it. `__cardPriceCompareDone` keeps 01c to once per
   scenario and is in both reset lists. A ReductionCardType is an object:
   compare code and issuer, never identity.
+- **A scenario can name the product it sells** (#598, 1.11.229 /
+  OTST_V2.0.113). `expectedProduct` is a code (exact) or words of the name;
+  `library-bruno/products.js` (pure) lets a code match anywhere win over a
+  name match. `selectAndSetOffer()` filters on it before the flexibility; no
+  holder sets `__productNotOffered`, and 01 / 01b stop on it after their
+  failed check (do not let a step go on to book another tariff). 07 checks
+  the booking and each fulfillment through `summaryProductId` /
+  `products[].productId`. The simulator's `gamma` sells named products, the
+  first of which keeps the old fully flexible price so older scenarios do not
+  move.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

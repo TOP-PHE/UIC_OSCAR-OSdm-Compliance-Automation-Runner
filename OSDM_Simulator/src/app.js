@@ -22,7 +22,7 @@
 
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
-const { buildOfferCollection } = require('./osdm/offers');
+const { buildOfferCollection, productsOf } = require('./osdm/offers');
 const { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
@@ -222,6 +222,15 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (resource === 'versions' && rest.length === 0) {
       requireMethod(req, 'GET');
       return [{ version: provider.osdmVersion }];
+    }
+    // #598: a provider with named products lists them; the others answer 501.
+    if (resource === 'products' && rest.length <= 1 && provider.products) {
+      requireMethod(req, 'GET');
+      const products = productsOf(provider);
+      if (rest.length === 0) return { products };
+      const product = products.find((p) => p.id === rest[0]);
+      if (!product) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+      return { product };
     }
     // #597: a provider with reduction cards lists them; the others answer 501.
     if (resource === 'reduction-cards' && rest.length === 0 && provider.reductionCards) {
