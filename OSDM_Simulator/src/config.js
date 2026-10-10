@@ -69,7 +69,6 @@ function checkProvider(key, raw) {
   const products = checkProducts(raw.products, bad);
   const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
   const reservations = checkReservations(raw.reservations, bad);
-  const tripsCollection = checkTripsCollection(raw.tripsCollection, bad);
   return {
     key,
     name: raw.name,
@@ -85,7 +84,7 @@ function checkProvider(key, raw) {
     ...(products ? { products } : {}),
     ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
     ...(reservations ? { reservations } : {}),
-    ...(tripsCollection ? { tripsCollection } : {}),
+    ...checkTripsCollection(raw.tripsCollection, bad),
   };
 }
 
@@ -146,10 +145,11 @@ function checkCategories(categories, bad) {
 }
 
 // #602: POST /trips-collection is answered only when the profile says so.
+// What the provider takes of it: { tripsCollection: true }, or nothing.
 function checkTripsCollection(value, bad) {
-  if (value === undefined) return false;
+  if (value === undefined) return {};
   if (typeof value !== 'boolean') throw bad('tripsCollection');
-  return value;
+  return value ? { tripsCollection: true } : {};
 }
 
 // The seat reservation of each train category (#601), by short name:
