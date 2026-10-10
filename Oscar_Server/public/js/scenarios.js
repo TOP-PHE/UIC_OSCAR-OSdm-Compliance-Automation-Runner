@@ -2677,7 +2677,7 @@ function buildPassengersSection(idx, sc, paxGroup) {
       </div>
       <!-- Reduction cards — free text, vendor-specific codes -->
       <div class="param-section" style="margin-bottom:10px">
-        <div class="param-section-head" style="font-size:11px">🏷️ Reduction cards <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0;margin-left:6px">vendor-specific codes — e.g. BC_50, SENIOR, CARTE_LIBERTE</span></div>
+        <div class="param-section-head" style="font-size:11px">🏷️ Reduction cards <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0;margin-left:6px">the provider's codes (GET /reduction-cards) — sent with the offer and booking requests</span></div>
         <div style="padding:10px 14px" id="pax-reductions-${esc(pIdx)}-${esc(pi)}">
           ${reductionCards.map((code, ci) => buildReductionCardRow(pIdx, pi, ci, code, readOnly)).join('')}
           ${!readOnly ? `<button class="btn btn-sm btn-secondary" data-action="add-pax-reduction" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" style="font-size:11px;margin-top:6px">➕ Add reduction card</button>` : ''}

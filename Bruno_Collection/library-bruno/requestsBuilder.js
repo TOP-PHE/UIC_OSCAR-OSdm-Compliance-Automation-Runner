@@ -9,6 +9,14 @@
 const { parseEnvJson } = require('./envUtils.js');
 const { getComplianceVersion } = require('./osdmVersion.js');
 const { normaliseReturnModel, returnUsesInboundDate, localDateTime, buildInboundOfferRequest } = require('./returnJourney.js');
+const { withIssuers } = require('./reductionCards.js');
+
+// #597: the passengers of a request, each reduction card with the issuer the
+// provider's list (step 06, __reductionCardTypes) gives its code.
+function passengersWithCardIssuers(envName) {
+  const known = parseEnvJson("__reductionCardTypes", null);
+  return withIssuers(parseEnvJson(envName), Array.isArray(known) ? known : null).specs;
+}
 
 module.exports = {
   buildOfferCollectionRequest,
@@ -71,7 +79,7 @@ function buildReturnOfferCollectionRequest() {
   const isPaxone = sandbox.includes("paxone");
   const body = {
     tripSearchCriteria: tripPart.tripSearchCriteria,
-    anonymousPassengerSpecifications: parseEnvJson("offerPassengerSpecifications"),
+    anonymousPassengerSpecifications: passengersWithCardIssuers("offerPassengerSpecifications"),
     offerSearchCriteria: parseEnvJson("offerSearchCriteria")
   };
   // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).
@@ -110,7 +118,7 @@ function buildOfferCollectionRequest() {
     body.tripSearchCriteria = parseEnvJson("offerTripSearchCriteria");
   }
 
-  body.anonymousPassengerSpecifications = parseEnvJson("offerPassengerSpecifications");
+  body.anonymousPassengerSpecifications = passengersWithCardIssuers("offerPassengerSpecifications");
   body.offerSearchCriteria = parseEnvJson("offerSearchCriteria");
   // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).
   if (isPaxone) {
@@ -150,11 +158,11 @@ function buildBookingRequest() {
     validationLogger(`[DEBUG] Pre-flight self-check skipped — place-selection probe pass ${_placeProbe.index + 1}/${_placeProbe.total} corrupts the request deliberately.`);
   }
 
-  const bookingPassengerSpecifications = parseEnvJson("bookingPassengerSpecifications");
+  const bookingPassengerSpecifications = passengersWithCardIssuers("bookingPassengerSpecifications");
   const firstPassenger = bookingPassengerSpecifications[0];
   const passengerSpecifications = (firstPassenger?.detail?.firstName && firstPassenger?.detail?.lastName)
     ? bookingPassengerSpecifications
-    : parseEnvJson("offerPassengerSpecifications");
+    : passengersWithCardIssuers("offerPassengerSpecifications");
 
   const placeSelections = parseEnvJson("placeSelections", []);
   // #239: OSDM's mechanism for booking a mandatory reservation without
@@ -647,7 +655,7 @@ function requestExchangeOffersBody(overruleCode) {
   // Previously hardcoded to index 0 only — any additional passengers were silently dropped.
   let anonymousPassengerSpecifications;
   try {
-    const passengerSpecs = parseEnvJson('offerPassengerSpecifications', []);
+    const passengerSpecs = passengersWithCardIssuers('offerPassengerSpecifications');
     if (!Array.isArray(passengerSpecs) || passengerSpecs.length === 0) {
       throw new Error('offerPassengerSpecifications is empty or not an array');
     }
@@ -660,6 +668,8 @@ function requestExchangeOffersBody(overruleCode) {
         type: spec.type || "PERSON"
       };
       if (updateGender != null) entry.gender = updateGender;
+      // #597: the passenger's reduction cards go with the exchange too.
+      if (Array.isArray(spec.cards) && spec.cards.length > 0) entry.cards = spec.cards;
       return entry;
     });
     validationLogger("[DEBUG] Built anonymousPassengerSpecifications for " + passengerSpecs.length + " passenger(s)");

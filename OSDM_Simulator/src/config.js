@@ -29,6 +29,7 @@ const MIN_SECRET_LENGTH = 32;
 const CLIENT_ID = /^[\x21-\x39\x3B-\x7E]{3,64}$/;
 const OVERRULE_CODE = /^[A-Z][A-Z0-9_]{1,59}$/;
 const MAX_OVERRULE_CODES = 30;
+const MAX_REDUCTION_CARDS = 20;
 
 class ConfigError extends Error {}
 
@@ -61,6 +62,7 @@ function checkProvider(key, raw) {
   if (typeof raw.utcOffset !== 'string' || !/^[+-]\d{2}:\d{2}$/.test(raw.utcOffset)) throw bad('utcOffset');
   if (!Number.isInteger(raw.tokenLifetimeSeconds) || raw.tokenLifetimeSeconds < 30 || raw.tokenLifetimeSeconds > 86400) throw bad('tokenLifetimeSeconds');
   const overruleCodes = checkOverruleCodes(raw.overruleCodes, bad);
+  const reductionCards = checkReductionCards(raw.reductionCards, bad);
   return {
     key,
     name: raw.name,
@@ -72,7 +74,20 @@ function checkProvider(key, raw) {
     utcOffset: raw.utcOffset,
     tokenLifetimeSeconds: raw.tokenLifetimeSeconds,
     ...(overruleCodes ? { overruleCodes } : {}),
+    ...(reductionCards ? { reductionCards } : {}),
   };
+}
+
+// The reduction cards a provider knows (#597): a code, a name and the
+// reduction in percent. Absent: GET /reduction-cards answers 501 and every
+// card is unknown.
+function checkReductionCards(cards, bad) {
+  if (cards === undefined) return null;
+  if (!Array.isArray(cards) || cards.length === 0 || cards.length > MAX_REDUCTION_CARDS) throw bad('reductionCards');
+  const ok = (c) => c && OVERRULE_CODE.test(c.code) && isText(c.name, 1, 80)
+    && Number.isInteger(c.percent) && c.percent >= 1 && c.percent <= 90;
+  if (!cards.every(ok) || new Set(cards.map((c) => c.code)).size !== cards.length) throw bad('reductionCards');
+  return cards.map((c) => ({ code: c.code, name: c.name, percent: c.percent }));
 }
 
 // The overrule codes a provider accepts in a refund request (#596). Absent:

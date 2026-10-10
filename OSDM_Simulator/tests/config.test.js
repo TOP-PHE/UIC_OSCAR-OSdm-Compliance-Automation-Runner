@@ -70,6 +70,16 @@ test('overrule codes: gamma lists the four it accepts; a wrong list stops the st
   assert.deepEqual(loadProviders(providersDir({ 'test.json': profile({ overruleCodes: ['STRIKE'] }) })).get('test').overruleCodes, ['STRIKE']);
 });
 
+test('reduction cards: gamma lists three; a wrong list stops the start (#597)', () => {
+  const providers = loadProviders(PROVIDERS_DIR);
+  assert.deepEqual(providers.get('gamma').reductionCards.map((c) => [c.code, c.percent]), [['SIM_CARD_25', 25], ['SIM_CARD_50', 50], ['SIM_STUDENT', 30]]);
+  assert.equal(providers.get('alpha').reductionCards, undefined);
+  const good = { code: 'CARD_A', name: 'Card A', percent: 10 };
+  for (const wrong of [[], 'CARD_A', [{ ...good, code: 'a' }], [{ ...good, name: '' }], [{ ...good, percent: 0 }], [{ ...good, percent: 95 }], [{ ...good, percent: 2.5 }], [good, good]]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ reductionCards: wrong }) })), /reductionCards/, JSON.stringify(wrong));
+  }
+});
+
 test('a provider key that the router keeps for itself, or that is not a plain name, is refused', () => {
   assert.throws(() => loadProviders(providersDir({ 'healthz.json': profile() })), /not a usable provider key/);
   assert.throws(() => loadProviders(providersDir({ 'Bad Key.json': profile() })), /not a usable provider key/);

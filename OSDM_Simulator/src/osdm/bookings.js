@@ -18,6 +18,7 @@
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const { cardsOf } = require('./reductionCards');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 9;
@@ -57,6 +58,9 @@ function passengerFrom(spec, externalRef, provider) {
   if (gender) passenger.gender = gender;
   const detail = personDetail(spec?.detail);
   if (Object.keys(detail).length > 0) passenger.detail = detail;
+  // #597: the passenger keeps the cards the booking request gave.
+  const cards = cardsOf(spec, `passengerSpecifications[${externalRef}]`);
+  if (cards.length > 0) passenger.cards = cards;
   return passenger;
 }
 
@@ -97,6 +101,7 @@ function admissionFrom(part, passengers, createdOn, confirmableUntil) {
     refundable: part.refundable,
     exchangeable: part.exchangeable,
     isReservationRequired: false,
+    ...(part.appliedPassengerTypes ? { appliedPassengerTypes: part.appliedPassengerTypes } : {}),
   };
 }
 

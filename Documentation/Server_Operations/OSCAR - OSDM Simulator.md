@@ -181,12 +181,15 @@ rebuilds its Test Framework from the file.
    (the inbound ticket only) on each version, and technical cancellations
    (#596) on 3.8 only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
    `gamma` accepts and `SIM_REFUND_OVERRULE_REFUSED_38`, which expects the
-   refusal of a code it does not accept.
+   refusal of a code it does not accept, and sales with a reduction card
+   (#597) on 3.8 only: `SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38`
+   and `SIM_SALE_CARD_STUDENT_1YTH_38`.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
-   "not implemented by this provider", and no check fails.
+   "not implemented by this provider" (on `gamma`, `GET /reduction-cards`
+   answers 200 with its cards), and no check fails.
 
 The same data file runs without OSCAR too, with Bruno on a PC: see
 [Run standalone](../../Bruno_Collection/README.md#run-standalone) in the

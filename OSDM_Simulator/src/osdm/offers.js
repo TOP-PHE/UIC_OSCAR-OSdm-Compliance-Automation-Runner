@@ -21,10 +21,15 @@
  *    (`returnSearchParameters.outboundTripIds`, OSDM 3.7 and later), and gets
  *    offers that cover the outbound and the inbound trip, with a return price.
  * An id this client was not given is refused, as is naming both.
+ *
+ * A passenger's reduction card is applied when the provider knows it (#597):
+ * the passenger's price is reduced and its admissions name the card in
+ * `appliedPassengerTypes`. An unknown card is reported in `problems`.
  */
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 
 const MAX_PASSENGERS = 9;
 const MAX_TRIPS = 4;
@@ -44,6 +49,9 @@ const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-cat
 const RETURN_FACTOR = 0.9;
 
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The offer request is not valid', detail);
+// What the provider made of a passenger's cards: a hidden property (a symbol,
+// not enumerable), so that it is never sent back with the passenger.
+const CARDS_APPLIED = Symbol('cards applied');
 const randomId = () => crypto.randomBytes(8).toString('hex');
 const hashOf = (text) => crypto.createHash('sha256').update(text, 'utf8').digest();
 
@@ -183,7 +191,7 @@ function tripsOf(body, provider) {
   throw bad('tripSearchCriteria or tripSpecifications is required');
 }
 
-function passengersOf(body) {
+function passengersOf(body, provider) {
   const list = body.anonymousPassengerSpecifications;
   if (!Array.isArray(list) || list.length === 0 || list.length > MAX_PASSENGERS) {
     throw bad(`anonymousPassengerSpecifications must hold 1 to ${MAX_PASSENGERS} passengers`);
@@ -195,6 +203,9 @@ function passengersOf(body) {
     seen.add(externalRef);
     const out = { externalRef, type: typeof p.type === 'string' && p.type.length <= 30 ? p.type : 'PERSON' };
     if (typeof p.dateOfBirth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.dateOfBirth)) out.dateOfBirth = p.dateOfBirth;
+    const cards = cardsOf(p, `anonymousPassengerSpecifications[${i}]`);
+    if (cards.length > 0) out.cards = cards;
+    Object.defineProperty(out, CARDS_APPLIED, { value: applyCards(cards, provider) });
     return out;
   });
 }
@@ -224,14 +235,30 @@ function priceOfTrip(trip, flexibility, travelClass, provider) {
   return Math.round(baseCents * flexibility.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor);
 }
 
+// The passenger type and card an admission was priced with, when a card was
+// applied; nothing otherwise, as before cards existed.
+function appliedPassengerTypesOf(passenger, provider) {
+  const { applied } = passenger[CARDS_APPLIED];
+  if (!applied) return {};
+  return {
+    appliedPassengerTypes: [{
+      passengerRef: passenger.externalRef,
+      type: passenger.type === 'PERSON' ? 'ADULT' : passenger.type,
+      description: `${passenger.type === 'PERSON' ? 'Adult' : passenger.type} with ${applied.name}`,
+      appliedReductionCardTypes: [appliedCardType(applied, provider)],
+      appliedReductions: [{ type: 'REDUCTION_CARD', code: applied.code, issuer: provider.carrier.ref }],
+    }],
+  };
+}
+
 // An offer for `trip`, or, given `inboundTrip`, for both directions: one
 // admission per passenger and direction, each covering its own trip.
 function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
   const coverage = coverageOf(trip);
   const directions = inboundTrip ? [trip, inboundTrip] : [trip];
   const factor = inboundTrip ? RETURN_FACTOR : 1;
-  const priceFor = (t) => Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor);
-  const perPassenger = directions.reduce((total, t) => total + priceFor(t), 0);
+  const priceFor = (t, passenger) => reducedPrice(Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor), passenger[CARDS_APPLIED].applied);
+  const total = directions.reduce((sum, t) => sum + passengers.reduce((s, p) => s + priceFor(t, p), 0), 0);
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
   const serviceClass = travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' };
@@ -253,8 +280,9 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     createdOn,
     validFrom: t.startTime,
     validUntil: t.endTime,
-    price: price(priceFor(t)),
+    price: price(priceFor(t, passenger)),
     tripCoverage: coverageOf(t),
+    ...appliedPassengerTypesOf(passenger, provider),
     offerMode: 'INDIVIDUAL',
     isReusable: false,
     passengerRefs: [passenger.externalRef],
@@ -269,7 +297,7 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     offerId: `${provider.idPrefix}-OFR-${randomId()}`,
     summary: `${product.summary}, ${serviceClass.name} class`,
     offerSummary: {
-      minimalPrice: price(perPassenger * passengers.length),
+      minimalPrice: price(total),
       overallServiceClass: serviceClass,
       overallTravelClass: travelClass,
       overallFlexibility: flexibility.key,
@@ -334,7 +362,7 @@ function outboundTripsOf(asked, known, trips) {
  */
 function buildOfferCollection(body, provider, nowMs, known = {}) {
   const trips = tripsOf(body, provider);
-  const passengers = passengersOf(body);
+  const passengers = passengersOf(body, provider);
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   const criteria = body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
@@ -358,7 +386,12 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
     }
   }
   const allTrips = [...outboundTrips, ...trips];
-  return { response: { anonymousPassengerSpecifications: passengers, trips: allTrips, offers }, remembered, trips: allTrips };
+  const problems = passengers
+    .filter((p) => p[CARDS_APPLIED].unknown.length > 0)
+    .map((p) => unknownCardProblem(p.externalRef, p[CARDS_APPLIED].unknown));
+  const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };
+  if (problems.length > 0) response.problems = problems;
+  return { response, remembered, trips: allTrips };
 }
 
 module.exports = { buildOfferCollection, OFFER_LIFETIME_MS };

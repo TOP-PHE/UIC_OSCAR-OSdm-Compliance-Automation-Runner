@@ -13,6 +13,12 @@ module.exports = {
   logStepStart
 };
 
+// #597: a passenger's cards are CardReferences ({ type, code, … }); show their
+// codes (or the text itself, for a card given as a bare code).
+function cardCodes(cards) {
+  return cards.map((c) => (c && typeof c === "object" ? c.code || c.type : String(c))).join(", ");
+}
+
 /**
  * logStepStart(req) — print a "step is starting" line with a millisecond-
  * precision UTC timestamp + Europe/Paris local-time annotation.
@@ -235,7 +241,7 @@ function displayOfferResponse(response) {
       validationLogger(
         `[FULL]       Cards: ${
           response.anonymousPassengerSpecifications
-            ?.map((spec) => (spec?.cards ? spec.cards.join(", ") : "None"))
+            ?.map((spec) => (spec?.cards ? cardCodes(spec.cards) : "None"))
             .join(", ") || "None"
         }`
       );
@@ -293,7 +299,7 @@ function displayBookingResponse(response) {
       validationLogger(`[FULL]   Passenger ID: ${passenger?.id ?? "N/A"}`);
       validationLogger(`[FULL]   Type: ${passenger?.type ?? "N/A"}`);
       validationLogger(`[FULL]   Date of Birth: ${passenger?.dateOfBirth ?? "N/A"}`);
-      validationLogger(`[FULL]   Cards: ${passenger?.cards?.join(", ") ?? "None"}`);
+      validationLogger(`[FULL]   Cards: ${passenger?.cards ? cardCodes(passenger.cards) : "None"}`);
     });
 
     (booking.trips || []).forEach((trip, tripIndex) => {
@@ -373,7 +379,7 @@ function displayFulFilledBooking(response) {
       validationLogger(`[FULL]   Type: ${passenger?.type ?? "Not available"}`);
       validationLogger(`[FULL]   Date of Birth: ${passenger?.dateOfBirth ?? "Not available"}`);
       validationLogger(
-        `[FULL]   Cards: ${passenger?.cards?.join(", ") ?? "None"}`
+        `[FULL]   Cards: ${passenger?.cards ? cardCodes(passenger.cards) : "None"}`
       );
     });
 

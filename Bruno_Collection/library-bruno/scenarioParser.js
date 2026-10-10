@@ -12,6 +12,7 @@ require('./displays.js');
 require('./validators.js');
 require('./model.js');
 const { getComplianceVersion } = require('./osdmVersion.js');
+const { cardsOfPassenger } = require('./reductionCards.js');
 const {
   normaliseReturnModel, normaliseReturnFulfillments, returnUsesInboundDate, combinedReturnDefined,
 } = require('./returnJourney.js');
@@ -91,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1118,12 +1119,17 @@ function parseScenarioData(jsonData) {
           }
 
           passengersList.passengers.forEach(function (passenger) {
-            offerPassengerSpecs.push(new AnonymousPassengerSpec(
+            // #597: the passenger's reduction cards, sent with the offer and
+            // the booking requests.
+            const cards = cardsOfPassenger(passenger);
+            const offerSpec = new AnonymousPassengerSpec(
               passenger.reference,
               passenger.type,
               passenger.dateOfBirth,
               passenger.gender || null,
-            ));
+            );
+            if (cards.length > 0) offerSpec.cards = cards;
+            offerPassengerSpecs.push(offerSpec);
 
             const osdmVersion = bru.getEnvVar("osdmVersion");
             if (parseFloat(osdmVersion) >= 3.4) {
@@ -1156,6 +1162,7 @@ function parseScenarioData(jsonData) {
               ));
             }
 
+            if (cards.length > 0) passengerSpecs[passengerSpecs.length - 1].cards = cards;
             passengerReferences.push(passenger.reference);
 
             const passengerDataStruct = {

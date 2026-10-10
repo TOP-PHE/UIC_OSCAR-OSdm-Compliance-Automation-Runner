@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-reduction-cards",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Reduction cards are sent with the offer and booking requests, and checked",
+    "summary": "The reduction card codes you give a passenger in Test Config are now sent to the provider. OSCAR checks that the offer applied each card and that the card holder pays less than without it.",
+    "content": "A passenger in Test Config could already hold reduction card codes, but they were not sent. They now go with the offer, booking and exchange requests, as OSDM card references. The card's issuer is taken from the provider's own list of cards (GET /reduction-cards), which every run already reads.\n\nTwo checks show whether the provider applied a card. The chosen offer must name the card on the passenger. And OSCAR asks for the same offers once more without the cards: the card holder must pay less than without it (the other passengers the same). This extra request, \"01c. POST Get Offer without Cards\", only runs when a passenger holds a card.\n\nUse the codes the provider lists: a code it does not know gives a warning, and the card check then fails."
+  },
+  {
     "id": "2026-10-10-technical-cancellation",
     "date": "October 10, 2026",
     "tag": "New",

@@ -888,6 +888,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   framework does not declare. The simulator restricts codes per provider
   (`overruleCodes` in the profile, `gamma` only), so `alpha` is where the
   refusal test is seen to fail.
+- **A reduction card is sent, and proved applied twice** (#597, 1.11.228 /
+  OTST_V2.0.112). `library-bruno/reductionCards.js` (pure) turns a
+  passenger's `reductionCards` into `{ type: REDUCTION_CARD, code, issuer }`;
+  the issuer is filled at request time from `__reductionCardTypes`, which step
+  06 sets per run (so a request built before 06 has none). The proofs: the
+  chosen offer names the card in `appliedPassengerTypes`, and step `01c`
+  (only when a passenger holds a card) asks the same offers without cards and
+  compares the offer of the same flexibility and travel class. 01 and 01c
+  route with `routeAfterOfferStep()`; a new step after the offer must go
+  through it, not copy it. `__cardPriceCompareDone` keeps 01c to once per
+  scenario and is in both reset lists. A ReductionCardType is an object:
+  compare code and issuer, never identity.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

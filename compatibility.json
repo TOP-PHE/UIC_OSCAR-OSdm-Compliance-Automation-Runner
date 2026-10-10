@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.256",
+  "current_release": "2026.257",
   "releases": [
+    {
+      "release": "2026.257",
+      "date": "2026-10-10",
+      "server": "1.11.228",
+      "collection": "OTST_V2.0.112",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#597): a passenger's reduction cards are sent. The codes Test Config keeps per passenger go in the offer, booking and exchange requests as OSDM card references { type: REDUCTION_CARD, code, issuer }; the issuer comes from the provider's GET /reduction-cards, which step 06 now keeps (a warning when it cannot be read or lacks the code).",
+        "Two checks prove a card was applied: the chosen offer (and the chosen inbound offer of a return) names it on the passenger in appliedPassengerTypes (appliedReductionCardTypes or appliedReductions), and the new step 01c. POST Get Offer without Cards, run only when a passenger holds a card, asks the same offers without cards: the holder must pay less than in the offer of the same flexibility and travel class, the others the same (a warning).",
+        "Fix: the offer/booking comparison of appliedReductionCardTypes compared card objects by identity, so it would have failed on every provider that names a card; it now compares code and issuer. Card codes are shown as codes in the logs.",
+        "Server 1.11.228: the data file schema declares passengers[].reductionCards; the Test Config hint says the codes are sent.",
+        "Simulator 0.7.0 (not part of a release): gamma lists three cards (SIM_CARD_25, SIM_CARD_50, SIM_STUDENT), prices a known card's reduction and names it on the admission, and ignores an unknown card with a REDUCTION_CARD_NOT_APPLIED Problem. Its data file has three sales with a card, on 3.8."
+      ]
+    },
     {
       "release": "2026.256",
       "date": "2026-10-10",

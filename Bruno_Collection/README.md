@@ -118,12 +118,16 @@ version, and `SIM_RETURN_COMBINED_1ADT` (one offer for both directions) from
 (#596), on `gamma` only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
 it accepts (`CONNECTION_BROKEN`, `PAYMENT_FAILURE`, `SALES_STAFF_ERROR`,
 `TECHNICAL_FAILURE`), and `SIM_REFUND_OVERRULE_REFUSED_38`, which sends
-`STRIKE` and expects the refusal.
+`STRIKE` and expects the refusal. Reduction cards (#597), on `gamma` only:
+`SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38` (one of two adults holds
+the card) and `SIM_SALE_CARD_STUDENT_1YTH_38`; each also runs `01c. POST Get
+Offer without Cards` to compare the prices.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional
 information requests answer 501, reported as "not implemented by this
-provider". The same holds for the `_36` pair on `alpha` and the `_37` pair on
+provider", except `GET /reduction-cards`, which `gamma` answers with its three
+cards (#597). The same holds for the `_36` pair on `alpha` and the `_37` pair on
 `beta`, and for the return scenarios, which also check the inbound answer and
 expect one ticket per direction. A scenario run on a provider of another
 version gets a warning from the version check.

@@ -15,5 +15,22 @@
     "PAYMENT_FAILURE",
     "SALES_STAFF_ERROR",
     "TECHNICAL_FAILURE"
+  ],
+  "reductionCards": [
+    {
+      "code": "SIM_CARD_25",
+      "name": "Simulator card 25",
+      "percent": 25
+    },
+    {
+      "code": "SIM_CARD_50",
+      "name": "Simulator card 50",
+      "percent": 50
+    },
+    {
+      "code": "SIM_STUDENT",
+      "name": "Simulator student card",
+      "percent": 30
+    }
   ]
 }
