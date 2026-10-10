@@ -580,7 +580,7 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
       + pairing.extra.map((bi) => _describePart(bookedParts[bi])).join('; '));
     // #594: they are parts of this booking all the same, so a fulfillment
     // that holds them (the outbound ticket of a return) is not refused.
-    pairing.extra.forEach((bi) => { if (bookedParts[bi] && bookedParts[bi].id) ids.push(bookedParts[bi].id); });
+    pairing.extra.forEach((bi) => { if (bookedParts[bi]?.id) ids.push(bookedParts[bi].id); });
   }
 
   pairing.pairs.forEach(({ offerIndex: index, bookedIndex }) => {

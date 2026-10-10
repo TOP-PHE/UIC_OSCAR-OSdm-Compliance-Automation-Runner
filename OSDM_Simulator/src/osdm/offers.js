@@ -310,6 +310,22 @@ function returnOf(body) {
 
 const notGiven = (field, id) => bad(`returnSearchParameters.${field}: "${id}" is not one this client was given`);
 
+// For a return request: checks that what it names was given to this client,
+// marks the searched trips IN_BOUND, and gives the outbound trips it names
+// (both directions), or none.
+function outboundTripsOf(asked, known, trips) {
+  if (!asked) return [];
+  for (const trip of trips) trip.direction = 'IN_BOUND';
+  for (const id of asked.outwardOfferIds || []) {
+    if (!known.offer?.(id)) throw notGiven('outwardOfferIds', id);
+  }
+  return (asked.outboundTripIds || []).map((id) => {
+    const outbound = known.trip?.(id);
+    if (!outbound) throw notGiven('outboundTripIds', id);
+    return outbound;
+  });
+}
+
 /**
  * The OfferCollectionResponse for this request and provider, and what has to
  * be remembered of each offer for the booking that may follow. `known` reads
@@ -319,19 +335,10 @@ const notGiven = (field, id) => bad(`returnSearchParameters.${field}: "${id}" is
 function buildOfferCollection(body, provider, nowMs, known = {}) {
   const trips = tripsOf(body, provider);
   const passengers = passengersOf(body);
-  const asked = returnOf(body);
-  if (asked?.outwardOfferIds) {
-    for (const id of asked.outwardOfferIds) if (!known.offer?.(id)) throw notGiven('outwardOfferIds', id);
-  }
-  const outboundTrips = [];
-  for (const id of asked?.outboundTripIds || []) {
-    const outbound = known.trip?.(id);
-    if (!outbound) throw notGiven('outboundTripIds', id);
-    outboundTrips.push(outbound);
-  }
-  if (asked) for (const trip of trips) trip.direction = 'IN_BOUND';
+  const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   const criteria = body.offerSearchCriteria;
-  const flexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
+  const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
+  const flexibilities = FLEXIBILITIES.filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
   const classes = wanted(criteria, 'travelClass', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const offers = [];
@@ -341,12 +348,12 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
     ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
     : trips.map((trip) => ({ trip }));
   for (const { trip, inboundTrip } of pairs) {
+    const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
-      for (const flexibility of FLEXIBILITIES) {
-        if (flexibilities && !flexibilities.includes(flexibility.key)) continue;
+      for (const flexibility of flexibilities) {
         const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
         offers.push(offer);
-        remembered.push({ offer, trips: inboundTrip ? [trip, inboundTrip] : [trip], passengers });
+        remembered.push({ offer, trips: covered, passengers });
       }
     }
   }

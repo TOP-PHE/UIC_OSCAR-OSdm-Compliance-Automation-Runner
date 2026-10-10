@@ -116,9 +116,10 @@ function checkTripBack(trips, ctx, add) {
   const from = stopOf(ctx.outboundCriteria?.destination);
   const to = stopOf(ctx.outboundCriteria?.origin);
   const inbound = trips.filter((t) => t?.id !== ctx.outboundTripId);
+  const seen = trips.map((t) => stopOf(t?.origin) + '→' + stopOf(t?.destination)).join(', ') || 'none';
   add(`Return: a trip goes back, from ${from} to ${to}`,
     inbound.some((t) => stopOf(t.origin) === from && stopOf(t.destination) === to),
-    `no trip of the inbound response runs from ${from} to ${to}; trips: ${trips.map((t) => `${stopOf(t?.origin)}→${stopOf(t?.destination)}`).join(', ') || 'none'}`);
+    `no trip of the inbound response runs from ${from} to ${to}; trips: ${seen}`);
   for (const t of inbound) {
     if (t?.direction != null && t.direction !== 'IN_BOUND') {
       add(`Return: trip ${t.id} of the inbound search is IN_BOUND`, false,
@@ -148,8 +149,13 @@ function checkCombinedOffers(offers, tripIds, ctx, add) {
     const back = offer?.inboundTripCoverage?.coveredTripId;
     add(`${label} covers an inbound trip of the response (inboundTripCoverage.coveredTripId)`,
       !!back && back !== ctx.outboundTripId && tripIds.includes(back),
-      back ? `${back} is ${back === ctx.outboundTripId ? 'the outbound trip' : 'not a trip of the response'}` : 'inboundTripCoverage is missing: the offer does not cover both directions');
+      inboundCoverageProblem(back, ctx.outboundTripId));
   });
+}
+
+function inboundCoverageProblem(back, outboundTripId) {
+  if (!back) return 'inboundTripCoverage is missing: the offer does not cover both directions';
+  return `${back} is ${back === outboundTripId ? 'the outbound trip' : 'not a trip of the response'}`;
 }
 
 // Separate directions: an inbound offer that names its trip names an inbound
@@ -202,5 +208,5 @@ module.exports = {
 try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
-  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+  console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + e?.message);
 }

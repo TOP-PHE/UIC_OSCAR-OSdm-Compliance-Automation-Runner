@@ -87,7 +87,7 @@ function buildReturnOfferCollectionRequest() {
 
   bru.setEnvVar("ReturnOfferCollectionRequest", JSON.stringify(body));
   const tsc = body.tripSearchCriteria;
-  validationLogger(`[INFO] 🔁 Return (inward) offer request built — ${model}: ${tsc.origin && tsc.origin.stopPlaceRef} → ${tsc.destination && tsc.destination.stopPlaceRef} on ${tsc.departureTime}, returnSearchParameters ${JSON.stringify(tsc.returnSearchParameters)}`);
+  validationLogger(`[INFO] 🔁 Return (inward) offer request built — ${model}: ${tsc.origin?.stopPlaceRef} → ${tsc.destination?.stopPlaceRef} on ${tsc.departureTime}, returnSearchParameters ${JSON.stringify(tsc.returnSearchParameters)}`);
   return true;
 }
 
@@ -120,7 +120,7 @@ function buildOfferCollectionRequest() {
   // (before, in the trip's returnSearchParameters.inwardReturnDate).
   const inboundDate = bru.getEnvVar("returnInboundDate");
   if (inboundDate && returnUsesInboundDate(getComplianceVersion())) {
-    body.offerSearchCriteria = Object.assign({}, body.offerSearchCriteria, { inboundDate: localDateTime(inboundDate) });
+    body.offerSearchCriteria = { ...body.offerSearchCriteria, inboundDate: localDateTime(inboundDate) };
   }
 
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
