@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.254",
+  "current_release": "2026.255",
   "releases": [
+    {
+      "release": "2026.255",
+      "date": "2026-10-10",
+      "server": "1.11.226",
+      "collection": "OTST_V2.0.110",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#621): three moderate advisories in the Bruno CLI tree are closed with overrides in Oscar_Server/bruno-cli/package.json: csv-parse 5.6.0 → 7.0.3 (GHSA-8cw4-87c7-c6xx), uuid 10.0.0 → 11.1.1 (GHSA-w5hq-g745-h8pq), yaml 2.3.4 → 2.9.1 (GHSA-48c2-rrv3-qjmp). @usebruno/cli stays at 4.2.1; npm audit reports no vulnerability.",
+        "No server code or collection change. The collection was run against the simulator with the old and the new tree: same checks, none failed."
+      ]
+    },
     {
       "release": "2026.254",
       "date": "2026-10-10",

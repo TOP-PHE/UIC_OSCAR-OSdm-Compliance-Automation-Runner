@@ -62,6 +62,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.226] — 2026-10-10
+
+Issue #621: three moderate advisories in the Bruno CLI tree. Dependencies of
+the Bruno engine only; no server code change. Collection unchanged
+(OTST_V2.0.110).
+
+### Security
+
+- **`Oscar_Server/bruno-cli/package.json` gains three `overrides` floors**,
+  next to those of #545. @usebruno/cli stays at 4.2.1; `npm audit` on its
+  lockfile now reports no vulnerability.
+  - csv-parse `^7.0.3` (was 5.6.0): GHSA-8cw4-87c7-c6xx, prototype
+    replacement through `columns`.
+  - uuid `^11.1.1` (was 10.0.0): GHSA-w5hq-g745-h8pq, missing buffer bounds
+    check in v3/v5/v6.
+  - yaml `^2.8.3` (installed 2.9.1, was 2.3.4): GHSA-48c2-rrv3-qjmp, stack
+    overflow on deeply nested collections.
+- No Dependabot pull request could do it: the fixed versions are outside the
+  ranges Bruno 4.2.1 declares (`csv-parse ^5.5.6`, `uuid ^10.0.0`,
+  `yaml 2.3.4`).
+- csv-parse and uuid change major version. The CLI uses csv-parse in one
+  place (`parseCSV`: callback form, `columns`, `skip_empty_lines`, `trim`, for
+  `--csv-file-path`, which OSCAR does not use) and uuid as `uuid.v4()`; both
+  were run with those arguments. The collection was run against the simulator
+  with the old and the new tree (sale 3.6 and 3.8, return separate 3.7,
+  return combined 3.8, refund of a whole return 3.8, refund of its inbound
+  ticket 3.7): the same 173, 232, 240, 281, 440 and 371 checks, none failed.
+
+---
+
 ## [server-1.11.225] / [collection-OTST_V2.0.110] — 2026-10-10
 
 Issue #595, release 2026.254. Simulator 0.5.0.
