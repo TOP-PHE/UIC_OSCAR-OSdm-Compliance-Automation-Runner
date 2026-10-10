@@ -162,7 +162,7 @@ function rememberRefundOffersToConfirm(refundOffers) {
 function nextRefundOfferToConfirm() {
   const ids = _readJson("__refundOfferIds", []);
   const next = Number.parseInt(bru.getEnvVar("__refundOfferIndex") || "0", 10) + 1;
-  if (!(next < ids.length)) return null;
+  if (Number.isNaN(next) || next >= ids.length) return null;
   bru.setEnvVar("__refundOfferIndex", String(next));
   bru.setEnvVar("refundOffersOfferId", ids[next]);
   return { id: ids[next], position: next + 1, total: ids.length };

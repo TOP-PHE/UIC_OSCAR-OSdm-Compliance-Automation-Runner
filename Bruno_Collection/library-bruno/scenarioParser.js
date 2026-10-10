@@ -730,9 +730,10 @@ function parseScenarioData(jsonData) {
       const _prByFf = (scenario.partialRefundByFulfillment === true ||
                        ["true", "on", "yes"].includes(String(scenario.partialRefundByFulfillment).toLowerCase()));
       bru.setEnvVar("partialRefundByFulfillment", _prByFf ? "true" : "false");
+      const _prFfDefault = _prByFf ? "first" : "";
       bru.setEnvVar("partialRefundFulfillmentSelection",
         ["", "null", null, undefined].includes(scenario.partialRefundFulfillmentSelection)
-          ? (_prByFf ? "first" : "")
+          ? _prFfDefault
           : String(scenario.partialRefundFulfillmentSelection));
 
       // Setup-time consistency checks. The wizard does these proactively too;
