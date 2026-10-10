@@ -26,6 +26,7 @@ const { buildOfferCollection, productsOf } = require('./osdm/offers');
 const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
+const { buildTripCollection } = require('./osdm/trips');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -249,6 +250,15 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return response;
   }
 
+  // POST /trips-collection (#602): its trips are remembered, so that offers
+  // can be asked for them by id.
+  async function tripCollectionRoute(req, provider, scope) {
+    requireMethod(req, 'POST');
+    const { response, trips } = buildTripCollection(await bodyOf(req), provider);
+    for (const trip of trips) store.put('trip', scope, trip.id, trip);
+    return response;
+  }
+
   async function osdmRoute(req, provider, clientId, segments) {
     const scope = `${provider.key}\n${clientId}`;
     const [resource, ...rest] = segments;
@@ -264,6 +274,8 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return reductionCardCollection(provider);
     }
     if (resource === 'offers' && rest.length === 0) return offerRoute(req, provider, scope);
+    // #602: a provider with a trip search answers it; the others answer 501.
+    if (resource === 'trips-collection' && rest.length === 0 && provider.tripsCollection) return tripCollectionRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);
     if (NOT_PROVIDED.has(resource)) throw notProvided();
     throw notFound();

@@ -259,6 +259,16 @@
             "type": ["string", "null"],
             "enum": ["RESERVATION_SELECTION", "PLACE_SELECTION", "ADD_LATER", "", null]
           },
+          "offersByTripIds": {
+            "description": "Offers asked by trip id (#602). When on, the offer step first asks POST /trips-collection with the origin, destination and time of the scenario's SEARCH trip, takes the trip running the trip's train (vehicleNumber) or, without one, the first leaving at the time asked or later, and asks POST /offers with tripIds naming it. A one-way journey only: a return, or a SPECIFICATION trip, is asked as before with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "tripIdsExpectRejection": {
+            "description": "Negative test (#602). When on, POST /offers names a trip id the provider never gave: it must answer 4xx with an RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "expectedProductAbsent": {
             "description": "Negative test (#599). When true, no offer may hold expectedProduct (for example a group that the product's rules exclude): the offer step passes when none does, fails when one does, and the scenario ends there either way. Ignored without expectedProduct. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

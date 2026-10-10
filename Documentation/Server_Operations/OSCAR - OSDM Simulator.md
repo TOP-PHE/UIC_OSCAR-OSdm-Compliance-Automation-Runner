@@ -194,7 +194,9 @@ rebuilds its Test Framework from the file.
    on 3.8 only: `SIM_SALE_RESERVATION_MANDATORY_2ADT_38`,
    `SIM_SALE_RESERVATION_SELECTION_2ADT_38`,
    `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` and
-   `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38`.
+   `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38`, and offers by trip id (#602) on
+   3.8 only: `SIM_SALE_BY_TRIP_ID_1ADT_38`, `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38`
+   and the negative test `SIM_SALE_BY_TRIP_ID_UNKNOWN_38`.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer

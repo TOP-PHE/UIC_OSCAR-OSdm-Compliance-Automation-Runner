@@ -10,6 +10,7 @@
   "idPrefix": "GAMMA",
   "utcOffset": "+02:00",
   "tokenLifetimeSeconds": 900,
+  "tripsCollection": true,
   "reservations": {
     "SC": "MANDATORY",
     "EC": "OPTIONAL"

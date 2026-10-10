@@ -891,3 +891,67 @@ test('reservations: added to a pre-booked booking with offer-parts, once, then o
   assert.equal(after.confirmedPrice.amount, [...after.bookedOffers[0].admissions, ...after.bookedOffers[0].reservations].reduce((s, p) => s + p.price.amount, 0));
   assert.equal((await call(sim.base, token, 'POST', url, body)).status, 409, 'not after confirmation');
 });
+
+// ── offers by trip ids (#602) ───────────────────────────────────────────────
+
+const tripSearch = () => offerRequest().tripSearchCriteria;
+
+test('trips collection: gamma answers four departures, each with a train of its own; the others answer 501', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const res = await call(sim.base, token, 'POST', '/gamma/trips-collection', tripSearch());
+  assert.equal(res.status, 200);
+  assert.match(res.body.id, /^GAMMA-TRIPS-[0-9a-f]{16}$/);
+  const starts = res.body.trips.map((t) => t.startTime);
+  assert.deepEqual(starts, ['2026-11-20T07:30:00+02:00', '2026-11-20T08:00:00+02:00', '2026-11-20T09:00:00+02:00', '2026-11-20T10:00:00+02:00']);
+  const numbers = res.body.trips.map((t) => t.legs[0].timedLeg.service.vehicleNumbers[0]);
+  assert.equal(new Set(numbers).size, 4);
+  assert.equal(new Set(res.body.trips.map((t) => t.id)).size, 4);
+
+  // The departure at the time asked is the trip a search for offers gets.
+  const searched = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body.trips[0];
+  assert.equal(searched.id, res.body.trips[1].id);
+  assert.equal(searched.legs[0].timedLeg.service.vehicleNumbers[0], numbers[1]);
+
+  const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'POST', '/alpha/trips-collection', tripSearch());
+  assert.equal(alpha.status, 501);
+  const get = await call(sim.base, token, 'GET', '/gamma/trips-collection');
+  assert.equal(get.status, 405);
+});
+
+test('trips collection: a search that is not valid, or a return, is refused with a Problem', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const noOrigin = await call(sim.base, token, 'POST', '/gamma/trips-collection', { ...tripSearch(), origin: undefined });
+  assert.equal(noOrigin.status, 400);
+  assert.equal(noOrigin.body.code, 'VALIDATION_ERROR');
+  const back = await call(sim.base, token, 'POST', '/gamma/trips-collection', { ...tripSearch(), returnSearchParameters: { outboundTripIds: ['x'] } });
+  assert.equal(back.status, 400);
+  assert.match(back.body.detail, /returnSearchParameters/);
+});
+
+test('offers by trip ids: offers for the trip named, which can be booked; an unknown id is refused', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const { trips } = (await call(sim.base, token, 'POST', '/gamma/trips-collection', tripSearch())).body;
+  const request = offerRequest({ tripIds: [trips[2].id] });
+  delete request.tripSearchCriteria;
+  const res = await call(sim.base, token, 'POST', '/gamma/offers', request);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.trips.map((t) => t.id), [trips[2].id]);
+  assert.ok(res.body.offers.length > 0);
+  assert.ok(res.body.offers.every((o) => o.tripCoverage.coveredTripId === trips[2].id));
+  const booked = await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(res.body.offers[0]));
+  assert.equal(booked.status, 200);
+
+  const unknown = await call(sim.base, token, 'POST', '/gamma/offers', { ...request, tripIds: ['GAMMA-TRIP-000000000000'] });
+  assert.equal(unknown.status, 400);
+  assert.equal(unknown.body.code, 'VALIDATION_ERROR');
+  assert.match(unknown.body.detail, /tripIds\[0\].*not a trip this client was given/);
+
+  // Another client's trip is unknown to this one, and a return by ids is not provided.
+  const other = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'POST', '/alpha/offers', request);
+  assert.equal(other.status, 400);
+  const inbound = await call(sim.base, token, 'POST', '/gamma/offers', { ...request, inboundTripIds: [trips[3].id] });
+  assert.equal(inbound.status, 400);
+  assert.match(inbound.body.detail, /inboundTripIds/);
+  const tooMany = await call(sim.base, token, 'POST', '/gamma/offers', { ...request, tripIds: Array(5).fill(trips[0].id) });
+  assert.equal(tooMany.status, 400);
+});

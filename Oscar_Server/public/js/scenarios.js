@@ -60,6 +60,9 @@ const ENUMS = {
   reservationBookingForm:            [null, 'RESERVATION_SELECTION', 'PLACE_SELECTION', 'ADD_LATER'],
   // #599: negative test, the expected product must not be offered.
   expectedProductAbsent:             ['off', 'on'],
+  // #602: offers asked by trip id, after POST /trips-collection; and its negative test.
+  offersByTripIds:                   ['off', 'on'],
+  tripIdsExpectRejection:            ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -1542,6 +1545,10 @@ function buildDetailHTML(idx) {
           'The class expected on each leg, in the order of the legs (#600): for a train with a first class and one without. The request asks for every class named; the offer chosen must give each leg its class, by an admission of its own or by a supplement on that leg, and so must the booking. Empty: the travel class criterion applies.')}
         ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
           'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
+        ${buildSelect(idx, 'offersByTripIds', 'Offers by trip id', ENUMS.offersByTripIds,
+          'Offers asked by trip id (#602). On: POST /trips-collection is asked with the origin, destination and time of the SEARCH trip; the trip of its train number, or else the first leaving at that time or later, is taken, and POST /offers names it in tripIds. One-way only: a return or a SPECIFICATION trip is asked as before.')}
+        ${buildSelect(idx, 'tripIdsExpectRejection', 'Unknown trip id refused', ENUMS.tripIdsExpectRejection,
+          'Negative test (#602). On: POST /offers names a trip id the provider never gave, and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE

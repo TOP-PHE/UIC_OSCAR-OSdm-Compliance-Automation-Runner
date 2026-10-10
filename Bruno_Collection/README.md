@@ -139,7 +139,10 @@ supplement and second class on the second. Seat reservations (#601), on
 (optional): `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` (the mandatory one only),
 `SIM_SALE_RESERVATION_SELECTION_2ADT_38`, `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38`
 and `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` (the optional one too, in each
-form).
+form). Offers by trip id (#602), on `gamma` only, after `POST
+/trips-collection`: `SIM_SALE_BY_TRIP_ID_1ADT_38` (the first departure at the
+time asked), `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38` (the train the trip names,
+a later departure) and the negative test `SIM_SALE_BY_TRIP_ID_UNKNOWN_38`.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional

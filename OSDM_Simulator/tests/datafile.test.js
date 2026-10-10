@@ -15,6 +15,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { loadProviders } = require('../src/config');
 const { buildOfferCollection } = require('../src/osdm/offers');
+const { buildTripCollection } = require('../src/osdm/trips');
 const { PROVIDERS_DIR } = require('./helpers');
 
 const collection = path.join(__dirname, '..', '..', 'Bruno_Collection');
@@ -70,7 +71,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -268,4 +269,18 @@ test('the reservation scenarios: one per form, on a SuperCity (mandatory) then a
   }, gamma, Date.parse('2026-11-02T09:00:00Z'));
   assert.ok(response.offers.every((o) => o.reservationOfferParts.length === 2));
   for (const scenario of datafile.scenarios.filter((s) => !booked.includes(s))) assert.equal(scenario.reservationBookingForm, undefined, scenario.code);
+});
+
+test('the trip id scenarios: the train named is a later departure of POST /trips-collection than the time asked (#602)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const byId = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_BY_TRIP_ID_'));
+  assert.deepEqual(byId.map((s) => [s.offersByTripIds ?? null, s.tripIdsExpectRejection ?? null]), [['on', null], ['on', null], [null, 'on']]);
+  const named = datafile.tripRequirements.find((t) => t.id === byId[1].tripRequirementId);
+  const { trips } = buildTripCollection(tripRequest(named).tripSearchCriteria, gamma);
+  const numbers = trips.map((t) => t.legs[0].timedLeg.service.vehicleNumbers[0]);
+  // Third in the answer: neither the first trip nor the one at the time asked.
+  assert.equal(numbers.indexOf(named.trip.vehicleNumber), 2);
+  for (const scenario of byId) {
+    assert.equal(datafile.tripRequirements.find((t) => t.id === scenario.tripRequirementId).tripType, 'SEARCH', scenario.code);
+  }
 });

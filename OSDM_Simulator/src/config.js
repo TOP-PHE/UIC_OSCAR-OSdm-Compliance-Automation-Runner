@@ -69,6 +69,8 @@ function checkProvider(key, raw) {
   const products = checkProducts(raw.products, bad);
   const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
   const reservations = checkReservations(raw.reservations, bad);
+  // #602: POST /trips-collection is answered only when the profile says so.
+  if (raw.tripsCollection !== undefined && typeof raw.tripsCollection !== 'boolean') throw bad('tripsCollection');
   return {
     key,
     name: raw.name,
@@ -84,6 +86,7 @@ function checkProvider(key, raw) {
     ...(products ? { products } : {}),
     ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
     ...(reservations ? { reservations } : {}),
+    ...(raw.tripsCollection ? { tripsCollection: true } : {}),
   };
 }
 

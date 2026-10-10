@@ -942,6 +942,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   still skipped when the filter says so. Bruno may give a JSON variable back
   as an object (`offer` does): read it with `fromEnv()`, never a bare
   `JSON.parse`, or a check silently sees nothing.
+- **Offers by trip id are asked from 01's own script** (#602, 1.11.233 /
+  OTST_V2.0.117). `library-bruno/tripIds.js` (pure) chooses the trip of
+  `POST /trips-collection` (the trip's train, else the first at the time asked
+  or later). The call is `bru.sendRequest` in `prepareOfferRequestByTripIds()`,
+  not a request file, on purpose: nine places route straight to `01. POST Get
+  Offer` (retry, loop-back, expired-flow reruns, exchange ends), and the
+  next scenario is loaded in 01's before-request, so a step before 01 would
+  be skipped or would see the previous scenario. Its checks are kept in
+  `__tripIdsOutcome` and recorded by 01's after-response, ahead of the status
+  check, because the negative test (`tripIdsExpectRejection`) expects a 4xx
+  there. One-way SEARCH trips only.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
