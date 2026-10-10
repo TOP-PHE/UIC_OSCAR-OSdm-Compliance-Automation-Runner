@@ -69,8 +69,7 @@ function checkProvider(key, raw) {
   const products = checkProducts(raw.products, bad);
   const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
   const reservations = checkReservations(raw.reservations, bad);
-  // #602: POST /trips-collection is answered only when the profile says so.
-  if (raw.tripsCollection !== undefined && typeof raw.tripsCollection !== 'boolean') throw bad('tripsCollection');
+  const tripsCollection = checkTripsCollection(raw.tripsCollection, bad);
   return {
     key,
     name: raw.name,
@@ -86,7 +85,7 @@ function checkProvider(key, raw) {
     ...(products ? { products } : {}),
     ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
     ...(reservations ? { reservations } : {}),
-    ...(raw.tripsCollection ? { tripsCollection: true } : {}),
+    ...(tripsCollection ? { tripsCollection } : {}),
   };
 }
 
@@ -144,6 +143,13 @@ function checkCategories(categories, bad) {
     && categories.every((c) => typeof c === 'string' && /^[A-Za-z0-9]{1,10}$/.test(c)) && new Set(categories).size === categories.length;
   if (!ok) throw bad('secondClassOnlyCategories');
   return [...categories];
+}
+
+// #602: POST /trips-collection is answered only when the profile says so.
+function checkTripsCollection(value, bad) {
+  if (value === undefined) return false;
+  if (typeof value !== 'boolean') throw bad('tripsCollection');
+  return value;
 }
 
 // The seat reservation of each train category (#601), by short name:

@@ -162,7 +162,7 @@ function coveredTripsOf(offer) {
 function checkOffersForTrip(body, tripId) {
   const offers = listOf(body?.offers);
   const other = offers.map((o) => ({ id: o?.offerId, trips: coveredTripsOf(o) }))
-    .filter((o) => o.trips.length > 0 && o.trips.some((t) => t !== tripId));
+    .filter((o) => o.trips.some((t) => t !== tripId));
   const unknown = offers.filter((o) => coveredTripsOf(o).length === 0).length;
   const checks = [{
     name: `Offers by trip id: every offer covers the trip asked (${tripId})`,

@@ -1863,13 +1863,6 @@ function handleOptionalReservationSelections(selectedOffer) {
     return;
   }
   validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
-  const recordChecks = (checks) => checks.forEach((c) => {
-    if (c.level === "warn") {
-      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
-      return;
-    }
-    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
-  });
   recordChecks(sr.checkRelations(selectedOffer));
   const passengerRefs = (parseEnvJson("offerPassengerSpecifications", []) || []).map((p) => p?.externalRef).filter(Boolean);
   recordChecks(sr.checkProviderRules(selectedOffer, passengerRefs));
@@ -2223,16 +2216,9 @@ function checkOfferRequestByTripIds(status, body) {
     }
     return true;
   }
-  const record = (checks) => checks.forEach((c) => {
-    if (c.level === "warn") {
-      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
-      return;
-    }
-    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
-  });
-  record(outcome.checks || []);
+  recordChecks(outcome.checks || []);
   if (outcome.failed) return true;
-  if (status === 200) record(require("./tripIds.js").checkOffersForTrip(body, outcome.tripId));
+  if (status === 200) recordChecks(require("./tripIds.js").checkOffersForTrip(body, outcome.tripId));
   return false;
 }
 

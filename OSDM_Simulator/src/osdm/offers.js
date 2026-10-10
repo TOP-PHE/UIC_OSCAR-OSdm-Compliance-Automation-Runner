@@ -261,7 +261,7 @@ function tripsById(body, known) {
   return body.tripIds.map((id, i) => {
     const trip = known.trip?.(ref(id, `tripIds[${i}]`));
     if (!trip) throw bad(`tripIds[${i}]: "${id}" is not a trip this client was given`);
-    return JSON.parse(JSON.stringify(trip));
+    return structuredClone(trip);
   });
 }
 
