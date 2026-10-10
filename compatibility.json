@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.260",
+  "current_release": "2026.261",
   "releases": [
+    {
+      "release": "2026.261",
+      "date": "2026-10-10",
+      "server": "1.11.232",
+      "collection": "OTST_V2.0.116",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#601): mandatory and optional seat reservations. A reservation is mandatory when an admission's reservations relation has minGroupItemsToBeBooked above 0: OSCAR now books it by itself. reservationBookingForm books the optional ones too: RESERVATION_SELECTION (optionalReservationSelections), PLACE_SELECTION (placeSelections with the trip and leg) or ADD_LATER (POST .../booked-offers/{id}/offer-parts, step 09). bookMandatoryReservations keeps working and now means 'book the optional ones too' (library-bruno/seatReservations.js, pure).",
+        "Checks: each relation names reservation parts of the offer and fits its group (fail); a reservation for all passengers and on one leg at most (ČD rules, warnings); the booking holds each reservation booked on its leg (fail), and the place it was given (warning). The admission-level minGroupItemsToBeBooked checks, which read a field OSDM does not put there and so never ran, are removed.",
+        "Server 1.11.232: Test Config has the Optional reservations field; the data file schema accepts reservationBookingForm.",
+        "Simulator 0.11.0 (not part of a release): reservations by train category (gamma: SC mandatory, EC optional), booking by either selection, POST offer-parts, seats in placeAllocation; a booked admission now keeps the offer's isReservationRequired. Four reservation scenarios on 3.8."
+      ]
+    },
     {
       "release": "2026.260",
       "date": "2026-10-10",

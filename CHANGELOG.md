@@ -62,6 +62,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.232] / [collection-OTST_V2.0.116] — 2026-10-10
+
+Issue #601, release 2026.261. Simulator 0.11.0.
+
+### Added
+
+- **Mandatory seat reservations are booked by themselves; optional ones in
+  the form the scenario names.** `library-bruno/seatReservations.js` holds the
+  rules (pure).
+  - A reservation is **mandatory** when a relation in an admission's
+    `reservations` has `minGroupItemsToBeBooked` above 0; the first that many
+    of its group are booked with every booking. At 0 it is **optional**.
+  - **`reservationBookingForm`** books the optional ones too (the first of
+    each optional group): `RESERVATION_SELECTION` sends
+    `optionalReservationSelections`, `PLACE_SELECTION` sends `placeSelections`
+    naming the trip and the leg, `ADD_LATER` adds them after the booking with
+    `POST /bookings/{id}/booked-offers/{id}/offer-parts` (step `09`, without
+    the post-booking seat map). A mandatory reservation always goes with the
+    booking.
+  - `bookMandatoryReservations` keeps working: it now means "book the
+    optional ones too", in `optionalReservationSelections`. An offer whose
+    reservation parts no relation names gives them as optional.
+  - **Checks.** Each relation names reservation parts of the offer and asks
+    for no more than its group holds (failures). Each reservation part is for
+    all passengers and on one leg at most: ČD's rules, which OSDM does not
+    make everyone's, so warnings. `07` checks the booking holds each
+    reservation booked, on the same trip and leg whatever its id (failure),
+    and reports the coach and seats given (a warning when none); `09` checks
+    the reservations it added the same way.
+- **Test Config**: an "Optional reservations" field in Booking Flow Actions.
+  `datafile.schema.json` accepts `reservationBookingForm`.
+
+### Fixed
+
+- `minGroupItemsToBeBooked` / `maxGroupItemsToBeBooked` were checked on the
+  admission, where OSDM never puts them, so those checks never ran on a
+  conformant answer. They are read from the relations now.
+- A Bruno variable holding JSON can come back as an object: the new steps
+  read them with `fromEnv()`, which takes either.
+
+### Simulator 0.11.0
+
+- A profile may map train categories to `reservations` (`gamma`: `SC`
+  mandatory, `EC` optional). On such a leg an offer holds one collective
+  reservation offer part, and each admission of the trip a relation to it; a
+  mandatory one is in the offer's price.
+- A booking takes every mandatory reservation and those named in
+  `optionalReservationSelections` or `placeSelections` (a place selection
+  must name the reservation's own trip and leg); an unknown one is refused. A
+  booked reservation carries `placeAllocation` with a coach and one seat per
+  passenger; the admissions point to it in `reservationRefs`.
+- `POST …/booked-offers/{bookedOfferId}/offer-parts` adds reservations to a
+  pre-booked booking (`409` twice or after confirmation).
+- Reservations are on the ticket, in the prices and refunded with it.
+- A booked admission kept `isReservationRequired: false` whatever the offer
+  said; it now keeps the offer's value.
+- The data file has `SIM_SALE_RESERVATION_MANDATORY_2ADT_38`,
+  `SIM_SALE_RESERVATION_SELECTION_2ADT_38`,
+  `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` and
+  `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38`, on a SuperCity then a EuroCity.
+
+Checked: the four scenarios standalone against the simulator (334, 362, 362
+and 360 checks) and through OSCAR (two fewer each): none failed, and each
+booking holds the reservations booked. Sale, class per leg, group, return,
+refund and card scenarios on gamma, a sale on alpha and a refund on beta: no
+failure, the same number of checks as before. Counter-check: with the
+simulator booking no reservation, the booking checks fail on both legs (and
+the price check with them). Not yet run against a real provider (ČD cases 1
+and 2).
+
+---
+
 ## [server-1.11.231] / [collection-OTST_V2.0.115] — 2026-10-10
 
 Issue #600, release 2026.260. Simulator 0.10.0.

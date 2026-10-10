@@ -254,6 +254,11 @@
             "type": ["array", "string", "null"],
             "items": { "type": "string" }
           },
+          "reservationBookingForm": {
+            "description": "How the optional seat reservations are booked (#601). A mandatory reservation (a relation of an admission with minGroupItemsToBeBooked above 0) is always booked with the booking. RESERVATION_SELECTION: optionalReservationSelections; PLACE_SELECTION: placeSelections naming the trip and leg; ADD_LATER: added after the booking by POST /bookings/{id}/booked-offers/{id}/offer-parts. Empty or null: optional reservations are not booked.",
+            "type": ["string", "null"],
+            "enum": ["RESERVATION_SELECTION", "PLACE_SELECTION", "ADD_LATER", "", null]
+          },
           "expectedProductAbsent": {
             "description": "Negative test (#599). When true, no offer may hold expectedProduct (for example a group that the product's rules exclude): the offer step passes when none does, fails when one does, and the scenario ends there either way. Ignored without expectedProduct. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

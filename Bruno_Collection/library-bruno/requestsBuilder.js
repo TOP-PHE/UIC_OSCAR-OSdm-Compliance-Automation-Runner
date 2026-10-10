@@ -164,7 +164,9 @@ function buildBookingRequest() {
     ? bookingPassengerSpecifications
     : passengersWithCardIssuers("offerPassengerSpecifications");
 
-  const placeSelections = parseEnvJson("placeSelections", []);
+  // #601: reservations booked by placeSelections (reservationBookingForm
+  // PLACE_SELECTION) go with the seat map's own selections.
+  const placeSelections = [...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])];
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   const optionalReservationSelections = parseEnvJson("optionalReservationSelections", []);

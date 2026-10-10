@@ -92,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -687,6 +687,8 @@ function parseScenarioData(jsonData) {
       // #239 — book mandatory reservations via optionalReservationSelections.
       bru.setEnvVar("bookMandatoryReservations",
         (scenario.bookMandatoryReservations === true || String(scenario.bookMandatoryReservations).toLowerCase() === "true") ? "true" : "false");
+      // #601: how the optional reservations are booked (mandatory ones always are).
+      bru.setEnvVar("reservationBookingForm", require('./seatReservations.js').normaliseForm(scenario.reservationBookingForm));
       // #378: place-selection NHF probe sweep. The wizard stores an object of
       // booleans; the env carries an ORDERED array of the enabled probe keys
       // (omit → unknown type → wrong id). Default: no probes. The booking step

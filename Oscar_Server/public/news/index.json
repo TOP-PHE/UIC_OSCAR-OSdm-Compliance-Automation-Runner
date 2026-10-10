@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-seat-reservations",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Mandatory seat reservations booked by themselves, optional ones in the form you choose",
+    "summary": "OSCAR now sees when an offer makes a seat reservation mandatory and books it with the booking. A new field books the optional ones too, by reservation selection, by place selection, or after the booking, and the booking is checked to hold them.",
+    "content": "An offer says a seat reservation is mandatory in its admissions' reservation relations (minGroupItemsToBeBooked above 0). OSCAR now reads that and always books such a reservation with the booking.\n\nThe new field \"Optional reservations\" in the Booking Flow Actions of Test Config books the optional ones too, in one of three ways: in the booking request as reservation selections, in the booking request as place selections naming the trip and leg, or after the booking with the add-offer-part request. Leave it empty to book the mandatory ones only.\n\nAfter fulfillment, OSCAR checks that the booking holds every reservation booked, and reports the coach and seats given. A reservation that does not cover all passengers, or that covers more than one leg, is reported as a warning: some providers require this, OSDM does not.\n\nThe older switch \"Book via optionalReservationSelections\" still works; it now books the optional reservations too."
+  },
+  {
     "id": "2026-10-10-class-per-leg",
     "date": "October 10, 2026",
     "tag": "New",

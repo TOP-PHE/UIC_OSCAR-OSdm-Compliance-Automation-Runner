@@ -74,10 +74,19 @@ runtime:
           placeSelections.push(_sel);
         }
 
+        // #601: reservationBookingForm ADD_LATER names the optional
+        // reservations chosen at offer time, each with its trip and leg.
+        const _later = require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []);
+        const _addLaterForm = bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && _later.length > 0;
+        if (_addLaterForm) {
+          placeSelections.length = 0;
+          placeSelections.push(..._later);
+        }
+
         const body = { offerId: offerId, passengerRefs: passengerRefs };
         if (!useOfferParts) {
           // Deprecated /reservations: reservationOfferId + placeSelections required.
-          body.reservationOfferId = reservationOfferId;
+          body.reservationOfferId = _addLaterForm ? _later[0].reservationId : reservationOfferId;
           body.placeSelections = placeSelections;
         } else if (placeSelections.length > 0) {
           // Unified /offer-parts: placeSelections optional.
@@ -184,6 +193,20 @@ runtime:
         validateBookedOfferPartResponse(body, endpoint).forEach((c) => {
           bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
+
+        // #601: the reservations added are in the answer, on their legs, and
+        // count as booked for the checks of 07.
+        const { checkBookedReservations, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
+        const _addedLater = fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []);
+        if (bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && _addedLater.length > 0) {
+          const _ids = _addedLater.map((s) => s.reservationId);
+          const _offer = fromEnv(bru.getEnvVar("offer"), null);
+          checkBookedReservations(body, _offer, _ids).forEach((c) => {
+            if (c.level === "warn") { if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`); return; }
+            bruTest(c.name.replace(/^Booking:/, "Added reservation:"), () => { if (!c.ok) throw new Error(c.message); });
+          });
+          bru.setEnvVar("__reservationsAddedLater", JSON.stringify(_ids));
+        }
 
         // Mark done so the smart run filter does not re-run this post-booking
         // step if the flow falls through to it again at the end of the scenario.

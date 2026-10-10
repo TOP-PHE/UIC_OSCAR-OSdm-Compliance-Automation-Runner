@@ -416,3 +416,51 @@ test('a leg category that is not plain text is replaced by the simulator\'s own'
   const response = build(request, 'gamma');
   assert.equal(response.trips[0].legs[1].timedLeg.service.productCategory.shortName, 'IC');
 });
+
+// ── seat reservations (#601) ────────────────────────────────────────────────
+
+// A trip in three legs: a SuperCity (reservation mandatory), a EuroCity
+// (optional) and a regional train (none).
+const threeLegs = (passengers = [{ externalRef: 'P1', type: 'PERSON' }, { externalRef: 'P2', type: 'PERSON' }]) => {
+  const leg = (from, to, start, end, number, shortName) => ({
+    timedLeg: {
+      start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: from }, serviceDeparture: { timetabledTime: start } },
+      end: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: to }, serviceArrival: { timetabledTime: end } },
+      service: { vehicleNumbers: [number], productCategory: { name: shortName, shortName } },
+    },
+  });
+  const request = offerRequest({
+    anonymousPassengerSpecifications: passengers,
+    tripSpecifications: [{ legs: [
+      leg('urn:uic:stn:0000001', 'urn:uic:stn:0000005', '2026-11-20T08:00:00+02:00', '2026-11-20T10:00:00+02:00', '501', 'SC'),
+      leg('urn:uic:stn:0000005', 'urn:uic:stn:0000006', '2026-11-20T10:20:00+02:00', '2026-11-20T12:00:00+02:00', '172', 'EC'),
+      leg('urn:uic:stn:0000006', 'urn:uic:stn:0000002', '2026-11-20T12:20:00+02:00', '2026-11-20T13:00:00+02:00', '2202', 'R'),
+    ] }],
+  });
+  delete request.tripSearchCriteria;
+  return request;
+};
+
+test('a reservation per leg whose train has one, for all passengers together, mandatory on the SuperCity only', () => {
+  const response = build(threeLegs(), 'gamma');
+  const [trip] = response.trips;
+  const [sc, ec] = trip.legs.map((l) => l.id);
+  for (const offer of response.offers) {
+    const parts = offer.reservationOfferParts;
+    assert.deepEqual(parts.map((p) => p.tripCoverage.coveredLegIds), [[sc], [ec]], 'one leg each, none on the regional train');
+    assert.ok(parts.every((p) => p.offerMode === 'COLLECTIVE' && p.passengerRefs.join() === 'P1,P2'));
+    const product = offer.products.find((p) => p.id === parts[0].summaryProductId);
+    assert.equal(product.type, 'RESERVATION');
+    for (const admission of offer.admissionOfferParts) {
+      assert.deepEqual(admission.reservations.map((r) => [r.minGroupItemsToBeBooked, r.reservationGroup.reservationRefs[0].id]), [[1, parts[0].id], [0, parts[1].id]]);
+      assert.equal(admission.isReservationRequired, true);
+    }
+    const admissions = offer.admissionOfferParts.reduce((sum, p) => sum + p.price.amount, 0);
+    assert.equal(offer.offerSummary.minimalPrice.amount, admissions + parts[0].price.amount, 'the mandatory reservation is in the price, the optional one is not');
+  }
+});
+
+test('no reservation on a searched InterCity, nor on a provider without reservations', () => {
+  assert.ok(build(offerRequest(), 'gamma').offers.every((o) => o.reservationOfferParts === undefined && o.admissionOfferParts.every((a) => a.reservations === undefined)));
+  assert.ok(build(threeLegs()).offers.every((o) => o.reservationOfferParts === undefined));
+});

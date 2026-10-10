@@ -232,11 +232,16 @@ runtime:
         // runs once then routes to 09 itself; if it already ran we go straight
         // to 09. The pre-booking SEATMAP_AT_OFFER path (picks already made at
         // offer time) does not enter here — it is not an add-reservation flow.
-        const _postBookMap = _addRes
+        // #601: reservationBookingForm ADD_LATER adds the optional reservations
+        // after the booking, with no seat map: straight to 09.
+        const _addLater = bru.getEnvVar("reservationBookingForm") === "ADD_LATER"
+            && require(bru.getEnvVar("library_base") + "seatReservations.js").fromEnv(bru.getEnvVar("reservationAddLaterSelections"), []).length > 0
+            && bru.getEnvVar("__addReservationDone") !== "true";
+        const _postBookMap = _addRes && !_addLater
             && bru.getEnvVar("__postBookingPlaceMapDone") !== "true";
         if (_postBookMap) {
             bru.runner.setNextRequest("08b. GET Place Map Post-Booking");
-        } else if (_addRes) {
+        } else if (_addRes || _addLater) {
             bru.runner.setNextRequest("09. POST Add Reservation to Booking");
         } else if (_addAnc) {
             bru.runner.setNextRequest("11. Add Ancillary - Get Additional Offers");

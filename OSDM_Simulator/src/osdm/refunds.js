@@ -35,7 +35,8 @@ const conflict = (detail) => new HttpError(409, 'CONFLICT', 'Conflict', detail);
 const notFound = () => new HttpError(404, 'RESOURCE_NOT_FOUND', 'Refund offer not found');
 const randomId = () => crypto.randomBytes(8).toString('hex');
 
-const admissionsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.admissions);
+// Every part of a booking, reservations included (#601).
+const admissionsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...(bookedOffer.reservations || [])]);
 const price = (amount, currency) => ({ amount, currency, scale: 2 });
 
 // What a part gives back: its fee and what is left of its price.

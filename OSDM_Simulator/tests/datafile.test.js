@@ -58,7 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599) and classes per leg (#600) are gamma's only.
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600) and reservations (#601) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -70,7 +70,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -252,4 +252,20 @@ test('the class-per-leg scenario: gamma gives first class on the InterCity leg o
   assert.ok(upgraded.length > 0);
   const upgradePart = upgraded[0].admissionOfferParts.find((p) => p.summaryProductId.includes('-UPG-'));
   assert.deepEqual(upgradePart.tripCoverage.coveredLegIds, [trip.legs[0].id]);
+});
+
+test('the reservation scenarios: one per form, on a SuperCity (mandatory) then a EuroCity (optional) (#601)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const booked = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_RESERVATION_'));
+  assert.deepEqual(booked.map((s) => s.reservationBookingForm ?? null), [null, 'RESERVATION_SELECTION', 'PLACE_SELECTION', 'ADD_LATER']);
+  for (const scenario of booked) {
+    const requirement = datafile.tripRequirements.find((t) => t.id === scenario.tripRequirementId);
+    assert.deepEqual(requirement.legs.map((l) => gamma.reservations[l.productCategoryShortName]), ['MANDATORY', 'OPTIONAL'], scenario.code);
+  }
+  const { response } = buildOfferCollection({
+    ...tripRequest(datafile.tripRequirements.find((t) => t.id === booked[0].tripRequirementId)),
+    anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }, { externalRef: '00002', type: 'PERSON' }],
+  }, gamma, Date.parse('2026-11-02T09:00:00Z'));
+  assert.ok(response.offers.every((o) => o.reservationOfferParts.length === 2));
+  for (const scenario of datafile.scenarios.filter((s) => !booked.includes(s))) assert.equal(scenario.reservationBookingForm, undefined, scenario.code);
 });

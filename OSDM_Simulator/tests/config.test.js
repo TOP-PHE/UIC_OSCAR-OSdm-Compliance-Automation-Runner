@@ -193,3 +193,10 @@ test('second-class-only categories: gamma names R and Os; a wrong list stops the
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ secondClassOnlyCategories: wrong }) })), /secondClassOnlyCategories/, JSON.stringify(wrong));
   }
 });
+
+test('reservations: gamma\'s SuperCity mandatory, EuroCity optional; a wrong map stops the start (#601)', () => {
+  assert.deepEqual(loadProviders(PROVIDERS_DIR).get('gamma').reservations, { SC: 'MANDATORY', EC: 'OPTIONAL' });
+  for (const wrong of [{}, [], { SC: 'YES' }, { 'S C': 'MANDATORY' }, 'SC']) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ reservations: wrong }) })), /reservations/, JSON.stringify(wrong));
+  }
+});
