@@ -38,6 +38,7 @@ module.exports = {
   compareOfferWithoutCards,
   checkGroupOffer,
   compareGroupOfferIndividual,
+  checkOfferLegClasses,
   routeAfterOfferStep,
 };
 
@@ -554,6 +555,19 @@ function selectAndSetOffer(jsonData) {
       if (holding.length === 0) bru.setEnvVar("__productNotOffered", "true");
       else filteredOffers = holding;
     }
+  }
+
+  // #600: the class the scenario expects on each leg. No offer giving them
+  // fails the scenario, which the offer step then stops (__legClassesNotOffered).
+  const legTravelClasses = parseEnvJson("legTravelClasses", null);
+  if (Array.isArray(legTravelClasses)) {
+    const { offerMatches, offeredCombinations } = require('./legClasses.js');
+    const matching = filteredOffers.filter((o) => offerMatches(o, jsonData.trips, legTravelClasses));
+    test(`Offer: an offer gives each leg its class [${legTravelClasses.join(", ")}] — ${matching.length} offer(s)`, () => {
+      if (matching.length === 0) throw new Error(`classes per leg offered: ${offeredCombinations(jsonData.offers, jsonData.trips).join("; ") || "none"}`);
+    });
+    if (matching.length === 0) bru.setEnvVar("__legClassesNotOffered", "true");
+    else filteredOffers = matching;
   }
 
   // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
@@ -2033,6 +2047,22 @@ function compareOfferWithoutCards(status, body) {
       if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
       return;
     }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+}
+
+// ── Travel class per leg (#600) ──────────────────────────────────────────────
+
+/**
+ * After the offer step of a scenario that names a class per leg: one check
+ * per leg of the chosen offer, saying how its class is given (its admission,
+ * or a supplement on the leg).
+ */
+function checkOfferLegClasses(jsonData) {
+  const expected = parseEnvJson("legTravelClasses", null);
+  if (!Array.isArray(expected)) return;
+  const { checkLegClasses } = require('./legClasses.js');
+  checkLegClasses("Offer", chosenOffer(), jsonData?.trips, expected).forEach((c) => {
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
 }

@@ -58,7 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598) and groups (#599) are gamma's only.
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599) and classes per leg (#600) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -70,7 +70,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -201,19 +201,31 @@ test('the data file holds no real person, station or template', () => {
   for (const station of text.match(/urn:uic:stn:\d+/g)) assert.match(station, /urn:uic:stn:00000\d\d$/);
 });
 
+// What the collection sends for a trip of the data file: a search with the
+// local time, without offset, or the specified legs with their categories.
+function tripRequest(requirement, day = '2026-11-20') {
+  const at = (text) => text.replace('%TRIP_DATE%', day);
+  if (requirement.tripType === 'SPECIFICATION') {
+    return { tripSpecifications: [{ legs: requirement.legs.map((leg) => ({ timedLeg: {
+      start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: leg.origin }, serviceDeparture: { timetabledTime: at(leg.startDatetime) } },
+      end: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: leg.destination }, serviceArrival: { timetabledTime: at(leg.endDatetime) } },
+      service: { vehicleNumbers: [leg.vehicleNumber], productCategory: { productCategoryRef: leg.productCategoryRef, name: leg.productCategoryName, shortName: leg.productCategoryShortName } },
+    } })) }] };
+  }
+  return { tripSearchCriteria: {
+    departureTime: at(requirement.trip.startDatetime).slice(0, 19),
+    origin: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.origin },
+    destination: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.destination },
+  } };
+}
+
 test('every trip of the data file is one the simulator answers, on every provider', () => {
   const providers = loadProviders(PROVIDERS_DIR);
   for (const requirement of datafile.tripRequirements) {
-    assert.equal(requirement.tripType, 'SEARCH');
-    // What the collection sends for a search: the local time, without offset.
-    const departureTime = requirement.trip.startDatetime.replace('%TRIP_DATE%', '2026-11-20').slice(0, 19);
+    assert.ok(['SEARCH', 'SPECIFICATION'].includes(requirement.tripType));
     for (const provider of providers.values()) {
       const { response } = buildOfferCollection({
-        tripSearchCriteria: {
-          departureTime,
-          origin: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.origin },
-          destination: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.destination },
-        },
+        ...tripRequest(requirement),
         anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }],
       }, provider, Date.parse('2026-11-02T09:00:00Z'));
       const wanted = new Set(datafile.scenarios.filter((s) => s.tripRequirementId === requirement.id).map((s) => s.desiredFlexibility));
@@ -221,4 +233,23 @@ test('every trip of the data file is one the simulator answers, on every provide
       for (const flexibility of wanted) assert.ok(offered.has(flexibility), `${provider.key}: ${flexibility}`);
     }
   }
+});
+
+test('the class-per-leg scenario: gamma gives first class on the InterCity leg only, with a supplement (#600)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const perLeg = datafile.scenarios.filter((s) => s.legTravelClasses != null);
+  assert.deepEqual(perLeg.map((s) => [s.code, s.legTravelClasses]), [['SIM_SALE_CLASS_PER_LEG_1ADT_38', ['FIRST', 'SECOND']]]);
+  const requirement = datafile.tripRequirements.find((t) => t.id === perLeg[0].tripRequirementId);
+  assert.deepEqual(requirement.legs.map((l) => gamma.secondClassOnlyCategories.includes(l.productCategoryShortName)), [false, true]);
+  const { response } = buildOfferCollection({
+    ...tripRequest(requirement),
+    anonymousPassengerSpecifications: [{ externalRef: '00001', type: 'PERSON' }],
+    offerSearchCriteria: { travelClasses: ['FIRST', 'SECOND'] },
+  }, gamma, Date.parse('2026-11-02T09:00:00Z'));
+  const [trip] = response.trips;
+  const upgraded = response.offers.filter((o) => o.products.some((p) => p.type === 'UPGRADE_POINT2POINT')
+    && o.offerSummary.overallFlexibility === perLeg[0].desiredFlexibility);
+  assert.ok(upgraded.length > 0);
+  const upgradePart = upgraded[0].admissionOfferParts.find((p) => p.summaryProductId.includes('-UPG-'));
+  assert.deepEqual(upgradePart.tripCoverage.coveredLegIds, [trip.legs[0].id]);
 });

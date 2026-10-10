@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -1192,6 +1192,43 @@
         "offerMode": "COLLECTIVE",
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
+      "description": "Simulated provider: a trip in two legs, first class on the InterCity leg (a supplement from second class) and second class on the regional leg, which has no first class. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "legTravelClasses": [
+        "FIRST",
+        "SECOND"
+      ],
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 4,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -1267,6 +1304,35 @@
         "description": "Simulated trip, station 0000001 to station 0000002, on a Saturday"
       },
       "departureDay": "SATURDAY"
+    },
+    {
+      "id": 4,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000001",
+          "destination": "urn:uic:stn:0000004",
+          "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "vehicleNumber": "101",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        },
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:20:00+01:00",
+          "vehicleNumber": "2202",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip in two legs: InterCity from station 0000001 to station 0000004, then a regional train to station 0000002"
     }
   ],
   "purchaserList": [

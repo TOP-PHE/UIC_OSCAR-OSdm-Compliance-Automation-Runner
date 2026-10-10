@@ -922,6 +922,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   simulator's group rules live on the product (`group` in the profile); a
   group product is never offered to an INDIVIDUAL request, so the earlier
   gamma scenarios see the same offers. Offers and bookings take 19 passengers.
+- **A travel class per leg is read from the products covering each leg**
+  (#600, 1.11.231 / OTST_V2.0.115). `library-bruno/legClasses.js` (pure): a
+  leg's class is the highest `travelClass` of the products that cover it,
+  through `products[].legIds` (else the part's `coveredLegIds`), so a
+  second-class admission plus an `UPGRADE_*` supplement on one leg and a
+  first-class admission of its own on that leg both read as FIRST; the check
+  names the form. `legTravelClasses` replaces the travel class in the request
+  (`travelClasses`, every class named). The simulator read `travelClass` until
+  0.10.0, so it answered every request in second class only: a simulator
+  field read from a request must be the OSDM name the collection sends.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

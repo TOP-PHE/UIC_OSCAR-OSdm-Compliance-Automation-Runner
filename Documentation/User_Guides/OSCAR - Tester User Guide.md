@@ -322,6 +322,16 @@ framework authorised.
   vendors `400`/`500` on an empty `offerSearchCriteria` with no currency.
 - **Service class** — `STANDARD`, `BEST`, `HIGH`, `BASIC`, `ANY_CLASS`.
 - **Travel class** — `FIRST`, `SECOND`, `ANY_CLASS`.
+- **Travel class per leg** (#600) — the class expected on each leg, in the
+  order of the legs, e.g. `FIRST, SECOND` for a trip whose second train has no
+  first class. It replaces the travel class above: the request asks for every
+  class named. The offer is chosen among those that give each leg its class;
+  none doing so fails the scenario, with the combinations offered, and stops
+  it. A provider may sell first class on one leg as a first-class admission of
+  its own, or as a second-class admission for the whole trip and a supplement
+  (an upgrade product) on that leg: both are accepted, and the check names the
+  form found. The booking must give each leg the same class. Use a
+  specification trip, whose legs are listed.
 - **Requested offer parts** — `ADMISSION`, `RESERVATION`, `ANCILLARY`, `FARE_*`,
   `CONTINUOUS_SERVICE`, `ALL`. (Include `RESERVATION` if you intend to pick seats.)
 - **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`.
@@ -922,6 +932,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Currency | `EUR`, … | `offerSearchCriteria.currency` |
 | Service class | `STANDARD` `BEST` `HIGH` `BASIC` `ANY_CLASS` | `offerSearchCriteria` |
 | Travel class | `FIRST` `SECOND` `ANY_CLASS` | `offerSearchCriteria` |
+| Travel class per leg | `FIRST, SECOND`, one per leg | `offerSearchCriteria.travelClasses`; which offer is chosen; checked on the booking |
 | Requested offer parts | `ADMISSION` `RESERVATION` `ANCILLARY` `FARE_*` `CONTINUOUS_SERVICE` `ALL` | `offerSearchCriteria` |
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
 | Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |

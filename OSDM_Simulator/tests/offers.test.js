@@ -102,9 +102,9 @@ test('a train number asked for in the search is the one the trip carries', () =>
 test('the criteria narrow the offers; values the simulator does not know are ignored', () => {
   const flexible = build(offerRequest({ offerSearchCriteria: { flexibilities: ['NON_FLEXIBLE', 'UNKNOWN'] } }));
   assert.deepEqual(flexible.offers.map((o) => o.offerSummary.overallFlexibility), ['NON_FLEXIBLE']);
-  const first = build(offerRequest({ offerSearchCriteria: { travelClass: ['FIRST'] } }));
+  const first = build(offerRequest({ offerSearchCriteria: { travelClasses: ['FIRST'] } }));
   assert.deepEqual([...new Set(first.offers.map((o) => o.offerSummary.overallTravelClass))], ['FIRST']);
-  const second = build(offerRequest({ offerSearchCriteria: { travelClass: ['ANY_CLASS'], flexibilities: [] } }));
+  const second = build(offerRequest({ offerSearchCriteria: { travelClasses: ['ANY_CLASS'], flexibilities: [] } }));
   assert.equal(second.offers.length, 3);
   assert.ok(first.offers[0].offerSummary.minimalPrice.amount > second.offers[0].offerSummary.minimalPrice.amount);
 });
@@ -328,12 +328,12 @@ test('no group offer when the rules are not met, and a Problem says why', () => 
     assert.ok(!codes(response).includes('SIM_WEEKEND_GROUP'), why.source);
     assert.ok(codes(response).includes(still), why.source);
   }
-  const none = build(groupRequest(people(ADULT), { travelClass: ['FIRST'] }), 'gamma');
+  const none = build(groupRequest(people(ADULT), { travelClasses: ['FIRST'] }), 'gamma');
   assert.ok(none.offers.every((o) => o.admissionOfferParts.every((p) => p.offerMode === 'INDIVIDUAL')));
   assert.equal(none.problems.length, 1);
   assert.equal(none.problems[0].code, 'COLLECTIVE_OFFER_NOT_AVAILABLE');
   assert.match(none.problems[0].detail, /Weekend group ticket: 2 to 5 passengers, not 1; Group ticket: 2 to 19 passengers, not 1/);
-  const first = build(groupRequest(people(ADULT, ADULT, ADULT), { travelClass: ['FIRST'], departureTime: '2026-11-20T08:00:00' }), 'gamma');
+  const first = build(groupRequest(people(ADULT, ADULT, ADULT), { travelClasses: ['FIRST'], departureTime: '2026-11-20T08:00:00' }), 'gamma');
   assert.match(first.problems[0].detail, /Group ticket: in second class only/);
 });
 
@@ -352,4 +352,67 @@ test('nineteen passengers can travel as a group; twenty are refused', () => {
   const group = nineteen.offers.find((o) => o.products[0].code === 'SIM_GROUP');
   assert.equal(group.admissionOfferParts[0].passengerRefs.length, 19);
   refused(groupRequest(people(...new Array(20).fill(ADULT))), /1 to 19 passengers/);
+});
+
+// ── travel class per leg (#600) ─────────────────────────────────────────────
+
+const twoLegs = (secondCategory, criteria = { travelClasses: ['FIRST', 'SECOND'] }) => {
+  const leg = (from, to, start, end, number, shortName) => ({
+    externalRef: `leg-${number}`,
+    timedLeg: {
+      start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: from }, serviceDeparture: { timetabledTime: start } },
+      end: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: to }, serviceArrival: { timetabledTime: end } },
+      service: { vehicleNumbers: [number], productCategory: { productCategoryRef: `urn:x:cat:${shortName}`, name: shortName, shortName } },
+    },
+  });
+  const request = offerRequest({
+    tripSpecifications: [{ legs: [
+      leg('urn:uic:stn:0000001', 'urn:uic:stn:0000004', '2026-11-20T08:00:00+02:00', '2026-11-20T10:00:00+02:00', '101', 'IC'),
+      leg('urn:uic:stn:0000004', 'urn:uic:stn:0000002', '2026-11-20T10:20:00+02:00', '2026-11-20T11:20:00+02:00', '202', secondCategory),
+    ] }],
+    offerSearchCriteria: criteria,
+  });
+  delete request.tripSearchCriteria;
+  return request;
+};
+
+test('first class on a trip with a regional leg: a second-class admission for both legs and an upgrade on the other', () => {
+  const response = build(twoLegs('R'), 'gamma');
+  const [trip] = response.trips;
+  const [icLeg, regionalLeg] = trip.legs.map((l) => l.id);
+  assert.deepEqual(trip.legs.map((l) => l.timedLeg.service.productCategory.shortName), ['IC', 'R'], 'the categories asked are kept');
+  const second = response.offers.filter((o) => o.offerSummary.overallTravelClass === 'SECOND');
+  const upgraded = response.offers.filter((o) => o.offerSummary.overallTravelClass === undefined);
+  assert.equal(second.length, 4);
+  assert.equal(upgraded.length, 4);
+  for (const offer of upgraded) {
+    const [base, upgrade] = offer.admissionOfferParts;
+    const productOfPart = (part) => offer.products.find((p) => p.id === part.summaryProductId);
+    assert.deepEqual([productOfPart(base).travelClass, base.tripCoverage.coveredLegIds], ['SECOND', [icLeg, regionalLeg]]);
+    assert.deepEqual([productOfPart(upgrade).type, productOfPart(upgrade).travelClass, upgrade.tripCoverage.coveredLegIds], ['UPGRADE_POINT2POINT', 'FIRST', [icLeg]]);
+    assert.deepEqual(upgrade.products, [{ productId: upgrade.summaryProductId, legIds: [icLeg] }]);
+    assert.equal(offer.offerSummary.minimalPrice.amount, base.price.amount + upgrade.price.amount);
+    // The upgrade costs part of the difference between the classes: two hours of three.
+    const sameSecond = second.find((o) => o.offerSummary.overallFlexibility === offer.offerSummary.overallFlexibility && o.products[0].code === productOfPart(base).code);
+    assert.equal(base.price.amount, sameSecond.offerSummary.minimalPrice.amount);
+    assert.ok(upgrade.price.amount > 0 && upgrade.price.amount < base.price.amount);
+  }
+  assert.ok(upgraded.every((o) => o.summary.endsWith('first class where the train has one')));
+});
+
+test('no regional leg: plain first-class offers; only regional legs: no first-class offer; another provider: first everywhere', () => {
+  const ic = build(twoLegs('IC'), 'gamma');
+  assert.ok(ic.offers.every((o) => o.admissionOfferParts.length === 1 && ['FIRST', 'SECOND'].includes(o.offerSummary.overallTravelClass)));
+  const allRegional = twoLegs('R');
+  allRegional.tripSpecifications[0].legs[0].timedLeg.service.productCategory.shortName = 'Os';
+  assert.deepEqual([...new Set(build(allRegional, 'gamma').offers.map((o) => o.offerSummary.overallTravelClass))], ['SECOND']);
+  const alpha = build(twoLegs('R'));
+  assert.deepEqual(alpha.offers.map((o) => o.offerSummary.overallTravelClass), ['FIRST', 'FIRST', 'FIRST', 'SECOND', 'SECOND', 'SECOND']);
+});
+
+test('a leg category that is not plain text is replaced by the simulator\'s own', () => {
+  const request = twoLegs('R');
+  request.tripSpecifications[0].legs[1].timedLeg.service.productCategory = { shortName: { x: 1 } };
+  const response = build(request, 'gamma');
+  assert.equal(response.trips[0].legs[1].timedLeg.service.productCategory.shortName, 'IC');
 });

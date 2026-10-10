@@ -249,6 +249,11 @@
             "description": "The product (tariff) the scenario expects (#598): a product code, matched exactly, or else words of the product's name (summary, then description), without case. The offer step keeps the offers that hold it and stops the scenario when none does; the fulfilled booking must hold it. Empty or null: the offer is chosen as before.",
             "type": ["string", "null"]
           },
+          "legTravelClasses": {
+            "description": "The travel class expected on each leg of the trip, in the order of the legs (#600): a list such as [\"FIRST\", \"SECOND\"], or the same as text, \"FIRST, SECOND\". The offer request asks for every class named; the offer chosen gives each leg its class (by an admission of its own, or by a supplement on that leg), and the booking must give the same. Empty or null: the travel class criterion applies as before.",
+            "type": ["array", "string", "null"],
+            "items": { "type": "string" }
+          },
           "expectedProductAbsent": {
             "description": "Negative test (#599). When true, no offer may hold expectedProduct (for example a group that the product's rules exclude): the offer step passes when none does, fails when one does, and the scenario ends there either way. Ignored without expectedProduct. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

@@ -185,3 +185,11 @@ test('group rules: gamma\'s two group products; a wrong rule stops the start (#5
   }
   assert.ok(pricedPassengers);
 });
+
+test('second-class-only categories: gamma names R and Os; a wrong list stops the start (#600)', () => {
+  assert.deepEqual(loadProviders(PROVIDERS_DIR).get('gamma').secondClassOnlyCategories, ['R', 'Os']);
+  assert.equal(loadProviders(PROVIDERS_DIR).get('alpha').secondClassOnlyCategories, undefined);
+  for (const wrong of [[], 'R', ['R', 'R'], ['R x'], ['ABCDEFGHIJK'], new Array(11).fill(0).map((_, i) => `C${i}`)]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ secondClassOnlyCategories: wrong }) })), /secondClassOnlyCategories/, JSON.stringify(wrong));
+  }
+});
