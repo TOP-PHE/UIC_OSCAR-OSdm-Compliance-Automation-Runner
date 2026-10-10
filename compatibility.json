@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.258",
+  "current_release": "2026.259",
   "releases": [
+    {
+      "release": "2026.259",
+      "date": "2026-10-10",
+      "server": "1.11.230",
+      "collection": "OTST_V2.0.114",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#599): group tariffs. A scenario asks for one with the COLLECTIVE offer mode and names the group product in expectedProduct. The chosen offer must hold, on each trip it covers, one COLLECTIVE admission for the whole group, naming each passenger's applied passenger type (a warning when none is given). The new step 01d. POST Get Offer Individual sends the same request in the INDIVIDUAL mode: a group dearer than the cheapest offer of the same class (and flexibility) fails, the same price is a warning (library-bruno/groupOffers.js, pure).",
+        "expectedProductAbsent (on/off): the negative test, no offer may hold the expected product; the scenario ends after the offer either way.",
+        "Server 1.11.230: Test Config has the Expected product absent field; the data file schema accepts expectedProductAbsent.",
+        "Simulator 0.9.0 (not part of a release): a product may carry group rules; gamma sells SIM_WEEKEND_GROUP (2 to 5 passengers, at most 2 aged 15 or more, Saturday or Sunday, one ticket, the price of two) and SIM_GROUP (2 to 19, second class only, 60 % after the first), only to a COLLECTIVE request; otherwise a COLLECTIVE_OFFER_NOT_AVAILABLE Problem says why. Up to 19 passengers. Its data file has three group sales and two negative tests on 3.8."
+      ]
+    },
     {
       "release": "2026.258",
       "date": "2026-10-10",

@@ -80,9 +80,9 @@ test('reduction cards: gamma lists three; a wrong list stops the start (#597)', 
   }
 });
 
-test('products: gamma sells four named products; a wrong list stops the start (#598)', () => {
+test('products: gamma sells four named products and two group ones; a wrong list stops the start (#598, #599)', () => {
   const providers = loadProviders(PROVIDERS_DIR);
-  assert.deepEqual(providers.get('gamma').products.map((p) => p.code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND']);
+  assert.deepEqual(providers.get('gamma').products.map((p) => p.code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND', 'SIM_WEEKEND_GROUP', 'SIM_GROUP']);
   assert.equal(providers.get('alpha').products, undefined);
   const good = { code: 'P_A', name: 'Product A', flexibility: 'FULL_FLEXIBLE', factor: 1, isTrainBound: false };
   for (const wrong of [[], [{ ...good, code: 'a' }], [{ ...good, flexibility: 'ANY' }], [{ ...good, factor: 4 }], [{ ...good, isTrainBound: 'no' }], [good, good]]) {
@@ -167,4 +167,21 @@ test('settings have defaults, listen on loopback, and refuse a value out of rang
   assert.throws(() => loadSettings({ SIM_PORT: 'abc' }, '/base'), ConfigError);
   assert.throws(() => loadSettings({ SIM_MAX_BODY_BYTES: '1' }, '/base'), /SIM_MAX_BODY_BYTES/);
   assert.throws(() => loadSettings({ SIM_TTL_SECONDS: '1.5' }, '/base'), /SIM_TTL_SECONDS/);
+});
+
+test('group rules: gamma\'s two group products; a wrong rule stops the start (#599)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  assert.deepEqual(gamma.products.find((p) => p.code === 'SIM_WEEKEND_GROUP').group,
+    { minPassengers: 2, maxPassengers: 5, maxOver15: 2, weekendOnly: true, secondClassOnly: false, oneFulfillment: true, pricedPassengers: 2 });
+  assert.deepEqual(gamma.products.find((p) => p.code === 'SIM_GROUP').group,
+    { minPassengers: 2, maxPassengers: 19, weekendOnly: false, secondClassOnly: true, oneFulfillment: false, followerPercent: 60 });
+  const group = { minPassengers: 2, maxPassengers: 5, weekendOnly: false, secondClassOnly: false, oneFulfillment: false, pricedPassengers: 2 };
+  const product = (rules) => ({ code: 'P_G', name: 'Group', flexibility: 'NON_FLEXIBLE', factor: 1, isTrainBound: false, group: rules });
+  assert.doesNotThrow(() => loadProviders(providersDir({ 'test.json': profile({ products: [product(group)] }) })));
+  const { pricedPassengers, ...unpriced } = group;
+  for (const wrong of [null, { ...group, minPassengers: 0 }, { ...group, maxPassengers: 1 }, { ...group, maxPassengers: 20 }, { ...group, maxOver15: -1 },
+    { ...group, weekendOnly: 'yes' }, { ...group, followerPercent: 50 }, unpriced, { ...unpriced, followerPercent: 0 }, { ...group, pricedPassengers: 0 }]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ products: [product(wrong)] }) })), /products/, JSON.stringify(wrong));
+  }
+  assert.ok(pricedPassengers);
 });

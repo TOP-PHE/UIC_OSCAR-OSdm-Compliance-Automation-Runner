@@ -92,7 +92,7 @@ runtime:
         // #598: no inbound offer holds the expected product: stop, as at 01.
         if (bru.getEnvVar("__productNotOffered") === "true") {
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("POST Get Return Offer (expected product not offered)");
+          loopbackOrStop("POST Get Return Offer (expected product check)");
           return;
         }
 
@@ -117,7 +117,9 @@ runtime:
         });
 
         // #597: the chosen inbound offer applied each passenger's card too.
+        // #599: and, for a group, is one admission for the whole group.
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferCards("Inbound offer");
+        require(bru.getEnvVar("library_base") + "offers.js").checkGroupOffer();
 
         // Return trips book outbound + inbound together; no pre-booking place map.
         bru.setGlobalEnvVar("skipPlaceMaps", true);

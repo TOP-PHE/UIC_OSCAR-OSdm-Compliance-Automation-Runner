@@ -58,7 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597) and products (#598) are gamma's only.
+  // The overrule codes (#596), reduction cards (#597), products (#598) and groups (#599) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -70,7 +70,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -82,7 +82,8 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
-  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE');
+  // The weekend group return (#599) is the group test below.
+  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE' && !s.code.startsWith('SIM_GROUP_'));
   assert.equal(returns.length, 5);
   for (const scenario of returns) {
     const model = scenario.offerSearchCriteria.returnModel;
@@ -157,7 +158,40 @@ test('the product scenarios: each names a product gamma sells, by code or by nam
     assert.equal(scenario.desiredFlexibility, product.flexibility, `${scenario.code}: the flexibility agrees with the product`);
   }
   assert.ok(named.some((s) => !gamma.products.some((p) => p.code === s.expectedProduct)), 'one names the product by its name');
-  for (const scenario of datafile.scenarios.filter((s) => !named.includes(s))) assert.equal(scenario.expectedProduct, undefined, scenario.code);
+  const others = datafile.scenarios.filter((s) => !named.includes(s) && !s.code.startsWith('SIM_GROUP_'));
+  for (const scenario of others) assert.equal(scenario.expectedProduct, undefined, scenario.code);
+});
+
+test('the group scenarios: gamma offers the group product to the groups that meet its rules, and only to them (#599)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const groups = datafile.scenarios.filter((s) => s.code.startsWith('SIM_GROUP_'));
+  assert.deepEqual(groups.map((s) => [s.code, s.expectedProductAbsent === 'on']), [
+    ['SIM_GROUP_WEEKEND_2ADT_2CHD_38', false], ['SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38', false], ['SIM_GROUP_6ADT_38', false],
+    ['SIM_GROUP_WEEKEND_6PAX_ABSENT_38', true], ['SIM_GROUP_WEEKEND_3ADT_ABSENT_38', true],
+  ]);
+  for (const scenario of groups) {
+    assert.equal(scenario.offerSearchCriteria.offerMode, 'COLLECTIVE', scenario.code);
+    const product = gamma.products.find((p) => p.code === scenario.expectedProduct);
+    assert.ok(product?.group, `${scenario.code}: a group product`);
+    assert.equal(scenario.desiredFlexibility, product.flexibility, scenario.code);
+    const requirement = datafile.tripRequirements.find((t) => t.id === scenario.tripRequirementId);
+    // The collection moves the date to the day the trip asks for; 2026-11-21 is a Saturday.
+    const day = requirement.departureDay === 'SATURDAY' ? '2026-11-21' : '2026-11-18';
+    const passengers = datafile.passengersList.find((l) => l.id === scenario.passengersListId).passengers;
+    const { response } = buildOfferCollection({
+      tripSearchCriteria: {
+        departureTime: requirement.trip.startDatetime.replace('%TRIP_DATE%', day).slice(0, 19),
+        origin: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.origin },
+        destination: { objectType: 'StopPlaceRef', stopPlaceRef: requirement.trip.destination },
+      },
+      anonymousPassengerSpecifications: passengers.map((p) => ({ externalRef: p.reference, type: p.type, dateOfBirth: p.dateOfBirth })),
+      offerSearchCriteria: { offerMode: 'COLLECTIVE' },
+    }, gamma, Date.parse('2026-11-02T09:00:00Z'));
+    const offered = response.offers.some((o) => o.products[0].code === product.code);
+    assert.equal(offered, scenario.expectedProductAbsent !== 'on', scenario.code);
+  }
+  const ret = groups.find((s) => s.code.includes('_RETURN_'));
+  assert.deepEqual([ret.offerSearchCriteria.returnModel, ret.offerSearchCriteria.returnFulfillments, ret.offerSearchCriteria.returnOffsetDays], ['COMBINED', 'ONE', 1]);
 });
 
 test('the data file holds no real person, station or template', () => {

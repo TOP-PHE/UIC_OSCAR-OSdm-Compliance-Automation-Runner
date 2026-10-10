@@ -25,13 +25,20 @@
  * A passenger's reduction card is applied when the provider knows it (#597):
  * the passenger's price is reduced and its admissions name the card in
  * `appliedPassengerTypes`. An unknown card is reported in `problems`.
+ *
+ * A group product (#599) is offered only when the request asks for the
+ * COLLECTIVE offer mode and the group meets the product's rules: one admission
+ * per direction for the whole group, priced for the group, naming the
+ * passenger type of each passenger, without card reductions. When no group
+ * offer can be made, the answer holds the individual offers and a Problem
+ * saying why, as OSDM asks of a provider that falls back to the other mode.
  */
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 
-const MAX_PASSENGERS = 9;
+const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
 const MAX_LEGS = 6;
 const MAX_REF_LENGTH = 120;
@@ -51,7 +58,7 @@ function tariffsOf(provider) {
   if (!provider.products) return FLEXIBILITIES;
   return provider.products.map((p) => {
     const flexibility = FLEXIBILITIES.find((f) => f.key === p.flexibility);
-    return { ...flexibility, label: p.name, factor: p.factor, code: p.code, name: p.name, isTrainBound: p.isTrainBound };
+    return { ...flexibility, label: p.name, factor: p.factor, code: p.code, name: p.name, isTrainBound: p.isTrainBound, group: p.group };
   });
 }
 
@@ -72,9 +79,12 @@ function productOf(tariff, travelClass, provider) {
   };
 }
 
+// The travel classes a tariff is sold in: a group product may be second class only.
+const classesOf = (tariff) => Object.keys(TRAVEL_CLASSES).filter((c) => c === 'SECOND' || !tariff.group?.secondClassOnly);
+
 /** The products of a provider, for GET /products: each tariff in each class. */
 function productsOf(provider) {
-  return tariffsOf(provider).flatMap((tariff) => Object.keys(TRAVEL_CLASSES).map((c) => productOf(tariff, c, provider)));
+  return tariffsOf(provider).flatMap((tariff) => classesOf(tariff).map((c) => productOf(tariff, c, provider)));
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
@@ -284,31 +294,106 @@ function appliedPassengerTypesOf(passenger, provider) {
   };
 }
 
+// ── Group products (#599) ───────────────────────────────────────────────────
+
+const AGE_LIMIT = 15;
+const localDay = (trip) => trip.startTime.slice(0, 10);
+const isWeekend = (day) => [0, 6].includes(new Date(`${day}T12:00:00Z`).getUTCDay());
+
+// The age of a passenger on a day, or null without a date of birth.
+function ageOn(dateOfBirth, day) {
+  if (!dateOfBirth) return null;
+  const [y, m, d] = dateOfBirth.split('-').map(Number);
+  const [ty, tm, td] = day.split('-').map(Number);
+  const beforeBirthday = tm < m || (tm === m && td < d);
+  return ty - y - (beforeBirthday ? 1 : 0);
+}
+
+// A passenger without a date of birth counts as aged 15 or more.
+function isOver15(passenger, day) {
+  const age = ageOn(passenger.dateOfBirth, day);
+  return age === null || age >= AGE_LIMIT;
+}
+
+/**
+ * Why a group product cannot be offered to these passengers, on these trips,
+ * in this class; null when it can. The ages are taken on the day of the first
+ * trip.
+ */
+function groupRefusal(tariff, passengers, trips, travelClass) {
+  const rules = tariff.group;
+  const count = passengers.length;
+  if (count < rules.minPassengers || count > rules.maxPassengers) {
+    return `${tariff.name}: ${rules.minPassengers} to ${rules.maxPassengers} passengers, not ${count}`;
+  }
+  const over15 = passengers.filter((p) => isOver15(p, localDay(trips[0]))).length;
+  if (rules.maxOver15 !== undefined && over15 > rules.maxOver15) {
+    return `${tariff.name}: at most ${rules.maxOver15} passengers aged 15 or more, not ${over15}`;
+  }
+  if (rules.weekendOnly && !trips.every((t) => isWeekend(localDay(t)))) return `${tariff.name}: on a Saturday or a Sunday only`;
+  if (rules.secondClassOnly && travelClass !== 'SECOND') return `${tariff.name}: in second class only`;
+  return null;
+}
+
+// The price of a group from the price of one passenger.
+function groupPrice(single, count, rules) {
+  if (rules.pricedPassengers !== undefined) return single * rules.pricedPassengers;
+  return single + (count - 1) * Math.round(single * rules.followerPercent / 100);
+}
+
+// The passenger type each member of a group was priced as.
+function groupPassengerTypes(passengers, day) {
+  return passengers.map((p) => {
+    const adult = isOver15(p, day);
+    return { passengerRef: p.externalRef, type: adult ? 'ADULT' : 'CHILD', description: adult ? 'Adult in a group' : 'Child in a group' };
+  });
+}
+
+// The admissions of one direction: one per passenger, or one for the whole
+// group, each with its passengers, its price and its applied passenger types.
+function admissionsOfDirection(trip, passengers, tariff, singlePrice, provider) {
+  if (tariff.group) {
+    return [{
+      passengers,
+      amount: groupPrice(singlePrice(trip, null), passengers.length, tariff.group),
+      applied: { appliedPassengerTypes: groupPassengerTypes(passengers, localDay(trip)) },
+      offerMode: 'COLLECTIVE',
+    }];
+  }
+  return passengers.map((passenger) => ({
+    passengers: [passenger],
+    amount: singlePrice(trip, passenger),
+    applied: appliedPassengerTypesOf(passenger, provider),
+    offerMode: 'INDIVIDUAL',
+  }));
+}
+
 // An offer for `trip`, or, given `inboundTrip`, for both directions: one
-// admission per passenger and direction, each covering its own trip.
+// admission per passenger and direction, or, for a group product, one per
+// direction for the whole group; each covers its own trip.
 function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
   const coverage = coverageOf(trip);
   const directions = inboundTrip ? [trip, inboundTrip] : [trip];
   const factor = inboundTrip ? RETURN_FACTOR : 1;
-  const priceFor = (t, passenger) => reducedPrice(Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor), passenger[CARDS_APPLIED].applied);
-  const total = directions.reduce((sum, t) => sum + passengers.reduce((s, p) => s + priceFor(t, p), 0), 0);
+  // A group pays no card reduction: its single price is the full one.
+  const singlePrice = (t, passenger) => reducedPrice(Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor), passenger?.[CARDS_APPLIED].applied);
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
   const product = productOf(flexibility, travelClass, provider);
   const { serviceClass } = product;
-  const admissionOfferParts = directions.flatMap((t) => passengers.map((passenger) => ({
+  const admissionOfferParts = directions.flatMap((t) => admissionsOfDirection(t, passengers, flexibility, singlePrice, provider).map((part) => ({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
     summary: `${product.summary}, ${serviceClass.name} class`,
     createdOn,
     validFrom: t.startTime,
     validUntil: t.endTime,
-    price: price(priceFor(t, passenger)),
+    price: price(part.amount),
     tripCoverage: coverageOf(t),
-    ...appliedPassengerTypesOf(passenger, provider),
-    offerMode: 'INDIVIDUAL',
+    ...part.applied,
+    offerMode: part.offerMode,
     isReusable: false,
-    passengerRefs: [passenger.externalRef],
+    passengerRefs: part.passengers.map((p) => p.externalRef),
     refundable: flexibility.refundable,
     exchangeable: flexibility.exchangeable,
     summaryProductId: product.id,
@@ -316,6 +401,7 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     availableFulfillmentOptions: fulfillmentOptions,
     isReservationRequired: false,
   })));
+  const total = admissionOfferParts.reduce((sum, part) => sum + part.price.amount, 0);
   const offer = {
     offerId: `${provider.idPrefix}-OFR-${randomId()}`,
     summary: `${product.summary}, ${serviceClass.name} class`,
@@ -377,6 +463,37 @@ function outboundTripsOf(asked, known, trips) {
   });
 }
 
+// Whether a tariff is offered: a group product only to a COLLECTIVE request
+// whose group meets its rules. Why one is not goes into `refusals`.
+function isOffered(tariff, { collective, passengers, covered, travelClass, refusals }) {
+  if (!tariff.group) return true;
+  if (!collective) return false;
+  const refusal = groupRefusal(tariff, passengers, covered, travelClass);
+  if (refusal) refusals.add(refusal);
+  return !refusal;
+}
+
+// The Problem of a COLLECTIVE request answered with individual offers only.
+function noCollectiveOfferProblem(refusals) {
+  const why = refusals.size > 0 ? `the group does not meet the rules (${[...refusals].join('; ')})` : 'this provider sells no group product';
+  return {
+    code: 'COLLECTIVE_OFFER_NOT_AVAILABLE',
+    title: 'No collective offer',
+    detail: `No collective offer: ${why}. Individual offers are given instead.`,
+  };
+}
+
+// The Problems of an answer: each card not applied (#597), and a COLLECTIVE
+// request answered without a collective offer (#599).
+function problemsOf(passengers, offers, collective, refusals) {
+  const problems = passengers
+    .filter((p) => p[CARDS_APPLIED].unknown.length > 0)
+    .map((p) => unknownCardProblem(p.externalRef, p[CARDS_APPLIED].unknown));
+  const hasCollective = offers.some((o) => o.admissionOfferParts.some((part) => part.offerMode === 'COLLECTIVE'));
+  if (collective && !hasCollective) problems.push(noCollectiveOfferProblem(refusals));
+  return problems;
+}
+
 /**
  * The OfferCollectionResponse for this request and provider, and what has to
  * be remembered of each offer for the booking that may follow. `known` reads
@@ -392,6 +509,8 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
   const classes = wanted(criteria, 'travelClass', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
   const fulfillmentOptions = fulfillmentOptionsOf(body);
+  const collective = criteria?.offerMode === 'COLLECTIVE';
+  const refusals = new Set();
   const offers = [];
   const remembered = [];
   // Both directions: one offer covers an outbound trip and an inbound one.
@@ -401,17 +520,15 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   for (const { trip, inboundTrip } of pairs) {
     const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
-      for (const flexibility of flexibilities) {
+      for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals }))) {
         const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
         offers.push(offer);
-        remembered.push({ offer, trips: covered, passengers });
+        remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true });
       }
     }
   }
   const allTrips = [...outboundTrips, ...trips];
-  const problems = passengers
-    .filter((p) => p[CARDS_APPLIED].unknown.length > 0)
-    .map((p) => unknownCardProblem(p.externalRef, p[CARDS_APPLIED].unknown));
+  const problems = problemsOf(passengers, offers, collective, refusals);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };
   if (problems.length > 0) response.problems = problems;
   return { response, remembered, trips: allTrips };

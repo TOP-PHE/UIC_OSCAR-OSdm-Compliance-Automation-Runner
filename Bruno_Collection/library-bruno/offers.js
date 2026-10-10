@@ -36,6 +36,8 @@ module.exports = {
   offerFlexibility,
   checkOfferCards,
   compareOfferWithoutCards,
+  checkGroupOffer,
+  compareGroupOfferIndividual,
   routeAfterOfferStep,
 };
 
@@ -534,15 +536,24 @@ function selectAndSetOffer(jsonData) {
 
   // #598: the product the scenario expects. No offer holding it fails the
   // scenario, which the offer step then stops (__productNotOffered).
+  // #599: with expectedProductAbsent, no offer may hold it (a group the
+  // product's rules exclude); the scenario then ends there either way.
   const expectedProduct = bru.getEnvVar("expectedProduct");
   if (expectedProduct) {
     const { offersWithProduct, offeredProducts } = require('./products.js');
     const holding = offersWithProduct(filteredOffers, expectedProduct);
-    test(`Offer: an offer holds the expected product "${expectedProduct}" — ${holding.length} offer(s)`, () => {
-      if (holding.length === 0) throw new Error(`no offer holds it; offered: [${offeredProducts(jsonData.offers).join(", ")}]`);
-    });
-    if (holding.length === 0) bru.setEnvVar("__productNotOffered", "true");
-    else filteredOffers = holding;
+    if (String(bru.getEnvVar("expectedProductAbsent")) === "true") {
+      test(`Offer: no offer holds the product "${expectedProduct}", as the scenario expects — ${holding.length} offer(s)`, () => {
+        if (holding.length > 0) throw new Error(`offered by: [${holding.map((o) => o.offerId).join(", ")}]`);
+      });
+      bru.setEnvVar("__productNotOffered", "true");
+    } else {
+      test(`Offer: an offer holds the expected product "${expectedProduct}" — ${holding.length} offer(s)`, () => {
+        if (holding.length === 0) throw new Error(`no offer holds it; offered: [${offeredProducts(jsonData.offers).join(", ")}]`);
+      });
+      if (holding.length === 0) bru.setEnvVar("__productNotOffered", "true");
+      else filteredOffers = holding;
+    }
   }
 
   // Apply flexibility filter if specified. offerSummary is OPTIONAL in OSDM, so
@@ -2026,12 +2037,64 @@ function compareOfferWithoutCards(status, body) {
   });
 }
 
+// ── Group tariffs (#599) ─────────────────────────────────────────────────────
+
+// Records checks: a failed warning-level check is a [WARNING] line, the others
+// are tests.
+function recordChecks(checks) {
+  checks.forEach((c) => {
+    if (c.level === "warn") {
+      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
+      return;
+    }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+}
+
 /**
- * Where the flow goes after the outbound offer: the inbound offer of a return
+ * After an offer step of a COLLECTIVE request: the chosen offer holds one
+ * COLLECTIVE admission for the whole group on each trip, with the passenger
+ * types applied. Nothing for any other request.
+ */
+function checkGroupOffer() {
+  const { collectiveAsked, checkCollectiveOffer } = require('./groupOffers.js');
+  const request = parseEnvJson("OfferCollectionRequest", {});
+  if (!collectiveAsked(request)) return;
+  const refs = listOfRefs(request.anonymousPassengerSpecifications);
+  recordChecks(checkCollectiveOffer(chosenOffer(), refs));
+}
+
+const listOfRefs = (specs) => (Array.isArray(specs) ? specs.map((p) => p?.externalRef).filter(Boolean) : []);
+
+// Whether the outbound group offer is still to be compared with the same
+// search in the INDIVIDUAL mode (01d).
+function groupCompareDue() {
+  const { collectiveAsked } = require('./groupOffers.js');
+  return collectiveAsked(parseEnvJson("OfferCollectionRequest", {})) && String(bru.getEnvVar("__groupPriceCompareDone")) !== "true";
+}
+
+/** 01d: the chosen group offer against the same search in the INDIVIDUAL mode. */
+function compareGroupOfferIndividual(status, body) {
+  const { compareGroupWithIndividual } = require('./groupOffers.js');
+  bru.setEnvVar("__groupPriceCompareDone", "true");
+  if (status !== 200) {
+    validationLogger(`[WARNING] Group offer: the INDIVIDUAL offer request answered ${status}; prices not compared.`);
+    return;
+  }
+  recordChecks(compareGroupWithIndividual(chosenOffer(), body));
+}
+
+/**
+ * Where the flow goes after the outbound offer: the comparison of a group
+ * offer with the INDIVIDUAL search (01d, #599), the inbound offer of a return
  * (#178, #594), the seat map before booking (#104), or the booking. Shared by
- * 01 and 01c, which comes between them when a passenger holds a card.
+ * 01, 01c and 01d, which come between them.
  */
 function routeAfterOfferStep() {
+  if (groupCompareDue()) {
+    bru.runner.setNextRequest("01d. POST Get Offer Individual");
+    return;
+  }
   const isReturn = !!bru.getEnvVar("returnInboundDate");
   if (isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
     bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));

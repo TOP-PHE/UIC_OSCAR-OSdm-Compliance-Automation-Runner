@@ -910,6 +910,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `products[].productId`. The simulator's `gamma` sells named products, the
   first of which keeps the old fully flexible price so older scenarios do not
   move.
+- **A group tariff is a COLLECTIVE request naming a group product** (#599,
+  1.11.230 / OTST_V2.0.114). `library-bruno/groupOffers.js` (pure) checks the
+  chosen offer (one COLLECTIVE admission per trip for the whole group, every
+  passenger in `appliedPassengerTypes`; none given is a warning, OSDM does not
+  require it) and compares its price with the same request in the INDIVIDUAL
+  mode, sent by `01d`. `routeAfterOfferStep()` goes to `01d` once
+  (`__groupPriceCompareDone`), so 01, 01c and 01d all end in it; a new step
+  between the offer and the booking goes through it too. `expectedProductAbsent`
+  is the negative test and always ends the scenario after the offer. The
+  simulator's group rules live on the product (`group` in the profile); a
+  group product is never offered to an INDIVIDUAL request, so the earlier
+  gamma scenarios see the same offers. Offers and bookings take 19 passengers.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

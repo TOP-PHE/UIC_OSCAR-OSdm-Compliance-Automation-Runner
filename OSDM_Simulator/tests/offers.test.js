@@ -159,9 +159,9 @@ test('a request the simulator cannot serve is a 400 that says which part', () =>
   refused(offerRequest({ tripSearchCriteria: { ...offerRequest().tripSearchCriteria, departureTime: 'tomorrow' } }), /departureTime/);
   refused(offerRequest({ tripSearchCriteria: { ...offerRequest().tripSearchCriteria, departureTime: '2026-13-45T08:00:00' } }), /departureTime/);
   refused(offerRequest({ tripSearchCriteria: { ...offerRequest().tripSearchCriteria, destination: { stopPlaceRef: 'x'.repeat(121) } } }), /destination/);
-  refused(without(['anonymousPassengerSpecifications']), /1 to 9 passengers/);
-  refused(offerRequest({ anonymousPassengerSpecifications: [] }), /1 to 9 passengers/);
-  refused(offerRequest({ anonymousPassengerSpecifications: new Array(10).fill({ externalRef: 'x' }) }), /1 to 9 passengers/);
+  refused(without(['anonymousPassengerSpecifications']), /1 to 19 passengers/);
+  refused(offerRequest({ anonymousPassengerSpecifications: [] }), /1 to 19 passengers/);
+  refused(offerRequest({ anonymousPassengerSpecifications: new Array(20).fill({ externalRef: 'x' }) }), /1 to 19 passengers/);
   refused(offerRequest({ anonymousPassengerSpecifications: [{ type: 'PERSON' }] }), /externalRef/);
   refused(offerRequest({ anonymousPassengerSpecifications: [{ externalRef: 'a' }, { externalRef: 'a' }] }), /appears twice/);
   refused(offerRequest({ tripSpecifications: new Array(5).fill({ legs: [] }) }), /at most 4/);
@@ -262,4 +262,94 @@ test('gamma sells named products, one offer each; alpha one per flexibility, as 
 test('asking a flexibility gives the named products of that flexibility', () => {
   const request = offerRequest({ offerSearchCriteria: { flexibilities: ['FULL_FLEXIBLE'] } });
   assert.deepEqual(build(request, 'gamma').offers.map((o) => o.products[0].code), ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY']);
+});
+
+// ── group products (#599) ─────────────────────────────────────────────────
+
+const SATURDAY = '2026-11-21T08:00:00';
+const people = (...births) => births.map((dateOfBirth, i) => ({ externalRef: `P${i + 1}`, type: 'PERSON', ...(dateOfBirth ? { dateOfBirth } : {}) }));
+const groupRequest = (passengers, { departureTime = SATURDAY, offerMode = 'COLLECTIVE', ...criteria } = {}) => {
+  const request = offerRequest({ anonymousPassengerSpecifications: passengers, offerSearchCriteria: { offerMode, ...criteria } });
+  request.tripSearchCriteria.departureTime = departureTime;
+  return request;
+};
+const codes = (response) => response.offers.map((o) => o.products[0].code);
+const ADULT = '1980-05-05';
+const CHILD = '2016-05-05';
+
+test('group products are offered only to a COLLECTIVE request', () => {
+  assert.deepEqual(codes(build(groupRequest(people(ADULT, ADULT, CHILD), { offerMode: 'INDIVIDUAL' }), 'gamma')),
+    ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND']);
+  assert.deepEqual(codes(build(groupRequest(people(ADULT, ADULT, CHILD)), 'gamma')),
+    ['SIM_FLEXI_BASIC', 'SIM_ALL_DAY', 'SIM_FLEXI_SAVER', 'SIM_TRAIN_BOUND', 'SIM_WEEKEND_GROUP', 'SIM_GROUP']);
+});
+
+test('a group offer is one COLLECTIVE admission for the whole group, naming each passenger type', () => {
+  const response = build(groupRequest(people(ADULT, ADULT, CHILD, CHILD)), 'gamma');
+  const weekend = response.offers.find((o) => o.products[0].code === 'SIM_WEEKEND_GROUP');
+  assert.equal(weekend.admissionOfferParts.length, 1);
+  const [part] = weekend.admissionOfferParts;
+  assert.equal(part.offerMode, 'COLLECTIVE');
+  assert.deepEqual(part.passengerRefs, ['P1', 'P2', 'P3', 'P4']);
+  assert.deepEqual(part.appliedPassengerTypes.map((t) => [t.passengerRef, t.type]), [['P1', 'ADULT'], ['P2', 'ADULT'], ['P3', 'CHILD'], ['P4', 'CHILD']]);
+  // The individual offers are untouched: one admission per passenger.
+  const saver = response.offers.find((o) => o.products[0].code === 'SIM_TRAIN_BOUND');
+  assert.ok(saver.admissionOfferParts.every((p) => p.offerMode === 'INDIVIDUAL' && p.passengerRefs.length === 1));
+  assert.equal(response.problems, undefined);
+});
+
+test('a group pays less than the same passengers alone: two full fares, or the first full and 60 % for the others', () => {
+  const response = build(groupRequest(people(ADULT, ADULT, CHILD, CHILD)), 'gamma');
+  const amount = (code) => response.offers.find((o) => o.products[0].code === code).offerSummary.minimalPrice.amount;
+  const single = amount('SIM_TRAIN_BOUND') / 4;
+  assert.equal(amount('SIM_WEEKEND_GROUP'), 2 * single);
+  const semi = amount('SIM_FLEXI_SAVER') / 4;
+  assert.equal(amount('SIM_GROUP'), semi + 3 * Math.round(semi * 0.6));
+  assert.ok(amount('SIM_GROUP') < amount('SIM_FLEXI_SAVER'));
+});
+
+test('a card does not reduce a group price', () => {
+  const passengers = people(ADULT, ADULT, CHILD);
+  passengers[0].cards = [{ type: 'REDUCTION_CARD', code: 'SIM_CARD_50' }];
+  const withCard = build(groupRequest(passengers), 'gamma').offers.find((o) => o.products[0].code === 'SIM_GROUP');
+  const without = build(groupRequest(people(ADULT, ADULT, CHILD)), 'gamma').offers.find((o) => o.products[0].code === 'SIM_GROUP');
+  assert.equal(withCard.offerSummary.minimalPrice.amount, without.offerSummary.minimalPrice.amount);
+});
+
+test('no group offer when the rules are not met, and a Problem says why', () => {
+  const cases = [
+    [people(ADULT, CHILD, CHILD, CHILD, CHILD, CHILD), {}, 'SIM_GROUP', /Weekend group ticket: 2 to 5 passengers, not 6/],
+    [people(ADULT, ADULT, ADULT), {}, 'SIM_GROUP', /at most 2 passengers aged 15 or more, not 3/],
+    [people(ADULT, ADULT, null), {}, 'SIM_GROUP', /no date of birth counts as aged 15 or more/],
+    [people(ADULT, ADULT, CHILD), { departureTime: '2026-11-20T08:00:00' }, 'SIM_GROUP', /on a Saturday or a Sunday only/],
+  ];
+  for (const [passengers, options, still, why] of cases) {
+    const response = build(groupRequest(passengers, options), 'gamma');
+    assert.ok(!codes(response).includes('SIM_WEEKEND_GROUP'), why.source);
+    assert.ok(codes(response).includes(still), why.source);
+  }
+  const none = build(groupRequest(people(ADULT), { travelClass: ['FIRST'] }), 'gamma');
+  assert.ok(none.offers.every((o) => o.admissionOfferParts.every((p) => p.offerMode === 'INDIVIDUAL')));
+  assert.equal(none.problems.length, 1);
+  assert.equal(none.problems[0].code, 'COLLECTIVE_OFFER_NOT_AVAILABLE');
+  assert.match(none.problems[0].detail, /Weekend group ticket: 2 to 5 passengers, not 1; Group ticket: 2 to 19 passengers, not 1/);
+  const first = build(groupRequest(people(ADULT, ADULT, ADULT), { travelClass: ['FIRST'], departureTime: '2026-11-20T08:00:00' }), 'gamma');
+  assert.match(first.problems[0].detail, /Group ticket: in second class only/);
+});
+
+test('age is counted on the day of travel; a provider without group products says so and answers individually', () => {
+  // 15 on the Saturday of travel: counts as aged 15 or more.
+  const response = build(groupRequest(people(ADULT, ADULT, '2011-11-21')), 'gamma');
+  assert.ok(!codes(response).includes('SIM_WEEKEND_GROUP'));
+  assert.ok(codes(build(groupRequest(people(ADULT, ADULT, '2011-11-22')), 'gamma')).includes('SIM_WEEKEND_GROUP'));
+  const alpha = build(groupRequest(people(ADULT, ADULT)));
+  assert.equal(alpha.offers.length, 3);
+  assert.match(alpha.problems[0].detail, /this provider sells no group product/);
+});
+
+test('nineteen passengers can travel as a group; twenty are refused', () => {
+  const nineteen = build(groupRequest(people(...new Array(19).fill(ADULT)), { departureTime: '2026-11-20T08:00:00' }), 'gamma');
+  const group = nineteen.offers.find((o) => o.products[0].code === 'SIM_GROUP');
+  assert.equal(group.admissionOfferParts[0].passengerRefs.length, 19);
+  refused(groupRequest(people(...new Array(20).fill(ADULT))), /1 to 19 passengers/);
 });

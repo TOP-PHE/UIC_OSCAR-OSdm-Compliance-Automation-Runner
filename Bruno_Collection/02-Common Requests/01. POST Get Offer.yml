@@ -131,10 +131,11 @@ runtime:
         displayOfferResponse(jsonData);
 
         // #598: no offer holds the product the scenario expects (already a
-        // failed check): booking another tariff would test nothing.
+        // failed check): booking another tariff would test nothing. #599: a
+        // scenario that expects the product absent ends here too.
         if (bru.getEnvVar("__productNotOffered") === "true") {
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
-          loopbackOrStop("POST Get Offer (expected product not offered)");
+          loopbackOrStop("POST Get Offer (expected product check)");
           return;
         }
 
@@ -154,7 +155,11 @@ runtime:
         // then routes on as this step would.
         // ── Routing: the inbound offer of a return (#178, #594), the seat map
         // before booking (#104), or the booking — routeAfterOfferStep().
-        const { checkOfferCards, routeAfterOfferStep } = require(bru.getEnvVar("library_base") + "offers.js");
+        // ── Group tariffs (#599): a COLLECTIVE request's chosen offer is one
+        // admission for the whole group; routeAfterOfferStep() then goes to
+        // 01d to compare its price with the same passengers alone.
+        const { checkOfferCards, checkGroupOffer, routeAfterOfferStep } = require(bru.getEnvVar("library_base") + "offers.js");
+        checkGroupOffer();
         if (checkOfferCards("Offer", { compare: true })) {
           bru.runner.setNextRequest("01c. POST Get Offer without Cards");
         } else {

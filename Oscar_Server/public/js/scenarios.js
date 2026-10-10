@@ -56,6 +56,8 @@ const ENUMS = {
   partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound'],
   // #596: negative probe, the provider must refuse the scenario's overrule code.
   overruleCodeExpectRejection:       ['off', 'on'],
+  // #599: negative test, the expected product must not be offered.
+  expectedProductAbsent:             ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -1533,7 +1535,9 @@ function buildDetailHTML(idx) {
           [null, ...fwFilter(ENUMS.desiredFlexibility.filter(v => v != null), wizData.framework?.offerCriteria?.flexibilities)],
           'Flexibility tier that will be selected from the offer')}
         ${buildText(idx, 'expectedProduct', 'Expected product', 'code or name, e.g. a code from GET /products',
-          'The product (tariff) the offer must hold (#598): its code, or words of its name. No offer holding it fails the scenario and stops it; the fulfilled booking must hold it. Empty: chosen on the flexibility only.')}
+          'The product (tariff) the offer must hold (#598): its code, or words of its name. No offer holding it fails the scenario and stops it; the fulfilled booking must hold it. Empty: chosen on the flexibility only. A group tariff (#599) also needs the COLLECTIVE offer mode in the offer search criteria.')}
+        ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
+          'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE

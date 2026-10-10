@@ -124,13 +124,20 @@ the card) and `SIM_SALE_CARD_STUDENT_1YTH_38`; each also runs `01c. POST Get
 Offer without Cards` to compare the prices. Products (#598), on `gamma` only:
 `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38` and `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38`
 name the product by its code, `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38` by its
-name.
+name. Group tariffs (#599), on `gamma` only, in the `COLLECTIVE` offer mode:
+`SIM_GROUP_WEEKEND_2ADT_2CHD_38` (on a Saturday),
+`SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38` (Saturday out, Sunday back, one ticket
+for both) and `SIM_GROUP_6ADT_38`; each also runs `01d. POST Get Offer
+Individual` to compare the group price with the same passengers alone. The
+negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
+`SIM_GROUP_WEEKEND_3ADT_ABSENT_38` expect no weekend group offer and end after
+the offer.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional
 information requests answer 501, reported as "not implemented by this
 provider", except `GET /reduction-cards` and `GET /products`, which `gamma`
-answers with its three cards (#597) and its four products (#598). The same holds for the `_36` pair on `alpha` and the `_37` pair on
+answers with its three cards (#597) and its six products (#598, #599). The same holds for the `_36` pair on `alpha` and the `_37` pair on
 `beta`, and for the return scenarios, which also check the inbound answer and
 expect one ticket per direction. A scenario run on a provider of another
 version gets a warning from the version check.

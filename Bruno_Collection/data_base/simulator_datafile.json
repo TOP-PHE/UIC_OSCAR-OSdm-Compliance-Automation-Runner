@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -1016,6 +1016,182 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_GROUP_WEEKEND_2ADT_2CHD_38",
+      "description": "Simulated provider: weekend group of two adults and two children on a Saturday, one collective admission, cheaper than four single tickets. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "expectedProduct": "SIM_WEEKEND_GROUP",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3,
+      "passengersListId": 6,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": "COLLECTIVE",
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38",
+      "description": "Simulated provider: weekend group return for one adult and two children, Saturday out and Sunday back, one offer covering both directions and one ticket for both. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "expectedProduct": "SIM_WEEKEND_GROUP",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3,
+      "passengersListId": 10,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": "COLLECTIVE",
+        "requestedOfferParts": [],
+        "returnOffsetDays": 1,
+        "returnTime": "17:00",
+        "returnModel": "COMBINED",
+        "returnFulfillments": "ONE"
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_GROUP_6ADT_38",
+      "description": "Simulated provider: group of six adults, second class, the first at full price and the others reduced. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "SEMI_FLEXIBLE",
+      "expectedProduct": "SIM_GROUP",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 7,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": "COLLECTIVE",
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_GROUP_WEEKEND_6PAX_ABSENT_38",
+      "description": "Simulated provider: negative test, six passengers on a Saturday: no weekend group offer (two to five passengers). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "expectedProduct": "SIM_WEEKEND_GROUP",
+      "expectedProductAbsent": "on",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3,
+      "passengersListId": 8,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": "COLLECTIVE",
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_GROUP_WEEKEND_3ADT_ABSENT_38",
+      "description": "Simulated provider: negative test, three adults on a Saturday: no weekend group offer (at most two passengers aged 15 or more). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "NON_FLEXIBLE",
+      "expectedProduct": "SIM_WEEKEND_GROUP",
+      "expectedProductAbsent": "on",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 3,
+      "passengersListId": 9,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": "COLLECTIVE",
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -1074,6 +1250,23 @@
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000003 to station 0000001"
       }
+    },
+    {
+      "id": 3,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000001",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000001 to station 0000002, on a Saturday"
+      },
+      "departureDay": "SATURDAY"
     }
   ],
   "purchaserList": [
@@ -1220,6 +1413,361 @@
           "updateEmail": "francis.sample@example.org",
           "type": "YOUTH",
           "reductionCards": ["SIM_STUDENT"]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Gale",
+          "lastName": "Example",
+          "phoneNumber": "+33199000019",
+          "email": "gale.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Gail",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000020",
+          "updateEmail": "gail.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Harper",
+          "lastName": "Example",
+          "phoneNumber": "+33199000021",
+          "email": "harper.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Harpa",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000022",
+          "updateEmail": "harpa.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Indy",
+          "lastName": "Example",
+          "phoneNumber": "+33199000023",
+          "email": "indy.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Indra",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000024",
+          "updateEmail": "indra.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00004",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Jules",
+          "lastName": "Example",
+          "phoneNumber": "+33199000025",
+          "email": "jules.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Julian",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000026",
+          "updateEmail": "julian.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Kim",
+          "lastName": "Example",
+          "phoneNumber": "+33199000027",
+          "email": "kim.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Kimberly",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000028",
+          "updateEmail": "kimberly.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Lee",
+          "lastName": "Example",
+          "phoneNumber": "+33199000029",
+          "email": "lee.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Leeroy",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000030",
+          "updateEmail": "leeroy.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Max",
+          "lastName": "Example",
+          "phoneNumber": "+33199000031",
+          "email": "max.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Maxime",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000032",
+          "updateEmail": "maxime.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00004",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Noa",
+          "lastName": "Example",
+          "phoneNumber": "+33199000033",
+          "email": "noa.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Noam",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000034",
+          "updateEmail": "noam.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00005",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Oak",
+          "lastName": "Example",
+          "phoneNumber": "+33199000035",
+          "email": "oak.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Oakley",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000036",
+          "updateEmail": "oakley.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00006",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Pat",
+          "lastName": "Example",
+          "phoneNumber": "+33199000037",
+          "email": "pat.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Patrice",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000038",
+          "updateEmail": "patrice.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Quinn",
+          "lastName": "Example",
+          "phoneNumber": "+33199000039",
+          "email": "quinn.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Quincy",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000040",
+          "updateEmail": "quincy.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Remy",
+          "lastName": "Example",
+          "phoneNumber": "+33199000041",
+          "email": "remy.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Remi",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000042",
+          "updateEmail": "remi.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Sky",
+          "lastName": "Example",
+          "phoneNumber": "+33199000043",
+          "email": "sky.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Skylar",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000044",
+          "updateEmail": "skylar.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00004",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Toni",
+          "lastName": "Example",
+          "phoneNumber": "+33199000045",
+          "email": "toni.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Antonia",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000046",
+          "updateEmail": "antonia.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00005",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Uma",
+          "lastName": "Example",
+          "phoneNumber": "+33199000047",
+          "email": "uma.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Umar",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000048",
+          "updateEmail": "umar.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00006",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Vic",
+          "lastName": "Example",
+          "phoneNumber": "+33199000049",
+          "email": "vic.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Victor",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000050",
+          "updateEmail": "victor.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Wren",
+          "lastName": "Example",
+          "phoneNumber": "+33199000051",
+          "email": "wren.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Wrenna",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000052",
+          "updateEmail": "wrenna.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Xan",
+          "lastName": "Example",
+          "phoneNumber": "+33199000053",
+          "email": "xan.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Xander",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000054",
+          "updateEmail": "xander.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Yael",
+          "lastName": "Example",
+          "phoneNumber": "+33199000055",
+          "email": "yael.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Yaelle",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000056",
+          "updateEmail": "yaelle.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1984-04-10",
+          "firstName": "Zed",
+          "lastName": "Example",
+          "phoneNumber": "+33199000057",
+          "email": "zed.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Zedd",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1984-04-11",
+          "updatePhoneNumber": "+33199000058",
+          "updateEmail": "zedd.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Ari",
+          "lastName": "Example",
+          "phoneNumber": "+33199000059",
+          "email": "ari.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Ariel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000060",
+          "updateEmail": "ariel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "2016-08-14",
+          "firstName": "Cy",
+          "lastName": "Example",
+          "phoneNumber": "+33199000061",
+          "email": "cy.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Cyrus",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2016-08-15",
+          "updatePhoneNumber": "+33199000062",
+          "updateEmail": "cyrus.sample@example.org",
+          "type": "PERSON"
         }
       ]
     }

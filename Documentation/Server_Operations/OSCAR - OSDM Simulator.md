@@ -185,7 +185,11 @@ rebuilds its Test Framework from the file.
    (#597) on 3.8 only: `SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38`
    and `SIM_SALE_CARD_STUDENT_1YTH_38`, and sales of a named product (#598)
    on 3.8 only: `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38`,
-   `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38` and `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38`.
+   `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38` and `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38`,
+   and group tariffs (#599) on 3.8 only: `SIM_GROUP_WEEKEND_2ADT_2CHD_38`,
+   `SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38`, `SIM_GROUP_6ADT_38`, and the
+   negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
+   `SIM_GROUP_WEEKEND_3ADT_ABSENT_38`.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
