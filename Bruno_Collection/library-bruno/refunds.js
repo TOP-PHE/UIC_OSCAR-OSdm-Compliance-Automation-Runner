@@ -18,6 +18,10 @@ module.exports = {
   refundScope,
   isScopedRefundOnBooking,
   checkRefundScopeOnBooking,
+  checkRefundOfferFulfillments,
+  rememberRefundOffersToConfirm,
+  nextRefundOfferToConfirm,
+  checkFullRefundDone,
 };
 
 // Function to validate refund offers response
@@ -118,12 +122,86 @@ function recordRefundOfferStates(refundOffers) {
   bru.setEnvVar("__refundedFulfillmentIds", JSON.stringify([...refunded]));
 }
 
+// ─── #595: every refund offer of the answer, one per fulfillment or not ────
+
+// Each refund offer of a POST names fulfillments of this booking, and no
+// fulfillment is in two offers.
+function checkRefundOfferFulfillments(refundOffers) {
+  const bookingIds = _readJson("__bookingFulfillmentIds", []);
+  const offers = Array.isArray(refundOffers) ? refundOffers : [];
+  offers.forEach((offer, i) => {
+    const ids = _fulfillmentIdsOf(offer);
+    test(`Refund offer ${i + 1} (${offer?.id}) names fulfillments of this booking`, () => {
+      if (ids.length === 0) throw new Error("the refund offer names no fulfillment");
+      const strange = bookingIds.length > 0 ? ids.filter((id) => !bookingIds.includes(id)) : [];
+      if (strange.length > 0) throw new Error(`[${strange.join(", ")}] not among the booking's fulfillments [${bookingIds.join(", ")}]`);
+    });
+  });
+  if (offers.length > 1) {
+    const all = offers.flatMap(_fulfillmentIdsOf);
+    const twice = all.filter((id, i) => all.indexOf(id) !== i);
+    test(`No fulfillment is in two of the ${offers.length} refund offers`, () => {
+      if (twice.length > 0) throw new Error(`in two refund offers: [${[...new Set(twice)].join(", ")}]`);
+    });
+  }
+}
+
+// The refund offers to confirm, in the order the provider gave them: the
+// PATCH step confirms them one by one, and the booking is read after each.
+function rememberRefundOffersToConfirm(refundOffers) {
+  const ids = (Array.isArray(refundOffers) ? refundOffers : []).map((o) => o?.id).filter(Boolean);
+  bru.setEnvVar("__refundOfferIds", JSON.stringify(ids));
+  bru.setEnvVar("__refundOfferIndex", "0");
+  if (ids.length > 1) {
+    validationLogger(`[INFO] ${ids.length} refund offers (one per fulfillment or group): each is confirmed in turn, and the booking checked after each.`);
+  }
+}
+
+// After a confirmation: the next refund offer to confirm, made the current
+// one (refundOffersOfferId), or null when all are confirmed.
+function nextRefundOfferToConfirm() {
+  const ids = _readJson("__refundOfferIds", []);
+  const next = Number.parseInt(bru.getEnvVar("__refundOfferIndex") || "0", 10) + 1;
+  if (!(next < ids.length)) return null;
+  bru.setEnvVar("__refundOfferIndex", String(next));
+  bru.setEnvVar("refundOffersOfferId", ids[next]);
+  return { id: ids[next], position: next + 1, total: ids.length };
+}
+
+// Once every refund offer is confirmed: a full refund has refunded every
+// fulfillment of the booking. A partial one is checked by scope instead.
+function checkFullRefundDone(booking) {
+  const partial = partialRefundArmed() && String(bru.getEnvVar("__partialRefundDegradedToFull")) !== "true";
+  if (partial) return;
+  const bookingIds = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).map((f) => f?.id).filter(Boolean);
+  const refunded = _readJson("__refundedFulfillmentIds", []);
+  const left = bookingIds.filter((id) => !refunded.includes(id));
+  test(`Full refund: every fulfillment of the booking is refunded (${bookingIds.length - left.length}/${bookingIds.length})`, () => {
+    if (left.length > 0) throw new Error(`not refunded by any confirmed refund offer: [${left.join(", ")}]`);
+  });
+}
+
+// #595: this refund offer leaves out some of the booking's fulfillments, so
+// it is one of several that together refund the booking.
+function _oneOfSeveral(refundOffer) {
+  const bookingIds = _readJson("__bookingFulfillmentIds", []);
+  const ids = _fulfillmentIdsOf(refundOffer);
+  return bookingIds.length > 1 && ids.length > 0 && bookingIds.some((id) => !ids.includes(id));
+}
+
+// A partial refund was asked for: by leg, by passenger (#218) or by
+// fulfillment (#595).
+function partialRefundArmed() {
+  return ["partialRefundByLeg", "partialRefundByPax", "partialRefundByFulfillment"]
+    .some((name) => String(bru.getEnvVar(name)) === "true");
+}
+
 // F2: a refund is scoped when it leaves at least one of the booking's
 // fulfillments out, or when a partial refund was asked for and not degraded.
 function refundScope(refundOffer) {
   const refundedIds = _fulfillmentIdsOf(refundOffer);
   const bookingIds = _readJson("__bookingFulfillmentIds", []);
-  const partialArmed = String(bru.getEnvVar("partialRefundByLeg")) === "true" || String(bru.getEnvVar("partialRefundByPax")) === "true";
+  const partialArmed = partialRefundArmed();
   const degraded = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
   const leavesOut = bookingIds.length > 0 && refundedIds.length > 0 && bookingIds.some((id) => !refundedIds.includes(id));
   return { scoped: leavesOut || (partialArmed && !degraded), refundedIds, bookingIds };
@@ -585,10 +663,7 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
   // When partial refund was REQUESTED but DEGRADED to full at runtime, the
   // standard full-refund identity applies — the degradation flag tells us
   // which mode to use.
-  const _partialArmed = (
-    String(bru.getEnvVar("partialRefundByLeg")) === "true" ||
-    String(bru.getEnvVar("partialRefundByPax")) === "true"
-  );
+  const _partialArmed = partialRefundArmed();
   const _partialDegraded = String(bru.getEnvVar("__partialRefundDegradedToFull")) === "true";
   const _isPartial = _partialArmed && !_partialDegraded;
 
@@ -658,6 +733,15 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
           .to.be.below(_confirmedInt);
         const _diff = _confirmedInt - (_feeInt + _refundInt);
         validationLogger(`[DEBUG] Partial-refund scope verified (scaled): ${_feeInt} + ${_refundInt} = ${_feeInt + _refundInt} < ${_confirmedInt} (out-of-scope = ${_diff})`);
+      });
+    } else if (_oneOfSeveral(refundOffer)) {
+      // #595: a full refund given as one refund offer per fulfillment. Each
+      // offer covers a share of the booking, so the full-restitution identity
+      // holds for the sum, not for one offer; the fee is waived on each.
+      test(`Refund WITH overrule (${overruleCode}), one refund offer of several: refundFee == 0 (overrule contract: no fee)`, () => {
+        expect(_feeInt,
+          `Provider did NOT honour overrule(${overruleCode}): fee(${_feeInt}) ≠ 0 on refund offer ${refundOffer.id}.`)
+          .to.eql(0);
       });
     } else {
       // Full-with-overrule — strict identity, the canonical overrule contract:

@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.253",
+  "current_release": "2026.254",
   "releases": [
+    {
+      "release": "2026.254",
+      "date": "2026-10-10",
+      "server": "1.11.225",
+      "collection": "OTST_V2.0.110",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#595): refunds per fulfillment. When a provider answers a refund request with several refund offers (one per fulfillment), every offer is now confirmed in turn and the booking read after each; before, only refundOffers[0] was confirmed, so a full refund of a two-ticket return refunded one direction and the run passed. A full refund now ends with a check that every fulfillment is refunded.",
+        "New partial refund by fulfillment (partialRefundByFulfillment, partialRefundFulfillmentSelection first/last/outbound/inbound): the refund of one whole fulfillment, sent as fulfillmentIds only (no refundSpecifications), for providers that refund per fulfillment and refuse a scope by leg or passenger. Gated by REFUND_PARTIAL like the leg and passenger axes; it takes precedence over them.",
+        "New checks at 10. POST Refund Offers: each refund offer names fulfillments of the booking, and no fulfillment is in two offers. The partial-refund alignment now counts the fee: refundableAmount + refundFee must equal the price of the parts in scope (before, a conformant offer with a fee failed it). With an overrule code and one offer per fulfillment, each offer must waive the fee; the full-restitution identity is no longer asked of one offer.",
+        "Server 1.11.225: Test Config has the Per-fulfillment partial refund fields; frameworkGating gates them by REFUND_PARTIAL; the data file schema accepts both fields.",
+        "Simulator 0.5.0 (not part of a release): refund offers per fulfillment (POST, GET, PATCH, DELETE), a scope by part or passenger refused; the data file has full and inbound-only refund scenarios of a return on 3.6, 3.7 and 3.8."
+      ]
+    },
     {
       "release": "2026.253",
       "date": "2026-10-10",

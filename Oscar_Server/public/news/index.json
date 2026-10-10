@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-refund-per-fulfillment",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Refunds: every refund offer is confirmed, and a refund can target one fulfillment",
+    "summary": "When a provider answers a refund request with one refund offer per fulfillment, OSCAR now confirms each of them and checks the booking after each. A partial refund can now be the refund of one whole fulfillment, for providers that refund per fulfillment only.",
+    "content": "Some providers split a refund into one refund offer per fulfillment: a return with one ticket per direction gives two refund offers. OSCAR used to confirm only the first one, so a full refund refunded one direction and the run still passed. It now confirms every refund offer in turn, reads the booking after each confirmation (what was refunded must be REFUNDED, the rest unchanged), and ends a full refund with a check that every fulfillment is refunded.\n\nA refund scenario has a new partial refund option in Test Config, \"Per-fulfillment\": the refund of one whole fulfillment, the first or last of the booking, or the one holding the outbound or inbound trip of a return. OSCAR then sends only the fulfillment's id, with no refund specification, which is what providers that refund per fulfillment accept. Like the per-leg and per-passenger options, it is expected to be declared as Partial refund in the Test Framework.\n\nAlso fixed: the check that a partial refund's amount matches the parts refunded now counts the refund fee, so a provider that keeps a fee no longer fails it.\n\nNo action is required for existing scenarios."
+  },
+  {
     "id": "2026-10-10-return-both-models",
     "date": "October 10, 2026",
     "tag": "New",

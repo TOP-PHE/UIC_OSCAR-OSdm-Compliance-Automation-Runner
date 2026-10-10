@@ -100,4 +100,4 @@ function parseJsonObject(buffer) {
   return value;
 }
 
-module.exports = { HttpError, sendJson, sendProblem, readBody, parseJsonObject };
+module.exports = { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject };

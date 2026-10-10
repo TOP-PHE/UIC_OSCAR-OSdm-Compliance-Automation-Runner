@@ -88,6 +88,13 @@ function gatingRules() {
       requiresScenarioType: 'REFUND',
       humanLabel: 'Partial refund per-passenger',
     },
+    {
+      field: 'partialRefundByFulfillment',
+      isArmed: isArmedValue,
+      requiresFlow: 'REFUND_PARTIAL',
+      requiresScenarioType: 'REFUND',
+      humanLabel: 'Partial refund per-fulfillment',
+    },
   ];
 }
 

@@ -140,7 +140,10 @@ function resetScenarioEnvVars() {
     // Partial refund (issue #218)
     "partialRefundByLeg", "partialRefundLegSelection",
     "partialRefundByPax", "partialRefundPaxSelection",
+    "partialRefundByFulfillment", "partialRefundFulfillmentSelection",
     "__partialRefundDegradedToFull", "__partialRefundResolvedSpec",
+    "__partialRefundExpectedAmount", "__partialRefundExpectedPartIds", "__partialRefundScopeFulfillmentId",
+    "__refundOfferRetryCount", "__refundOfferIds", "__refundOfferIndex",
     "__bookingForRefund",
     // Misc
     "data_base_tmp", "scriptContent", "swaggerJson",
@@ -722,6 +725,15 @@ function parseScenarioData(jsonData) {
         ["", "null", null, undefined].includes(scenario.partialRefundPaxSelection)
           ? (_prByPax ? "first" : "")
           : String(scenario.partialRefundPaxSelection));
+      // #595: the refund of one whole fulfillment (first, last, outbound,
+      // inbound), for providers that refund per fulfillment only.
+      const _prByFf = (scenario.partialRefundByFulfillment === true ||
+                       ["true", "on", "yes"].includes(String(scenario.partialRefundByFulfillment).toLowerCase()));
+      bru.setEnvVar("partialRefundByFulfillment", _prByFf ? "true" : "false");
+      bru.setEnvVar("partialRefundFulfillmentSelection",
+        ["", "null", null, undefined].includes(scenario.partialRefundFulfillmentSelection)
+          ? (_prByFf ? "first" : "")
+          : String(scenario.partialRefundFulfillmentSelection));
 
       // Setup-time consistency checks. The wizard does these proactively too;
       // re-check here so a hand-edited data file can't bypass the wizard.

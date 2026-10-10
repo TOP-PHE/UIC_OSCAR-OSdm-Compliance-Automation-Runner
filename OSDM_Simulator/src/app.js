@@ -20,10 +20,11 @@
  * The simulator never makes an outbound request.
  */
 
-const { HttpError, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
+const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection } = require('./osdm/offers');
 const { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
+const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -36,10 +37,12 @@ const NOT_PROVIDED = new Set([
 ]);
 const BOOKING_PARTS_NOT_PROVIDED = new Set([
   'booked-offers', 'cancel-fulfillments-offers', 'cleanup', 'documents', 'exchange-offers', 'exchange-operations',
-  'fulfillment-check', 'history', 'on-hold-offer', 'refund-offers', 'reimbursements', 'release-offers', 'split',
+  'fulfillment-check', 'history', 'on-hold-offer', 'reimbursements', 'release-offers', 'split',
 ]);
 
 const notFound = () => new HttpError(404, 'NOT_FOUND', 'Not found');
+// What a route returns for a 204: the answer has no body.
+const NO_CONTENT = Symbol('no content');
 const notProvided = () => new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator does not provide this OSDM resource.');
 const methodNotAllowed = (allowed) => new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method not allowed', undefined, { Allow: allowed.join(', ') });
 
@@ -181,6 +184,21 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return { purchaser: setPurchaser(booking, await bodyOf(req)) };
   }
 
+  // POST, GET /bookings/{id}/refund-offers; GET, PATCH, DELETE .../{refundOfferId}
+  async function refundOffers(req, provider, scope, bookingId, refundOfferId) {
+    const booking = bookingOf(scope, bookingId);
+    if (refundOfferId === undefined) {
+      requireMethod(req, 'POST', 'GET');
+      if (req.method === 'GET') return { refundOffers: booking.refundOffers || [] };
+      return { refundOffers: createRefundOffers(booking, await bodyOf(req), provider, now()) };
+    }
+    requireMethod(req, 'GET', 'PATCH', 'DELETE');
+    if (req.method === 'GET') return { refundOffer: findRefundOffer(booking, refundOfferId) };
+    if (req.method === 'PATCH') return { refundOffer: confirmRefundOffer(booking, refundOfferId, await bodyOf(req), provider, now()) };
+    deleteRefundOffer(booking, refundOfferId);
+    return NO_CONTENT;
+  }
+
   async function bookingRoute(req, provider, scope, rest) {
     const [bookingId, part, partId, ...more] = rest;
     if (bookingId === undefined) return newBooking(req, provider, scope);
@@ -193,6 +211,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (part === 'fulfillments' && partId === undefined) return fulfillments(req, provider, scope, bookingId);
     if (part === 'passengers' && partId !== undefined) return passenger(req, scope, bookingId, partId);
     if (part === 'purchaser' && partId === undefined) return purchaser(req, scope, bookingId);
+    if (part === 'refund-offers') return refundOffers(req, provider, scope, bookingId, partId);
     throw notFound();
   }
 
@@ -247,7 +266,13 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return tokenEndpoint(req, res, provider, seen);
     }
     seen.client = authenticate(req, provider);
-    sendJson(res, 200, await osdmRoute(req, provider, seen.client, segments.slice(1)));
+    const answer = await osdmRoute(req, provider, seen.client, segments.slice(1));
+    if (answer === NO_CONTENT) {
+      res.writeHead(204, BASE_HEADERS);
+      res.end();
+      return 204;
+    }
+    sendJson(res, 200, answer);
     return 200;
   }
 

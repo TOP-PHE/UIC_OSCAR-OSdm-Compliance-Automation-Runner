@@ -38,6 +38,7 @@ function chaiExpect(actual, message) {
     },
     a: (type) => check(type === 'array' ? Array.isArray(actual) : typeof actual === type, `to be a ${type}`),
     above: (n) => check(actual > n, `to be above ${n}`),
+    below: (n, m) => { if (m) message = m; return check(actual < n, `to be below ${n}`); },
     members: (arr) => check(Array.isArray(actual) && isDeepStrictEqual(sorted(actual), sorted(arr)), `to have members ${JSON.stringify(arr)}`),
     lengthOf: (n) => check(actual != null && actual.length === n, `to have length ${n}`),
     equal: (v, m) => { if (m) message = m; return check(actual === v, `to equal ${JSON.stringify(v)}`); },
