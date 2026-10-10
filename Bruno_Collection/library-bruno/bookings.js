@@ -578,6 +578,9 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
     // parts, and parts can be added after the sale.
     validationLogger(`[INFO] ${partType}: the booking has ${pairing.extra.length} part(s) that no part of the selected offer pairs with: `
       + pairing.extra.map((bi) => _describePart(bookedParts[bi])).join('; '));
+    // #594: they are parts of this booking all the same, so a fulfillment
+    // that holds them (the outbound ticket of a return) is not refused.
+    pairing.extra.forEach((bi) => { if (bookedParts[bi]?.id) ids.push(bookedParts[bi].id); });
   }
 
   pairing.pairs.forEach(({ offerIndex: index, bookedIndex }) => {
@@ -612,7 +615,7 @@ function validateOfferParts(offerParts, bookedParts, partType, expectedBookedOff
     validateAppliedPassengerTypes(part, bookedPart, partType, index);
   });
 
-  bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", ids);
+  bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", [...new Set(ids)]);
 }
 
 // ─── Public functions ────────────────────────────────────────────────────────

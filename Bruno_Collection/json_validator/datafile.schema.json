@@ -316,6 +316,16 @@
                 "type": ["integer", "null"],
                 "description": "For return trips: number of days after outbound departure for the inbound trip."
               },
+              "returnModel": {
+                "type": ["string", "null"],
+                "description": "For return trips (#594): SEPARATE = the inbound call names the outbound offer (outwardOfferIds), both offers are booked; COMBINED = it names the outbound trip (outboundTripIds, OSDM 3.7+) and gets offers covering both directions. Empty = SEPARATE.",
+                "enum": ["SEPARATE", "COMBINED", "", null]
+              },
+              "returnFulfillments": {
+                "type": ["string", "null"],
+                "description": "For return trips (#594): the number of fulfillments expected after confirmation. Empty = not checked.",
+                "enum": ["ONE", "PER_DIRECTION", "PER_PASSENGER", "", null]
+              },
               "productTags": {
                 "type": "array",
                 "items": {

@@ -46,12 +46,12 @@ collection's README: same data file, same checks.
 |---|---|
 | `POST /<provider>/oauth/token` | an access token (`client_credentials`; client id and secret in a Basic header or in the body) |
 | `GET /<provider>/versions` | the provider's OSDM version (`alpha` 3.6.0, `beta` 3.7.0, `gamma` 3.8.0) |
-| `POST /<provider>/offers` | one direct trip and three offers (flexible, semi-flexible, saver), for a search or a specified trip |
+| `POST /<provider>/offers` | one direct trip and three offers (flexible, semi-flexible, saver), for a search or a specified trip. A return (#594): with `returnSearchParameters.outwardOfferIds`, inbound offers; with `returnSearchParameters.outboundTripIds`, offers covering the outbound and the inbound trip at a return price. An id the client was not given is refused |
 | `POST /<provider>/bookings` | a `PREBOOKED` booking of offers this client received |
 | `GET /<provider>/bookings/{id}` | the booking |
 | `GET`, `PATCH /<provider>/bookings/{id}/passengers/{id}` | a passenger |
 | `GET`, `PATCH`, `POST /<provider>/bookings/{id}/purchaser` | the purchaser |
-| `POST /<provider>/bookings/{id}/fulfillments` | confirms the booking: its parts and its ticket become `FULFILLED` |
+| `POST /<provider>/bookings/{id}/fulfillments` | confirms the booking: its parts and its tickets become `FULFILLED`, one ticket per trip (two for a return) |
 | any other OSDM resource (places, products, refund offers, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
 | `GET /healthz` | `{"status":"ok"}`, for the container health check |
 

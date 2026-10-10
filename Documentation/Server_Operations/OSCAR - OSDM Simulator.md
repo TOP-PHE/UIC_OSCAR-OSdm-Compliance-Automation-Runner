@@ -173,9 +173,11 @@ rebuilds its Test Framework from the file.
    [`Bruno_Collection/data_base/simulator_datafile.json`](../../Bruno_Collection/data_base/simulator_datafile.json).
    It holds two sale scenarios, shared with the company's testers, once per
    OSDM version: `SIM_SALE_SEARCH_1ADT_36` and `SIM_SALE_SEARCH_2ADT_SAVER_36`
-   for `alpha`, `…_37` for `beta`, `…_38` for `gamma`. The file's run list is
-   the `gamma` pair; for `alpha` or `beta`, tick that provider's pair in Test
-   Config.
+   for `alpha`, `…_37` for `beta`, `…_38` for `gamma`, and return journeys
+   (#594): `SIM_RETURN_SEPARATE_1ADT_…` on each version and
+   `SIM_RETURN_COMBINED_1ADT_…` (one offer for both directions) on 3.7 and 3.8.
+   The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
+   that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider", and no check fails.

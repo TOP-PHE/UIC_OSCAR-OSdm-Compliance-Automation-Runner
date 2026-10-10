@@ -11,6 +11,10 @@
 require('./displays.js');
 require('./validators.js');
 require('./model.js');
+const { getComplianceVersion } = require('./osdmVersion.js');
+const {
+  normaliseReturnModel, normaliseReturnFulfillments, returnUsesInboundDate, combinedReturnDefined,
+} = require('./returnJourney.js');
 
 // scenarioParser-bruno.js
 
@@ -99,6 +103,7 @@ function resetScenarioEnvVars() {
     "outboundOfferId", "inboundOfferId", "outboundOfferTag",
     "ReturnOfferCollectionRequest", "__returnInboundDone",
     "outboundBookingId", "__returnBookMode",
+    "returnInboundDate", "returnModel", "returnFulfillments", "outboundTripId",
     "admissionReservationAncillaryOfferPartsIds",
     "admissionReservationAncillaryOfferPartsAftersalesConditions",
     "overallFlexibility", "coveredTripId", "minimalPrice",
@@ -1338,9 +1343,8 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
     );
   }
 
-  // Return trip (#176): derive inwardReturnDate from the outbound departure.
-  const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, _startDateTime);
-  if (rsp) tripSearchCriteria.returnSearchParameters = rsp;
+  // Return trip (#176, #594): the inbound date, from the outbound departure.
+  applyReturnOpts(tripSearchCriteria, returnOpts, _startDateTime);
 
   // ── #359: optional OSDM TripSearchCriteria members from the wizard's
   // Trip Search Criteria sub-panel. Only filled fields are sent; the wire
@@ -1476,9 +1480,8 @@ function osdmTripSpecification(legDefinitions, returnOpts) {
     legSpecs
   );
 
-  // Return trip (#176): derive inwardReturnDate from the first leg's departure.
-  const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, outboundStartDateTime);
-  if (rsp) tripSpecification.returnSearchParameters = rsp;
+  // Return trip (#176, #594): the inbound date, from the first leg's departure.
+  applyReturnOpts(tripSpecification, returnOpts, outboundStartDateTime);
 
   bru.setEnvVar("offerTripSpecifications", JSON.stringify([tripSpecification]));
 }
@@ -1517,11 +1520,34 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
 }
 
 // Read the return-trip options the OSCAR scenario stores on offerSearchCriteria
-// (returnOffsetDays + optional returnTime). These are authoring data only — they
-// are routed to the TRIP, never echoed into the OSDM offerSearchCriteria.
+// (returnOffsetDays + optional returnTime, returnModel, returnFulfillments).
+// These are authoring data only — never echoed into the OSDM offerSearchCriteria.
 function returnOptsFromScenario(scenario) {
   const c = (scenario && scenario.offerSearchCriteria) || {};
-  return { offsetDays: c.returnOffsetDays, time: c.returnTime };
+  return { offsetDays: c.returnOffsetDays, time: c.returnTime, model: c.returnModel, fulfillments: c.returnFulfillments };
+}
+
+// The return of a scenario (#594), on the first offer call's trip. The inbound
+// date is kept in returnInboundDate, which is what marks a return scenario.
+// From OSDM 3.7 it is sent as offerSearchCriteria.inboundDate (requestsBuilder);
+// before, as the deprecated returnSearchParameters.inwardReturnDate on the trip.
+function applyReturnOpts(trip, returnOpts, outboundStart) {
+  const rsp = returnOpts && buildReturnSearchParameters(returnOpts.offsetDays, returnOpts.time, outboundStart);
+  bru.setEnvVar("returnInboundDate", rsp ? rsp.inwardReturnDate : null);
+  if (!rsp) return;
+  const version = getComplianceVersion();
+  const model = normaliseReturnModel(returnOpts.model);
+  bru.setEnvVar("returnModel", model);
+  bru.setEnvVar("returnFulfillments", normaliseReturnFulfillments(returnOpts.fulfillments));
+  validationLogger(`[INFO] 🔁 Return — model ${model} (${model === 'COMBINED' ? 'outboundTripIds: offers covering both directions' : 'outwardOfferIds: one offer per direction'})`);
+  if (model === 'COMBINED' && !combinedReturnDefined(version)) {
+    validationLogger(`[WARNING] Return model COMBINED (returnSearchParameters.outboundTripIds) is defined from OSDM 3.7; this scenario declares ${version}. The request is sent as it is.`);
+  }
+  if (returnUsesInboundDate(version)) {
+    validationLogger(`[INFO] 🔁 Return — OSDM ${version}: the inbound date goes in offerSearchCriteria.inboundDate (returnSearchParameters.inwardReturnDate is deprecated since 3.7)`);
+  } else {
+    trip.returnSearchParameters = rsp;
+  }
 }
 
 // Function to set offer search criteria

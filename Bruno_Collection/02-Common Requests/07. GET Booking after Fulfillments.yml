@@ -114,6 +114,24 @@ runtime:
 
         displayFulFilledBooking(jsonData);
 
+        // #594: the number of fulfillments of a return, when the scenario states
+        // what it expects (one, one per direction, one per passenger). A return
+        // booked as two bookings (vendor fallback) is not counted here.
+        if (bru.getEnvVar("returnInboundDate")) {
+          const { checkReturnFulfillmentCount } = require(bru.getEnvVar("library_base") + "returnJourney.js");
+          const _expected = bru.getEnvVar("returnFulfillments");
+          let _paxCount = 0;
+          try { _paxCount = (JSON.parse(bru.getEnvVar("offerPassengerSpecifications") || "[]") || []).length; } catch (_e) { _paxCount = 0; }
+          const _check = bru.getEnvVar("__returnBookMode") === "done"
+            ? null
+            : checkReturnFulfillmentCount(jsonData && jsonData.booking && jsonData.booking.fulfillments, _expected, _paxCount);
+          if (_check) {
+            test(_check.name, () => { if (!_check.ok) throw new Error(_check.message); });
+          } else {
+            validationLogger(`[INFO] 🔁 Return — fulfillment count not checked (${bru.getEnvVar("__returnBookMode") === "done" ? "booked as two bookings" : "the scenario states no expectation"}); this booking has ${((jsonData && jsonData.booking && jsonData.booking.fulfillments) || []).length}.`);
+          }
+        }
+
         // Partial refund (#218): when armed on this scenario, stash the just-
         // fetched booking JSON so 10. POST Refund Offers can resolve scope
         // (bookingPartIds for the chosen leg, passengerIds for the chosen

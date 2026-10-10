@@ -2183,6 +2183,37 @@ function buildSalesFlowActionsSection(idx, sc) {
   </div>`;
 }
 
+// #594: how a return is asked for, and how many fulfillments it should give.
+// Only read when the scenario has a return (Return trip filled in).
+const RETURN_MODEL_OPTIONS = [
+  ['SEPARATE', 'Separate directions (outwardOfferIds) — default'],
+  ['COMBINED', 'Both directions in one offer (outboundTripIds, OSDM 3.7+)'],
+];
+const RETURN_FULFILLMENT_OPTIONS = [
+  ['', 'Not checked'],
+  ['ONE', 'One for the whole return'],
+  ['PER_DIRECTION', 'One per direction'],
+  ['PER_PASSENGER', 'One per passenger'],
+];
+
+function buildReturnModelFields(idx, criteria) {
+  const optionsOf = (current, options) => options.map(([value, text]) =>
+    `<option value="${esc(value)}" ${optionValue(current) === value ? 'selected' : ''}>${esc(text)}</option>`).join('');
+  return `
+      <div class="param-field">
+        <span class="param-label">Return model <span class="param-hint">(return trips only) — what the inbound offer call names</span></span>
+        <select class="param-input param-select" data-action="set-offer-return-model" data-idx="${esc(idx)}">
+          ${optionsOf(criteria.returnModel || 'SEPARATE', RETURN_MODEL_OPTIONS)}
+        </select>
+      </div>
+      <div class="param-field">
+        <span class="param-label">Return fulfillments <span class="param-hint">(return trips only) — expected after confirmation</span></span>
+        <select class="param-input param-select" data-action="set-offer-return-fulfillments" data-idx="${esc(idx)}">
+          ${optionsOf(criteria.returnFulfillments, RETURN_FULFILLMENT_OPTIONS)}
+        </select>
+      </div>`;
+}
+
 // The value of a <select> option: null and undefined stand for the empty option.
 function optionValue(v) {
   return v == null ? '' : v;
@@ -2920,6 +2951,7 @@ function buildOfferSection(idx, sc) {
         <input class="param-input" type="time" value="${esc(criteria.returnTime||'')}"
           data-action="set-offer-return-time" data-idx="${esc(idx)}">
       </div>
+      ${buildReturnModelFields(idx, criteria)}
     </div>
 
     <div style="padding:4px 14px 2px;font-size:10px;font-weight:800;color:#90a4ae;text-transform:uppercase;letter-spacing:.4px">
@@ -7432,6 +7464,10 @@ document.body.addEventListener('input', function(e) {
     }
     case 'set-offer-return-time':
       setOfferField(Number.parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
+    case 'set-offer-return-model':
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); break;
+    case 'set-offer-return-fulfillments':
+      setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); break;
     case 'set-offer-selections': {
       try {
         const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;

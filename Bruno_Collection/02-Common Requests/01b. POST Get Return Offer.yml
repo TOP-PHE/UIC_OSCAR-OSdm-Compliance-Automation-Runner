@@ -24,11 +24,12 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        // ── Two-step return (#178), leg 2 — the INWARD (return) offer ──────────
+        // ── Two-step return (#178, #594), leg 2 — the INWARD (return) offer ────
         // Reached only when "01. POST Get Offer" detected a return scenario and
-        // routed here (after capturing the outbound offer). Build the inward
-        // request: O&D swapped, departureTime = inwardReturnDate, related to the
-        // outbound via returnSearchParameters.outwardOfferIds.
+        // routed here (after capturing the outbound offer and its trip). Build
+        // the inward request: O&D swapped, departureTime = the inbound date,
+        // related to the outbound by returnSearchParameters.outwardOfferIds
+        // (SEPARATE) or .outboundTripIds (COMBINED).
         const { buildReturnOfferCollectionRequest } = require(bru.getEnvVar("library_base") + "requestsBuilder.js");
         require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
         buildReturnOfferCollectionRequest();
@@ -66,12 +67,19 @@ runtime:
         }
 
         // Capture + validate the inward offer. postOfferResponse sets offer /
-        // offerId to the inbound; we copy offerId into inboundOfferId so the
-        // booking can reference BOTH legs. On "no offers" it throws → skip.
+        // offerId to the chosen inbound offer. SEPARATE: offerId is copied into
+        // inboundOfferId so the booking references BOTH offers. COMBINED: that
+        // one offer covers both directions and is booked alone, as a one-way
+        // offer is. On "no offers" it throws → skip.
+        const _model = bru.getEnvVar("returnModel") || "SEPARATE";
         try {
           postOfferResponse(jsonData);
-          bru.setEnvVar("inboundOfferId", bru.getEnvVar("offerId"));
-          console.log("[INFO] 🔁 Inbound (return) offer captured: " + bru.getEnvVar("offerId"));
+          if (_model === "COMBINED") {
+            console.log("[INFO] 🔁 Return offer covering both directions captured: " + bru.getEnvVar("offerId") + " — booked alone.");
+          } else {
+            bru.setEnvVar("inboundOfferId", bru.getEnvVar("offerId"));
+            console.log("[INFO] 🔁 Inbound (return) offer captured: " + bru.getEnvVar("offerId"));
+          }
         } catch (noOffersErr) {
           bruTest("Return offers found in response", () => { throw noOffersErr; });
           console.log("[INFO] No inbound (return) offers returned — skipping this scenario");
@@ -80,6 +88,26 @@ runtime:
           return;
         }
         displayOfferResponse(jsonData);
+
+        // #594: the inbound response against the outbound call: a trip back,
+        // the same passengers, and what each model's offers must cover.
+        const { checkReturnOffers } = require(bru.getEnvVar("library_base") + "returnJourney.js");
+        let _outboundCriteria = {};
+        let _passengerRefs = [];
+        try { _outboundCriteria = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}"); } catch (_e) { _outboundCriteria = {}; }
+        try { _passengerRefs = (JSON.parse(bru.getEnvVar("offerPassengerSpecifications") || "[]") || []).map((p) => p && p.externalRef).filter(Boolean); } catch (_e) { _passengerRefs = []; }
+        checkReturnOffers(jsonData, {
+          model: _model,
+          outboundCriteria: _outboundCriteria,
+          outboundTripId: bru.getEnvVar("outboundTripId"),
+          passengerRefs: _passengerRefs,
+        }).forEach((c) => {
+          if (c.level === "warn") {
+            if (!c.ok) console.log("[WARNING] " + c.name + " — " + c.message);
+            return;
+          }
+          bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
+        });
 
         // Return trips book outbound + inbound together; no pre-booking place map.
         bru.setGlobalEnvVar("skipPlaceMaps", true);

@@ -44,7 +44,7 @@ function start(env = process.env, baseDir = __dirname) {
     clients,
     tokens: createTokenService(),
     store: createStore({
-      limits: { offer: settings.limits.offersPerClient, booking: settings.limits.bookingsPerClient },
+      limits: { offer: settings.limits.offersPerClient, trip: settings.limits.offersPerClient, booking: settings.limits.bookingsPerClient },
       ttlMs: settings.limits.ttlSeconds * 1000,
     }),
     limits: settings.limits,

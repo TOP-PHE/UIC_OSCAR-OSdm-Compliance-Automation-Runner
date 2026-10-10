@@ -820,3 +820,38 @@ describe('pages — written this way on purpose (#527)', () => {
     expect(read('run-detail.html')).toContain('${safeJsonForInlineScript(pretty)}<\\/script>`');
   });
 });
+
+// #594: the two return fields of Test Config. Their values are the data file
+// schema's, the stored value is selected, and the input delegate stores both.
+describe('Test Config return model and fulfillments (#594)', () => {
+  const source = read('js/scenarios.js');
+  const constant = (name) => vm.runInNewContext(`(${new RegExp(`^const ${name} = (\\[[\\s\\S]*?\\]);$`, 'm').exec(source)[1]})`);
+  const schema = require('../../../Bruno_Collection/json_validator/datafile.schema.json');
+  const criteria = JSON.stringify(schema).match(/"returnModel":\{[^}]*\}|"returnFulfillments":\{[^}]*\}/g).map((s) => JSON.parse(`{${s}}`));
+  const enumOf = (field) => criteria.find((c) => c[field])[field].enum;
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const optionValue = (v) => (v == null ? '' : v);
+  const context = {
+    esc, optionValue,
+    RETURN_MODEL_OPTIONS: constant('RETURN_MODEL_OPTIONS'),
+    RETURN_FULFILLMENT_OPTIONS: constant('RETURN_FULFILLMENT_OPTIONS'),
+  };
+  const render = loadFunction('js/scenarios.js', 'buildReturnModelFields', context);
+
+  test('every option is a value the data file schema accepts', () => {
+    for (const [value] of context.RETURN_MODEL_OPTIONS) expect(enumOf('returnModel')).toContain(value);
+    for (const [value] of context.RETURN_FULFILLMENT_OPTIONS) expect(enumOf('returnFulfillments')).toContain(value);
+  });
+
+  test('the stored value is the selected option; nothing stored selects the default', () => {
+    const selected = (html) => [...html.matchAll(/<option value="([^"]*)" selected>/g)].map((m) => m[1]);
+    expect(selected(render(0, { returnModel: 'COMBINED', returnFulfillments: 'PER_DIRECTION' }))).toEqual(['COMBINED', 'PER_DIRECTION']);
+    expect(selected(render(0, {}))).toEqual(['SEPARATE', '']);
+    expect(selected(render(0, { returnModel: 'SEPARATE', returnFulfillments: null }))).toEqual(['SEPARATE', '']);
+  });
+
+  test('the input delegate stores both fields on the offer criteria', () => {
+    expect(source).toContain("case 'set-offer-return-model':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); break;");
+    expect(source).toContain("case 'set-offer-return-fulfillments':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); break;");
+  });
+});

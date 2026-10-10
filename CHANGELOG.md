@@ -62,6 +62,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.224] / [collection-OTST_V2.0.109] — 2026-10-10
+
+Issue #594, release 2026.253. Simulator 0.4.0.
+
+### Added
+
+- **Return journeys in both OSDM models.** A return makes two `POST /offers`
+  calls; the scenario's new *Return model* says what the second one names:
+  - *Separate directions* (default, the behaviour so far):
+    `returnSearchParameters.outwardOfferIds` = the chosen outbound offer; both
+    offers are booked.
+  - *Both directions in one offer* (OSDM 3.7 and later):
+    `returnSearchParameters.outboundTripIds` = the chosen outbound offer's trip;
+    the answer's offers cover both trips (`tripCoverage` +
+    `inboundTripCoverage`) and the chosen one is booked alone. Declared on an
+    older version, it is sent with a WARNING.
+- **Checks of the inbound answer** (`library-bruno/returnJourney.js`, pure):
+  - a trip goes back, from the outbound destination to its origin;
+  - the passengers are those of the outbound call;
+  - both directions: each offer's `tripCoverage` is the chosen outbound trip
+    and its `inboundTripCoverage` an inbound trip of the answer;
+  - separate: no inbound offer covers the outbound trip;
+  - an inbound trip marked `OUT_BOUND` is a WARNING (`direction` is optional).
+- **Return fulfillments** (optional): one, per direction, or per passenger,
+  checked at `07. GET Booking after Fulfillments`. Not checked when the scenario
+  states nothing, or when the return was booked as two bookings.
+- Test Config: the *Return model* and *Return fulfillments* fields under the
+  return trip (server 1.11.224). The data file schema accepts `returnModel` and
+  `returnFulfillments`.
+
+### Changed
+
+- **The inbound date of a return follows the version.** From OSDM 3.7 it is
+  sent as `offerSearchCriteria.inboundDate` (local date-time), before as the
+  deprecated `returnSearchParameters.inwardReturnDate`. `outwardOfferTag`, also
+  deprecated since 3.7, is sent only before it. A return scenario is recognised
+  by that date (`returnInboundDate`), not by the trip field.
+
+### Fixed
+
+- In a return booked as two offers, a fulfillment holding the other direction's
+  parts failed "bookingParts.id exist in admissionReservationAncillaryBookingPartsIds":
+  that list only held the parts of the last offer. Every part of the booking is
+  in it now, each once.
+
+### Simulator 0.4.0
+
+- `POST /offers` answers both return models: inbound offers for
+  `outwardOfferIds`; for `outboundTripIds`, offers covering the outbound and
+  the inbound trip at a return price. An id the client was not given, both
+  kinds of id, or a malformed list is a 400 Problem. The trips a client was
+  given are remembered, like its offers.
+- A confirmed booking has one fulfillment per trip it covers: two for a return.
+- The data file has the return scenarios: separate directions on 3.6, 3.7 and
+  3.8; both directions on 3.7 and 3.8.
+
 ## [collection-OTST_V2.0.108] — 2026-10-10
 
 Issue #614, release 2026.252. Collection data and documentation only; no

@@ -109,14 +109,18 @@ secret variables nor the token). Do not commit that; put the file back with
 
 The scenarios exist once per OSDM version: `_36` for `alpha`, `_37` for
 `beta`, `_38` for `gamma`, the file's run list. On another provider, set
-`api_base` to it and name its scenario with `scenario_override`.
+`api_base` to it and name its scenario with `scenario_override`. Besides the two
+sales there are return journeys (#594): `SIM_RETURN_SEPARATE_1ADT` on every
+version, and `SIM_RETURN_COMBINED_1ADT` (one offer for both directions) from
+3.7, so not on `alpha`.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional
 information requests answer 501, reported as "not implemented by this
 provider". The same holds for the `_36` pair on `alpha` and the `_37` pair on
-`beta`. A scenario run on a provider of another version gets a warning from
-the version check.
+`beta`, and for the return scenarios, which also check the inbound answer and
+expect one ticket per direction. A scenario run on a provider of another
+version gets a warning from the version check.
 
 Through OSCAR, the same data file gives the same checks: OSCAR obtains the
 token itself, so its run has two checks fewer, those of the token request.

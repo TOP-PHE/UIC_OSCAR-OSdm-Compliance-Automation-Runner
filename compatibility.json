@@ -1,8 +1,24 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.252",
+  "current_release": "2026.253",
   "releases": [
+    {
+      "release": "2026.253",
+      "date": "2026-10-10",
+      "server": "1.11.224",
+      "collection": "OTST_V2.0.109",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#594): return journeys in both OSDM models. A scenario's Return model chooses what the inbound offer call names: the outbound offer (returnSearchParameters.outwardOfferIds, separate directions, the default and the behaviour so far) or the outbound trip (returnSearchParameters.outboundTripIds, OSDM 3.7+, offers covering both directions, booked as one offer).",
+        "The inbound date of a return goes in offerSearchCriteria.inboundDate from OSDM 3.7, in the deprecated returnSearchParameters.inwardReturnDate before; outwardOfferTag is no longer sent from 3.7. A return scenario is recognised by that date, not by the trip field.",
+        "New checks on the inbound answer (library-bruno/returnJourney.js): a trip goes back from the outbound destination to its origin, the passengers are those of the outbound call, and each offer covers what the model says (both: tripCoverage = the chosen outbound trip, inboundTripCoverage = an inbound trip of the answer; separate: never the outbound trip). An inbound trip marked OUT_BOUND is a warning. Return fulfillments (one, per direction, per passenger) is checked after confirmation when the scenario states it.",
+        "Fix: in a return booked as two offers, a fulfillment holding the other direction's parts failed 'bookingParts.id exist in ...'; those parts are now part of the booking's list.",
+        "Server 1.11.224: Test Config has the Return model and Return fulfillments fields; the data file schema accepts returnModel and returnFulfillments.",
+        "Simulator 0.4.0 (not part of a release) answers both models and issues one ticket per direction; its data file has the return scenarios (separate on 3.6/3.7/3.8, both directions on 3.7/3.8)."
+      ]
+    },
     {
       "release": "2026.252",
       "date": "2026-10-10",

@@ -154,17 +154,11 @@ request:
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
 
-          // Two-step return (#178): the inward "01b. POST Get Return Offer" step
-          // runs only for return scenarios — detected from the outbound
-          // tripSearchCriteria the scenarioParser built (returnSearchParameters
-          // .inwardReturnDate). For one-way scenarios it is skipped wherever it
-          // sits in the flow.
-          var _isReturnScenario = (function () {
-            try {
-              var _t = JSON.parse(bru.getEnvVar('offerTripSearchCriteria') || '{}');
-              return !!(_t.returnSearchParameters && _t.returnSearchParameters.inwardReturnDate);
-            } catch (_e) { return false; }
-          })();
+          // Two-step return (#178, #594): the inward "01b. POST Get Return Offer"
+          // step runs only for return scenarios — those for which the
+          // scenarioParser set returnInboundDate. For one-way scenarios it is
+          // skipped wherever it sits in the flow.
+          var _isReturnScenario = !!bru.getEnvVar('returnInboundDate');
 
           // Place maps run only when the scenario enabled Place selection in the
           // SEATMAP_AT_OFFER mode (issues #104/#107); legacy requiresPlaceSelection
@@ -307,6 +301,7 @@ request:
                 "outboundOfferId", "inboundOfferId", "outboundOfferTag",
                 "ReturnOfferCollectionRequest", "__returnInboundDone",
                 "outboundBookingId", "__returnBookMode",
+                "returnInboundDate", "returnModel", "returnFulfillments", "outboundTripId",
                 "admissionReservationAncillaryOfferPartsIds",
                 "admissionReservationAncillaryOfferPartsAftersalesConditions",
                 "overallFlexibility", "coveredTripId", "minimalPrice",
