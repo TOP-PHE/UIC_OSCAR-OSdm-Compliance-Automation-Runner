@@ -31,6 +31,7 @@ module.exports = {
   validateAncillaries,
   getTripLegCoverage,
   handleAccommodationAndPlaceSelection,
+  handleOptionalReservationSelections,
   ensureYesWhenRefundOrExchangeSelected,
   deriveOfferFlexibilityFromProducts,
   offerFlexibility,
@@ -1133,25 +1134,11 @@ function validateAdmissions(selectedOffer) {
         });
       }
 
-      // #211 (SFR night-train spec): minGroupItemsToBeBooked/maxGroupItemsToBeBooked
-      // are optional OSDM fields — not every vendor populates them, so this is a
-      // soft type-check only, never a hard requirement that they equal 1.
-      if ("minGroupItemsToBeBooked" in admission) {
-        test(`AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked is a number or null - value: ${admission.minGroupItemsToBeBooked}`, function () {
-          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} minGroupItemsToBeBooked: ${admission.minGroupItemsToBeBooked}`);
-          expectTypeOrNull(admission.minGroupItemsToBeBooked, "number", "minGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
-        });
-      } else {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare minGroupItemsToBeBooked (optional per OSDM) → check skipped`);
-      }
-      if ("maxGroupItemsToBeBooked" in admission) {
-        test(`AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked is a number or null - value: ${admission.maxGroupItemsToBeBooked}`, function () {
-          validationLogger(`[DEBUG] AdmissionOfferPart ${i + 1} maxGroupItemsToBeBooked: ${admission.maxGroupItemsToBeBooked}`);
-          expectTypeOrNull(admission.maxGroupItemsToBeBooked, "number", "maxGroupItemsToBeBooked should be a number or null (nullable per OSDM)");
-        });
-      } else {
-        validationLogger(`[INFO] AdmissionOfferPart ${i + 1} does not declare maxGroupItemsToBeBooked (optional per OSDM) → check skipped`);
-      }
+      // #601: minGroupItemsToBeBooked / maxGroupItemsToBeBooked belong to the
+      // admission's reservation relations (admission.reservations[]), not to
+      // the admission: they were read here, where OSDM never puts them, so the
+      // checks never ran. The relations are checked when the reservations are
+      // chosen (handleOptionalReservationSelections, seatReservations.js).
 
       // appliedPassengerTypes each has a type and passengerRef
       const appliedPassengerTypes = admission.appliedPassengerTypes || [];
@@ -1854,29 +1841,50 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
   validationLogger(`[DEBUG] tripLegCoverage stored in environment: ${JSON.stringify(tripLegCoverage)}`);
 }
 
-// #239: book the selected offer's reservationOfferParts via
-// optionalReservationSelections — the OSDM mechanism for offers where a
-// reservation is mandatory, distinct from (and independent of)
-// placeSelections/accommodationSelection above, which additionally state
-// WHICH place/compartment is wanted. This only declares the reservation(s)
-// themselves should be booked, one {reservationId} entry per part.
+// #239, #601: the reservations booked with the selected offer. Every
+// mandatory reservation (a relation of an admission with
+// minGroupItemsToBeBooked > 0) is booked; the optional ones too when the
+// scenario names a reservationBookingForm, or with the older
+// bookMandatoryReservations switch (which booked every reservation part).
+// RESERVATION_SELECTION sends optionalReservationSelections, PLACE_SELECTION
+// placeSelections naming the trip and leg, ADD_LATER adds the optional ones
+// after the booking (09). Independent of the seat map flow above, which picks
+// places.
 function handleOptionalReservationSelections(selectedOffer) {
-  const bookMandatoryReservations = bru.getEnvVar("bookMandatoryReservations");
-  if (bookMandatoryReservations !== true && bookMandatoryReservations !== "true") {
-    return;
-  }
-  validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
-
-  const reservationParts = selectedOffer.reservationOfferParts || [];
-  if (reservationParts.length === 0) {
-    validationLogger("[WARN] bookMandatoryReservations is enabled but the selected offer has no reservationOfferParts — nothing to add to optionalReservationSelections.");
+  const sr = require('./seatReservations.js');
+  const form = sr.normaliseForm(bru.getEnvVar("reservationBookingForm"));
+  const legacy = String(bru.getEnvVar("bookMandatoryReservations")) === "true";
+  const parts = selectedOffer.reservationOfferParts || [];
+  if (parts.length === 0) {
+    if (form || legacy) validationLogger(`[WARNING] The scenario books reservations (${form || "bookMandatoryReservations"}) but the selected offer has no reservationOfferParts — nothing to book.`);
     bru.setEnvVar("optionalReservationSelections", JSON.stringify([]));
     return;
   }
+  validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
+  const recordChecks = (checks) => checks.forEach((c) => {
+    if (c.level === "warn") {
+      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
+      return;
+    }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+  recordChecks(sr.checkRelations(selectedOffer));
+  const passengerRefs = (parseEnvJson("offerPassengerSpecifications", []) || []).map((p) => p?.externalRef).filter(Boolean);
+  recordChecks(sr.checkProviderRules(selectedOffer, passengerRefs));
 
-  const selections = reservationParts.map(part => ({ reservationId: part.id }));
-  bru.setEnvVar("optionalReservationSelections", JSON.stringify(selections));
-  validationLogger(`[INFO] optionalReservationSelections will book ${selections.length} reservationOfferPart(s): ${reservationParts.map(p => p.id).join(", ")}`);
+  const { mandatory, optional } = sr.reservationsToBook(selectedOffer, { bookOptional: !!form || legacy });
+  const later = form === "ADD_LATER" ? optional : [];
+  const atBooking = form === "ADD_LATER" ? mandatory : [...mandatory, ...optional];
+  if (form === "PLACE_SELECTION") {
+    bru.setEnvVar("reservationPlaceSelections", JSON.stringify(sr.placeSelectionsFor(selectedOffer, atBooking)));
+    bru.setEnvVar("optionalReservationSelections", JSON.stringify([]));
+  } else {
+    bru.setEnvVar("reservationPlaceSelections", JSON.stringify([]));
+    bru.setEnvVar("optionalReservationSelections", JSON.stringify(atBooking.map((id) => ({ reservationId: id }))));
+  }
+  bru.setEnvVar("reservationAddLaterSelections", JSON.stringify(sr.placeSelectionsFor(selectedOffer, later)));
+  bru.setEnvVar("__reservationsBooked", JSON.stringify(atBooking));
+  validationLogger(`[INFO] Reservations: ${mandatory.length} mandatory, ${optional.length} optional booked; ${atBooking.length} with the booking${form === "PLACE_SELECTION" ? " (placeSelections)" : " (optionalReservationSelections)"}, ${later.length} added after it.`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {

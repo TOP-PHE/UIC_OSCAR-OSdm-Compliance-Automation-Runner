@@ -19,6 +19,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
+const { reservationsToBook, reservationFrom, linkReservations } = require('./reservations');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 19;
@@ -69,7 +70,8 @@ function passengerFrom(spec, externalRef, provider) {
 const ONE_FULFILLMENT = Symbol('one fulfillment');
 
 const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total + p.amount, 0), currency, scale: 2 });
-const admissionsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => bookedOffer.admissions);
+// Every part of a booking: its admissions and, since #601, its reservations.
+const partsOf = (booking) => booking.bookedOffers.flatMap((bookedOffer) => [...bookedOffer.admissions, ...bookedOffer.reservations]);
 
 // What was remembered of the offer a booking request selects. Refused when the
 // offer is unknown to this client or can no longer be booked.
@@ -104,7 +106,8 @@ function admissionFrom(part, passengers, createdOn, confirmableUntil) {
     availableFulfillmentOptions: part.availableFulfillmentOptions,
     refundable: part.refundable,
     exchangeable: part.exchangeable,
-    isReservationRequired: false,
+    // #601: as the offer said (true when a reservation is mandatory).
+    isReservationRequired: part.isReservationRequired === true,
     ...(part.appliedPassengerTypes ? { appliedPassengerTypes: part.appliedPassengerTypes } : {}),
   };
 }
@@ -131,6 +134,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   let oneFulfillment = true;
   for (const selection of selections) {
     const { offer, trips: offerTrips, oneFulfillment: single } = bookableOffer(selection, findOffer, nowMs);
+    const reserved = reservationsToBook(offer, selection);
     oneFulfillment = oneFulfillment && single === true;
     for (const trip of offerTrips) trips.set(trip.id, trip);
     for (const externalRef of offer.passengerRefs) {
@@ -142,9 +146,10 @@ function createBooking(body, findOffer, provider, nowMs) {
       tripCoverage: offer.tripCoverage,
       products: offer.products,
       admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, confirmableUntil)),
-      reservations: [],
+      reservations: reserved.map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, offerTrips, createdOn, confirmableUntil)),
       ancillaries: [],
     };
+    linkReservations(bookedOffer);
     if (offer.inboundTripCoverage) bookedOffer.inboundTripCoverage = offer.inboundTripCoverage;
     bookedOffers.push(bookedOffer);
   }
@@ -162,7 +167,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   };
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
-  booking.provisionalPrice = sumOf(admissionsOf(booking).map((a) => a.price), provider.currency);
+  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), provider.currency);
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   return booking;
 }
@@ -171,10 +176,10 @@ function createBooking(body, findOffer, provider, nowMs) {
 // one ticket per direction of a return (#594), one for a single journey.
 function admissionsByTrip(booking) {
   const groups = new Map(booking.trips.map((trip) => [trip.id, []]));
-  for (const admission of admissionsOf(booking)) {
-    const tripId = admission.tripCoverage?.coveredTripId;
+  for (const part of partsOf(booking)) {
+    const tripId = part.tripCoverage?.coveredTripId;
     if (!groups.has(tripId)) groups.set(tripId, []);
-    groups.get(tripId).push(admission);
+    groups.get(tripId).push(part);
   }
   return [...groups.values()].filter((group) => group.length > 0);
 }
@@ -191,7 +196,7 @@ function confirmBooking(booking, provider, nowMs) {
     throw new HttpError(409, 'BOOKING_EXPIRED', 'Booking expired', 'The time limit to confirm this booking has passed.');
   }
   const confirmedOn = new Date(nowMs).toISOString();
-  const admissions = admissionsOf(booking);
+  const admissions = partsOf(booking);
   for (const admission of admissions) {
     admission.status = 'FULFILLED';
     admission.confirmedOn = confirmedOn;
@@ -212,6 +217,34 @@ function confirmBooking(booking, provider, nowMs) {
     bookingParts: group.map((a) => ({ id: a.id, summary: a.summary })),
   }));
   return booking.fulfillments;
+}
+
+/**
+ * POST .../booked-offers/{bookedOfferId}/offer-parts (#601): a reservation of
+ * the booked offer, added while the booking is pre-booked. The request names
+ * the offer and, in placeSelections, the reservations.
+ */
+function addOfferParts(booking, bookedOfferId, body, findOffer) {
+  const bookedOffer = booking.bookedOffers.find((o) => o.offerId === bookedOfferId);
+  if (!bookedOffer) throw new HttpError(404, 'BOOKED_OFFER_NOT_FOUND', 'Booked offer not found');
+  if (booking.fulfillments.length > 0) throw new HttpError(409, 'BOOKING_CONFIRMED', 'Booking confirmed', 'A part can be added to a pre-booked booking only.');
+  if (body.offerId !== bookedOfferId) throw bad('offerId must be the offer of the booked offer');
+  if (Array.isArray(body.ancillaryOfferIds) && body.ancillaryOfferIds.length > 0) {
+    throw new HttpError(501, 'NOT_IMPLEMENTED', 'Not implemented', 'This simulator adds reservations only.');
+  }
+  if (!Array.isArray(body.placeSelections) || body.placeSelections.length === 0) throw bad('placeSelections must name the reservations to add');
+  const found = findOffer(bookedOfferId);
+  if (!found) throw new HttpError(404, 'OFFER_NOT_FOUND', 'Offer not found', 'The offer does not exist, has expired, or belongs to another client.');
+  const already = new Set(bookedOffer.reservations.map((r) => r.id));
+  const wanted = reservationsToBook({ ...found.offer, admissionOfferParts: [] }, { placeSelections: body.placeSelections });
+  const added = wanted.filter((part) => !already.has(part.id));
+  if (added.length === 0) throw new HttpError(409, 'ALREADY_BOOKED', 'Already booked', 'The reservations named are already in the booking.');
+  const passengerIdOf = (ref) => booking.passengers.find((p) => p.externalRef === ref)?.id;
+  const createdOn = new Date().toISOString();
+  bookedOffer.reservations.push(...added.map((part) => reservationFrom(part, passengerIdOf, found.trips, createdOn, booking.confirmationTimeLimit)));
+  linkReservations(bookedOffer);
+  booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), booking.provisionalPrice.currency);
+  return { bookedOffers: [bookedOffer] };
 }
 
 function findPassenger(booking, passengerId) {
@@ -239,4 +272,4 @@ function setPurchaser(booking, body) {
   return booking.purchaser;
 }
 
-module.exports = { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser };
+module.exports = { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser };

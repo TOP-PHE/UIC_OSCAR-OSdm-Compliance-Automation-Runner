@@ -134,7 +134,12 @@ negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
 the offer. Travel class per leg (#600), on `gamma` only:
 `SIM_SALE_CLASS_PER_LEG_1ADT_38`, a trip in two legs (an InterCity, then a
 regional train with no first class), first class on the first leg through a
-supplement and second class on the second.
+supplement and second class on the second. Seat reservations (#601), on
+`gamma` only, on a SuperCity (reservation mandatory) then a EuroCity
+(optional): `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` (the mandatory one only),
+`SIM_SALE_RESERVATION_SELECTION_2ADT_38`, `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38`
+and `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` (the optional one too, in each
+form).
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional

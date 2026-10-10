@@ -56,6 +56,8 @@ const ENUMS = {
   partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound'],
   // #596: negative probe, the provider must refuse the scenario's overrule code.
   overruleCodeExpectRejection:       ['off', 'on'],
+  // #601: how the optional seat reservations are booked; mandatory ones always are.
+  reservationBookingForm:            [null, 'RESERVATION_SELECTION', 'PLACE_SELECTION', 'ADD_LATER'],
   // #599: negative test, the expected product must not be offered.
   expectedProductAbsent:             ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
@@ -2204,7 +2206,7 @@ function buildSalesFlowActionsSection(idx, sc) {
   const _bookMandatoryRes = sc.bookMandatoryReservations === true;
   const mandatoryReservationHtml = `
         <div class="fw-subsection" style="margin-top:12px">
-          <div class="fw-subsection-label" style="margin-bottom:6px">Mandatory reservation booking <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— books the offer's reservationOfferPart(s) via optionalReservationSelections, without stating a specific place (OSDM's mechanism for reservation-mandatory offers)</span></div>
+          <div class="fw-subsection-label" style="margin-bottom:6px">Book the optional reservations too <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0">— a mandatory reservation (minGroupItemsToBeBooked above 0) is always booked (#601); this older switch also books the optional ones, via optionalReservationSelections. The form below says how instead</span></div>
           <div class="pill-group">
             <div class="pill${_bookMandatoryRes ? ' selected' : ''}" data-action="toggle-book-mandatory-reservations" data-idx="${esc(idx)}" title="${esc(_bookMandatoryRes ? 'Enabled — click to disable' : 'Disabled (default) — click to enable')}"${_accStyle}>🎫 Book via optionalReservationSelections</div>
           </div>
@@ -2220,6 +2222,8 @@ function buildSalesFlowActionsSection(idx, sc) {
         ${accommodationPickerHtml}
         ${genderPickerHtml}
         ${mandatoryReservationHtml}
+        ${buildSelect(idx, 'reservationBookingForm', 'Optional reservations', ENUMS.reservationBookingForm,
+          'How the optional seat reservations are booked (#601); mandatory ones always go with the booking. RESERVATION_SELECTION: optionalReservationSelections. PLACE_SELECTION: placeSelections naming the trip and leg. ADD_LATER: added after the booking (09, /offer-parts). Empty: optional reservations are not booked.')}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">
           Enabled steps are attempted in order after the booking is created. If the offer
           doesn't support a step (e.g. no ancillaries in the offer, non-reservable train),

@@ -37,6 +37,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
+const { reservationsOfDirection, reservationProductOf } = require('./reservations');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -90,7 +91,7 @@ function productsOf(provider) {
   return tariffsOf(provider).flatMap((tariff) => [
     ...classesOf(tariff).map((c) => productOf(tariff, c, provider)),
     ...(provider.secondClassOnlyCategories && !tariff.group ? [upgradeProductOf(tariff, provider)] : []),
-  ]);
+  ]).concat(provider.reservations ? FLEXIBILITIES.map((f) => reservationProductOf(f, provider)) : []);
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
@@ -481,7 +482,12 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     .map((id) => [product, productOf(flexibility, 'SECOND', provider), upgradeProductOf(flexibility, provider)].find((p) => p.id === id));
   // A first-class offer with an upgrade part is first class where offered only.
   const mixed = products.some((p) => p.type === 'UPGRADE_POINT2POINT');
-  const total = admissionOfferParts.reduce((sum, part) => sum + part.price.amount, 0);
+  // #601: the seat reservations of the trains that have one, each admission
+  // pointing to those of its trip; a mandatory one is part of the price.
+  const reservations = directions.flatMap((t) => reservationsOfDirection(t, { passengers, tariff: flexibility, provider, createdOn, price, fulfillmentOptions }));
+  linkAdmissionsToReservations(admissionOfferParts, products, reservations);
+  const total = [...admissionOfferParts, ...reservations.filter((r) => r.mandatory).map((r) => r.part)]
+    .reduce((sum, part) => sum + part.price.amount, 0);
   const offer = {
     offerId: `${provider.idPrefix}-OFR-${randomId()}`,
     summary: mixed ? `${product.summary}, first class where the train has one` : `${product.summary}, ${serviceClass.name} class`,
@@ -497,8 +503,22 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
     tripCoverage: coverage,
     admissionOfferParts,
   };
+  if (reservations.length > 0) offer.reservationOfferParts = reservations.map((r) => r.part);
   if (inboundTrip) offer.inboundTripCoverage = coverageOf(inboundTrip);
   return offer;
+}
+
+// Each admission (not an upgrade) points to the reservations of its trip,
+// and the offer lists the reservation product.
+function linkAdmissionsToReservations(admissionOfferParts, products, reservations) {
+  if (reservations.length === 0) return;
+  for (const admission of admissionOfferParts.filter((part) => !part.summaryProductId.includes('-UPG-'))) {
+    const own = reservations.filter((r) => r.part.tripCoverage.coveredTripId === admission.tripCoverage.coveredTripId);
+    if (own.length === 0) continue;
+    admission.reservations = own.map((r) => r.relation);
+    admission.isReservationRequired = own.some((r) => r.mandatory);
+  }
+  products.push(reservations[0].product);
 }
 
 // What a return request asks, from the trip it searches with:

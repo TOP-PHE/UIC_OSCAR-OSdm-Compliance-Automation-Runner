@@ -932,6 +932,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`travelClasses`, every class named). The simulator read `travelClass` until
   0.10.0, so it answered every request in second class only: a simulator
   field read from a request must be the OSDM name the collection sends.
+- **A mandatory reservation is read from the admission's relations and booked
+  by itself** (#601, 1.11.232 / OTST_V2.0.116). `library-bruno/seatReservations.js`
+  (pure): `minGroupItemsToBeBooked` lives in `admission.reservations[]`
+  (ReservationRelation), never on the admission. `reservationBookingForm`
+  books the optional ones (RESERVATION_SELECTION, PLACE_SELECTION, ADD_LATER);
+  ADD_LATER goes through 09, and its run-filter gate is in `opencollection.yml`
+  (`_addLaterForm`) as well as in 02's routing: a step a script routes to is
+  still skipped when the filter says so. Bruno may give a JSON variable back
+  as an object (`offer` does): read it with `fromEnv()`, never a bare
+  `JSON.parse`, or a check silently sees nothing.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

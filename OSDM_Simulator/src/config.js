@@ -68,6 +68,7 @@ function checkProvider(key, raw) {
   const reductionCards = checkReductionCards(raw.reductionCards, bad);
   const products = checkProducts(raw.products, bad);
   const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
+  const reservations = checkReservations(raw.reservations, bad);
   return {
     key,
     name: raw.name,
@@ -82,6 +83,7 @@ function checkProvider(key, raw) {
     ...(reductionCards ? { reductionCards } : {}),
     ...(products ? { products } : {}),
     ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
+    ...(reservations ? { reservations } : {}),
   };
 }
 
@@ -139,6 +141,18 @@ function checkCategories(categories, bad) {
     && categories.every((c) => typeof c === 'string' && /^[A-Za-z0-9]{1,10}$/.test(c)) && new Set(categories).size === categories.length;
   if (!ok) throw bad('secondClassOnlyCategories');
   return [...categories];
+}
+
+// The seat reservation of each train category (#601), by short name:
+// MANDATORY or OPTIONAL. A train of a category not listed has none. Absent:
+// no train has a reservation.
+function checkReservations(reservations, bad) {
+  if (reservations === undefined) return null;
+  const entries = reservations && typeof reservations === 'object' && !Array.isArray(reservations) ? Object.entries(reservations) : [];
+  const ok = entries.length > 0 && entries.length <= 10
+    && entries.every(([category, kind]) => /^[A-Za-z0-9]{1,10}$/.test(category) && ['MANDATORY', 'OPTIONAL'].includes(kind));
+  if (!ok) throw bad('reservations');
+  return Object.fromEntries(entries);
 }
 
 // The reduction cards a provider knows (#597): a code, a name and the

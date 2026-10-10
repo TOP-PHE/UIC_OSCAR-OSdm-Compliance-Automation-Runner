@@ -23,7 +23,7 @@
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
-const { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
+const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 
@@ -37,7 +37,7 @@ const NOT_PROVIDED = new Set([
   'trips-collections', 'zones',
 ]);
 const BOOKING_PARTS_NOT_PROVIDED = new Set([
-  'booked-offers', 'cancel-fulfillments-offers', 'cleanup', 'documents', 'exchange-offers', 'exchange-operations',
+  'cancel-fulfillments-offers', 'cleanup', 'documents', 'exchange-offers', 'exchange-operations',
   'fulfillment-check', 'history', 'on-hold-offer', 'reimbursements', 'release-offers', 'split',
 ]);
 
@@ -210,6 +210,15 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return NO_CONTENT;
   }
 
+  // POST /bookings/{id}/booked-offers/{bookedOfferId}/offer-parts (#601); the
+  // other booked-offer resources are not provided.
+  async function bookedOfferRoute(req, scope, bookingId, bookedOfferId, more) {
+    if (bookedOfferId === undefined || more.length !== 1 || more[0] !== 'offer-parts') throw notProvided();
+    requireMethod(req, 'POST');
+    const booking = bookingOf(scope, bookingId);
+    return addOfferParts(booking, bookedOfferId, await bodyOf(req), (offerId) => store.get('offer', scope, offerId));
+  }
+
   async function bookingRoute(req, provider, scope, rest) {
     const [bookingId, part, partId, ...more] = rest;
     if (bookingId === undefined) return newBooking(req, provider, scope);
@@ -218,6 +227,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       return { booking: bookingOf(scope, bookingId) };
     }
     if (BOOKING_PARTS_NOT_PROVIDED.has(part)) throw notProvided();
+    if (part === 'booked-offers') return bookedOfferRoute(req, scope, bookingId, partId, more);
     if (more.length > 0) throw notFound();
     if (part === 'fulfillments' && partId === undefined) return fulfillments(req, provider, scope, bookingId);
     if (part === 'passengers' && partId !== undefined) return passenger(req, scope, bookingId, partId);

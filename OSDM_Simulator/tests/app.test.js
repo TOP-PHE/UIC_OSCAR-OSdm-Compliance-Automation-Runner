@@ -189,6 +189,8 @@ test('products: gamma lists its named products in both classes and gives one by 
     'GAMMA-PRD-SIM_TRAIN_BOUND-SECOND', 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST', 'GAMMA-PRD-UPG-SIM_TRAIN_BOUND',
     // #599: the weekend group in both classes, the group in second class only.
     'GAMMA-PRD-SIM_WEEKEND_GROUP-SECOND', 'GAMMA-PRD-SIM_WEEKEND_GROUP-FIRST', 'GAMMA-PRD-SIM_GROUP-SECOND',
+    // #601: the seat reservation, one per flexibility.
+    'GAMMA-PRD-RES-FULL_FLEXIBLE', 'GAMMA-PRD-RES-SEMI_FLEXIBLE', 'GAMMA-PRD-RES-NON_FLEXIBLE',
   ]);
   for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
   const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');
@@ -798,4 +800,94 @@ test('class per leg: the booking keeps the upgrade part, and the ticket covers b
   const fulfillments = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
   assert.equal(fulfillments.length, 1);
   assert.equal(fulfillments[0].bookingParts.length, 2);
+});
+
+// ── seat reservations (#601) ────────────────────────────────────────────────
+
+const reservationTrip = () => {
+  const leg = (from, to, start, end, number, shortName) => ({
+    timedLeg: {
+      start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: from }, serviceDeparture: { timetabledTime: start } },
+      end: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: to }, serviceArrival: { timetabledTime: end } },
+      service: { vehicleNumbers: [number], productCategory: { name: shortName, shortName } },
+    },
+  });
+  const request = offerRequest({
+    anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON' }, { externalRef: 'P2', type: 'PERSON' }],
+    tripSpecifications: [{ legs: [
+      leg('urn:uic:stn:0000001', 'urn:uic:stn:0000005', '2026-11-20T08:00:00+02:00', '2026-11-20T10:00:00+02:00', '501', 'SC'),
+      leg('urn:uic:stn:0000005', 'urn:uic:stn:0000002', '2026-11-20T10:20:00+02:00', '2026-11-20T12:00:00+02:00', '172', 'EC'),
+    ] }],
+  });
+  delete request.tripSearchCriteria;
+  return request;
+};
+
+async function reservableOffer() {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const { offers, trips } = (await call(sim.base, token, 'POST', '/gamma/offers', reservationTrip())).body;
+  return { token, offer: offers[0], trip: trips[0] };
+}
+
+test('reservations: the mandatory one is booked unasked, with its coach and seats; the optional one only when named', async () => {
+  const { token, offer, trip } = await reservableOffer();
+  const [mandatory, optional] = offer.reservationOfferParts;
+  const plain = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  const [booked] = plain.bookedOffers;
+  assert.deepEqual(booked.reservations.map((r) => r.id), [mandatory.id]);
+  const allocation = booked.reservations[0].placeAllocation;
+  assert.deepEqual([allocation.accommodationType, allocation.tripLegCoverage], ['SEAT', { tripId: trip.id, legId: trip.legs[0].id }]);
+  assert.deepEqual(allocation.reservedPlaces[0].passengerIds, booked.admissions[0].passengerIds.concat(booked.admissions[1].passengerIds));
+  assert.equal(allocation.reservedPlaces[0].vehicleNumber, '501');
+  assert.equal(allocation.reservedPlaces[0].placeNumbers.length, 2);
+  assert.ok(allocation.reservedPlaces[0].coachNumber);
+  assert.ok(booked.admissions.every((a) => a.reservationRefs[0].id === mandatory.id));
+  const admissions = booked.admissions.reduce((sum, a) => sum + a.price.amount, 0);
+  assert.equal(plain.provisionalPrice.amount, admissions + mandatory.price.amount);
+
+  const request = bookingRequest(offer);
+  request.offers[0].optionalReservationSelections = [{ reservationId: optional.id }];
+  const chosen = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  assert.deepEqual(chosen.bookedOffers[0].reservations.map((r) => r.id), [mandatory.id, optional.id]);
+
+  const placed = bookingRequest(offer);
+  placed.offers[0].placeSelections = [{ reservationId: optional.id, tripLegCoverage: { tripId: trip.id, legId: trip.legs[1].id } }];
+  const viaPlace = (await call(sim.base, token, 'POST', '/gamma/bookings', placed)).body.booking;
+  assert.deepEqual(viaPlace.bookedOffers[0].reservations.map((r) => r.id), [mandatory.id, optional.id]);
+});
+
+test('reservations: a selection naming another reservation, or the wrong leg, is refused', async () => {
+  const { token, offer, trip } = await reservableOffer();
+  const wrongId = bookingRequest(offer);
+  wrongId.offers[0].optionalReservationSelections = [{ reservationId: 'GAMMA-RES-nope' }];
+  const res1 = await call(sim.base, token, 'POST', '/gamma/bookings', wrongId);
+  assert.equal(res1.status, 400);
+  assert.match(res1.body.detail, /is not one of offer/);
+  const wrongLeg = bookingRequest(offer);
+  wrongLeg.offers[0].placeSelections = [{ reservationId: offer.reservationOfferParts[1].id, tripLegCoverage: { tripId: trip.id, legId: trip.legs[0].id } }];
+  const res2 = await call(sim.base, token, 'POST', '/gamma/bookings', wrongLeg);
+  assert.equal(res2.status, 400);
+  assert.match(res2.body.detail, /not the trip and leg/);
+});
+
+test('reservations: added to a pre-booked booking with offer-parts, once, then on the ticket; not after confirmation', async () => {
+  const { token, offer, trip } = await reservableOffer();
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  const url = `/gamma/bookings/${booking.id}/booked-offers/${offer.offerId}/offer-parts`;
+  const optional = offer.reservationOfferParts[1];
+  const body = { offerId: offer.offerId, passengerRefs: ['P1', 'P2'], placeSelections: [{ reservationId: optional.id, tripLegCoverage: { tripId: trip.id, legId: trip.legs[1].id } }] };
+  const added = await call(sim.base, token, 'POST', url, body);
+  assert.equal(added.status, 200);
+  assert.deepEqual(added.body.bookedOffers[0].reservations.map((r) => r.id), [offer.reservationOfferParts[0].id, optional.id]);
+  assert.equal((await call(sim.base, token, 'POST', url, body)).status, 409, 'not twice');
+  assert.equal((await call(sim.base, token, 'POST', url, { ...body, placeSelections: [] })).status, 400);
+  assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/booked-offers/nope/offer-parts`, body)).status, 404);
+  assert.equal((await call(sim.base, token, 'GET', url)).status, 405);
+  assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/booked-offers/${offer.offerId}/reservations`, body)).status, 501);
+  const fulfillments = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(fulfillments[0].bookingParts.length, 4, 'two admissions and two reservations on the ticket');
+  const after = (await call(sim.base, token, 'GET', `/gamma/bookings/${booking.id}`)).body.booking;
+  assert.ok(after.bookedOffers[0].reservations.every((r) => r.status === 'FULFILLED'));
+  assert.equal(after.confirmedPrice.amount, [...after.bookedOffers[0].admissions, ...after.bookedOffers[0].reservations].reduce((s, p) => s + p.price.amount, 0));
+  assert.equal((await call(sim.base, token, 'POST', url, body)).status, 409, 'not after confirmation');
 });

@@ -449,6 +449,32 @@ The two modes — the same labels appear in the framework and the scenario:
 - A reservation must exist in the offer for a seat map to apply. If it doesn't,
   the seat‑map step is skipped cleanly ("not applicable") rather than erroring.
 
+**Mandatory and optional seat reservations (#601).** These are separate from
+seat selection: here OSCAR only books the reservation, and the provider
+allocates the seats.
+
+- OSCAR reads each admission's `reservations` relations to know what is
+  required. A relation whose `minGroupItemsToBeBooked` is above 0 is a
+  **mandatory** reservation, and OSCAR always books it with the booking. A
+  relation at 0 is **optional**.
+- **Optional reservations** (Booking Flow Actions) says how the optional ones
+  are booked:
+  - `RESERVATION_SELECTION`: `optionalReservationSelections` in the booking;
+  - `PLACE_SELECTION`: `placeSelections` in the booking, naming the trip and
+    the leg;
+  - `ADD_LATER`: added after the booking with `POST
+    /bookings/{id}/booked-offers/{id}/offer-parts` (step 09);
+  - empty: the optional ones are not booked.
+- The older **Book via optionalReservationSelections** switch now means
+  "book the optional ones too".
+- **Checks:**
+  - every relation names reservation parts of the offer and fits its group;
+  - the booking holds each reservation booked, on the same leg;
+  - the place each reservation was given is reported (a warning when there
+    is none).
+- Some providers (ČD) sell a reservation for all passengers or none, on one
+  leg at most. OSDM does not require this, so OSCAR reports it as a warning.
+
 ### 4.7 Passengers & fulfillment (optional)
 
 - **Passengers** — type (`PERSON`, `BICYCLE`, `DOG`, `PRM`, …), date of birth,

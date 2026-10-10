@@ -175,9 +175,15 @@ request:
           // Adaptive fallback (#182): also runs when the pre-booking seat map
           // failed at offer time (08. GET Place Maps set __placeMapAtOfferFailed)
           // — the seat is then selected AFTER pre-booking via add-reservation.
-          var _runAddReservation = ((bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
+          // #601: reservationBookingForm ADD_LATER adds the optional
+          // reservations with 09 too, without the post-booking seat map (08b).
+          var _laterRaw = bru.getEnvVar('reservationAddLaterSelections');
+          var _addLaterForm = bru.getEnvVar('reservationBookingForm') === 'ADD_LATER'
+                              && (Array.isArray(_laterRaw) ? _laterRaw.length > 0 : String(_laterRaw || '[]') !== '[]');
+          var _runAddReservation = (((bru.getEnvVar('placeSelectionMode') === 'ADD_TO_BOOKING')
                                     || bru.getEnvVar('__placeMapAtOfferFailed') === 'true')
-                                 && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true';
+                                 && String(bru.getEnvVar('salesFlow_placeSelection')) === 'true')
+                                 || _addLaterForm;
 
           // Post-booking add-ancillary runs only when the scenario enabled it
           // (salesFlow_addAncillary, authorised by the framework #107), once.
@@ -208,7 +214,7 @@ request:
               : 'vendor token request for a different sandbox (env "' + _sandbox + '") — runs only in standalone Bruno with the matching vendor env';
           } else if (_isOfferPlaceMap && !_runPlaceMap)                  { _skipReason = 'place selection not enabled (SEATMAP_AT_OFFER)'; }
             else if (_isOfferPlaceMap && bru.getEnvVar('bookingId'))      { _skipReason = 'offer-context place map is pre-booking only (booking already created)'; }
-            else if (_isPostBookingPlaceMap && !_runAddReservation)       { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
+            else if (_isPostBookingPlaceMap && (!_runAddReservation || _addLaterForm)) { _skipReason = 'post-booking place map not enabled (ADD_TO_BOOKING / #182 fallback)'; }
             else if (_isPostBookingPlaceMap && !bru.getEnvVar('bookingId')) { _skipReason = 'post-booking place map needs a booking first'; }
             else if (_isPostBookingPlaceMap && bru.getEnvVar('__postBookingPlaceMapDone') === 'true') { _skipReason = 'post-booking place map already done this scenario'; }
             else if (_isPlaceMap && !bru.getEnvVar('reservationId')) { _skipReason = 'no reservation offer-part in this offer — seat map not applicable (resourceId would be unresolved)'; }
@@ -289,7 +295,7 @@ request:
                 "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
                 "selectedAccommodation",
                 "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered",
+                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
                 "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
                 "tripProductCategoryName", "tripProductCategoryShortName",
