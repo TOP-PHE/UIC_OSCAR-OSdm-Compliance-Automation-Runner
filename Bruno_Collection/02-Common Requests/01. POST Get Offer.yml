@@ -130,6 +130,14 @@ runtime:
         }
         displayOfferResponse(jsonData);
 
+        // #598: no offer holds the product the scenario expects (already a
+        // failed check): booking another tariff would test nothing.
+        if (bru.getEnvVar("__productNotOffered") === "true") {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (expected product not offered)");
+          return;
+        }
+
         //swaggerSchemaValidatorContent();
 
         // ── OSDM compliance (Layer 1): offer-time AncillaryOfferPart shape (#108) ──

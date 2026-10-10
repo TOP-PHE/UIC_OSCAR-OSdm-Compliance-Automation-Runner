@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.257",
+  "current_release": "2026.258",
   "releases": [
+    {
+      "release": "2026.258",
+      "date": "2026-10-10",
+      "server": "1.11.229",
+      "collection": "OTST_V2.0.113",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#598): a scenario can name the product (tariff) it expects, expectedProduct: a product code (exact), or else words of the product's name (summary, then description, without case). The offer step keeps the offers that hold it, before the flexibility; none holding it is a failed check listing the products offered, and the scenario stops there. The same applies to the inbound offer of a return.",
+        "At 07. GET Booking after Fulfillments, a booked offer must hold the product and each fulfillment must cover a booked part of it (library-bruno/products.js, pure).",
+        "Server 1.11.229: Test Config has the Expected product field next to the flexibility; the data file schema accepts expectedProduct.",
+        "Simulator 0.8.0 (not part of a release): a profile may list named products. gamma sells SIM_FLEXI_BASIC, SIM_ALL_DAY, SIM_FLEXI_SAVER and SIM_TRAIN_BOUND, one offer each (prices of the existing gamma scenarios unchanged), and answers GET /products and /products/{id}. Its data file has three sales of a named product, two by code and one by name, on 3.8."
+      ]
+    },
     {
       "release": "2026.257",
       "date": "2026-10-10",

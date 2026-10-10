@@ -132,6 +132,15 @@ runtime:
           }
         }
 
+        // #598: the fulfilled booking holds the product the scenario expects,
+        // and each fulfillment covers a part of it.
+        if (bru.getEnvVar("expectedProduct")) {
+          const { checkBookingProduct } = require(bru.getEnvVar("library_base") + "products.js");
+          checkBookingProduct((jsonData && jsonData.booking) || jsonData, bru.getEnvVar("expectedProduct")).forEach((c) => {
+            test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+          });
+        }
+
         // Partial refund (#218): when armed on this scenario, stash the just-
         // fetched booking JSON so 10. POST Refund Offers can resolve scope
         // (bookingPartIds for the chosen leg, passengerIds for the chosen

@@ -177,6 +177,21 @@ test('reduction cards: gamma lists its cards, a provider without cards answers 5
   assert.equal(alpha.status, 501);
 });
 
+test('products: gamma lists its named products in both classes and gives one by id (#598)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const list = await call(sim.base, token, 'GET', '/gamma/products');
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.body.products.map((p) => p.id), [
+    'GAMMA-PRD-SIM_FLEXI_BASIC-SECOND', 'GAMMA-PRD-SIM_FLEXI_BASIC-FIRST', 'GAMMA-PRD-SIM_ALL_DAY-SECOND', 'GAMMA-PRD-SIM_ALL_DAY-FIRST',
+    'GAMMA-PRD-SIM_FLEXI_SAVER-SECOND', 'GAMMA-PRD-SIM_FLEXI_SAVER-FIRST', 'GAMMA-PRD-SIM_TRAIN_BOUND-SECOND', 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST',
+  ]);
+  for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
+  const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');
+  assert.deepEqual(one.body.product, list.body.products[7]);
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/products/nope')).status, 404);
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/products/a/b')).status, 501, 'deeper product paths are not provided');
+});
+
 test('reduction cards: the booking keeps the card on the passenger and on the admission (#597)', async () => {
   const token = await tokenFor(sim.base, 'gamma', gammaOne);
   const cards = [{ type: 'REDUCTION_CARD', code: 'SIM_STUDENT' }];

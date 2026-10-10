@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-expected-product",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Choose the product (tariff) a scenario sells, and check it",
+    "summary": "A scenario can now name the product it expects, by its code or by words of its name. OSCAR picks the offer that holds it, stops with the list of products offered when none does, and checks the booking holds it.",
+    "content": "Until now an offer was picked on its flexibility only. When a provider sells several tariffs of the same flexibility (a basic flexible ticket and an all-day ticket, for example), the scenario could not say which one to test.\n\nThe new field \"Expected product\" in Test Config, next to the flexibility, takes the product's code (as GET /products or an offer lists it) or words of its name. OSCAR chooses among the offers that hold that product. If no offer does, the scenario fails with the list of the products that were offered, and stops: booking another tariff would test nothing. After fulfillment, OSCAR checks that the booking holds the product and that each ticket covers a part of it.\n\nLeave the field empty to keep choosing on the flexibility only."
+  },
+  {
     "id": "2026-10-10-reduction-cards",
     "date": "October 10, 2026",
     "tag": "New",

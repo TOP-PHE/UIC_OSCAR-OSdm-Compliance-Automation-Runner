@@ -22,7 +22,7 @@
 
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
-const { buildOfferCollection } = require('./osdm/offers');
+const { buildOfferCollection, productsOf } = require('./osdm/offers');
 const { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
@@ -73,6 +73,16 @@ function requireMethod(req, ...allowed) {
 }
 
 // An error answer of the token endpoint (RFC 6749 section 5.2).
+// GET /products, GET /products/{id} (#598)
+function productRoute(req, provider, productId) {
+  requireMethod(req, 'GET');
+  const products = productsOf(provider);
+  if (productId === undefined) return { products };
+  const product = products.find((p) => p.id === productId);
+  if (!product) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  return { product };
+}
+
 function oauthError(res, status, error, description, headers) {
   sendJson(res, status, { error, error_description: description }, { Pragma: 'no-cache', ...headers });
 }
@@ -216,6 +226,19 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     throw notFound();
   }
 
+  // POST /offers
+  async function offerRoute(req, provider, scope) {
+    requireMethod(req, 'POST');
+    const known = {
+      offer: (id) => store.get('offer', scope, id),
+      trip: (id) => store.get('trip', scope, id),
+    };
+    const { response, remembered, trips } = buildOfferCollection(await bodyOf(req), provider, now(), known);
+    for (const entry of remembered) store.put('offer', scope, entry.offer.offerId, entry);
+    for (const trip of trips) store.put('trip', scope, trip.id, trip);
+    return response;
+  }
+
   async function osdmRoute(req, provider, clientId, segments) {
     const scope = `${provider.key}\n${clientId}`;
     const [resource, ...rest] = segments;
@@ -223,22 +246,14 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       requireMethod(req, 'GET');
       return [{ version: provider.osdmVersion }];
     }
+    // #598: a provider with named products lists them; the others answer 501.
+    if (resource === 'products' && rest.length <= 1 && provider.products) return productRoute(req, provider, rest[0]);
     // #597: a provider with reduction cards lists them; the others answer 501.
     if (resource === 'reduction-cards' && rest.length === 0 && provider.reductionCards) {
       requireMethod(req, 'GET');
       return reductionCardCollection(provider);
     }
-    if (resource === 'offers' && rest.length === 0) {
-      requireMethod(req, 'POST');
-      const known = {
-        offer: (id) => store.get('offer', scope, id),
-        trip: (id) => store.get('trip', scope, id),
-      };
-      const { response, remembered, trips } = buildOfferCollection(await bodyOf(req), provider, now(), known);
-      for (const entry of remembered) store.put('offer', scope, entry.offer.offerId, entry);
-      for (const trip of trips) store.put('trip', scope, trip.id, trip);
-      return response;
-    }
+    if (resource === 'offers' && rest.length === 0) return offerRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);
     if (NOT_PROVIDED.has(resource)) throw notProvided();
     throw notFound();

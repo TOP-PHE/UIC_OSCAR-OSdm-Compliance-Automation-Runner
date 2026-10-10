@@ -245,6 +245,10 @@
           "overruleCode": {
             "type": ["string", "null"]
           },
+          "expectedProduct": {
+            "description": "The product (tariff) the scenario expects (#598): a product code, matched exactly, or else words of the product's name (summary, then description), without case. The offer step keeps the offers that hold it and stops the scenario when none does; the fulfilled booking must hold it. Empty or null: the offer is chosen as before.",
+            "type": ["string", "null"]
+          },
           "overruleCodeExpectRejection": {
             "description": "Negative test (#596). When on, the provider is expected to refuse overruleCode: 10. POST Refund Offers must answer 4xx with an RFC-9457 Problem, and the scenario ends there. Without an overruleCode the flag is ignored with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
