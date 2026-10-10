@@ -131,7 +131,10 @@ for both) and `SIM_GROUP_6ADT_38`; each also runs `01d. POST Get Offer
 Individual` to compare the group price with the same passengers alone. The
 negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
 `SIM_GROUP_WEEKEND_3ADT_ABSENT_38` expect no weekend group offer and end after
-the offer.
+the offer. Travel class per leg (#600), on `gamma` only:
+`SIM_SALE_CLASS_PER_LEG_1ADT_38`, a trip in two legs (an InterCity, then a
+regional train with no first class), first class on the first leg through a
+supplement and second class on the second.
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional

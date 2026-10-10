@@ -141,6 +141,15 @@ runtime:
           });
         }
 
+        // #600: the booking gives each leg the class the scenario names.
+        if (bru.getEnvVar("legTravelClasses")) {
+          const { checkLegClasses } = require(bru.getEnvVar("library_base") + "legClasses.js");
+          const _booking = (jsonData && jsonData.booking) || jsonData || {};
+          checkLegClasses("Booking", (_booking.bookedOffers || [])[0], _booking.trips, JSON.parse(bru.getEnvVar("legTravelClasses"))).forEach((c) => {
+            test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+          });
+        }
+
         // Partial refund (#218): when armed on this scenario, stash the just-
         // fetched booking JSON so 10. POST Refund Offers can resolve scope
         // (bookingPartIds for the chosen leg, passengerIds for the chosen

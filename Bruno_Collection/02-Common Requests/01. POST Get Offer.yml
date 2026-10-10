@@ -139,6 +139,15 @@ runtime:
           return;
         }
 
+        // #600: no offer gives each leg the class the scenario names (already
+        // a failed check): stop, as for a product. Otherwise one check per leg.
+        if (bru.getEnvVar("__legClassesNotOffered") === "true") {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (class per leg)");
+          return;
+        }
+        require(bru.getEnvVar("library_base") + "offers.js").checkOfferLegClasses(jsonData);
+
         //swaggerSchemaValidatorContent();
 
         // ── OSDM compliance (Layer 1): offer-time AncillaryOfferPart shape (#108) ──

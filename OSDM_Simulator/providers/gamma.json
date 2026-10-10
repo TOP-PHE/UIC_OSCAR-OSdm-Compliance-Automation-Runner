@@ -10,6 +10,10 @@
   "idPrefix": "GAMMA",
   "utcOffset": "+02:00",
   "tokenLifetimeSeconds": 900,
+  "secondClassOnlyCategories": [
+    "R",
+    "Os"
+  ],
   "overruleCodes": [
     "CONNECTION_BROKEN",
     "PAYMENT_FAILURE",

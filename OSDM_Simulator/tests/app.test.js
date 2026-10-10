@@ -182,14 +182,17 @@ test('products: gamma lists its named products in both classes and gives one by 
   const list = await call(sim.base, token, 'GET', '/gamma/products');
   assert.equal(list.status, 200);
   assert.deepEqual(list.body.products.map((p) => p.id), [
-    'GAMMA-PRD-SIM_FLEXI_BASIC-SECOND', 'GAMMA-PRD-SIM_FLEXI_BASIC-FIRST', 'GAMMA-PRD-SIM_ALL_DAY-SECOND', 'GAMMA-PRD-SIM_ALL_DAY-FIRST',
-    'GAMMA-PRD-SIM_FLEXI_SAVER-SECOND', 'GAMMA-PRD-SIM_FLEXI_SAVER-FIRST', 'GAMMA-PRD-SIM_TRAIN_BOUND-SECOND', 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST',
+    // Each tariff in both classes, then (#600) its upgrade from second to first class.
+    'GAMMA-PRD-SIM_FLEXI_BASIC-SECOND', 'GAMMA-PRD-SIM_FLEXI_BASIC-FIRST', 'GAMMA-PRD-UPG-SIM_FLEXI_BASIC',
+    'GAMMA-PRD-SIM_ALL_DAY-SECOND', 'GAMMA-PRD-SIM_ALL_DAY-FIRST', 'GAMMA-PRD-UPG-SIM_ALL_DAY',
+    'GAMMA-PRD-SIM_FLEXI_SAVER-SECOND', 'GAMMA-PRD-SIM_FLEXI_SAVER-FIRST', 'GAMMA-PRD-UPG-SIM_FLEXI_SAVER',
+    'GAMMA-PRD-SIM_TRAIN_BOUND-SECOND', 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST', 'GAMMA-PRD-UPG-SIM_TRAIN_BOUND',
     // #599: the weekend group in both classes, the group in second class only.
     'GAMMA-PRD-SIM_WEEKEND_GROUP-SECOND', 'GAMMA-PRD-SIM_WEEKEND_GROUP-FIRST', 'GAMMA-PRD-SIM_GROUP-SECOND',
   ]);
   for (const p of list.body.products) for (const field of ['id', 'code', 'owner', 'flexibility']) assert.ok(p[field], `${p.id} ${field}`);
   const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_TRAIN_BOUND-FIRST');
-  assert.deepEqual(one.body.product, list.body.products[7]);
+  assert.deepEqual(one.body.product, list.body.products.find((p) => p.id === 'GAMMA-PRD-SIM_TRAIN_BOUND-FIRST'));
   assert.equal((await call(sim.base, token, 'GET', '/gamma/products/nope')).status, 404);
   assert.equal((await call(sim.base, token, 'GET', '/gamma/products/a/b')).status, 501, 'deeper product paths are not provided');
 });
@@ -767,4 +770,32 @@ test('weekend group, both directions: one COLLECTIVE admission per direction, on
   const group = both.offers.find((o) => o.products[0].code === 'SIM_GROUP');
   const other = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(group))).body.booking;
   assert.equal((await call(sim.base, token, 'POST', `/gamma/bookings/${other.id}/fulfillments`, {})).body.fulfillments.length, 2);
+});
+
+// ── travel class per leg (#600) ─────────────────────────────────────────────
+
+test('class per leg: the booking keeps the upgrade part, and the ticket covers both parts', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const leg = (from, to, start, end, number, shortName) => ({
+    timedLeg: {
+      start: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: from }, serviceDeparture: { timetabledTime: start } },
+      end: { stopPlaceRef: { objectType: 'StopPlaceRef', stopPlaceRef: to }, serviceArrival: { timetabledTime: end } },
+      service: { vehicleNumbers: [number], productCategory: { name: shortName, shortName } },
+    },
+  });
+  const request = offerRequest({
+    tripSpecifications: [{ legs: [
+      leg('urn:uic:stn:0000001', 'urn:uic:stn:0000004', '2026-11-20T08:00:00+02:00', '2026-11-20T10:00:00+02:00', '101', 'IC'),
+      leg('urn:uic:stn:0000004', 'urn:uic:stn:0000002', '2026-11-20T10:20:00+02:00', '2026-11-20T11:20:00+02:00', '202', 'R'),
+    ] }],
+    offerSearchCriteria: { travelClasses: ['FIRST'] },
+  });
+  delete request.tripSearchCriteria;
+  const offer = (await call(sim.base, token, 'POST', '/gamma/offers', request)).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  assert.deepEqual(booking.bookedOffers[0].admissions.map((a) => a.summaryProductId), offer.admissionOfferParts.map((p) => p.summaryProductId));
+  assert.deepEqual(booking.bookedOffers[0].products.map((p) => p.type), ['ADMISSION', 'UPGRADE_POINT2POINT']);
+  const fulfillments = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(fulfillments.length, 1);
+  assert.equal(fulfillments[0].bookingParts.length, 2);
 });

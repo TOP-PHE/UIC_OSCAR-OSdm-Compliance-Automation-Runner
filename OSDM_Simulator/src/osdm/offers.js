@@ -82,9 +82,15 @@ function productOf(tariff, travelClass, provider) {
 // The travel classes a tariff is sold in: a group product may be second class only.
 const classesOf = (tariff) => Object.keys(TRAVEL_CLASSES).filter((c) => c === 'SECOND' || !tariff.group?.secondClassOnly);
 
-/** The products of a provider, for GET /products: each tariff in each class. */
+/**
+ * The products of a provider, for GET /products: each tariff in each class,
+ * and its upgrade to first class when some trains run in second class only.
+ */
 function productsOf(provider) {
-  return tariffsOf(provider).flatMap((tariff) => classesOf(tariff).map((c) => productOf(tariff, c, provider)));
+  return tariffsOf(provider).flatMap((tariff) => [
+    ...classesOf(tariff).map((c) => productOf(tariff, c, provider)),
+    ...(provider.secondClassOnlyCategories && !tariff.group ? [upgradeProductOf(tariff, provider)] : []),
+  ]);
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
@@ -139,14 +145,25 @@ const stopPlace = (value, what) => ({ objectType: 'StopPlaceRef', stopPlaceRef: 
 // No station list: the name is made from the last part of the reference.
 const stopName = (stopPlaceRef) => `Station ${stopPlaceRef.split(':').pop()}`;
 
-function buildLeg({ from, to, start, end, vehicleNumber }, provider) {
+// The category of a specified leg's train (#600): the request's, when it
+// names one in plain text; the simulator's InterCity otherwise.
+function categoryOf(service) {
+  const asked = service?.productCategory;
+  const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+  if (!text(asked?.shortName, 10)) return PRODUCT_CATEGORY;
+  const out = { shortName: asked.shortName, name: text(asked.name, 60) ? asked.name : asked.shortName };
+  if (text(asked.productCategoryRef, MAX_REF_LENGTH)) out.productCategoryRef = asked.productCategoryRef;
+  return out;
+}
+
+function buildLeg({ from, to, start, end, vehicleNumber, category = PRODUCT_CATEGORY }, provider) {
   return {
     timedLeg: {
       start: { stopPlaceRef: from, stopPlaceName: stopName(from.stopPlaceRef), serviceDeparture: { timetabledTime: isoAt(start.ms, start.offset) } },
       end: { stopPlaceRef: to, stopPlaceName: stopName(to.stopPlaceRef), serviceArrival: { timetabledTime: isoAt(end.ms, end.offset) } },
       service: {
         mode: { ptMode: 'TRAIN' },
-        productCategory: PRODUCT_CATEGORY,
+        productCategory: category,
         vehicleNumbers: [vehicleNumber],
         carriers: [{ ref: provider.carrier.ref, name: provider.carrier.name }],
       },
@@ -220,6 +237,7 @@ function tripFromSpecification(spec, provider) {
       start: instant(timed.start.serviceDeparture?.timetabledTime, `legs[${i}].start.serviceDeparture`, provider),
       end: instant(timed.end.serviceArrival?.timetabledTime, `legs[${i}].end.serviceArrival`, provider),
       vehicleNumber: typeof numbers[0] === 'string' && numbers[0].length > 0 && numbers[0].length <= 20 ? numbers[0] : '1000',
+      category: categoryOf(timed.service),
     }, provider);
   });
   return finishTrip(legs, spec.externalRef, provider);
@@ -349,22 +367,79 @@ function groupPassengerTypes(passengers, day) {
   });
 }
 
+// ── Travel class per leg (#600) ─────────────────────────────────────────────
+
+// The legs of a trip whose train runs in second class only: a category the
+// provider names in `secondClassOnlyCategories`.
+function secondClassOnlyLegs(trip, provider) {
+  const categories = provider.secondClassOnlyCategories || [];
+  return trip.legs.filter((leg) => categories.includes(leg.timedLeg.service.productCategory?.shortName));
+}
+
+// The supplement from second to first class of a tariff.
+function upgradeProductOf(tariff, provider) {
+  const key = tariff.code ?? tariff.key;
+  return {
+    id: `${provider.idPrefix}-PRD-UPG-${key}`,
+    code: `${provider.idPrefix}_UPGRADE_${key}`,
+    summary: `Upgrade to first class (${tariff.label})`,
+    type: 'UPGRADE_POINT2POINT',
+    owner: provider.carrier.ref,
+    flexibility: tariff.key,
+    serviceClass: { type: 'HIGH', name: 'First' },
+    travelClass: 'FIRST',
+    isTrainBound: tariff.isTrainBound ?? tariff.key === 'NON_FLEXIBLE',
+  };
+}
+
+const legMs = (leg) => Date.parse(leg.timedLeg.end.serviceArrival.timetabledTime) - Date.parse(leg.timedLeg.start.serviceDeparture.timetabledTime);
+const legIdsOf = (legs) => legs.map((leg) => leg.id);
+
+// First class asked on a trip with a leg in second class only: per passenger,
+// a second-class admission for the whole trip and, on the legs that have a
+// first class, an upgrade part priced as the difference on those legs.
+function upgradedAdmissions(trip, ctx, secondOnly) {
+  const { passengers, tariff, singlePrice, provider } = ctx;
+  const upgradeLegs = trip.legs.filter((leg) => !secondOnly.includes(leg));
+  const share = upgradeLegs.reduce((sum, leg) => sum + legMs(leg), 0) / trip.legs.reduce((sum, leg) => sum + legMs(leg), 0);
+  const base = productOf(tariff, 'SECOND', provider);
+  const upgrade = upgradeProductOf(tariff, provider);
+  return passengers.flatMap((passenger) => {
+    const second = singlePrice(trip, passenger, 'SECOND');
+    const extra = Math.round((singlePrice(trip, passenger, 'FIRST') - second) * share);
+    return [
+      { passengers: [passenger], amount: second, applied: appliedPassengerTypesOf(passenger, provider), offerMode: 'INDIVIDUAL', product: base, legIds: legIdsOf(trip.legs) },
+      { passengers: [passenger], amount: extra, applied: {}, offerMode: 'INDIVIDUAL', product: upgrade, legIds: legIdsOf(upgradeLegs) },
+    ];
+  });
+}
+
 // The admissions of one direction: one per passenger, or one for the whole
-// group, each with its passengers, its price and its applied passenger types.
-function admissionsOfDirection(trip, passengers, tariff, singlePrice, provider) {
+// group, each with its passengers, its price, its applied passenger types, its
+// product and the legs it covers. First class on a trip with a leg in second
+// class only gives an upgrade part besides (#600).
+function admissionsOfDirection(trip, ctx) {
+  const { passengers, tariff, travelClass, singlePrice, provider } = ctx;
+  const product = productOf(tariff, travelClass, provider);
   if (tariff.group) {
     return [{
       passengers,
-      amount: groupPrice(singlePrice(trip, null), passengers.length, tariff.group),
+      amount: groupPrice(singlePrice(trip, null, travelClass), passengers.length, tariff.group),
       applied: { appliedPassengerTypes: groupPassengerTypes(passengers, localDay(trip)) },
       offerMode: 'COLLECTIVE',
+      product,
+      legIds: legIdsOf(trip.legs),
     }];
   }
+  const secondOnly = travelClass === 'FIRST' ? secondClassOnlyLegs(trip, provider) : [];
+  if (secondOnly.length > 0) return upgradedAdmissions(trip, ctx, secondOnly);
   return passengers.map((passenger) => ({
     passengers: [passenger],
-    amount: singlePrice(trip, passenger),
+    amount: singlePrice(trip, passenger, travelClass),
     applied: appliedPassengerTypesOf(passenger, provider),
     offerMode: 'INDIVIDUAL',
+    product,
+    legIds: legIdsOf(trip.legs),
   }));
 }
 
@@ -376,45 +451,49 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
   const directions = inboundTrip ? [trip, inboundTrip] : [trip];
   const factor = inboundTrip ? RETURN_FACTOR : 1;
   // A group pays no card reduction: its single price is the full one.
-  const singlePrice = (t, passenger) => reducedPrice(Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor), passenger?.[CARDS_APPLIED].applied);
+  const singlePrice = (t, passenger, cls) => reducedPrice(Math.round(priceOfTrip(t, flexibility, cls, provider) * factor), passenger?.[CARDS_APPLIED].applied);
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
   const product = productOf(flexibility, travelClass, provider);
   const { serviceClass } = product;
-  const admissionOfferParts = directions.flatMap((t) => admissionsOfDirection(t, passengers, flexibility, singlePrice, provider).map((part) => ({
+  const ctx = { passengers, tariff: flexibility, travelClass, singlePrice, provider };
+  const admissionOfferParts = directions.flatMap((t) => admissionsOfDirection(t, ctx).map((part) => ({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
-    summary: `${product.summary}, ${serviceClass.name} class`,
+    summary: `${part.product.summary}, ${part.product.serviceClass.name} class`,
     createdOn,
     validFrom: t.startTime,
     validUntil: t.endTime,
     price: price(part.amount),
-    tripCoverage: coverageOf(t),
+    tripCoverage: { coveredTripId: t.id, coveredLegIds: part.legIds },
     ...part.applied,
     offerMode: part.offerMode,
     isReusable: false,
     passengerRefs: part.passengers.map((p) => p.externalRef),
     refundable: flexibility.refundable,
     exchangeable: flexibility.exchangeable,
-    summaryProductId: product.id,
-    products: [{ productId: product.id, legIds: coverageOf(t).coveredLegIds }],
+    summaryProductId: part.product.id,
+    products: [{ productId: part.product.id, legIds: part.legIds }],
     availableFulfillmentOptions: fulfillmentOptions,
     isReservationRequired: false,
   })));
+  const products = [...new Map(admissionOfferParts.map((part) => [part.summaryProductId, null])).keys()]
+    .map((id) => [product, productOf(flexibility, 'SECOND', provider), upgradeProductOf(flexibility, provider)].find((p) => p.id === id));
+  // A first-class offer with an upgrade part is first class where offered only.
+  const mixed = products.some((p) => p.type === 'UPGRADE_POINT2POINT');
   const total = admissionOfferParts.reduce((sum, part) => sum + part.price.amount, 0);
   const offer = {
     offerId: `${provider.idPrefix}-OFR-${randomId()}`,
-    summary: `${product.summary}, ${serviceClass.name} class`,
+    summary: mixed ? `${product.summary}, first class where the train has one` : `${product.summary}, ${serviceClass.name} class`,
     offerSummary: {
       minimalPrice: price(total),
-      overallServiceClass: serviceClass,
-      overallTravelClass: travelClass,
+      ...(mixed ? {} : { overallServiceClass: serviceClass, overallTravelClass: travelClass }),
       overallFlexibility: flexibility.key,
     },
     createdOn,
     preBookableUntil: new Date(nowMs + OFFER_LIFETIME_MS).toISOString(),
     passengerRefs: passengers.map((p) => p.externalRef),
-    products: [product],
+    products,
     tripCoverage: coverage,
     admissionOfferParts,
   };
@@ -465,7 +544,9 @@ function outboundTripsOf(asked, known, trips) {
 
 // Whether a tariff is offered: a group product only to a COLLECTIVE request
 // whose group meets its rules. Why one is not goes into `refusals`.
-function isOffered(tariff, { collective, passengers, covered, travelClass, refusals }) {
+function isOffered(tariff, { collective, passengers, covered, travelClass, refusals, provider }) {
+  // #600: no first-class offer where no leg has a first class.
+  if (travelClass === 'FIRST' && covered.every((t) => secondClassOnlyLegs(t, provider).length === t.legs.length)) return false;
   if (!tariff.group) return true;
   if (!collective) return false;
   const refusal = groupRefusal(tariff, passengers, covered, travelClass);
@@ -507,7 +588,7 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const criteria = body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
   const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
-  const classes = wanted(criteria, 'travelClass', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
+  const classes = wanted(criteria, 'travelClasses', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const collective = criteria?.offerMode === 'COLLECTIVE';
   const refusals = new Set();
@@ -520,7 +601,7 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   for (const { trip, inboundTrip } of pairs) {
     const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
-      for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals }))) {
+      for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
         const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
         offers.push(offer);
         remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true });

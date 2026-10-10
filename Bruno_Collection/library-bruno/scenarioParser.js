@@ -92,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -705,6 +705,9 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
       // #598: the product (tariff) the scenario expects: a code, or words of its name.
       bru.setEnvVar("expectedProduct", typeof scenario.expectedProduct === "string" && scenario.expectedProduct.trim() ? scenario.expectedProduct.trim() : null);
+      // #600: the travel class expected on each leg, in the order of the legs.
+      const _legClasses = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
+      bru.setEnvVar("legTravelClasses", _legClasses ? JSON.stringify(_legClasses) : null);
       // #599: the expected product must NOT be offered (a group its rules exclude).
       bru.setEnvVar("expectedProductAbsent", (scenario.expectedProductAbsent === true || ["true", "on", "yes"].includes(String(scenario.expectedProductAbsent).toLowerCase())) ? "true" : "false");
       // #596: negative probe — the provider is expected to refuse this overrule code.
@@ -1232,6 +1235,8 @@ function parseScenarioData(jsonData) {
         }
       }
 
+      // #600: a class per leg asks for every class it names.
+      const _perLeg = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
       if (criteria && typeof criteria === 'object') {
         osdmOfferSearchCriteria(
           criteria.currency || null,
@@ -1239,7 +1244,7 @@ function parseScenarioData(jsonData) {
           criteria.requestedOfferParts || null,
           criteria.flexibilities || null,
           criteria.serviceClass || null,
-          criteria.travelClass || null,
+          _perLeg ? require('./legClasses.js').requestedClasses(_perLeg) : (criteria.travelClass || null),
           criteria.productTags || null,
           criteria.productSelections || null
         );

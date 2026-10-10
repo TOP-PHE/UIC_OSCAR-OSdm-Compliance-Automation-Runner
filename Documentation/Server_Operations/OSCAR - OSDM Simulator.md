@@ -189,7 +189,8 @@ rebuilds its Test Framework from the file.
    and group tariffs (#599) on 3.8 only: `SIM_GROUP_WEEKEND_2ADT_2CHD_38`,
    `SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38`, `SIM_GROUP_6ADT_38`, and the
    negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
-   `SIM_GROUP_WEEKEND_3ADT_ABSENT_38`.
+   `SIM_GROUP_WEEKEND_3ADT_ABSENT_38`, and a travel class per leg (#600) on
+   3.8 only: `SIM_SALE_CLASS_PER_LEG_1ADT_38`.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-class-per-leg",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "A travel class for each leg of a trip",
+    "summary": "A scenario can now expect first class on one leg and second class on another, for a trip whose trains do not all have a first class. OSCAR picks the offer that gives each leg its class and checks the booking does too.",
+    "content": "Some journeys combine a train with a first class and one without, a regional train for example. The new field \"Travel class per leg\" in Test Config takes the class of each leg in order, such as FIRST, SECOND. Use it with a specification trip, whose legs are listed.\n\nOSCAR asks the provider for every class named and chooses the offer that gives each leg its class. A provider may sell first class on that leg with a first-class ticket of its own, or with a second-class ticket for the whole trip and a supplement for that leg: both are accepted, and the check says which one it found. If no offer gives each leg its class, the scenario fails with the combinations offered, and stops. After fulfillment, OSCAR checks the booking gives each leg the same class."
+  },
+  {
     "id": "2026-10-10-group-tariffs",
     "date": "October 10, 2026",
     "tag": "New",

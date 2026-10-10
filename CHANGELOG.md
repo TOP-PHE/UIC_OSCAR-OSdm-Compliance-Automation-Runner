@@ -62,6 +62,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.231] / [collection-OTST_V2.0.115] — 2026-10-10
+
+Issue #600, release 2026.260. Simulator 0.10.0.
+
+### Added
+
+- **A travel class per leg**, `legTravelClasses`: the class expected on each
+  leg, in the order of the legs, as a list or as text (`"FIRST, SECOND"`), for
+  a trip whose trains do not all have a first class.
+  `library-bruno/legClasses.js` holds the rules (pure).
+  - **Request.** The offer search criteria ask for every class named
+    (`travelClasses`), in place of the scenario's travel class.
+  - **Offer step.** `selectAndSetOffer()` keeps the offers that give each leg
+    its class. A leg's class is the highest class of the products covering it
+    through the offer's admissions, so both ways of selling first class on one
+    leg are accepted: a first-class admission of its own, or a second-class
+    admission for the whole trip and a supplement (an `UPGRADE_*` product, or a
+    narrower part) on that leg. None matching fails "an offer gives each leg
+    its class", listing the combinations offered, and `01` stops the scenario
+    (`__legClassesNotOffered`), as `01b` does for a return. On the chosen offer,
+    one check per leg names the class and the form.
+  - **Booking** (`07. GET Booking after Fulfillments`): the same check per leg
+    on the booked offer.
+- **Test Config**: a "Travel class per leg" field. `datafile.schema.json`
+  accepts `legTravelClasses`.
+
+### Fixed
+
+- **Simulator: the classes asked are read from `travelClasses`**, the OSDM
+  name, which the collection sends; it read `travelClass`, so every request
+  was answered in second class only.
+
+### Simulator 0.10.0
+
+- A specified leg keeps the train category it names (`productCategory`).
+- A profile may name `secondClassOnlyCategories` (`gamma`: `R`, `Os`). First
+  class on a trip with such a leg is, per passenger, a second-class admission
+  for the whole trip and an upgrade part (`UPGRADE_POINT2POINT`, first class)
+  on the other legs, priced as the difference on those legs; the offer then
+  has no `overallTravelClass`. No first-class offer when no leg has a first
+  class. Each non-group product has its upgrade product in `GET /products`.
+  The booking keeps both parts on one ticket. The data file has
+  `SIM_SALE_CLASS_PER_LEG_1ADT_38` (an InterCity, then a regional train),
+  with a specification trip.
+
+Checked: the scenario standalone against the simulator (278 checks) and
+through OSCAR (276): none failed; first class on the first leg is found as a
+supplement, second class on the second as the admission, on the offer and on
+the booking. Sale, product, group, return, refund and card scenarios on gamma,
+a sale on alpha and a refund on beta: no failure, the same number of checks
+as before. Counter-check: run against `alpha`, which gives first class on
+every leg, the one per-leg check fails, listing `[FIRST, FIRST]` and
+`[SECOND, SECOND]`, and the scenario stops before booking. Not yet run against
+a real provider.
+
+---
+
 ## [server-1.11.230] / [collection-OTST_V2.0.114] — 2026-10-10
 
 Issue #599, release 2026.259. Simulator 0.9.0.

@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.259",
+  "current_release": "2026.260",
   "releases": [
+    {
+      "release": "2026.260",
+      "date": "2026-10-10",
+      "server": "1.11.231",
+      "collection": "OTST_V2.0.115",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#600): a travel class per leg, legTravelClasses (a list, or text such as \"FIRST, SECOND\"), in the order of the legs. The offer request asks for every class named (offerSearchCriteria.travelClasses); the offer chosen gives each leg its class, none doing so is a failed check listing the combinations offered and the scenario stops. One check per leg of the chosen offer and of the booking (07) names how the class is given: an admission of its own, or a supplement (an upgrade product) on that leg. Both forms are accepted (library-bruno/legClasses.js, pure).",
+        "Server 1.11.231: Test Config has the Travel class per leg field; the data file schema accepts legTravelClasses.",
+        "Simulator 0.10.0 (not part of a release): it now reads the classes asked from offerSearchCriteria.travelClasses, as the collection sends them (it read travelClass, so every request got second class). A specified leg keeps its train category. A profile may name secondClassOnlyCategories (gamma: R, Os): first class on a trip with such a leg is a second-class admission for the whole trip and an UPGRADE_POINT2POINT part on the other legs. Its data file has SIM_SALE_CLASS_PER_LEG_1ADT_38, an InterCity then a regional train."
+      ]
+    },
     {
       "release": "2026.259",
       "date": "2026-10-10",

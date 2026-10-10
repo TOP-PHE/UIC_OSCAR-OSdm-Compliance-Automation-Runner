@@ -95,6 +95,11 @@ runtime:
           loopbackOrStop("POST Get Return Offer (expected product check)");
           return;
         }
+        if (bru.getEnvVar("__legClassesNotOffered") === "true") {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Return Offer (class per leg)");
+          return;
+        }
 
         // #594: the inbound response against the outbound call: a trip back,
         // the same passengers, and what each model's offers must cover.

@@ -67,6 +67,7 @@ function checkProvider(key, raw) {
   const overruleCodes = checkOverruleCodes(raw.overruleCodes, bad);
   const reductionCards = checkReductionCards(raw.reductionCards, bad);
   const products = checkProducts(raw.products, bad);
+  const secondClassOnlyCategories = checkCategories(raw.secondClassOnlyCategories, bad);
   return {
     key,
     name: raw.name,
@@ -80,6 +81,7 @@ function checkProvider(key, raw) {
     ...(overruleCodes ? { overruleCodes } : {}),
     ...(reductionCards ? { reductionCards } : {}),
     ...(products ? { products } : {}),
+    ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
   };
 }
 
@@ -126,6 +128,17 @@ function checkGroup(group, bad) {
   if (group.pricedPassengers === undefined) out.followerPercent = group.followerPercent;
   else out.pricedPassengers = group.pricedPassengers;
   return out;
+}
+
+// The train categories (their short names) that run in second class only
+// (#600). A first-class offer then gives a second-class admission and an
+// upgrade part on the other legs. Absent: every train has a first class.
+function checkCategories(categories, bad) {
+  if (categories === undefined) return null;
+  const ok = Array.isArray(categories) && categories.length > 0 && categories.length <= 10
+    && categories.every((c) => typeof c === 'string' && /^[A-Za-z0-9]{1,10}$/.test(c)) && new Set(categories).size === categories.length;
+  if (!ok) throw bad('secondClassOnlyCategories');
+  return [...categories];
 }
 
 // The reduction cards a provider knows (#597): a code, a name and the
