@@ -84,9 +84,92 @@
 
 require('./displays.js');
 
+// ── Partial refund by fulfillment (#595) ────────────────────────────────────
+// Some providers refund per fulfillment only: a refund offer always holds
+// every part and passenger of its fulfillment, and a scope by booking part or
+// passenger is refused. A partial refund is then the refund of one
+// fulfillment: the first or last of the booking, or the one holding the
+// outbound or inbound trip of a return. What a fulfillment holds depends on
+// how the provider divides the booking (one per booking, per direction, per
+// passenger, per passenger and leg), so the selection is by position or by
+// direction, never by an id.
+
+const PART_GROUPS = ['admissions', 'reservations', 'ancillaries'];
+
+function bookedParts(booking) {
+  const out = [];
+  for (const bo of (Array.isArray(booking?.bookedOffers) ? booking.bookedOffers : [])) {
+    for (const group of PART_GROUPS) {
+      for (const part of (Array.isArray(bo?.[group]) ? bo[group] : [])) if (part?.id) out.push(part);
+    }
+  }
+  return out;
+}
+
+// The trip of a direction: the one marked OUT_BOUND / IN_BOUND, else the
+// first / last of the booking's trips. Null when the booking has one trip.
+function tripOfDirection(booking, direction) {
+  const trips = (Array.isArray(booking?.trips) ? booking.trips : []).filter((t) => t?.id);
+  if (trips.length < 2) return null;
+  const marked = trips.find((t) => t.direction === (direction === 'outbound' ? 'OUT_BOUND' : 'IN_BOUND'));
+  if (marked) return marked;
+  return direction === 'outbound' ? trips[0] : trips[trips.length - 1];
+}
+
+function partsCoveringTrip(booking, tripId) {
+  return new Set(bookedParts(booking)
+    .filter((p) => p.tripCoverage && String(p.tripCoverage.coveredTripId) === String(tripId))
+    .map((p) => String(p.id)));
+}
+
+function chooseFulfillment(booking, fulfillments, selection) {
+  if (selection !== 'outbound' && selection !== 'inbound') {
+    return { fulfillment: pickFromArray(fulfillments, selection) };
+  }
+  const trip = tripOfDirection(booking, selection);
+  if (!trip) return { reason: `'${selection}' needs a return: the booking has fewer than 2 trips` };
+  const parts = partsCoveringTrip(booking, trip.id);
+  const fulfillment = fulfillments.find((f) => (f.bookingParts || []).some((p) => p && parts.has(String(p.id))));
+  if (!fulfillment) return { reason: `no fulfillment holds a part covering the ${selection} trip ${trip.id}` };
+  return { fulfillment };
+}
+
+/**
+ * The fulfillment to refund for a partial refund by fulfillment, and what its
+ * refund should cover.
+ *
+ * @param {object} booking    the booking after fulfillments
+ * @param {string} selection  'first' | 'last' | 'outbound' | 'inbound'
+ * @returns {{armed: boolean, degraded: boolean, reason?: string,
+ *            fulfillmentId?: string, expectedPartIds?: string[],
+ *            expected?: {amount: number, currency: string|null, scale: number|null}}}
+ */
+function resolveFulfillmentRefundScope(booking, selection) {
+  const fulfillments = (Array.isArray(booking?.fulfillments) ? booking.fulfillments : []).filter((f) => f?.id);
+  if (fulfillments.length < 2) {
+    return { armed: false, degraded: true, reason: `the booking has ${fulfillments.length} fulfillment(s): refunding one of them is the whole booking` };
+  }
+  const sel = ['first', 'last', 'outbound', 'inbound'].includes(String(selection || '').toLowerCase())
+    ? String(selection).toLowerCase() : 'first';
+  const { fulfillment, reason } = chooseFulfillment(booking, fulfillments, sel);
+  if (!fulfillment) return { armed: false, degraded: true, reason };
+  const expectedPartIds = (fulfillment.bookingParts || []).filter((p) => p?.id).map((p) => String(p.id));
+  const wanted = new Set(expectedPartIds);
+  const expected = { amount: 0, currency: null, scale: null };
+  for (const part of bookedParts(booking)) {
+    if (!wanted.has(String(part.id))) continue;
+    const price = part.price || {};
+    if (typeof price.amount === 'number') expected.amount += price.amount;
+    if (!expected.currency && price.currency) expected.currency = price.currency;
+    if (expected.scale == null && typeof price.scale === 'number') expected.scale = price.scale;
+  }
+  return { armed: true, degraded: false, selection: sel, fulfillmentId: String(fulfillment.id), expectedPartIds, expected };
+}
+
 module.exports = {
   resolvePartialRefundScope,
   buildRefundSpecifications,
+  resolveFulfillmentRefundScope,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────

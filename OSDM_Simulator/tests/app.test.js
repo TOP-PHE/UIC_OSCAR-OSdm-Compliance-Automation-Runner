@@ -154,7 +154,7 @@ test('the version check reports the provider\'s OSDM version', async () => {
 test('OSDM resources the simulator does not provide answer 501 with a Problem', async () => {
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
   for (const url of ['/alpha/places', '/alpha/products', '/alpha/products/abc', '/alpha/coach-deck-layouts', '/alpha/coach-layouts', '/alpha/trips-collection',
-    '/alpha/bookings/any/refund-offers', '/alpha/bookings/any/exchange-operations/x', '/alpha/bookings/any/booked-offers/x/reservations']) {
+    '/alpha/bookings/any/reimbursements', '/alpha/bookings/any/exchange-operations/x', '/alpha/bookings/any/booked-offers/x/reservations']) {
     const res = await call(sim.base, token, 'GET', url);
     assert.equal(res.status, 501, url);
     assert.equal(res.body.code, 'NOT_IMPLEMENTED');
@@ -319,6 +319,136 @@ test('the date of a later inbound journey, on the first call, changes nothing', 
   const res = await call(sim.base, token, 'POST', '/alpha/offers', withDates);
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.trips, plain.trips);
+});
+
+// ── refunds, one offer per fulfillment (#595) ─────────────────────────────
+
+// A confirmed return: two fulfillments, one per direction.
+async function confirmedReturn(flexibility = 'FULL_FLEXIBLE') {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const pick = (list) => list.offers.find((o) => o.offerSummary.overallFlexibility === flexibility);
+  const both = (await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest({ outboundTripIds: [outbound.trips[0].id] }))).body;
+  const booking = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(pick(both)))).body.booking;
+  const fulfillments = (await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  return { token, booking, fulfillments, base: `/alpha/bookings/${booking.id}` };
+}
+
+test('refund: one refund offer per fulfillment named, holding all its parts', async () => {
+  const { token, fulfillments, base } = await confirmedReturn();
+  const res = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) });
+  assert.equal(res.status, 200);
+  const offers = res.body.refundOffers;
+  assert.equal(offers.length, 2);
+  offers.forEach((offer, i) => {
+    assert.equal(offer.status, 'PROPOSED');
+    assert.deepEqual(offer.fulfillments.map((f) => f.id), [fulfillments[i].id]);
+    assert.deepEqual(offer.refundOfferBreakdown.flatMap((b) => b.bookingParts.map((p) => p.id)), fulfillments[i].bookingParts.map((p) => p.id));
+    assert.equal(offer.refundFee.amount, 0, 'a flexible part is refunded in full');
+    assert.ok(offer.refundableAmount.amount > 0);
+    for (const field of ['id', 'createdOn', 'validFrom', 'validUntil']) assert.ok(offer[field], field);
+  });
+  assert.deepEqual((await call(sim.base, token, 'GET', `${base}/refund-offers/${offers[0].id}`)).body.refundOffer, offers[0]);
+  assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers`)).body.refundOffers.length, 2);
+});
+
+test('refund: confirming one offer refunds that direction only; the other keeps its status', async () => {
+  const { token, fulfillments, base } = await confirmedReturn();
+  const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
+  const before = (await call(sim.base, token, 'GET', base)).body.booking;
+  const done = await call(sim.base, token, 'PATCH', `${base}/refund-offers/${first.id}`, { status: 'CONFIRMED' });
+  assert.equal(done.status, 200);
+  assert.equal(done.body.refundOffer.status, 'CONFIRMED');
+  assert.ok(done.body.refundOffer.confirmedOn);
+  let booking = (await call(sim.base, token, 'GET', base)).body.booking;
+  assert.deepEqual(booking.fulfillments.map((f) => f.status), ['REFUNDED', 'FULFILLED']);
+  assert.deepEqual(booking.bookedOffers[0].admissions.map((a) => a.status), ['REFUNDED', 'FULFILLED']);
+  assert.equal(booking.confirmedPrice.amount, before.confirmedPrice.amount - first.refundableAmount.amount);
+  // Asked again: the same confirmed offer, nothing refunded twice.
+  assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${first.id}`, { status: 'CONFIRMED' })).body.refundOffer.confirmedOn, done.body.refundOffer.confirmedOn);
+  await call(sim.base, token, 'PATCH', `${base}/refund-offers/${second.id}`, { status: 'CONFIRMED' });
+  booking = (await call(sim.base, token, 'GET', base)).body.booking;
+  assert.deepEqual(booking.fulfillments.map((f) => f.status), ['REFUNDED', 'REFUNDED']);
+  assert.equal(booking.confirmedPrice.amount, 0);
+});
+
+test('refund: the fee follows the flexibility of the parts', async () => {
+  for (const [flexibility, check] of [
+    ['SEMI_FLEXIBLE', (o) => o.refundFee.amount > 0 && o.refundableAmount.amount > o.refundFee.amount],
+    ['NON_FLEXIBLE', (o) => o.refundableAmount.amount === 0 && o.refundFee.amount > 0],
+  ]) {
+    const { token, fulfillments, base } = await confirmedReturn(flexibility);
+    const [offer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id] })).body.refundOffers;
+    assert.ok(check(offer), `${flexibility}: ${JSON.stringify([offer.refundFee, offer.refundableAmount])}`);
+  }
+});
+
+test('refund: an overrule code waives the fee and is named in the offer', async () => {
+  const { token, fulfillments, base } = await confirmedReturn('NON_FLEXIBLE');
+  const [offer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], overruleCode: 'STRIKE' })).body.refundOffers;
+  assert.equal(offer.refundFee.amount, 0);
+  assert.ok(offer.refundableAmount.amount > 0);
+  assert.equal(offer.appliedOverruleCode, 'STRIKE');
+  assert.equal((await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[1].id], overruleCode: 7 })).status, 400);
+});
+
+test('refund: a proposed offer can be withdrawn, a confirmed one cannot', async () => {
+  const { token, fulfillments, base } = await confirmedReturn();
+  const [first, second] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
+  const removed = await fetch(`${sim.base}${base}/refund-offers/${first.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  assert.equal(removed.status, 204);
+  assert.equal(await removed.text(), '');
+  assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers/${first.id}`)).status, 404);
+  await call(sim.base, token, 'PATCH', `${base}/refund-offers/${second.id}`, { status: 'CONFIRMED' });
+  const kept = await call(sim.base, token, 'DELETE', `${base}/refund-offers/${second.id}`);
+  assert.equal(kept.status, 409);
+});
+
+test('refund: what is refused, as the provider it follows refuses it', async () => {
+  const { token, booking, fulfillments, base } = await confirmedReturn();
+  const cases = [
+    [{}, 400, 'VALIDATION_ERROR'],
+    [{ fulfillmentIds: [] }, 400, 'VALIDATION_ERROR'],
+    [{ fulfillmentIds: ['nope'] }, 400, 'VALIDATION_ERROR'],
+    [{ fulfillmentIds: [fulfillments[0].id, fulfillments[0].id] }, 400, 'VALIDATION_ERROR'],
+    [{ fulfillmentIds: [fulfillments[0].id], refundSpecifications: [{ fulfillmentId: fulfillments[0].id, bookingPartIds: [booking.bookedOffers[0].admissions[0].id] }] }, 400, 'PARTIAL_REFUND_NOT_SUPPORTED'],
+    [{ fulfillmentIds: [fulfillments[0].id], refundSpecifications: [{ fulfillmentId: fulfillments[0].id, passengerIds: [booking.passengers[0].id] }] }, 400, 'PARTIAL_REFUND_NOT_SUPPORTED'],
+  ];
+  for (const [body, status, code] of cases) {
+    const res = await call(sim.base, token, 'POST', `${base}/refund-offers`, body);
+    assert.equal(res.status, status, JSON.stringify(body));
+    assert.equal(res.body.code, code);
+  }
+  // A whole-fulfillment specification is a plain refund.
+  const plain = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], refundSpecifications: [{ fulfillmentId: fulfillments[0].id }] });
+  assert.equal(plain.status, 200);
+  const offer = plain.body.refundOffers[0];
+  for (const [body, status] of [[{ status: 'PROPOSED' }, 400], [{ status: 'OTHER' }, 400]]) {
+    assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${offer.id}`, body)).status, status);
+  }
+  const missing = await call(sim.base, token, 'PATCH', `${base}/refund-offers/nope`, { status: 'CONFIRMED' });
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.code, 'RESOURCE_NOT_FOUND');
+  await call(sim.base, token, 'PATCH', `${base}/refund-offers/${offer.id}`, { status: 'CONFIRMED' });
+  assert.equal((await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id] })).status, 409, 'already refunded');
+  // Another client sees no booking, so no refund offer either.
+  const other = await tokenFor(sim.base, 'alpha', alphaTwo);
+  assert.equal((await call(sim.base, other, 'GET', `${base}/refund-offers/${offer.id}`)).status, 404);
+});
+
+test('refund: a booking not confirmed has nothing to refund; an offer past its time cannot be confirmed', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const offer = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(offer))).body.booking;
+  assert.equal((await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/refund-offers`, { fulfillmentIds: ['x'] })).status, 409);
+  const { fulfillments, base } = await confirmedReturn();
+  const [refundOffer] = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id] })).body.refundOffers;
+  sim.clock.ms += 31 * 60 * 1000;
+  try {
+    assert.equal((await call(sim.base, token, 'PATCH', `${base}/refund-offers/${refundOffer.id}`, { status: 'CONFIRMED' })).status, 409);
+  } finally {
+    sim.clock.ms -= 31 * 60 * 1000;
+  }
 });
 
 test('passenger and purchaser can be read and changed; id, reference and type cannot', async () => {

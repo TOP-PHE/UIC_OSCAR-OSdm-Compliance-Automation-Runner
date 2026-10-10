@@ -708,7 +708,7 @@ before — same assertion names (no `NHF_…` prefix), same flow, same budget.
 The auto-expansion mechanism only kicks in when the per-scenario queue has
 2+ entries.
 
-### 4.9 Partial refund (`partialRefundByLeg` / `partialRefundByPax`) — issue #218
+### 4.9 Partial refund (`partialRefundByLeg` / `partialRefundByPax` / `partialRefundByFulfillment`) — issues #218, #595
 
 For **REFUND** scenarios only. Scopes the refund-offer request to a subset of
 the booking via OSDM's `RefundOfferRequest.refundSpecifications[]` (each entry
@@ -721,8 +721,17 @@ and `passengerIds[]` for the per-passenger axis).
 | **`partialRefundLegSelection`** | `first` / `last` / `outbound` / `inbound` | Which leg. `outbound` / `inbound` only appear in the wizard for return-trip scenarios; on a one-way trip OSCAR falls back to `first`. |
 | **`partialRefundByPax`** | `off` / `on` | When on, the refund covers only one passenger of a multi-passenger booking. |
 | **`partialRefundPaxSelection`** | `first` / `last` | Which passenger (by booking-order). |
+| **`partialRefundByFulfillment`** | `off` / `on` | When on, the refund covers one whole fulfillment (#595). Only `fulfillmentIds` is sent, without `refundSpecifications`: for providers that refund per fulfillment and refuse a scope by leg or passenger. It takes precedence over the two axes above. |
+| **`partialRefundFulfillmentSelection`** | `first` / `last` / `outbound` / `inbound` | Which fulfillment: the first or last of the booking, or the one holding the outbound or inbound trip of a return. What a fulfillment holds depends on how the provider divides the booking (one per booking, per direction, per passenger…). |
 
 Both axes can be combined — `byLeg=on` + `byPax=on` refunds one passenger on one leg.
+
+**Several refund offers (#595).** Some providers answer a refund request with
+one refund offer per fulfillment. OSCAR then confirms every offer in turn and
+reads the booking after each: the fulfillments of the confirmed offers must be
+`REFUNDED` and the others unchanged. A full refund ends with every fulfillment
+refunded. Each offer must name fulfillments of the booking, and no fulfillment
+may be in two offers.
 
 #### Setup-time validation (wizard)
 
@@ -749,6 +758,7 @@ When partial refund is armed AND not degraded:
 | Assertion | Replaces |
 |---|---|
 | `refundFee + refundableAmount < confirmedPrice` (strict-less) | The standard full-refund `=` identity (which would fail by design) |
+| `refundableAmount + refundFee` = the price of the parts in scope (#595: the fee is counted) | — |
 | `refundOfferBreakdownItems[].bookingParts[] ⊆ requested bookingPartIds` | (additional structural check; logs INFO when the response omits a breakdown) |
 
 When partial refund is degraded: the standard full-refund financial-identity check fires unchanged.

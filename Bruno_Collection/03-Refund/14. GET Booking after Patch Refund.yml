@@ -77,6 +77,18 @@ runtime:
         checkRefundScopeOnBooking(jsonData.booking);
 
         displayFulFilledBooking(jsonData);
+
+        // #595: the next refund offer, when the provider gave several (one
+        // per fulfillment): confirm it and read the booking again. When all
+        // are confirmed, a full refund has refunded every fulfillment.
+        const { nextRefundOfferToConfirm, checkFullRefundDone } = require(bru.getEnvVar("library_base") + "refunds.js");
+        const _nextRefundOffer = nextRefundOfferToConfirm();
+        if (_nextRefundOffer) {
+          console.log(`[INFO] 🔁 Refund offer ${_nextRefundOffer.position}/${_nextRefundOffer.total} (${_nextRefundOffer.id}): confirming it.`);
+          bru.runner.setNextRequest("13. PATCH Refund Offer");
+          return;
+        }
+        checkFullRefundDone(jsonData.booking);
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────
         // #385: a skipped expired-flow sub-run must not behead the queue —
         // hand the remaining timers their pass before the next scenario.

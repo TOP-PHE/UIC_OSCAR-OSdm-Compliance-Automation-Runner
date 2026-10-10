@@ -52,7 +52,9 @@ collection's README: same data file, same checks.
 | `GET`, `PATCH /<provider>/bookings/{id}/passengers/{id}` | a passenger |
 | `GET`, `PATCH`, `POST /<provider>/bookings/{id}/purchaser` | the purchaser |
 | `POST /<provider>/bookings/{id}/fulfillments` | confirms the booking: its parts and its tickets become `FULFILLED`, one ticket per trip (two for a return) |
-| any other OSDM resource (places, products, refund offers, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
+| `POST`, `GET /<provider>/bookings/{id}/refund-offers` | one refund offer per fulfillment named in `fulfillmentIds` (#595), each holding all its parts. A refund scoped by booking part or passenger (`refundSpecifications` with `bookingPartIds` or `passengerIds`) is refused with `PARTIAL_REFUND_NOT_SUPPORTED`. Fee by flexibility: none (flexible), a quarter (semi-flexible), the whole price (saver); an `overruleCode` waives it |
+| `GET`, `PATCH`, `DELETE /<provider>/bookings/{id}/refund-offers/{id}` | the refund offer; `PATCH {status: CONFIRMED}` refunds its fulfillment and parts and lowers the confirmed price; `DELETE` withdraws a proposed offer (204), not a confirmed one (409) |
+| any other OSDM resource (places, products, exchanges, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
 | `GET /healthz` | `{"status":"ok"}`, for the container health check |
 
 There is no timetable. A trip is built from the request: the same origin,

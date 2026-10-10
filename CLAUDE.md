@@ -863,6 +863,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refunds.js` `getBookingRefundResponse` is called by no request (its
   `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
   if it is wired in).
+- **A refund can come as one refund offer per fulfillment, and every offer is
+  confirmed** (#595, 1.11.225 / OTST_V2.0.110). Step 10 keeps the ids
+  (`__refundOfferIds`, `__refundOfferIndex`); step 14, after checking the
+  booking, makes the next one `refundOffersOfferId` and goes back to `13.
+  PATCH`; when none is left, `checkFullRefundDone()` asks every fulfillment to
+  be refunded (not for a partial refund that did not degrade). Providers divide
+  a booking into fulfillments differently (one per booking, per direction, per
+  passenger, per passenger and leg), so a partial refund *by fulfillment*
+  targets first, last, outbound or inbound, never an id, and sends
+  `fulfillmentIds` only: providers that refund per fulfillment refuse
+  `refundSpecifications` with `bookingPartIds` / `passengerIds`. A partial
+  refund is armed by any of `partialRefundArmed()`'s three flags; use it
+  instead of reading the leg and passenger flags.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
