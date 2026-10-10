@@ -25,6 +25,7 @@ const { clientMatches } = require('./config');
 const { buildOfferCollection } = require('./osdm/offers');
 const { createBooking, confirmBooking, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
+const { reductionCardCollection } = require('./osdm/reductionCards');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -221,6 +222,11 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (resource === 'versions' && rest.length === 0) {
       requireMethod(req, 'GET');
       return [{ version: provider.osdmVersion }];
+    }
+    // #597: a provider with reduction cards lists them; the others answer 501.
+    if (resource === 'reduction-cards' && rest.length === 0 && provider.reductionCards) {
+      requireMethod(req, 'GET');
+      return reductionCardCollection(provider);
     }
     if (resource === 'offers' && rest.length === 0) {
       requireMethod(req, 'POST');

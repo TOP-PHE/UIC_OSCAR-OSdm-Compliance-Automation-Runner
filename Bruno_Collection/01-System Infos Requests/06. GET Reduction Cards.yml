@@ -24,6 +24,9 @@ runtime:
         const { handleSystemInfoStatus, validateReductionCards } = require(bru.getEnvVar("library_base") + "osdmCompliance.js");
 
         const endpoint = '/reduction-cards';
+        // #597: the provider's cards give the issuer of a passenger's card in
+        // the offer and booking requests. Unknown until this answer is read.
+        bru.setEnvVar("__reductionCardTypes", "");
         // Shared, version-aware status handling (out-of-version 404 → skip, etc.).
         if (!handleSystemInfoStatus(res.getStatus(), endpoint, { bruTest, validationLogger, body: (() => { try { return res.getBody(); } catch (_e) { return null; } })() })) return;
 
@@ -37,6 +40,8 @@ runtime:
           expect(bodyNotEmpty, 'Response array/object should not be empty').to.be.true;
         });
         validationLogger(Array.isArray(body) ? `[INFO] GET ${endpoint} → 200 OK, ${body.length} item(s)` : `[DEBUG] GET ${endpoint} → 200 OK, body received`);
+        const _knownCards = require(bru.getEnvVar("library_base") + "reductionCards.js").knownCardTypesFrom(body);
+        if (_knownCards) bru.setEnvVar("__reductionCardTypes", JSON.stringify(_knownCards));
 
         // ── OSDM compliance (Layer 1): ReductionCardCollectionResponse ──
         // Envelope object → "reductionCardTypes" array; every entry has required

@@ -140,46 +140,17 @@ runtime:
           bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
-        // ── Place-selection routing (issue #104) ──────────────────────────────
-        // Pre-booking seat map (SEATMAP_AT_OFFER) runs only when the scenario
-        // opted into Place selection AND chose the SEATMAP_AT_OFFER mode (both
-        // authorised by the Test Framework, issue #107). Legacy requiresPlaceSelection
-        // is kept as an OR-fallback for backward compatibility. When the gate is
-        // off (every current scenario) we route straight to Create Booking and
-        // set skipPlaceMaps — the historic behaviour, unchanged.
-        // ── Two-step return (#178, #594) ──────────────────────────────────────
-        // On the OUTBOUND offer of a return scenario, capture the chosen outbound
-        // offer and its trip, and route to the inward (return) offer step BEFORE
-        // booking. A return scenario is one the scenarioParser gave an inbound
-        // date (returnInboundDate; SEARCH returns only).
-        const _isReturn = !!bru.getEnvVar("returnInboundDate");
-
-        if (_isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
-          bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
-          // The chosen offer's trip, for returnSearchParameters.outboundTripIds
-          // (COMBINED): its tripCoverage, else its first part's.
-          const _chosen = (jsonData.offers || []).find((o) => o && o.offerId === bru.getEnvVar("offerId")) || {};
-          const _firstPart = (_chosen.admissionOfferParts || [])[0] || {};
-          const _tripId = (_chosen.tripCoverage && _chosen.tripCoverage.coveredTripId)
-            || (_firstPart.tripCoverage && _firstPart.tripCoverage.coveredTripId) || null;
-          bru.setEnvVar("outboundTripId", _tripId);
-          bru.setGlobalEnvVar("skipPlaceMaps", true);
-          console.log("[INFO] 🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
-          bru.runner.setNextRequest("01b. POST Get Return Offer");
+        // ── Reduction cards (#597) ────────────────────────────────────────────
+        // The chosen offer applied each passenger's card. When a passenger holds
+        // one, 01c asks the same offers without cards to compare the prices,
+        // then routes on as this step would.
+        // ── Routing: the inbound offer of a return (#178, #594), the seat map
+        // before booking (#104), or the booking — routeAfterOfferStep().
+        const { checkOfferCards, routeAfterOfferStep } = require(bru.getEnvVar("library_base") + "offers.js");
+        if (checkOfferCards("Offer", { compare: true })) {
+          bru.runner.setNextRequest("01c. POST Get Offer without Cards");
         } else {
-          const _psMode   = bru.getEnvVar("placeSelectionMode");
-          const _psOptIn  = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
-          const _reqPlace = bru.getEnvVar("requiresPlaceSelection");
-          const _runPlaceMap = (_psMode === "SEATMAP_AT_OFFER" && _psOptIn)
-                            || (_reqPlace === true || _reqPlace === "true");
-
-          if (_runPlaceMap) {
-            bru.setGlobalEnvVar("skipPlaceMaps", false);
-            bru.runner.setNextRequest("08. GET Place Maps");
-          } else {
-            bru.runner.setNextRequest("02. POST Create Booking");
-            bru.setGlobalEnvVar("skipPlaceMaps", true);
-          }
+          routeAfterOfferStep();
         }
 
 settings:

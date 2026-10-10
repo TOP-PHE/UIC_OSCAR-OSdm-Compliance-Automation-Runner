@@ -1,0 +1,50 @@
+info:
+  name: 01c. POST Get Offer without Cards
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{api_base}}/offers"
+  headers:
+    - name: Content-Type
+      value: application/json;version={{osdmVersion}}
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Requestor
+      value: "{{requestor}}"
+  body:
+    type: json
+    data: "{{OfferCollectionRequestWithoutCards}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // ── Reduction cards (#597) — the same offer request without cards ─────
+        // Reached only from "01. POST Get Offer" when a passenger holds a
+        // reduction card: the request of 01 is sent again with the cards taken
+        // off, and the chosen offer's prices are compared with this answer.
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+        const { withoutCards } = require(bru.getEnvVar("library_base") + "reductionCards.js");
+        const _request = JSON.parse(bru.getEnvVar("OfferCollectionRequest") || "{}");
+        _request.anonymousPassengerSpecifications = withoutCards(_request.anonymousPassengerSpecifications);
+        bru.setEnvVar("OfferCollectionRequestWithoutCards", JSON.stringify(_request));
+    - type: after-response
+      code: |-
+        // A failed comparison never stops the scenario: the offer of 01 is
+        // still the one booked.
+        let _body;
+        try { _body = res.getBody(); } catch (_e) { _body = null; }
+        const { compareOfferWithoutCards, routeAfterOfferStep } = require(bru.getEnvVar("library_base") + "offers.js");
+        compareOfferWithoutCards(res.getStatus(), _body);
+        routeAfterOfferStep();
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

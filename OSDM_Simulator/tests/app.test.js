@@ -164,6 +164,31 @@ test('OSDM resources the simulator does not provide answer 501 with a Problem', 
   }
 });
 
+test('reduction cards: gamma lists its cards, a provider without cards answers 501 (#597)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const res = await call(sim.base, token, 'GET', '/gamma/reduction-cards');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.reductionCardTypes.map((c) => c.code), ['SIM_CARD_25', 'SIM_CARD_50', 'SIM_STUDENT']);
+  for (const type of res.body.reductionCardTypes) {
+    assert.equal(type.issuer, 'urn:x_osdm_simulator:carrier:gamma');
+    assert.ok(type.name.id && type.name.text && type.reductionsGranted[0].description);
+  }
+  const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'GET', '/alpha/reduction-cards');
+  assert.equal(alpha.status, 501);
+});
+
+test('reduction cards: the booking keeps the card on the passenger and on the admission (#597)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const cards = [{ type: 'REDUCTION_CARD', code: 'SIM_STUDENT' }];
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest({ anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON', cards }] }))).body.offers;
+  const request = bookingRequest(offers[0]);
+  request.passengerSpecifications[0].cards = cards;
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', request)).body.booking;
+  assert.deepEqual(booking.passengers[0].cards, cards);
+  assert.deepEqual(booking.bookedOffers[0].admissions[0].appliedPassengerTypes, offers[0].admissionOfferParts[0].appliedPassengerTypes);
+  assert.equal(booking.bookedOffers[0].admissions[0].appliedPassengerTypes[0].appliedReductionCardTypes[0].code, 'SIM_STUDENT');
+});
+
 test('a path that is no OSDM resource is a 404, a wrong method a 405', async () => {
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
   for (const url of ['/alpha', '/alpha/nothing', '/alpha/versions/extra', '/alpha/offers/extra', '/alpha/oauth', '/alpha/bookings/x/y/z/w',

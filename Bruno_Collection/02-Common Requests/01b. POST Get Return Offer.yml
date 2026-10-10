@@ -109,6 +109,9 @@ runtime:
           bruTest(c.name, () => { if (!c.ok) throw new Error(c.message); });
         });
 
+        // #597: the chosen inbound offer applied each passenger's card too.
+        require(bru.getEnvVar("library_base") + "offers.js").checkOfferCards("Inbound offer");
+
         // Return trips book outbound + inbound together; no pre-booking place map.
         bru.setGlobalEnvVar("skipPlaceMaps", true);
         bru.runner.setNextRequest("02. POST Create Booking");

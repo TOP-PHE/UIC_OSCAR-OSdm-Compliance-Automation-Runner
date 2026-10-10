@@ -420,6 +420,14 @@ The two modes — the same labels appear in the framework and the scenario:
 
 - **Passengers** — type (`PERSON`, `BICYCLE`, `DOG`, `PRM`, …), date of birth,
   and optional patch values (name/email/phone) used by the PATCH‑passengers step.
+- **Reduction cards** (#597) — the provider's card codes, as its
+  `GET /reduction-cards` lists them. Each is sent as an OSDM card reference
+  (`{ type: REDUCTION_CARD, code, issuer }`) with the offer, booking and
+  exchange requests; the issuer comes from the provider's list (a warning when
+  the list cannot be read or does not hold the code). OSCAR then checks that
+  the chosen offer names the card on the passenger (`appliedPassengerTypes`),
+  and asks the same offers again without cards (`01c. POST Get Offer without
+  Cards`): the card holder must pay less, the others the same (a warning).
 - **Fulfillment** — media (`PDF_A4`, `UIC_PDF`, …) and type (`ETICKET`, …),
   constrained to the framework's `fulfillment`.
 

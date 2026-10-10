@@ -54,6 +54,7 @@ collection's README: same data file, same checks.
 | `POST /<provider>/bookings/{id}/fulfillments` | confirms the booking: its parts and its tickets become `FULFILLED`, one ticket per trip (two for a return) |
 | `POST`, `GET /<provider>/bookings/{id}/refund-offers` | one refund offer per fulfillment named in `fulfillmentIds` (#595), each holding all its parts. A refund scoped by booking part or passenger (`refundSpecifications` with `bookingPartIds` or `passengerIds`) is refused with `PARTIAL_REFUND_NOT_SUPPORTED`. Fee by flexibility: none (flexible), a quarter (semi-flexible), the whole price (saver); an `overruleCode` waives it. `gamma` accepts four codes (`CONNECTION_BROKEN`, `PAYMENT_FAILURE`, `SALES_STAFF_ERROR`, `TECHNICAL_FAILURE`, its profile's `overruleCodes`, #596) and refuses any other with `OVERRULE_CODE_NOT_SUPPORTED`; `alpha` and `beta` accept any |
 | `GET`, `PATCH`, `DELETE /<provider>/bookings/{id}/refund-offers/{id}` | the refund offer; `PATCH {status: CONFIRMED}` refunds its fulfillment and parts and lowers the confirmed price; `DELETE` withdraws a proposed offer (204), not a confirmed one (409) |
+| `GET /<provider>/reduction-cards` | `gamma`: its three cards (`SIM_CARD_25`, `SIM_CARD_50`, `SIM_STUDENT`, its profile's `reductionCards`, #597); the others answer `501` |
 | any other OSDM resource (places, products, exchanges, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
 | `GET /healthz` | `{"status":"ok"}`, for the container health check |
 
@@ -74,6 +75,7 @@ used in the path.
 | `utcOffset` | the offset a time without one is read in |
 | `tokenLifetimeSeconds` | how long a token lasts |
 | `overruleCodes` | optional: the only overrule codes a refund request may carry (#596); absent, any code |
+| `reductionCards` | optional: the cards it knows, `{ code, name, percent }` (#597). A passenger's known card takes `percent` off its price and is named in the admission's `appliedPassengerTypes`; of several, the largest. An unknown card is ignored with a `REDUCTION_CARD_NOT_APPLIED` Problem in `problems`. Absent: `GET /reduction-cards` is `501` and every card is unknown |
 
 Shipped: `alpha` (EUR, OSDM 3.6.0, one-hour tokens), `beta` (CHF, 3.7.0,
 two-minute tokens, so a long run goes through OSCAR's token refresh), `gamma`

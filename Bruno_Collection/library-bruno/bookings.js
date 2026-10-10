@@ -395,10 +395,13 @@ function validateAppliedPassengerTypes(part, bookedPart, partType, index) {
           validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}] has ${passengerType.appliedReductionCardTypes.length} appliedReductionCardType(s)`);
         });
         passengerType.appliedReductionCardTypes.forEach((cardType, cardIndex) => {
-          const bookedCardType = bookedPassengerType.appliedReductionCardTypes?.find(c => c === cardType);
-          test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}] matches`, () => {
-            expect(bookedCardType).to.eql(cardType);
-            validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}]: offer='${cardType}' booking='${bookedCardType}'`);
+          // #597: a ReductionCardType is an object; it is the same card when
+          // the code and issuer are (it used to be compared by identity, which
+          // two parsed answers never share).
+          const bookedCardType = bookedPassengerType.appliedReductionCardTypes?.find(c => c?.code === cardType?.code && c?.issuer === cardType?.issuer);
+          test(`${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}] matches — ${cardType?.code}`, () => {
+            expect(bookedCardType, `card ${cardType?.code} (issuer ${cardType?.issuer}) of the offer is not in the booking`).to.exist;
+            validationLogger(`[DEBUG] ${partType}[${index}] appliedPassengerTypes[${ptIndex}].appliedReductionCardTypes[${cardIndex}]: offer='${cardType?.code}' booking='${bookedCardType?.code}'`);
           });
         });
       } else {

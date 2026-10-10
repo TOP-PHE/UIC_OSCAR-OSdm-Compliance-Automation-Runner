@@ -609,6 +609,13 @@
                 "updateGender": {
                   "type": "string"
                 },
+                "reductionCards": {
+                  "description": "Reduction cards of the passenger (#597): codes from the provider's list (GET /reduction-cards), sent as CardReferences { type: REDUCTION_CARD, code, issuer } in the offer and booking requests. An entry may also be an object { code, issuer, number }.",
+                  "type": "array",
+                  "items": {
+                    "type": ["string", "object"]
+                  }
+                },
                 "category": {
                   "type": "string",
                   "description": "Passenger category used for fare selection.",

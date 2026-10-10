@@ -182,3 +182,59 @@ test('a specified leg that ends before it starts is refused', () => {
   });
   refused(request, /end after it starts/);
 });
+
+// ── reduction cards (#597) ────────────────────────────────────────────────
+
+const card = (code) => ({ type: 'REDUCTION_CARD', code });
+const withCards = (...cardLists) => offerRequest({
+  anonymousPassengerSpecifications: cardLists.map((cards, i) => ({ externalRef: `P${i + 1}`, type: 'PERSON', ...(cards ? { cards } : {}) })),
+});
+const partOf = (offer, ref) => offer.admissionOfferParts.find((p) => p.passengerRefs[0] === ref);
+
+test('a known card takes its reduction off the passenger\'s price and is named on the admission', () => {
+  const plain = build(withCards(null, null), 'gamma');
+  const carded = build(withCards([card('SIM_CARD_25')], null), 'gamma');
+  plain.offers.forEach((offer, i) => {
+    const full = partOf(offer, 'P1').price.amount;
+    const reduced = partOf(carded.offers[i], 'P1');
+    assert.equal(reduced.price.amount, Math.round(full * 0.75));
+    assert.equal(partOf(carded.offers[i], 'P2').price.amount, partOf(offer, 'P2').price.amount, 'the other passenger pays the full fare');
+    assert.equal(carded.offers[i].offerSummary.minimalPrice.amount, reduced.price.amount + partOf(offer, 'P2').price.amount);
+    assert.deepEqual(reduced.appliedPassengerTypes, [{
+      passengerRef: 'P1', type: 'ADULT', description: 'Adult with Simulator card 25',
+      appliedReductionCardTypes: [{ code: 'SIM_CARD_25', issuer: 'urn:x_osdm_simulator:carrier:gamma', name: { id: 'SIM_CARD_25-NAME', text: 'Simulator card 25' } }],
+      appliedReductions: [{ type: 'REDUCTION_CARD', code: 'SIM_CARD_25', issuer: 'urn:x_osdm_simulator:carrier:gamma' }],
+    }]);
+    assert.equal(partOf(carded.offers[i], 'P2').appliedPassengerTypes, undefined);
+  });
+  assert.equal(carded.problems, undefined);
+  assert.deepEqual(carded.anonymousPassengerSpecifications[0].cards, [card('SIM_CARD_25')]);
+});
+
+test('of several known cards the largest reduction applies; a card of another type is not a reduction', () => {
+  const plain = partOf(build(withCards(null), 'gamma').offers[0], 'P1').price.amount;
+  const best = partOf(build(withCards([card('SIM_CARD_25'), card('SIM_CARD_50')]), 'gamma').offers[0], 'P1');
+  assert.equal(best.price.amount, Math.round(plain * 0.5));
+  assert.equal(best.appliedPassengerTypes[0].appliedReductionCardTypes[0].code, 'SIM_CARD_50');
+  const loyalty = build(withCards([{ type: 'LOYALTY_CARD', code: 'SIM_CARD_50', number: '123' }]), 'gamma');
+  assert.equal(partOf(loyalty.offers[0], 'P1').price.amount, plain);
+  assert.equal(loyalty.problems, undefined, 'only reduction cards are reported');
+});
+
+test('an unknown card is ignored with a Problem naming it; a provider with no card knows none', () => {
+  const plain = partOf(build(withCards(null), 'gamma').offers[0], 'P1').price.amount;
+  const unknown = build(withCards([card('NO_SUCH_CARD')]), 'gamma');
+  assert.equal(partOf(unknown.offers[0], 'P1').price.amount, plain);
+  assert.equal(partOf(unknown.offers[0], 'P1').appliedPassengerTypes, undefined);
+  assert.deepEqual(unknown.problems.map((p) => p.code), ['REDUCTION_CARD_NOT_APPLIED']);
+  assert.match(unknown.problems[0].detail, /Passenger P1: reduction card "NO_SUCH_CARD" is not known/);
+  const alpha = build(withCards([card('SIM_CARD_25')]));
+  assert.equal(alpha.problems.length, 1);
+  assert.equal(partOf(alpha.offers[0], 'P1').appliedPassengerTypes, undefined);
+});
+
+test('cards that are not a list of typed cards are refused', () => {
+  for (const cards of ['SIM_CARD_25', [{}], [{ type: 'REDUCTION_CARD', code: 7 }], Array.from({ length: 6 }, () => card('SIM_CARD_25'))]) {
+    assert.throws(() => build(withCards(cards), 'gamma'), (error) => error instanceof HttpError && error.status === 400 && /cards/.test(error.detail), JSON.stringify(cards));
+  }
+});

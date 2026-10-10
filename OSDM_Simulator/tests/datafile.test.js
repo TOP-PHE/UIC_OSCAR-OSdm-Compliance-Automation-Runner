@@ -58,7 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596) are gamma's only.
+  // The overrule codes (#596) and the reduction cards (#597) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -70,7 +70,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !s.startsWith('SIM_REFUND_OVERRULE_'));
+  const everyVersion = latest.filter((s) => !s.startsWith('SIM_REFUND_OVERRULE_') && !s.startsWith('SIM_SALE_CARD_'));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -124,6 +124,26 @@ test('the overrule scenarios: each code gamma accepts, and one it refuses (#596)
     assert.equal(scenario.partialRefundByFulfillment, 'off', scenario.code);
   }
   for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
+});
+
+test('the reduction card scenarios: each card gamma lists, on a passenger of its own (#597)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const carded = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_CARD_'));
+  assert.deepEqual(carded.map((s) => s.code), ['SIM_SALE_CARD_25_1ADT_38', 'SIM_SALE_CARD_50_2ADT_38', 'SIM_SALE_CARD_STUDENT_1YTH_38']);
+  const used = [];
+  for (const scenario of carded) {
+    assert.equal(scenario.osdmVersion, gamma.osdmVersion);
+    assert.equal(scenario.scenarioType, 'SALE');
+    const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
+    const cards = list.passengers.flatMap((p) => p.reductionCards || []);
+    assert.equal(cards.length, 1, `${scenario.code}: one passenger holds one card`);
+    used.push(...cards);
+  }
+  assert.deepEqual(used.sort(), gamma.reductionCards.map((c) => c.code).sort());
+  for (const scenario of datafile.scenarios.filter((s) => !carded.includes(s))) {
+    const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
+    assert.ok(list.passengers.every((p) => !p.reductionCards), `${scenario.code} holds no card`);
+  }
 });
 
 test('the data file holds no real person, station or template', () => {

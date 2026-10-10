@@ -33,7 +33,10 @@ module.exports = {
   handleAccommodationAndPlaceSelection,
   ensureYesWhenRefundOrExchangeSelected,
   deriveOfferFlexibilityFromProducts,
-  offerFlexibility
+  offerFlexibility,
+  checkOfferCards,
+  compareOfferWithoutCards,
+  routeAfterOfferStep,
 };
 
 // The envelope `warnings` member (#613 F10). From OSDM 3.5 on it is a
@@ -1959,4 +1962,86 @@ try {
   Object.assign(globalThis, module.exports);
 } catch (e) {
   console.log('[DEBUG] [library-bruno] globalThis exposure skipped: ' + (e && e.message));
+}
+
+// ── Reduction cards (#597) ───────────────────────────────────────────────────
+
+// The offer postOfferResponse chose, kept in the environment as an object.
+function chosenOffer() {
+  const offer = bru.getEnvVar("offer");
+  if (typeof offer !== "string") return offer || null;
+  try { return JSON.parse(offer); } catch { return null; }
+}
+
+/**
+ * After an offer step: the chosen offer applied each passenger's reduction
+ * card. Warns once for a card code the provider's list (step 06) does not
+ * hold. Returns true when the price comparison without cards (01c) is still
+ * to be made, which the outbound step asks for (`compare`).
+ */
+function checkOfferCards(label, { compare = false } = {}) {
+  const { withIssuers, passengersWithCards, checkCardsApplied } = require('./reductionCards.js');
+  const specs = parseEnvJson("offerPassengerSpecifications", []);
+  if (passengersWithCards(specs).length === 0) return false;
+  const known = parseEnvJson("__reductionCardTypes", null);
+  if (!Array.isArray(known)) {
+    validationLogger(`[WARNING] Reduction cards: the provider's list (GET /reduction-cards) could not be read, so the cards are sent without an issuer.`);
+  } else {
+    const { unknown } = withIssuers(specs, known);
+    if (unknown.length > 0) validationLogger(`[WARNING] Reduction cards: ${unknown.join(", ")} not in the provider's list (GET /reduction-cards).`);
+  }
+  checkCardsApplied(chosenOffer(), specs, label).forEach((c) => {
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+  return compare && String(bru.getEnvVar("__cardPriceCompareDone")) !== "true";
+}
+
+/** 01c: the chosen offer against the same request without cards. */
+function compareOfferWithoutCards(status, body) {
+  const { comparePrices } = require('./reductionCards.js');
+  bru.setEnvVar("__cardPriceCompareDone", "true");
+  if (status !== 200) {
+    validationLogger(`[WARNING] Reduction cards: the offer request without cards answered ${status}; prices not compared.`);
+    return;
+  }
+  comparePrices(chosenOffer(), body, parseEnvJson("offerPassengerSpecifications", [])).forEach((c) => {
+    if (c.level === "warn") {
+      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
+      return;
+    }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+  });
+}
+
+/**
+ * Where the flow goes after the outbound offer: the inbound offer of a return
+ * (#178, #594), the seat map before booking (#104), or the booking. Shared by
+ * 01 and 01c, which comes between them when a passenger holds a card.
+ */
+function routeAfterOfferStep() {
+  const isReturn = !!bru.getEnvVar("returnInboundDate");
+  if (isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
+    bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
+    // The chosen offer's trip, for returnSearchParameters.outboundTripIds
+    // (COMBINED): its tripCoverage, else its first part's.
+    const chosen = chosenOffer() || {};
+    const firstPart = (chosen.admissionOfferParts || [])[0] || {};
+    const tripId = chosen.tripCoverage?.coveredTripId || firstPart.tripCoverage?.coveredTripId || null;
+    bru.setEnvVar("outboundTripId", tripId);
+    bru.setGlobalEnvVar("skipPlaceMaps", true);
+    console.log("[INFO] 🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
+    bru.runner.setNextRequest("01b. POST Get Return Offer");
+    return;
+  }
+  const psMode = bru.getEnvVar("placeSelectionMode");
+  const psOptIn = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
+  const reqPlace = bru.getEnvVar("requiresPlaceSelection");
+  const runPlaceMap = (psMode === "SEATMAP_AT_OFFER" && psOptIn) || (reqPlace === true || reqPlace === "true");
+  if (runPlaceMap) {
+    bru.setGlobalEnvVar("skipPlaceMaps", false);
+    bru.runner.setNextRequest("08. GET Place Maps");
+  } else {
+    bru.runner.setNextRequest("02. POST Create Booking");
+    bru.setGlobalEnvVar("skipPlaceMaps", true);
+  }
 }

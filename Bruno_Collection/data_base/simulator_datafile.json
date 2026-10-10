@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -815,6 +815,105 @@
       },
       "partialRefundByFulfillment": "off",
       "partialRefundFulfillmentSelection": "first"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_CARD_25_1ADT_38",
+      "description": "Simulated provider: sale to an adult with a 25 % reduction card: the offer names the card on the passenger and costs less than the same request without it. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 3,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_CARD_50_2ADT_38",
+      "description": "Simulated provider: sale to two adults, one with a 50 % reduction card: only that passenger pays less. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 4,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_CARD_STUDENT_1YTH_38",
+      "description": "Simulated provider: sale to a young traveller with a student reduction card. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 5,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -941,6 +1040,84 @@
           "updatePhoneNumber": "+33199000006",
           "updateEmail": "robyn.sample@example.org",
           "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1992-04-10",
+          "firstName": "Charlie",
+          "lastName": "Example",
+          "phoneNumber": "+33199000011",
+          "email": "charlie.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Charles",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1992-04-11",
+          "updatePhoneNumber": "+33199000012",
+          "updateEmail": "charles.sample@example.org",
+          "type": "PERSON",
+          "reductionCards": ["SIM_CARD_25"]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1980-09-05",
+          "firstName": "Dana",
+          "lastName": "Example",
+          "phoneNumber": "+33199000013",
+          "email": "dana.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Danae",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1980-09-06",
+          "updatePhoneNumber": "+33199000014",
+          "updateEmail": "danae.sample@example.org",
+          "type": "PERSON",
+          "reductionCards": ["SIM_CARD_50"]
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1982-12-11",
+          "firstName": "Eli",
+          "lastName": "Example",
+          "phoneNumber": "+33199000015",
+          "email": "eli.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Elias",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1982-12-12",
+          "updatePhoneNumber": "+33199000016",
+          "updateEmail": "elias.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "2006-05-20",
+          "firstName": "Frankie",
+          "lastName": "Example",
+          "phoneNumber": "+33199000017",
+          "email": "frankie.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Francis",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "2006-05-21",
+          "updatePhoneNumber": "+33199000018",
+          "updateEmail": "francis.sample@example.org",
+          "type": "YOUTH",
+          "reductionCards": ["SIM_STUDENT"]
         }
       ]
     }

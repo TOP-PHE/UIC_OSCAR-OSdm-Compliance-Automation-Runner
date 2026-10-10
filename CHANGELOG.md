@@ -62,6 +62,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.228] / [collection-OTST_V2.0.112] — 2026-10-10
+
+Issue #597, release 2026.257. Simulator 0.7.0.
+
+### Added
+
+- **A passenger's reduction cards are sent.** Test Config kept card codes per
+  passenger, and no request carried them. `library-bruno/reductionCards.js`
+  (pure) turns them into OSDM card references, `{ type: "REDUCTION_CARD",
+  code, issuer }` (the same shape from OSDM 3.5 to 3.8), which the parser puts
+  on the offer and booking passengers; the offer, return, booking and exchange
+  requests send them. The issuer comes from the provider's list:
+  `06. GET Reduction Cards` keeps it (`__reductionCardTypes`), and a card that
+  already names an issuer keeps it. A list that cannot be read, or that lacks
+  a code, is a warning.
+- **Two checks prove a card was applied.**
+  - The chosen offer, and the chosen inbound offer of a return, names the card
+    on the passenger: an admission's `appliedPassengerTypes` entry for that
+    passenger lists it in `appliedReductionCardTypes` or `appliedReductions`.
+  - The new step `01c. POST Get Offer without Cards`, run only when a
+    passenger holds a card, sends the request of 01 without the cards. In the
+    offer of the same flexibility and travel class, the card holder must pay
+    more than in the chosen offer; a passenger without a card the same (a
+    warning). A failed call or no such offer is a warning; the offer of 01 is
+    still the one booked.
+- The routing after the offer step (return, seat map, booking) is one function,
+  `routeAfterOfferStep()` in `offers.js`, shared by 01 and 01c. Same routes as
+  before.
+- `passengers[].reductionCards` is declared in `datafile.schema.json` (codes,
+  or `{ code, issuer, number }`).
+- **Simulator 0.7.0**: a provider profile may list `reductionCards`
+  (`{ code, name, percent }`). `gamma` lists `SIM_CARD_25`, `SIM_CARD_50` and
+  `SIM_STUDENT` and answers `GET /reduction-cards` with them; `alpha` and
+  `beta` still answer 501. A known card takes its reduction off the
+  passenger's price and is named on the admission (`appliedPassengerTypes`,
+  kept in the booking); of several, the largest applies. An unknown card is
+  ignored: full fare and a `REDUCTION_CARD_NOT_APPLIED` Problem in `problems`.
+  A booking keeps the passenger's cards. The data file has, on 3.8 only,
+  `SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38` (one of two adults
+  holds the card) and `SIM_SALE_CARD_STUDENT_1YTH_38`.
+
+### Fixed
+
+- The offer/booking comparison of `appliedReductionCardTypes` (`bookings.js`)
+  compared ReductionCardType objects by identity, which two parsed answers
+  never share: it would have failed on every provider that names a card. It
+  compares code and issuer now.
+- The logs showed a passenger's cards with `join`, which prints
+  `[object Object]` for a card reference; they show the codes.
+
+Checked: the three card scenarios standalone against the simulator (209, 268,
+209 checks, none failed) and through OSCAR (207, 266, 207); sale, return and
+refund scenarios on the three providers unchanged in result (no failure; gamma
+gains the ten checks of a `GET /reduction-cards` that now answers). A card
+scenario run against `alpha`, which knows no card, fails exactly the two card
+checks. Not yet run against a real provider.
+
+---
+
 ## [server-1.11.227] / [collection-OTST_V2.0.111] — 2026-10-10
 
 Issue #596, release 2026.256. Simulator 0.6.0.
