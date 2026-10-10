@@ -38,18 +38,24 @@ const text = (value) => (typeof value === 'string' ? value.trim() : '');
 function cardsOfPassenger(passenger) {
   const list = Array.isArray(passenger?.reductionCards) ? passenger.reductionCards : [];
   const cards = [];
-  for (const entry of list) {
-    const code = text(typeof entry === 'string' ? entry : entry?.code);
-    if (!code || cards.some((c) => c.code === code)) continue;
-    const card = { type: REDUCTION_CARD, code };
-    if (entry && typeof entry === 'object') {
-      if (text(entry.issuer)) card.issuer = text(entry.issuer);
-      if (text(entry.number)) card.number = text(entry.number);
-    }
+  for (const card of list.map(cardOfEntry)) {
+    if (!card || cards.some((c) => c.code === card.code)) continue;
     cards.push(card);
     if (cards.length === MAX_CARDS) break;
   }
   return cards;
+}
+
+// One entry of a passenger's list: a code, or an object with a code and
+// perhaps an issuer and a number. Null when it holds no code.
+function cardOfEntry(entry) {
+  const isObject = entry !== null && typeof entry === 'object';
+  const code = text(isObject ? entry.code : entry);
+  if (!code) return null;
+  const card = { type: REDUCTION_CARD, code };
+  if (isObject && text(entry.issuer)) card.issuer = text(entry.issuer);
+  if (isObject && text(entry.number)) card.number = text(entry.number);
+  return card;
 }
 
 /** The codes and issuers of a ReductionCardCollectionResponse, or null when it holds none. */
@@ -109,14 +115,14 @@ const admissionsOf = (offer) => (Array.isArray(offer?.admissionOfferParts) ? off
 const refsOf = (part) => (Array.isArray(part?.passengerRefs) ? part.passengerRefs : []);
 
 // The card codes an offer part says it applied to a passenger.
+const listOf = (value) => (Array.isArray(value) ? value : []);
+
 function appliedCodes(part, ref) {
-  const types = Array.isArray(part?.appliedPassengerTypes) ? part.appliedPassengerTypes : [];
-  const codes = [];
-  for (const type of types.filter((t) => t?.passengerRef === ref)) {
-    for (const c of Array.isArray(type.appliedReductionCardTypes) ? type.appliedReductionCardTypes : []) if (c?.code) codes.push(c.code);
-    for (const c of Array.isArray(type.appliedReductions) ? type.appliedReductions : []) if (c?.code) codes.push(c.code);
-  }
-  return codes;
+  return listOf(part?.appliedPassengerTypes)
+    .filter((t) => t?.passengerRef === ref)
+    .flatMap((t) => [...listOf(t.appliedReductionCardTypes), ...listOf(t.appliedReductions)])
+    .map((c) => c?.code)
+    .filter(Boolean);
 }
 
 /**
@@ -153,7 +159,7 @@ const sameKind = (a, b) => a?.offerSummary?.overallFlexibility === b?.offerSumma
  * @returns {Array<{name: string, ok: boolean, message?: string, level: 'fail'|'warn'}>}
  */
 function comparePrices(chosen, plainResponse, specs) {
-  const withCards = passengersWithCards(specs).map((p) => p.ref);
+  const withCards = new Set(passengersWithCards(specs).map((p) => p.ref));
   const counterpart = (Array.isArray(plainResponse?.offers) ? plainResponse.offers : []).find((o) => sameKind(o, chosen));
   if (!counterpart) {
     return [{
@@ -167,7 +173,7 @@ function comparePrices(chosen, plainResponse, specs) {
   return refs.map((ref) => {
     const withCard = priceOf(chosen, ref);
     const without = priceOf(counterpart, ref);
-    const carded = withCards.includes(ref);
+    const carded = withCards.has(ref);
     if (withCard === null || without === null) {
       return { name: `Reduction cards: the price of passenger ${ref} can be compared`, ok: false, level: 'warn', message: 'no single-passenger admission with a price on one side' };
     }

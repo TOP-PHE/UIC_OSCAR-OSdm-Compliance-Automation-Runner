@@ -230,7 +230,7 @@ describe('the requests carry the cards', () => {
     const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
     const parser = fs.readFileSync(path.join(root, 'library-bruno', 'scenarioParser.js'), 'utf8');
     expect(parser).toMatch(/if \(cards\.length > 0\) offerSpec\.cards = cards;/);
-    expect(parser).toMatch(/passengerSpecs\[passengerSpecs\.length - 1\]\.cards = cards;/);
+    expect(parser).toMatch(/passengerSpecs\.at\(-1\)\.cards = cards;/);
     for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
       expect(fs.readFileSync(file, 'utf8')).toMatch(/"__cardPriceCompareDone", "OfferCollectionRequestWithoutCards"/);
     }

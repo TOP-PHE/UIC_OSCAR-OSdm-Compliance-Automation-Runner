@@ -85,10 +85,11 @@ const reducedPrice = (amount, applied) => (applied ? Math.round(amount * (100 - 
 
 /** The Problem an offer answer carries for a card the provider does not know. */
 function unknownCardProblem(externalRef, codes) {
+  const quoted = codes.map((c) => JSON.stringify(c)).join(', ');
   return {
     code: 'REDUCTION_CARD_NOT_APPLIED',
     title: 'Reduction card not applied',
-    detail: `Passenger ${externalRef}: reduction card ${codes.map((c) => `"${c}"`).join(', ')} is not known to this provider; the full fare applies.`,
+    detail: `Passenger ${externalRef}: reduction card ${quoted} is not known to this provider; the full fare applies.`,
   };
 }
 

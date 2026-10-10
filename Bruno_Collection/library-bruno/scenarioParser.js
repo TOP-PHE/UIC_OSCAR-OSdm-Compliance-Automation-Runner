@@ -1162,7 +1162,7 @@ function parseScenarioData(jsonData) {
               ));
             }
 
-            if (cards.length > 0) passengerSpecs[passengerSpecs.length - 1].cards = cards;
+            if (cards.length > 0) passengerSpecs.at(-1).cards = cards;
             passengerReferences.push(passenger.reference);
 
             const passengerDataStruct = {
