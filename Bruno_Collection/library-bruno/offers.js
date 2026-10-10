@@ -1869,7 +1869,7 @@ function handleOptionalReservationSelections(selectedOffer) {
     test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
   recordChecks(sr.checkRelations(selectedOffer));
-  const passengerRefs = (parseEnvJson("offerPassengerSpecifications", []) || []).map((p) => p && p.externalRef).filter(Boolean);
+  const passengerRefs = (parseEnvJson("offerPassengerSpecifications", []) || []).map((p) => p?.externalRef).filter(Boolean);
   recordChecks(sr.checkProviderRules(selectedOffer, passengerRefs));
 
   const { mandatory, optional } = sr.reservationsToBook(selectedOffer, { bookOptional: !!form || legacy });

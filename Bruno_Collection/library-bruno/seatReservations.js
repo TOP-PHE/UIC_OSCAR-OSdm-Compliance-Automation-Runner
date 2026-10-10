@@ -59,6 +59,9 @@ function relationsOf(offer) {
 }
 
 const ids = (list) => [...new Set(list)];
+// A relation asks for a reservation when its minimum is above 0; a missing
+// minimum asks for none.
+const isMandatory = (relation) => relation?.minGroupItemsToBeBooked > 0;
 
 /**
  * The reservations to book: the first `minGroupItemsToBeBooked` of each
@@ -70,13 +73,13 @@ const ids = (list) => [...new Set(list)];
 function reservationsToBook(offer, { bookOptional }) {
   const known = new Set(listOf(offer?.reservationOfferParts).map((p) => p?.id));
   const relations = relationsOf(offer);
-  const mandatory = ids(relations.flatMap(({ relation, refs }) => (relation?.minGroupItemsToBeBooked > 0 ? refs.slice(0, relation.minGroupItemsToBeBooked) : [])))
+  const mandatory = ids(relations.flatMap(({ relation, refs }) => (isMandatory(relation) ? refs.slice(0, relation.minGroupItemsToBeBooked) : [])))
     .filter((id) => known.has(id));
   let optional = [];
   if (bookOptional) {
     const linked = relations.length > 0;
     const candidates = linked
-      ? relations.filter(({ relation }) => !(relation?.minGroupItemsToBeBooked > 0)).flatMap(({ refs }) => refs.slice(0, 1))
+      ? relations.filter(({ relation }) => !isMandatory(relation)).flatMap(({ refs }) => refs.slice(0, 1))
       : [...known];
     optional = ids(candidates).filter((id) => known.has(id) && !mandatory.includes(id));
   }
