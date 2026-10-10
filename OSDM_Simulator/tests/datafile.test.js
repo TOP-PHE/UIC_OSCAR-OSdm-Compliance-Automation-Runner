@@ -58,6 +58,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
+  // The overrule codes (#596) are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -69,8 +70,11 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
+  const everyVersion = latest.filter((s) => !s.startsWith('SIM_REFUND_OVERRULE_'));
   for (const [version, sales] of byVersion) {
-    const expected = version === '3.6.0' ? latest.filter((s) => s !== combined) : latest;
+    let expected = latest;
+    if (version === '3.7.0') expected = everyVersion;
+    if (version === '3.6.0') expected = everyVersion.filter((s) => s !== combined);
     assert.deepEqual(sales, expected, version);
   }
   const gamma = providers.find((p) => p.key === 'gamma');
@@ -92,7 +96,7 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND');
-  assert.equal(refunds.length, 6);
+  assert.equal(refunds.length, 11);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
     const partial = scenario.partialRefundByFulfillment === 'on';
@@ -102,6 +106,24 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
       assert.ok([undefined, 'off', false].includes(scenario[axis]), `${scenario.code}: the provider refuses a scope by leg or passenger`);
     }
   }
+});
+
+test('the overrule scenarios: each code gamma accepts, and one it refuses (#596)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const overruled = datafile.scenarios.filter((s) => s.code.startsWith('SIM_REFUND_OVERRULE_'));
+  const accepted = overruled.filter((s) => s.overruleCodeExpectRejection !== 'on');
+  const refused = overruled.filter((s) => s.overruleCodeExpectRejection === 'on');
+  assert.deepEqual(accepted.map((s) => s.overruleCode), gamma.overruleCodes);
+  for (const scenario of accepted) assert.equal(scenario.code, `SIM_REFUND_OVERRULE_${scenario.overruleCode}_38`);
+  assert.deepEqual(refused.map((s) => s.code), ['SIM_REFUND_OVERRULE_REFUSED_38']);
+  assert.equal(gamma.overruleCodes.includes(refused[0].overruleCode), false, 'the probe sends a code gamma does not accept');
+  for (const scenario of overruled) {
+    assert.equal(scenario.osdmVersion, gamma.osdmVersion);
+    // A fee without the code, so that waiving it shows.
+    assert.equal(scenario.desiredFlexibility, 'SEMI_FLEXIBLE', scenario.code);
+    assert.equal(scenario.partialRefundByFulfillment, 'off', scenario.code);
+  }
+  for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
 });
 
 test('the data file holds no real person, station or template', () => {

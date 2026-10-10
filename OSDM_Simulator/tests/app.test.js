@@ -17,6 +17,7 @@ after(async () => { await sim.close(); });
 
 const [alphaOne, alphaTwo, alphaSame] = SECRETS.alpha;
 const [betaOne, betaSame] = SECRETS.beta;
+const [gammaOne] = SECRETS.gamma;
 const form = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
 async function tokenRequest(provider, { headers = {}, body = 'grant_type=client_credentials', method = 'POST' } = {}) {
@@ -324,14 +325,14 @@ test('the date of a later inbound journey, on the first call, changes nothing', 
 // ── refunds, one offer per fulfillment (#595) ─────────────────────────────
 
 // A confirmed return: two fulfillments, one per direction.
-async function confirmedReturn(flexibility = 'FULL_FLEXIBLE') {
-  const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+async function confirmedReturn(flexibility = 'FULL_FLEXIBLE', provider = 'alpha') {
+  const token = await tokenFor(sim.base, provider, provider === 'gamma' ? gammaOne : alphaOne);
+  const outbound = (await call(sim.base, token, 'POST', `/${provider}/offers`, offerRequest())).body;
   const pick = (list) => list.offers.find((o) => o.offerSummary.overallFlexibility === flexibility);
-  const both = (await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest({ outboundTripIds: [outbound.trips[0].id] }))).body;
-  const booking = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(pick(both)))).body.booking;
-  const fulfillments = (await call(sim.base, token, 'POST', `/alpha/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
-  return { token, booking, fulfillments, base: `/alpha/bookings/${booking.id}` };
+  const both = (await call(sim.base, token, 'POST', `/${provider}/offers`, inboundRequest({ outboundTripIds: [outbound.trips[0].id] }))).body;
+  const booking = (await call(sim.base, token, 'POST', `/${provider}/bookings`, bookingRequest(pick(both)))).body.booking;
+  const fulfillments = (await call(sim.base, token, 'POST', `/${provider}/bookings/${booking.id}/fulfillments`, {})).body.fulfillments;
+  return { token, booking, fulfillments, base: `/${provider}/bookings/${booking.id}` };
 }
 
 test('refund: one refund offer per fulfillment named, holding all its parts', async () => {
@@ -390,6 +391,38 @@ test('refund: an overrule code waives the fee and is named in the offer', async 
   assert.ok(offer.refundableAmount.amount > 0);
   assert.equal(offer.appliedOverruleCode, 'STRIKE');
   assert.equal((await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[1].id], overruleCode: 7 })).status, 400);
+});
+
+test('refund: gamma takes its four overrule codes, each a full refund with no fee (#596)', async () => {
+  for (const code of ['CONNECTION_BROKEN', 'PAYMENT_FAILURE', 'SALES_STAFF_ERROR', 'TECHNICAL_FAILURE']) {
+    const { token, fulfillments, base } = await confirmedReturn('SEMI_FLEXIBLE', 'gamma');
+    const booking = (await call(sim.base, token, 'GET', base)).body.booking;
+    const offers = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id), overruleCode: code })).body.refundOffers;
+    assert.deepEqual(offers.map((o) => o.refundFee.amount), [0, 0], code);
+    assert.deepEqual(offers.map((o) => o.appliedOverruleCode), [code, code]);
+    assert.equal(offers.reduce((sum, o) => sum + o.refundableAmount.amount, 0), booking.confirmedPrice.amount, code);
+  }
+});
+
+test('refund: without a code, the same product keeps its fee on gamma (#596)', async () => {
+  const { token, fulfillments, base } = await confirmedReturn('SEMI_FLEXIBLE', 'gamma');
+  const booking = (await call(sim.base, token, 'GET', base)).body.booking;
+  const offers = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: fulfillments.map((f) => f.id) })).body.refundOffers;
+  assert.ok(offers.every((o) => o.refundFee.amount > 0 && o.appliedOverruleCode === undefined));
+  assert.ok(offers.reduce((sum, o) => sum + o.refundableAmount.amount, 0) < booking.confirmedPrice.amount);
+});
+
+test('refund: gamma refuses another overrule code with a Problem naming it; alpha takes any (#596)', async () => {
+  const { token, fulfillments, base } = await confirmedReturn('SEMI_FLEXIBLE', 'gamma');
+  const refused = await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: [fulfillments[0].id], overruleCode: 'STRIKE' });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.code, 'OVERRULE_CODE_NOT_SUPPORTED');
+  assert.match(refused.body.detail, /overruleCode "STRIKE" is not accepted/);
+  // Nothing was proposed by the refused request.
+  assert.equal((await call(sim.base, token, 'GET', `${base}/refund-offers`)).body.refundOffers.length, 0);
+  const alpha = await confirmedReturn('SEMI_FLEXIBLE');
+  const [offer] = (await call(sim.base, alpha.token, 'POST', `${alpha.base}/refund-offers`, { fulfillmentIds: [alpha.fulfillments[0].id], overruleCode: 'STRIKE' })).body.refundOffers;
+  assert.equal(offer.appliedOverruleCode, 'STRIKE');
 });
 
 test('refund: a proposed offer can be withdrawn, a confirmed one cannot', async () => {

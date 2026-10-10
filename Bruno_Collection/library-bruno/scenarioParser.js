@@ -91,7 +91,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "refundDate", "TripType",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -702,6 +702,8 @@ function parseScenarioData(jsonData) {
       }
       bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
       bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
+      // #596: negative probe — the provider is expected to refuse this overrule code.
+      bru.setEnvVar("overruleCodeExpectRejection", (scenario.overruleCodeExpectRejection === true || ["true", "on", "yes"].includes(String(scenario.overruleCodeExpectRejection).toLowerCase())) ? "true" : "false");
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);
 
       // ── Partial refund (issue #218) ─────────────────────────────────────

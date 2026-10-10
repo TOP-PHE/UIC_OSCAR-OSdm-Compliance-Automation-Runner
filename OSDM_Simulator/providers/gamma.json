@@ -9,5 +9,11 @@
   "osdmVersion": "3.8.0",
   "idPrefix": "GAMMA",
   "utcOffset": "+02:00",
-  "tokenLifetimeSeconds": 900
+  "tokenLifetimeSeconds": 900,
+  "overruleCodes": [
+    "CONNECTION_BROKEN",
+    "PAYMENT_FAILURE",
+    "SALES_STAFF_ERROR",
+    "TECHNICAL_FAILURE"
+  ]
 }

@@ -232,6 +232,28 @@ runtime:
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
         const { postPatchRefundOfferResponse } = require(bru.getEnvVar("library_base")+"refunds.js");
 
+        // #596: negative probe — an overrule code the provider does not
+        // support must be refused. Graded, then the scenario ends: there is
+        // no refund offer to confirm.
+        const { overruleRejectionArmed, checkOverruleRejected } = require(bru.getEnvVar("library_base") + "refunds.js");
+        if (overruleRejectionArmed()) {
+          let _probeBody;
+          try { _probeBody = res.getBody(); } catch (_e) { _probeBody = null; }
+          checkOverruleRejected(res.getStatus(), _probeBody);
+          if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+          const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+          const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+          if (_scList.length > 0 && _scNextIdx < _scList.length) {
+            console.log('🔄 Overrule code probe done — looping to [' + (_scNextIdx + 1) + '/' + _scList.length + ']: ' + _scList[_scNextIdx]);
+            bru.setEnvVar('__loopback', 'true');
+            bru.runner.setNextRequest('01. POST Get Offer');
+          } else {
+            console.log('[INFO] ✅ All scenarios complete — run finished');
+            bru.runner.stopExecution();
+          }
+          return;
+        }
+
         // Validate HTTP response status
         test(`HTTP response status — expected 200, actual: ${res.getStatus()}`, () => {
             if (res.getStatus() !== 200) throw new Error("HTTP " + res.getStatus() + " received, expected 200 — see the response body in the HTTP-traffic viewer and any [ERROR]/[WARNING] envelope lines above.");
@@ -285,6 +307,8 @@ runtime:
           const { checkRefundOfferFulfillments, rememberRefundOffersToConfirm } = require(bru.getEnvVar("library_base") + "refunds.js");
           checkRefundOfferFulfillments(jsonData.refundOffers);
           rememberRefundOffersToConfirm(jsonData.refundOffers);
+          // #596: with an overrule code, the offers together refund what was paid.
+          require(bru.getEnvVar("library_base") + "refunds.js").checkOverruleTotal(jsonData.refundOffers);
 
           // Partial-refund alignment check (#218 follow-up).
           // If the scenario armed partial scope AND we didn't have to degrade,

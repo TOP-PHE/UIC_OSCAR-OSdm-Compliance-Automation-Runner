@@ -18,7 +18,7 @@ const { createApp } = require('../src/app');
 
 const PROVIDERS_DIR = path.join(__dirname, '..', 'providers');
 
-// Two clients for alpha, one for beta, and one id, "same-id", that exists on
+// Two clients for alpha, one for beta, one for gamma, and one id, "same-id", that exists on
 // both with different secrets: only the provider tells those two apart. The
 // secrets only exist in the test.
 const SECRETS = {
@@ -30,6 +30,9 @@ const SECRETS = {
   beta: [
     { client_id: 'beta-one', client_secret: 'b1'.repeat(24) },
     { client_id: 'same-id', client_secret: 'b3'.repeat(24) },
+  ],
+  gamma: [
+    { client_id: 'gamma-one', client_secret: 'g1'.repeat(24) },
   ],
 };
 

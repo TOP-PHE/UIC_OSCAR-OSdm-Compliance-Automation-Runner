@@ -60,6 +60,16 @@ test('a profile with a missing or wrong field stops the start', () => {
   assert.throws(() => loadProviders(providersDir({ 'test.json': 'null' })), /must be an object/);
 });
 
+test('overrule codes: gamma lists the four it accepts; a wrong list stops the start (#596)', () => {
+  const providers = loadProviders(PROVIDERS_DIR);
+  assert.deepEqual(providers.get('gamma').overruleCodes, ['CONNECTION_BROKEN', 'PAYMENT_FAILURE', 'SALES_STAFF_ERROR', 'TECHNICAL_FAILURE']);
+  assert.equal(providers.get('alpha').overruleCodes, undefined);
+  for (const wrong of [[], 'STRIKE', ['strike'], ['STRIKE', 'STRIKE'], [7], Array.from({ length: 31 }, (_, i) => `CODE_${i}`)]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ overruleCodes: wrong }) })), /overruleCodes/, JSON.stringify(wrong));
+  }
+  assert.deepEqual(loadProviders(providersDir({ 'test.json': profile({ overruleCodes: ['STRIKE'] }) })).get('test').overruleCodes, ['STRIKE']);
+});
+
 test('a provider key that the router keeps for itself, or that is not a plain name, is refused', () => {
   assert.throws(() => loadProviders(providersDir({ 'healthz.json': profile() })), /not a usable provider key/);
   assert.throws(() => loadProviders(providersDir({ 'Bad Key.json': profile() })), /not a usable provider key/);

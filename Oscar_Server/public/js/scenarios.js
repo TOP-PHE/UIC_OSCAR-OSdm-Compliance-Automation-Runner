@@ -54,6 +54,8 @@ const ENUMS = {
   // fulfillment only. Outbound / inbound only for a return.
   partialRefundByFulfillment:        ['off', 'on'],
   partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound'],
+  // #596: negative probe, the provider must refuse the scenario's overrule code.
+  overruleCodeExpectRejection:       ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -180,6 +182,13 @@ function fwIropsCodesFor(scenarioType) {
   const fw = wizData?.framework || {};
   const codes = fw.iropsCodes?.[key];
   return Array.isArray(codes) ? codes : [];
+}
+// The overrule codes a scenario may pick (#596). Normally those the framework
+// declares; for the refusal probe every listed code, since the point is to
+// send one the provider does not support.
+function overruleCodeChoices(scenarioType, sc) {
+  if (scenarioType !== 'REFUND' || sc?.overruleCodeExpectRejection !== 'on') return [null, ...fwIropsCodesFor(scenarioType)];
+  return [null, ...new Set([...WIZ_IROPS_MANDATORY, ...WIZ_IROPS_OPTIONAL])];
 }
 // Is IROPS enabled for this scenario type in the framework's salesFlows?
 // The gate the wizard uses for the sub-type card (REFUND_IROPS / EXCHANGE_IROPS).
@@ -1530,9 +1539,14 @@ function buildDetailHTML(idx) {
           // offered are intersected with fw.iropsCodes.<type>.
           const scType = state.scenarios[idx]?.scenarioType;
           if (!fwSupportsIrops(scType)) return '';
-          const codes = [null, ...fwIropsCodesFor(scType)];
+          const codes = overruleCodeChoices(scType, state.scenarios[idx]);
+          // The refusal probe (#596) is graded at 10. POST Refund Offers: refunds only.
+          const probe = scType === 'REFUND'
+            ? buildSelect(idx, 'overruleCodeExpectRejection', 'Overrule code refused', ENUMS.overruleCodeExpectRejection,
+              'Negative test (#596). On: the provider is expected to refuse the overrule code above (4xx + RFC-9457 Problem) at 10. POST Refund Offers, and the scenario ends there. Pick a code it does not support; every listed code is offered while this is on.')
+            : '';
           return buildSelect(idx, 'overruleCode', 'Overrule Code', codes,
-            'Reason code used when overruling the refund/exchange policy');
+            'Reason code used when overruling the refund/exchange policy') + probe;
         })()}
         ${buildPartialRefundFields(idx, sc)}
         ${buildText(idx,   'osdmVersion',        'OSDM Version',         'e.g. 3.4')}
@@ -7011,11 +7025,11 @@ document.body.addEventListener('change', function(e) {
       // other way) and the new type doesn't support IROPS or doesn't allow
       // the previously selected code, clear the stale overruleCode and
       // re-render the detail so the UI matches the model.
-      if (field === 'scenarioType') {
+      if (field === 'scenarioType' || field === 'overruleCodeExpectRejection') {
         const sc = state.scenarios[scIdx];
         if (sc) {
-          const codesForNew = fwIropsCodesFor(newVal);
-          const typeSupports = fwSupportsIrops(newVal);
+          const codesForNew = overruleCodeChoices(sc.scenarioType, sc);
+          const typeSupports = fwSupportsIrops(sc.scenarioType);
           if (!typeSupports || !codesForNew.includes(sc.overruleCode)) {
             sc.overruleCode = null;
           }

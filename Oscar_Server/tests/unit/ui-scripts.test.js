@@ -277,6 +277,30 @@ describe('dashboard.html — tenant strings are escaped (S11)', () => {
   });
 });
 
+describe('js/scenarios.js — overruleCodeChoices (#596)', () => {
+  // The refusal probe needs a code the provider does not support, so while it
+  // is on the picker offers every listed code, not only the declared ones.
+  const choices = (sc, type = 'REFUND') => loadFunction('js/scenarios.js', 'overruleCodeChoices', {
+    fwIropsCodesFor: () => ['CONNECTION_BROKEN', 'TECHNICAL_FAILURE'],
+    WIZ_IROPS_MANDATORY: ['CONNECTION_BROKEN', 'STRIKE'],
+    WIZ_IROPS_OPTIONAL: ['PAYMENT_FAILURE', 'STRIKE'],
+  })(type, sc);
+
+  test('the declared codes, with "none" first, when the probe is off or unset', () => {
+    for (const sc of [undefined, {}, { overruleCodeExpectRejection: 'off' }]) {
+      expect(choices(sc)).toEqual([null, 'CONNECTION_BROKEN', 'TECHNICAL_FAILURE']);
+    }
+  });
+
+  test('every listed code, once each, when the probe is on', () => {
+    expect(choices({ overruleCodeExpectRejection: 'on' })).toEqual([null, 'CONNECTION_BROKEN', 'STRIKE', 'PAYMENT_FAILURE']);
+  });
+
+  test('an exchange keeps the declared codes: the probe is a refund step', () => {
+    expect(choices({ overruleCodeExpectRejection: 'on' }, 'EXCHANGE')).toEqual([null, 'CONNECTION_BROKEN', 'TECHNICAL_FAILURE']);
+  });
+});
+
 describe('js/scenarios.js — fwIropsCodesFor', () => {
   // Reads the framework through two optional chains since #526. The answer
   // for a missing or odd framework must stay an empty list.

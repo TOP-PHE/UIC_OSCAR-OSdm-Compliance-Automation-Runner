@@ -19,7 +19,8 @@
  * The amounts follow the flexibility of the parts: a flexible part is refunded
  * in full, a semi-flexible one with a fee of a quarter of its price, a saver
  * one not at all (the fee is its price). An overrule code waives the fee: the
- * whole price is refunded, and the offer says which code it applied.
+ * whole price is refunded, and the offer says which code it applied. A
+ * provider that lists its overrule codes refuses any other (#596).
  */
 
 const crypto = require('node:crypto');
@@ -102,10 +103,14 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs) {
 }
 
 // An overrule code is text the request gave; it is only ever sent back in JSON.
-function overruleCodeOf(body) {
+function overruleCodeOf(body, provider) {
   const code = body.overruleCode;
   if (code == null) return null;
   if (typeof code !== 'string' || code.length === 0 || code.length > 60) throw bad('overruleCode is not valid');
+  if (provider.overruleCodes && !provider.overruleCodes.includes(code)) {
+    throw new HttpError(400, 'OVERRULE_CODE_NOT_SUPPORTED', 'Overrule code not supported',
+      `overruleCode "${code}" is not accepted. Accepted: ${provider.overruleCodes.join(', ')}.`);
+  }
   return code;
 }
 
@@ -116,7 +121,7 @@ function overruleCodeOf(body) {
 function createRefundOffers(booking, body, provider, nowMs) {
   if (booking.fulfillments.length === 0) throw conflict('the booking is not confirmed: it has no fulfillment to refund');
   refuseScopedRefund(body);
-  const overruleCode = overruleCodeOf(body);
+  const overruleCode = overruleCodeOf(body, provider);
   const offers = requestedFulfillments(booking, body).map((f) => buildRefundOffer(booking, f, overruleCode, provider, nowMs));
   booking.refundOffers = [...(booking.refundOffers || []), ...offers];
   return offers;
