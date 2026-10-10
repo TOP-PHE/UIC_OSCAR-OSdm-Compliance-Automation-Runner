@@ -42,7 +42,9 @@ test('every scenario points at entries that exist, and the run list at scenarios
     assert.ok(ids('purchaserList').has(scenario.purchaserListId), scenario.code);
     assert.ok(ids('requestedFulfillmentOptionsList').has(scenario.requestedFulfillmentOptionsListId), scenario.code);
     assert.ok(ids('offerSearchCriteriaList').has(scenario.offerSearchCriteriaListId), scenario.code);
-    assert.equal(scenario.scenarioType, 'SALE', 'the simulator only answers a sale');
+    // A sale, or the refund of one (#595); exchanges are not simulated.
+    assert.ok(['SALE', 'REFUND'].includes(scenario.scenarioType), `${scenario.code}: ${scenario.scenarioType}`);
+    if (scenario.scenarioType === 'REFUND') assert.equal(scenario.scenarioAction, 'PATCH', `${scenario.code}: a refund is confirmed`);
     assert.equal(scenario.shared, true, 'a tester must see the scenario');
     assert.equal(scenario.created_by, undefined, 'the file belongs to no one in particular');
     // The collection checks a passenger against the updated values even when
@@ -76,13 +78,29 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
-  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null);
+  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE');
   assert.equal(returns.length, 5);
   for (const scenario of returns) {
     const model = scenario.offerSearchCriteria.returnModel;
     assert.ok(scenario.code.startsWith(`SIM_RETURN_${model}_`), scenario.code);
     if (model === 'COMBINED') assert.notEqual(scenario.osdmVersion, '3.6.0', 'outboundTripIds is OSDM 3.7 and later');
     assert.equal(scenario.offerSearchCriteria.returnFulfillments, 'PER_DIRECTION');
+  }
+});
+
+test('the refund scenarios refund a return: in full, and the inbound ticket alone', () => {
+  // #595: a return gives one ticket per direction on the simulator, so a full
+  // refund confirms two refund offers and a partial one refunds one ticket.
+  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND');
+  assert.equal(refunds.length, 6);
+  for (const scenario of refunds) {
+    assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
+    const partial = scenario.partialRefundByFulfillment === 'on';
+    assert.equal(partial, scenario.code.startsWith('SIM_REFUND_INBOUND_'), scenario.code);
+    if (partial) assert.equal(scenario.partialRefundFulfillmentSelection, 'inbound');
+    for (const axis of ['partialRefundByLeg', 'partialRefundByPax']) {
+      assert.ok([undefined, 'off', false].includes(scenario[axis]), `${scenario.code}: the provider refuses a scope by leg or passenger`);
+    }
   }
 });
 

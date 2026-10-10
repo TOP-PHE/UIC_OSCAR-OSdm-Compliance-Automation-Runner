@@ -32,6 +32,7 @@ const {
 
 const PARTIAL_LEG_RULE = gatingRules().find(r => r.field === 'partialRefundByLeg');
 const PARTIAL_PAX_RULE = gatingRules().find(r => r.field === 'partialRefundByPax');
+const PARTIAL_FF_RULE = gatingRules().find(r => r.field === 'partialRefundByFulfillment');
 
 describe('gatingRules', () => {
   test('returns the partial-refund pair', () => {
@@ -41,7 +42,7 @@ describe('gatingRules', () => {
   });
 
   test('partialRefund rules require REFUND scenario type and REFUND_PARTIAL flow', () => {
-    for (const r of [PARTIAL_LEG_RULE, PARTIAL_PAX_RULE]) {
+    for (const r of [PARTIAL_LEG_RULE, PARTIAL_PAX_RULE, PARTIAL_FF_RULE]) {
       expect(r.requiresScenarioType).toBe('REFUND');
       expect(r.requiresFlow).toBe('REFUND_PARTIAL');
     }
@@ -81,6 +82,13 @@ describe('isScenarioArmedForField', () => {
 });
 
 describe('scenarioWarnings', () => {
+  test('#595: a partial refund by fulfillment is gated by REFUND_PARTIAL too', () => {
+    const sc = { scenarioType: 'REFUND', partialRefundByFulfillment: 'on' };
+    expect(scenarioWarnings(sc, { salesFlows: ['SALE', 'REFUND_FULL'] })).toEqual(['partialRefundByFulfillment']);
+    expect(scenarioWarnings(sc, { salesFlows: ['REFUND_PARTIAL'] })).toEqual([]);
+    expect(scenarioWarnings({ ...sc, partialRefundByFulfillment: 'off' }, { salesFlows: [] })).toEqual([]);
+  });
+
   test('returns empty array when framework declares the flow', () => {
     const sc = { scenarioType: 'REFUND', partialRefundByLeg: 'on', partialRefundByPax: 'on' };
     const fw = { salesFlows: ['SALE', 'REFUND_FULL', 'REFUND_PARTIAL'] };

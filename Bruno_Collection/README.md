@@ -112,7 +112,9 @@ The scenarios exist once per OSDM version: `_36` for `alpha`, `_37` for
 `api_base` to it and name its scenario with `scenario_override`. Besides the two
 sales there are return journeys (#594): `SIM_RETURN_SEPARATE_1ADT` on every
 version, and `SIM_RETURN_COMBINED_1ADT` (one offer for both directions) from
-3.7, so not on `alpha`.
+3.7, so not on `alpha`. Refunds of a return (#595), on every version:
+`SIM_REFUND_RETURN_1ADT` (full refund, every refund offer confirmed) and
+`SIM_REFUND_INBOUND_1ADT` (the inbound ticket only).
 
 `SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional

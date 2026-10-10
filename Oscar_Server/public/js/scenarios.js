@@ -50,6 +50,10 @@ const ENUMS = {
   partialRefundByPax:             ['off', 'on'],
   partialRefundLegSelection:      ['first', 'last', 'outbound', 'inbound'],
   partialRefundPaxSelection:      ['first', 'last'],
+  // #595: the refund of one whole fulfillment, for providers that refund per
+  // fulfillment only. Outbound / inbound only for a return.
+  partialRefundByFulfillment:        ['off', 'on'],
+  partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -213,7 +217,8 @@ function fwUndeclaredArmedCount() {
   let n = 0;
   for (const sc of scenarios) {
     const t = String(sc?.scenarioType || 'SALE').toUpperCase();
-    if (t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax))
+    if (t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax)
+        || isArmed(sc.partialRefundByFulfillment))
         && !flows.has('REFUND_PARTIAL')) {
       n++;
     }
@@ -1742,7 +1747,8 @@ function buildPartialRefundFields(idx, sc) {
   // banner with a deep-link to Step 1 so the Test Manager can either
   // tick the declaration or unset the scenario flag. Soft: save is not
   // blocked; the runtime emits an equivalent [WARNING].
-  if ((byLegOn || byPaxOn) && !fwDeclaresPartialRefund(sc.scenarioType)) {
+  const byFulfillmentOn = isArmed(sc.partialRefundByFulfillment);
+  if ((byLegOn || byPaxOn || byFulfillmentOn) && !fwDeclaresPartialRefund(sc.scenarioType)) {
     warnings += `<div style="color:#e65100;font-size:12px;margin-top:4px;padding:6px 8px;border:1px solid #ffb74d;border-radius:4px;background:#fff8e1">
       ⚠ Test Framework does not declare <strong>REFUND_PARTIAL</strong> for ${esc(sc.scenarioType || 'REFUND')} scenarios.
       The scenario will still run; runtime will degrade where the wire can't carry the scope.
@@ -1763,6 +1769,7 @@ function buildPartialRefundFields(idx, sc) {
         'When on, scope the refund to one passenger via OSDM RefundSpecification.passengerIds. Requires ≥2 passengers in the booking.')}
       ${byPaxOn ? buildSelect(idx, 'partialRefundPaxSelection', 'Passenger target', ENUMS.partialRefundPaxSelection,
         'Which passenger to refund (first or last in the booking order).') : ''}
+      ${buildRefundByFulfillmentFields(idx, sc, isReturn)}
       ${warnings}
       <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
         Both axes can be combined (per-leg AND per-pax) → refund one passenger on one leg.
@@ -1770,6 +1777,27 @@ function buildPartialRefundFields(idx, sc) {
         OSCAR logs a <code>[WARNING]</code> and degrades to full refund.
       </div>
     </div>`;
+}
+
+// #595: the refund of one whole fulfillment, for providers that refund per
+// fulfillment only (a scope by leg or passenger is refused there). The target
+// is by position or by direction: what a fulfillment holds depends on how the
+// provider divides the booking.
+function buildRefundByFulfillmentFields(idx, sc, isReturnTrip) {
+  const on = isArmed(sc.partialRefundByFulfillment);
+  const hasReturn = isReturnTrip || sc.offerSearchCriteria?.returnOffsetDays != null;
+  const options = hasReturn
+    ? ENUMS.partialRefundFulfillmentSelection
+    : ENUMS.partialRefundFulfillmentSelection.filter(v => v !== 'outbound' && v !== 'inbound');
+  let note = '';
+  if (on && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax))) {
+    note = `<div style="color:#e65100;font-size:12px;margin-top:4px">⚠ Per-fulfillment is on: the per-leg and per-passenger settings are not used.</div>`;
+  }
+  return `${buildSelect(idx, 'partialRefundByFulfillment', 'Per-fulfillment', ENUMS.partialRefundByFulfillment,
+      'When on, refund one whole fulfillment (only fulfillmentIds is sent, no refundSpecifications). For providers that refund per fulfillment. Requires ≥2 fulfillments in the booking.')}
+      ${on ? buildSelect(idx, 'partialRefundFulfillmentSelection', 'Fulfillment target', options,
+        'Which fulfillment: first or last of the booking, or the one holding the outbound or inbound trip of a return.') : ''}
+      ${note}`;
 }
 
 // ── Badge renderer ────────────────────────────────────────────────────────
@@ -6249,6 +6277,8 @@ async function wizGenerateScenario() {
       partialRefundLegSelection: 'first',
       partialRefundByPax: 'off',
       partialRefundPaxSelection: 'first',
+      partialRefundByFulfillment: 'off',
+      partialRefundFulfillmentSelection: 'first',
       ...(sc.type === 'REFUND' ? { refundDate: null } : {}),
       tripRequirementId:                tripId,
       passengersListId:                 paxListId,

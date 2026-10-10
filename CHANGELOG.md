@@ -66,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Issue #621: three moderate advisories in the Bruno CLI tree. Dependencies of
 the Bruno engine only; no server code change. Collection unchanged
-(OTST_V2.0.109).
+(OTST_V2.0.110).
 
 ### Security
 
@@ -87,9 +87,63 @@ the Bruno engine only; no server code change. Collection unchanged
   `--csv-file-path`, which OSCAR does not use) and uuid as `uuid.v4()`; both
   were run with those arguments. The collection was run against the simulator
   with the old and the new tree (sale 3.6 and 3.8, return separate 3.7,
-  return combined 3.8): the same 173, 232, 240 and 281 checks, none failed.
+  return combined 3.8, refund of a whole return 3.8, refund of its inbound
+  ticket 3.7): the same 173, 232, 240, 281, 440 and 371 checks, none failed.
 
 ---
+
+## [server-1.11.225] / [collection-OTST_V2.0.110] — 2026-10-10
+
+Issue #595, release 2026.254. Simulator 0.5.0.
+
+### Fixed
+
+- **A refund given as several refund offers was confirmed for the first one
+  only.** Some providers answer one refund offer per fulfillment; the
+  collection confirmed `refundOffers[0]`, so a "full" refund of a two-ticket
+  return refunded one direction, and the run passed. Every refund offer is now
+  confirmed in turn (`13. PATCH` → `14. GET Booking` → `13. PATCH` …), the
+  booking is checked after each (the confirmed offers' fulfillments
+  `REFUNDED`, the others unchanged), and a full refund ends with "every
+  fulfillment of the booking is refunded".
+- **The partial-refund alignment ignored the fee.** It compared
+  `refundableAmount` with the price of the parts in scope, so a conformant
+  offer that keeps a fee failed it. It now checks `refundableAmount +
+  refundFee` against that price.
+- With an overrule code and one refund offer per fulfillment, the
+  full-restitution identity (`refundableAmount == confirmedPrice`) was asked
+  of each offer. Each now has to waive the fee; the identity is for an offer
+  that covers the whole booking.
+
+### Added
+
+- **Partial refund by fulfillment** (`partialRefundByFulfillment`,
+  `partialRefundFulfillmentSelection`: first, last, outbound, inbound). The
+  refund of one whole fulfillment, sent as `fulfillmentIds` only (no
+  `refundSpecifications`), for providers that refund per fulfillment and
+  refuse a scope by leg or passenger. Outbound and inbound pick the
+  fulfillment holding that trip of a return. It takes precedence over the leg
+  and passenger axes, degrades to a full refund with a WARNING when the booking
+  has one fulfillment, and is gated by `REFUND_PARTIAL` (server
+  `frameworkGating.js` and the Test Config banner) like them.
+  `resolveFulfillmentRefundScope()` in `library-bruno/partialRefund.js`, pure.
+- At `10. POST Refund Offers`: each refund offer names fulfillments of the
+  booking, and no fulfillment is in two offers.
+- Test Config: the *Per-fulfillment* and *Fulfillment target* fields of a
+  refund scenario (server 1.11.225). The data file schema accepts both fields.
+
+### Simulator 0.5.0
+
+- `POST`, `GET /bookings/{id}/refund-offers` and `GET`, `PATCH`, `DELETE
+  /bookings/{id}/refund-offers/{id}`: one refund offer per fulfillment named,
+  holding all its parts; a scope by booking part or passenger is refused
+  (`PARTIAL_REFUND_NOT_SUPPORTED`). Fee by flexibility (none, a quarter, the
+  whole price), waived by an overrule code. Confirming refunds the fulfillment
+  and its parts and lowers the confirmed price; a confirmed refund cannot be
+  withdrawn (409); a proposed one can (204).
+- The data file has, on 3.6, 3.7 and 3.8, the full refund of a return
+  (`SIM_REFUND_RETURN_1ADT`) and the refund of its inbound ticket
+  (`SIM_REFUND_INBOUND_1ADT`).
 
 ## [server-1.11.224] / [collection-OTST_V2.0.109] — 2026-10-10
 

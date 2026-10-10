@@ -138,7 +138,8 @@ runtime:
         // passenger). Gated on partial flags to keep env vars lean for the
         // common full-refund and SALE-only paths.
         if (String(bru.getEnvVar("partialRefundByLeg")) === "true" ||
-            String(bru.getEnvVar("partialRefundByPax")) === "true") {
+            String(bru.getEnvVar("partialRefundByPax")) === "true" ||
+            String(bru.getEnvVar("partialRefundByFulfillment")) === "true") {
             // Prefer the `booking` wrapper if the provider returns one
             // (response shape varies); fall back to the root object.
             const _bk = (jsonData && jsonData.booking) ? jsonData.booking : jsonData;

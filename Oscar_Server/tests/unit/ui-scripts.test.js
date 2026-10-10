@@ -447,6 +447,8 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     ['nothing armed', [{ scenarioType: 'refund', partialRefundByLeg: 'off' }], [], 0],
     ['a SALE scenario is not counted', [{ scenarioType: 'SALE', partialRefundByLeg: 'on' }], [], 0],
     ['two of three', [{ scenarioType: 'Refund', partialRefundByPax: 'yes' }, { scenarioType: 'REFUND', partialRefundByLeg: 1 }, {}], [], 2],
+    ['#595: by fulfillment armed, flow not declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_FULL'], 1],
+    ['#595: by fulfillment armed, flow declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_PARTIAL'], 0],
   ])('fwUndeclaredArmedCount: %s', (_label, scenarios, salesFlows, expected) => {
     const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, state: { scenarios }, wizData: { framework: { salesFlows } } });
     expect(count()).toBe(expected);
@@ -853,5 +855,35 @@ describe('Test Config return model and fulfillments (#594)', () => {
   test('the input delegate stores both fields on the offer criteria', () => {
     expect(source).toContain("case 'set-offer-return-model':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); break;");
     expect(source).toContain("case 'set-offer-return-fulfillments':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); break;");
+  });
+});
+
+// #595: the per-fulfillment axis of a partial refund in Test Config.
+describe('Test Config partial refund per fulfillment (#595)', () => {
+  const source = read('js/scenarios.js');
+  const ENUMS = vm.runInNewContext(`({ partialRefundByFulfillment: ['off', 'on'], partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound'] })`);
+  const isArmed = loadFunction('js/scenarios.js', 'isArmed');
+  const buildSelect = (idx, field, label, options) => `[${field}:${options.join('|')}]`;
+  const render = loadFunction('js/scenarios.js', 'buildRefundByFulfillmentFields', { ENUMS, isArmed, buildSelect });
+
+  test('the ENUMS of the page are the ones the data file schema accepts', () => {
+    const schema = require('../../../Bruno_Collection/json_validator/datafile.schema.json');
+    const props = JSON.stringify(schema);
+    expect(source).toContain("partialRefundFulfillmentSelection: ['first', 'last', 'outbound', 'inbound']");
+    expect(props).toContain('"partialRefundFulfillmentSelection"');
+    expect(props).toContain('"partialRefundByFulfillment"');
+  });
+
+  test('off: only the switch; on: the target, with outbound/inbound only for a return', () => {
+    expect(render(0, { partialRefundByFulfillment: 'off' }, false)).not.toContain('partialRefundFulfillmentSelection');
+    expect(render(0, { partialRefundByFulfillment: 'on' }, false)).toContain('[partialRefundFulfillmentSelection:first|last]');
+    expect(render(0, { partialRefundByFulfillment: 'on', offerSearchCriteria: { returnOffsetDays: 2 } }, false))
+      .toContain('[partialRefundFulfillmentSelection:first|last|outbound|inbound]');
+    expect(render(0, { partialRefundByFulfillment: true }, true)).toContain('outbound|inbound');
+  });
+
+  test('on together with per-leg or per-passenger: says those are not used', () => {
+    expect(render(0, { partialRefundByFulfillment: 'on', partialRefundByPax: 'on' }, false)).toContain('not used');
+    expect(render(0, { partialRefundByFulfillment: 'off', partialRefundByPax: 'on' }, false)).not.toContain('not used');
   });
 });

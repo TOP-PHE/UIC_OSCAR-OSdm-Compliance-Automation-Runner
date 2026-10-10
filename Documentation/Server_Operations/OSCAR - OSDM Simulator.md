@@ -175,7 +175,10 @@ rebuilds its Test Framework from the file.
    OSDM version: `SIM_SALE_SEARCH_1ADT_36` and `SIM_SALE_SEARCH_2ADT_SAVER_36`
    for `alpha`, `…_37` for `beta`, `…_38` for `gamma`, and return journeys
    (#594): `SIM_RETURN_SEPARATE_1ADT_…` on each version and
-   `SIM_RETURN_COMBINED_1ADT_…` (one offer for both directions) on 3.7 and 3.8.
+   `SIM_RETURN_COMBINED_1ADT_…` (one offer for both directions) on 3.7 and 3.8,
+   and refunds of a return (#595): `SIM_REFUND_RETURN_1ADT_…` (full: each
+   refund offer, one per ticket, is confirmed) and `SIM_REFUND_INBOUND_1ADT_…`
+   (the inbound ticket only) on each version.
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
