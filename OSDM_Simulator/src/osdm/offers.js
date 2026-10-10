@@ -13,6 +13,14 @@
  * There is no timetable. The trip is built from the request: the same origin,
  * destination and time always give the same trip and the same prices, and a
  * different provider gives a different carrier, currency, price and id prefix.
+ *
+ * A return is answered in both of the OSDM ways (#594):
+ *  - separate directions: the inbound search names the outbound offer it goes
+ *    with (`returnSearchParameters.outwardOfferIds`), and gets inbound offers;
+ *  - both directions: the inbound search names the outbound trip
+ *    (`returnSearchParameters.outboundTripIds`, OSDM 3.7 and later), and gets
+ *    offers that cover the outbound and the inbound trip, with a return price.
+ * An id this client was not given is refused, as is naming both.
  */
 
 const crypto = require('node:crypto');
@@ -32,6 +40,8 @@ const FLEXIBILITIES = [
 const TRAVEL_CLASSES = { SECOND: 1, FIRST: 1.5 };
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
 const PRODUCT_CATEGORY = { productCategoryRef: 'urn:x_osdm_simulator:product-category:IC', name: 'InterCity', shortName: 'IC' };
+// An offer that covers both directions costs this share of two single ones.
+const RETURN_FACTOR = 0.9;
 
 const bad = (detail) => new HttpError(400, 'VALIDATION_ERROR', 'The offer request is not valid', detail);
 const randomId = () => crypto.randomBytes(8).toString('hex');
@@ -205,11 +215,23 @@ function fulfillmentOptionsOf(body) {
   return options.length > 0 ? options : DEFAULT_FULFILLMENT_OPTIONS;
 }
 
-function buildOffer({ trip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
-  const coverage = { coveredTripId: trip.id, coveredLegIds: trip.legs.map((leg) => leg.id) };
+const coverageOf = (trip) => ({ coveredTripId: trip.id, coveredLegIds: trip.legs.map((leg) => leg.id) });
+
+// The price of one passenger for one trip.
+function priceOfTrip(trip, flexibility, travelClass, provider) {
   const seed = hashOf(`${trip.origin.stopPlaceRef}|${trip.destination.stopPlaceRef}`);
   const baseCents = 1500 + (seed.readUInt16BE(4) % 8500);
-  const perPassenger = Math.round(baseCents * flexibility.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor);
+  return Math.round(baseCents * flexibility.factor * TRAVEL_CLASSES[travelClass] * provider.priceFactor);
+}
+
+// An offer for `trip`, or, given `inboundTrip`, for both directions: one
+// admission per passenger and direction, each covering its own trip.
+function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
+  const coverage = coverageOf(trip);
+  const directions = inboundTrip ? [trip, inboundTrip] : [trip];
+  const factor = inboundTrip ? RETURN_FACTOR : 1;
+  const priceFor = (t) => Math.round(priceOfTrip(t, flexibility, travelClass, provider) * factor);
+  const perPassenger = directions.reduce((total, t) => total + priceFor(t), 0);
   const price = (amount) => ({ amount, currency: provider.currency, scale: 2 });
   const createdOn = new Date(nowMs).toISOString();
   const serviceClass = travelClass === 'FIRST' ? { type: 'HIGH', name: 'First' } : { type: 'STANDARD', name: 'Standard' };
@@ -224,26 +246,26 @@ function buildOffer({ trip, passengers, flexibility, travelClass, fulfillmentOpt
     travelClass,
     isTrainBound: flexibility.key === 'NON_FLEXIBLE',
   };
-  const admissionOfferParts = passengers.map((passenger) => ({
+  const admissionOfferParts = directions.flatMap((t) => passengers.map((passenger) => ({
     objectType: 'AdmissionOfferPart',
     id: `${provider.idPrefix}-ADM-${randomId()}`,
     summary: `${product.summary}, ${serviceClass.name} class`,
     createdOn,
-    validFrom: trip.startTime,
-    validUntil: trip.endTime,
-    price: price(perPassenger),
-    tripCoverage: coverage,
+    validFrom: t.startTime,
+    validUntil: t.endTime,
+    price: price(priceFor(t)),
+    tripCoverage: coverageOf(t),
     offerMode: 'INDIVIDUAL',
     isReusable: false,
     passengerRefs: [passenger.externalRef],
     refundable: flexibility.refundable,
     exchangeable: flexibility.exchangeable,
     summaryProductId: product.id,
-    products: [{ productId: product.id, legIds: coverage.coveredLegIds }],
+    products: [{ productId: product.id, legIds: coverageOf(t).coveredLegIds }],
     availableFulfillmentOptions: fulfillmentOptions,
     isReservationRequired: false,
-  }));
-  return {
+  })));
+  const offer = {
     offerId: `${provider.idPrefix}-OFR-${randomId()}`,
     summary: `${product.summary}, ${serviceClass.name} class`,
     offerSummary: {
@@ -259,32 +281,77 @@ function buildOffer({ trip, passengers, flexibility, travelClass, fulfillmentOpt
     tripCoverage: coverage,
     admissionOfferParts,
   };
+  if (inboundTrip) offer.inboundTripCoverage = coverageOf(inboundTrip);
+  return offer;
 }
+
+// What a return request asks, from the trip it searches with:
+// { outwardOfferIds } (separate directions), { outboundTripIds } (both
+// directions), or null. A date of a later inbound journey (first call) is no
+// return request of its own.
+function returnOf(body) {
+  const params = body.tripSearchCriteria?.returnSearchParameters
+    ?? (Array.isArray(body.tripSpecifications) ? body.tripSpecifications[0]?.returnSearchParameters : undefined);
+  if (params == null) return null;
+  if (typeof params !== 'object' || Array.isArray(params)) throw bad('returnSearchParameters is not valid');
+  const ids = (field) => {
+    const value = params[field];
+    if (value == null) return null;
+    if (!Array.isArray(value) || value.length === 0 || value.length > MAX_TRIPS) throw bad(`returnSearchParameters.${field} must hold 1 to ${MAX_TRIPS} ids`);
+    return value.map((id, i) => ref(id, `returnSearchParameters.${field}[${i}]`));
+  };
+  const outwardOfferIds = ids('outwardOfferIds');
+  const outboundTripIds = ids('outboundTripIds');
+  if (outwardOfferIds && outboundTripIds) throw bad('returnSearchParameters: give outwardOfferIds or outboundTripIds, not both');
+  if (outwardOfferIds) return { outwardOfferIds };
+  if (outboundTripIds) return { outboundTripIds };
+  return null;
+}
+
+const notGiven = (field, id) => bad(`returnSearchParameters.${field}: "${id}" is not one this client was given`);
 
 /**
  * The OfferCollectionResponse for this request and provider, and what has to
- * be remembered of each offer for the booking that may follow.
+ * be remembered of each offer for the booking that may follow. `known` reads
+ * back what this client was given before: `known.offer(id)`, `known.trip(id)`;
+ * only a return request uses it.
  */
-function buildOfferCollection(body, provider, nowMs) {
+function buildOfferCollection(body, provider, nowMs, known = {}) {
   const trips = tripsOf(body, provider);
   const passengers = passengersOf(body);
+  const asked = returnOf(body);
+  if (asked?.outwardOfferIds) {
+    for (const id of asked.outwardOfferIds) if (!known.offer?.(id)) throw notGiven('outwardOfferIds', id);
+  }
+  const outboundTrips = [];
+  for (const id of asked?.outboundTripIds || []) {
+    const outbound = known.trip?.(id);
+    if (!outbound) throw notGiven('outboundTripIds', id);
+    outboundTrips.push(outbound);
+  }
+  if (asked) for (const trip of trips) trip.direction = 'IN_BOUND';
   const criteria = body.offerSearchCriteria;
   const flexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
   const classes = wanted(criteria, 'travelClass', Object.keys(TRAVEL_CLASSES)) || ['SECOND'];
   const fulfillmentOptions = fulfillmentOptionsOf(body);
   const offers = [];
   const remembered = [];
-  for (const trip of trips) {
+  // Both directions: one offer covers an outbound trip and an inbound one.
+  const pairs = outboundTrips.length > 0
+    ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
+    : trips.map((trip) => ({ trip }));
+  for (const { trip, inboundTrip } of pairs) {
     for (const travelClass of classes) {
       for (const flexibility of FLEXIBILITIES) {
         if (flexibilities && !flexibilities.includes(flexibility.key)) continue;
-        const offer = buildOffer({ trip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
+        const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
         offers.push(offer);
-        remembered.push({ offer, trip, passengers });
+        remembered.push({ offer, trips: inboundTrip ? [trip, inboundTrip] : [trip], passengers });
       }
     }
   }
-  return { response: { anonymousPassengerSpecifications: passengers, trips, offers }, remembered };
+  const allTrips = [...outboundTrips, ...trips];
+  return { response: { anonymousPassengerSpecifications: passengers, trips: allTrips, offers }, remembered, trips: allTrips };
 }
 
 module.exports = { buildOfferCollection, OFFER_LIFETIME_MS };

@@ -7,6 +7,8 @@
  * purchaser and after-sales requests. Pure assembly — no assertions.
  */
 const { parseEnvJson } = require('./envUtils.js');
+const { getComplianceVersion } = require('./osdmVersion.js');
+const { normaliseReturnModel, returnUsesInboundDate, localDateTime, buildInboundOfferRequest } = require('./returnJourney.js');
 
 module.exports = {
   buildOfferCollectionRequest,
@@ -41,50 +43,34 @@ function withPaxoneOfferSearchCriteriaDefaults(osc) {
   return out;
 }
 
-// Two-step return (#178): does this scenario's outbound search request a return?
-// We detect it from the outbound tripSearchCriteria the scenarioParser built —
-// returnSearchParameters.inwardReturnDate is present only for return scenarios.
-// (Return is supported for SEARCH outbounds; SPECIFICATION returns are out of
-// scope — there's no return train spec in the test data.)
-function returnInwardDateFromOutbound() {
-  try {
-    const tsc = parseEnvJson("offerTripSearchCriteria", {});
-    const d = tsc && tsc.returnSearchParameters && tsc.returnSearchParameters.inwardReturnDate;
-    return (typeof d === "string" && d) ? d : null;
-  } catch { return null; }
-}
-
-// Build the INWARD (return) offer request — OSDM two-step return, leg 2.
-// Reuses the outbound tripSearchCriteria but swaps origin/destination, sets the
-// departureTime to the inwardReturnDate, and relates it to the chosen outbound
-// offer via returnSearchParameters.outwardOfferIds. Passengers / offer criteria
-// / fulfillment are the same as the outbound. Returns true when a body was
-// built (i.e. this is a return scenario), false otherwise.
+// Two-step return (#178, #594), leg 2 — the INWARD (return) offer request.
+// Same passengers, offer criteria and fulfillment options as the outbound; the
+// trip is the outbound search turned round, leaving at the inbound date, and
+// returnSearchParameters names what was chosen on the outbound call:
+//   SEPARATE  outwardOfferIds = the outbound offer (+ outwardOfferTag before 3.7)
+//   COMBINED  outboundTripIds = the outbound offer's trip (OSDM 3.7 and later)
+// Returns true when a body was built, false otherwise.
 function buildReturnOfferCollectionRequest() {
   validationLogger("[DEBUG] ➤ buildReturnOfferCollectionRequest");
-  const inwardReturnDate = returnInwardDateFromOutbound();
-  const outboundOfferId  = bru.getEnvVar("outboundOfferId");
-  if (!inwardReturnDate || !outboundOfferId) {
-    validationLogger("[WARN] buildReturnOfferCollectionRequest — not a return scenario or missing outbound offer; skipping.");
+  const model = normaliseReturnModel(bru.getEnvVar("returnModel"));
+  const { body: tripPart, reason } = buildInboundOfferRequest({
+    model,
+    outboundCriteria: parseEnvJson("offerTripSearchCriteria", {}),
+    inboundDateTime: bru.getEnvVar("returnInboundDate"),
+    outboundOfferId: bru.getEnvVar("outboundOfferId"),
+    outboundOfferTag: bru.getEnvVar("outboundOfferTag"),
+    outboundTripId: bru.getEnvVar("outboundTripId"),
+    version: getComplianceVersion(),
+  });
+  if (!tripPart) {
+    validationLogger(`[WARNING] buildReturnOfferCollectionRequest — ${reason}; the inbound offer request is not built.`);
     return false;
   }
-
-  const outboundTsc = parseEnvJson("offerTripSearchCriteria", {});
-  // Swap O&D for the return leg; drop the outbound's vehicle/carrier filter
-  // (the return is an open search) and the inwardReturnDate.
-  const inboundTsc = {
-    departureTime: inwardReturnDate,
-    origin: outboundTsc.destination,
-    destination: outboundTsc.origin,
-    returnSearchParameters: { outwardOfferIds: [outboundOfferId] }
-  };
-  const outboundTag = bru.getEnvVar("outboundOfferTag");
-  if (outboundTag) inboundTsc.returnSearchParameters.outwardOfferTag = outboundTag;
 
   const sandbox = bru.getEnvVar("api_base") || "";
   const isPaxone = sandbox.includes("paxone");
   const body = {
-    tripSearchCriteria: inboundTsc,
+    tripSearchCriteria: tripPart.tripSearchCriteria,
     anonymousPassengerSpecifications: parseEnvJson("offerPassengerSpecifications"),
     offerSearchCriteria: parseEnvJson("offerSearchCriteria")
   };
@@ -100,7 +86,8 @@ function buildReturnOfferCollectionRequest() {
   }
 
   bru.setEnvVar("ReturnOfferCollectionRequest", JSON.stringify(body));
-  validationLogger(`[INFO] 🔁 Return (inward) offer request built — ${inboundTsc.origin && inboundTsc.origin.stopPlaceRef} → ${inboundTsc.destination && inboundTsc.destination.stopPlaceRef} on ${inwardReturnDate}, outwardOfferIds=[${outboundOfferId}]`);
+  const tsc = body.tripSearchCriteria;
+  validationLogger(`[INFO] 🔁 Return (inward) offer request built — ${model}: ${tsc.origin && tsc.origin.stopPlaceRef} → ${tsc.destination && tsc.destination.stopPlaceRef} on ${tsc.departureTime}, returnSearchParameters ${JSON.stringify(tsc.returnSearchParameters)}`);
   return true;
 }
 
@@ -128,6 +115,12 @@ function buildOfferCollectionRequest() {
   // PAXONE requires offerSearchCriteria.currency + .offerMode (422 if absent).
   if (isPaxone) {
     body.offerSearchCriteria = withPaxoneOfferSearchCriteriaDefaults(body.offerSearchCriteria);
+  }
+  // #594: from OSDM 3.7 the date of the inbound journey of a return goes here
+  // (before, in the trip's returnSearchParameters.inwardReturnDate).
+  const inboundDate = bru.getEnvVar("returnInboundDate");
+  if (inboundDate && returnUsesInboundDate(getComplianceVersion())) {
+    body.offerSearchCriteria = Object.assign({}, body.offerSearchCriteria, { inboundDate: localDateTime(inboundDate) });
   }
 
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");

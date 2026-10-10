@@ -863,6 +863,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `refunds.js` `getBookingRefundResponse` is called by no request (its
   `bookedOffers[0]` / `refundOffers[0]` lookups would need the same treatment
   if it is wired in).
+- **A return is two offer calls, in one of two models** (#594, 1.11.224 /
+  OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
+  - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
+    offers; **COMBINED** names the outbound trip (`outboundTripIds`, OSDM 3.7+),
+    and the chosen offer covers both trips and is booked alone, so
+    `inboundOfferId` stays unset and the booking takes the one-way path.
+  - **A return scenario is one with `returnInboundDate`**, set by the parser
+    from `returnOffsetDays`. From 3.7 the date goes in
+    `offerSearchCriteria.inboundDate`, so do not look for
+    `returnSearchParameters.inwardReturnDate` on the trip to detect a return.
+  - The outbound trip is taken at step 01 from the chosen offer's
+    `tripCoverage` (else its first part's) into `outboundTripId`.
+  - Model and version come from the OSDM 3.6/3.7/3.8 files: 3.6 has neither
+    `outboundTripIds`, `inboundDate` nor `inboundTripCoverage`.
+  - `admissionReservationAncillaryBookingPartsIds` holds every part of the
+    booking, including those no part of the selected offer pairs with (the
+    other direction of a two-offer return), each once.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

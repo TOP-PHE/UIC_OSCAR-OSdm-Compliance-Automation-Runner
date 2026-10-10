@@ -205,8 +205,13 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     }
     if (resource === 'offers' && rest.length === 0) {
       requireMethod(req, 'POST');
-      const { response, remembered } = buildOfferCollection(await bodyOf(req), provider, now());
+      const known = {
+        offer: (id) => store.get('offer', scope, id),
+        trip: (id) => store.get('trip', scope, id),
+      };
+      const { response, remembered, trips } = buildOfferCollection(await bodyOf(req), provider, now(), known);
       for (const entry of remembered) store.put('offer', scope, entry.offer.offerId, entry);
+      for (const trip of trips) store.put('trip', scope, trip.id, trip);
       return response;
     }
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);

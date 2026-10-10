@@ -180,49 +180,89 @@ describe('buildBookingRequest', () => {
   });
 });
 
-describe('buildReturnOfferCollectionRequest (#178)', () => {
-  test('builds the inward request: O&D swapped, departureTime = inwardReturnDate, outwardOfferIds set', () => {
-    setEnv({
-      api_base: 'https://sqills-osdm-test.cloud',
-      offerTripSearchCriteria: JSON.stringify({
-        departureTime: '2026-06-03T09:22:00',
-        origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5457076' },
-        destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5454300' },
-        returnSearchParameters: { inwardReturnDate: '2026-06-05T09:22:00' }
-      }),
-      outboundOfferId: 'OUT-1',
-      offerPassengerSpecifications: '[{"externalRef":"PAX1","type":"PERSON"}]',
-      offerSearchCriteria: '{}',
-      offerFulfillmentOptions: '[{"type":"ETICKET","media":"PDF_A4"}]',
-    });
-    const ok = rb.buildReturnOfferCollectionRequest();
-    expect(ok).toBe(true);
+describe('buildReturnOfferCollectionRequest (#178, #594)', () => {
+  const outbound = {
+    departureTime: '2026-06-03T09:22:00',
+    origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5457076' },
+    destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:5454300' },
+  };
+  const common = {
+    api_base: 'https://sqills-osdm-test.cloud',
+    offerTripSearchCriteria: JSON.stringify(outbound),
+    returnInboundDate: '2026-06-05T09:22:00',
+    outboundOfferId: 'OUT-1',
+    outboundTripId: 'TRIP-OUT',
+    offerPassengerSpecifications: '[{"externalRef":"PAX1","type":"PERSON"}]',
+    offerSearchCriteria: '{}',
+    offerFulfillmentOptions: '[{"type":"ETICKET","media":"PDF_A4"}]',
+  };
+
+  test('SEPARATE: O&D swapped, departureTime = the inbound date, outwardOfferIds set', () => {
+    setEnv({ ...common, osdmVersion: '3.5.0' });
+    expect(rb.buildReturnOfferCollectionRequest()).toBe(true);
     const body = JSON.parse(store.ReturnOfferCollectionRequest);
     expect(body.tripSearchCriteria.departureTime).toBe('2026-06-05T09:22:00');
     expect(body.tripSearchCriteria.origin.stopPlaceRef).toBe('urn:uic:stn:5454300');      // swapped
     expect(body.tripSearchCriteria.destination.stopPlaceRef).toBe('urn:uic:stn:5457076'); // swapped
-    expect(body.tripSearchCriteria.returnSearchParameters.outwardOfferIds).toEqual(['OUT-1']);
-    expect(body.tripSearchCriteria.returnSearchParameters.inwardReturnDate).toBeUndefined();
+    expect(body.tripSearchCriteria.returnSearchParameters).toEqual({ outwardOfferIds: ['OUT-1'] });
     expect(body.anonymousPassengerSpecifications).toHaveLength(1);
     expect(body.requestedFulfillmentOptions[0].type).toBe('ETICKET');
   });
 
-  test('returns false for a one-way scenario (no returnSearchParameters)', () => {
-    setEnv({
-      api_base: 'https://x',
-      offerTripSearchCriteria: '{"departureTime":"2026-06-03T09:22:00","origin":{},"destination":{}}',
-      outboundOfferId: 'OUT-1',
-    });
+  test('SEPARATE: the outward offer tag only before 3.7 (deprecated since)', () => {
+    setEnv({ ...common, osdmVersion: '3.6.0', outboundOfferTag: 'TAG' });
+    rb.buildReturnOfferCollectionRequest();
+    expect(JSON.parse(store.ReturnOfferCollectionRequest).tripSearchCriteria.returnSearchParameters.outwardOfferTag).toBe('TAG');
+    setEnv({ osdmVersion: '3.7.0' });
+    rb.buildReturnOfferCollectionRequest();
+    expect(JSON.parse(store.ReturnOfferCollectionRequest).tripSearchCriteria.returnSearchParameters).toEqual({ outwardOfferIds: ['OUT-1'] });
+  });
+
+  test('COMBINED: outboundTripIds = the outbound trip, nothing else', () => {
+    setEnv({ ...common, osdmVersion: '3.8.0', returnModel: 'COMBINED' });
+    expect(rb.buildReturnOfferCollectionRequest()).toBe(true);
+    const tsc = JSON.parse(store.ReturnOfferCollectionRequest).tripSearchCriteria;
+    expect(tsc.returnSearchParameters).toEqual({ outboundTripIds: ['TRIP-OUT'] });
+    expect(tsc.origin.stopPlaceRef).toBe('urn:uic:stn:5454300');
+  });
+
+  test('returns false for a one-way scenario (no inbound date)', () => {
+    setEnv({ ...common, returnInboundDate: undefined });
     expect(rb.buildReturnOfferCollectionRequest()).toBe(false);
     expect(store.ReturnOfferCollectionRequest).toBeUndefined();
   });
 
-  test('returns false when the outbound offer was not captured', () => {
-    setEnv({
-      api_base: 'https://x',
-      offerTripSearchCriteria: JSON.stringify({ returnSearchParameters: { inwardReturnDate: '2026-06-05T09:22:00' } }),
-    });
+  test('returns false when the outbound offer, or its trip for COMBINED, was not captured', () => {
+    setEnv({ ...common, outboundOfferId: undefined });
     expect(rb.buildReturnOfferCollectionRequest()).toBe(false);
+    setEnv({ ...common, returnModel: 'COMBINED', outboundTripId: undefined });
+    expect(rb.buildReturnOfferCollectionRequest()).toBe(false);
+  });
+});
+
+describe('buildOfferCollectionRequest: the inbound date of a return (#594)', () => {
+  const env = {
+    TripType: 'SEARCH',
+    api_base: 'https://x',
+    offerTripSearchCriteria: '{"departureTime":"2026-06-03T09:22:00"}',
+    offerPassengerSpecifications: '[{"externalRef":"00001","type":"PERSON"}]',
+    offerSearchCriteria: '{"currency":"EUR"}',
+    offerFulfillmentOptions: '',
+    returnInboundDate: '2026-06-05T09:22:00+01:00',
+  };
+  test('from 3.7: offerSearchCriteria.inboundDate, as a local date-time', () => {
+    setEnv({ ...env, osdmVersion: '3.7.0' });
+    rb.buildOfferCollectionRequest();
+    expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria).toEqual({ currency: 'EUR', inboundDate: '2026-06-05T09:22:00' });
+  });
+  test('before 3.7, or one-way: no inboundDate', () => {
+    setEnv({ ...env, osdmVersion: '3.6.0' });
+    rb.buildOfferCollectionRequest();
+    expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria).toEqual({ currency: 'EUR' });
+    store = {};
+    setEnv({ ...env, osdmVersion: '3.8.0', returnInboundDate: undefined });
+    rb.buildOfferCollectionRequest();
+    expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria).toEqual({ currency: 'EUR' });
   });
 });
 

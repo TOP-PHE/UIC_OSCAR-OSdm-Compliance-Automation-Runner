@@ -147,20 +147,22 @@ runtime:
         // is kept as an OR-fallback for backward compatibility. When the gate is
         // off (every current scenario) we route straight to Create Booking and
         // set skipPlaceMaps — the historic behaviour, unchanged.
-        // ── Two-step return (#178) ────────────────────────────────────────────
+        // ── Two-step return (#178, #594) ──────────────────────────────────────
         // On the OUTBOUND offer of a return scenario, capture the chosen outbound
-        // offer and route to the inward (return) offer step BEFORE booking.
-        // Detected from the outbound tripSearchCriteria's
-        // returnSearchParameters.inwardReturnDate (SEARCH returns only).
-        const _isReturn = (function () {
-          try {
-            const t = JSON.parse(bru.getEnvVar("offerTripSearchCriteria") || "{}");
-            return !!(t.returnSearchParameters && t.returnSearchParameters.inwardReturnDate);
-          } catch (_) { return false; }
-        })();
+        // offer and its trip, and route to the inward (return) offer step BEFORE
+        // booking. A return scenario is one the scenarioParser gave an inbound
+        // date (returnInboundDate; SEARCH returns only).
+        const _isReturn = !!bru.getEnvVar("returnInboundDate");
 
         if (_isReturn && bru.getEnvVar("__returnInboundDone") !== "true") {
           bru.setEnvVar("outboundOfferId", bru.getEnvVar("offerId"));
+          // The chosen offer's trip, for returnSearchParameters.outboundTripIds
+          // (COMBINED): its tripCoverage, else its first part's.
+          const _chosen = (jsonData.offers || []).find((o) => o && o.offerId === bru.getEnvVar("offerId")) || {};
+          const _firstPart = (_chosen.admissionOfferParts || [])[0] || {};
+          const _tripId = (_chosen.tripCoverage && _chosen.tripCoverage.coveredTripId)
+            || (_firstPart.tripCoverage && _firstPart.tripCoverage.coveredTripId) || null;
+          bru.setEnvVar("outboundTripId", _tripId);
           bru.setGlobalEnvVar("skipPlaceMaps", true);
           console.log("[INFO] 🔁 Return scenario — outbound offer captured (" + bru.getEnvVar("offerId") + "); fetching the inward (return) offer.");
           bru.runner.setNextRequest("01b. POST Get Return Offer");

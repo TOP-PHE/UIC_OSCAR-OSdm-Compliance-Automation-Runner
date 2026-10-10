@@ -205,6 +205,17 @@ describe('#550 — booked parts are paired with offer parts by content', () => {
     expect(r.filter((x) => !x.ok)).toEqual([]);
     expect(l).toContain('[INFO] admission: the booking has 1 part(s) that no part of the selected offer pairs with: id=booked-adm-9, passenger types ADULT');
   });
+
+  test('#594: such a part is still a part of the booking, so a fulfillment may hold it; each id once', () => {
+    // A return booked as two offers: the parts of the other direction pair with
+    // no part of the selected offer, and the outbound ticket holds them.
+    const extra = { ...bookedPart({ ref: 'PAX9', type: 'ADULT', amount: 1 }, 8) };
+    const { ids } = run(OFFER, [extra, ...BOOKED]);
+    expect(ids).toContain('booked-adm-9');
+    expect(ids).toHaveLength(BOOKED.length + 1);
+    // Read again (07 after 05), nothing is listed twice.
+    expect(run(OFFER, [extra, ...BOOKED]).ids).toHaveLength(BOOKED.length + 1);
+  });
 });
 
 describe('#550 — pairOfferParts', () => {

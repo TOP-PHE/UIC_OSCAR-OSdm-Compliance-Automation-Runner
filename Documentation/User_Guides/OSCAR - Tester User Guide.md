@@ -341,10 +341,26 @@ Leave empty for a **one‑way**. To make it a **return**, set:
 - **Return time** (optional `HH:MM`) — overrides the time‑of‑day; otherwise the
   outbound departure time is mirrored.
 
-Under the hood this becomes `returnSearchParameters.inwardReturnDate` and triggers
-the **two‑step return** (outbound offer → inward offer → round‑trip booking). If a
-vendor rejects a combined two‑offer booking, OSCAR automatically falls back to two
-separate bookings and records a trackable finding (issue #180).
+- **Return model** — what the second offer call names (issue #594):
+  - *Separate directions* (default): the chosen outbound offer
+    (`returnSearchParameters.outwardOfferIds`). The provider answers with
+    inbound offers, and OSCAR books the outbound and the inbound offer together.
+  - *Both directions in one offer* (OSDM 3.7 and later): the chosen outbound
+    trip (`returnSearchParameters.outboundTripIds`). The provider answers with
+    offers that cover both trips (`tripCoverage` + `inboundTripCoverage`), and
+    OSCAR books that one offer.
+- **Return fulfillments** (optional) — how many fulfillments the confirmed
+  booking should have: one for the whole return, one per direction, or one per
+  passenger. Empty = not checked.
+
+The return date goes with the first offer call: from OSDM 3.7 as
+`offerSearchCriteria.inboundDate`, before as the deprecated
+`returnSearchParameters.inwardReturnDate`. Then comes the **two‑step return**
+(outbound offer → inward offer → booking). OSCAR checks the second answer
+against the first: a trip goes back, the passengers are the same, and the
+offers cover what the model says. If a vendor rejects a combined two‑offer
+booking, OSCAR automatically falls back to two separate bookings and records a
+trackable finding (issue #180); the fulfillment count is then not checked.
 
 ### 4.5 Sales‑flow actions (optional opt‑in steps)
 
@@ -833,7 +849,9 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Scenario type | `SALE` / `REFUND` / `EXCHANGE` | Which flow runs |
 | Origin / Destination | station URN | `POST /offers` trip |
 | Departure date | dynamic (`%TRIP_DATE%`) | `POST /offers` `departureTime` |
-| Return offset (days) + return time | `0,1,2…` + `HH:MM` | `returnSearchParameters.inwardReturnDate` |
+| Return offset (days) + return time | `0,1,2…` + `HH:MM` | `offerSearchCriteria.inboundDate` (3.7+) or `returnSearchParameters.inwardReturnDate` |
+| Return model | separate directions / both directions in one offer | inbound call: `returnSearchParameters.outwardOfferIds` / `.outboundTripIds` |
+| Return fulfillments | not checked / one / per direction / per passenger | check after confirmation |
 | Currency | `EUR`, … | `offerSearchCriteria.currency` |
 | Service class | `STANDARD` `BEST` `HIGH` `BASIC` `ANY_CLASS` | `offerSearchCriteria` |
 | Travel class | `FIRST` `SECOND` `ANY_CLASS` | `offerSearchCriteria` |

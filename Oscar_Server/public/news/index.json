@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-return-both-models",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Return journeys: both OSDM models, and the inbound date of OSDM 3.7",
+    "summary": "A return scenario can now ask for offers that cover both directions in one offer (OSDM 3.7 and later), as well as one offer per direction. OSCAR checks the inbound answer against the outbound one, and can check the number of tickets.",
+    "content": "OSDM has two ways to sell a return journey. In both, OSCAR makes two offer calls: the outbound search, then the inbound one. Until now the second call always named the outbound offer and booked two offers. Some providers instead expect it to name the outbound trip, and answer with offers that cover both directions; that model can now be chosen.\n\nIn Test Config, a scenario with a return trip has two more fields: \"Return model\" (separate directions, the default, or both directions in one offer) and \"Return fulfillments\" (not checked, one for the whole return, one per direction, or one per passenger).\n\nOSCAR now checks the inbound answer: a trip goes back the other way, the passengers are those of the outbound search, and the offers cover what the model says. Before, it only checked that offers came back.\n\nFrom OSDM 3.7 the date of the return journey is sent as offerSearchCriteria.inboundDate, which replaces the deprecated returnSearchParameters.inwardReturnDate; scenarios on an older version keep sending the old field.\n\nNo action is required: existing return scenarios keep the separate-directions model."
+  },
+  {
     "id": "2026-10-09-datafile-round-trip",
     "date": "October 9, 2026",
     "tag": "Fix",

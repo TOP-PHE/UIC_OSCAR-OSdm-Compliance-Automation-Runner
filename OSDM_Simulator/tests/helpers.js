@@ -62,7 +62,7 @@ async function startSimulator({ limits = {}, store: givenStore } = {}) {
   const providers = loadProviders(PROVIDERS_DIR);
   const allLimits = { bodyBytes: 64 * 1024, offersPerClient: 50, bookingsPerClient: 5, ttlSeconds: 3600, requestsPerMinute: 10000, ...limits };
   const store = givenStore || createStore({
-    limits: { offer: allLimits.offersPerClient, booking: allLimits.bookingsPerClient },
+    limits: { offer: allLimits.offersPerClient, trip: allLimits.offersPerClient, booking: allLimits.bookingsPerClient },
     ttlMs: allLimits.ttlSeconds * 1000,
     now,
   });

@@ -52,9 +52,10 @@ test('every scenario points at entries that exist, and the run list at scenarios
   for (const code of datafile.scenariosToRun) assert.ok(codes.includes(code), code);
 });
 
-test('each provider\'s OSDM version has the same sale scenarios, and the run list is gamma\'s', () => {
+test('each provider\'s OSDM version has the same scenarios, and the run list is gamma\'s', () => {
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
+  // The return covering both directions (#594, outboundTripIds) exists from 3.7.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -64,10 +65,25 @@ test('each provider\'s OSDM version has the same sale scenarios, and the run lis
     byVersion.get(scenario.osdmVersion).push(sale);
   }
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
-  const sales = [...byVersion.values()].map((list) => list.join());
-  assert.equal(new Set(sales).size, 1, 'every version has the same sales');
+  const combined = 'SIM_RETURN_COMBINED_1ADT';
+  const latest = byVersion.get('3.8.0');
+  for (const [version, sales] of byVersion) {
+    const expected = version === '3.6.0' ? latest.filter((s) => s !== combined) : latest;
+    assert.deepEqual(sales, expected, version);
+  }
   const gamma = providers.find((p) => p.key === 'gamma');
   assert.deepEqual(datafile.scenariosToRun, datafile.scenarios.filter((s) => s.osdmVersion === gamma.osdmVersion).map((s) => s.code));
+});
+
+test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
+  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null);
+  assert.equal(returns.length, 5);
+  for (const scenario of returns) {
+    const model = scenario.offerSearchCriteria.returnModel;
+    assert.ok(scenario.code.startsWith(`SIM_RETURN_${model}_`), scenario.code);
+    if (model === 'COMBINED') assert.notEqual(scenario.osdmVersion, '3.6.0', 'outboundTripIds is OSDM 3.7 and later');
+    assert.equal(scenario.offerSearchCriteria.returnFulfillments, 'PER_DIRECTION');
+  }
 });
 
 test('the data file holds no real person, station or template', () => {

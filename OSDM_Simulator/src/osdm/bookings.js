@@ -120,12 +120,12 @@ function createBooking(body, findOffer, provider, nowMs) {
   const bookedOffers = [];
 
   for (const selection of selections) {
-    const { offer, trip } = bookableOffer(selection, findOffer, nowMs);
-    trips.set(trip.id, trip);
+    const { offer, trips: offerTrips } = bookableOffer(selection, findOffer, nowMs);
+    for (const trip of offerTrips) trips.set(trip.id, trip);
     for (const externalRef of offer.passengerRefs) {
       if (!passengers.has(externalRef)) passengers.set(externalRef, passengerFrom(specByRef.get(externalRef), externalRef, provider));
     }
-    bookedOffers.push({
+    const bookedOffer = {
       offerId: offer.offerId,
       summary: offer.summary,
       tripCoverage: offer.tripCoverage,
@@ -133,7 +133,9 @@ function createBooking(body, findOffer, provider, nowMs) {
       admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, confirmableUntil)),
       reservations: [],
       ancillaries: [],
-    });
+    };
+    if (offer.inboundTripCoverage) bookedOffer.inboundTripCoverage = offer.inboundTripCoverage;
+    bookedOffers.push(bookedOffer);
   }
 
   const booking = {
@@ -153,9 +155,22 @@ function createBooking(body, findOffer, provider, nowMs) {
   return booking;
 }
 
+// The admissions grouped by the trip they cover, in the booking's trip order:
+// one ticket per direction of a return (#594), one for a single journey.
+function admissionsByTrip(booking) {
+  const groups = new Map(booking.trips.map((trip) => [trip.id, []]));
+  for (const admission of admissionsOf(booking)) {
+    const tripId = admission.tripCoverage?.coveredTripId;
+    if (!groups.has(tripId)) groups.set(tripId, []);
+    groups.get(tripId).push(admission);
+  }
+  return [...groups.values()].filter((group) => group.length > 0);
+}
+
 /**
- * Confirm the booking and issue its fulfilments. Asked again on a booking that
- * is already confirmed, it gives the fulfilments it issued the first time.
+ * Confirm the booking and issue its fulfilments, one per trip it covers.
+ * Asked again on a booking that is already confirmed, it gives the fulfilments
+ * it issued the first time.
  */
 function confirmBooking(booking, provider, nowMs) {
   if (booking.fulfillments.length > 0) return booking.fulfillments;
@@ -172,7 +187,7 @@ function confirmBooking(booking, provider, nowMs) {
   booking.confirmedPrice = sumOf(admissions.map((a) => a.price), provider.currency);
   booking.provisionalPrice = { amount: 0, currency: provider.currency, scale: 2 };
   delete booking.confirmationTimeLimit;
-  booking.fulfillments = [{
+  booking.fulfillments = admissionsByTrip(booking).map((group) => ({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
     bookingRef: booking.id,
@@ -180,8 +195,8 @@ function confirmBooking(booking, provider, nowMs) {
     createdOn: confirmedOn,
     controlNumber: String(crypto.randomInt(1000000000, 9999999999)),
     issuer: provider.carrier.ref,
-    bookingParts: admissions.map((a) => ({ id: a.id, summary: a.summary })),
-  }];
+    bookingParts: group.map((a) => ({ id: a.id, summary: a.summary })),
+  }));
   return booking.fulfillments;
 }
 

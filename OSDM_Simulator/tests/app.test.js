@@ -229,6 +229,98 @@ test('offer, booking, tickets: the booking goes from PREBOOKED to FULFILLED', as
   assert.equal(again.body.fulfillments[0].id, fulfillment.id);
 });
 
+// ── return journeys (#594) ──────────────────────────────────────────────────
+
+const inboundRequest = (returnSearchParameters) => offerRequest({
+  tripSearchCriteria: {
+    departureTime: '2026-11-22T17:00:00',
+    origin: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000002' },
+    destination: { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000001' },
+    returnSearchParameters,
+  },
+});
+
+test('return, both directions: offers cover the outbound and the inbound trip; two tickets', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const outboundTrip = outbound.trips[0];
+  const res = await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest({ outboundTripIds: [outboundTrip.id] }));
+  assert.equal(res.status, 200);
+  const { trips, offers } = res.body;
+  assert.deepEqual(trips.map((t) => t.direction), ['OUT_BOUND', 'IN_BOUND']);
+  assert.equal(trips[0].id, outboundTrip.id);
+  assert.equal(trips[1].origin.stopPlaceRef, outboundTrip.destination.stopPlaceRef);
+  for (const offer of offers) {
+    assert.equal(offer.tripCoverage.coveredTripId, outboundTrip.id);
+    assert.equal(offer.inboundTripCoverage.coveredTripId, trips[1].id);
+    assert.deepEqual(offer.admissionOfferParts.map((p) => p.tripCoverage.coveredTripId), [outboundTrip.id, trips[1].id]);
+    const parts = offer.admissionOfferParts.reduce((total, p) => total + p.price.amount, 0);
+    assert.equal(offer.offerSummary.minimalPrice.amount, parts);
+  }
+  // A return price: less than the two single journeys bought apart.
+  const single = (list, flex) => list.offers.find((o) => o.offerSummary.overallFlexibility === flex).offerSummary.minimalPrice.amount;
+  const inboundAlone = (await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest(undefined))).body;
+  assert.ok(single(res.body, 'FULL_FLEXIBLE') < single(outbound, 'FULL_FLEXIBLE') + single(inboundAlone, 'FULL_FLEXIBLE'));
+
+  const offer = offers[0];
+  const created = (await call(sim.base, token, 'POST', '/alpha/bookings', bookingRequest(offer))).body.booking;
+  assert.deepEqual(created.trips.map((t) => t.id), trips.map((t) => t.id));
+  assert.equal(created.bookedOffers[0].inboundTripCoverage.coveredTripId, trips[1].id);
+  const issued = (await call(sim.base, token, 'POST', `/alpha/bookings/${created.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(issued.length, 2, 'one ticket per direction');
+  const admissions = created.bookedOffers[0].admissions;
+  assert.deepEqual(issued.map((f) => f.bookingParts.map((p) => p.id)), [[admissions[0].id], [admissions[1].id]]);
+});
+
+test('return, separate directions: inbound offers for an outbound offer; booked together, two tickets', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const res = await call(sim.base, token, 'POST', '/alpha/offers', inboundRequest({ outwardOfferIds: [outbound.offers[0].offerId] }));
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.trips.map((t) => t.direction), ['IN_BOUND']);
+  assert.equal(res.body.offers[0].inboundTripCoverage, undefined);
+  const inbound = res.body.offers[0];
+  const request = bookingRequest(outbound.offers[0]);
+  request.offers.push({ offerId: inbound.offerId, passengerRefs: inbound.passengerRefs });
+  const created = (await call(sim.base, token, 'POST', '/alpha/bookings', request)).body.booking;
+  assert.equal(created.trips.length, 2);
+  const issued = (await call(sim.base, token, 'POST', `/alpha/bookings/${created.id}/fulfillments`, {})).body.fulfillments;
+  assert.equal(issued.length, 2);
+});
+
+test('return: an id this client was not given, both kinds of id, or a malformed list are refused', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const other = await tokenFor(sim.base, 'alpha', alphaTwo);
+  const outbound = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const tripId = outbound.trips[0].id;
+  const offerId = outbound.offers[0].offerId;
+  const cases = [
+    [token, { outboundTripIds: ['ALPHA-TRIP-000000000000'] }, /outboundTripIds.*not one this client was given/],
+    [other, { outboundTripIds: [tripId] }, /outboundTripIds.*not one this client was given/],
+    [token, { outwardOfferIds: ['ALPHA-OFR-0'] }, /outwardOfferIds.*not one this client was given/],
+    [token, { outboundTripIds: [tripId], outwardOfferIds: [offerId] }, /not both/],
+    [token, { outboundTripIds: [] }, /1 to 4 ids/],
+    [token, { outboundTripIds: 'x' }, /1 to 4 ids/],
+    [token, [], /returnSearchParameters is not valid/],
+  ];
+  for (const [who, params, pattern] of cases) {
+    const res = await call(sim.base, who, 'POST', '/alpha/offers', inboundRequest(params));
+    assert.equal(res.status, 400, JSON.stringify(params));
+    assert.equal(res.body.code, 'VALIDATION_ERROR');
+    assert.match(res.body.detail, pattern);
+  }
+});
+
+test('the date of a later inbound journey, on the first call, changes nothing', async () => {
+  const token = await tokenFor(sim.base, 'alpha', alphaOne);
+  const plain = (await call(sim.base, token, 'POST', '/alpha/offers', offerRequest())).body;
+  const withDates = offerRequest({ offerSearchCriteria: { inboundDate: '2026-11-22T17:00:00' } });
+  withDates.tripSearchCriteria.returnSearchParameters = { inwardReturnDate: '2026-11-22T17:00:00' };
+  const res = await call(sim.base, token, 'POST', '/alpha/offers', withDates);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.trips, plain.trips);
+});
+
 test('passenger and purchaser can be read and changed; id, reference and type cannot', async () => {
   const { token, booking } = await sale('alpha', alphaOne);
   const url = `/alpha/bookings/${booking.id}/passengers/${booking.passengers[0].id}`;
