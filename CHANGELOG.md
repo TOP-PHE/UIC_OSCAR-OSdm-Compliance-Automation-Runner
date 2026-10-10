@@ -62,6 +62,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.108] — 2026-10-10
+
+Issue #614, release 2026.252. Collection data and documentation only; no
+request or validator changed; server unchanged (1.11.223). Simulator 0.3.0.
+
+### Changed
+
+- **The simulator's providers report three OSDM versions**: `alpha` 3.6.0,
+  `beta` 3.7.0, `gamma` 3.8.0 (before: 3.8.0, 3.8.0, 3.7.0). Not every
+  provider is on 3.8, and the collection sends and checks according to the
+  version. `gamma` stays the provider that receives each new function. The
+  answers keep the 3.8 shapes on all three; only the version check differs.
+- **`simulator_datafile.json` holds its two sale scenarios once per version**:
+  `SIM_SALE_SEARCH_1ADT_36` / `SIM_SALE_SEARCH_2ADT_SAVER_36` for `alpha`,
+  `_37` for `beta`, `_38` for `gamma`. The run list is the `gamma` pair; on
+  `alpha` or `beta`, tick that provider's pair. The scenarios without a
+  suffix are gone. A scenario run on a provider of another version still
+  runs, with the version check's warning.
+- What the collection sends differs between the versions only in the coach
+  layout request (`/coach-layouts` below 3.8, `/coach-deck-layouts` from 3.8),
+  which the simulator answers 501 in both cases. The sale requests, the
+  search time (local, without offset) and the checks are the same.
+
 ## [collection-OTST_V2.0.107] — 2026-10-09
 
 Issue #613, release 2026.251. Collection only; server unchanged (1.11.223).

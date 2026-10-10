@@ -6,7 +6,7 @@
   },
   "currency": "CZK",
   "priceFactor": 24,
-  "osdmVersion": "3.7.0",
+  "osdmVersion": "3.8.0",
   "idPrefix": "GAMMA",
   "utcOffset": "+02:00",
   "tokenLifetimeSeconds": 900

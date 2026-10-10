@@ -146,14 +146,14 @@ test('the health check answers without a token and says nothing else', async () 
 
 test('the version check reports the provider\'s OSDM version', async () => {
   const alpha = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'GET', '/alpha/versions');
-  assert.deepEqual(alpha.body, [{ version: '3.8.0' }]);
+  assert.deepEqual(alpha.body, [{ version: '3.6.0' }]);
   assert.equal(alpha.headers.get('content-type'), 'application/json; charset=utf-8');
   assert.equal(alpha.headers.get('x-content-type-options'), 'nosniff');
 });
 
 test('OSDM resources the simulator does not provide answer 501 with a Problem', async () => {
   const token = await tokenFor(sim.base, 'alpha', alphaOne);
-  for (const url of ['/alpha/places', '/alpha/products', '/alpha/products/abc', '/alpha/coach-deck-layouts', '/alpha/trips-collection',
+  for (const url of ['/alpha/places', '/alpha/products', '/alpha/products/abc', '/alpha/coach-deck-layouts', '/alpha/coach-layouts', '/alpha/trips-collection',
     '/alpha/bookings/any/refund-offers', '/alpha/bookings/any/exchange-operations/x', '/alpha/bookings/any/booked-offers/x/reservations']) {
     const res = await call(sim.base, token, 'GET', url);
     assert.equal(res.status, 501, url);

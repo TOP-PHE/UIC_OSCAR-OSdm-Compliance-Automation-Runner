@@ -14,9 +14,12 @@ One server that plays three providers, told apart by the first part of the path:
 
 | Provider | Endpoint to give OSCAR | Currency | OSDM version | Token lifetime |
 |---|---|---|---|---|
-| `alpha` | `https://<simulator-host>/alpha` | EUR | 3.8.0 | 1 hour |
-| `beta` | `https://<simulator-host>/beta` | CHF | 3.8.0 | 2 minutes |
-| `gamma` | `https://<simulator-host>/gamma` | CZK | 3.7.0 | 15 minutes |
+| `alpha` | `https://<simulator-host>/alpha` | EUR | 3.6.0 | 1 hour |
+| `beta` | `https://<simulator-host>/beta` | CHF | 3.7.0 | 2 minutes |
+| `gamma` | `https://<simulator-host>/gamma` | CZK | 3.8.0 | 15 minutes |
+
+The version is what each provider reports; the answers have the 3.8 shapes on
+all three.
 
 Every identifier a provider returns starts with its name (`ALPHA-BKG-…`,
 `BETA-OFR-…`), and its carrier is named after it, so a report shows at a glance
@@ -168,9 +171,12 @@ rebuilds its Test Framework from the file.
      one somebody else already uses. Scope is left empty.
 3. **Test data** (Test Manager, Test Config → *Upload datafile*): upload
    [`Bruno_Collection/data_base/simulator_datafile.json`](../../Bruno_Collection/data_base/simulator_datafile.json).
-   It holds two sale scenarios, shared with the company's testers:
-   `SIM_SALE_SEARCH_1ADT` and `SIM_SALE_SEARCH_2ADT_SAVER`.
-4. **Run** one of them. Expected: the version check and the sale steps answer
+   It holds two sale scenarios, shared with the company's testers, once per
+   OSDM version: `SIM_SALE_SEARCH_1ADT_36` and `SIM_SALE_SEARCH_2ADT_SAVER_36`
+   for `alpha`, `…_37` for `beta`, `…_38` for `gamma`. The file's run list is
+   the `gamma` pair; for `alpha` or `beta`, tick that provider's pair in Test
+   Config.
+4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider", and no check fails.
 
@@ -178,9 +184,9 @@ The same data file runs without OSCAR too, with Bruno on a PC: see
 [Run standalone](../../Bruno_Collection/README.md#run-standalone) in the
 collection's README.
 
-The data file works unchanged on the three providers. On `gamma` the run shows
-one warning, on purpose: the data file asks for OSDM 3.8.0 and `gamma` reports
-3.7.0.
+The data file works unchanged on the three providers. A scenario of another
+version also runs, with a warning from the version check: the scenario asks for
+one version and the provider reports another.
 
 One client can be given to several testers, but they then share their
 bookings on the simulator. Give each tester a client of their own if their

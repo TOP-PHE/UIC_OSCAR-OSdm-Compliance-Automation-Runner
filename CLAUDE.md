@@ -929,6 +929,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     that line a run "completes" with no request made. Seed the company and a
     Test Manager, then `PATCH /v1/company`, `PATCH /v1/me/credentials`,
     `PUT /v1/company/datafile/json`, `POST /v1/runs`.
+  - **One OSDM version per provider** (#614): `alpha` 3.6.0, `beta` 3.7.0,
+    `gamma` 3.8.0, which receives each new function. Only `/versions`
+    differs; the answers have the 3.8 shapes on all three. The data file
+    holds each sale scenario once per version (`_36`, `_37`, `_38`), and
+    `tests/datafile.test.js` keeps one pair per provider version. Below 3.8
+    the collection asks `/coach-layouts` instead of `/coach-deck-layouts`;
+    nothing else it sends in a sale changes.
   - **Its data file is `Bruno_Collection/data_base/simulator_datafile.json`,
     the one copy** for OSCAR and for a standalone run (#593), with
     `environments/OTST_Simulator_Env.yml` and `00-Access Token/Simulator Access
@@ -937,8 +944,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `00-Access Token` (that folder carries its own `opencollection.yml`), so
     name the folders; and `scenarioTarget` in a collection run repeats the
     same scenario without end; one scenario is `scenario_override`, as OSCAR
-    does. Standalone and through OSCAR give the same checks (173 and 234),
-    plus the two of the token request standalone. **`bru run` writes the
+    does. Standalone and through OSCAR give the same checks (171 and 230
+    through OSCAR since #613), plus the two of the token request standalone. **`bru run` writes the
     run's variables back into the environment file** (secret variables
     excepted): check its size before committing it; #593's first push carried
     918 lines of run state.
@@ -1079,7 +1086,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `tests/integration/company-places.test.js` | Places API: refresh pagination/dedupe (stubbed `fetch`), ranked `?q=` search, role gating |
 | `OSDM_Simulator/src/app.js` | the simulator's routing: provider from the path, token endpoint, Bearer check, per-client scope, 501 for what it does not provide (#575) |
 | `OSDM_Simulator/src/osdm/offers.js`, `bookings.js` | the simulated answers: a trip built from the request, three offers, PREBOOKED → FULFILLED |
-| `Bruno_Collection/data_base/simulator_datafile.json` | the simulator's data file, two sale scenarios, the one copy for OSCAR and for a standalone run (#593); `OSDM_Simulator/tests/datafile.test.js` keeps it valid and answerable |
+| `Bruno_Collection/data_base/simulator_datafile.json` | the simulator's data file, two sale scenarios per OSDM version (#614), the one copy for OSCAR and for a standalone run (#593); `OSDM_Simulator/tests/datafile.test.js` keeps it valid and answerable |
 | `Bruno_Collection/README.md` | running the collection standalone (Bruno desktop and `bru run`), against the simulator's `gamma` (#593) |
 | `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` | installing the simulator on its own host and pointing a company at it |
 

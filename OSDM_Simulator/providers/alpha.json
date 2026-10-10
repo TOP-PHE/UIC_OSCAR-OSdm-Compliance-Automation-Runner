@@ -6,7 +6,7 @@
   },
   "currency": "EUR",
   "priceFactor": 1,
-  "osdmVersion": "3.8.0",
+  "osdmVersion": "3.6.0",
   "idPrefix": "ALPHA",
   "utcOffset": "+01:00",
   "tokenLifetimeSeconds": 3600

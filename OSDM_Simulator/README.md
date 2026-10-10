@@ -45,7 +45,7 @@ collection's README: same data file, same checks.
 | Request | Answer |
 |---|---|
 | `POST /<provider>/oauth/token` | an access token (`client_credentials`; client id and secret in a Basic header or in the body) |
-| `GET /<provider>/versions` | the provider's OSDM version |
+| `GET /<provider>/versions` | the provider's OSDM version (`alpha` 3.6.0, `beta` 3.7.0, `gamma` 3.8.0) |
 | `POST /<provider>/offers` | one direct trip and three offers (flexible, semi-flexible, saver), for a search or a specified trip |
 | `POST /<provider>/bookings` | a `PREBOOKED` booking of offers this client received |
 | `GET /<provider>/bookings/{id}` | the booking |
@@ -72,8 +72,16 @@ used in the path.
 | `utcOffset` | the offset a time without one is read in |
 | `tokenLifetimeSeconds` | how long a token lasts |
 
-Shipped: `alpha` (EUR, 3.8.0, one-hour tokens), `beta` (CHF, two-minute tokens,
-so a long run goes through OSCAR's token refresh), `gamma` (CZK, reports 3.7.0).
+Shipped: `alpha` (EUR, OSDM 3.6.0, one-hour tokens), `beta` (CHF, 3.7.0,
+two-minute tokens, so a long run goes through OSCAR's token refresh), `gamma`
+(CZK, 3.8.0). Not every provider is on 3.8, and the collection sends and checks
+according to the version, so each provider reports another one (#614). `gamma`
+is the provider that receives each new function.
+
+**The answers are 3.8 answers on every provider.** Only the version check
+differs. The collection's sale requests and checks are the same at 3.6, 3.7
+and 3.8, so the ready-made scenarios pass on all three; answers in each
+version's own shapes are left for when a scenario needs them.
 
 ## Clients
 

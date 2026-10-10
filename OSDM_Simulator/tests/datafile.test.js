@@ -52,6 +52,24 @@ test('every scenario points at entries that exist, and the run list at scenarios
   for (const code of datafile.scenariosToRun) assert.ok(codes.includes(code), code);
 });
 
+test('each provider\'s OSDM version has the same sale scenarios, and the run list is gamma\'s', () => {
+  // One file for the three providers (#614): a scenario asks for one version,
+  // so each provider runs the scenarios of its own and the version check agrees.
+  const providers = [...loadProviders(PROVIDERS_DIR).values()];
+  const byVersion = new Map();
+  for (const scenario of datafile.scenarios) {
+    const sale = scenario.code.replace(/_\d{2}$/, '');
+    assert.equal(scenario.code, `${sale}_${scenario.osdmVersion.slice(0, 3).replace('.', '')}`, 'the code names the version');
+    if (!byVersion.has(scenario.osdmVersion)) byVersion.set(scenario.osdmVersion, []);
+    byVersion.get(scenario.osdmVersion).push(sale);
+  }
+  assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
+  const sales = [...byVersion.values()].map((list) => list.join());
+  assert.equal(new Set(sales).size, 1, 'every version has the same sales');
+  const gamma = providers.find((p) => p.key === 'gamma');
+  assert.deepEqual(datafile.scenariosToRun, datafile.scenarios.filter((s) => s.osdmVersion === gamma.osdmVersion).map((s) => s.code));
+});
+
 test('the data file holds no real person, station or template', () => {
   const text = JSON.stringify(datafile);
   assert.equal(text.includes('{{'), false, 'OSCAR refuses a data file that holds a template');
