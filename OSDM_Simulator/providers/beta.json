@@ -6,7 +6,7 @@
   },
   "currency": "CHF",
   "priceFactor": 1.25,
-  "osdmVersion": "3.8.0",
+  "osdmVersion": "3.7.0",
   "idPrefix": "BETA",
   "utcOffset": "+01:00",
   "tokenLifetimeSeconds": 120

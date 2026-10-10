@@ -1,8 +1,21 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.251",
+  "current_release": "2026.252",
   "releases": [
+    {
+      "release": "2026.252",
+      "date": "2026-10-10",
+      "server": "1.11.223",
+      "collection": "OTST_V2.0.108",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#614): the simulator's data file holds its two sale scenarios once per OSDM version, for the three simulated providers: _36 for alpha (3.6.0), _37 for beta (3.7.0), _38 for gamma (3.8.0). Collection data and documentation only; no request or validator changed; server unchanged at 1.11.223.",
+        "The run list (scenariosToRun) is the gamma pair; on alpha or beta, tick that provider's pair. A scenario run on a provider of another version still runs, with the version check's warning.",
+        "Simulator 0.3.0 (not part of a release): alpha reports 3.6.0, beta 3.7.0, gamma 3.8.0. The answers keep the 3.8 shapes on all three."
+      ]
+    },
     {
       "release": "2026.251",
       "date": "2026-10-09",

@@ -92,7 +92,7 @@ bru run "00-Access Token" "01-System Infos Requests" "02-Common Requests" "03-Re
   --env-var "client_id=$SIM_CLIENT_ID" --env-var "client_secret=$SIM_CLIENT_SECRET"
 
 # One scenario: the same command, plus
-  --env-var scenario_override=SIM_SALE_SEARCH_2ADT_SAVER
+  --env-var scenario_override=SIM_SALE_SEARCH_2ADT_SAVER_38
 ```
 
 Name the folders: `bru run` on the whole collection leaves out
@@ -107,11 +107,16 @@ secret variables nor the token). Do not commit that; put the file back with
 
 ### 5. What to expect
 
-`SIM_SALE_SEARCH_1ADT` and `SIM_SALE_SEARCH_2ADT_SAVER` pass with no failed
+The scenarios exist once per OSDM version: `_36` for `alpha`, `_37` for
+`beta`, `_38` for `gamma`, the file's run list. On another provider, set
+`api_base` to it and name its scenario with `scenario_override`.
+
+`SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
 check: the version check and the sale steps answer 200, and the nine optional
 information requests answer 501, reported as "not implemented by this
-provider". One warning on purpose: the data file asks for OSDM 3.8.0 and
-`gamma` reports 3.7.0.
+provider". The same holds for the `_36` pair on `alpha` and the `_37` pair on
+`beta`. A scenario run on a provider of another version gets a warning from
+the version check.
 
 Through OSCAR, the same data file gives the same checks: OSCAR obtains the
 token itself, so its run has two checks fewer, those of the token request.

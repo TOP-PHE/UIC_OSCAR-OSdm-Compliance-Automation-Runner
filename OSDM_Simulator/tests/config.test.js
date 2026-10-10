@@ -43,6 +43,9 @@ test('the shipped profiles load: three providers that differ where it shows', ()
   }
   assert.equal(new Set(all.map((p) => p.carrier.ref)).size, 3);
   assert.equal(new Set(all.map((p) => p.tokenLifetimeSeconds)).size, 3);
+  // Not every provider is on 3.8, and the collection sends and checks
+  // according to the version (#614). gamma receives each new function.
+  assert.deepEqual(all.map((p) => p.osdmVersion), ['3.6.0', '3.7.0', '3.8.0']);
 });
 
 test('a profile with a missing or wrong field stops the start', () => {
