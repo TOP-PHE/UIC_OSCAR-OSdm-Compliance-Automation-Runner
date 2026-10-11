@@ -46,7 +46,7 @@
     {
       "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
       "source": "SIM_REFUND_OVERRULE_REFUSED_38",
-      "purpose": "Negative probe: a refund with an overrule code the provider does not accept must be refused.",
+      "purpose": "A refund with an overrule code the provider does not accept must be refused.",
       "checks": 315
     },
     {
@@ -118,7 +118,7 @@
     {
       "code": "NHF_SALE_BY_TRIP_ID_UNKNOWN",
       "source": "SIM_SALE_BY_TRIP_ID_UNKNOWN_38",
-      "purpose": "Negative probe: offers asked for a trip id the provider never gave must be refused.",
+      "purpose": "Offers asked for a trip id the provider never gave must be refused.",
       "checks": 71
     },
     {
@@ -136,7 +136,7 @@
     {
       "code": "NHF_EXPIRED_OFFER",
       "source": "SIM_NHF_EXPIRED_OFFER_38",
-      "purpose": "Negative probe: booking an offer after its preBookableUntil must be refused.",
+      "purpose": "Booking an offer after its preBookableUntil must be refused.",
       "checks": 120,
       "set": {
         "expiredOfferMaxWaitMinutes": 40
@@ -145,7 +145,7 @@
     {
       "code": "NHF_EXPIRED_BOOKING",
       "source": "SIM_NHF_EXPIRED_BOOKING_38",
-      "purpose": "Negative probe: confirming a booking after its confirmation time limit must be refused.",
+      "purpose": "Confirming a booking after its confirmation time limit must be refused.",
       "checks": 188,
       "set": {
         "expiredBookingMaxWaitMinutes": 40
@@ -154,7 +154,7 @@
     {
       "code": "NHF_EXPIRED_REFUND_OFFER",
       "source": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
-      "purpose": "Negative probe: confirming a refund offer after its validUntil must be refused.",
+      "purpose": "Confirming a refund offer after its validUntil must be refused.",
       "checks": 298,
       "set": {
         "expiredRefundOfferMaxWaitMinutes": 40
@@ -163,7 +163,7 @@
     {
       "code": "NHF_EXPIRED_EXCHANGE_OFFER",
       "source": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
-      "purpose": "Negative probe: taking an exchange offer after its preBookableUntil must be refused.",
+      "purpose": "Taking an exchange offer after its preBookableUntil must be refused.",
       "checks": 264,
       "set": {
         "expiredExchangeOfferMaxWaitMinutes": 40
@@ -178,13 +178,13 @@
     {
       "code": "NHF_REQUESTED_INFORMATION_OMITTED",
       "source": "SIM_NHF_RI_OMIT_1ADT_38",
-      "purpose": "Negative probe: a passenger update without a demanded field must be refused.",
+      "purpose": "A passenger update without a demanded field must be refused.",
       "checks": 145
     },
     {
       "code": "NHF_PASSENGER_DATA_INVALID",
       "source": "SIM_NHF_RI_INVALID_1ADT_38",
-      "purpose": "Negative probe: a passenger update with an invalid field, one field per pass, must be refused.",
+      "purpose": "A passenger update with an invalid field, one field per pass, must be refused.",
       "checks": 156
     },
     {
@@ -196,7 +196,7 @@
     {
       "code": "NHF_PURCHASER_INVALID",
       "source": "SIM_NHF_PURCHASER_INVALID_1ADT_38",
-      "purpose": "Negative probe: a purchaser with a missing or invalid field, one per pass, must be refused.",
+      "purpose": "A purchaser with a missing or invalid field, one per pass, must be refused.",
       "checks": 243
     }
   ]
