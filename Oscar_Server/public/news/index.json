@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-return-models-framework",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Return models in the Test Framework",
+    "summary": "The Test Framework now declares which return models a provider supports, and Test Config offers only those.",
+    "content": "Test Framework → Sales Flows → Return journeys lists the two ways a return can be asked for: separate directions (one offer each) and both directions in one offer (OSDM 3.7 and later). Tick the ones the provider supports.\n\nTest Config then offers only the declared models. A scenario that asks for an undeclared model still runs, with a warning in the run log naming the model, as for the other capabilities the Test Framework declares. A framework that existed before declares, the first time it is opened, the models its scenarios already use."
+  },
+  {
     "id": "2026-10-11-partial-refund-fulfillment",
     "date": "October 11, 2026",
     "tag": "Fix",

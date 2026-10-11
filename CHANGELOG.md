@@ -62,6 +62,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.121] — 2026-10-11
+
+Issue #619, release 2026.266.
+
+### Added
+
+- **Return models in the Test Framework** (`returnModels`: `SEPARATE`,
+  `COMBINED`), under Sales Flows → 🔁 Return journeys.
+  - Gating, the two existing mechanisms (#218): `utils/frameworkGating.js`
+    adds `returnModel` to `__featureNotDeclaredWarnings` for a return
+    scenario (`offerSearchCriteria.returnOffsetDays` set) whose model is not
+    declared: a soft `[WARNING]`, never a failure. In Test Config the Return
+    model list offers only the declared models; a scenario's own undeclared
+    model stays, marked ⚠, so that opening a card never changes it. With no
+    model declared, the return fields of a one-way scenario are locked. The
+    banner counts these scenarios too.
+  - `COMBINED` with an OSDM version below 3.7 is flagged in the framework
+    editor, and the note follows the version field.
+  - A framework without `returnModels` (before 1.11.236) declares, on its
+    first read, the models its scenarios use, like the `salesFlows`
+    migration; afterwards the list is the Test Manager's. Until then no
+    return warning is given.
+
+### Fixed
+
+- **The framework warnings reach the run.** The annotation was added only to
+  the browser's `GET /v1/company/datafile`; the run reads `/data/:filename`,
+  which served the stored file, so the collection's warning never showed in a
+  run log. The run's request (with its run secret) now gets the annotated
+  copy, best effort; a Test Manager's download is still the stored file.
+  `annotateDatafile` passes over a scenario that is not an object.
+- **Collection OTST_V2.0.121**: the warning names what is missing (the return
+  model and where to declare it, or the partial-refund flow), instead of
+  always speaking of `REFUND_PARTIAL`.
+
+Not done: declaring how a provider divides the fulfillments of a return
+(optional in the issue); Return fulfillments stays a per-scenario setting.
+
+Checked: unit tests (gating, editor, the `/data` route, the warning text);
+the full Jest suite; a run through OSCAR on the simulator with only
+`SEPARATE` declared: the `COMBINED` scenario logs the warning and passes (350
+checks), the `SEPARATE` one has none (308); in a browser, the framework
+editor (the 3.6 note, untick saved), the banner (4 scenarios) and a
+`COMBINED` card's list. Not run against a real provider.
+
+---
+
 ## [server-1.11.235] / [collection-OTST_V2.0.120] — 2026-10-11
 
 Issue #610, release 2026.265.
