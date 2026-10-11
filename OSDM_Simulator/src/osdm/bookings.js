@@ -22,6 +22,7 @@ const { cardsOf } = require('./reductionCards');
 const { reservationsToBook, reservationFrom, linkReservations } = require('./reservations');
 const { issueDocuments } = require('./documents');
 const variants = require('./variants');
+const persons = require('./persons');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 19;
@@ -169,17 +170,21 @@ function createBooking(body, findOffer, provider, nowMs) {
     bookingCode: `${provider.idPrefix}${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
     createdOn,
     passengers: [...passengers.values()],
-    purchaser: { detail: personDetail(body.purchaser?.detail) },
     bookedOffers,
     trips: [...trips.values()],
     confirmationTimeLimit: confirmableUntil,
     fulfillments: [],
   };
+  // #611: a booking made without its purchaser has none until one is written.
+  if (body.purchaser !== undefined) booking.purchaser = { detail: personDetail(body.purchaser?.detail) };
   const externalRef = text(body.externalRef);
   if (externalRef) booking.externalRef = externalRef;
   booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), provider.currency);
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
+  // #611: a booking of offers that asked for information keeps asking while it is missing.
+  persons.markRequestedInformation(booking, selections.some((s) => typeof s?.offerId === 'string' && findOffer(s.offerId)?.asksInfo));
+  persons.showRequestedInformation(booking);
   // #611: the variants its passengers' last names name.
   variants.keepVariants(booking, variants.variantsOf(specs, provider));
   variants.shapeNewBooking(booking);

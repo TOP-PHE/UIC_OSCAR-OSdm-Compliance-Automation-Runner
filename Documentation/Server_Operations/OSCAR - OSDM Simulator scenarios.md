@@ -214,3 +214,15 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 | `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds" (4 failed checks). |
 | `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice" (7 failed checks). |
 
+### Requested information and purchaser (#611)
+
+gamma (profile `personChecks`) checks passenger and purchaser data when they are updated: a gender outside `MALE`, `FEMALE`, `X`, a date of birth that is no date, an e-mail or phone number of the wrong form, or an empty name is a `400` Problem naming the field, with a pointer. A purchaser written must have a first and a last name. The offers of a trip from station `0000097` (trip requirement 9) ask for each passenger's date of birth and phone number (`requestedInformation`), and so does the booking while one is missing.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_RI_AUTOFEED_1ADT_38` | Offers with `requestedInformation`; the collection checks the expression and supplies what is demanded. | `passengerSpecifications[ANY].dateOfBirth AND passengerSpecifications[ANY].detail.contact.phoneNumber` on each admission. | No failed check; the log says the demand is already met by the scenario's passenger data. |
+| `SIM_NHF_RI_OMIT_1ADT_38` | `requestedInformationProbe` omit: a demanded field withheld from the passenger update. | `400 INVALID_PERSON_DATA` naming the field. | No failed check: the refusal is graded as passing; the run ends at step 03. |
+| `SIM_NHF_RI_INVALID_1ADT_38` | `requestedInformationProbe` invalid: the passenger update sent six times, one field invalid each time (gender, date of birth, first and last name, e-mail, phone). | Each refused with `400`, the field named. | No failed check: six refusals graded. |
+| `SIM_PURCHASER_DEFERRED_1ADT_38` | `bookingPurchaserMode` deferred: the booking made without its purchaser, which is then written (steps 12, 14). | A booking made without a purchaser has none: `GET …/purchaser` is `404`, `POST` creates it. | No failed check. |
+| `SIM_NHF_PURCHASER_INVALID_1ADT_38` | `bookingPurchaserMode` invalid: the purchaser written four times, one field missing or invalid each time. | Each refused with `400`, the field named. | No failed check: four refusals graded. |
+

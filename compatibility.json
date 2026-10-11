@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.268",
+  "current_release": "2026.269",
   "releases": [
+    {
+      "release": "2026.269",
+      "date": "2026-10-11",
+      "server": "1.11.236",
+      "collection": "OTST_V2.0.124",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#611, part 3): on the simulator's gamma, passenger and purchaser data are checked when written, offers of a trip from station 0000097 carry requestedInformation, and a booking made without a purchaser has none. Five new scenarios run the collection's requested-information and purchaser probes: autofeed, omit, invalid sweep, deferred purchaser, invalid purchaser sweep. No request or validator of the collection changed; collection OTST_V2.0.124 for the data file.",
+        "Simulator 0.18.0 (not part of a release): profile personChecks (gamma); a booking made without a purchaser has none (every provider)."
+      ]
+    },
     {
       "release": "2026.268",
       "date": "2026-10-11",

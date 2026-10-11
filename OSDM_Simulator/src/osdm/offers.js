@@ -42,6 +42,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 const { reservationsOfDirection, reservationProductOf } = require('./reservations');
+const persons = require('./persons');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -660,6 +661,13 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
         remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true, shortLivedMs });
       }
     }
+  }
+  // #611: the offers of a trip from the requested-information stop place ask
+  // for each passenger's date of birth and phone number.
+  const asksInfo = persons.asksForInformation(trips, provider);
+  if (asksInfo) {
+    for (const offer of offers) for (const part of offer.admissionOfferParts) part.requestedInformation = persons.REQUESTED;
+    for (const entry of remembered) entry.asksInfo = true;
   }
   // #611: the offers of a trip from the wrong-offers stop place are one cent off.
   const wrongFrom = provider.variants?.wrongOffersFrom;

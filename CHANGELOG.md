@@ -91,6 +91,48 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.124] — 2026-10-11
+
+Issue #611, release 2026.269. Simulator 0.18.0.
+
+### Added
+
+- **Simulator data file**: five scenarios on `gamma` for the collection's
+  requested-information and purchaser probes, and trip requirement 9 (from
+  station `0000097`).
+  - `SIM_RI_AUTOFEED_1ADT_38`: the offers ask for each passenger's date of
+    birth and phone number; the demand is met.
+  - `SIM_NHF_RI_OMIT_1ADT_38` and `SIM_NHF_RI_INVALID_1ADT_38`
+    (`requestedInformationProbe` omit / invalid): the passenger update must
+    be refused; six refusals graded in the invalid sweep.
+  - `SIM_PURCHASER_DEFERRED_1ADT_38` (`bookingPurchaserMode` deferred): the
+    purchaser read gives 404, the purchaser is then created with `POST`.
+  - `SIM_NHF_PURCHASER_INVALID_1ADT_38` (`bookingPurchaserMode` invalid):
+    four refusals graded.
+  - Each has a row in the scenario catalogue.
+
+### Simulator 0.18.0
+
+- Profile `personChecks` (`gamma`; `requestedInformationFrom`:
+  `urn:uic:stn:0000097`). A passenger update is refused (`400
+  INVALID_PERSON_DATA`, the field in the detail and in `pointers`) when a
+  value is not valid: gender outside `MALE`, `FEMALE`, `X`; a date of birth
+  that is no date; an e-mail or phone number of the wrong form; an empty
+  name. A purchaser written must have both names. Offers of a trip from the
+  station carry `requestedInformation` (date of birth and phone number of
+  every passenger), the booking too while one is missing, and an update that
+  leaves one empty is refused. A refused update changes nothing.
+- A booking made without a purchaser has none: `GET …/purchaser` is 404
+  until one is written (every provider).
+- A Problem may carry more members (`pointers`).
+
+Checked standalone on the simulator: the five scenarios, none failed (234,
+145, 156, 235 and 243 checks), with every refusal graded; no regression on
+three earlier ones. Simulator tests 178 → 183. Not run through OSCAR, nor
+against a real provider.
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.123] — 2026-10-11
 
 Issue #611, release 2026.268. Simulator 0.17.0.

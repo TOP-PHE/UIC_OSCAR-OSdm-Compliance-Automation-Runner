@@ -90,6 +90,7 @@ function checkProvider(key, raw) {
     ...checkExchange(raw.exchange, bad),
     ...checkShortDeadlines(raw.shortDeadlines, bad),
     ...checkVariants(raw.variants, bad),
+    ...checkPersonChecks(raw.personChecks, bad),
   };
 }
 
@@ -190,6 +191,14 @@ function checkVariants(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || !isText(value.wrongOffersFrom, 1, 120)) throw bad('variants');
   return { variants: { wrongOffersFrom: value.wrongOffersFrom } };
+}
+
+// #611: passenger and purchaser data checked on update, and a stop place
+// whose offers ask for requested information. Absent: any value is kept.
+function checkPersonChecks(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || !isText(value.requestedInformationFrom, 1, 120)) throw bad('personChecks');
+  return { personChecks: { requestedInformationFrom: value.requestedInformationFrom } };
 }
 
 // #603: the media of the documents issued on confirmation (PDF_A4 merged for
