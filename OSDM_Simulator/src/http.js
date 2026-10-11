@@ -17,13 +17,15 @@
 // A failure a route wants turned into an HTTP answer. Anything else that is
 // thrown is a bug and becomes a 500 with no detail.
 class HttpError extends Error {
-  constructor(status, code, title, detail, headers) {
+  constructor(status, code, title, detail, headers, extra) {
     super(title);
     this.status = status;
     this.code = code;
     this.title = title;
     this.detail = detail;
     this.headers = headers || {};
+    // More Problem members (#611: pointers), sent after the standard ones.
+    this.extra = extra || {};
   }
 }
 
@@ -44,8 +46,8 @@ function sendJson(res, status, body, headers) {
 }
 
 // An OSDM Problem (RFC 9457 shape, as the OSDM specification uses it).
-function sendProblem(res, status, code, title, detail, headers) {
-  const body = { code, title, status };
+function sendProblem(res, status, code, title, detail, headers, extra) {
+  const body = { ...extra, code, title, status };
   if (detail) body.detail = detail;
   const text = JSON.stringify(body);
   res.writeHead(status, {

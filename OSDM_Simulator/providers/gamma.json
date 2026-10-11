@@ -13,6 +13,9 @@
   "tripsCollection": true,
   "idempotency": true,
   "exchange": true,
+  "personChecks": {
+    "requestedInformationFrom": "urn:uic:stn:0000097"
+  },
   "variants": {
     "wrongOffersFrom": "urn:uic:stn:0000098"
   },

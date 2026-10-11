@@ -30,6 +30,7 @@ const { reductionCardCollection } = require('./osdm/reductionCards');
 const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 const exchanges = require('./osdm/exchanges');
+const persons = require('./osdm/persons');
 const { version: VERSION } = require('../package.json');
 
 // OSDM resources this simulator knows of and does not provide. They answer
@@ -228,19 +229,30 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
   }
 
   // GET, PATCH /bookings/{id}/passengers/{id}
-  async function passenger(req, scope, bookingId, passengerId) {
+  async function passenger(req, provider, scope, bookingId, passengerId) {
     requireMethod(req, 'GET', 'PATCH');
     const booking = bookingOf(scope, bookingId);
     if (req.method === 'GET') return { passenger: findPassenger(booking, passengerId) };
-    return { passenger: patchPassenger(booking, passengerId, await bodyOf(req)) };
+    const body = await bodyOf(req);
+    // #611: the values checked, and the demanded fields on the result, before anything changes.
+    persons.checkPassengerPatch(body, provider);
+    persons.checkDemanded(booking, patchPassenger(structuredClone(booking), passengerId, body));
+    const patched = patchPassenger(booking, passengerId, body);
+    persons.showRequestedInformation(booking);
+    return { passenger: patched };
   }
 
   // GET, PATCH, POST /bookings/{id}/purchaser
-  async function purchaser(req, scope, bookingId) {
+  async function purchaser(req, provider, scope, bookingId) {
     requireMethod(req, 'GET', 'PATCH', 'POST');
     const booking = bookingOf(scope, bookingId);
-    if (req.method === 'GET') return { purchaser: booking.purchaser };
-    return { purchaser: setPurchaser(booking, await bodyOf(req)) };
+    if (req.method === 'GET') {
+      if (!booking.purchaser) throw new HttpError(404, 'PURCHASER_NOT_FOUND', 'Purchaser not found', 'This booking has no purchaser yet.');
+      return { purchaser: booking.purchaser };
+    }
+    const body = await bodyOf(req);
+    persons.checkPurchaser(body, provider);
+    return { purchaser: setPurchaser(booking, body) };
   }
 
   // POST, GET /bookings/{id}/refund-offers; GET, PATCH, DELETE .../{refundOfferId}
@@ -294,6 +306,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       requireMethod(req, 'GET');
       const booking = bookingOf(scope, bookingId);
       releaseIfExpired(booking, now());
+      persons.showRequestedInformation(booking);
       showRefundReceipt(booking, provider, now());
       return { booking };
     }
@@ -304,8 +317,8 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (part === 'booked-offers') return bookedOfferRoute(req, scope, bookingId, partId, more);
     if (more.length > 0) throw notFound();
     if (part === 'fulfillments' && partId === undefined) return fulfillments(req, provider, scope, bookingId);
-    if (part === 'passengers' && partId !== undefined) return passenger(req, scope, bookingId, partId);
-    if (part === 'purchaser' && partId === undefined) return purchaser(req, scope, bookingId);
+    if (part === 'passengers' && partId !== undefined) return passenger(req, provider, scope, bookingId, partId);
+    if (part === 'purchaser' && partId === undefined) return purchaser(req, provider, scope, bookingId);
     if (part === 'refund-offers') return refundOffers(req, provider, scope, bookingId, partId);
     throw notFound();
   }
@@ -410,7 +423,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       if (res.headersSent) {
         res.destroy();
       } else if (error instanceof HttpError) {
-        sendProblem(res, error.status, error.code, error.title, error.detail, headers);
+        sendProblem(res, error.status, error.code, error.title, error.detail, headers, error.extra);
       } else {
         sendProblem(res, 500, 'INTERNAL_ERROR', 'Internal error', undefined, headers);
       }
