@@ -1,0 +1,152 @@
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+'use strict';
+
+/**
+ * scenario-catalogue-routes.test.js — the scenario catalogue (#612):
+ * GET /v1/company/scenario-catalogue, and the copy with source_id
+ * "catalogue": roles, a provider's own framework, the golden rule, and what
+ * is written.
+ *
+ * Company C (Test Manager TM, tester TS, certifier CE, administrator AD) and
+ * its provider P, which TS is granted. C declares sales only; P declares sales, full refunds and
+ * both return models on OSDM 3.8.
+ */
+
+const path = require('node:path');
+
+process.env.JWT_SECRET = 'test-jwt-secret-for-scenario-catalogue';
+process.env.COLLECTION_PATH = path.resolve(__dirname, '../../../Bruno_Collection');
+
+const fs      = require('fs');
+const express = require('express');
+const jwt     = require('jsonwebtoken');
+const request = require('supertest');
+const { randomUUID: uuidv4 } = require('node:crypto');
+const { run, get, colEncrypt } = require('../../src/db/db');
+const { decryptFromFileAsync } = require('../../src/utils/at-rest');
+
+const app = express();
+app.use(express.json());
+app.use('/v1/company', require('../../src/api/routes/company-scenario-copy'));
+
+const tag = uuidv4().slice(0, 8);
+const ids = { C: uuidv4(), P: uuidv4(), TM: uuidv4(), TS: uuidv4(), CE: uuidv4(), AD: uuidv4() };
+const users = {
+  TM: { role: 'test_manager', email: `tm-${tag}@cat.example` },
+  TS: { role: 'company_user', email: `ts-${tag}@cat.example` },
+  CE: { role: 'certification_user', email: `ce-${tag}@cat.example` },
+  AD: { role: 'administrator', email: `ad-${tag}@cat.example` },
+};
+const as = (who, provider) => {
+  const u = users[who];
+  const h = { Authorization: `Bearer ${jwt.sign({ sub: ids[who], email: u.email, companyId: ids.C, role: u.role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' })}` };
+  if (provider) h['X-Provider-Id'] = ids[provider];
+  return h;
+};
+const framework = (config) => colEncrypt(JSON.stringify({ fulfillment: { types: ['ETICKET'], media: ['PDF_A4'] }, passengerTypes: ['ADULT'], ...config }));
+const train = (companyId) => [`tr-${tag}-${companyId.slice(0, 4)}`, companyId, colEncrypt(JSON.stringify({
+  originURN: 'urn:c:a', destinationURN: 'urn:c:b', services: [{ vehicleNumber: 'C-7', departureTime: '09:00:00Z', arrivalTime: '10:00:00Z' }],
+}))];
+
+async function readFile(companyId) {
+  const row = get('SELECT datafile_path FROM companies WHERE id = ?', [companyId]);
+  return row?.datafile_path ? JSON.parse((await decryptFromFileAsync(row.datafile_path)).toString('utf8')) : null;
+}
+
+beforeAll(() => {
+  run(`INSERT INTO companies (id, name, slug) VALUES (?, 'C', ?)`, [ids.C, `cat-c-${tag}`]);
+  run(`INSERT INTO companies (id, name, slug, parent_id) VALUES (?, 'P', ?, ?)`, [ids.P, `cat-c-${tag}--p`, ids.C]);
+  for (const [who, u] of Object.entries(users)) {
+    run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, 'x', ?)`, [ids[who], ids.C, u.email, u.role]);
+  }
+  run('INSERT INTO provider_access (company_id, user_id) VALUES (?, ?)', [ids.P, ids.TS]);
+  run(`INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)`, [uuidv4(), ids.C, framework({ osdmVersion: '3.6.0', salesFlows: ['SALE'], returnModels: [] })]);
+  run(`INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)`,
+    [uuidv4(), ids.P, framework({ osdmVersion: '3.8.0', salesFlows: ['SALE', 'REFUND_FULL'], returnModels: ['SEPARATE', 'COMBINED'] })]);
+  for (const c of [ids.C, ids.P]) run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', 'Train', ?)`, train(c));
+});
+
+afterAll(() => {
+  for (const c of ['C', 'P']) {
+    const row = get('SELECT datafile_path FROM companies WHERE id = ?', [ids[c]]);
+    if (row?.datafile_path) fs.rmSync(row.datafile_path, { force: true });
+  }
+  run('DELETE FROM auth_events WHERE email LIKE ?', [`%-${tag}@cat.example`]);
+  run('DELETE FROM companies WHERE id IN (?, ?)', [ids.P, ids.C]);
+  run('DELETE FROM users WHERE email LIKE ?', [`%-${tag}@cat.example`]);
+});
+
+const entryOf = (body, code) => body.entries.find(e => e.code === code);
+
+describe('GET /scenario-catalogue', () => {
+  test('lists every reference scenario, with what this company\'s framework lacks', async () => {
+    const res = await request(app).get('/v1/company/scenario-catalogue').set(as('TM'));
+    expect(res.status).toBe(200);
+    expect(res.body.entries.length).toBeGreaterThan(20);
+    expect(entryOf(res.body, 'OTST_SALE_ONE_WAY_1ADT')).toMatchObject({ kind: 'OTST', area: 'sale', missing: [] });
+    expect(entryOf(res.body, 'OTST_REFUND_RETURN_FULL_1ADT').missing).toEqual(expect.arrayContaining(['sales flow REFUND_FULL', 'return model SEPARATE']));
+    expect(entryOf(res.body, 'OTST_SALE_RETURN_COMBINED_1ADT').missing).toEqual(['return model COMBINED', 'OSDM 3.7 or later']);
+    expect(entryOf(res.body, 'NHF_EXPIRED_OFFER').kind).toBe('NHF');
+  });
+
+  test('a provider is judged by its own framework', async () => {
+    const res = await request(app).get('/v1/company/scenario-catalogue').set(as('TM', 'P'));
+    expect(res.status).toBe(200);
+    expect(entryOf(res.body, 'OTST_REFUND_RETURN_FULL_1ADT').missing).toEqual([]);
+    expect(entryOf(res.body, 'OTST_SALE_RETURN_COMBINED_1ADT').missing).toEqual([]);
+  });
+
+  test('a tester reads it; a certifier and an administrator do not', async () => {
+    expect((await request(app).get('/v1/company/scenario-catalogue').set(as('TS'))).status).toBe(200);
+    for (const who of ['CE', 'AD']) expect((await request(app).get('/v1/company/scenario-catalogue').set(as(who))).status).toBe(403);
+  });
+});
+
+describe('copy from the catalogue', () => {
+  test('the preview says what each reference scenario tests and what is missing', async () => {
+    const res = await request(app).post('/v1/company/scenario-copy/preview').set(as('TM')).send({ source_id: 'catalogue' });
+    expect(res.status).toBe(200);
+    expect(res.body.source).toEqual({ id: 'catalogue', name: 'Scenario catalogue' });
+    const one = res.body.scenarios.find(s => s.code === 'OTST_SALE_ONE_WAY_1ADT');
+    expect(one).toMatchObject({ kind: 'OTST', missing: [] });
+    expect(one.purpose).toMatch(/One-way sale/);
+    expect(res.body.trips.length).toBeGreaterThan(0);
+  });
+
+  test('a reference scenario the framework does not allow is refused, naming what is missing', async () => {
+    const res = await request(app).post('/v1/company/scenario-copy').set(as('TM'))
+      .send({ source_id: 'catalogue', codes: ['OTST_SALE_ONE_WAY_1ADT', 'OTST_REFUND_RETURN_FULL_1ADT'], trip_map: {} });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toMatch(/OTST_REFUND_RETURN_FULL_1ADT needs sales flow REFUND_FULL/);
+    expect(await readFile(ids.C)).toBeNull();
+  });
+
+  test('a tester copies one: it is theirs, its trip is the company\'s train, and the wait is the catalogue\'s', async () => {
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TS', 'P')).send({ source_id: 'catalogue' })).body;
+    const codes = ['OTST_SALE_ONE_WAY_1ADT', 'NHF_EXPIRED_OFFER'];
+    const tripMap = Object.fromEntries(preview.trips.filter(t => t.usedBy.some(c => codes.includes(c)))
+      .map(t => [t.id, { type: 'train', train_id: train(ids.P)[0], service_index: 0 }]));
+    const res = await request(app).post('/v1/company/scenario-copy').set(as('TS', 'P')).send({ source_id: 'catalogue', codes, trip_map: tripMap });
+    expect(res.status).toBe(200);
+    expect(res.body.copied.map(c => c.to)).toEqual(codes);
+    const file = await readFile(ids.P);
+    const [sale, probe] = codes.map(c => file.scenarios.find(s => s.code === c));
+    expect(sale.created_by).toBe(users.TS.email);
+    expect(sale.shared).toBeFalsy();
+    expect(probe.expiredOfferMaxWaitMinutes).toBe(40);
+    const trip = file.tripRequirements.find(t => t.id === sale.tripRequirementId);
+    expect(trip.trip.origin).toBe('urn:c:a');
+    expect(file.systemInfoParameters).toBeUndefined();
+  });
+
+  test('a certifier cannot copy from it', async () => {
+    const res = await request(app).post('/v1/company/scenario-copy/preview').set(as('CE')).send({ source_id: 'catalogue' });
+    expect(res.status).toBe(403);
+  });
+});

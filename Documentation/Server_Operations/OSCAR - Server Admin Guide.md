@@ -1633,3 +1633,21 @@ Nothing to configure and nothing changes in behaviour: the upload's schema
 check and the Test Config confirmation texts were restructured to clear code
 quality findings. Same checks, same answers, same texts.
 
+
+### 15.26 v1.11.237 — the scenario catalogue (#612)
+
+Test Config's **📋 Copy scenarios from…** offers a **Scenario catalogue** of
+reference scenarios. It is a file of the Bruno collection,
+`data_base/scenario_catalogue.json`, read from the collection the runs use
+(`COLLECTION_PATH`), so it is refreshed with the collection and carries its
+version. Each entry names a scenario of the simulator's data file
+(`data_base/simulator_datafile.json`), which supplies its data: the two files
+must be deployed together, as they are with the collection.
+
+`GET /v1/company/scenario-catalogue` lists the entries with what each needs the
+Test Framework to declare and what the company's framework lacks; the copy is
+the ordinary scenario copy with `source_id: "catalogue"`. Reference scenarios
+needing an undeclared capability are refused. Administrators and certifiers
+have no access, as on every data file route. When the catalogue cannot be read,
+the route answers 503 and the copy panel says so; nothing else is affected.
+Each copy is written to the audit log as `scenarios_copied:catalogue:<count>`.

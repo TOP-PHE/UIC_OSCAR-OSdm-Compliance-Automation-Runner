@@ -130,6 +130,16 @@ Framework, test resources, findings, runs and reports.
   already used. The endpoint, credentials, known deviations and findings are
   never copied. Save or discard unsaved changes first: the page reloads after
   the copy. The provider needs a Test Framework and Test Data before you copy.
+- **The scenario catalogue** (#612). **📋 Copy scenarios from…** always offers
+  **📚 Scenario catalogue**: ready-made reference scenarios, happy flows
+  (`OTST_…`) and negative probes (`NHF_…`, 🚫), each with one line saying what
+  it tests. Each has been run end to end on the OSDM simulator. A reference
+  scenario that needs something your Test Framework does not declare (a sales
+  flow, a return model, OSDM 3.7, a passenger type) is greyed out and names
+  what is missing: declare it, or leave the scenario. The copy works as above:
+  you choose a train for each trip, and the copies are yours. A negative probe
+  that waits for a deadline (`NHF_EXPIRED_…`) waits at most 40 minutes; raise
+  its *Max wait* if your provider's deadline is longer.
 - **"The data file has changed since this page loaded it."** Test Config
   refuses a save when the data file changed after you opened the page: in
   another tab, by your Test Manager, or by a copy. Nothing is saved. Your edits

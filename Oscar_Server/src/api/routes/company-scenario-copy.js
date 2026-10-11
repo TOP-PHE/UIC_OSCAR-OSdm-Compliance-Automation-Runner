@@ -13,16 +13,22 @@
  *
  *   POST /v1/company/scenario-copy/preview   { source_id }
  *   POST /v1/company/scenario-copy           { source_id, codes, trip_map }
+ *   GET  /v1/company/scenario-catalogue      the catalogue, against this framework
  *
  * The target is the request's company (enforceTenant: the own company or the
  * provider named with X-Provider-Id). The source is a parameter, checked with
  * the same rule, canUseCompany(); an unknown or refused source answers 404.
  * A tester copies only what their view of the source shows them, and the
  * copies are theirs. The rules of the copy are in utils/scenarioCopy.js.
+ *
+ * #612: `source_id: "catalogue"` copies reference scenarios from the scenario
+ * catalogue (utils/scenarioCatalogue.js) instead of a company. Those whose
+ * requirements this company's Test Framework does not declare are refused.
  */
 
 const express   = require('express');
 const fs        = require('node:fs');
+const path      = require('node:path');
 const rateLimit = require('express-rate-limit');
 const { get, all, colDecrypt } = require('../../db/db');
 const { requireAuth } = require('../middleware/auth');
@@ -35,6 +41,7 @@ const { withDatafileLock } = require('../../utils/datafileLock');
 const { writeDatafile } = require('../../utils/datafileWrite');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
 const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
+const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
 const TripApply = require('../../../public/js/trip-apply');
 const log = require('../../utils/logger').child({ module: 'scenario-copy' });
 
@@ -52,6 +59,10 @@ const copyLimiter = rateLimit({
 router.use(requireAuth, enforceTenant);
 
 const SOURCE_NOT_FOUND = { status: 404, title: 'Not Found', detail: 'Source not found.' };
+const CATALOGUE = 'catalogue';
+const CATALOGUE_NAME = 'Scenario catalogue';
+
+const REFUSAL_TITLES = { 404: 'Not Found', 503: 'Service Unavailable' };
 
 class Refusal extends Error {
   constructor(status, detail) { super(detail); this.status = status; }
@@ -69,6 +80,23 @@ async function readDatafile(companyId) {
     log.error({ err, companyId }, 'scenario copy: data file unreadable');
   }
   throw new Refusal(409, 'A data file involved in the copy cannot be read. Ask your Test Manager to check it.');
+}
+
+// #612: a file of the collection the runs use (COLLECTION_PATH), else the
+// repository's copy, as the data file schema is read.
+function collectionJson(...parts) {
+  const candidates = [
+    path.join(path.resolve(process.env.COLLECTION_PATH || '/collection'), ...parts),
+    path.resolve(__dirname, '../../../../Bruno_Collection', ...parts),
+  ];
+  for (const file of candidates) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* the next copy */ }
+  }
+  throw new Refusal(503, 'The scenario catalogue cannot be read on this server.');
+}
+
+function readCatalogue() {
+  return { catalogue: collectionJson('data_base', 'scenario_catalogue.json'), simulator: collectionJson('data_base', 'simulator_datafile.json') };
 }
 
 function readFramework(companyId) {
@@ -97,24 +125,34 @@ async function copyContext(req, res) {
   const targetId = resolveCompanyScope(req, res);
   if (targetId === null) return null;
   const sourceId = req.body?.source_id;
-  if (typeof sourceId !== 'string' || sourceId === targetId || !canUseCompany(req.user, sourceId)) {
+  const fromCatalogue = sourceId === CATALOGUE;
+  if (typeof sourceId !== 'string' || sourceId === targetId || (!fromCatalogue && !canUseCompany(req.user, sourceId))) {
     res.status(404).json(SOURCE_NOT_FOUND);
     return null;
   }
   try {
-    let source = await readDatafile(sourceId);
-    if (!source) throw new Refusal(404, 'The source has no data file.');
-    if (req.user.role === 'company_user') source = viewForTester(source, req.user.email, null);
+    let source;
+    let catalogue = null;
+    if (fromCatalogue) {
+      catalogue = readCatalogue();
+      source = catalogueDatafile(catalogue.catalogue, catalogue.simulator);
+    } else {
+      source = await readDatafile(sourceId);
+      if (!source) throw new Refusal(404, 'The source has no data file.');
+      if (req.user.role === 'company_user') source = viewForTester(source, req.user.email, null);
+    }
     const frameworkConfig = readFramework(targetId);
     if (!frameworkConfig) throw new Refusal(409, 'Set up the Test Framework of the company you copy into first.');
     const resources = readTestData(targetId);
     if (!resources.length) throw new Refusal(409, 'Add trains or journeys to the Test Data of the company you copy into first.');
     const names = Object.fromEntries(all('SELECT id, name, slug FROM companies WHERE id IN (?, ?)', [sourceId, targetId])
       .map(c => [c.id, c]));
-    return { targetId, sourceId, source, frameworkConfig, resources, names };
+    if (fromCatalogue) names[CATALOGUE] = { id: CATALOGUE, name: CATALOGUE_NAME };
+    const entries = catalogue ? catalogueFor(catalogue.catalogue, catalogue.simulator, frameworkConfig) : null;
+    return { targetId, sourceId, source, frameworkConfig, resources, names, entries };
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
-    res.status(err.status).json({ status: err.status, title: err.status === 404 ? 'Not Found' : 'Conflict', detail: err.message });
+    res.status(err.status).json({ status: err.status, title: REFUSAL_TITLES[err.status] || 'Conflict', detail: err.message });
     return null;
   }
 }
@@ -140,10 +178,19 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
   if (!ctx) return;
   const codes = (Array.isArray(ctx.source.scenarios) ? ctx.source.scenarios : [])
     .map(s => s?.code).filter(c => typeof c === 'string' && c !== '');
+  const plan = planCopy(ctx.source, codes, ctx.frameworkConfig);
+  // #612: what each reference scenario is for, and what it needs declared.
+  if (ctx.entries) {
+    const byCode = new Map(ctx.entries.map(e => [e.code, e]));
+    plan.scenarios = plan.scenarios.map(s => {
+      const e = byCode.get(s.code);
+      return { ...s, kind: e.kind, purpose: e.purpose, checks: e.checks, missing: e.missing };
+    });
+  }
   return res.json({
     source: { id: ctx.sourceId, name: ctx.names[ctx.sourceId]?.name || '' },
     target: { id: ctx.targetId, name: ctx.names[ctx.targetId]?.name || '' },
-    ...planCopy(ctx.source, codes, ctx.frameworkConfig),
+    ...plan,
     testData: testDataChoices(ctx.resources),
   });
 });
@@ -155,6 +202,13 @@ router.post('/scenario-copy', copyLimiter, async (req, res) => {
   const { codes, trip_map: tripMap } = req.body || {};
   if (!Array.isArray(codes) || codes.length === 0) {
     return res.status(400).json({ status: 400, title: 'Bad Request', detail: 'Choose at least one scenario to copy.' });
+  }
+  // #612, the golden rule: a reference scenario needing what this company's
+  // framework does not declare is not copied.
+  const undeclared = (ctx.entries || []).filter(e => codes.includes(e.code) && e.missing.length > 0);
+  if (undeclared.length) {
+    const detail = undeclared.map(e => `${e.code} needs ${e.missing.join(', ')} in the Test Framework.`).join(' ');
+    return res.status(400).json({ status: 400, title: 'Bad Request', detail });
   }
   const target = ctx.names[ctx.targetId];
   return withDatafileLock(ctx.targetId, async () => {
@@ -186,6 +240,25 @@ router.post('/scenario-copy', copyLimiter, async (req, res) => {
     auditLog(req.user.id, ctx.targetId, req.user.email, `scenarios_copied:${ctx.sourceId}:${result.copied.length}`);
     return res.json({ copied: result.copied, hash });
   });
+});
+
+// ── GET /scenario-catalogue (#612) ────────────────────────────────────────────
+// The reference scenarios, each with what it needs the Test Framework to
+// declare and what this company's framework lacks. Needs no Test Data: it is
+// for reading; the copy is POST /scenario-copy with source_id "catalogue".
+router.get('/scenario-catalogue', previewLimiter, (req, res) => {
+  if (denyAdminAndCertifier(req, res)) return;
+  const companyId = resolveCompanyScope(req, res);
+  if (companyId === null) return;
+  try {
+    const { catalogue, simulator } = readCatalogue();
+    const entries = catalogueFor(catalogue, simulator, readFramework(companyId) || {});
+    return res.json({ entries });
+  } catch (err) {
+    if (err instanceof Refusal) return res.status(err.status).json({ status: err.status, title: 'Service Unavailable', detail: err.message });
+    log.error({ err }, 'scenario catalogue: not valid');
+    return res.status(503).json({ status: 503, title: 'Service Unavailable', detail: 'The scenario catalogue cannot be read on this server.' });
+  }
 });
 
 module.exports = router;
