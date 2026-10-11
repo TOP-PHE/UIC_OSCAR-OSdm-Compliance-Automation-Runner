@@ -31,6 +31,7 @@ const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 const exchanges = require('./osdm/exchanges');
 const persons = require('./osdm/persons');
+const variants = require('./osdm/variants');
 const { version: VERSION } = require('../package.json');
 
 // OSDM resources this simulator knows of and does not provide. They answer
@@ -234,10 +235,16 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     const booking = bookingOf(scope, bookingId);
     if (req.method === 'GET') return { passenger: findPassenger(booking, passengerId) };
     const body = await bodyOf(req);
+    findPassenger(booking, passengerId);
+    if (!variants.mayChangePassenger(booking, passengerId)) {
+      throw new HttpError(400, 'BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE', 'Only the main passenger may be modified',
+        `Only the main passenger '${booking.passengers[0].externalRef}' is allowed to be modified.`);
+    }
     // #611: the values checked, and the demanded fields on the result, before anything changes.
     persons.checkPassengerPatch(body, provider);
     persons.checkDemanded(booking, patchPassenger(structuredClone(booking), passengerId, body));
     const patched = patchPassenger(booking, passengerId, body);
+    variants.shapePassengers(booking);
     persons.showRequestedInformation(booking);
     return { passenger: patched };
   }

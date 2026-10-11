@@ -66,30 +66,30 @@ function patchMultiPassengerResponse(response, passengerIndex) {
 
   validationLogger(`[DEBUG] Comparing passenger ${passengerIndex} values with expected values from data file.`);
 
-  test(`Passenger ${passengerIndex} - First name is correct (expected: ${passenger.updateFirstName}, actual: ${firstName})`, () => {
-    validationLogger(`[DEBUG] Passenger ${passengerIndex} - First name is correct (expected: ${passenger.updateFirstName}, actual: ${firstName})`);
-    expect(firstName).to.equal(passenger.updateFirstName);
-  });
-
-  test(`Passenger ${passengerIndex} - Last name is correct (expected: ${passenger.updateLastName}, actual: ${lastName})`, () => {
-    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Last name is correct (expected: ${passenger.updateLastName}, actual: ${lastName})`);
-    expect(lastName).to.equal(passenger.updateLastName);
-  });
-
-  test(`Passenger ${passengerIndex} - Date of birth is correct (expected: ${passenger.updateDateOfBirth}, actual: ${dateOfBirth})`, () => {
-    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Date of birth is correct (expected: ${passenger.updateDateOfBirth}, actual: ${dateOfBirth})`);
-    expect(dateOfBirth).to.equal(passenger.updateDateOfBirth);
-  });
-
-  test(`Passenger ${passengerIndex} - Phone number is correct (expected: ${passenger.updatePhoneNumber}, actual: ${phoneNumber})`, () => {
-    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Phone number is correct (expected: ${passenger.updatePhoneNumber}, actual: ${phoneNumber})`);
-    expect(phoneNumber).to.equal(passenger.updatePhoneNumber);
-  });
-
-  test(`Passenger ${passengerIndex} - Email is correct (expected: ${passenger.updateEmail}, actual: ${email})`, () => {
-    validationLogger(`[DEBUG] Passenger ${passengerIndex} - Email is correct (expected: ${passenger.updateEmail}, actual: ${email})`);
-    expect(email).to.equal(passenger.updateEmail);
-  });
+  // A member the booking or the update gave must come back with the same
+  // value: a different value is a FAIL. One the provider does not return at
+  // all is a WARNING: OSDM does not oblige a provider to keep what it does not
+  // need (some providers keep only the main passenger's names, and no date of birth).
+  const sameOrAbsent = (label, expected, actual) => {
+    const name = `Passenger ${passengerIndex} - ${label} is correct (expected: ${expected}, actual: ${actual})`;
+    const absent = actual === undefined || actual === null || actual === "";
+    const wanted = expected !== undefined && expected !== null && expected !== "";
+    if (absent && wanted) {
+      validationLogger(`[WARNING] Passenger ${passengerIndex} - ${label} not returned by the provider (sent: ${expected}); OSDM does not require it to be kept.`);
+      test(`Passenger ${passengerIndex} - ${label} not returned by the provider (WARNING, optional member)`, () => {});
+      return;
+    }
+    test(name, () => {
+      validationLogger(`[DEBUG] ${name}`);
+      if (absent && !wanted) return; // nothing sent, nothing returned
+      expect(actual).to.equal(expected);
+    });
+  };
+  sameOrAbsent('First name', passenger.updateFirstName, firstName);
+  sameOrAbsent('Last name', passenger.updateLastName, lastName);
+  sameOrAbsent('Date of birth', passenger.updateDateOfBirth, dateOfBirth);
+  sameOrAbsent('Phone number', passenger.updatePhoneNumber, phoneNumber);
+  sameOrAbsent('Email', passenger.updateEmail, email);
 
   if (gender != null) {
     test(`Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`, () => {

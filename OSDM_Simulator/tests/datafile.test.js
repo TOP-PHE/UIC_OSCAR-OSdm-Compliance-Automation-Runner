@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -91,8 +91,9 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
   // The weekend group return (#599) is the group test below; the documents
   // return (#603), the documents test.
+  // A card or a product on a return, the card and product tests.
   const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE'
-    && !s.code.startsWith('SIM_GROUP_') && !s.code.startsWith('SIM_SALE_DOCUMENTS_'));
+    && !['SIM_GROUP_', 'SIM_SALE_DOCUMENTS_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_'].some((prefix) => s.code.startsWith(prefix)));
   assert.equal(returns.length, 5);
   for (const scenario of returns) {
     const model = scenario.offerSearchCriteria.returnModel;
@@ -108,11 +109,13 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
     && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.code.startsWith(prefix)));
-  assert.equal(refunds.length, 12);
+  // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
+  assert.equal(refunds.length, 16);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
+    assert.equal(scenario.offerSearchCriteria.returnModel === 'COMBINED', scenario.code.startsWith('SIM_REFUND_COMBINED_'), scenario.code);
     const partial = scenario.partialRefundByFulfillment === 'on';
-    assert.equal(partial, scenario.code.startsWith('SIM_REFUND_INBOUND_'), scenario.code);
+    assert.equal(partial, /^SIM_REFUND_(COMBINED_)?INBOUND_/.test(scenario.code), scenario.code);
     if (partial) assert.equal(scenario.partialRefundFulfillmentSelection, 'inbound');
     for (const axis of ['partialRefundByLeg', 'partialRefundByPax']) {
       assert.ok([undefined, 'off', false].includes(scenario[axis]), `${scenario.code}: the provider refuses a scope by leg or passenger`);
@@ -176,6 +179,7 @@ test('the variants and the deliberately wrong answers: each named by a passenger
     SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38: ['per-passenger'],
     SIM_VARIANT_REORDERED_2ADT_38: ['reordered'],
     SIM_VARIANT_MINIMAL_2ADT_38: ['minimal'],
+    SIM_VARIANT_MAIN_PASSENGER_2ADT_38: ['main-passenger-only', 'main-names-only'],
     SIM_WRONG_OFFER_PRICE_38: [],
     SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
     SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
@@ -192,6 +196,9 @@ test('the variants and the deliberately wrong answers: each named by a passenger
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const wrongTrip = datafile.tripRequirements.find((t) => t.trip?.origin === gamma.variants.wrongOffersFrom);
   assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === wrongTrip.id).map((s) => s.code), ['SIM_WRONG_OFFER_PRICE_38']);
+  // As with some providers, only the main passenger may be changed: the scenario updates it alone.
+  const scoped = datafile.scenarios.filter((s) => s.passengerUpdateScope != null).map((s) => [s.code, s.passengerUpdateScope]);
+  assert.deepEqual(scoped, [['SIM_VARIANT_MAIN_PASSENGER_2ADT_38', 'MAIN']]);
   const byPax = datafile.scenarios.find((s) => s.code === 'SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38');
   assert.equal(byPax.partialRefundByPax, 'on');
 });
@@ -226,13 +233,18 @@ test('the overrule scenarios: each code gamma accepts, and one it refuses (#596)
     assert.equal(scenario.desiredFlexibility, 'SEMI_FLEXIBLE', scenario.code);
     assert.equal(scenario.partialRefundByFulfillment, 'off', scenario.code);
   }
-  for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
+  // The same technical cancellation on a return sold as one offer.
+  const combined = datafile.scenarios.filter((s) => s.code.startsWith('SIM_REFUND_COMBINED_OVERRULE_'));
+  assert.deepEqual(combined.map((s) => [s.code, s.overruleCode]), [['SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38', 'TECHNICAL_FAILURE']]);
+  for (const scenario of datafile.scenarios.filter((s) => !overruled.includes(s) && !combined.includes(s))) assert.equal(scenario.overruleCode, null, scenario.code);
 });
 
 test('the reduction card scenarios: each card gamma lists, on a passenger of its own (#597)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const carded = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_CARD_'));
-  assert.deepEqual(carded.map((s) => s.code), ['SIM_SALE_CARD_25_1ADT_38', 'SIM_SALE_CARD_50_2ADT_38', 'SIM_SALE_CARD_STUDENT_1YTH_38']);
+  assert.deepEqual(carded.map((s) => s.code), ['SIM_SALE_CARD_25_1ADT_38', 'SIM_SALE_CARD_50_2ADT_38', 'SIM_SALE_CARD_STUDENT_1YTH_38', 'SIM_SALE_CARD_STUDENT_RETURN_1YTH_38']);
+  // The student card on a return sold as one offer.
+  assert.equal(carded[3].offerSearchCriteria.returnModel, 'COMBINED');
   const used = [];
   for (const scenario of carded) {
     assert.equal(scenario.osdmVersion, gamma.osdmVersion);
@@ -242,7 +254,7 @@ test('the reduction card scenarios: each card gamma lists, on a passenger of its
     assert.equal(cards.length, 1, `${scenario.code}: one passenger holds one card`);
     used.push(...cards);
   }
-  assert.deepEqual(used.sort(), gamma.reductionCards.map((c) => c.code).sort());
+  assert.deepEqual([...new Set(used)].sort(), gamma.reductionCards.map((c) => c.code).sort());
   for (const scenario of datafile.scenarios.filter((s) => !carded.includes(s))) {
     const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
     assert.ok(list.passengers.every((p) => !p.reductionCards), `${scenario.code} holds no card`);
@@ -252,7 +264,9 @@ test('the reduction card scenarios: each card gamma lists, on a passenger of its
 test('the product scenarios: each names a product gamma sells, by code or by name (#598)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const named = datafile.scenarios.filter((s) => s.code.startsWith('SIM_SALE_PRODUCT_'));
-  assert.equal(named.length, 3);
+  assert.equal(named.length, 4);
+  // The all-day ticket on a return sold as one offer.
+  assert.deepEqual(named.filter((s) => s.offerSearchCriteria.returnModel === 'COMBINED').map((s) => s.code), ['SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38']);
   for (const scenario of named) {
     const wanted = scenario.expectedProduct.toLowerCase();
     const product = gamma.products.find((p) => p.code.toLowerCase() === wanted || p.name.toLowerCase().includes(wanted));
@@ -399,12 +413,12 @@ test('the scenario catalogue names every scenario of the data file, and no other
 test('the document scenarios: a return asking both media, and its refund awaiting the receipt (#603)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const documented = datafile.scenarios.filter((s) => s.requestedFulfillmentOptionsListId === 2);
-  assert.deepEqual(documented.map((s) => s.code), ['SIM_SALE_DOCUMENTS_RETURN_1ADT_38', 'SIM_REFUND_RECEIPT_RETURN_1ADT_38']);
+  assert.deepEqual(documented.map((s) => s.code), ['SIM_SALE_DOCUMENTS_RETURN_1ADT_38', 'SIM_REFUND_RECEIPT_RETURN_1ADT_38', 'SIM_REFUND_COMBINED_RECEIPT_1ADT_38']);
   const media = datafile.requestedFulfillmentOptionsList.find((l) => l.id === 2).requestedFulfillmentOptions.map((o) => o.fulfillmentMedia);
   assert.deepEqual(media, gamma.documents);
   for (const scenario of documented) assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code}: two tickets, so a merged PDF`);
   const awaiting = datafile.scenarios.filter((s) => s.refundReceiptMaxWaitMinutes != null);
-  assert.deepEqual(awaiting.map((s) => s.code), ['SIM_REFUND_RECEIPT_RETURN_1ADT_38']);
+  assert.deepEqual(awaiting.map((s) => s.code), ['SIM_REFUND_RECEIPT_RETURN_1ADT_38', 'SIM_REFUND_COMBINED_RECEIPT_1ADT_38']);
   // The receipt comes well within the wait.
-  assert.ok(gamma.refundReceiptDelaySeconds < awaiting[0].refundReceiptMaxWaitMinutes * 60);
+  for (const scenario of awaiting) assert.ok(gamma.refundReceiptDelaySeconds < scenario.refundReceiptMaxWaitMinutes * 60, scenario.code);
 });

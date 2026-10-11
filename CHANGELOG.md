@@ -62,6 +62,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.238] / [collection-OTST_V2.0.127] — 2026-10-11
+
+Issue #642, release 2026.272. Simulator 0.22.0.
+
+### Added
+
+- **`passengerUpdateScope`** (scenario field, Test Config → Booking Flow
+  Actions → *Passengers updated*): `ALL` (default) updates every passenger at
+  step 03, `MAIN` only the first one, for providers that let only the main
+  passenger be changed (another one answers 400
+  `BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`). Step 04 then expects the
+  update for the passengers that had it and the booked details for the others.
+- **Four reference scenarios** in the catalogue (35): the refunds of a return
+  sold as one offer (COMBINED, OSDM 3.7+) — full, inbound only, technical
+  cancellation with an overrule code, and the refund receipt.
+
+### Changed
+
+- **A passenger detail the provider does not return is a WARNING, not a
+  FAIL** (steps 03/04: first and last name, date of birth, phone, email).
+  OSDM does not oblige a provider to keep what it does not need; some keep
+  only the main passenger's names and no date of birth. A detail returned
+  with a different value still fails. Gender is unchanged.
+
+### Fixed
+
+- **`04. GET Passenger` compared with the update values when the scenario had
+  the passenger update off** (`patchPassengers: false`), so such a scenario
+  failed five checks on any provider. It now expects what was booked.
+
+### Simulator 0.22.0
+
+- Two response variants on `gamma`, chosen by the first passenger's last name:
+  `Simvariant-Main-Passenger-Only` (only the main passenger may be updated;
+  another one is refused with 400 `BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`)
+  and `Simvariant-Main-Names-Only` (no date of birth kept, only the main
+  passenger's names).
+- Seven scenarios in its data file (73): the four COMBINED-return refunds
+  above, a return with a reduction card, a return of an all-day product, and
+  `SIM_VARIANT_MAIN_PASSENGER_2ADT_38` (`passengerUpdateScope: MAIN` against
+  the two variants, eleven expected warnings).
+
+### Default decisions (taken without asking)
+
+- A detail sent but not returned is a WARNING; a different one is a FAIL.
+- `MAIN` means the first passenger of the scenario's passenger list.
+- The COMBINED-return refunds go into the catalogue; the return with a card
+  and the return of an all-day product stay simulator scenarios only (the
+  catalogue already has the card, product and return scopes separately).
+
+Checked: every new scenario on `gamma` standalone with no failed check, and
+the main-passenger scenario failing without `MAIN` (the second PATCH is
+refused); a full recording of the 73 scenarios (`replay.js catalogue`:
+agrees; `compare` with the 0.21.0 recording: the 66 earlier scenarios make
+the same checks), from which `OSCAR - Checks by scenario.md` is regenerated; new unit tests mutation-checked (scope, the booked-details
+expectation, the WARNING rule); simulator tests 193 → 195. Not checked: a
+run against a real provider that keeps only the main passenger.
+
+---
+
 ## [simulator-0.21.0] — 2026-10-11
 
 Issue #640. Simulator 0.21.0. Server and collection unchanged.

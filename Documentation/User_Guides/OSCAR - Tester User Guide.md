@@ -508,6 +508,19 @@ allocates the seats.
   - empty: the optional ones are not booked.
 - The older **Book via optionalReservationSelections** switch now means
   "book the optional ones too".
+
+#### Passengers updated
+
+**Passengers updated** (Booking Flow Actions) says which passengers step 03
+updates: all of them (the default), or the **main passenger only**, for a
+provider that lets only the first passenger be changed. Step 04 then expects
+the new details for the passengers updated and the booked ones for the
+others.
+
+After the update, a detail the provider does not return at all (a date of
+birth, a phone number, a co-traveller's name) is a `[WARNING]`: OSDM does not
+oblige a provider to keep it. A detail returned with a different value is a
+failure.
 - **Checks:**
   - every relation names reservation parts of the offer and fits its group;
   - the booking holds each reservation booked, on the same leg;

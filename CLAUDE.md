@@ -1074,10 +1074,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **The collection sends a search's `departureTime` without an offset**
     (`2026-10-18T08:00:00`). It is read in the provider's `utcOffset`, and the
     answer always carries an offset.
-  - **`04. GET Passenger` compares with the `update*` values even when the
-    scenario turned the PATCH step off**, so a scenario with
-    `patchPassengers: false` fails five checks on any provider. The ready-made
-    scenarios keep it on.
+  - **Which passengers step 03 updates is `passengerUpdateScope`** (#642,
+    1.11.238): `ALL`, or `MAIN` (the first only; some providers refuse the others with
+    400 `BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`). The parser builds
+    `passengerAdditionalData` from it and `patchPassengers`: an updated
+    passenger is expected with the `update*` values, any other with the
+    booked ones (before 1.11.238 a scenario with `patchPassengers: false`
+    failed five checks). In 03/04 a detail sent but not returned is a
+    WARNING, a different one a FAIL. The simulator's `Main-Passenger-Only` /
+    `Main-Names-Only` variants are what proves both.
   - **To run the real collection against it locally:** a throw-away OSCAR
     server with `ALLOW_PRIVATE_TARGETS=1` and `BRU_CMD=bru.cmd` set before
     `require('src/server.js')`. The local `Oscar_Server/.env` has

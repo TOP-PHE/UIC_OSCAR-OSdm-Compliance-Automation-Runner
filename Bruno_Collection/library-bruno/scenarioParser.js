@@ -32,6 +32,7 @@ module.exports = {
   parseScenarioData,
   resetScenarioEnvVars,
   resolveSalesFlowActions,
+  passengerUpdateScope,
   osdmTripSearchCriteria,
   osdmTripSpecification,
   osdmOfferSearchCriteria,
@@ -40,6 +41,12 @@ module.exports = {
   featureNotDeclaredWarning,
   applyExternalRefFormat
 };
+
+// Which passengers step 03 updates: "MAIN" (the first only) when the scenario
+// says so, else "ALL".
+function passengerUpdateScope(scenario) {
+  return String(scenario?.passengerUpdateScope || "").toUpperCase() === "MAIN" ? "MAIN" : "ALL";
+}
 
 // Resolve the optional intermediate booking-flow actions for a scenario.
 // The OPTIONAL features (placeSelection, addAncillary, deleteAncillary) default
@@ -93,7 +100,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -688,6 +695,8 @@ function parseScenarioData(jsonData) {
         (scenario.bookMandatoryReservations === true || String(scenario.bookMandatoryReservations).toLowerCase() === "true") ? "true" : "false");
       // #601: how the optional reservations are booked (mandatory ones always are).
       bru.setEnvVar("reservationBookingForm", require('./seatReservations.js').normaliseForm(scenario.reservationBookingForm));
+      // Which passengers step 03 updates (ALL, or MAIN = the first only).
+      bru.setEnvVar("passengerUpdateScope", passengerUpdateScope(scenario));
       // #378: place-selection NHF probe sweep. The wizard stores an object of
       // booleans; the env carries an ORDERED array of the enabled probe keys
       // (omit → unknown type → wrong id). Default: no probes. The booking step
@@ -1214,7 +1223,13 @@ function parseScenarioData(jsonData) {
               updateGender: passenger.updateGender ?? passengerDataStruct.updateGender,
             };
 
-            passengerAdditionalData.push(passengerAdditionalDataStruct);
+            // A passenger step 03 does not update is read back at step 04
+            // against the values the booking sent: every passenger when the
+            // scenario turns the PATCH off, the others than the first when
+            // only the main passenger is updated.
+            const _updated = resolveSalesFlowActions(scenario.salesFlowActions).patchPassengers
+              && (passengerUpdateScope(scenario) === "ALL" || passengerIndex === 0);
+            passengerAdditionalData.push(_updated ? passengerAdditionalDataStruct : passengerDataStruct);
             passengerIndex++;
 
             if (

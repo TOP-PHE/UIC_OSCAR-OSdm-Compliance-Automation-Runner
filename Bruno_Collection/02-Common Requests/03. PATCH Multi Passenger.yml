@@ -229,7 +229,10 @@ runtime:
         currentIndex++;
         bru.setEnvVar("currentPassengerIndex", currentIndex);
 
-        if (currentIndex < totalPassengers) {
+        // With passengerUpdateScope MAIN only the first
+        // passenger is updated; step 04 reads every passenger back.
+        const _mainOnly = bru.getEnvVar("passengerUpdateScope") === "MAIN";
+        if (currentIndex < totalPassengers && !_mainOnly) {
             bru.runner.setNextRequest(req.getName());
         } else {
             bru.runner.setNextRequest("04. GET Passenger");

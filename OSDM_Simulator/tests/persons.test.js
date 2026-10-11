@@ -84,3 +84,41 @@ test('a booking made without a purchaser has none until one is written, and it n
   assert.equal(made.status, 200);
   assert.equal((await call(sim.base, token, 'GET', `${base}/purchaser`)).body.purchaser.detail.firstName, 'Paula');
 });
+
+// Only the main passenger may be changed, and only the main
+// passenger's names are kept (no date of birth, no contact).
+async function bookedTwo(lastNames) {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const two = [{ externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' }, { externalRef: '00002', type: 'PERSON', dateOfBirth: '1991-02-16' }];
+  const offers = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest({ anonymousPassengerSpecifications: two }))).body.offers;
+  const body = bookingRequest(offers[0]);
+  lastNames.forEach((name, i) => { body.passengerSpecifications[i].detail.lastName = name; });
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', body)).body.booking;
+  return { token, booking, url: (i) => `/gamma/bookings/${booking.id}/passengers/${booking.passengers[i].id}` };
+}
+
+test('main-passenger-only: the main passenger may be changed, another one is refused and left as it was', async () => {
+  const { token, booking, url } = await bookedTwo(['Simvariant-main-passenger-only', 'Example']);
+  assert.equal((await call(sim.base, token, 'PATCH', url(0), { detail: { firstName: 'Main', lastName: 'Changed' } })).status, 200);
+  const refused = await call(sim.base, token, 'PATCH', url(1), { detail: { firstName: 'Other', lastName: 'Changed' } });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.code, 'BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE');
+  assert.match(refused.body.detail, /Only the main passenger '00001'/);
+  assert.deepEqual((await call(sim.base, token, 'GET', url(1))).body.passenger, booking.passengers[1]);
+  const plain = await bookedTwo(['Example', 'Example']);
+  assert.equal((await call(sim.base, plain.token, 'PATCH', plain.url(1), { detail: { firstName: 'Other', lastName: 'Changed' } })).status, 200);
+});
+
+test('main-names-only: the main passenger keeps its names, nothing else is kept, before or after an update', async () => {
+  const { token, booking, url } = await bookedTwo(['Simvariant-main-names-only', 'Example']);
+  assert.deepEqual(booking.passengers.map((p) => [p.dateOfBirth, p.detail]), [
+    [undefined, { firstName: 'Alex', lastName: 'Simvariant-main-names-only' }],
+    [undefined, undefined],
+  ]);
+  const patched = await call(sim.base, token, 'PATCH', url(0), { dateOfBirth: '1980-05-05', detail: { firstName: 'New', lastName: 'Name', contact: { email: 'n@example.org' } } });
+  assert.equal(patched.status, 200);
+  assert.deepEqual(patched.body.passenger.detail, { firstName: 'New', lastName: 'Name' });
+  assert.equal(patched.body.passenger.dateOfBirth, undefined);
+  const plain = await bookedTwo(['Example', 'Example']);
+  assert.equal(plain.booking.passengers[1].dateOfBirth, '1990-01-15', 'without the variant, kept as booked');
+});
