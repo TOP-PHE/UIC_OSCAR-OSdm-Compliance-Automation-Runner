@@ -344,6 +344,12 @@ framework authorised.
   asked. These checks show in step `01. POST Get Offer`, which makes the call
   itself, so that a retry or the next scenario asks the trips again. One-way
   only: a return, or a SPECIFICATION trip, is asked as before, with a warning.
+- **Idempotency-Key test** (#604) — on: `POST /bookings` and `POST
+  /bookings/{id}/fulfillments` carry an `Idempotency-Key`. Each is sent again
+  with the same key, and the same booking, or the same fulfillments, must
+  come back, with no second booking. The booking is also sent with another
+  key, which must give a new booking; that booking is left pre-booked and
+  expires on its own. The checks show in steps 02 and 06.
 - **Unknown trip id refused** (#602) — the negative test: on, `POST /offers`
   names a trip id the provider never gave, and must be refused (`4xx` with an
   RFC-9457 Problem). The scenario ends there.
@@ -1003,6 +1009,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |
 | Expected product absent | `off` / `on` | negative test: no offer may hold the product |
 | Refund receipt wait (min) | `1`–`60` (optional) | after the refund, reads `GET /bookings/{id}` until a receipt (type `INFORMATION`) appears; none within the wait fails |
+| Idempotency-Key test | `off` / `on` | `Idempotency-Key` on the booking and the confirmation, each sent again with the same key |
 | Offers by trip id | `off` / `on` | `POST /trips-collection` first, then `POST /offers` with `tripIds` (one-way SEARCH trips) |
 | Unknown trip id refused | `off` / `on` | negative test: `POST /offers` with a trip id never given must be refused |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |

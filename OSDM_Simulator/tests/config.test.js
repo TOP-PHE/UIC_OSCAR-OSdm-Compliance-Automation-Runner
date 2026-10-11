@@ -222,3 +222,9 @@ test('documents: gamma issues PDF_A4 and RETAILER_APP, its receipt after 30 s; a
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ documents: ['PDF_A4'], refundReceiptDelaySeconds: wrong }) })), /refundReceiptDelaySeconds/, String(wrong));
   }
 });
+
+test('idempotency: gamma keeps the answers; a value that is not true or false stops the start (#604)', () => {
+  assert.equal(loadProviders(PROVIDERS_DIR).get('gamma').idempotency, true);
+  assert.equal(loadProviders(PROVIDERS_DIR).get('beta').idempotency, undefined);
+  assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ idempotency: 'yes' }) })), /idempotency/);
+});

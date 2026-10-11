@@ -1044,3 +1044,55 @@ test('refund receipt: in the booking 30 seconds after the refund, not before, an
   sim.clock.ms += 60000;
   assert.equal((await receipts()).length, 1, 'still one');
 });
+
+// ── Idempotency-Key on booking and confirmation (#604) ──────────────────────
+
+async function postWithKey(token, url, body, key) {
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  if (key !== undefined) headers['Idempotency-Key'] = key;
+  const res = await fetch(sim.base + url, { method: 'POST', headers, body: JSON.stringify(body) });
+  return { status: res.status, body: await res.json() };
+}
+
+test('idempotency: the same key gives the same booking, as it was; another key a new one', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offer = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body.offers[0];
+  const request = bookingRequest(offer);
+  const first = await postWithKey(token, '/gamma/bookings', request, 'key-1');
+  assert.equal(first.status, 200);
+  // The booking changes after the first answer; the replay is the first answer.
+  await call(sim.base, token, 'POST', `/gamma/bookings/${first.body.booking.id}/fulfillments`, {});
+  const again = await postWithKey(token, '/gamma/bookings', request, 'key-1');
+  assert.equal(again.status, 200);
+  assert.deepEqual(again.body, first.body);
+  const other = await postWithKey(token, '/gamma/bookings', request, 'key-2');
+  assert.equal(other.status, 200);
+  assert.notEqual(other.body.booking.id, first.body.booking.id);
+  // The same key for another body is refused; no key at all is a new booking each time.
+  const reused = await postWithKey(token, '/gamma/bookings', { ...request, externalRef: 'other' }, 'key-1');
+  assert.equal(reused.status, 409);
+  assert.equal(reused.body.code, 'IDEMPOTENCY_KEY_REUSED');
+  const plainA = await postWithKey(token, '/gamma/bookings', request);
+  const plainB = await postWithKey(token, '/gamma/bookings', request);
+  assert.notEqual(plainA.body.booking.id, plainB.body.booking.id);
+  assert.equal((await postWithKey(token, '/gamma/bookings', request, 'x'.repeat(101))).status, 400);
+});
+
+test('idempotency: the confirmation replayed gives the same fulfillments; a key is per client and per request', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offer = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  const url = `/gamma/bookings/${booking.id}/fulfillments`;
+  const first = await postWithKey(token, url, {}, 'conf-1');
+  const again = await postWithKey(token, url, {}, 'conf-1');
+  assert.equal(again.status, 200);
+  assert.deepEqual(again.body, first.body);
+  // The confirmation key used on POST /bookings is another request: refused.
+  assert.equal((await postWithKey(token, '/gamma/bookings', bookingRequest(offer), 'conf-1')).status, 409);
+  // alpha keeps no answers: the header is ignored.
+  const alpha = await tokenFor(sim.base, 'alpha', alphaOne);
+  const alphaOffer = (await call(sim.base, alpha, 'POST', '/alpha/offers', offerRequest())).body.offers[0];
+  const a1 = await postWithKey(alpha, '/alpha/bookings', bookingRequest(alphaOffer), 'k');
+  const a2 = await postWithKey(alpha, '/alpha/bookings', bookingRequest(alphaOffer), 'k');
+  assert.notEqual(a1.body.booking.id, a2.body.booking.id);
+});

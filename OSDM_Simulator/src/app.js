@@ -20,6 +20,7 @@
  * The simulator never makes an outbound request.
  */
 
+const crypto = require('node:crypto');
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
@@ -166,22 +167,49 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return booking;
   }
 
+  // #604: a request carrying an Idempotency-Key gets, the second time, the
+  // answer it got the first time, on a provider that keeps them. The same key
+  // with another body (or for another request) is refused.
+  async function idempotent(req, provider, scope, what, answer) {
+    const raw = await readBody(req, limits.bodyBytes);
+    const key = req.headers['idempotency-key'];
+    if (!provider.idempotency || key === undefined) return answer(parseJsonObject(raw));
+    if (typeof key !== 'string' || key.length === 0 || key.length > 100) {
+      throw new HttpError(400, 'VALIDATION_ERROR', 'The request is not valid', 'The Idempotency-Key header is not valid.');
+    }
+    const fingerprint = crypto.createHash('sha256').update(what).update('\n').update(raw).digest('hex');
+    const kept = store.get('idempotency', scope, key);
+    if (kept) {
+      if (kept.fingerprint !== fingerprint) {
+        throw new HttpError(409, 'IDEMPOTENCY_KEY_REUSED', 'Idempotency key reused', 'This Idempotency-Key was used for another request.');
+      }
+      return structuredClone(kept.answer);
+    }
+    const result = answer(parseJsonObject(raw));
+    // The answer as it was: the booking changes afterwards.
+    store.put('idempotency', scope, key, { fingerprint, answer: structuredClone(result) });
+    return result;
+  }
+
   // POST /bookings
   async function newBooking(req, provider, scope) {
     requireMethod(req, 'POST');
-    const booking = createBooking(await bodyOf(req), (offerId) => store.get('offer', scope, offerId), provider, now());
-    store.put('booking', scope, booking.id, booking);
-    return { booking };
+    return idempotent(req, provider, scope, 'POST /bookings', (body) => {
+      const booking = createBooking(body, (offerId) => store.get('offer', scope, offerId), provider, now());
+      store.put('booking', scope, booking.id, booking);
+      return { booking };
+    });
   }
 
   // POST /bookings/{id}/fulfillments; the documents with them (#603).
   async function fulfillments(req, provider, scope, bookingId) {
     requireMethod(req, 'POST');
-    await bodyOf(req);
-    const booking = bookingOf(scope, bookingId);
-    const issued = confirmBooking(booking, provider, now());
-    for (const fulfillment of issued) store.put('fulfillment', scope, fulfillment.id, booking.id);
-    return booking.fulfillmentDocuments ? { fulfillments: issued, fulfillmentDocuments: booking.fulfillmentDocuments } : { fulfillments: issued };
+    return idempotent(req, provider, scope, `POST /bookings/${bookingId}/fulfillments`, () => {
+      const booking = bookingOf(scope, bookingId);
+      const issued = confirmBooking(booking, provider, now());
+      for (const fulfillment of issued) store.put('fulfillment', scope, fulfillment.id, booking.id);
+      return booking.fulfillmentDocuments ? { fulfillments: issued, fulfillmentDocuments: booking.fulfillmentDocuments } : { fulfillments: issued };
+    });
   }
 
   // GET /fulfillments/{id} (#603): one fulfilment of this client's bookings.
