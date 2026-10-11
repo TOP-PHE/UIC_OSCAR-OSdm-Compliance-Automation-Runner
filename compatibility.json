@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.273",
+  "current_release": "2026.274",
   "releases": [
+    {
+      "release": "2026.274",
+      "date": "2026-10-11",
+      "server": "1.11.240",
+      "collection": "OTST_V2.0.128",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#646): a provider that stops answering no longer leaves runs hanging. A run whose Bruno writes nothing for 5 minutes is stopped with a log line saying why (RUN_IDLE_TIMEOUT_MS, off for scenarios that wait on purpose); the run timeout escalates to SIGKILL; the endpoint's DNS lookup at run start gives up after 10 s with its own message."
+      ]
+    },
     {
       "release": "2026.273",
       "date": "2026-10-11",

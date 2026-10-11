@@ -62,6 +62,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.240] — 2026-10-11
+
+Issue #646, release 2026.274. Collection unchanged (OTST_V2.0.128).
+
+### Fixed
+
+A provider's gateway stopped answering the OSCAR server's address (TCP
+timeouts; another network still got answers). Three runs then sat 18 minutes
+in their start-up checks with nothing in their log, their Bruno processes
+waited on an unanswered request for over 24 minutes, past the 10-minute run
+timeout, and the six other runs of the batch stayed queued behind them.
+
+- **A run whose Bruno writes nothing for five minutes is stopped**, and its
+  log says why: "No output from Bruno for 300s: a request to the provider got
+  no answer (unreachable, or blocking this server). Run stopped." Bruno prints
+  a line per request, so such a silence is a request with no answer. Not
+  armed when a scenario in scope waits on purpose (an expired-flow or refund
+  receipt timer). `RUN_IDLE_TIMEOUT_MS` sets it (server config); `0` turns it
+  off.
+- **The run timeout escalates to SIGKILL** three seconds after SIGTERM when
+  the process has not ended, as the emergency stop already did.
+- **The endpoint's DNS lookup at the start of a run gives up after 10
+  seconds**, with its own sentence ("could not be resolved within 10 s: the
+  server's DNS is not answering. Try again later."), instead of waiting
+  without a time limit. The same check guards the timetable discovery.
+
+### Default decisions (taken without asking)
+
+- Five minutes of silence; ten seconds for a DNS lookup.
+- The silence watch is off for a run whose scenario waits on purpose, rather
+  than lengthened: such waits can be 40 minutes long.
+
+Checked: unit tests for each guard, each failing with its guard undone.
+Not established: what held the three runs for 18 minutes before their token
+step. The DNS lookup is the one call there with no time limit, and it now has
+one; the same lookup answered in 0.3 s when tried afterwards.
+
+---
+
 ## [server-1.11.239] / [collection-OTST_V2.0.128] — 2026-10-11
 
 Issue #644, release 2026.273. Server code unchanged (tests only).

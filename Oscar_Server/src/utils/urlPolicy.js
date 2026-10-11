@@ -89,8 +89,23 @@ function structuralReason(raw) {
 async function resolvesPublic(host) {
   if (net.isIP(host)) return ipIsPublic(host);
   let addrs;
-  try { addrs = await dns.lookup(host, { all: true }); } catch { return false; }
+  try { addrs = await lookupWithin(host, DNS_LOOKUP_TIMEOUT_MS); } catch (err) {
+    if (err && err.code === 'DNS_TIMEOUT') throw err;
+    return false;
+  }
   return addrs.length > 0 && addrs.every(a => ipIsPublic(a.address));
+}
+
+// A lookup has no time limit of its own: with a resolver that does not
+// answer, a run waits without a word before it has even started. Give up
+// after a few seconds instead, and say so.
+const DNS_LOOKUP_TIMEOUT_MS = 10000;
+function lookupWithin(host, ms) {
+  let timer;
+  const late = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error(`DNS lookup of ${host} timed out`), { code: 'DNS_TIMEOUT' })), ms);
+  });
+  return Promise.race([dns.lookup(host, { all: true }), late]).finally(() => clearTimeout(timer));
 }
 
 const what = label => label || 'address';
@@ -107,10 +122,14 @@ async function usableUrlRefusal(raw, label) {
   if (reason) return `This ${what(label)} ${reason}. It must be an https address on a public host.`;
   if (allowPrivate()) return null;
   const host = hostOf(new URL(raw.trim()));
-  if (!(await resolvesPublic(host))) {
+  let isPublic;
+  try { isPublic = await resolvesPublic(host); } catch {
+    return `The name of this ${what(label)} (${host}) could not be resolved within ${DNS_LOOKUP_TIMEOUT_MS / 1000} s: the server's DNS is not answering. Try again later.`;
+  }
+  if (!isPublic) {
     return `This ${what(label)} resolves to a private, loopback or link-local address. It must be an https address on a public host.`;
   }
   return null;
 }
 
-module.exports = { storedUrlRefusal, usableUrlRefusal, ipIsPublic, allowPrivate };
+module.exports = { storedUrlRefusal, usableUrlRefusal, ipIsPublic, allowPrivate, DNS_LOOKUP_TIMEOUT_MS };

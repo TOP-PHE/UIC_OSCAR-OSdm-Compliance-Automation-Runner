@@ -17,7 +17,7 @@
 
 jest.mock('node:dns', () => ({ promises: { lookup: jest.fn() } }));
 const dns = require('node:dns').promises;
-const { storedUrlRefusal, usableUrlRefusal, ipIsPublic } = require('../../src/utils/urlPolicy');
+const { storedUrlRefusal, usableUrlRefusal, ipIsPublic, DNS_LOOKUP_TIMEOUT_MS } = require('../../src/utils/urlPolicy');
 
 const PRIOR = process.env.ALLOW_PRIVATE_TARGETS;
 beforeEach(() => { process.env.ALLOW_PRIVATE_TARGETS = ''; dns.lookup.mockReset(); });
@@ -114,5 +114,23 @@ describe('usableUrlRefusal — structural + DNS', () => {
     process.env.ALLOW_PRIVATE_TARGETS = '1';
     expect(await usableUrlRefusal('https://anything.internal', 'endpoint')).toBeNull();
     expect(dns.lookup).not.toHaveBeenCalled();
+  });
+});
+
+// #646: a resolver that does not answer must not hold a run without a word.
+describe('a DNS lookup that never answers', () => {
+  afterEach(() => jest.useRealTimers());
+
+  test('gives up after DNS_LOOKUP_TIMEOUT_MS with its own sentence', async () => {
+    jest.useFakeTimers();
+    dns.lookup.mockReturnValue(new Promise(() => {}));
+    const pending = usableUrlRefusal('https://osdm.example.org/api', 'OSDM endpoint');
+    await jest.advanceTimersByTimeAsync(DNS_LOOKUP_TIMEOUT_MS + 1);
+    await expect(pending).resolves.toBe(`The name of this OSDM endpoint (osdm.example.org) could not be resolved within ${DNS_LOOKUP_TIMEOUT_MS / 1000} s: the server's DNS is not answering. Try again later.`);
+  });
+
+  test('a lookup that fails at once is still "not public", not a timeout', async () => {
+    dns.lookup.mockRejectedValue(Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' }));
+    expect(await usableUrlRefusal('https://nowhere.example.org', 'OSDM endpoint')).toMatch(/resolves to a private, loopback or link-local address/);
   });
 });

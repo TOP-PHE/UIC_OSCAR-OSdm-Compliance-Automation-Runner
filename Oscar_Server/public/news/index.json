@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-silent-provider",
+    "date": "October 11, 2026",
+    "tag": "Fix",
+    "title": "Runs no longer hang on a silent provider",
+    "summary": "When a provider stops answering, a run now stops after five minutes of silence and says why, instead of hanging.",
+    "content": "If a provider's system stops answering OSCAR (for example when its firewall blocks OSCAR's address), a run used to wait on the unanswered request for a long time, and the runs queued behind it waited too. A run now stops after five minutes without any progress, and its log says that a request to the provider got no answer. Scenarios that wait on purpose (expiry tests, refund receipts) are not affected."
+  },
+  {
     "id": "2026-10-11-first-provider-runs",
     "date": "October 11, 2026",
     "tag": "Fix",

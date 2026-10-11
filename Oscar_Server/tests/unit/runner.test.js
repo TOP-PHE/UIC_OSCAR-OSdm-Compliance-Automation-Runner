@@ -49,7 +49,7 @@ jest.mock('../../src/utils/datafileOwnership', () => {
 const { viewForTester } = require('../../src/utils/datafileOwnership');
 
 const { run, get, colDecrypt, colEncrypt } = require('../../src/db/db');
-const { executeRun, killRun } = require('../../src/worker/runner');
+const { executeRun, killRun, runIdleLimitMs } = require('../../src/worker/runner');
 const runSecrets = require('../../src/utils/runSecrets');
 
 const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
@@ -657,6 +657,77 @@ describe('executeRun — timeout kill', () => {
 
     run(`DELETE FROM server_config WHERE key = 'RUN_TIMEOUT_MS'`);
   }, 10000);
+});
+
+// ── A provider that stops answering (#646) ─────────────────────────────────────
+describe('executeRun — a silent Bruno is stopped', () => {
+  const setConfig = (key, value) => run(`INSERT INTO server_config (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+  const clearConfig = (...keys) => keys.forEach((k) => run('DELETE FROM server_config WHERE key = ?', [k]));
+
+  test('no output for RUN_IDLE_TIMEOUT_MS: the run is stopped and the log says why', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    setConfig('RUN_IDLE_TIMEOUT_MS', '80');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForKillCall(fakeProc);
+    expect(fakeProc.kill).toHaveBeenCalledWith('SIGTERM');
+    fakeProc.emit('close', 143);
+    await runPromise;
+    expect(getDecryptedEvents(runId).some((e) => /No output from Bruno for \d+s: a request to the provider got no answer/.test(e.message))).toBe(true);
+    clearConfig('RUN_IDLE_TIMEOUT_MS');
+  }, 10000);
+
+  test('a Bruno that keeps writing is not stopped', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    setConfig('RUN_IDLE_TIMEOUT_MS', '120');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    for (let i = 0; i < 12; i++) {
+      fakeProc.stdout.emit('data', Buffer.from(`request ${i}\n`));
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    const killed = fakeProc.kill.mock.calls.length;
+    fakeProc.emit('close', 0);
+    await runPromise;
+    clearConfig('RUN_IDLE_TIMEOUT_MS');
+    expect(killed).toBe(0);
+  }, 10000);
+
+  test('a process that ignores SIGTERM at the timeout gets SIGKILL', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    setConfig('RUN_TIMEOUT_MS', '80');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForKillCall(fakeProc);
+    const start = Date.now();
+    while (!fakeProc.kill.mock.calls.some((c) => c[0] === 'SIGKILL') && Date.now() - start < 6000) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(fakeProc.kill.mock.calls.map((c) => c[0])).toEqual(['SIGTERM', 'SIGKILL']);
+    fakeProc.emit('close', 137);
+    await runPromise;
+    clearConfig('RUN_TIMEOUT_MS');
+  }, 12000);
+
+  test('runIdleLimitMs: five minutes by default, off at 0, off when a scenario waits on purpose', () => {
+    clearConfig('RUN_IDLE_TIMEOUT_MS');
+    expect(runIdleLimitMs({ requestedMs: 0 })).toBe(300000);
+    expect(runIdleLimitMs({ requestedMs: 2460000 })).toBe(0);
+    setConfig('RUN_IDLE_TIMEOUT_MS', '0');
+    expect(runIdleLimitMs({ requestedMs: 0 })).toBe(0);
+    clearConfig('RUN_IDLE_TIMEOUT_MS');
+  });
 });
 
 // ── killRun() ──────────────────────────────────────────────────────────────────
