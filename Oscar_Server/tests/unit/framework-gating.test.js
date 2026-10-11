@@ -28,6 +28,9 @@ const {
   deriveSalesFlowsAdditions,
   applyFrameworkMigration,
   annotateDatafile,
+  scenarioReturnModel,
+  returnModelsUsed,
+  needsFrameworkMigration,
 } = require('../../src/utils/frameworkGating');
 
 const PARTIAL_LEG_RULE = gatingRules().find(r => r.field === 'partialRefundByLeg');
@@ -173,10 +176,11 @@ describe('applyFrameworkMigration', () => {
   });
 
   test('is idempotent — second call is a no-op', () => {
-    const fw = { salesFlows: ['REFUND_FULL'], _salesFlowsMigratedAt: '2026-06-01T00:00:00Z' };
-    const scs = [{ scenarioType: 'REFUND', partialRefundByLeg: 'on' }];
+    const fw = { salesFlows: ['REFUND_FULL'], _salesFlowsMigratedAt: '2026-06-01T00:00:00Z', returnModels: [] };
+    const scs = [{ scenarioType: 'REFUND', partialRefundByLeg: 'on', offerSearchCriteria: { returnOffsetDays: 2 } }];
     const r = applyFrameworkMigration(fw, scs, '2026-06-08T18:00:00Z');
     expect(r.migrated).toBe(false);
+    expect(fw.returnModels).toEqual([]);
     expect(r.additions).toEqual([]);
     expect(fw.salesFlows).toEqual(['REFUND_FULL']);
     expect(fw._salesFlowsMigratedAt).toBe('2026-06-01T00:00:00Z'); // unchanged
@@ -244,6 +248,71 @@ describe('annotateDatafile', () => {
   test('null inputs are safe', () => {
     expect(annotateDatafile(null, {}).annotatedCount).toBe(0);
     expect(annotateDatafile({ scenarios: [] }, null).annotatedCount).toBe(0);
+  });
+});
+
+// #619: the return models a Test Framework declares.
+describe('return models (#619)', () => {
+  const ret = (criteria, extra = {}) => ({ code: 'R', offerSearchCriteria: criteria, ...extra });
+
+  test('a return is a non-negative whole returnOffsetDays; the model defaults to SEPARATE', () => {
+    expect(scenarioReturnModel(ret({ returnOffsetDays: 2 }))).toBe('SEPARATE');
+    expect(scenarioReturnModel(ret({ returnOffsetDays: 0, returnModel: 'COMBINED' }))).toBe('COMBINED');
+    expect(scenarioReturnModel(ret({ returnOffsetDays: '3', returnModel: 'combined' }))).toBe('SEPARATE');
+    for (const offset of [null, undefined, '', -1, 'x']) {
+      expect(scenarioReturnModel(ret({ returnOffsetDays: offset, returnModel: 'COMBINED' }))).toBeNull();
+    }
+    expect(scenarioReturnModel({ code: 'S' })).toBeNull();
+    expect(scenarioReturnModel(null)).toBeNull();
+  });
+
+  test('scenarioWarnings: declared, not declared, no return, nothing asked yet', () => {
+    const combined = ret({ returnOffsetDays: 2, returnModel: 'COMBINED' });
+    expect(scenarioWarnings(combined, { returnModels: ['COMBINED'] })).toEqual([]);
+    expect(scenarioWarnings(combined, { returnModels: ['SEPARATE'] })).toEqual(['returnModel']);
+    expect(scenarioWarnings(combined, { returnModels: [] })).toEqual(['returnModel']);
+    expect(scenarioWarnings(ret({ returnModel: 'COMBINED' }), { returnModels: [] })).toEqual([]);
+    expect(scenarioWarnings(combined, { salesFlows: ['SALE'] })).toEqual([]);
+  });
+
+  test('a REFUND scenario can carry both warnings', () => {
+    const sc = ret({ returnOffsetDays: 1 }, { scenarioType: 'REFUND', partialRefundByLeg: 'on' });
+    expect(scenarioWarnings(sc, { salesFlows: [], returnModels: ['COMBINED'] })).toEqual(['partialRefundByLeg', 'returnModel']);
+  });
+
+  test('returnModelsUsed lists the models of the return scenarios, in a fixed order', () => {
+    expect(returnModelsUsed([ret({ returnOffsetDays: 1, returnModel: 'COMBINED' }), ret({ returnOffsetDays: 1 }), { code: 'S' }]))
+      .toEqual(['SEPARATE', 'COMBINED']);
+    expect(returnModelsUsed([{ code: 'S' }, null])).toEqual([]);
+    expect(returnModelsUsed(null)).toEqual([]);
+  });
+
+  test('the migration declares what the scenarios use, once', () => {
+    const fw = { salesFlows: ['SALE'], _salesFlowsMigratedAt: '2026-06-01T00:00:00Z' };
+    expect(needsFrameworkMigration(fw)).toBe(true);
+    const scs = [ret({ returnOffsetDays: 1, returnModel: 'COMBINED' })];
+    const r = applyFrameworkMigration(fw, scs, '2026-10-11T00:00:00Z');
+    expect(r).toEqual({ migrated: true, additions: [] });
+    expect(fw.returnModels).toEqual(['COMBINED']);
+    expect(fw._salesFlowsMigratedAt).toBe('2026-06-01T00:00:00Z');
+    expect(needsFrameworkMigration(fw)).toBe(false);
+    // The Test Manager's list is never derived again, even when emptied.
+    fw.returnModels = [];
+    expect(applyFrameworkMigration(fw, scs, '2026-10-12T00:00:00Z').migrated).toBe(false);
+    expect(fw.returnModels).toEqual([]);
+    expect(annotateDatafile({ scenarios: scs }, fw).annotatedCount).toBe(1);
+  });
+
+  test('needsFrameworkMigration: nothing to do for a non-object', () => {
+    expect(needsFrameworkMigration(null)).toBe(false);
+    expect(needsFrameworkMigration({ _salesFlowsMigratedAt: 'x', returnModels: ['SEPARATE'] })).toBe(false);
+    expect(needsFrameworkMigration({ returnModels: [] })).toBe(true);
+  });
+
+  test('annotateDatafile passes over a scenario that is not an object', () => {
+    const df = { scenarios: [null, 'x', ret({ returnOffsetDays: 1 })] };
+    expect(annotateDatafile(df, { returnModels: [] }).annotatedCount).toBe(1);
+    expect(df.scenarios[2].__featureNotDeclaredWarnings).toEqual(['returnModel']);
   });
 });
 

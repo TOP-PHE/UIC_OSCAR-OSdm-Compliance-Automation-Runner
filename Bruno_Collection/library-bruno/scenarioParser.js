@@ -37,6 +37,7 @@ module.exports = {
   osdmOfferSearchCriteria,
   osdmFulfillmentOptions,
   buildReturnSearchParameters,
+  featureNotDeclaredWarning,
   applyExternalRefFormat
 };
 
@@ -593,9 +594,7 @@ function parseScenarioData(jsonData) {
       const _fwWarnings = Array.isArray(scenario.__featureNotDeclaredWarnings)
         ? scenario.__featureNotDeclaredWarnings : [];
       for (const _field of _fwWarnings) {
-        validationLogger(
-          `[WARNING] Scenario "${scenario.code}" arms ${_field}=on but the Test Framework does not declare the corresponding capability (REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows). The run will proceed; the runtime will degrade where the wire cannot convey the requested scope. Declare the capability in the Test Framework wizard to silence this warning, or unset ${_field} on the scenario.`
-        );
+        validationLogger(featureNotDeclaredWarning(scenario, _field));
       }
 
       // Set environment variables for the scenario
@@ -1571,6 +1570,16 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
   const inwardReturnDate = `${yyyy}-${mm}-${dd}T${timePart}${tz}`;
   validationLogger(`[INFO] 🔁 Return trip — inwardReturnDate "${inwardReturnDate}" (outbound "${outboundStart}" + ${offset} day(s))`);
   return { inwardReturnDate };
+}
+
+// The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
+// scenario arms that the Test Framework does not declare (#218, #619).
+function featureNotDeclaredWarning(scenario, field) {
+  if (field === 'returnModel') {
+    const model = scenario?.offerSearchCriteria?.returnModel || 'SEPARATE';
+    return `[WARNING] Scenario "${scenario.code}" asks for a return in the ${model} model, which the Test Framework does not declare (Return journeys). The run will proceed. Declare the model in the Test Framework, or choose a declared one on the scenario.`;
+  }
+  return `[WARNING] Scenario "${scenario.code}" arms ${field}=on but the Test Framework does not declare the corresponding capability (REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows). The run will proceed; the runtime will degrade where the wire cannot convey the requested scope. Declare the capability in the Test Framework wizard to silence this warning, or unset ${field} on the scenario.`;
 }
 
 // Read the return-trip options the OSCAR scenario stores on offerSearchCriteria

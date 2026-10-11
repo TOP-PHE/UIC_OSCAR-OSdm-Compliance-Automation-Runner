@@ -230,6 +230,56 @@ function isArmed(v) {
   return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1;
 }
 
+// #619: the return model a scenario asks for, or null when it has no return.
+// Kept in sync with Oscar_Server/src/utils/frameworkGating.js scenarioReturnModel().
+function scenarioReturnModel(sc) {
+  const c = sc?.offerSearchCriteria;
+  if (!c || typeof c !== 'object' || c.returnOffsetDays == null || c.returnOffsetDays === '') return null;
+  const offset = Number.parseInt(c.returnOffsetDays, 10);
+  if (!Number.isInteger(offset) || offset < 0) return null;
+  return c.returnModel === 'COMBINED' ? 'COMBINED' : 'SEPARATE';
+}
+
+// #619: the return models the Test Framework declares, or null for a framework
+// from before the declaration existed (nothing is restricted then).
+function fwReturnModels(fw) {
+  return Array.isArray(fw?.returnModels) ? fw.returnModels : null;
+}
+
+// #619: true when the scenario asks for a return model the framework does not declare.
+function returnModelUndeclared(sc, fw) {
+  const model = scenarioReturnModel(sc);
+  const declared = fwReturnModels(fw);
+  return model !== null && declared !== null && !declared.includes(model);
+}
+
+// #619: the options of a scenario's Return model picker: the declared models,
+// and the scenario's own model when it is not one of them, marked, so that
+// drawing a card never changes what it asks for.
+function returnModelChoices(options, declared, current) {
+  if (!Array.isArray(declared)) return options;
+  return options
+    .filter(([value]) => declared.includes(value) || value === current)
+    .map(([value, text]) => (declared.includes(value) ? [value, text] : [value, `⚠ ${text} — not declared in the Test Framework`]));
+}
+
+// #619: a scenario's return fields are locked when the framework declares no
+// return model and the scenario has no return (one it has can still be removed).
+function returnFieldsLocked(declared, criteria) {
+  const hasReturn = criteria?.returnOffsetDays != null && criteria.returnOffsetDays !== '';
+  return Array.isArray(declared) && declared.length === 0 && !hasReturn;
+}
+
+// #619: the framework editor's note when COMBINED is declared below OSDM 3.7,
+// where returnSearchParameters.outboundTripIds does not exist.
+function returnModelVersionNote(fw) {
+  if (!Array.isArray(fw?.returnModels) || !fw.returnModels.includes('COMBINED')) return '';
+  const [major, minor] = String(fw.osdmVersion || '').split('.').map(n => Number.parseInt(n, 10));
+  if (!Number.isInteger(major) || !Number.isInteger(minor)) return '';
+  if (major > 3 || (major === 3 && minor >= 7)) return '';
+  return `⚠ Both directions in one offer needs OSDM 3.7 or later (returnSearchParameters.outboundTripIds); this framework declares ${fw.osdmVersion}.`;
+}
+
 // Count of scenarios in the current datafile whose armed feature is not
 // declared in the framework — used by the top-of-scenarios banner.
 // Kept in sync with Oscar_Server/src/utils/frameworkGating.js scenarioWarnings()
@@ -241,11 +291,10 @@ function fwUndeclaredArmedCount() {
   let n = 0;
   for (const sc of scenarios) {
     const t = String(sc?.scenarioType || 'SALE').toUpperCase();
-    if (t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax)
+    const partial = t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax)
         || isArmed(sc.partialRefundByFulfillment))
-        && !flows.has('REFUND_PARTIAL')) {
-      n++;
-    }
+        && !flows.has('REFUND_PARTIAL');
+    if (partial || returnModelUndeclared(sc, fw)) n++;
   }
   return n;
 }
@@ -1009,11 +1058,12 @@ function renderScenariosSection(framework, resources, datafile) {
     const _gatingBanner = _undeclaredCount > 0 ? `
       <div style="margin:0 0 12px;padding:10px 14px;border:1px solid #ffb74d;border-radius:6px;background:#fff8e1;color:#bf6f00;font-size:13px;line-height:1.5">
         ⚠ ${_undeclaredCount} scenario(s) arm a feature the Test Framework does not declare
-        (currently <strong>REFUND_PARTIAL</strong> on REFUND scenarios with partial-refund flags armed).
+        (<strong>REFUND_PARTIAL</strong> on REFUND scenarios with partial-refund flags armed,
+        or a return in a model not ticked under 🔁 Return journeys).
         The run is not blocked — the runtime will emit a <code>[WARNING]</code> and degrade
         where the wire can't carry the requested scope. Tick the matching Partial card in
-        Test Framework → ✂️ Refund/Exchange row to silence both this banner and the
-        runtime warning.
+        Test Framework → ✂️ Refund/Exchange row, or the return model under Sales Flows →
+        🔁 Return journeys, to silence both this banner and the runtime warning.
       </div>` : '';
 
     // Build merged scenario list with checkbox + expandable details
@@ -2266,6 +2316,11 @@ const RETURN_MODEL_OPTIONS = [
   ['SEPARATE', 'Separate directions (outwardOfferIds) — default'],
   ['COMBINED', 'Both directions in one offer (outboundTripIds, OSDM 3.7+)'],
 ];
+// #619: the same models as the Test Framework declares them.
+const FW_RETURN_MODELS = [
+  ['SEPARATE', 'Separate directions (one offer each)'],
+  ['COMBINED', 'Both directions in one offer (OSDM 3.7+)'],
+];
 const RETURN_FULFILLMENT_OPTIONS = [
   ['', 'Not checked'],
   ['ONE', 'One for the whole return'],
@@ -2276,19 +2331,36 @@ const RETURN_FULFILLMENT_OPTIONS = [
 function buildReturnModelFields(idx, criteria) {
   const optionsOf = (current, options) => options.map(([value, text]) =>
     `<option value="${esc(value)}" ${optionValue(current) === value ? 'selected' : ''}>${esc(text)}</option>`).join('');
+  // #619: only the models the Test Framework declares.
+  const declared = fwReturnModels(wizData?.framework);
+  const model = criteria.returnModel || 'SEPARATE';
+  const off = returnFieldsLocked(declared, criteria) ? ' disabled' : '';
+  let undeclared = '';
+  if (returnModelUndeclared({ offerSearchCriteria: criteria }, wizData?.framework)) {
+    undeclared = `<div style="color:#e65100;font-size:12px;margin-top:4px">⚠ This return model is not declared in the Test Framework (Sales Flows → 🔁 Return journeys). The run will log a warning.</div>`;
+  }
   return `
       <div class="param-field">
         <span class="param-label">Return model <span class="param-hint">(return trips only) — what the inbound offer call names</span></span>
-        <select class="param-input param-select" data-action="set-offer-return-model" data-idx="${esc(idx)}">
-          ${optionsOf(criteria.returnModel || 'SEPARATE', RETURN_MODEL_OPTIONS)}
+        <select class="param-input param-select" data-action="set-offer-return-model" data-idx="${esc(idx)}"${off}>
+          ${optionsOf(model, returnModelChoices(RETURN_MODEL_OPTIONS, declared, model))}
         </select>
+        ${undeclared}
       </div>
       <div class="param-field">
         <span class="param-label">Return fulfillments <span class="param-hint">(return trips only) — expected after confirmation</span></span>
-        <select class="param-input param-select" data-action="set-offer-return-fulfillments" data-idx="${esc(idx)}">
+        <select class="param-input param-select" data-action="set-offer-return-fulfillments" data-idx="${esc(idx)}"${off}>
           ${optionsOf(criteria.returnFulfillments, RETURN_FULFILLMENT_OPTIONS)}
         </select>
       </div>`;
+}
+
+// #619: the Return trip hint, which says why the field is locked when it is.
+function returnTripHint(criteria) {
+  if (returnFieldsLocked(fwReturnModels(wizData?.framework), criteria)) {
+    return '— the Test Framework declares no return model (Sales Flows → 🔁 Return journeys)';
+  }
+  return '(optional) — days after the outbound. Empty = one-way · 0 = same day · e.g. 2';
 }
 
 // The value of a <select> option: null and undefined stand for the empty option.
@@ -3019,14 +3091,14 @@ function buildOfferSection(idx, sc) {
           data-action="set-offer-tags" data-idx="${esc(idx)}">
       </div>
       <div class="param-field">
-        <span class="param-label">Return trip <span class="param-hint">(optional) — days after the outbound. Empty = one-way · 0 = same day · e.g. 2</span></span>
+        <span class="param-label">Return trip <span class="param-hint">${esc(returnTripHint(criteria))}</span></span>
         <input class="param-input" type="number" min="0" max="30" value="${esc(criteria.returnOffsetDays != null ? criteria.returnOffsetDays : '')}" placeholder="e.g. 2 (leave empty for one-way)"
-          data-action="set-offer-return-offset" data-idx="${esc(idx)}">
+          data-action="set-offer-return-offset" data-idx="${esc(idx)}"${returnFieldsLocked(fwReturnModels(wizData?.framework), criteria) ? ' disabled' : ''}>
       </div>
       <div class="param-field">
         <span class="param-label">Return time <span class="param-hint">(optional) — HH:MM; defaults to the outbound departure time</span></span>
         <input class="param-input" type="time" value="${esc(criteria.returnTime||'')}"
-          data-action="set-offer-return-time" data-idx="${esc(idx)}">
+          data-action="set-offer-return-time" data-idx="${esc(idx)}"${returnFieldsLocked(fwReturnModels(wizData?.framework), criteria) ? ' disabled' : ''}>
       </div>
       ${buildReturnModelFields(idx, criteria)}
     </div>
@@ -3751,6 +3823,13 @@ function renderWizardStep1() {
       </div>
       ${afterSalesRow('REFUND',   '↩️', 'Refund — After-sales')}
       ${afterSalesRow('EXCHANGE', '🔄', 'Exchange — After-sales')}
+      <div class="fw-subsection" style="margin-top:12px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">🔁 Return journeys — the models a return may be asked in (none ticked: no return scenario)</div>
+        <div class="pill-group">
+          ${FW_RETURN_MODELS.map(([v, t]) => `<div class="pill${(fw.returnModels||[]).includes(v)?' selected':''}" data-action="fw-return-model" data-val="${esc(v)}">${esc(t)}</div>`).join('')}
+        </div>
+        <div id="fw-return-version-note" style="color:#e65100;font-size:12px;margin-top:6px">${esc(returnModelVersionNote(fw))}</div>
+      </div>
     </div>
   </div>
 
@@ -3990,6 +4069,12 @@ function fwTogglePill(el, modeKey, subKey, value) {
   if (idx === -1) { arr.push(value); el.classList.add('selected'); }
   else            { arr.splice(idx,1); el.classList.remove('selected'); }
   wizData.framework[modeKey][subKey] = arr;
+}
+
+// #619: the note under Return journeys follows the models and the OSDM version.
+function refreshReturnVersionNote() {
+  const note = document.getElementById('fw-return-version-note');
+  if (note) note.textContent = returnModelVersionNote(wizData.framework);
 }
 
 function fwToggleSimplePill(el, key, value) {
@@ -6863,6 +6948,8 @@ document.body.addEventListener('click', function(e) {
       fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-ancillary':
       fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-return-model':
+      fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;
     case 'fw-remove-ancillary':
       fwRemoveAncillary(el.dataset.val); break;
     case 'fw-add-ancillary':
@@ -7576,6 +7663,7 @@ document.body.addEventListener('input', function(e) {
       // will snap the displayed value back to the stored one.
       if (!v) break;
       wizData.framework.osdmVersion = v;
+      refreshReturnVersionNote();
       saveFrameworkDebounced();
       break;
     }
