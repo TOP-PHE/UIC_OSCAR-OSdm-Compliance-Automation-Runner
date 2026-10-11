@@ -875,7 +875,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `fulfillmentIds` only: providers that refund per fulfillment refuse
   `refundSpecifications` with `bookingPartIds` / `passengerIds`. A partial
   refund is armed by any of `partialRefundArmed()`'s three flags; use it
-  instead of reading the leg and passenger flags.
+  instead of reading the leg and passenger flags. A refund by leg or by
+  passenger names the fulfillment that holds its parts
+  (`fulfillmentForScope()`, #610, OTST_V2.0.120): the only one, else the one
+  whose `bookingParts` list them, else the passenger's. Parts in several
+  fulfillments, or none shown, degrade to a full refund: never fall back to
+  `fulfillments[0]`.
 - **An overrule code is a technical cancellation: everything back, no fee**
   (#596, 1.11.227 / OTST_V2.0.111). One refund offer is compared with
   `confirmedPrice` in `validateRefundableAmount`; several (one per
@@ -969,6 +974,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   every scenario of the simulator's data file with its expected warnings.
   `datafile.test.js` fails when the two disagree, so a new scenario needs its
   row in the same change.
+- **The Idempotency-Key test sends requests again from the step's script**
+  (#604). `idempotencySteps.js` puts the key on 02 and 06 with `req.setHeader`
+  and replays them with `bru.sendRequest`, so the flow of the scenario does not
+  change. Its key comes from `require('crypto')`, which the developer sandbox
+  gives. The simulator keeps a *copy* of the first answer: the booking changes
+  afterwards, and a replay must not show its later state.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two

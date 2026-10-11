@@ -265,6 +265,11 @@
             "minimum": 1,
             "maximum": 60
           },
+          "idempotencyCheck": {
+            "description": "Idempotency-Key test (#604). When on, POST /bookings and POST /bookings/{id}/fulfillments carry an Idempotency-Key and are each sent again with the same key: the same booking, or the same fulfillments, must come back, and no second booking. The booking is also sent with another key, which must give a new booking (left pre-booked). Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "offersByTripIds": {
             "description": "Offers asked by trip id (#602). When on, the offer step first asks POST /trips-collection with the origin, destination and time of the scenario's SEARCH trip, takes the trip running the trip's train (vehicleNumber) or, without one, the first leaving at the time asked or later, and asks POST /offers with tripIds naming it. A one-way journey only: a return, or a SPECIFICATION trip, is asked as before with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

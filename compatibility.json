@@ -1,8 +1,32 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.263",
+  "current_release": "2026.265",
   "releases": [
+    {
+      "release": "2026.265",
+      "date": "2026-10-11",
+      "server": "1.11.235",
+      "collection": "OTST_V2.0.120",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#610): a partial refund by leg or by passenger names, in its RefundSpecification, the fulfillment that holds the parts it refunds (bookingParts), else the chosen passenger's (fulfillmentParts). fulfillments[0] only when the booking has one. Parts spread over several fulfillments, or no way to tell, degrade to a full refund with a WARNING giving the reason, instead of naming a fulfillment that may not hold them (library-bruno/partialRefund.js)."
+      ]
+    },
+    {
+      "release": "2026.264",
+      "date": "2026-10-11",
+      "server": "1.11.235",
+      "collection": "OTST_V2.0.119",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#604): Idempotency-Key. With idempotencyCheck, POST /bookings (02) and POST /bookings/{id}/fulfillments (06) carry an Idempotency-Key and are each sent again with the same key from the step's script: the same booking, or the same fulfillments, must come back, and no second booking (failures). The booking is also sent with another key, which must give a new booking; that booking is left pre-booked (library-bruno/idempotency.js, pure; idempotencySteps.js).",
+        "Server 1.11.235: Test Config has the Idempotency-Key test field; the data file schema accepts idempotencyCheck.",
+        "Simulator 0.14.0 (not part of a release): gamma (profile idempotency) keeps the answers of POST /bookings and POST .../fulfillments per client and key, as first given; the same key with another body is 409 IDEMPOTENCY_KEY_REUSED. Scenario SIM_SALE_IDEMPOTENCY_1ADT_38."
+      ]
+    },
     {
       "release": "2026.263",
       "date": "2026-10-11",

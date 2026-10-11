@@ -59,6 +59,8 @@ runtime:
             validationLogger(`[INFO] expiredBookingTest: attempting fulfillment, expecting the provider to reject it (booking expired).`);
           }
         }
+        // #604: a new Idempotency-Key when the scenario tests it.
+        require(bru.getEnvVar("library_base") + "idempotencySteps.js").setIdempotencyKey(req, "confirmation");
     - type: after-response
       code: |-
         const { validationLogger } = require(bru.getEnvVar("library_base")+"displays.js");
@@ -121,6 +123,9 @@ runtime:
             validationLogger('[WARNING] POST /fulfillments returned no fulfillments[] — OSDM requires a FulfillmentResponse body with the generated fulfillments. Proceeding; booking state will be verified at 07. GET Booking after Fulfillments.');
         }
         validateFulfillments(jsonData.fulfillments, 0, ["FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments);
+
+        // #604: the same confirmation sent again with the same key.
+        await require(bru.getEnvVar("library_base") + "idempotencySteps.js").checkConfirmationIdempotency(jsonData);
 
         // #603: read each fulfillment with GET /fulfillments/{id} (06b), then
         // the booking (07).

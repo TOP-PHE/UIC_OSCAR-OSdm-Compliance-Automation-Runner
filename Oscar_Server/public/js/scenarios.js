@@ -62,6 +62,8 @@ const ENUMS = {
   expectedProductAbsent:             ['off', 'on'],
   // #602: offers asked by trip id, after POST /trips-collection; and its negative test.
   offersByTripIds:                   ['off', 'on'],
+  // #604: booking and confirmation sent again with the same Idempotency-Key.
+  idempotencyCheck:                  ['off', 'on'],
   tripIdsExpectRejection:            ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
@@ -1611,6 +1613,8 @@ function buildDetailHTML(idx) {
             placeholder="leave empty = not awaited"
             data-action="set-scenario-receipt-wait-minutes" data-idx="${esc(idx)}">
         </div>` : ''}
+        ${buildSelect(idx, 'idempotencyCheck', 'Idempotency-Key test', ENUMS.idempotencyCheck,
+          'Idempotency-Key (#604). On: POST /bookings and POST /bookings/{id}/fulfillments carry an Idempotency-Key and are each sent again with the same key; the same booking, or the same fulfillments, must come back, and no second booking. The booking is also sent with another key, which must give a new booking (it is left pre-booked and expires).')}
         ${buildSelect(idx, 'offersByTripIds', 'Offers by trip id', ENUMS.offersByTripIds,
           'Offers asked by trip id (#602). On: POST /trips-collection is asked with the origin, destination and time of the SEARCH trip; the trip of its train number, or else the first leaving at that time or later, is taken, and POST /offers names it in tripIds. One-way only: a return or a SPECIFICATION trip is asked as before.')}
         ${buildSelect(idx, 'tripIdsExpectRejection', 'Unknown trip id refused', ENUMS.tripIdsExpectRejection,

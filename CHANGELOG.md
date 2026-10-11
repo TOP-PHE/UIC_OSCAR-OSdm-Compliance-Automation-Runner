@@ -62,6 +62,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.235] / [collection-OTST_V2.0.120] — 2026-10-11
+
+Issue #610, release 2026.265.
+
+### Fixed
+
+- **A partial refund names the fulfillment that holds what it refunds**
+  (`library-bruno/partialRefund.js`, `fulfillmentForScope()`). A
+  RefundSpecification names one fulfillment. It is now:
+  - the booking's only fulfillment, as before;
+  - else the one whose `bookingParts` list the parts refunded (the leg's
+    parts by leg, the passenger's parts by passenger);
+  - else the chosen passenger's, by `fulfillmentParts[].passengerRef`.
+  
+  Parts in several fulfillments, or none shown to hold them, degrade to a full
+  refund with the reason in a WARNING. Before, the first fulfillment was taken
+  whenever nothing matched, which a provider with one fulfillment per
+  passenger refuses. A refund by fulfillment (#595) is unchanged.
+
+Checked: the unit tests (27; five of them fail on the previous version), and
+three refund scenarios on the simulator, unchanged (373, 449 and 522 checks,
+none failed). The simulator refunds per fulfillment only, so the new choice
+itself is covered by the unit tests, not by a simulator run. Not run against
+a real provider (ČD).
+
+---
+
+## [server-1.11.235] / [collection-OTST_V2.0.119] — 2026-10-11
+
+Issue #604, release 2026.264. Simulator 0.14.0.
+
+### Added
+
+- **Idempotency-Key test** (`idempotencyCheck`). `library-bruno/idempotency.js`
+  (pure) holds the checks, `idempotencySteps.js` the steps.
+  - Steps `02` and `06` put a new `Idempotency-Key` (a UUID) on
+    `POST /bookings` and `POST /bookings/{id}/fulfillments`.
+  - After each answer, the step's script sends the same request again with the
+    same key: the same booking, or the same fulfillments (in any order), must
+    come back (failures). The booking is also sent with another key, which
+    must give a new booking; that booking is left pre-booked.
+  - The requests sent again do not change the flow; their checks are in the
+    step. One-way bookings only.
+- **Test Config**: an "Idempotency-Key test" field. `datafile.schema.json`
+  accepts `idempotencyCheck`.
+
+### Simulator 0.14.0
+
+- A profile may set `idempotency` (`gamma`): the answers of `POST /bookings`
+  and `POST …/fulfillments` are kept per client and key, as they were first
+  given (a copy, not the booking as it is later), and given again. The same
+  key for another body or another request is `409 IDEMPOTENCY_KEY_REUSED`;
+  a key over 100 characters is `400`.
+- `SIM_SALE_IDEMPOTENCY_1ADT_38`, with its row in the scenario catalogue.
+
+Checked: the scenario standalone (237 checks, none failed); two earlier gamma
+scenarios unchanged (231 and 522). Counter-check: with `idempotency` off on
+the simulator, the "same booking" check fails. The confirmation sent again
+still passes there, because a confirmation of a confirmed booking returns the
+same fulfillments anyway. Not run against a real provider (ČD).
+
+---
+
 ## [server-1.11.234] / [collection-OTST_V2.0.118] — 2026-10-11
 
 Issue #603, release 2026.263. Simulator 0.13.0.

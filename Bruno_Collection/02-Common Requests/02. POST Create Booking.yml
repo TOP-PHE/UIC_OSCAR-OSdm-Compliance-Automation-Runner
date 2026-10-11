@@ -59,6 +59,8 @@ runtime:
         }
 
         buildBookingRequest();
+        // #604: a new Idempotency-Key when the scenario tests it.
+        require(bru.getEnvVar("library_base") + "idempotencySteps.js").setIdempotencyKey(req, "booking");
     - type: after-response
       code: |-
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
@@ -188,6 +190,8 @@ runtime:
           }
           postCreateBookingResponse(bru.getEnvVar("offer"), _body, ["PREBOOKED"], ["ON_HOLD", "AVAILABLE"]);
           bru.deleteEnvVar("currentPassengerIndex");
+          // #604: the same booking sent again with the same key, then another key.
+          await require(bru.getEnvVar("library_base") + "idempotencySteps.js").checkBookingIdempotency(_body);
         }
 
         // Routing after POST Create Booking:
