@@ -1,5 +1,7 @@
 # OSCAR Test Coverage Map
 
+> **As of release 2026.123 (collection OTST_V2.0.43). Not kept up to date:** what the collection checks today is in [OSCAR - What is tested](OSCAR%20-%20What%20is%20tested.md) and, check by check from a real run, in [OSCAR - Checks by scenario](OSCAR%20-%20Checks%20by%20scenario.md) (#640). The file:line references below point at the code of that release.
+
 *Reference document — what OSCAR tests against an OSDM-conformant provider, as of release **2026.123** (server-v1.11.95 / collection OTST_V2.0.43, 2026-05-28).*
 
 > **Two sections.** Section 1 enumerates the happy-flow coverage: every OSDM endpoint OSCAR exercises, the inputs OSCAR can vary per scenario, and the response checks fired in each after-response. Section 2 enumerates the non-happy-flow coverage: the negative-test framework — expired-X tests, requestedInformation probes, purchaser modes, IROPS overrules, vendor-gap markers, and other refusal-expecting assertions.

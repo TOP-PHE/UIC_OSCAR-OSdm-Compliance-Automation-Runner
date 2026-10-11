@@ -62,6 +62,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.21.0] — 2026-10-11
+
+Issue #640. Simulator 0.21.0. Server and collection unchanged.
+
+### Simulator 0.21.0
+
+- **`node scripts/replay.js describe`** writes
+  `Documentation/Test_Coverage/OSCAR - Checks by scenario.md` from the last
+  recording (`replay/after.json`): for every step of the collection, every
+  check it makes and how many scenarios make it; for every scenario, its
+  provider, its reference-scenario code if the catalogue has one, the steps it
+  runs with their number of checks, its failed checks, and the checks at most
+  four scenarios make. Values a run met (amounts, counts, codes, quoted text,
+  code-list values) are shown as `N` and `…`, so a check reads the same in
+  every scenario.
+
+### Documentation
+
+- **`Documentation/Test_Coverage/OSCAR - What is tested.md`**: what a run
+  tests, in one place. How a scenario becomes a run; what the simulator
+  answers on `alpha`, `beta` and `gamma`; what each Bruno step checks (sale,
+  return, refund, exchange, expiry probes); the 66 scenarios of the
+  simulator's data file by group; the 31 reference scenarios of the catalogue
+  with their scope, what the Test Framework must declare, their number of
+  checks and their source scenario. The reference-scenario tables are pinned
+  to `scenario_catalogue.json` by `OSDM_Simulator/tests/what-is-tested.test.js`.
+- **`OSCAR - Checks by scenario.md`**, generated as above from a full recording of collection OTST_V2.0.126: 41 steps, 805 different checks, 66 scenarios.
+- The Test Coverage Map now says it is as of release 2026.123 and points to
+  the two new documents.
+
+Checked: a full recording of the 66 scenarios on this commit, the same as
+the one #611 was released with (`compare`), and the catalogue's check counts
+against it (`catalogue`: agrees). Simulator tests 189 → 193; the
+distinctive-check threshold, the Markdown escaping and the reference-scenario
+row test each fail when broken on purpose. Not checked: how GitHub renders
+the generated document's 805-row tables.
+
+---
+
 ## [simulator-0.15.0] — 2026-10-11
 
 Issue #617. Simulator 0.15.0. Server and collection unchanged.
