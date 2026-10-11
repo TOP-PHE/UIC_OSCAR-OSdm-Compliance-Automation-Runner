@@ -13,6 +13,10 @@
   "tripsCollection": true,
   "idempotency": true,
   "exchange": true,
+  "shortDeadlines": {
+    "stopPlaceRef": "urn:uic:stn:0000099",
+    "seconds": 60
+  },
   "documents": [
     "PDF_A4",
     "RETAILER_APP"

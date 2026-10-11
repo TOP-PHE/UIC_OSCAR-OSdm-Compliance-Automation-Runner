@@ -26,6 +26,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
+const { lifetimeOf } = require('./bookings');
 
 const REFUND_OFFER_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_FULFILLMENT_IDS = 20;
@@ -90,7 +91,7 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs) {
     summary: `Refund of ${fulfillment.summary || fulfillment.id}`,
     createdOn: new Date(nowMs).toISOString(),
     validFrom: new Date(nowMs).toISOString(),
-    validUntil: new Date(nowMs + REFUND_OFFER_LIFETIME_MS).toISOString(),
+    validUntil: new Date(nowMs + lifetimeOf(booking, REFUND_OFFER_LIFETIME_MS)).toISOString(),
     status: 'PROPOSED',
     fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, bookingParts: fulfillment.bookingParts }],
     refundFee: price(sum('fee'), provider.currency),

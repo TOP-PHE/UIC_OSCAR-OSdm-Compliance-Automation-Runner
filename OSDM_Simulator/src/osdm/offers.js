@@ -469,7 +469,7 @@ function admissionsOfDirection(trip, ctx) {
 // An offer for `trip`, or, given `inboundTrip`, for both directions: one
 // admission per passenger and direction, or, for a group product, one per
 // direction for the whole group; each covers its own trip.
-function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs }) {
+function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs, lifetimeMs = OFFER_LIFETIME_MS }) {
   const coverage = coverageOf(trip);
   const directions = inboundTrip ? [trip, inboundTrip] : [trip];
   const factor = inboundTrip ? RETURN_FACTOR : 1;
@@ -519,7 +519,7 @@ function buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, f
       overallFlexibility: flexibility.key,
     },
     createdOn,
-    preBookableUntil: new Date(nowMs + OFFER_LIFETIME_MS).toISOString(),
+    preBookableUntil: new Date(nowMs + lifetimeMs).toISOString(),
     passengerRefs: passengers.map((p) => p.externalRef),
     products,
     tripCoverage: coverage,
@@ -623,8 +623,19 @@ function problemsOf(passengers, offers, collective, refusals) {
  * back what this client was given before: `known.offer(id)`, `known.trip(id)`;
  * a return request and a request by trip ids (#602) use it.
  */
+// #611: a trip from the provider's short-deadline stop place gives offers,
+// and then the booking, refund offers and exchange offers made from them,
+// that expire after `shortDeadlines.seconds`: the expired-X probes of the
+// collection then wait a minute, not half an hour. Null otherwise.
+function shortLivedMsOf(trips, provider) {
+  const short = provider.shortDeadlines;
+  if (!short || !trips.some((t) => t.origin?.stopPlaceRef === short.stopPlaceRef)) return null;
+  return short.seconds * 1000;
+}
+
 function buildOfferCollection(body, provider, nowMs, known = {}) {
   const trips = tripsOf(body, provider, known);
+  const shortLivedMs = shortLivedMsOf(trips, provider);
   const passengers = passengersOf(body, provider);
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   const criteria = body.offerSearchCriteria;
@@ -644,9 +655,9 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
     const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
       for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
-        const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs });
+        const offer = buildOffer({ trip, inboundTrip, passengers, flexibility, travelClass, fulfillmentOptions, provider, nowMs, lifetimeMs: shortLivedMs || OFFER_LIFETIME_MS });
         offers.push(offer);
-        remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true });
+        remembered.push({ offer, trips: covered, passengers, oneFulfillment: flexibility.group?.oneFulfillment === true, shortLivedMs });
       }
     }
   }

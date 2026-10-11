@@ -24,7 +24,7 @@ const crypto = require('node:crypto');
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
-const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
+const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { buildTripCollection } = require('./osdm/trips');
@@ -292,6 +292,7 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (part === undefined) {
       requireMethod(req, 'GET');
       const booking = bookingOf(scope, bookingId);
+      releaseIfExpired(booking, now());
       showRefundReceipt(booking, provider, now());
       return { booking };
     }

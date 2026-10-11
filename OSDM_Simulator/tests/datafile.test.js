@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -104,7 +104,7 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
-  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH');
+  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH' && !s.code.startsWith('SIM_NHF_'));
   assert.equal(refunds.length, 12);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
@@ -134,6 +134,31 @@ test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the
     assert.equal(scenario.offerSearchCriteria.returnOffsetDays, undefined, `${code} is one-way`);
     assert.equal(scenario.osdmVersion, gamma.osdmVersion);
     assert.equal(scenario.desiredFlexibility, 'FULL_FLEXIBLE', code);
+  }
+});
+
+test('the expiry probes: one per deadline, on the short-deadline trip, with a wait that covers it (#611)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const station = gamma.shortDeadlines.stopPlaceRef;
+  const shortTrips = datafile.tripRequirements.filter((t) => t.trip?.origin === station).map((t) => t.id);
+  assert.equal(shortTrips.length, 1);
+  const probes = datafile.scenarios.filter((s) => s.code.startsWith('SIM_NHF_EXPIRED_'));
+  const flags = Object.fromEntries(probes.map((s) => [s.code, Object.keys(s).filter((k) => /^expired.*Test$/.test(k) && s[k] === 'on')]));
+  assert.deepEqual(flags, {
+    SIM_NHF_EXPIRED_OFFER_38: ['expiredOfferTest'],
+    SIM_NHF_EXPIRED_BOOKING_38: ['expiredBookingTest'],
+    SIM_NHF_EXPIRED_REFUND_OFFER_38: ['expiredRefundOfferTest'],
+    SIM_NHF_EXPIRED_EXCHANGE_OFFER_38: ['expiredExchangeOfferTest'],
+  });
+  for (const scenario of probes) {
+    assert.equal(scenario.tripRequirementId, shortTrips[0], scenario.code);
+    const [flag] = flags[scenario.code];
+    // The deadline plus the collection's 15 s margin and 45 s of headroom.
+    assert.ok(scenario[flag.replace(/Test$/, 'MaxWaitMinutes')] * 60 >= gamma.shortDeadlines.seconds + 60, scenario.code);
+  }
+  // No other scenario uses the short-deadline trip: its runs would expire under it.
+  for (const scenario of datafile.scenarios) {
+    if (!scenario.code.startsWith('SIM_NHF_EXPIRED_')) assert.notEqual(scenario.tripRequirementId, shortTrips[0], scenario.code);
   }
 });
 

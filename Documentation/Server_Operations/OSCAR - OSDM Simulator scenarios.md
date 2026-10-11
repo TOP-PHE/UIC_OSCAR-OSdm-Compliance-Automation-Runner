@@ -179,3 +179,15 @@ optional. Each is one reservation for all the passengers, on one leg.
 |---|---|---|---|
 | `SIM_EXCHANGE_1ADT_38` | The `04-Exchange` folder end to end on a one-way ticket: exchange offers for the same journey (10), one taken (11), read (12), the booking during the exchange (13), the exchange confirmed (14), the booking after it (15). | gamma (profile `exchange`) gives one exchange offer per offer of the request, priced against the ticket given up: `exchangeFee` by its exchangeability (none when fully flexible), `amountToBePaid` = new price + fee − price given up (else `refundableAmount`). The operation is `PREBOOKED` and the parts `EXCHANGE_ONGOING`; `POST /fulfillments` confirms it: the old part and fulfillment `EXCHANGED`, a new booked offer and fulfillment `FULFILLED`. | No failed check. |
 | `SIM_EXCHANGE_DELETE_1ADT_38` | The same exchange, withdrawn before its confirmation (`scenarioAction` DELETE: 16. DEL, then 17). | `DELETE` of the pre-booked operation answers 204 and the parts go back to `FULFILLED`. A confirmed exchange cannot be withdrawn (409). | No failed check. |
+
+### Expiry probes (#611)
+
+These four are negative probes: each waits until a deadline has passed and expects the next request to be refused. They use the trip from station `0000099`, where gamma (profile `shortDeadlines`) makes offers, the booking, refund offers and exchange offers expire after 60 seconds instead of 30 minutes; each scenario waits at most 3 minutes. A run takes a little over a minute each.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_NHF_EXPIRED_OFFER_38` | `expiredOfferTest`: step 02 waits until past the chosen offer's `preBookableUntil`, then books it. | `409 OFFER_EXPIRED`, a Problem. | No failed check: the refusal (4xx) and its Problem body are graded as passing. The scenario ends there. |
+| `SIM_NHF_EXPIRED_BOOKING_38` | `expiredBookingTest`: step 06 waits until past the booking's confirmation time limit, then confirms it; 07 reads the booking. | `409 BOOKING_EXPIRED`; the booking read afterwards has its parts `RELEASED`. | No failed check. |
+| `SIM_NHF_EXPIRED_REFUND_OFFER_38` | `expiredRefundOfferTest`: a one-way ticket, refund offer asked for; step 13 waits until past its `validUntil`, then confirms it. | `409`, "the refund offer has expired". | No failed check. |
+| `SIM_NHF_EXPIRED_EXCHANGE_OFFER_38` | `expiredExchangeOfferTest`: a one-way ticket, exchange offers asked for; step 11 waits until past the first one's `preBookableUntil`, then takes it. | `409 OFFER_EXPIRED`. | No failed check. |
+

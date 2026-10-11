@@ -88,6 +88,7 @@ function checkProvider(key, raw) {
     ...checkDocuments(raw, bad),
     ...checkIdempotency(raw.idempotency, bad),
     ...checkExchange(raw.exchange, bad),
+    ...checkShortDeadlines(raw.shortDeadlines, bad),
   };
 }
 
@@ -169,6 +170,16 @@ function checkExchange(value, bad) {
   if (value === undefined) return {};
   if (typeof value !== 'boolean') throw bad('exchange');
   return value ? { exchange: true } : {};
+}
+
+// #611: a stop place whose trips give offers, bookings, refund and exchange
+// offers that expire after `seconds` (10 to 600), for the expired-X probes.
+function checkShortDeadlines(value, bad) {
+  if (value === undefined) return {};
+  const ok = value && typeof value === 'object' && isText(value.stopPlaceRef, 1, 120)
+    && Number.isInteger(value.seconds) && value.seconds >= 10 && value.seconds <= 600;
+  if (!ok) throw bad('shortDeadlines');
+  return { shortDeadlines: { stopPlaceRef: value.stopPlaceRef, seconds: value.seconds } };
 }
 
 // #603: the media of the documents issued on confirmation (PDF_A4 merged for
