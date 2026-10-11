@@ -117,6 +117,18 @@ function readTestData(companyId) {
     });
 }
 
+// The source data file as this user may see it: the catalogue's (#612), or a
+// company's, a tester's view of it. A Refusal when there is none.
+async function readSource(user, sourceId, fromCatalogue) {
+  if (fromCatalogue) {
+    const catalogue = readCatalogue();
+    return { source: catalogueDatafile(catalogue.catalogue, catalogue.simulator), catalogue };
+  }
+  const stored = await readDatafile(sourceId);
+  if (!stored) throw new Refusal(404, 'The source has no data file.');
+  return { source: user.role === 'company_user' ? viewForTester(stored, user.email, null) : stored, catalogue: null };
+}
+
 // Everything both routes need, or a Refusal: the target (the request's
 // company), the source and its scenarios as this user may see them, and the
 // target's framework and Test Data (which must exist: the copy adapts to them).
@@ -131,16 +143,7 @@ async function copyContext(req, res) {
     return null;
   }
   try {
-    let source;
-    let catalogue = null;
-    if (fromCatalogue) {
-      catalogue = readCatalogue();
-      source = catalogueDatafile(catalogue.catalogue, catalogue.simulator);
-    } else {
-      source = await readDatafile(sourceId);
-      if (!source) throw new Refusal(404, 'The source has no data file.');
-      if (req.user.role === 'company_user') source = viewForTester(source, req.user.email, null);
-    }
+    const { source, catalogue } = await readSource(req.user, sourceId, fromCatalogue);
     const frameworkConfig = readFramework(targetId);
     if (!frameworkConfig) throw new Refusal(409, 'Set up the Test Framework of the company you copy into first.');
     const resources = readTestData(targetId);

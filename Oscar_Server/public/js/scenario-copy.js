@@ -112,7 +112,8 @@
   function scenarioRow(s) {
     const missing = Array.isArray(s.missing) ? s.missing : [];
     const locked = missing.length > 0;
-    const purpose = s.purpose ? `<br><span style="font-size:12px;color:#546e7a">${s.kind === 'NHF' ? '🚫 Negative probe · ' : ''}${esc(s.purpose)}</span>` : '';
+    const probe = s.kind === 'NHF' ? '🚫 Negative probe · ' : '';
+    const purpose = s.purpose ? `<br><span style="font-size:12px;color:#546e7a">${probe}${esc(s.purpose)}</span>` : '';
     const needs = locked ? `<br><span style="font-size:12px;color:#90a4ae">Needs in the Test Framework: ${esc(missing.join(', '))}</span>` : '';
     return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:${locked ? 'not-allowed' : 'pointer'};${locked ? 'opacity:.55' : ''}">
         <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px"${locked ? ' disabled' : ''}>

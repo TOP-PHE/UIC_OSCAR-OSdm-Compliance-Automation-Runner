@@ -34,7 +34,7 @@ const { scenarioReturnModel } = require('./frameworkGating');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const clone = (v) => JSON.parse(JSON.stringify(v));
+const clone = (v) => structuredClone(v);
 const ARMED = new Set(['on', 'true', 'yes', true]);
 const LISTS = [
   ['tripRequirementId', 'tripRequirements'],
@@ -48,6 +48,20 @@ const CODE = /^(OTST|NHF)_[A-Z0-9_]{3,60}$/;
 // at another entry or changes what the scenario is.
 const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
 
+// The problems of one entry of the catalogue.
+function entryProblems(e, at, scenarios, codes) {
+  if (!isObj(e)) return [`${at} is not an object`];
+  const problems = [];
+  if (typeof e.code !== 'string' || !CODE.test(e.code)) problems.push(`${at}.code "${e.code}" is not OTST_… or NHF_… in capitals`);
+  if (codes.has(e.code)) problems.push(`${at}.code "${e.code}" appears twice`);
+  if (!scenarios.has(e.source)) problems.push(`${at}.source "${e.source}" is not a scenario of the simulator's data file`);
+  if (typeof e.purpose !== 'string' || e.purpose.length < 10) problems.push(`${at}.purpose is missing`);
+  if (!Number.isInteger(e.checks) || e.checks <= 0) problems.push(`${at}.checks must be the number of checks it gives on the simulator`);
+  for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
+  if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
+  return problems;
+}
+
 /** The problems of a catalogue against the simulator's data file; none when it is sound. */
 function catalogueProblems(catalogue, simulator) {
   const problems = [];
@@ -56,16 +70,8 @@ function catalogueProblems(catalogue, simulator) {
   const codes = new Set();
   const scenarios = new Map(arr(simulator?.scenarios).filter(isObj).map((s) => [s.code, s]));
   for (const [i, e] of entries.entries()) {
-    const at = `entries[${i}]`;
-    if (!isObj(e)) { problems.push(`${at} is not an object`); continue; }
-    if (typeof e.code !== 'string' || !CODE.test(e.code)) problems.push(`${at}.code "${e.code}" is not OTST_… or NHF_… in capitals`);
-    if (codes.has(e.code)) problems.push(`${at}.code "${e.code}" appears twice`);
-    codes.add(e.code);
-    if (!scenarios.has(e.source)) problems.push(`${at}.source "${e.source}" is not a scenario of the simulator's data file`);
-    if (typeof e.purpose !== 'string' || e.purpose.length < 10) problems.push(`${at}.purpose is missing`);
-    if (!Number.isInteger(e.checks) || e.checks <= 0) problems.push(`${at}.checks must be the number of checks it gives on the simulator`);
-    for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
-    if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
+    problems.push(...entryProblems(e, `entries[${i}]`, scenarios, codes));
+    if (isObj(e)) codes.add(e.code);
   }
   return problems;
 }
@@ -102,7 +108,8 @@ function requirementsOf(scenario, datafile) {
 
 /** The declarations a framework lacks for these requirements, as sentences. */
 function missingFor(requirements, framework) {
-  const fw = isObj(framework?.config) ? framework.config : (isObj(framework) ? framework : {});
+  let fw = isObj(framework) ? framework : {};
+  if (isObj(framework?.config)) fw = framework.config;
   const missing = [];
   const flows = arr(fw.salesFlows);
   for (const flow of requirements.salesFlows) if (!flows.includes(flow)) missing.push(`sales flow ${flow}`);
