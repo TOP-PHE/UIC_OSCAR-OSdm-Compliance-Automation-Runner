@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-partial-refund-fulfillment",
+    "date": "October 11, 2026",
+    "tag": "Fix",
+    "title": "Partial refund: the right fulfillment",
+    "summary": "A partial refund by leg or by passenger now names the fulfillment that holds what it refunds, and never guesses.",
+    "content": "A partial refund by leg or by passenger names one fulfillment. It used to take the first fulfillment of the booking when it could not tell which one held the parts, which a provider that issues one fulfillment per passenger refuses.\n\nThe refund now names the fulfillment that lists the parts it refunds, or the chosen passenger's. When the parts are in several fulfillments, or nothing tells which one holds them, the scenario does a full refund instead and the run log says why."
+  },
+  {
     "id": "2026-10-11-idempotency-key",
     "date": "October 11, 2026",
     "tag": "New",

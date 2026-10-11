@@ -62,6 +62,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.235] / [collection-OTST_V2.0.120] — 2026-10-11
+
+Issue #610, release 2026.265.
+
+### Fixed
+
+- **A partial refund names the fulfillment that holds what it refunds**
+  (`library-bruno/partialRefund.js`, `fulfillmentForScope()`). A
+  RefundSpecification names one fulfillment. It is now:
+  - the booking's only fulfillment, as before;
+  - else the one whose `bookingParts` list the parts refunded (the leg's
+    parts by leg, the passenger's parts by passenger);
+  - else the chosen passenger's, by `fulfillmentParts[].passengerRef`.
+  
+  Parts in several fulfillments, or none shown to hold them, degrade to a full
+  refund with the reason in a WARNING. Before, the first fulfillment was taken
+  whenever nothing matched, which a provider with one fulfillment per
+  passenger refuses. A refund by fulfillment (#595) is unchanged.
+
+Checked: the unit tests (27; five of them fail on the previous version), and
+three refund scenarios on the simulator, unchanged (373, 449 and 522 checks,
+none failed). The simulator refunds per fulfillment only, so the new choice
+itself is covered by the unit tests, not by a simulator run. Not run against
+a real provider (ČD).
+
+---
+
 ## [server-1.11.235] / [collection-OTST_V2.0.119] — 2026-10-11
 
 Issue #604, release 2026.264. Simulator 0.14.0.
