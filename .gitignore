@@ -70,3 +70,4 @@ Bruno_Collection/Dev working documents/
 # ── OSDM simulator ──────────────────────────────────────────────────────
 # The clients file holds the simulated providers' client secrets.
 OSDM_Simulator/**/clients.json
+OSDM_Simulator/replay/
