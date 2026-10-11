@@ -202,56 +202,56 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_SALE_ONE_WAY_1ADT` | One-way sale for one adult: offers, booking, passenger update, confirmation, documents. | — | 231 | `SIM_SALE_SEARCH_1ADT_38` |
-| `OTST_SALE_ONE_WAY_2ADT_SAVER` | One-way sale for two adults, choosing the non-flexible (saver) offer. | — | 290 | `SIM_SALE_SEARCH_2ADT_SAVER_38` |
-| `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 310 | `SIM_RETURN_SEPARATE_1ADT_38` |
-| `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 352 | `SIM_RETURN_COMBINED_1ADT_38` |
-| `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 285 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
+| `OTST_SALE_ONE_WAY_1ADT` | One-way sale for one adult: offers, booking, passenger update, confirmation, documents. | — | 230 | `SIM_SALE_SEARCH_1ADT_38` |
+| `OTST_SALE_ONE_WAY_2ADT_SAVER` | One-way sale for two adults, choosing the non-flexible (saver) offer. | — | 289 | `SIM_SALE_SEARCH_2ADT_SAVER_38` |
+| `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 309 | `SIM_RETURN_SEPARATE_1ADT_38` |
+| `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 351 | `SIM_RETURN_COMBINED_1ADT_38` |
+| `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 284 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
 | `OTST_SALE_RESERVATION_MANDATORY_2ADT` | A mandatory seat reservation, detected from the admission and booked with it. | — | 341 | `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` |
-| `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 369 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |
-| `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 369 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
+| `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 370 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |
+| `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 370 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
 | `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 367 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
-| `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 238 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
-| `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 352 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |
-| `OTST_SALE_IDEMPOTENCY_1ADT` | `Idempotency-Key` on the booking and the confirmation: the same key gives the same answer. | — | 237 | `SIM_SALE_IDEMPOTENCY_1ADT_38` |
-| `OTST_SALE_REQUESTED_INFORMATION_1ADT` | Requested information: what the offers ask for is checked and supplied. | — | 234 | `SIM_RI_AUTOFEED_1ADT_38` |
-| `OTST_PURCHASER_DEFERRED_1ADT` | Booking made without its purchaser, which is written afterwards. | — | 235 | `SIM_PURCHASER_DEFERRED_1ADT_38` |
+| `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 237 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
+| `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 351 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |
+| `OTST_SALE_IDEMPOTENCY_1ADT` | `Idempotency-Key` on the booking and the confirmation: the same key gives the same answer. | — | 236 | `SIM_SALE_IDEMPOTENCY_1ADT_38` |
+| `OTST_SALE_REQUESTED_INFORMATION_1ADT` | Requested information: what the offers ask for is checked and supplied. | — | 233 | `SIM_RI_AUTOFEED_1ADT_38` |
+| `OTST_PURCHASER_DEFERRED_1ADT` | Booking made without its purchaser, which is written afterwards. | — | 234 | `SIM_PURCHASER_DEFERRED_1ADT_38` |
 
 #### Refund
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_REFUND_RETURN_FULL_1ADT` | Full refund of a return: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model SEPARATE | 522 | `SIM_REFUND_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 449 | `SIM_REFUND_INBOUND_1ADT_38` |
-| `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 526 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
-| `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 328 | `SIM_REFUND_DELETE_1ADT_38` |
-| `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 295 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |
-| `OTST_REFUND_RECEIPT_RETURN_1ADT` | Full refund of a return, then the refund receipt waited for in the booking. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_COMBINED_FULL_1ADT` | Full refund of a return sold as one offer: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 592 | `SIM_REFUND_COMBINED_RETURN_1ADT_38` |
-| `OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT` | Partial refund by fulfillment of a return sold as one offer: the inbound ticket alone. | REFUND_PARTIAL, return model COMBINED, OSDM 3.7+ | 510 | `SIM_REFUND_COMBINED_INBOUND_1ADT_38` |
-| `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT` | Technical cancellation of a return sold as one offer: overrule code, everything back and no fee. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 596 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` |
-| `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT` | Full refund of a return sold as one offer, then the refund receipt waited for in the booking. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 595 | `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` |
+| `OTST_REFUND_RETURN_FULL_1ADT` | Full refund of a return: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model SEPARATE | 521 | `SIM_REFUND_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 448 | `SIM_REFUND_INBOUND_1ADT_38` |
+| `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
+| `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 327 | `SIM_REFUND_DELETE_1ADT_38` |
+| `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 294 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |
+| `OTST_REFUND_RECEIPT_RETURN_1ADT` | Full refund of a return, then the refund receipt waited for in the booking. | REFUND_FULL, return model SEPARATE | 524 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_FULL_1ADT` | Full refund of a return sold as one offer: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 591 | `SIM_REFUND_COMBINED_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT` | Partial refund by fulfillment of a return sold as one offer: the inbound ticket alone. | REFUND_PARTIAL, return model COMBINED, OSDM 3.7+ | 509 | `SIM_REFUND_COMBINED_INBOUND_1ADT_38` |
+| `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT` | Technical cancellation of a return sold as one offer: overrule code, everything back and no fee. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 595 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` |
+| `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT` | Full refund of a return sold as one offer, then the refund receipt waited for in the booking. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 594 | `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` |
 
 #### Exchange
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 379 | `SIM_EXCHANGE_1ADT_38` |
-| `OTST_EXCHANGE_WITHDRAWN_1ADT` | Exchange pre-booked, then withdrawn before its confirmation: the ticket stays. | EXCHANGE_FULL | 352 | `SIM_EXCHANGE_DELETE_1ADT_38` |
+| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 378 | `SIM_EXCHANGE_1ADT_38` |
+| `OTST_EXCHANGE_WITHDRAWN_1ADT` | Exchange pre-booked, then withdrawn before its confirmation: the ticket stays. | EXCHANGE_FULL | 351 | `SIM_EXCHANGE_DELETE_1ADT_38` |
 
 #### Negative tests (NHF: the provider must refuse)
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `NHF_REFUND_OVERRULE_CODE_REFUSED` | A refund with an overrule code the provider does not accept must be refused. | REFUND_FULL, return model SEPARATE | 315 | `SIM_REFUND_OVERRULE_REFUSED_38` |
-| `NHF_SALE_BY_TRIP_ID_UNKNOWN` | Offers asked for a trip id the provider never gave must be refused. | — | 71 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` |
-| `NHF_EXPIRED_OFFER` | Booking an offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | — | 120 | `SIM_NHF_EXPIRED_OFFER_38` |
-| `NHF_EXPIRED_BOOKING` | Confirming a booking after its confirmation time limit must be refused. Waits up to 40 minutes. | — | 188 | `SIM_NHF_EXPIRED_BOOKING_38` |
-| `NHF_EXPIRED_REFUND_OFFER` | Confirming a refund offer after its `validUntil` must be refused. Waits up to 40 minutes. | REFUND_FULL | 298 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` |
-| `NHF_EXPIRED_EXCHANGE_OFFER` | Taking an exchange offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | EXCHANGE_FULL | 264 | `SIM_NHF_EXPIRED_EXCHANGE_OFFER_38` |
-| `NHF_REQUESTED_INFORMATION_OMITTED` | A passenger update without a demanded field must be refused. | — | 145 | `SIM_NHF_RI_OMIT_1ADT_38` |
-| `NHF_PASSENGER_DATA_INVALID` | A passenger update with an invalid field, one field per pass, must be refused. | — | 156 | `SIM_NHF_RI_INVALID_1ADT_38` |
-| `NHF_PURCHASER_INVALID` | A purchaser with a missing or invalid field, one per pass, must be refused. | — | 243 | `SIM_NHF_PURCHASER_INVALID_1ADT_38` |
+| `NHF_REFUND_OVERRULE_CODE_REFUSED` | A refund with an overrule code the provider does not accept must be refused. | REFUND_FULL, return model SEPARATE | 314 | `SIM_REFUND_OVERRULE_REFUSED_38` |
+| `NHF_SALE_BY_TRIP_ID_UNKNOWN` | Offers asked for a trip id the provider never gave must be refused. | — | 70 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` |
+| `NHF_EXPIRED_OFFER` | Booking an offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | — | 119 | `SIM_NHF_EXPIRED_OFFER_38` |
+| `NHF_EXPIRED_BOOKING` | Confirming a booking after its confirmation time limit must be refused. Waits up to 40 minutes. | — | 187 | `SIM_NHF_EXPIRED_BOOKING_38` |
+| `NHF_EXPIRED_REFUND_OFFER` | Confirming a refund offer after its `validUntil` must be refused. Waits up to 40 minutes. | REFUND_FULL | 297 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` |
+| `NHF_EXPIRED_EXCHANGE_OFFER` | Taking an exchange offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | EXCHANGE_FULL | 263 | `SIM_NHF_EXPIRED_EXCHANGE_OFFER_38` |
+| `NHF_REQUESTED_INFORMATION_OMITTED` | A passenger update without a demanded field must be refused. | — | 144 | `SIM_NHF_RI_OMIT_1ADT_38` |
+| `NHF_PASSENGER_DATA_INVALID` | A passenger update with an invalid field, one field per pass, must be refused. | — | 155 | `SIM_NHF_RI_INVALID_1ADT_38` |
+| `NHF_PURCHASER_INVALID` | A purchaser with a missing or invalid field, one per pass, must be refused. | — | 242 | `SIM_NHF_PURCHASER_INVALID_1ADT_38` |
 
 The expiry probes wait 40 minutes on a real provider (the catalogue sets
 their `…MaxWaitMinutes`); on the simulator their deadlines are one minute.

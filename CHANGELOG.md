@@ -121,7 +121,16 @@ answered by a gateway with an HTML page and HTTP 200, an optional reservation
 accepted but not booked, a placeholder `confirmableUntil` on the pre-booking,
 products that give no travel class (so a class per leg cannot be read).
 
-Checked: each new unit test fails with its fix undone; RECORDCHECK
+Checked: each new unit test fails with its fix undone; a full recording of
+the 73 simulator scenarios, compared with the 1.11.238 one: every difference
+is one of the expected ones (73 `…/null` coach-layout calls and 11 `…/null`
+product calls no longer sent, six new reservation checks at step 02, all
+passing, the createdOn check renamed), no failure, no warning changed. The
+catalogue's check counts follow (33 entries one fewer, two one more) and
+`OSCAR - Checks by scenario.md` is regenerated. The station-code and price
+changes were made while that recording ran; neither changes what the
+simulator's answers give (same spelling, prices that pass). Not checked: a
+run against the provider since the fixes.
 
 ---
 

@@ -5,109 +5,109 @@
       "code": "OTST_SALE_ONE_WAY_1ADT",
       "source": "SIM_SALE_SEARCH_1ADT_38",
       "purpose": "One-way sale for one adult: offers, booking, passenger update, confirmation, documents.",
-      "checks": 231
+      "checks": 230
     },
     {
       "code": "OTST_SALE_ONE_WAY_2ADT_SAVER",
       "source": "SIM_SALE_SEARCH_2ADT_SAVER_38",
       "purpose": "One-way sale for two adults, choosing the non-flexible (saver) offer.",
-      "checks": 290
+      "checks": 289
     },
     {
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
-      "checks": 310
+      "checks": 309
     },
     {
       "code": "OTST_SALE_RETURN_COMBINED_1ADT",
       "source": "SIM_RETURN_COMBINED_1ADT_38",
       "purpose": "Return sold as one offer covering both directions (outboundTripIds, OSDM 3.7 and later).",
-      "checks": 352
+      "checks": 351
     },
     {
       "code": "OTST_REFUND_RETURN_FULL_1ADT",
       "source": "SIM_REFUND_RETURN_1ADT_38",
       "purpose": "Full refund of a return: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 522
+      "checks": 521
     },
     {
       "code": "OTST_REFUND_RETURN_INBOUND_1ADT",
       "source": "SIM_REFUND_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return by fulfillment: the inbound ticket alone.",
-      "checks": 449
+      "checks": 448
     },
     {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
-      "checks": 526
+      "checks": 525
     },
     {
       "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
       "source": "SIM_REFUND_OVERRULE_REFUSED_38",
       "purpose": "A refund with an overrule code the provider does not accept must be refused.",
-      "checks": 315
+      "checks": 314
     },
     {
       "code": "OTST_REFUND_WITHDRAWN_1ADT",
       "source": "SIM_REFUND_DELETE_1ADT_38",
       "purpose": "Refund offer asked for, then withdrawn instead of confirmed: the ticket stays.",
-      "checks": 328
+      "checks": 327
     },
     {
       "code": "OTST_REFUND_OFFER_ONLY_1ADT",
       "source": "SIM_REFUND_ONLY_OFFER_1ADT_38",
       "purpose": "Refund offer asked for and read, neither confirmed nor withdrawn.",
-      "checks": 295
+      "checks": 294
     },
     {
       "code": "OTST_REFUND_RECEIPT_RETURN_1ADT",
       "source": "SIM_REFUND_RECEIPT_RETURN_1ADT_38",
       "purpose": "Full refund of a return, then the refund receipt waited for in the booking.",
-      "checks": 525
+      "checks": 524
     },
     {
       "code": "OTST_REFUND_RETURN_COMBINED_FULL_1ADT",
       "source": "SIM_REFUND_COMBINED_RETURN_1ADT_38",
       "purpose": "Full refund of a return sold as one offer covering both directions: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 592
+      "checks": 591
     },
     {
       "code": "OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT",
       "source": "SIM_REFUND_COMBINED_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return sold as one offer, by fulfillment: the inbound ticket alone.",
-      "checks": 510
+      "checks": 509
     },
     {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
-      "checks": 596
+      "checks": 595
     },
     {
       "code": "OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_RECEIPT_1ADT_38",
       "purpose": "Full refund of a return sold as one offer, then the refund receipt waited for in the booking.",
-      "checks": 595
+      "checks": 594
     },
     {
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
-      "checks": 379
+      "checks": 378
     },
     {
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
       "source": "SIM_EXCHANGE_DELETE_1ADT_38",
       "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",
-      "checks": 352
+      "checks": 351
     },
     {
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",
-      "checks": 285
+      "checks": 284
     },
     {
       "code": "OTST_SALE_RESERVATION_MANDATORY_2ADT",
@@ -119,13 +119,13 @@
       "code": "OTST_SALE_RESERVATION_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with optionalReservationSelections.",
-      "checks": 369
+      "checks": 370
     },
     {
       "code": "OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with placeSelections.",
-      "checks": 369
+      "checks": 370
     },
     {
       "code": "OTST_SALE_RESERVATION_ADD_LATER_2ADT",
@@ -137,31 +137,31 @@
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",
-      "checks": 238
+      "checks": 237
     },
     {
       "code": "NHF_SALE_BY_TRIP_ID_UNKNOWN",
       "source": "SIM_SALE_BY_TRIP_ID_UNKNOWN_38",
       "purpose": "Offers asked for a trip id the provider never gave must be refused.",
-      "checks": 71
+      "checks": 70
     },
     {
       "code": "OTST_SALE_DOCUMENTS_RETURN_1ADT",
       "source": "SIM_SALE_DOCUMENTS_RETURN_1ADT_38",
       "purpose": "Fulfillment documents of a return, and each fulfillment read with GET /fulfillments/{id}.",
-      "checks": 352
+      "checks": 351
     },
     {
       "code": "OTST_SALE_IDEMPOTENCY_1ADT",
       "source": "SIM_SALE_IDEMPOTENCY_1ADT_38",
       "purpose": "Idempotency-Key on the booking and the confirmation: the same key gives the same answer.",
-      "checks": 237
+      "checks": 236
     },
     {
       "code": "NHF_EXPIRED_OFFER",
       "source": "SIM_NHF_EXPIRED_OFFER_38",
       "purpose": "Booking an offer after its preBookableUntil must be refused.",
-      "checks": 120,
+      "checks": 119,
       "set": {
         "expiredOfferMaxWaitMinutes": 40
       }
@@ -170,7 +170,7 @@
       "code": "NHF_EXPIRED_BOOKING",
       "source": "SIM_NHF_EXPIRED_BOOKING_38",
       "purpose": "Confirming a booking after its confirmation time limit must be refused.",
-      "checks": 188,
+      "checks": 187,
       "set": {
         "expiredBookingMaxWaitMinutes": 40
       }
@@ -179,7 +179,7 @@
       "code": "NHF_EXPIRED_REFUND_OFFER",
       "source": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
       "purpose": "Confirming a refund offer after its validUntil must be refused.",
-      "checks": 298,
+      "checks": 297,
       "set": {
         "expiredRefundOfferMaxWaitMinutes": 40
       }
@@ -188,7 +188,7 @@
       "code": "NHF_EXPIRED_EXCHANGE_OFFER",
       "source": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
       "purpose": "Taking an exchange offer after its preBookableUntil must be refused.",
-      "checks": 264,
+      "checks": 263,
       "set": {
         "expiredExchangeOfferMaxWaitMinutes": 40
       }
@@ -197,31 +197,31 @@
       "code": "OTST_SALE_REQUESTED_INFORMATION_1ADT",
       "source": "SIM_RI_AUTOFEED_1ADT_38",
       "purpose": "Requested information: what the offers ask for is checked and supplied.",
-      "checks": 234
+      "checks": 233
     },
     {
       "code": "NHF_REQUESTED_INFORMATION_OMITTED",
       "source": "SIM_NHF_RI_OMIT_1ADT_38",
       "purpose": "A passenger update without a demanded field must be refused.",
-      "checks": 145
+      "checks": 144
     },
     {
       "code": "NHF_PASSENGER_DATA_INVALID",
       "source": "SIM_NHF_RI_INVALID_1ADT_38",
       "purpose": "A passenger update with an invalid field, one field per pass, must be refused.",
-      "checks": 156
+      "checks": 155
     },
     {
       "code": "OTST_PURCHASER_DEFERRED_1ADT",
       "source": "SIM_PURCHASER_DEFERRED_1ADT_38",
       "purpose": "Booking made without its purchaser, which is written afterwards.",
-      "checks": 235
+      "checks": 234
     },
     {
       "code": "NHF_PURCHASER_INVALID",
       "source": "SIM_NHF_PURCHASER_INVALID_1ADT_38",
       "purpose": "A purchaser with a missing or invalid field, one per pass, must be refused.",
-      "checks": 243
+      "checks": 242
     }
   ]
 }
