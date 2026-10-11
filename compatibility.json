@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.269",
+  "current_release": "2026.270",
   "releases": [
+    {
+      "release": "2026.270",
+      "date": "2026-10-11",
+      "server": "1.11.236",
+      "collection": "OTST_V2.0.125",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#611, part 4): node OSDM_Simulator/scripts/replay.js runs every scenario of the simulator's data file with bru, standalone, records the ordered checks and WARNING lines of each, compares two recordings, and measures which lines of library-bruno/ a recording ran (V8 coverage of the bru process). Two recordings of the same commit compare equal (66 scenarios); a deliberately broken validator line shows. Line coverage of library-bruno/ from a full recording: 70.7 % of the 36 files a run loads. Collection OTST_V2.0.125: the README's replay section.",
+        "Simulator 0.19.0 (not part of a release): the replay scripts."
+      ]
+    },
     {
       "release": "2026.269",
       "date": "2026-10-11",

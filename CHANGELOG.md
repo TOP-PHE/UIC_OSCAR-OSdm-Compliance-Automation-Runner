@@ -91,6 +91,35 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.125] — 2026-10-11
+
+Issue #611, release 2026.270. Simulator 0.19.0.
+
+### Added
+
+- **Replay of the collection against the simulator**
+  (`OSDM_Simulator/scripts/replay.js`, `replay-lib.js` pure). `record before`
+  / `record after` run every scenario of the simulator's data file with `bru`,
+  standalone, each on the provider of its version, and keep for each the
+  ordered checks (request, name, pass or fail) and its `[WARNING]` lines;
+  `compare` reports any difference; `coverage` gives the lines of
+  `library-bruno/` the recording ran, from V8 coverage of the `bru` process.
+  What changes on its own between runs (ids, booking codes, instants,
+  durations, client ids) is replaced before comparing. Output goes to
+  `OSDM_Simulator/replay/` (ignored by git), under fixed names. Documented in
+  `Bruno_Collection/README.md`.
+
+Checked: a full recording of the 66 scenarios (about 13 minutes), then a
+second of the same commit: the same. A validator line broken on purpose
+(`exchanges.js`, the amountToBePaid identity) shows as four failed checks and
+four added warnings in `SIM_EXCHANGE_1ADT_38`. Coverage of `library-bruno/`
+from a full recording: 70.7 % of the lines of the 36 files a run loads;
+`mergeReport.js` (run by OSCAR only) and `schema.js` are never loaded.
+Lowest: `loopback.js` 26.8 %, `validators.js` 27.7 %, `placeProbes.js`
+29.7 %. Simulator tests 183 → 188.
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.124] — 2026-10-11
 
 Issue #611, release 2026.269. Simulator 0.18.0.
