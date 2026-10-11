@@ -90,7 +90,7 @@ async function resolvesPublic(host) {
   if (net.isIP(host)) return ipIsPublic(host);
   let addrs;
   try { addrs = await lookupWithin(host, DNS_LOOKUP_TIMEOUT_MS); } catch (err) {
-    if (err && err.code === 'DNS_TIMEOUT') throw err;
+    if (err?.code === 'DNS_TIMEOUT') throw err;
     return false;
   }
   return addrs.length > 0 && addrs.every(a => ipIsPublic(a.address));
