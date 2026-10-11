@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-11-simulator-exchange",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Simulator: exchanges and expiry probes",
+    "summary": "The OSDM simulator now exchanges tickets, and its data file has expiry probes that run in about a minute.",
+    "content": "The simulator's gamma provider exchanges a confirmed booking: exchange offers priced against the ticket given up, an exchange pre-booked, confirmed or withdrawn. The simulator data file has new scenarios for it, and for a refund offer withdrawn instead of confirmed.\n\nFour negative probes check that an expired offer, booking, refund offer or exchange offer is refused. They use a trip on which everything expires after 60 seconds, so each one runs in about a minute. The scenario catalogue describes each scenario and what a run must show."
+  },
+  {
+    "id": "2026-10-11-return-models-framework",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Return models in the Test Framework",
+    "summary": "The Test Framework now declares which return models a provider supports, and Test Config offers only those.",
+    "content": "Test Framework → Sales Flows → Return journeys lists the two ways a return can be asked for: separate directions (one offer each) and both directions in one offer (OSDM 3.7 and later). Tick the ones the provider supports.\n\nTest Config then offers only the declared models. A scenario that asks for an undeclared model still runs, with a warning in the run log naming the model, as for the other capabilities the Test Framework declares. A framework that existed before declares, the first time it is opened, the models its scenarios already use."
+  },
+  {
     "id": "2026-10-11-partial-refund-fulfillment",
     "date": "October 11, 2026",
     "tag": "Fix",

@@ -62,6 +62,126 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.15.0] — 2026-10-11
+
+Issue #617. Simulator 0.15.0. Server and collection unchanged.
+
+### Simulator 0.15.0
+
+- `GET /healthz` answers `{"status":"ok","version":"<version>"}`, and the
+  start line names the version (`OSDM simulator 0.15.0 listening on …`).
+  Nothing else is added: no build or host information.
+- **Tagged releases**: `simulator-release.yml` tags `simulator-<version>` and
+  creates a GitHub release when a merge to `main` changes the version. The
+  notes are this file's lines for that version
+  (`OSDM_Simulator/scripts/release-notes.js`); a version that this file does
+  not name stops the workflow. The server and release tags are untouched.
+- **Automatic update of the installed simulator**: `simulator-deploy.yml`, on
+  a version change or by hand, connects to the simulator host with a key
+  restricted to one command (`deploy/update.sh`, copied outside the checkout:
+  `git pull`, `docker compose restart`) and checks that `/healthz` reports
+  the new version. Not on other changes: a restart clears bookings and tokens.
+  Without its four `SIMULATOR_*` secrets it says so and stops, green. Set-up
+  on the operations page.
+
+Checked: the simulator's tests (158), the notes of 0.14.0 and 0.9.0 read from
+this file, and the version detection of both workflows run by hand on the
+last bump of `main`. Not checked: a workflow run on GitHub, and a first
+automatic update watched on the host (needs the secrets and the host set-up).
+
+---
+
+## [server-1.11.236] / [collection-OTST_V2.0.122] — 2026-10-11
+
+Issue #611, release 2026.267. Simulator 0.16.0.
+
+### Added
+
+- **Simulator data file**: the `03-Refund` and `04-Exchange` folders run end
+  to end on `gamma`. No request or validator of the collection changed.
+  - `SIM_EXCHANGE_1ADT_38` (exchange confirmed: steps 10 to 15) and
+    `SIM_EXCHANGE_DELETE_1ADT_38` (withdrawn: 16, 17).
+  - `SIM_REFUND_DELETE_1ADT_38` (refund offer withdrawn: 15, 16) and
+    `SIM_REFUND_ONLY_OFFER_1ADT_38` (asked for and read only).
+  - Four expiry probes, `SIM_NHF_EXPIRED_{OFFER,BOOKING,REFUND_OFFER,EXCHANGE_OFFER}_38`,
+    on a new trip from station `0000099` (trip requirement 7), each waiting
+    at most 3 minutes.
+  - The scenario catalogue has a row for each, with what a run must show.
+
+### Simulator 0.16.0
+
+- **Exchange** (profile `exchange`, `gamma`): `POST /bookings/{id}/exchange-offers`
+  gives one exchange offer per offer of the request, priced against the
+  fulfillments given up (`exchangeFee` by their exchangeability: none, a
+  quarter, the whole price; an accepted overrule code waives it;
+  `amountToBePaid` = new price + fee − price given up, else
+  `refundableAmount`). `POST …/exchange-operations` pre-books one (the parts
+  `EXCHANGE_ONGOING`); `POST …/fulfillments` confirms it (old parts and
+  fulfillments `EXCHANGED`, a new booked offer and fulfillment `FULFILLED`,
+  the confirmed price updated); `GET` reads it; `DELETE` withdraws it while
+  pre-booked (204), not after (409).
+- **Short deadlines** (profile `shortDeadlines`, `gamma`: station
+  `urn:uic:stn:0000099`, 60 s): offers from a trip leaving there, and the
+  booking, refund offers and exchange offers made from them, expire after 60 s.
+- A pre-booked booking past its time limit is read, and refused at
+  confirmation, with its parts `RELEASED` (the collection's expired-booking
+  check expects that). This applies to every provider.
+
+Checked: the eight new scenarios standalone on the simulator (exchange 379
+and 352 checks, refund withdrawn 328, refund offer only 295, the probes 120,
+188, 298 and 264), none failed; every probe graded its refusal, none skipped.
+Simulator tests 164 → 170 (exchange routes, deadlines, profile fields).
+Not run through OSCAR, nor against a real provider.
+
+---
+
+## [server-1.11.236] / [collection-OTST_V2.0.121] — 2026-10-11
+
+Issue #619, release 2026.266.
+
+### Added
+
+- **Return models in the Test Framework** (`returnModels`: `SEPARATE`,
+  `COMBINED`), under Sales Flows → 🔁 Return journeys.
+  - Gating, the two existing mechanisms (#218): `utils/frameworkGating.js`
+    adds `returnModel` to `__featureNotDeclaredWarnings` for a return
+    scenario (`offerSearchCriteria.returnOffsetDays` set) whose model is not
+    declared: a soft `[WARNING]`, never a failure. In Test Config the Return
+    model list offers only the declared models; a scenario's own undeclared
+    model stays, marked ⚠, so that opening a card never changes it. With no
+    model declared, the return fields of a one-way scenario are locked. The
+    banner counts these scenarios too.
+  - `COMBINED` with an OSDM version below 3.7 is flagged in the framework
+    editor, and the note follows the version field.
+  - A framework without `returnModels` (before 1.11.236) declares, on its
+    first read, the models its scenarios use, like the `salesFlows`
+    migration; afterwards the list is the Test Manager's. Until then no
+    return warning is given.
+
+### Fixed
+
+- **The framework warnings reach the run.** The annotation was added only to
+  the browser's `GET /v1/company/datafile`; the run reads `/data/:filename`,
+  which served the stored file, so the collection's warning never showed in a
+  run log. The run's request (with its run secret) now gets the annotated
+  copy, best effort; a Test Manager's download is still the stored file.
+  `annotateDatafile` passes over a scenario that is not an object.
+- **Collection OTST_V2.0.121**: the warning names what is missing (the return
+  model and where to declare it, or the partial-refund flow), instead of
+  always speaking of `REFUND_PARTIAL`.
+
+Not done: declaring how a provider divides the fulfillments of a return
+(optional in the issue); Return fulfillments stays a per-scenario setting.
+
+Checked: unit tests (gating, editor, the `/data` route, the warning text);
+the full Jest suite; a run through OSCAR on the simulator with only
+`SEPARATE` declared: the `COMBINED` scenario logs the warning and passes (350
+checks), the `SEPARATE` one has none (308); in a browser, the framework
+editor (the 3.6 note, untick saved), the banner (4 scenarios) and a
+`COMBINED` card's list. Not run against a real provider.
+
+---
+
 ## [server-1.11.235] / [collection-OTST_V2.0.120] — 2026-10-11
 
 Issue #610, release 2026.265.

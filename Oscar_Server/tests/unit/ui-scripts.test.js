@@ -459,6 +459,10 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
   const page = 'js/scenarios.js';
   const escHtml = require('../../public/js/esc.js').esc;   // S11: esc is shared now
   const isArmed = loadFunction(page, 'isArmed');
+  const returnModelUndeclared = loadFunction(page, 'returnModelUndeclared', {
+    scenarioReturnModel: loadFunction(page, 'scenarioReturnModel'),
+    fwReturnModels: loadFunction(page, 'fwReturnModels'),
+  });
 
   test('isArmed accepts the spellings datafiles use, and nothing else', () => {
     for (const v of [true, 'on', 'true', 'yes', 1]) expect(isArmed(v)).toBe(true);
@@ -474,12 +478,24 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     ['#595: by fulfillment armed, flow not declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_FULL'], 1],
     ['#595: by fulfillment armed, flow declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_PARTIAL'], 0],
   ])('fwUndeclaredArmedCount: %s', (_label, scenarios, salesFlows, expected) => {
-    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, state: { scenarios }, wizData: { framework: { salesFlows } } });
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: { scenarios }, wizData: { framework: { salesFlows } } });
     expect(count()).toBe(expected);
   });
 
   test('fwUndeclaredArmedCount with nothing loaded', () => {
-    expect(loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, state: null, wizData: null })()).toBe(0);
+    expect(loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: null, wizData: null })()).toBe(0);
+  });
+
+  test.each([
+    ['#619: a return in a model not declared', [{ offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' } }], ['SEPARATE'], 1],
+    ['#619: SEPARATE is the model of a return that names none', [{ offerSearchCriteria: { returnOffsetDays: 0 } }], ['COMBINED'], 1],
+    ['#619: a declared model', [{ offerSearchCriteria: { returnOffsetDays: '1', returnModel: 'COMBINED' } }], ['SEPARATE', 'COMBINED'], 0],
+    ['#619: no return, nothing declared', [{ offerSearchCriteria: { returnModel: 'COMBINED' } }], [], 0],
+    ['#619: a framework from before the declaration', [{ offerSearchCriteria: { returnOffsetDays: 2 } }], undefined, 0],
+    ['#619: counted once with a partial refund too', [{ scenarioType: 'REFUND', partialRefundByLeg: 'on', offerSearchCriteria: { returnOffsetDays: 2 } }], [], 1],
+  ])('fwUndeclaredArmedCount: %s', (_label, scenarios, returnModels, expected) => {
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: { scenarios }, wizData: { framework: { salesFlows: [], returnModels } } });
+    expect(count()).toBe(expected);
   });
 
   test('armedCountBadge is amber when something is armed, grey when not', () => {
@@ -857,12 +873,23 @@ describe('Test Config return model and fulfillments (#594)', () => {
   const enumOf = (field) => criteria.find((c) => c[field])[field].enum;
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const optionValue = (v) => (v == null ? '' : v);
+  const fwReturnModels = loadFunction('js/scenarios.js', 'fwReturnModels');
   const context = {
-    esc, optionValue,
+    esc, optionValue, fwReturnModels, wizData: null,
+    returnFieldsLocked: loadFunction('js/scenarios.js', 'returnFieldsLocked'),
+    returnModelChoices: loadFunction('js/scenarios.js', 'returnModelChoices'),
+    returnModelUndeclared: loadFunction('js/scenarios.js', 'returnModelUndeclared', {
+      fwReturnModels, scenarioReturnModel: loadFunction('js/scenarios.js', 'scenarioReturnModel'),
+    }),
     RETURN_MODEL_OPTIONS: constant('RETURN_MODEL_OPTIONS'),
     RETURN_FULFILLMENT_OPTIONS: constant('RETURN_FULFILLMENT_OPTIONS'),
   };
   const render = loadFunction('js/scenarios.js', 'buildReturnModelFields', context);
+  const withFramework = (framework, fn) => {
+    context.wizData = { framework };
+    try { return fn(); } finally { context.wizData = null; }
+  };
+  const optionValues = (html) => [...html.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
 
   test('every option is a value the data file schema accepts', () => {
     for (const [value] of context.RETURN_MODEL_OPTIONS) expect(enumOf('returnModel')).toContain(value);
@@ -874,6 +901,50 @@ describe('Test Config return model and fulfillments (#594)', () => {
     expect(selected(render(0, { returnModel: 'COMBINED', returnFulfillments: 'PER_DIRECTION' }))).toEqual(['COMBINED', 'PER_DIRECTION']);
     expect(selected(render(0, {}))).toEqual(['SEPARATE', '']);
     expect(selected(render(0, { returnModel: 'SEPARATE', returnFulfillments: null }))).toEqual(['SEPARATE', '']);
+  });
+
+  test('#619: the picker offers only the declared models', () => {
+    const html = withFramework({ returnModels: ['COMBINED'] }, () => render(0, { returnOffsetDays: 2, returnModel: 'COMBINED' }));
+    expect(optionValues(html).slice(0, 1)).toEqual(['COMBINED']);
+    expect(html).not.toContain('not declared');
+    expect(html).not.toContain(' disabled');
+  });
+
+  test("#619: a scenario's own model stays, marked, when it is not declared", () => {
+    const html = withFramework({ returnModels: ['COMBINED'] }, () => render(0, { returnOffsetDays: 2 }));
+    expect(optionValues(html).slice(0, 2)).toEqual(['SEPARATE', 'COMBINED']);
+    expect(html).toContain('<option value="SEPARATE" selected>⚠ Separate directions');
+    expect(html).toContain('This return model is not declared in the Test Framework');
+  });
+
+  test('#619: no model declared locks the fields of a scenario without a return, not of one with', () => {
+    const none = withFramework({ returnModels: [] }, () => render(0, {}));
+    expect(none.match(/" disabled>/g)).toHaveLength(2);
+    const has = withFramework({ returnModels: [] }, () => render(0, { returnOffsetDays: 1 }));
+    expect(has).not.toContain(' disabled');
+  });
+
+  test('#619: a framework from before the declaration restricts nothing', () => {
+    const html = withFramework({ salesFlows: ['SALE'] }, () => render(0, { returnOffsetDays: 1 }));
+    expect(optionValues(html).slice(0, 2)).toEqual(['SEPARATE', 'COMBINED']);
+    expect(html).not.toContain('not declared');
+  });
+
+  test('#619: the framework editor flags COMBINED below OSDM 3.7', () => {
+    const note = loadFunction('js/scenarios.js', 'returnModelVersionNote');
+    expect(note({ osdmVersion: '3.6.0', returnModels: ['COMBINED'] })).toContain('needs OSDM 3.7 or later');
+    expect(note({ osdmVersion: '3.6', returnModels: ['SEPARATE', 'COMBINED'] })).toContain('declares 3.6');
+    expect(note({ osdmVersion: '3.7.0', returnModels: ['COMBINED'] })).toBe('');
+    expect(note({ osdmVersion: '4.0', returnModels: ['COMBINED'] })).toBe('');
+    expect(note({ osdmVersion: '3.6.0', returnModels: ['SEPARATE'] })).toBe('');
+    expect(note({ osdmVersion: '3.6.0' })).toBe('');
+  });
+
+  test('#619: the framework editor stores the declaration and keeps the note current', () => {
+    expect(source).toContain("case 'fw-return-model':\n      fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;");
+    expect(source).toContain("wizData.framework.osdmVersion = v;\n      refreshReturnVersionNote();");
+    const fwModels = vm.runInNewContext(`(${/^const FW_RETURN_MODELS = (\[[\s\S]*?\]);$/m.exec(source)[1]})`);
+    expect(fwModels.map(([v]) => v)).toEqual(context.RETURN_MODEL_OPTIONS.map(([v]) => v));
   });
 
   test('the input delegate stores both fields on the offer criteria', () => {

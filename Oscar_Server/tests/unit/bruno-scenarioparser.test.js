@@ -214,3 +214,21 @@ describe('parseScenarioData — a scenario_override that is not in the file', ()
       .toContain('the data file holds 1 scenario)');
   });
 });
+
+// #619: the run log's warning for a field the Test Framework does not declare.
+describe('featureNotDeclaredWarning', () => {
+  test('a return model names the model and where to declare it', () => {
+    const line = sp.featureNotDeclaredWarning({ code: 'R1', offerSearchCriteria: { returnModel: 'COMBINED' } }, 'returnModel');
+    expect(line).toMatch(/^\[WARNING\] Scenario "R1" asks for a return in the COMBINED model/);
+    expect(line).toContain('Return journeys');
+    expect(line).not.toContain('REFUND_PARTIAL');
+    expect(sp.featureNotDeclaredWarning({ code: 'R2', offerSearchCriteria: { returnOffsetDays: 1 } }, 'returnModel'))
+      .toContain('in the SEPARATE model');
+  });
+
+  test('a partial-refund flag keeps its text', () => {
+    const line = sp.featureNotDeclaredWarning({ code: 'P1' }, 'partialRefundByLeg');
+    expect(line).toMatch(/^\[WARNING\] Scenario "P1" arms partialRefundByLeg=on/);
+    expect(line).toContain('REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows');
+  });
+});

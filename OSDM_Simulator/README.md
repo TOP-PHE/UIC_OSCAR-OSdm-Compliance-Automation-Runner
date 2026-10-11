@@ -66,7 +66,7 @@ and what a run must show:
 | `POST /<provider>/bookings/{id}/exchange-offers` | on a provider with `exchange` (`gamma`, #611): an offer request plus the `fulfillmentIds` given up; one exchange offer per offer, with `exchangePrice`, `exchangeFee` (by the exchangeability of what is given up: none, a quarter, the whole price; an accepted `overruleCode` waives it) and `amountToBePaid` = new price + fee − price given up, or `refundableAmount` when negative. Else 501 |
 | `POST /<provider>/bookings/{id}/exchange-operations`; `GET`, `DELETE …/{id}` | one exchange offer taken: the operation `PREBOOKED`, the parts given up `EXCHANGE_ONGOING`; `POST …/fulfillments` then confirms it (old parts and fulfillments `EXCHANGED`, a new booked offer and fulfillment `FULFILLED`, the confirmed price updated). `DELETE` withdraws a pre-booked one (204), not a confirmed one (409). Else 501 |
 | any other OSDM resource (places, products, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
-| `GET /healthz` | `{"status":"ok"}`, for the container health check |
+| `GET /healthz` | `{"status":"ok","version":"<package.json version>"}`, for the container health check and to see which version runs (#617) |
 
 There is no timetable. A trip is built from the request: the same origin,
 destination and time give the same trip and the same prices every time.

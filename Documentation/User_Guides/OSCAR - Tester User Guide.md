@@ -407,6 +407,16 @@ Leave empty for a **one‑way**. To make it a **return**, set:
   booking should have: one for the whole return, one per direction, or one per
   passenger. Empty = not checked.
 
+The Test Framework declares which return models the provider supports
+(*Sales Flows* → 🔁 *Return journeys*, issue #619). The *Return model* list
+offers only those. A scenario that already asks for a model the framework
+does not declare keeps it, marked ⚠: it still runs, and the run log shows a
+`[WARNING]` naming the model. When the framework declares no model, the return
+fields of a one-way scenario are locked. *Both directions in one offer* needs
+OSDM 3.7 or later, and the Test Framework says so when its version is lower.
+A framework from before 1.11.236 declares, the first time it is opened, the
+models its scenarios already use.
+
 The return date goes with the first offer call: from OSDM 3.7 as
 `offerSearchCriteria.inboundDate`, before as the deprecated
 `returnSearchParameters.inwardReturnDate`. Then comes the **two‑step return**

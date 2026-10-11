@@ -136,10 +136,11 @@ test('an unknown provider is a 404, with or without a token', async () => {
   }
 });
 
-test('the health check answers without a token and says nothing else', async () => {
+test('the health check answers without a token and says only its status and version (#617)', async () => {
   const res = await call(sim.base, null, 'GET', '/healthz');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { status: 'ok' });
+  assert.deepEqual(res.body, { status: 'ok', version: require('../package.json').version });
+  assert.match(res.body.version, /^\d+\.\d+\.\d+$/);
   assert.equal((await call(sim.base, null, 'POST', '/healthz', {})).status, 405);
 });
 

@@ -1,0 +1,101 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Simulator · tag and release
+
+# #617: a merge to main that changes the OSDM_Simulator/package.json version
+# creates the tag simulator-<version> and a GitHub release whose notes come
+# from the CHANGELOG (OSDM_Simulator/scripts/release-notes.js). The server and
+# release tags (auto-tag-on-release.yml) are not touched.
+#
+# The default GITHUB_TOKEN is enough: no workflow listens to simulator tags,
+# so the safeguard that makes auto-tag-on-release.yml use a GitHub App does
+# not matter here. Dispatched by hand, it tags the current version if that
+# tag does not exist yet; otherwise it does nothing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'OSDM_Simulator/package.json'
+  workflow_dispatch: {}
+
+concurrency:
+  group: simulator-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag and release the simulator version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (with previous commit for diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Detect a new version
+        id: version
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          new=$(jq -r '.version' OSDM_Simulator/package.json)
+          old=$(git show HEAD~1:OSDM_Simulator/package.json 2>/dev/null | jq -r '.version' 2>/dev/null || echo "")
+          tag=""
+          if [[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && { [[ "$EVENT" == "workflow_dispatch" ]] || [[ "$new" != "$old" ]]; }; then
+            if git ls-remote --tags origin "refs/tags/simulator-${new}" | grep -q .; then
+              echo "::notice::simulator-${new} already exists — nothing to do."
+            else
+              tag="simulator-${new}"
+            fi
+          else
+            echo "::notice::The simulator version did not change (${old} → ${new})."
+          fi
+          echo "version=${new}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Release notes from the CHANGELOG
+        if: steps.version.outputs.tag != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node OSDM_Simulator/scripts/release-notes.js "$VERSION" > "$RUNNER_TEMP/notes.md"
+
+      - name: Push the tag
+        if: steps.version.outputs.tag != ''
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -uo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "OSDM simulator ${TAG#simulator-}"
+          source .github/workflows/lib/push-tag-with-retry.sh
+          push_tag_with_retry "$TAG"
+
+      - name: Create the release
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" --title "OSDM simulator ${TAG#simulator-}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+
+      - name: Summary
+        if: always()
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [[ -n "$TAG" ]]; then
+            echo "Tagged and released \`$TAG\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No new simulator version: nothing tagged." >> "$GITHUB_STEP_SUMMARY"
+          fi

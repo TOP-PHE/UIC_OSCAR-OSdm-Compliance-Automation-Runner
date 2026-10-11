@@ -59,6 +59,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     shared `requestedFulfillmentOptionsList`) was deliberately left
     **unrestricted** since #436 (a stale filter was locking every new company
     to ETICKET/PDF_A4) — extending gating there is an open follow-up, see §6.
+  - **Return models** (#619, 1.11.236) use both: `returnModels` in the
+    framework, `scenarioReturnModel()` in `frameworkGating.js` and its twin in
+    `scenarios.js` (keep them alike), and a picker that keeps a scenario's own
+    undeclared model, marked, rather than changing it on display. A framework
+    without the key is migrated from its scenarios on first read
+    (`needsFrameworkMigration`); absent = no warning, `[]` = none declared.
+  - **The run gets the annotation too** since 1.11.236: `/data/:filename`
+    annotates on the run-secret branch only (`withFrameworkWarnings` in
+    `server.js`). Before, only the browser's `GET /datafile` had it, so the
+    collection's `[WARNING]` never reached a run log.
 - **Known-deviation baseline (#398).** Per-company "Test Findings & Open
   Points" register (`finding`/`finding_comment`): a threaded conformance
   dialogue, not a bug tracker — OSCAR opens a finding (observation + spec
@@ -1090,6 +1100,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A body over the limit is read to its end before the 413**, without being
     kept, up to a second limit. Answering while the caller is still sending
     closes the connection under its feet and it never sees the status.
+  - **`gamma` exchanges, and has a short-deadline stop place** (#611, 0.16.0).
+    Exchange state is a hidden `Symbol` on the booking (never serialised);
+    with an exchange pre-booked, `POST …/fulfillments` confirms the exchange,
+    not the booking. A trip from `urn:uic:stn:0000099` makes everything that
+    comes from it expire after 60 s: only the `SIM_NHF_EXPIRED_*` scenarios use
+    that trip, and the data-file test keeps it so. A pre-booked booking past its
+    limit is read with its parts `RELEASED` (the collection checks that).
+    Scenario data is appended to `simulator_datafile.json` as text, never by
+    re-dumping the file (its formatting is hand-kept).
+  - **Its version is visible and released on its own** (#617, 0.15.0):
+    `/healthz` returns `{status, version}`; a version change on `main` tags
+    `simulator-<version>` with a GitHub release whose notes
+    `scripts/release-notes.js` reads from the CHANGELOG (the section whose
+    first line says `Simulator <version>.`; a version it does not find stops
+    the workflow, and `tests/release-notes.test.js` fails first). The same
+    change updates the installed simulator (`simulator-deploy.yml`, forced SSH
+    command = a copy of `deploy/update.sh` outside the checkout). Only on a
+    version change: a restart clears every booking and token.
   - It is linted and tested in the required `Lint, audit, test` job (a new
     workflow would not be a required check), with the ESLint that
     `Oscar_Server` installs.

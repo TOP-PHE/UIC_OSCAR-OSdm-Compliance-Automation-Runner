@@ -147,11 +147,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/beta/v
 curl -s -o /dev/null -w '%{http_code}\n' $H/alpha/versions                                 # 401: no token
 ```
 
-Expected: `{"status":"ok"}`, then `200`, `401`, `401`. If the first number is
+Expected: `{"status":"ok","version":"<version>"}`, then `200`, `401`, `401`. If the first number is
 `401`, no token was issued: the secret is not the one of that client.
 
 What needs no secret can be checked at any time: `/healthz` answers
-`{"status":"ok"}` over https with a valid certificate, `/alpha/versions`
+`{"status":"ok","version":"<version>"}` over https with a valid certificate, `/alpha/versions`
 without a token answers 401, and an unknown provider answers 404.
 
 ## 5. Point a company at it
@@ -178,7 +178,15 @@ rebuilds its Test Framework from the file.
    [scenario catalogue](OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
-4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
+4. **Return journeys** (Test Manager, Test Config → Test Framework → *Sales
+   Flows* → 🔁 *Return journeys*, since 1.11.236): `alpha` (OSDM 3.6) declares
+   *Separate directions* only; `beta` and `gamma` declare both. A framework
+   that existed before declares, on first opening, the models its scenarios
+   use: both, since the file holds the scenarios of every version. On `alpha`
+   the editor then says that *Both directions in one offer* needs OSDM 3.7:
+   untick it. A return scenario whose model is not declared still runs, with a
+   `[WARNING]` naming the model.
+5. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider" (on `gamma`, `GET /reduction-cards` and
    `GET /products` answer 200), and no check fails. The warnings each
@@ -215,7 +223,8 @@ A Test Manager sets it up like this:
 3. In the menu bar, set **Working on** to `Beta`. Test Config, New Run, the
    Dashboard and the reports of that browser tab now work on `Beta`.
 4. **Test Config** → *Upload datafile*, the same file as in section 5: a
-   provider has its own data file and Test Framework.
+   provider has its own data file and Test Framework. Declare its return
+   models as in section 5, step 4.
 5. Run a scenario. Set **Working on** back to the company, or to another
    provider, to run there.
 
@@ -240,7 +249,8 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | To do | How |
 |---|---|
 | See what is being called | `docker compose logs -f` (one line per request: time, method, path, status, provider, client; no header, no body) |
-| Update the simulator | `git -C /opt/osdm-simulator pull && docker compose restart` |
+| Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
+| See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
 | Add a client | add an entry to `clients.json` in the deploy folder (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
 | Clear every booking and end every token | `docker compose restart` |
@@ -248,6 +258,44 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 
 A restart clears everything: bookings are kept in memory only, and the key that
 signs the tokens is drawn at start-up.
+
+**Automatic update** (#617). Each simulator version is tagged
+`simulator-<version>`, with a GitHub release whose notes come from the
+CHANGELOG. When a merge to `main` changes the version, the workflow
+*Simulator · update the installed simulator* connects to this host, runs the
+update and checks that `/healthz` reports the new version. It runs only on a
+version change, or when started by hand (Actions → the workflow → *Run
+workflow*): a restart clears every booking and token, so an edit to the
+documentation does not interrupt a campaign. Until the set-up below is done,
+the workflow says that the secrets are missing and stops, green.
+
+Set-up, once, as root on this host:
+
+```bash
+# 1. The update command, copied OUTSIDE the checkout: a merge cannot change
+#    what the key may run. Read it before copying it again after an update.
+install -m 0755 /opt/osdm-simulator/OSDM_Simulator/deploy/update.sh /usr/local/sbin/osdm-simulator-update
+# 2. A user that may run it and nothing else (docker group for the restart).
+useradd --create-home --shell /bin/sh simdeploy && usermod -aG docker simdeploy
+chown -R simdeploy /opt/osdm-simulator
+chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json   # the container's user reads it
+# 3. A key pair; the private half goes to GitHub, the public half here,
+#    restricted to the one command.
+ssh-keygen -t ed25519 -N '' -C simulator-deploy -f /root/simulator-deploy
+install -d -m 700 -o simdeploy /home/simdeploy/.ssh
+echo "command=\"/usr/local/sbin/osdm-simulator-update\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty $(cat /root/simulator-deploy.pub)" > /home/simdeploy/.ssh/authorized_keys
+chown simdeploy /home/simdeploy/.ssh/authorized_keys && chmod 600 /home/simdeploy/.ssh/authorized_keys
+ssh-keyscan -t ed25519 <simulator-host>     # the known_hosts line
+```
+
+Then in the repository, Settings → Secrets and variables → Actions:
+`SIMULATOR_SSH_KEY` (the content of `/root/simulator-deploy`, then delete that
+file), `SIMULATOR_KNOWN_HOSTS` (the `ssh-keyscan` line),
+`SIMULATOR_SSH_TARGET` (`simdeploy@<simulator-host>`), `SIMULATOR_URL`
+(`https://<simulator-host>`). Start the workflow by hand once and watch it: it
+must end with "The simulator reports <version>". The checkout must belong to
+`simdeploy` (step 2), or `git pull` fails; `clients.json` stays with user
+1000, or the container cannot read it.
 
 **Replacing all clients and secrets**, for instance to move a simulator
 installed before the `provider.role` ids to them. The script never replaces a
