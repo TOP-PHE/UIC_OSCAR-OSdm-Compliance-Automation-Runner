@@ -82,7 +82,7 @@ const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 // need not give scripts a Buffer.
 function firstBytes(content, count) {
   if (typeof content !== 'string') return null;
-  const values = [...content.slice(0, 8)].map((c) => BASE64.indexOf(c));
+  const values = Array.from(content.slice(0, 8), (c) => BASE64.indexOf(c));
   if (values.length < 8 || values.some((v) => v < 0)) return null;
   const bytes = [];
   for (let i = 0; i < 8; i += 4) {
@@ -130,7 +130,7 @@ function checkBookingDocuments(fulfillments, siblings, requestedMedia) {
   const all = [...new Map([...byFulfillment.values()].flat().map((d) => [keyOf(d) || d, d])).values()];
   const holders = holdersOf(byFulfillment);
   const checks = [];
-  for (const medium of [...new Set(listOf(requestedMedia).filter(Boolean))]) {
+  for (const medium of new Set(listOf(requestedMedia).filter(Boolean))) {
     const found = all.filter((d) => d.medium === medium);
     checks.push({ name: `Documents: the ${medium} medium asked for is delivered — ${found.length} document(s)`, ok: found.length > 0, level: 'warn', message: `no ${medium} document on the booking's ${byFulfillment.size} fulfillment(s)` });
   }
