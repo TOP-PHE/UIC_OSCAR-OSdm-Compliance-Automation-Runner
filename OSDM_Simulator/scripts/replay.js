@@ -16,6 +16,7 @@
  *   node scripts/replay.js compare                       before.json vs after.json
  *   node scripts/replay.js coverage                      library-bruno lines run
  *   node scripts/replay.js catalogue                     scenario_catalogue.json vs after.json
+ *   node scripts/replay.js describe                      after.json → Documentation/Test_Coverage/OSCAR - Checks by scenario.md
  *
  * Needs: the simulator listening (REPLAY_SIM_BASE, default
  * http://127.0.0.1:3002), the repository root served over HTTP
@@ -33,18 +34,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { providerOf, recordOf, compareRecordings, lineCoverage, catalogueDrift } = require('./replay-lib');
+const { providerOf, recordOf, compareRecordings, lineCoverage, catalogueDrift, describeRecording } = require('./replay-lib');
 
 const ROOT = path.join(__dirname, '..', '..');
 const COLLECTION = path.join(ROOT, 'Bruno_Collection');
 const DATA_FILE = path.join(COLLECTION, 'data_base', 'simulator_datafile.json');
 const CATALOGUE_FILE = path.join(COLLECTION, 'data_base', 'scenario_catalogue.json');
+const CHECKS_DOCUMENT = path.join(ROOT, 'Documentation', 'Test_Coverage', 'OSCAR - Checks by scenario.md');
 const ENV_FILE = path.join(COLLECTION, 'environments', 'OTST_Simulator_Env.yml');
 const CLIENTS_FILE = path.join(__dirname, '..', 'clients.json');
 const OUT = path.join(__dirname, '..', 'replay');
 const RUNS = path.join(OUT, 'runs');
 const COVERAGE = path.join(OUT, 'coverage');
 const RECORDINGS = { before: path.join(OUT, 'before.json'), after: path.join(OUT, 'after.json') };
+// What each recording was made from, written next to it.
+const ABOUT = { before: path.join(OUT, 'before.about.json'), after: path.join(OUT, 'after.about.json') };
 const FOLDERS = ['00-Access Token', '01-System Infos Requests', '02-Common Requests', '03-Refund', '04-Exchange'];
 const SIM_BASE = process.env.REPLAY_SIM_BASE || 'http://127.0.0.1:3002';
 const DATA_URL = process.env.REPLAY_DATA_URL || 'http://localhost:8080/Bruno_Collection/data_base/simulator_datafile.json';
@@ -111,6 +115,12 @@ function record(which, only) {
     process.stderr.write(`${code}: ${outcome} (${Math.round((Date.now() - started) / 1000)} s)\n`);
   });
   fs.writeFileSync(RECORDINGS[which], `${JSON.stringify(recording, null, 1)}\n`);
+  const about = {
+    collection: fs.readFileSync(path.join(COLLECTION, 'VERSION'), 'utf8').trim(),
+    simulator: JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version,
+    day: new Date().toISOString().slice(0, 10),
+  };
+  fs.writeFileSync(ABOUT[which], `${JSON.stringify(about)}\n`);
   process.stderr.write(`Recorded ${codes.length} scenario(s) in replay/${which}.json\n`);
 }
 
@@ -151,6 +161,16 @@ function catalogue() {
   return 1;
 }
 
+// The checks of the last recording, written as the document testers read.
+function describe() {
+  const recording = JSON.parse(fs.readFileSync(RECORDINGS.after, 'utf8'));
+  const catalogueEntries = JSON.parse(fs.readFileSync(CATALOGUE_FILE, 'utf8'));
+  const { collection, simulator, day } = JSON.parse(fs.readFileSync(ABOUT.after, 'utf8'));
+  const about = `collection ${collection}, simulator ${simulator}, recorded on ${day}`;
+  fs.writeFileSync(CHECKS_DOCUMENT, describeRecording(recording, catalogueEntries, about));
+  process.stdout.write(`Wrote ${path.relative(ROOT, CHECKS_DOCUMENT)} (${Object.keys(recording).length} scenarios).\n`);
+}
+
 if (require.main === module) {
   const [command, which, ...only] = process.argv.slice(2);
   try {
@@ -158,7 +178,8 @@ if (require.main === module) {
     else if (command === 'compare') process.exitCode = compare();
     else if (command === 'coverage') coverage();
     else if (command === 'catalogue') process.exitCode = catalogue();
-    else throw new Error('usage: replay.js record before|after [CODE ...] | compare | coverage | catalogue');
+    else if (command === 'describe') describe();
+    else throw new Error('usage: replay.js record before|after [CODE ...] | compare | coverage | catalogue | describe');
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 2;
