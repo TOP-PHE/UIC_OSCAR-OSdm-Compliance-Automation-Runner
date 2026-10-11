@@ -11,6 +11,7 @@
   "utcOffset": "+02:00",
   "tokenLifetimeSeconds": 900,
   "tripsCollection": true,
+  "idempotency": true,
   "documents": [
     "PDF_A4",
     "RETAILER_APP"

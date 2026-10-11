@@ -86,6 +86,7 @@ function checkProvider(key, raw) {
     ...(reservations ? { reservations } : {}),
     ...checkTripsCollection(raw.tripsCollection, bad),
     ...checkDocuments(raw, bad),
+    ...checkIdempotency(raw.idempotency, bad),
   };
 }
 
@@ -151,6 +152,14 @@ function checkTripsCollection(value, bad) {
   if (value === undefined) return {};
   if (typeof value !== 'boolean') throw bad('tripsCollection');
   return value ? { tripsCollection: true } : {};
+}
+
+// #604: whether the answers of POST /bookings and POST .../fulfillments are
+// kept per client and Idempotency-Key. Absent: the header is ignored.
+function checkIdempotency(value, bad) {
+  if (value === undefined) return {};
+  if (typeof value !== 'boolean') throw bad('idempotency');
+  return value ? { idempotency: true } : {};
 }
 
 // #603: the media of the documents issued on confirmation (PDF_A4 merged for

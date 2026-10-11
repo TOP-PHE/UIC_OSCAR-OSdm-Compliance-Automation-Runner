@@ -164,3 +164,9 @@ optional. Each is one reservation for all the passengers, on one leg.
 |---|---|---|---|
 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` | A return whose offers ask for `PDF_A4` and `RETAILER_APP`. The booking delivers both media; each document's format fits its medium and its content is that format; there is one PNG per ticket. Step 06b reads each ticket with `GET /fulfillments/{id}`. | In the 3.8 shape: one PDF for the whole booking and one PNG per ticket, in the booking's `fulfillmentDocuments`, each ticket naming its documents in `fulfillmentDocumentRefs`. `GET /fulfillments/{id}` gives the ticket and its two documents, with a `DOCUMENT_COVERS_MORE_FULFILLMENTS` Problem for the merged PDF. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` | The same booking, refunded in full. The scenario waits for the refund receipt (`refundReceiptMaxWaitMinutes` 2): step 14b reads the booking every 15 seconds until a document of type INFORMATION appears. | The receipt (`PDF_A4`, type INFORMATION) appears in the booking 30 seconds after the refund, and only in `GET /bookings/{id}`. | No failed check; the receipt found after about 30 s; the two merged-PDF warnings. If the receipt does not come within the 2 minutes, the receipt check fails. |
+
+### Idempotency-Key (#604)
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_IDEMPOTENCY_1ADT_38` | `POST /bookings` and `POST /bookings/{id}/fulfillments` carry an `Idempotency-Key`. Steps 02 and 06 send each again with the same key: the same booking, or the same fulfillments, must come back. Step 02 also sends the booking with another key, which must give a new booking. | gamma (profile `idempotency`) keeps each answer per client and key, as it was when first given, and gives it again. The same key with another body is `409 IDEMPOTENCY_KEY_REUSED`. A booking made with a new key is left pre-booked. | No failed check. |
