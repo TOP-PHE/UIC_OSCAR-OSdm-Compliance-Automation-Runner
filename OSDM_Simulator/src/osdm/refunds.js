@@ -133,7 +133,7 @@ function createRefundOffers(booking, body, provider, nowMs) {
   const offers = requestedFulfillments(booking, body).map((f) => {
     const spec = specs.find((s) => s?.fulfillmentId === f.id) || (specs.length === 1 && !specs[0]?.fulfillmentId ? specs[0] : null);
     const scoped = spec ? variants.scopedPartIds(booking, f, spec, admissionsOf(booking)) : null;
-    if (scoped && scoped.length === 0) throw bad(`the refund specification names no part of fulfillment ${f.id}`);
+    if (scoped?.length === 0) throw bad(`the refund specification names no part of fulfillment ${f.id}`);
     return buildRefundOffer(booking, f, overruleCode, provider, nowMs, scoped);
   });
   booking.refundOffers = [...(booking.refundOffers || []), ...offers];
