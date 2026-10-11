@@ -234,7 +234,7 @@ function findFulfillmentForPassenger(fulfillments, externalRef) {
 // The fulfillments listing any of these booking parts in their bookingParts.
 function fulfillmentsHoldingParts(fulfillments, partIds) {
   const wanted = new Set(partIds.map(String));
-  return fulfillments.filter(f => (Array.isArray(f && f.bookingParts) ? f.bookingParts : [])
+  return fulfillments.filter(f => (Array.isArray(f?.bookingParts) ? f.bookingParts : [])
     .some(p => p && wanted.has(String(p.id))));
 }
 
@@ -266,7 +266,7 @@ function passengerPartIds(allAdms, passenger) {
   const out = [];
   if (!passenger) return out;
   for (const a of allAdms) {
-    const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : [];
+    const owners = Array.isArray(a?.passengerIds) ? a.passengerIds.map(String) : [];
     if (!owners.includes(String(passenger.id))) continue;
     const refs = expandAdmissionRefs(a);
     out.push(String(a.id), ...refs.reservationIds, ...refs.ancillaryIds);
