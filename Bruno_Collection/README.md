@@ -128,3 +128,41 @@ OSDM Simulator.md`, section 5.
 the standalone run above, and the file a Test Manager uploads in OSCAR.
 `OSDM_Simulator/tests/datafile.test.js` keeps it valid against the schema and
 answerable by every simulated provider.
+
+## Replay: before and after a change
+
+A change to `library-bruno/` must leave every verdict where it was, unless it
+is meant to change one. The replay (#611) runs every scenario of the
+simulator's data file, standalone, and records for each the ordered list of
+its checks (request, name, pass or fail) and its `[WARNING]` lines; a second
+recording is compared with the first.
+
+With the simulator listening on `http://127.0.0.1:3002`, the repository root
+served on port 8080 (sections 1 and 2 above) and `bru` at the pinned version:
+
+```bash
+cd OSDM_Simulator
+git switch main                     # or the commit to compare against
+node scripts/replay.js record before
+git switch my-branch
+node scripts/replay.js record after
+node scripts/replay.js compare      # no output but "the same": nothing changed
+node scripts/replay.js coverage     # which lines of library-bruno/ the recording ran
+```
+
+Each scenario runs on the provider of its version (`_36` alpha, `_37` beta,
+`_38` gamma), with the first tester client of that provider in
+`OSDM_Simulator/clients.json`. Give scenario codes after `before` / `after`
+to record only those. The recordings and the coverage data go to
+`OSDM_Simulator/replay/` (not in git). `REPLAY_SIM_BASE` and
+`REPLAY_DATA_URL` point elsewhere when needed.
+
+What changes on its own between two runs (ids, booking codes, instants,
+durations, client ids) is replaced by a placeholder before the comparison,
+so two recordings of the same commit are the same. A full recording takes
+about a quarter of an hour, most of it in the expiry probes, which wait for
+their deadline, and the refund receipt.
+
+The deliberately wrong scenarios (`SIM_WRONG_*`) fail in every recording: a
+comparison shows a difference only when their failures change.
+
