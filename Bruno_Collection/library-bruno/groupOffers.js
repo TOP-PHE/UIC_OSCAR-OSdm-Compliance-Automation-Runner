@@ -103,8 +103,11 @@ const flexibilityOf = (offer) => offer?.offerSummary?.overallFlexibility;
 /**
  * Step 01d: the group offer against the cheapest offer of the same travel
  * class (and the same flexibility, when there is one) in the answer of the
- * INDIVIDUAL search, which prices the same passengers alone. Dearer fails; the
- * same price is a warning; an answer that cannot be compared is a warning.
+ * INDIVIDUAL search, which prices the same passengers alone. Cheaper passes.
+ * Dearer or the same price is a warning, not a failure: prices are the
+ * provider's commercial choice, which OSDM does not set (#644; a weekend
+ * group ticket for two adults may cost more than two returns). An answer that
+ * cannot be compared is a warning too.
  */
 function compareGroupWithIndividual(groupOffer, body) {
   const name = 'Group offer: the group pays less than the same passengers alone';
@@ -118,7 +121,7 @@ function compareGroupWithIndividual(groupOffer, body) {
   const cheapest = candidates.slice(1).reduce((best, o) => (priceOf(o).amount < priceOf(best).amount ? o : best), candidates[0]);
   const alone = priceOf(cheapest).amount;
   const what = `group ${group.amount} ${group.currency}, alone ${alone} (offer ${cheapest.offerId}${sameFlexibility.length > 0 ? '' : ', another flexibility'})`;
-  if (group.amount > alone) return [{ name: `${name} — ${what}`, ok: false, message: 'the group offer costs more than the same passengers alone' }];
+  if (group.amount > alone) return [{ name: `${name} — ${what}`, ok: false, level: 'warn', message: 'the group offer costs more than the same passengers alone (a commercial choice, not an OSDM rule)' }];
   if (group.amount === alone) return [{ name: `${name} — ${what}`, ok: false, level: 'warn', message: 'the group offer costs the same as the same passengers alone' }];
   return [{ name: `${name} — ${what}`, ok: true }];
 }

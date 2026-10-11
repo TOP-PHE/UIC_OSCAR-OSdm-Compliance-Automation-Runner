@@ -84,6 +84,21 @@ function buildInboundOfferRequest(o) {
 }
 
 const stopOf = (place) => (place && typeof place === 'object' ? place.stopPlaceRef || null : null);
+
+/**
+ * One stop place under two spellings: a UIC station code may be written with
+ * or without its leading zeros (`urn:uic:stn:005433295` and
+ * `urn:uic:stn:5433295`); a provider may answer in the other form.
+ */
+function sameStopPlace(a, b) {
+  if (a === b) return true;
+  const code = (ref) => {
+    const m = /^urn:uic:stn:(\d+)$/.exec(String(ref || ''));
+    return m ? m[1].replace(/^0+/, '') : null;
+  };
+  const ca = code(a);
+  return ca !== null && ca === code(b);
+}
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
 
 /**
@@ -118,7 +133,7 @@ function checkTripBack(trips, ctx, add) {
   const inbound = trips.filter((t) => t?.id !== ctx.outboundTripId);
   const seen = trips.map((t) => stopOf(t?.origin) + '→' + stopOf(t?.destination)).join(', ') || 'none';
   add(`Return: a trip goes back, from ${from} to ${to}`,
-    inbound.some((t) => stopOf(t.origin) === from && stopOf(t.destination) === to),
+    inbound.some((t) => sameStopPlace(stopOf(t.origin), from) && sameStopPlace(stopOf(t.destination), to)),
     `no trip of the inbound response runs from ${from} to ${to}; trips: ${seen}`);
   for (const t of inbound) {
     if (t?.direction != null && t.direction !== 'IN_BOUND') {
@@ -192,6 +207,7 @@ function checkReturnFulfillmentCount(fulfillments, expected, passengerCount) {
 
 module.exports = {
   RETURN_MODELS,
+  sameStopPlace,
   RETURN_FULFILLMENTS,
   normaliseReturnModel,
   normaliseReturnFulfillments,

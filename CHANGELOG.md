@@ -62,6 +62,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.239] / [collection-OTST_V2.0.128] — 2026-10-11
+
+Issue #644, release 2026.273. Server code unchanged (tests only).
+
+### Fixed
+
+False failures seen on the first runs of a provider's own sell scenarios
+(OSDM 3.8; the whole sale went through):
+
+- **Step 07 no longer checks the confirmation deadline of a confirmed
+  booking.** OSDM 3.8: `confirmableUntil` "must be provided for a booking part
+  in PREBOOKED state. For later states, the value is ignored and can be null".
+  A provider that leaves a placeholder (`0001-01-01`) there failed every run.
+  The deadline is still checked on the pre-booking (02, 05).
+- **A fulfillment's `createdOn` may be up to two minutes ahead of OSCAR's
+  clock.** The provider's server and OSCAR's are two clocks; 24 ms ahead
+  failed "at or before now".
+- **`GET /coach-deck-layouts/{id}` and `GET /products/{id}` are skipped when
+  there is no id** (none configured, none from the list call), instead of
+  being sent as `…/null`.
+- **`requestedInformation` may name the purchaser without an index**
+  (`purchaser.detail.contact.email`). The purchaser is one object; OSCAR
+  already ignored its index. A passenger still needs `[index]`.
+- **A return trip given with the station codes written without leading
+  zeros** (`urn:uic:stn:5433295` for `urn:uic:stn:005433295`) is the same
+  stop place; it failed "a trip goes back".
+
+### Added
+
+- **Step 02 checks that each reservation asked for with the booking is in
+  it**, not only step 07. A reservation part the offer gives without a trip
+  coverage is named by its summary instead of "on leg " (empty), and is
+  matched by any booked reservation not already counted.
+
+### Default decisions (taken without asking)
+
+- The clock tolerance is two minutes.
+- Only `purchaser` may go without an index; every other root keeps the
+  grammar's `[index]`.
+- A price comparison that passes is still a check (so the simulator's runs
+  keep their counts); one that does not is a warning line.
+- The station codes compared without leading zeros are `urn:uic:stn:` ones
+  only.
+
+### Changed
+
+- **A group that does not pay less than the same passengers alone (01d), and
+  a card holder who does not pay less than without the card (01c), are
+  warnings, not failures** (maintainer decision). Prices are the provider's
+  commercial choice, which OSDM does not set: a weekend group ticket for two
+  adults cost more than two returns. Whether the card is applied is still
+  checked on the offer (`appliedPassengerTypes`), and a cheaper price still
+  passes.
+
+Not changed, and reported to the provider instead: system-information URLs
+answered by a gateway with an HTML page and HTTP 200, an optional reservation
+accepted but not booked, a placeholder `confirmableUntil` on the pre-booking,
+products that give no travel class (so a class per leg cannot be read).
+
+Checked: each new unit test fails with its fix undone; a full recording of
+the 73 simulator scenarios, compared with the 1.11.238 one: every difference
+is one of the expected ones (73 `…/null` coach-layout calls and 11 `…/null`
+product calls no longer sent, six new reservation checks at step 02, all
+passing, the createdOn check renamed), no failure, no warning changed. The
+catalogue's check counts follow (33 entries one fewer, two one more) and
+`OSCAR - Checks by scenario.md` is regenerated. The station-code and price
+changes were made while that recording ran; neither changes what the
+simulator's answers give (same spelling, prices that pass). Not checked: a
+run against the provider since the fixes.
+
+---
+
 ## [server-1.11.238] / [collection-OTST_V2.0.127] — 2026-10-11
 
 Issue #642, release 2026.272. Simulator 0.22.0.

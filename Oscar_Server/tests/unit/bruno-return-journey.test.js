@@ -164,6 +164,24 @@ describe('checkReturnOffers', () => {
     ]);
   });
 
+  // #644: the provider answered the stations without their leading zeros.
+  test('a trip back given with the station codes written without leading zeros passes', () => {
+    const answer = structuredClone(combined);
+    for (const end of ['origin', 'destination']) {
+      answer.trips[1][end].stopPlaceRef = answer.trips[1][end].stopPlaceRef.replace(/:0+/, ':');
+    }
+    expect(answer.trips[1].origin.stopPlaceRef).toBe('urn:uic:stn:2');
+    expect(failing(rj.checkReturnOffers(answer, ctx))).toEqual([]);
+  });
+
+  test('sameStopPlace: UIC codes compare without leading zeros, nothing else is loosened', () => {
+    expect(rj.sameStopPlace('urn:uic:stn:005433295', 'urn:uic:stn:5433295')).toBe(true);
+    expect(rj.sameStopPlace('urn:uic:stn:5433295', 'urn:uic:stn:5433296')).toBe(false);
+    expect(rj.sameStopPlace('urn:x_eva:stn:05433295', 'urn:x_eva:stn:5433295')).toBe(false);
+    expect(rj.sameStopPlace('urn:uic:stn:', 'urn:uic:stn:0')).toBe(false);
+    expect(rj.sameStopPlace(null, 'urn:uic:stn:1')).toBe(false);
+  });
+
   test('an inbound trip marked OUT_BOUND is a warning only; an absent direction is nothing', () => {
     const answer = structuredClone(combined);
     answer.trips[1].direction = 'OUT_BOUND';

@@ -146,10 +146,11 @@ describe('comparePrices: less with the card than without', () => {
     ]);
   });
 
-  test('no reduction fails; another price for the passenger without card is a warning', () => {
+  // #644: what a card is worth on a tariff is the provider's choice.
+  test('no reduction is a warning, not a failure; so is another price for the passenger without card', () => {
     const checks = rc.comparePrices(offerOf([part('P1', 160), part('P2', 150)]), plain, specs);
-    expect(checks.map((c) => [c.ok, c.level])).toEqual([[false, 'fail'], [false, 'warn']]);
-    expect(checks[0].message).toBe('160 with the card is not below 160 without it');
+    expect(checks.map((c) => [c.ok, c.level])).toEqual([[false, 'warn'], [false, 'warn']]);
+    expect(checks[0].message).toBe('160 with the card is not below 160 without it (a commercial choice, not an OSDM rule)');
   });
 
   test('no counterpart, or no price to compare, is a warning only', () => {

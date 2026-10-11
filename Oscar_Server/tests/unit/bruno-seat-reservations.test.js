@@ -115,9 +115,27 @@ describe('the checks', () => {
       { name: 'Booking: holds the reservation on leg L1', ok: true, message: undefined },
       { name: 'Booking: reservation B-R1 gives a place — coach 7, places 21, 22', ok: true, level: 'warn', message: 'no placeAllocation.reservedPlaces' },
     ]);
-    expect(sr.checkBookedReservations(booking, offer, ['R1', 'R2'])[2]).toEqual({ name: 'Booking: holds the reservation on leg L2', ok: false, message: 'no reservation of the booking covers leg L2; the booking holds 1 reservation(s)' });
+    expect(sr.checkBookedReservations(booking, offer, ['R1', 'R2'])[2]).toEqual({ name: 'Booking: holds the reservation on leg L2', ok: false, message: 'the booking holds 1 reservation(s), none for the reservation R2 on leg L2' });
     const noPlace = { bookedOffers: [{ reservations: [{ id: 'X', tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L1'] } }] }] };
     expect(sr.checkBookedReservations(noPlace, offer, ['R1'])[1]).toMatchObject({ ok: false, level: 'warn' });
+  });
+
+  // #644: a provider's reservation part without a trip coverage, asked for and
+  // left out of the booking. The old check read "on leg ", and would not have
+  // matched a booked reservation that does carry a coverage.
+  test('a reservation part without trip coverage: named by its summary, matched by any booked reservation', () => {
+    const bare = { reservationOfferParts: [{ id: 'RX', summary: 'Rezervace 2.třída', tripCoverage: null }] };
+    const none = { bookedOffers: [{ reservations: [] }] };
+    expect(sr.checkBookedReservations(none, bare, ['RX'], { places: false })).toEqual([
+      { name: 'Booking: holds the reservation Rezervace 2.třída (the offer gives it no leg)', ok: false, message: 'the booking holds 0 reservation(s), none for the reservation RX Rezervace 2.třída (the offer gives it no leg)' },
+    ]);
+    const one = { bookedOffers: [{ reservations: [{ id: 'B-RX', tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L1'] } }] }] };
+    expect(sr.checkBookedReservations(one, bare, ['RX'], { places: false })).toEqual([
+      { name: 'Booking: holds the reservation Rezervace 2.třída (the offer gives it no leg)', ok: true, message: undefined },
+    ]);
+    // One booked reservation answers one asked for, not two.
+    const two = { reservationOfferParts: [...bare.reservationOfferParts, { id: 'RY', tripCoverage: null }] };
+    expect(sr.checkBookedReservations(one, two, ['RX', 'RY'], { places: false }).map((c) => c.ok)).toEqual([true, false]);
   });
 });
 
@@ -174,6 +192,10 @@ describe('the steps, the builder and the parser', () => {
     expect(add).toMatch(/body\.reservationOfferId = _addLaterForm \? _later\[0\]\.reservationId : reservationOfferId/);
     expect(add).toMatch(/__reservationsAddedLater/);
     expect(read('02-Common Requests', '07. GET Booking after Fulfillments.yml')).toMatch(/checkBookedReservations\(/);
+  });
+
+  test('#644: step 02 checks the reservations asked for, without the place check', () => {
+    expect(read('02-Common Requests', '02. POST Create Booking.yml')).toMatch(/__reservationsBooked"\), \[\]\);\n\s+if \(_asked\.length > 0\) \{\n\s+checkBookedReservations\([^\n]*_asked, \{ places: false \}\)/);
   });
 
   test('the booking request carries the reservation place selections; the misplaced admission checks are gone', () => {

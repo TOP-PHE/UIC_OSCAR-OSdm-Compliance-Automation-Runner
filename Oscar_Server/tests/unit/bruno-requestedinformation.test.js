@@ -708,3 +708,16 @@ describe('validateProblemResponse — provider-fair severity (#258)', () => {
     expect(m.asserts.some((a) => /\[purchaser\.gender\]/.test(a.name))).toBe(true);
   });
 });
+
+// #644: a provider names the purchaser without an index; it is one object.
+describe('the purchaser without an index', () => {
+  test('purchaser.detail.contact.email parses and means the purchaser; a passenger still needs its index', () => {
+    const r = ri.parseRequestedInformation('purchaser.detail.contact.email AND passengerSpecifications[0].detail.firstName');
+    expect(r.ok).toBe(true);
+    expect(ri.describeRequestedInformation(r.ast)).toBe('email (the purchaser) AND first name (passenger 0)');
+    expect(ri.parseRequestedInformation('passengerSpecifications.detail.firstName').error).toBe("Expected '[' after 'passengerSpecifications'");
+    expect(ri.parseRequestedInformation('purchaser').ok).toBe(false);
+    const m = { purchaser: { detail: { contact: { email: 'a@b.c' } } }, passengerSpecifications: [] };
+    expect(ri.evaluateRequestedInformation(ri.parseRequestedInformation('purchaser.detail.contact.email').ast, m).satisfied).toBe(true);
+  });
+});

@@ -20,7 +20,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *  - the offer names it on the passenger (AppliedPassengerType
  *    .appliedReductionCardTypes or .appliedReductions);
  *  - the passenger pays less than in the same request without cards (step
- *    01c, made only when a passenger holds a card).
+ *    01c, made only when a passenger holds a card). Not less is a warning
+ *    (#644): the price is the provider's commercial choice.
  *
  * Pure module: no Bruno globals. Unit-tested in
  * Oscar_Server/tests/unit/bruno-reduction-cards.test.js.
@@ -178,11 +179,15 @@ function comparePrices(chosen, plainResponse, specs) {
       return { name: `Reduction cards: the price of passenger ${ref} can be compared`, ok: false, level: 'warn', message: 'no single-passenger admission with a price on one side' };
     }
     if (carded) {
+      // Cheaper passes. Not cheaper is a warning (#644): what a card is worth
+      // on a tariff is the provider's commercial choice, which OSDM does not
+      // set; whether the card was applied is checked on the offer itself.
+      const cheaper = withCard < without;
       return {
         name: `Reduction cards: passenger ${ref} pays less with the card — ${withCard} against ${without} without`,
-        ok: withCard < without,
-        level: 'fail',
-        message: withCard < without ? undefined : `${withCard} with the card is not below ${without} without it`,
+        ok: cheaper,
+        level: cheaper ? 'fail' : 'warn',
+        message: cheaper ? undefined : `${withCard} with the card is not below ${without} without it (a commercial choice, not an OSDM rule)`,
       };
     }
     return {

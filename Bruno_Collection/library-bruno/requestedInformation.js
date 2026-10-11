@@ -146,21 +146,30 @@ function parseExpression(tokens) {
     }
     return parseLeaf();
   }
+  // `[number]` or `[ANY]` after a root, then the '.' that starts its path.
+  function parseIndex(rootName) {
+    if (peek()?.t !== '[') throw new Error(`Expected '[' after '${rootName}'`);
+    next(); // [
+    const idxTok = next();
+    let index;
+    if (idxTok?.t === 'num') index = Number.parseInt(idxTok.v, 10);
+    else if (idxTok?.t === 'word' && idxTok.v.toUpperCase() === 'ANY') index = 'ANY';
+    else throw new Error("Expected a numeric index or 'ANY' inside '[]'");
+    if (peek()?.t !== ']') throw new Error("Expected ']'");
+    next(); // ]
+    if (peek()?.t !== '.') throw new Error("Expected '.' after the index");
+    return index;
+  }
   function parseLeaf() {
     const root = next();
     if (!root || root.t !== 'word') throw new Error('Expected an attribute name');
     const up = root.v.toUpperCase();
     if (up === 'AND' || up === 'OR') throw new Error(`Unexpected operator '${root.v}'`);
-    if (!peek() || peek().t !== '[') throw new Error(`Expected '[' after '${root.v}'`);
-    next(); // [
-    const idxTok = next();
-    let index;
-    if (idxTok && idxTok.t === 'num') index = parseInt(idxTok.v, 10);
-    else if (idxTok && idxTok.t === 'word' && idxTok.v.toUpperCase() === 'ANY') index = 'ANY';
-    else throw new Error("Expected a numeric index or 'ANY' inside '[]'");
-    if (!peek() || peek().t !== ']') throw new Error("Expected ']'");
-    next(); // ]
-    if (!peek() || peek().t !== '.') throw new Error("Expected '.' after the index");
+    // The purchaser is one object, not a list: `purchaser.detail.contact.email`
+    // names it without an index, and the index of `purchaser[0]` means nothing.
+    // Every other root keeps the grammar's `[index]`.
+    const unindexed = rootKind(root.v) === 'purchaser' && peek()?.t === '.';
+    const index = unindexed ? 0 : parseIndex(root.v);
     const path = [];
     while (peek() && peek().t === '.') {
       next(); // .

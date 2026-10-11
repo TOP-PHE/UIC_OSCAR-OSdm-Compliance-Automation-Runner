@@ -453,3 +453,34 @@ describe('F9 auth guard', () => {
     expect(auth.isOptionalReadProbe('07. GET Booking after Fulfillments')).toBe(false);
   });
 });
+
+// ─── First run against a real provider (#644) ───────────────────────────────
+describe('#644: what a confirmed booking and a fulfillment are held to', () => {
+  const fulfillmentAt = (ms) => ({ id: 'F1', status: 'FULFILLED', createdOn: new Date(Date.now() + ms).toISOString(), bookingParts: [{ id: 'bp-1' }] });
+  const createdOnCheck = (ms) => {
+    envStore.admissionReservationAncillaryBookingPartsIds = JSON.stringify(['bp-1']);
+    return named(run(() => bookings.validateFulfillments([fulfillmentAt(ms)], 0, ['FULFILLED'])), 'createdOn is a valid datetime')[0];
+  };
+
+  // Old code: 24 ms ahead of OSCAR's clock failed.
+  test('a createdOn a little ahead of OSCAR\'s clock passes; ten minutes ahead fails', () => {
+    expect(createdOnCheck(24).ok).toBe(true);
+    expect(createdOnCheck(60000).ok).toBe(true);
+    expect(createdOnCheck(600000).ok).toBe(false);
+  });
+
+  const booking = (deadline) => ({ booking: { id: 'B1', bookedOffers: [{ offerId: 'O1', admissions: [{ id: 'bp-1', status: 'CONFIRMED', confirmableUntil: deadline }] }] } });
+  const deadlineChecks = (stage, deadline) => {
+    const r = run(() => { try { bookings.postCreateBookingResponse({ offerId: "O1", createdOn: new Date().toISOString(), admissionOfferParts: [], offerSummary: { minimalPrice: { amount: 0, currency: "CZK" } } }, booking(deadline), stage, ["FULFILLED"]); } catch { /* the rest of this small fixture is not what is checked here */ } });
+    return { checks: named(r, 'confirmation deadline'), r };
+  };
+
+  // Old code: a confirmed booking whose confirmableUntil is 0001-01-01 failed.
+  test('after the confirmation the deadline is not checked; before it, a past one fails', () => {
+    const after = deadlineChecks(['CONFIRMED'], '0001-01-01T00:00:00+00:00');
+    expect(after.checks).toEqual([]);
+    expect(after.r.logs.some((l) => l.startsWith('[INFO] Booking already confirmed'))).toBe(true);
+    const before = deadlineChecks(['PREBOOKED'], '0001-01-01T00:00:00+00:00');
+    expect(before.checks.map((c) => c.ok)).toEqual([false]);
+  });
+});

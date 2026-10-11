@@ -194,6 +194,19 @@ runtime:
           await require(bru.getEnvVar("library_base") + "idempotencySteps.js").checkBookingIdempotency(_body);
         }
 
+        // The reservations OSCAR asked for with the booking are in it: a
+        // provider that takes the request and leaves one out is seen here, not
+        // only after the confirmation (07).
+        {
+          const { checkBookedReservations, fromEnv } = require(bru.getEnvVar("library_base") + "seatReservations.js");
+          const _asked = fromEnv(bru.getEnvVar("__reservationsBooked"), []);
+          if (_asked.length > 0) {
+            checkBookedReservations((_body && _body.booking) || _body, fromEnv(bru.getEnvVar("offer"), null), _asked, { places: false }).forEach((c) => {
+              test(c.name, () => { if (!c.ok) throw new Error(c.message); });
+            });
+          }
+        }
+
         // Routing after POST Create Booking:
         //   1. Legacy `skipPatchPassengerRequest` still wins for explicit
         //      test-harness overrides.
