@@ -53,7 +53,7 @@ require('./db/db');
 // On first boot, generate a random secret and persist it. On subsequent boots,
 // reuse the stored secret. Admins can rotate via POST /v1/admin/rotate-jwt-secret
 // (which invalidates all current sessions intentionally).
-const { get: dbGet, run: dbRun } = require('./db/db');
+const { get: dbGet, run: dbRun, colDecrypt } = require('./db/db');
 let jwtRow = dbGet('SELECT value FROM server_config WHERE key = ?', ['JWT_SECRET']);
 if (!jwtRow) {
   const newSecret = crypto.randomBytes(32).toString('hex');
@@ -308,6 +308,25 @@ app.get('/json_validator/datafile.schema.json', fileDownloadLimiter, (req, res) 
   });
 });
 
+// #619: the run's own copy of the data file carries the Test Framework's
+// warnings (__featureNotDeclaredWarnings), as GET /v1/company/datafile does,
+// so that the golden rule's [WARNING] reaches the run log. Only for a run: a
+// Test Manager's download stays the stored file (#549). Best effort: anything
+// that goes wrong serves the file as it is.
+function withFrameworkWarnings(plaintext, companyId) {
+  try {
+    const fwRow = dbGet('SELECT config FROM test_frameworks WHERE company_id = ?', [companyId]);
+    if (!fwRow?.config) return plaintext;
+    const { annotateDatafile } = require('./utils/frameworkGating');
+    const datafile = JSON.parse(plaintext.toString('utf8'));
+    if (annotateDatafile(datafile, JSON.parse(colDecrypt(fwRow.config))).annotatedCount === 0) return plaintext;
+    return Buffer.from(JSON.stringify(datafile), 'utf8');
+  } catch (err) {
+    log.warn({ errMsg: err.message, companyId }, 'run datafile: framework warnings not added');
+    return plaintext;
+  }
+}
+
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
@@ -352,6 +371,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   } catch (err) {
     return res.status(500).send('Decryption failed: ' + err.message);
   }
+  if (runCompanyId !== null) plaintext = withFrameworkWarnings(plaintext, company.id);
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));
   return res.end(plaintext);

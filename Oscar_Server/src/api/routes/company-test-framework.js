@@ -24,7 +24,7 @@ const { requireAuth } = require('../middleware/auth');
 const { enforceTenant } = require('../middleware/tenant');
 const { resolveCompanyScope, denyAdminAndCertifier, requireTestManager } = require('../helpers/shared');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
-const { applyFrameworkMigration } = require('../../utils/frameworkGating');
+const { applyFrameworkMigration, needsFrameworkMigration } = require('../../utils/frameworkGating');
 const log = require('../../utils/logger');
 
 const router = express.Router();
@@ -70,7 +70,7 @@ router.get('/test-framework', frameworkReadLimiter, async (req, res) => {
   // that ADDS to salesFlows[] (never removes), so the running configuration
   // is preserved exactly. Runs once per framework (stamped with
   // _salesFlowsMigratedAt) and is silent when nothing needs to change.
-  if (!config._salesFlowsMigratedAt) {
+  if (needsFrameworkMigration(config)) {
     let scenarios = [];
     try {
       const company = get('SELECT datafile_path FROM companies WHERE id = ?', [targetCompanyId]);

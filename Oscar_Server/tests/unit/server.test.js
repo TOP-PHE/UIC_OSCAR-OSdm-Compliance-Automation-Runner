@@ -264,6 +264,64 @@ describe('GET /data/:filename', () => {
     }
   });
 
+  // #619: the run's copy carries the Test Framework's warnings; a Test
+  // Manager's download stays the stored file.
+  test('a run gets the framework warnings in its copy; a Test Manager the stored file', async () => {
+    const { companyId, userId, slug } = seedCompanyUser();
+    const { colEncrypt } = require('../../src/db/db');
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)',
+      [uuidv4(), companyId, colEncrypt(JSON.stringify({ salesFlows: ['SALE'], returnModels: ['SEPARATE'] }))]);
+    run("UPDATE users SET role = 'test_manager' WHERE id = ?", [userId]);
+    const stored = JSON.stringify({ scenarios: [
+      { code: 'RET_COMBINED', offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' } },
+      { code: 'RET_SEPARATE', offerSearchCriteria: { returnOffsetDays: 2 } },
+      null,
+    ] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const forRun = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(forRun.status).toBe(200);
+      expect(forRun.body.scenarios[0].__featureNotDeclaredWarnings).toEqual(['returnModel']);
+      expect(forRun.body.scenarios[1].__featureNotDeclaredWarnings).toBeUndefined();
+
+      const forTm = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-Forwarded-For', '1.2.3.4')
+        .set('Cookie', `oscar_session=${makeToken('test_manager', userId, companyId)}`);
+      expect(forTm.status).toBe(200);
+      expect(forTm.text).toBe(stored);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
+  test('a run gets the stored file when the framework cannot be read', async () => {
+    const { companyId, slug } = seedCompanyUser();
+    run('INSERT INTO test_frameworks (id, company_id, config) VALUES (?, ?, ?)', [uuidv4(), companyId, 'not json']);
+    const stored = JSON.stringify({ scenarios: [{ code: 'RET', offerSearchCriteria: { returnOffsetDays: 2 } }] });
+    const runId = uuidv4();
+    const secret = runSecrets.issue(runId, companyId);
+    fs.mkdirSync(DATAFILES_DIR, { recursive: true });
+    const filePath = path.join(DATAFILES_DIR, `${slug}-datafile.json`);
+    encryptToFile(Buffer.from(stored), filePath);
+    try {
+      const res = await request(app).get(`/data/${slug}-datafile.json`)
+        .set('X-OSCAR-Run-Id', runId)
+        .set('X-OSCAR-Run-Secret', secret);
+      expect(res.status).toBe(200);
+      expect(res.text).toBe(stored);
+    } finally {
+      runSecrets.revoke(runId);
+      fs.rmSync(filePath, { force: true });
+    }
+  });
+
   test("404 when a run's secret is used against another company's datafile (no cross-tenant read)", async () => {
     const victim = seedCompanyUser();                 // the file we try to steal
     const attacker = seedCompanyUser();               // the run we legitimately hold

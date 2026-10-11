@@ -178,7 +178,15 @@ rebuilds its Test Framework from the file.
    [scenario catalogue](OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
-4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
+4. **Return journeys** (Test Manager, Test Config → Test Framework → *Sales
+   Flows* → 🔁 *Return journeys*, since 1.11.236): `alpha` (OSDM 3.6) declares
+   *Separate directions* only; `beta` and `gamma` declare both. A framework
+   that existed before declares, on first opening, the models its scenarios
+   use: both, since the file holds the scenarios of every version. On `alpha`
+   the editor then says that *Both directions in one offer* needs OSDM 3.7:
+   untick it. A return scenario whose model is not declared still runs, with a
+   `[WARNING]` naming the model.
+5. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider" (on `gamma`, `GET /reduction-cards` and
    `GET /products` answer 200), and no check fails. The warnings each
@@ -215,7 +223,8 @@ A Test Manager sets it up like this:
 3. In the menu bar, set **Working on** to `Beta`. Test Config, New Run, the
    Dashboard and the reports of that browser tab now work on `Beta`.
 4. **Test Config** → *Upload datafile*, the same file as in section 5: a
-   provider has its own data file and Test Framework.
+   provider has its own data file and Test Framework. Declare its return
+   models as in section 5, step 4.
 5. Run a scenario. Set **Working on** back to the company, or to another
    provider, to run there.
 

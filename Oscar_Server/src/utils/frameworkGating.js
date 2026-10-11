@@ -38,6 +38,7 @@
  *
  * Scope today (#218 follow-up):
  *   - partialRefundByLeg / partialRefundByPax  ↔  salesFlows: REFUND_PARTIAL
+ *   - a return's model (offerSearchCriteria.returnModel)  ↔  returnModels (#619)
  *   - (future) partialExchangeByLeg / partialExchangeByPax  ↔  EXCHANGE_PARTIAL
  *   - (future) requestedInformationProbe                    ↔  ???
  *
@@ -48,10 +49,18 @@
  *   - `requiresScenarioType` : optional, scopes the rule to a scenario type
  */
 
+// #619: the return models a Test Framework may declare (framework.returnModels),
+// as the collection names them (library-bruno/returnJourney.js).
+const RETURN_MODELS = ['SEPARATE', 'COMBINED'];
+
 module.exports = {
   gatingRules,
   isScenarioArmedForField,
   scenarioWarnings,
+  RETURN_MODELS,
+  scenarioReturnModel,
+  returnModelsUsed,
+  needsFrameworkMigration,
   deriveSalesFlowsAdditions,
   applyFrameworkMigration,
   annotateDatafile,
@@ -61,6 +70,7 @@ module.exports = {
 // Keep aligned with Bruno_Collection/library-bruno/scenarioParser.js (which
 // treats 'on', 'true', 'yes', boolean true as armed).
 const ARMED_VALUES = new Set(['on', 'true', 'yes', '1', true, 1]);
+
 
 function isArmedValue(v) {
   if (v === true || v === 1) return true;
@@ -124,7 +134,43 @@ function scenarioWarnings(scenario, framework, rules) {
     if (flows.includes(rule.requiresFlow)) continue;
     out.push(rule.field);
   }
+  // #619: a return whose model the framework does not list. A framework with
+  // no returnModels at all has not been asked yet (before 1.11.236): no
+  // warning until the lazy migration below has filled it in.
+  const model = scenarioReturnModel(scenario);
+  const declared = Array.isArray(framework?.returnModels) ? framework.returnModels : null;
+  if (model && declared && !declared.includes(model)) out.push('returnModel');
   return out;
+}
+
+/**
+ * #619: the return model a scenario asks for, or null when it has no return.
+ * A return is a non-negative whole offerSearchCriteria.returnOffsetDays, as
+ * the collection reads it (scenarioParser buildReturnSearchParameters); the
+ * model defaults to SEPARATE, as normaliseReturnModel does.
+ */
+function scenarioReturnModel(scenario) {
+  const c = scenario && typeof scenario === 'object' ? scenario.offerSearchCriteria : null;
+  if (!c || typeof c !== 'object' || c.returnOffsetDays == null || c.returnOffsetDays === '') return null;
+  const offset = Number.parseInt(c.returnOffsetDays, 10);
+  if (!Number.isInteger(offset) || offset < 0) return null;
+  return RETURN_MODELS.includes(c.returnModel) ? c.returnModel : 'SEPARATE';
+}
+
+/** #619: the return models the scenarios use, in RETURN_MODELS order. */
+function returnModelsUsed(scenarios) {
+  const used = new Set();
+  for (const sc of (Array.isArray(scenarios) ? scenarios : [])) {
+    const model = scenarioReturnModel(sc);
+    if (model) used.add(model);
+  }
+  return RETURN_MODELS.filter(m => used.has(m));
+}
+
+/** True when applyFrameworkMigration still has something to do. */
+function needsFrameworkMigration(framework) {
+  if (!framework || typeof framework !== 'object') return false;
+  return !framework._salesFlowsMigratedAt || !Array.isArray(framework.returnModels);
 }
 
 /**
@@ -160,7 +206,8 @@ function deriveSalesFlowsAdditions(scenarios, framework) {
  *
  * Idempotent: when `_salesFlowsMigratedAt` is already set, the migration
  * skips (no second derivation). When there is nothing to add, the stamp is
- * still set so we don't keep re-scanning every GET.
+ * still set so we don't keep re-scanning every GET. `returnModels` (#619) is
+ * derived the same way, once, when the framework has none.
  *
  * @param {object} framework  the decrypted config object (mutated)
  * @param {object[]} scenarios  the company datafile scenarios array (may be empty)
@@ -171,16 +218,25 @@ function applyFrameworkMigration(framework, scenarios, nowIso) {
   if (!framework || typeof framework !== 'object') {
     return { migrated: false, additions: [] };
   }
-  if (framework._salesFlowsMigratedAt) {
-    return { migrated: false, additions: [] };
+  let migrated = false;
+  let additions = [];
+  if (!framework._salesFlowsMigratedAt) {
+    if (!Array.isArray(framework.salesFlows)) framework.salesFlows = [];
+    additions = deriveSalesFlowsAdditions(scenarios, framework);
+    if (additions.length > 0) {
+      framework.salesFlows = [...framework.salesFlows, ...additions];
+    }
+    framework._salesFlowsMigratedAt = nowIso || new Date().toISOString();
+    migrated = true;
   }
-  if (!Array.isArray(framework.salesFlows)) framework.salesFlows = [];
-  const additions = deriveSalesFlowsAdditions(scenarios, framework);
-  if (additions.length > 0) {
-    framework.salesFlows = [...framework.salesFlows, ...additions];
+  // #619: a framework from before returnModels declares what its scenarios
+  // already use, so an upgrade adds no warning. Once the list exists (even
+  // empty) it is the Test Manager's and is never derived again.
+  if (!Array.isArray(framework.returnModels)) {
+    framework.returnModels = returnModelsUsed(scenarios);
+    migrated = true;
   }
-  framework._salesFlowsMigratedAt = nowIso || new Date().toISOString();
-  return { migrated: true, additions };
+  return { migrated, additions };
 }
 
 /**
@@ -197,6 +253,7 @@ function annotateDatafile(datafile, framework) {
   if (!datafile || !Array.isArray(datafile.scenarios)) return { annotatedCount: 0 };
   let count = 0;
   for (const sc of datafile.scenarios) {
+    if (!sc || typeof sc !== 'object') continue; // a Test Manager's save can store null
     const warnings = scenarioWarnings(sc, framework);
     if (warnings.length > 0) {
       sc.__featureNotDeclaredWarnings = warnings;
