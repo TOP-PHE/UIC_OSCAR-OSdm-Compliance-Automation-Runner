@@ -201,19 +201,21 @@ const DISTINCTIVE = 4;
 
 // Text shown as text in Markdown: placeholders such as <id> are not tags, and
 // a | does not end a table cell.
-const md = (text) => String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '\\|');
+const md = (text) => String(text).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', String.raw`\|`);
+const tick = (text) => `\`${text}\``;
 
 // One scenario: provider, catalogue codes, steps with their number of checks,
 // failed checks, and its distinctive checks (made by at most four scenarios).
 function describeScenario(code, record, steps, catalogueOf) {
   const lines = [`### \`${code}\``, ''];
   const facts = [`provider \`${providerOf(code) || '?'}\``, `${record.checks} checks`, `${record.failed} failed`];
-  if (catalogueOf.has(code)) facts.push(`catalogue: ${catalogueOf.get(code).map((c) => `\`${c}\``).join(', ')}`);
+  if (catalogueOf.has(code)) facts.push(`catalogue: ${catalogueOf.get(code).map(tick).join(', ')}`);
   lines.push(`${facts.join(' · ')}`, '');
   if (record.error) return [...lines, `Did not run: ${record.error}`, ''];
   const perStep = new Map();
   for (const [step] of record.list) perStep.set(step, (perStep.get(step) || 0) + 1);
-  lines.push(`Steps: ${[...perStep].map(([step, n]) => `${step} (${n})`).join(' → ')}`, '');
+  const stepList = [...perStep].map(([step, n]) => `${step} (${n})`).join(' → ');
+  lines.push(`Steps: ${stepList}`, '');
   const failed = record.list.filter((c) => c[2] === 'fail');
   if (failed.length) {
     lines.push('Failed checks:', '');
@@ -259,14 +261,14 @@ function describeRecording(recording, catalogue, about) {
   ];
   for (const [step, checks] of steps) {
     const scenarios = new Set([...checks.values()].flatMap((set) => [...set]));
-    lines.push(`### ${step}`, '', `Run by ${scenarios.size} of ${codes.length} scenarios; ${checks.size} different checks.`, '');
-    lines.push('| Check | Scenarios |', '|---|---|');
+    lines.push(`### ${step}`, '', `Run by ${scenarios.size} of ${codes.length} scenarios; ${checks.size} different checks.`, '', '| Check | Scenarios |', '|---|---|');
     for (const [text, made] of checks) lines.push(`| ${md(text)} | ${made.size} |`);
     lines.push('');
   }
   lines.push('## Scenarios', '');
   for (const code of codes) lines.push(...describeScenario(code, recording[code], steps, catalogueOf));
-  return `${lines.join('\n').replace(/\n+$/, '')}\n`;
+  while (lines.at(-1) === '') lines.pop();
+  return `${lines.join('\n')}\n`;
 }
 
 module.exports = { providerOf, normalize, recordOf, compareRecordings, lineCoverage, catalogueDrift, checkText, describeRecording };
