@@ -32,11 +32,11 @@ const isOn = () => String(bru.getEnvVar('idempotencyCheck')) === 'true';
 // mode; without it, a time-and-counter value, unique within the run.
 function randomBytes() {
   try {
-    return Array.from(require('crypto').randomBytes(16));
+    return Array.from(require('node:crypto').randomBytes(16));
   } catch {
     counter += 1;
     const seed = `${Date.now()}-${counter}`.padEnd(16, '0');
-    return Array.from(seed.slice(0, 16), (c) => c.charCodeAt(0));
+    return Array.from(seed.slice(0, 16), (c) => c.codePointAt(0));
   }
 }
 
