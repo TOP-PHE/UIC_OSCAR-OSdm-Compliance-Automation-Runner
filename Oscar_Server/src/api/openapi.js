@@ -306,13 +306,18 @@ module.exports = {
     },
     '/v1/company/scenario-copy/preview': {
       post: { tags: ['Company'], summary: 'Prepare a copy of scenarios from another company or provider of yours into this one', security: [{ bearerAuth: [] }],
-        description: 'Body: { source_id }. Returns the source scenarios with warnings (features the target Test Framework does not declare, fulfillment reduced, OSDM version), each trip entry to map once, and the target trains and journeys. The target is the request\'s company (X-Provider-Id).',
+        description: 'Body: { source_id } (a company or provider id, or "catalogue" for the scenario catalogue). Returns the source scenarios with warnings (features the target Test Framework does not declare, fulfillment reduced, OSDM version), each trip entry to map once, and the target trains and journeys. The target is the request\'s company (X-Provider-Id).',
         responses: { 200: { description: 'Copy plan' }, 404: { description: 'Unknown or refused source, or no source data file' }, 409: { description: 'The target has no Test Framework or no Test Data' } } },
     },
     '/v1/company/scenario-copy': {
       post: { tags: ['Company'], summary: 'Copy scenarios from another company or provider of yours into this one', security: [{ bearerAuth: [] }],
         description: 'Body: { source_id, codes: [..], trip_map: { "<source trip id>": { type: "train", train_id, service_index } | { type: "journey", journey_id } } }. Copies belong to the caller; a code already used gets the next free one. Endpoint, credentials, known deviations and findings are never copied.',
-        responses: { 200: { description: '{ copied: [{ from, to }], hash }' }, 400: { description: 'A trip without a mapping, a missing scenario or entry, or a template' }, 404: { description: 'Unknown or refused source' } } },
+        responses: { 200: { description: '{ copied: [{ from, to }], hash }' }, 400: { description: 'A trip without a mapping, a missing scenario or entry, a template, or a catalogue entry the Test Framework does not cover' }, 404: { description: 'Unknown or refused source' } } },
+    },
+    '/v1/company/scenario-catalogue': {
+      get: { tags: ['Company'], summary: 'List the reference scenarios of the scenario catalogue, with what each needs the Test Framework to declare', security: [{ bearerAuth: [] }],
+        description: 'Each entry: { code, kind, area, purpose, checks, requirements, missing }. missing lists what the company\'s Test Framework does not declare; such an entry cannot be copied. Copy with source_id "catalogue".',
+        responses: { 200: { description: 'Catalogue entries' }, 403: { description: 'Administrators and certifiers have no access' }, 503: { description: 'The catalogue cannot be read' } } },
     },
     '/v1/company/providers': {
       get: { tags: ['Company'], summary: 'List the providers of the caller\'s company (Test Manager: all; tester: those granted)', security: [{ bearerAuth: [] }],
