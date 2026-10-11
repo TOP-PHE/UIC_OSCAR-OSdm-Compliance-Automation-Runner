@@ -32,7 +32,7 @@ const VOLATILE = [
   [/\b[A-Z]{2,12}-[A-Z]{2,4}-[0-9a-f]{12,32}\b/g, '<id>'],
   [/\b(?:alpha|beta|gamma)\.[a-z0-9.]+\b/g, '<client>'],
   [/\b[A-Z]{2,12}[0-9A-F]{6}\b/g, '<code>'],
-  [/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?/g, '<instant>'],
+  [/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}[\d:.]*(?:Z|[+-]\d{2}:\d{2})?/g, '<instant>'],
   [/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d{3})?\b/g, '<instant>'],
   [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<uuid>'],
   [/\b\d+(?:\.\d+)?\s?(?:ms|s|min)\b/g, '<duration>'],
@@ -67,34 +67,61 @@ function recordOf(report, consoleText) {
   return { checks: checks.length, failed, list: checks, warnings };
 }
 
+// The differences of one scenario recorded twice: totals, the first check
+// that differs, and warnings gone or added.
+function compareScenario(code, a, b) {
+  const out = [];
+  if (a.checks !== b.checks || a.failed !== b.failed) out.push(`${code}: ${a.checks} checks, ${a.failed} failed → ${b.checks} checks, ${b.failed} failed`);
+  const n = Math.max(a.list.length, b.list.length);
+  const i = Array.from({ length: n }, (_, k) => k).find((k) => JSON.stringify(a.list[k]) !== JSON.stringify(b.list[k]));
+  if (i !== undefined) out.push(`${code}: check ${i + 1} differs:\n    - ${JSON.stringify(a.list[i] ?? null)}\n    + ${JSON.stringify(b.list[i] ?? null)}`);
+  for (const w of a.warnings.filter((x) => !b.warnings.includes(x))) out.push(`${code}: warning gone: ${w}`);
+  for (const w of b.warnings.filter((x) => !a.warnings.includes(x))) out.push(`${code}: warning added: ${w}`);
+  return out;
+}
+
 /**
  * The differences between two recordings, as lines of text; none when they
  * are the same. A scenario present in one only is a difference too.
  */
 function compareRecordings(before, after) {
-  const out = [];
-  const codes = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-  for (const code of codes) {
+  const codes = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort((x, y) => x.localeCompare(y));
+  return codes.flatMap((code) => {
     const a = before[code];
     const b = after[code];
-    if (!a || !b) {
-      out.push(`${code}: only in the ${a ? 'first' : 'second'} recording`);
-      continue;
+    if (!a || !b) return [`${code}: only in the ${a ? 'first' : 'second'} recording`];
+    return compareScenario(code, a, b);
+  });
+}
+
+// Whether the character at `offset` ran in one of the runs: the innermost
+// range holding it decides.
+function ranAt(offset, runs) {
+  return runs.some((functions) => {
+    let best = null;
+    for (const range of functions.flatMap((fn) => fn.ranges)) {
+      const holds = offset >= range.startOffset && offset < range.endOffset;
+      if (holds && (!best || range.endOffset - range.startOffset <= best.endOffset - best.startOffset)) best = range;
     }
-    if (a.checks !== b.checks || a.failed !== b.failed) out.push(`${code}: ${a.checks} checks, ${a.failed} failed → ${b.checks} checks, ${b.failed} failed`);
-    const n = Math.max(a.list.length, b.list.length);
-    for (let i = 0; i < n; i += 1) {
-      if (JSON.stringify(a.list[i]) !== JSON.stringify(b.list[i])) {
-        out.push(`${code}: check ${i + 1} differs:\n    - ${JSON.stringify(a.list[i] ?? null)}\n    + ${JSON.stringify(b.list[i] ?? null)}`);
-        break;
-      }
+    return Boolean(best && best.count > 0);
+  });
+}
+
+const isCode = (content) => content !== '' && !content.startsWith('//') && !content.startsWith('*') && !content.startsWith('/*');
+
+// Lines counted and lines that ran, in one file's text.
+function fileCoverage(text, runs) {
+  let lines = 0;
+  let covered = 0;
+  let start = 0;
+  for (const line of text.split('\n')) {
+    if (isCode(line.trim())) {
+      lines += 1;
+      if (ranAt(start + line.search(/\S/), runs)) covered += 1;
     }
-    const gone = a.warnings.filter((w) => !b.warnings.includes(w));
-    const added = b.warnings.filter((w) => !a.warnings.includes(w));
-    for (const w of gone) out.push(`${code}: warning gone: ${w}`);
-    for (const w of added) out.push(`${code}: warning added: ${w}`);
+    start += line.length + 1;
   }
-  return out;
+  return { lines, covered };
 }
 
 /**
@@ -113,31 +140,7 @@ function lineCoverage(v8Results, include, read) {
     byFile.get(path).push(script.functions);
   }
   const files = {};
-  for (const [path, runs] of byFile) {
-    const text = read(path);
-    const starts = [0];
-    for (let i = 0; i < text.length; i += 1) if (text[i] === '\n') starts.push(i + 1);
-    const covered = new Set();
-    let counted = 0;
-    starts.forEach((start, line) => {
-      const end = line + 1 < starts.length ? starts[line + 1] - 1 : text.length;
-      const content = text.slice(start, end).trim();
-      if (content === '' || content.startsWith('//') || content.startsWith('*') || content.startsWith('/*')) return;
-      counted += 1;
-      const offset = start + text.slice(start, end).search(/\S/);
-      for (const functions of runs) {
-        let best = null;
-        for (const fn of functions) {
-          for (const range of fn.ranges) {
-            if (offset >= range.startOffset && offset < range.endOffset
-              && (!best || range.endOffset - range.startOffset <= best.endOffset - best.startOffset)) best = range;
-          }
-        }
-        if (best && best.count > 0) { covered.add(line); break; }
-      }
-    });
-    files[path] = { lines: counted, covered: covered.size };
-  }
+  for (const [path, runs] of byFile) files[path] = fileCoverage(read(path), runs);
   const total = Object.values(files).reduce((t, f) => ({ lines: t.lines + f.lines, covered: t.covered + f.covered }), { lines: 0, covered: 0 });
   return { files, total };
 }

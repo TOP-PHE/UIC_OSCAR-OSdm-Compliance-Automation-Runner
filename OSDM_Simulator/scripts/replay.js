@@ -19,8 +19,10 @@
  * Needs: the simulator listening (REPLAY_SIM_BASE, default
  * http://127.0.0.1:3002), the repository root served over HTTP
  * (REPLAY_DATA_URL, default http://localhost:8080/Bruno_Collection/data_base/simulator_datafile.json),
- * `bru` on the PATH at the version OSCAR pins, and `clients.json` next to
- * server.js. Each scenario runs on the provider of its version; the
+ * the Bruno CLI at the version OSCAR pins, and `clients.json` next to
+ * server.js. The CLI is run with this Node, from REPLAY_BRU_JS when set, else
+ * from Oscar_Server/bruno-cli (after `npm ci` there), else from the global
+ * install next to this Node. Each scenario runs on the provider of its version; the
  * environment file `bru` rewrites is put back after each run.
  *
  * Everything is written under OSDM_Simulator/replay/ (ignored by git), under
@@ -45,6 +47,21 @@ const FOLDERS = ['00-Access Token', '01-System Infos Requests', '02-Common Reque
 const SIM_BASE = process.env.REPLAY_SIM_BASE || 'http://127.0.0.1:3002';
 const DATA_URL = process.env.REPLAY_DATA_URL || 'http://localhost:8080/Bruno_Collection/data_base/simulator_datafile.json';
 
+// The CLI's own script, run with this Node rather than looked up on the PATH.
+function bruScript() {
+  const cli = path.join('node_modules', '@usebruno', 'cli', 'bin', 'bru.js');
+  const nodeDir = path.dirname(process.execPath);
+  const places = [
+    process.env.REPLAY_BRU_JS,
+    path.join(ROOT, 'Oscar_Server', 'bruno-cli', cli),
+    path.join(nodeDir, '..', 'lib', cli),
+    path.join(nodeDir, cli),
+  ].filter(Boolean);
+  const found = places.find((place) => fs.existsSync(place));
+  if (!found) throw new Error(`The Bruno CLI is not installed; looked at: ${places.join(', ')}`);
+  return found;
+}
+
 function clientOf(provider) {
   const clients = JSON.parse(fs.readFileSync(CLIENTS_FILE, 'utf8'))[provider] || [];
   const client = clients.find((c) => /\.tst\d/.test(c.client_id)) || clients[0];
@@ -61,7 +78,7 @@ function runOne(code, index) {
   const envBefore = fs.readFileSync(ENV_FILE);
   let run;
   try {
-    run = spawnSync('bru', ['run', ...FOLDERS, '--sandbox=developer', '--env', 'OTST_Simulator_Env',
+    run = spawnSync(process.execPath, [bruScript(), 'run', ...FOLDERS, '--sandbox=developer', '--env', 'OTST_Simulator_Env',
       '--env-var', `client_id=${client.client_id}`, '--env-var', `client_secret=${client.client_secret}`,
       '--env-var', `api_base=${SIM_BASE}/${provider}`, '--env-var', `data_base=${DATA_URL}`,
       '--env-var', `scenario_override=${code}`, '--reporter-json', report], {
@@ -88,7 +105,8 @@ function record(which, only) {
     const started = Date.now();
     recording[code] = runOne(code, i);
     const r = recording[code];
-    process.stderr.write(`${code}: ${r.error || `${r.checks} checks, ${r.failed} failed`} (${Math.round((Date.now() - started) / 1000)} s)\n`);
+    const outcome = r.error || `${r.checks} checks, ${r.failed} failed`;
+    process.stderr.write(`${code}: ${outcome} (${Math.round((Date.now() - started) / 1000)} s)\n`);
   });
   fs.writeFileSync(RECORDINGS[which], `${JSON.stringify(recording, null, 1)}\n`);
   process.stderr.write(`Recorded ${codes.length} scenario(s) in replay/${which}.json\n`);
@@ -112,7 +130,7 @@ function coverage() {
   const percent = (f) => (f.lines === 0 ? 100 : (100 * f.covered) / f.lines).toFixed(1);
   const known = new Set(Object.keys(files).map((f) => path.basename(f)));
   const all = fs.readdirSync(path.join(COLLECTION, 'library-bruno')).filter((f) => f.endsWith('.js'));
-  for (const [file, f] of Object.entries(files).sort()) process.stdout.write(`${percent(f).padStart(6)} %  ${f.covered}/${f.lines}  ${path.basename(file)}\n`);
+  for (const [file, f] of Object.entries(files).sort((x, y) => x[0].localeCompare(y[0]))) process.stdout.write(`${percent(f).padStart(6)} %  ${f.covered}/${f.lines}  ${path.basename(file)}\n`);
   for (const file of all.filter((f) => !known.has(f))) process.stdout.write(`   0.0 %  never loaded  ${file}\n`);
   process.stdout.write(`${percent(total)} % of the lines of the ${known.size} loaded file(s) ran; ${all.length - known.size} file(s) never loaded.\n`);
 }
