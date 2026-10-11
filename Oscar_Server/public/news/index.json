@@ -5,7 +5,7 @@
     "tag": "Fix",
     "title": "Fewer false failures on real providers",
     "summary": "Five checks that failed correct answers from a provider are fixed, and a reservation that was asked for but not booked is now reported at the booking.",
-    "content": "The first runs of a provider's own sell scenarios showed checks failing answers that OSDM allows: the confirmation deadline of a booking already confirmed, a ticket created a few milliseconds ahead of OSCAR's clock, the purchaser named without an index in requestedInformation, and station codes written without their leading zeros. These no longer fail. OSCAR also stops asking for a coach layout or a product by id when it has no id.\n\nA seat reservation asked for with the booking but left out by the provider is now reported at the booking step, with the reservation's name."
+    "content": "The first runs of a provider's own sell scenarios showed checks failing answers that OSDM allows: the confirmation deadline of a booking already confirmed, a ticket created a few milliseconds ahead of OSCAR's clock, the purchaser named without an index in requestedInformation, and station codes written without their leading zeros. These no longer fail. OSCAR also stops asking for a coach layout or a product by id when it has no id.\n\nA seat reservation asked for with the booking but left out by the provider is now reported at the booking step, with the reservation's name.\n\nA group that does not pay less than the same passengers travelling alone, or a card holder who does not pay less with the card, is now a warning instead of a failure: prices are the provider's commercial choice, which OSDM does not set."
   },
   {
     "id": "2026-10-11-passenger-update-scope",

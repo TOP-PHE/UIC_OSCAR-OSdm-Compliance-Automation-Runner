@@ -122,9 +122,10 @@ describe('01d: the group price against the same passengers alone', () => {
     expect(check).toEqual({ name: 'Group offer: the group pays less than the same passengers alone — group 2000 CZK, alone 2500 (offer I2)', ok: true });
   });
 
-  test('dearer fails, the same price is a warning', () => {
+  // #644: a weekend group ticket for two adults may cost more than two returns.
+  test('dearer and the same price are warnings, not failures', () => {
     expect(group.compareGroupWithIndividual(groupOffer([], 2600), answer(alone('I2', 2500)))[0])
-      .toMatchObject({ ok: false, message: 'the group offer costs more than the same passengers alone' });
+      .toMatchObject({ ok: false, level: 'warn', message: 'the group offer costs more than the same passengers alone (a commercial choice, not an OSDM rule)' });
     const same = group.compareGroupWithIndividual(groupOffer([], 2500), answer(alone('I2', 2500)))[0];
     expect(same).toMatchObject({ ok: false, level: 'warn' });
   });

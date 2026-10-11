@@ -101,15 +101,25 @@ False failures seen on the first runs of a provider's own sell scenarios
 - The clock tolerance is two minutes.
 - Only `purchaser` may go without an index; every other root keeps the
   grammar's `[index]`.
+- A price comparison that passes is still a check (so the simulator's runs
+  keep their counts); one that does not is a warning line.
 - The station codes compared without leading zeros are `urn:uic:stn:` ones
   only.
 
+### Changed
+
+- **A group that does not pay less than the same passengers alone (01d), and
+  a card holder who does not pay less than without the card (01c), are
+  warnings, not failures** (maintainer decision). Prices are the provider's
+  commercial choice, which OSDM does not set: a weekend group ticket for two
+  adults cost more than two returns. Whether the card is applied is still
+  checked on the offer (`appliedPassengerTypes`), and a cheaper price still
+  passes.
+
 Not changed, and reported to the provider instead: system-information URLs
 answered by a gateway with an HTML page and HTTP 200, an optional reservation
-accepted but not booked, a placeholder `confirmableUntil` on the pre-booking.
-Two checks the same runs failed are left as they are and put to the
-maintainer: a group tariff dearer than the same passengers alone, and a
-student card that changes neither the price nor `appliedPassengerTypes`.
+accepted but not booked, a placeholder `confirmableUntil` on the pre-booking,
+products that give no travel class (so a class per leg cannot be read).
 
 Checked: each new unit test fails with its fix undone; RECORDCHECK
 
