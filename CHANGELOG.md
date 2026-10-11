@@ -91,6 +91,48 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.123] — 2026-10-11
+
+Issue #611, release 2026.268. Simulator 0.17.0.
+
+### Added
+
+- **Simulator data file**: four variant scenarios and five deliberately wrong
+  ones on `gamma`, with passenger lists 11 to 17 and trip requirement 8.
+  - `SIM_VARIANT_PER_PASSENGER_2ADT_38`; `SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38`
+    refunds the last passenger alone, and the refund names the fulfillment
+    that holds that passenger: #610's choice, now proved on a run.
+  - `SIM_VARIANT_REORDERED_2ADT_38` (#550) and `SIM_VARIANT_MINIMAL_2ADT_38`.
+  - `SIM_WRONG_{OFFER_PRICE,BOOKING_PRICE,FULFILLMENT_STATUS,REFUND_AMOUNT,EXCHANGE_AMOUNT}_38`,
+    each making one validator family fail on purpose. They are not in the
+    run list.
+  - The scenario catalogue lists each one, with the checks that must fail.
+
+### Known gap
+
+- The collection does not compare a booking's `provisionalPrice` with the
+  sum of its parts: `SIM_WRONG_BOOKING_PRICE_38` fails no check. Recorded in
+  the catalogue; no validator changed here.
+
+### Simulator 0.17.0
+
+- Profile `variants` (`gamma`; `wrongOffersFrom`: `urn:uic:stn:0000098`). A
+  booking takes the variants its passengers' last names name
+  (`Simvariant-<name>`, any case): `per-passenger` (one fulfillment per
+  passenger; a refund scoped by `passengerIds` or `bookingPartIds` within one
+  fulfillment is offered, and the fulfillment is `REFUNDED` once all its parts
+  are), `reordered`, `minimal`, `wrong-booking-price`,
+  `wrong-fulfillment-status`, `wrong-refund-amount`, `wrong-exchange-amount`.
+  Offers of a trip from `wrongOffersFrom` have `minimalPrice` one cent off.
+
+Checked standalone on the simulator: the four variants pass (313, 470, 290
+and 287 checks, none failed); four wrong ones fail as described (4, 4, 4 and
+7 failed checks) and the booking-price one fails none (the gap). Simulator
+tests 171 → 178; a mutation of the per-passenger grouping fails them. Not run
+through OSCAR, nor against a real provider.
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.122] — 2026-10-11
 
 Issue #611, release 2026.267. Simulator 0.16.0.
