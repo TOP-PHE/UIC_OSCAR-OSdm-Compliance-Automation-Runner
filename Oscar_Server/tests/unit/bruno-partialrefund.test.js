@@ -332,18 +332,70 @@ describe('Paxone v3.8 multi-fulfillment shape', () => {
     expect(r.bookingPartIds).toEqual([]);
   });
 
-  test('per-leg last only → fulfillments[0] (no pax chosen), both passengers’ last-leg admissions', () => {
+  test('per-leg last only, one fulfillment per passenger, nothing says which holds the parts → degraded, not fulfillments[0] (#610)', () => {
     const r = resolvePartialRefundScope(paxoneMultiFulfillmentBooking(), {
       byLeg: true, legSel: 'last',
     });
+    expect(r.degraded).toBe(true);
+    expect(r.reason).toMatch(/4 fulfillments and none of them is shown to hold the parts to refund/);
+  });
+});
+
+// ─── #610: the fulfillment is the one holding the refunded parts ───────────
+// The same booking with each fulfillment listing its passenger's booking
+// parts (OSDM Fulfillment.bookingParts), as a provider issuing one
+// fulfillment per passenger does.
+function perPassengerFulfillmentsBooking() {
+  const b = paxoneMultiFulfillmentBooking();
+  const partsOf = (pax) => ['first', 'last'].flatMap((leg) => [`adm-${pax}-${leg}`, `res-${pax}-${leg}`, `anc-${pax}-${leg}`]).map((id) => ({ id }));
+  b.fulfillments = [
+    { id: 'ff-pax-A', bookingParts: partsOf('A') },
+    { id: 'ff-pax-D', bookingParts: partsOf('D') },
+  ];
+  b.passengers = [{ id: 'pax-A', externalRef: 'EXT-A' }, { id: 'pax-D', externalRef: 'EXT-D' }];
+  return b;
+}
+
+describe('#610: the fulfillment holding what is refunded', () => {
+  test('leg only, parts in two passengers\' fulfillments → degraded, naming them; never one that lacks the parts', () => {
+    const r = resolvePartialRefundScope(perPassengerFulfillmentsBooking(), { byLeg: true, legSel: 'last' });
+    expect(r.degraded).toBe(true);
+    expect(r.reason).toBe('the parts to refund are in 2 fulfillments (ff-pax-A, ff-pax-D); one RefundSpecification names one fulfillment');
+    expect(buildRefundSpecifications(perPassengerFulfillmentsBooking(), { byLeg: true, legSel: 'last' })).toBeNull();
+  });
+
+  test('leg and passenger → the fulfillment holding that passenger\'s parts on that leg', () => {
+    const r = resolvePartialRefundScope(perPassengerFulfillmentsBooking(), { byLeg: true, legSel: 'first', byPax: true, paxSel: 'last' });
     expect(r.degraded).toBe(false);
-    expect(r.fulfillmentId).toBe('ff-pax-A'); // fulfillments[0] fallback when no pax chosen
-    expect(r.passengerIds).toEqual([]);
-    expect(r.bookingPartIds).toEqual(expect.arrayContaining([
-      'adm-A-last', 'res-A-last', 'anc-A-last',
-      'adm-D-last', 'res-D-last', 'anc-D-last',
-    ]));
-    expect(r.bookingPartIds).not.toContain('adm-A-first');
-    expect(r.bookingPartIds).not.toContain('adm-D-first');
+    expect(r.fulfillmentId).toBe('ff-pax-D');
+    expect(r.bookingPartIds).toEqual(['adm-D-first', 'res-D-first', 'anc-D-first']);
+  });
+
+  test('passenger only → the fulfillment holding the passenger\'s parts, even without fulfillmentParts', () => {
+    const r = resolvePartialRefundScope(perPassengerFulfillmentsBooking(), { byPax: true, paxSel: 'first' });
+    expect(r.fulfillmentId).toBe('ff-pax-A');
+    expect(r.passengerIds).toEqual(['pax-A']);
+  });
+
+  test('a passenger no fulfillment is shown to hold → degraded, never another passenger\'s fulfillment', () => {
+    const b = perPassengerFulfillmentsBooking();
+    b.passengers.push({ id: 'pax-Z', externalRef: 'EXT-Z' });
+    const r = resolvePartialRefundScope(b, { byPax: true, paxSel: 'last' });
+    expect(r.degraded).toBe(true);
+    expect(r.reason).toMatch(/none of them is shown to hold the parts to refund or the chosen passenger/);
+  });
+
+  test('legs in fulfillments of their own (one per direction) → the leg\'s fulfillment', () => {
+    const b = perPassengerFulfillmentsBooking();
+    const legParts = (leg) => ['A', 'D'].flatMap((pax) => [`adm-${pax}-${leg}`, `res-${pax}-${leg}`, `anc-${pax}-${leg}`]).map((id) => ({ id }));
+    b.fulfillments = [{ id: 'ff-out', bookingParts: legParts('first') }, { id: 'ff-in', bookingParts: legParts('last') }];
+    expect(resolvePartialRefundScope(b, { byLeg: true, legSel: 'last' }).fulfillmentId).toBe('ff-in');
+  });
+
+  test('one fulfillment for the booking → that one, whatever it lists', () => {
+    const b = perPassengerFulfillmentsBooking();
+    b.fulfillments = [{ id: 'ff-all' }];
+    expect(resolvePartialRefundScope(b, { byLeg: true, legSel: 'last' }).fulfillmentId).toBe('ff-all');
+    expect(resolvePartialRefundScope(b, { byPax: true, paxSel: 'last' }).fulfillmentId).toBe('ff-all');
   });
 });

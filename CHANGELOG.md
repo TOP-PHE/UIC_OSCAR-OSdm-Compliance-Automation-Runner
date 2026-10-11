@@ -91,6 +91,80 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.121] — 2026-10-11
+
+Issue #619, release 2026.266.
+
+### Added
+
+- **Return models in the Test Framework** (`returnModels`: `SEPARATE`,
+  `COMBINED`), under Sales Flows → 🔁 Return journeys.
+  - Gating, the two existing mechanisms (#218): `utils/frameworkGating.js`
+    adds `returnModel` to `__featureNotDeclaredWarnings` for a return
+    scenario (`offerSearchCriteria.returnOffsetDays` set) whose model is not
+    declared: a soft `[WARNING]`, never a failure. In Test Config the Return
+    model list offers only the declared models; a scenario's own undeclared
+    model stays, marked ⚠, so that opening a card never changes it. With no
+    model declared, the return fields of a one-way scenario are locked. The
+    banner counts these scenarios too.
+  - `COMBINED` with an OSDM version below 3.7 is flagged in the framework
+    editor, and the note follows the version field.
+  - A framework without `returnModels` (before 1.11.236) declares, on its
+    first read, the models its scenarios use, like the `salesFlows`
+    migration; afterwards the list is the Test Manager's. Until then no
+    return warning is given.
+
+### Fixed
+
+- **The framework warnings reach the run.** The annotation was added only to
+  the browser's `GET /v1/company/datafile`; the run reads `/data/:filename`,
+  which served the stored file, so the collection's warning never showed in a
+  run log. The run's request (with its run secret) now gets the annotated
+  copy, best effort; a Test Manager's download is still the stored file.
+  `annotateDatafile` passes over a scenario that is not an object.
+- **Collection OTST_V2.0.121**: the warning names what is missing (the return
+  model and where to declare it, or the partial-refund flow), instead of
+  always speaking of `REFUND_PARTIAL`.
+
+Not done: declaring how a provider divides the fulfillments of a return
+(optional in the issue); Return fulfillments stays a per-scenario setting.
+
+Checked: unit tests (gating, editor, the `/data` route, the warning text);
+the full Jest suite; a run through OSCAR on the simulator with only
+`SEPARATE` declared: the `COMBINED` scenario logs the warning and passes (350
+checks), the `SEPARATE` one has none (308); in a browser, the framework
+editor (the 3.6 note, untick saved), the banner (4 scenarios) and a
+`COMBINED` card's list. Not run against a real provider.
+
+---
+
+## [server-1.11.235] / [collection-OTST_V2.0.120] — 2026-10-11
+
+Issue #610, release 2026.265.
+
+### Fixed
+
+- **A partial refund names the fulfillment that holds what it refunds**
+  (`library-bruno/partialRefund.js`, `fulfillmentForScope()`). A
+  RefundSpecification names one fulfillment. It is now:
+  - the booking's only fulfillment, as before;
+  - else the one whose `bookingParts` list the parts refunded (the leg's
+    parts by leg, the passenger's parts by passenger);
+  - else the chosen passenger's, by `fulfillmentParts[].passengerRef`.
+  
+  Parts in several fulfillments, or none shown to hold them, degrade to a full
+  refund with the reason in a WARNING. Before, the first fulfillment was taken
+  whenever nothing matched, which a provider with one fulfillment per
+  passenger refuses. A refund by fulfillment (#595) is unchanged.
+
+Checked: the unit tests (27; five of them fail on the previous version), and
+three refund scenarios on the simulator, unchanged (373, 449 and 522 checks,
+none failed). The simulator refunds per fulfillment only, so the new choice
+itself is covered by the unit tests, not by a simulator run. Not run against
+a real provider (ČD).
+
+---
+
 ## [server-1.11.235] / [collection-OTST_V2.0.119] — 2026-10-11
 
 Issue #604, release 2026.264. Simulator 0.14.0.

@@ -59,6 +59,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     shared `requestedFulfillmentOptionsList`) was deliberately left
     **unrestricted** since #436 (a stale filter was locking every new company
     to ETICKET/PDF_A4) — extending gating there is an open follow-up, see §6.
+  - **Return models** (#619, 1.11.236) use both: `returnModels` in the
+    framework, `scenarioReturnModel()` in `frameworkGating.js` and its twin in
+    `scenarios.js` (keep them alike), and a picker that keeps a scenario's own
+    undeclared model, marked, rather than changing it on display. A framework
+    without the key is migrated from its scenarios on first read
+    (`needsFrameworkMigration`); absent = no warning, `[]` = none declared.
+  - **The run gets the annotation too** since 1.11.236: `/data/:filename`
+    annotates on the run-secret branch only (`withFrameworkWarnings` in
+    `server.js`). Before, only the browser's `GET /datafile` had it, so the
+    collection's `[WARNING]` never reached a run log.
 - **Known-deviation baseline (#398).** Per-company "Test Findings & Open
   Points" register (`finding`/`finding_comment`): a threaded conformance
   dialogue, not a bug tracker — OSCAR opens a finding (observation + spec
@@ -875,7 +885,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `fulfillmentIds` only: providers that refund per fulfillment refuse
   `refundSpecifications` with `bookingPartIds` / `passengerIds`. A partial
   refund is armed by any of `partialRefundArmed()`'s three flags; use it
-  instead of reading the leg and passenger flags.
+  instead of reading the leg and passenger flags. A refund by leg or by
+  passenger names the fulfillment that holds its parts
+  (`fulfillmentForScope()`, #610, OTST_V2.0.120): the only one, else the one
+  whose `bookingParts` list them, else the passenger's. Parts in several
+  fulfillments, or none shown, degrade to a full refund: never fall back to
+  `fulfillments[0]`.
 - **An overrule code is a technical cancellation: everything back, no fee**
   (#596, 1.11.227 / OTST_V2.0.111). One refund offer is compared with
   `confirmedPrice` in `validateRefundableAmount`; several (one per
