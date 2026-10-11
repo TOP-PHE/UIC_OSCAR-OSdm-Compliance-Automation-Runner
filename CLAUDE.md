@@ -1116,6 +1116,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `SIM_WRONG_BOOKING_PRICE_38` fails nothing today (the collection does not
     compare `provisionalPrice` with the parts) — when such a check lands, it
     must start failing.
+  - **The replay is the before/after check for `library-bruno/`** (#611,
+    0.19.0): `node scripts/replay.js record before|after`, `compare`,
+    `coverage`, in `OSDM_Simulator/`. Two recordings of one commit compare
+    equal; anything that differs between runs on its own must be added to
+    `VOLATILE` in `replay-lib.js`, never compared loosely. A full recording
+    takes about 13 minutes, most of it in the expiry probes. Coverage from a
+    full recording was 70.7 % of the loaded `library-bruno/` lines (#528 can
+    restyle the covered lines and compare old/new functions for the rest).
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes
