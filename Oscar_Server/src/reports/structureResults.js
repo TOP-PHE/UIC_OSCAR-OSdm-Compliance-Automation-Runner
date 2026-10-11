@@ -296,6 +296,7 @@ const CAPABILITY_PROBE_ENDPOINTS = new Set([
   '04. GET Passenger',
   '11. GET Refund Offer',
   '12. GET Exchange Offer',
+  '06b. GET Fulfillment',
 ]);
 
 /**

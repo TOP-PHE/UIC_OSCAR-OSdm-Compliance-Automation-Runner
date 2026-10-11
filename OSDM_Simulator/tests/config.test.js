@@ -210,3 +210,15 @@ test('trips collection: only gamma answers it; a value that is not true or false
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ tripsCollection: wrong }) })), /tripsCollection/, JSON.stringify(wrong));
   }
 });
+
+test('documents: gamma issues PDF_A4 and RETAILER_APP, its receipt after 30 s; a wrong profile stops the start (#603)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  assert.deepEqual([gamma.documents, gamma.refundReceiptDelaySeconds], [['PDF_A4', 'RETAILER_APP'], 30]);
+  assert.equal(loadProviders(PROVIDERS_DIR).get('alpha').documents, undefined);
+  for (const wrong of [[], ['PDF_A4', 'PDF_A4'], ['RCT2'], 'PDF_A4']) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ documents: wrong, refundReceiptDelaySeconds: 30 }) })), /documents/, JSON.stringify(wrong));
+  }
+  for (const wrong of [undefined, -1, 3601, 1.5]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ documents: ['PDF_A4'], refundReceiptDelaySeconds: wrong }) })), /refundReceiptDelaySeconds/, String(wrong));
+  }
+});

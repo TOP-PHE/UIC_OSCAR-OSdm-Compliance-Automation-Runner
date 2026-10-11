@@ -80,7 +80,9 @@ const ENUMS = {
   flexibilities:      ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'],
   offerMode:          ['INDIVIDUAL', 'COLLECTIVE'],
   fulfillmentType:    ['ETICKET', 'CIT_PAPER', 'PASS_CHIP', 'PASS_REFERENCE'],
-  fulfillmentMedia:   ['PDF_A4', 'UIC_PDF', 'PKPASS', 'ALLOCATOR_APP', 'RCCST', 'RCT2', 'TICKETLESS'],
+  // #603: the OSDM 3.8 media too (RETAILER_APP replaces ALLOCATOR_APP).
+  fulfillmentMedia:   ['PDF_A4', 'UIC_PDF', 'PKPASS', 'ALLOCATOR_APP', 'RCCST', 'RCT2', 'TICKETLESS',
+                       'RETAILER_APP', 'DISTRIBUTOR_APP', 'WALLET', 'APPLICATION', 'CHIP_CARD', 'FULFILLMENT_PARTS'],
 };
 
 // Human-readable labels for enums
@@ -110,6 +112,12 @@ const LABELS = {
   RCCST:           'RCCST',
   RCT2:            'RCT2',
   TICKETLESS:      'Ticketless',
+  RETAILER_APP:    'Retailer app (mobile)',
+  DISTRIBUTOR_APP: 'Distributor app',
+  WALLET:          'Wallet',
+  APPLICATION:     'Application',
+  CHIP_CARD:       'Chip card',
+  FULFILLMENT_PARTS: 'Fulfillment parts',
   COMPANION_DOG:   'Companion dog',
   FAMILY_CHILD:    'Family child',
   WHEELCHAIR:      'Wheelchair',
@@ -1545,6 +1553,14 @@ function buildDetailHTML(idx) {
           'The class expected on each leg, in the order of the legs (#600): for a train with a first class and one without. The request asks for every class named; the offer chosen must give each leg its class, by an admission of its own or by a supplement on that leg, and so must the booking. Empty: the travel class criterion applies.')}
         ${buildSelect(idx, 'expectedProductAbsent', 'Expected product absent', ENUMS.expectedProductAbsent,
           'Negative test (#599). On: no offer may hold the expected product above, for example a group its rules exclude (too many passengers, too many adults, a weekday). Passes when none does, fails when one does; the scenario ends after the offer either way.')}
+        ${String(state.scenarios[idx]?.scenarioType || '').includes('REFUND') ? `
+        <div class="param-field">
+          <span class="param-label">Refund receipt wait (min) <span class="param-hint">${esc('Refund receipt (#603). After the refund, the booking is read again every 15 seconds until a receipt (a document of type INFORMATION) appears, for up to this many minutes (1 to 60); none by then fails the scenario. Some providers add it some minutes after the refund. Empty: not awaited.')}</span></span>
+          <input class="param-input" type="number" min="1" max="60"
+            value="${esc(state.scenarios[idx]?.refundReceiptMaxWaitMinutes ?? '')}"
+            placeholder="leave empty = not awaited"
+            data-action="set-scenario-receipt-wait-minutes" data-idx="${esc(idx)}">
+        </div>` : ''}
         ${buildSelect(idx, 'offersByTripIds', 'Offers by trip id', ENUMS.offersByTripIds,
           'Offers asked by trip id (#602). On: POST /trips-collection is asked with the origin, destination and time of the SEARCH trip; the trip of its train number, or else the first leaving at that time or later, is taken, and POST /offers names it in tripIds. One-way only: a return or a SPECIFICATION trip is asked as before.')}
         ${buildSelect(idx, 'tripIdsExpectRejection', 'Unknown trip id refused', ENUMS.tripIdsExpectRejection,
@@ -7413,6 +7429,16 @@ document.body.addEventListener('input', function(e) {
           setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
         }
       }
+      break;
+    }
+    case 'set-scenario-receipt-wait-minutes': {
+      // #603: how long to wait for the refund receipt, in minutes. Empty
+      // clears it (not awaited); otherwise an integer in [1, 60], anything
+      // else ignored mid-edit.
+      const v = el.value.trim();
+      const n = Number.parseInt(v, 10);
+      if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', null);
+      else if (Number.isInteger(n) && n >= 1 && n <= 60) setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', n);
       break;
     }
     case 'set-scenario-max-wait-offer-minutes': {

@@ -1,0 +1,55 @@
+info:
+  name: 14b. GET Booking Refund Receipt
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: "{{api_base}}/bookings/{{bookingId}}"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Accept
+      value: application/json
+    - name: Requestor
+      value: "{{requestor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // ── Refund receipt (#603) ─────────────────────────────────────────────
+        // Reached only from 14 (and from itself) when the scenario waits for a
+        // refund receipt (refundReceiptMaxWaitMinutes): the booking is read
+        // again every 15 seconds until a document of type INFORMATION appears,
+        // or the wait is over (a failure).
+        require(bru.getEnvVar("library_base") + "displays.js").logStepStart(req);
+        await require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").waitBeforeReceiptPoll();
+    - type: after-response
+      code: |-
+        let _body;
+        try { _body = res.getBody(); } catch (_e) { _body = null; }
+        if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").checkRefundReceiptPoll(res.getStatus(), _body) === "again") {
+          bru.runner.setNextRequest("14b. GET Booking Refund Receipt");
+          return;
+        }
+        // ── Multi-scenario: loop to next scenario or truly stop (as 14) ───────
+        if (require(bru.getEnvVar("library_base") + "expiredFlow.js").advanceExpiredFlowQueueAfterSkip()) return;
+
+        const _scList    = JSON.parse(bru.getEnvVar('__scenariosList') || '[]');
+        const _scNextIdx = parseInt(bru.getEnvVar('scenariosToRunIndex') || '0', 10);
+        if (_scList.length > 0 && _scNextIdx < _scList.length) {
+          console.log('🔄 REFUND+PATCH complete — looping to [' + (_scNextIdx + 1) + '/' + _scList.length + ']: ' + _scList[_scNextIdx]);
+          bru.setEnvVar('__loopback', 'true');
+          bru.runner.setNextRequest('01. POST Get Offer');
+        } else {
+          console.log('[INFO] ✅ All scenarios complete — run finished');
+          bru.runner.stopExecution();
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

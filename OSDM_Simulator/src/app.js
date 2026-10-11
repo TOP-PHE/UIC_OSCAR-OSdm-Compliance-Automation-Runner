@@ -27,6 +27,7 @@ const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassen
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { buildTripCollection } = require('./osdm/trips');
+const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -173,11 +174,24 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return { booking };
   }
 
-  // POST /bookings/{id}/fulfillments
+  // POST /bookings/{id}/fulfillments; the documents with them (#603).
   async function fulfillments(req, provider, scope, bookingId) {
     requireMethod(req, 'POST');
     await bodyOf(req);
-    return { fulfillments: confirmBooking(bookingOf(scope, bookingId), provider, now()) };
+    const booking = bookingOf(scope, bookingId);
+    const issued = confirmBooking(booking, provider, now());
+    for (const fulfillment of issued) store.put('fulfillment', scope, fulfillment.id, booking.id);
+    return booking.fulfillmentDocuments ? { fulfillments: issued, fulfillmentDocuments: booking.fulfillmentDocuments } : { fulfillments: issued };
+  }
+
+  // GET /fulfillments/{id} (#603): one fulfilment of this client's bookings.
+  function fulfillmentRoute(req, scope, fulfillmentId) {
+    requireMethod(req, 'GET');
+    const bookingId = store.get('fulfillment', scope, fulfillmentId);
+    const booking = bookingId && store.get('booking', scope, bookingId);
+    const fulfillment = booking?.fulfillments.find((f) => f.id === fulfillmentId);
+    if (!fulfillment) throw new HttpError(404, 'FULFILLMENT_NOT_FOUND', 'Fulfillment not found');
+    return fulfillmentWithDocuments(booking, fulfillment);
   }
 
   // GET, PATCH /bookings/{id}/passengers/{id}
@@ -225,7 +239,9 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     if (bookingId === undefined) return newBooking(req, provider, scope);
     if (part === undefined) {
       requireMethod(req, 'GET');
-      return { booking: bookingOf(scope, bookingId) };
+      const booking = bookingOf(scope, bookingId);
+      showRefundReceipt(booking, provider, now());
+      return { booking };
     }
     if (BOOKING_PARTS_NOT_PROVIDED.has(part)) throw notProvided();
     if (part === 'booked-offers') return bookedOfferRoute(req, scope, bookingId, partId, more);
@@ -277,6 +293,8 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     // #602: a provider with a trip search answers it; the others answer 501.
     if (resource === 'trips-collection' && rest.length === 0 && provider.tripsCollection) return tripCollectionRoute(req, provider, scope);
     if (resource === 'bookings') return bookingRoute(req, provider, scope, rest);
+    // #603: a provider that issues documents answers GET /fulfillments/{id}.
+    if (resource === 'fulfillments' && rest.length === 1 && provider.documents) return fulfillmentRoute(req, scope, rest[0]);
     if (NOT_PROVIDED.has(resource)) throw notProvided();
     throw notFound();
   }

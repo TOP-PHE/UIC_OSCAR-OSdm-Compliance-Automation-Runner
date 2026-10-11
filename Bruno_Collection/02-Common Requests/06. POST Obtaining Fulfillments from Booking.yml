@@ -122,6 +122,12 @@ runtime:
         }
         validateFulfillments(jsonData.fulfillments, 0, ["FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments);
 
+        // #603: read each fulfillment with GET /fulfillments/{id} (06b), then
+        // the booking (07).
+        if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").armFulfillmentReads(jsonData)) {
+            bru.runner.setNextRequest("06b. GET Fulfillment");
+        }
+
 settings:
   encodeUrl: true
   timeout: 0

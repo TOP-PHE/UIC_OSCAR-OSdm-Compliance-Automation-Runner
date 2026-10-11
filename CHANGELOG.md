@@ -62,6 +62,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.234] / [collection-OTST_V2.0.118] — 2026-10-11
+
+Issue #603, release 2026.263. Simulator 0.13.0.
+
+### Added
+
+- **Fulfilment documents are checked.** `library-bruno/fulfillmentDocuments.js`
+  (pure) holds the rules, `library-bruno/fulfillmentSteps.js` the steps.
+  - Documents are read where the version puts them: in each fulfillment up
+    to 3.7; in 3.8, in the booking's (or the response's)
+    `fulfillmentDocuments`, each fulfillment naming its own in
+    `fulfillmentDocumentRefs`.
+  - Step `07` checks that every medium the scenario asked for is delivered,
+    that each document's format fits its medium (`PDF_A4` is
+    `application/pdf`, an app medium a PNG or JPEG image), that its content
+    is that format (by its first bytes), and that there is one
+    `RETAILER_APP` document per fulfillment. A line says how the documents
+    are delivered, merged PDFs included.
+  - **Every one of these checks is a warning** (maintainer decision): OSDM
+    does not make the ČD way of delivering documents everyone's.
+- **New step `06b. GET Fulfillment`**: after `06`, each fulfillment is read
+  with `GET /fulfillments/{id}`. The answer must be that fulfillment
+  (failure otherwise); its documents are checked as above. A document that
+  also holds other fulfillments (one PDF merged for the booking) is a
+  warning. A Problem the provider adds is logged. Not implemented (`501`,
+  `404`, …) is a passing row, as for the other optional reads (#488): the
+  step is in `OPTIONAL_READ_PROBES` and in the report's
+  `CAPABILITY_PROBE_ENDPOINTS`.
+- **Refund receipt.** `refundReceiptMaxWaitMinutes` (1 to 60): after the
+  refund, step `14` looks for a document of type `INFORMATION` that was not
+  in the booking before the refund (in `documents` or `fulfillmentDocuments`).
+  When it is not there yet, step `14b. GET Booking Refund Receipt` reads the
+  booking every 15 seconds until it appears. None within the wait is a
+  failure. Its form (a PDF, with a content or a link) is a warning.
+- **Test Config**: the Refund receipt wait field (refund scenarios), and
+  the OSDM 3.8 fulfilment media (`RETAILER_APP`, `DISTRIBUTOR_APP`, `WALLET`,
+  `APPLICATION`, `CHIP_CARD`, `FULFILLMENT_PARTS`). `datafile.schema.json`
+  accepts them.
+- **Runner**: the receipt wait extends the run's time limit like the expiry
+  tests' waits (`EXPIRED_FLOW_TIMERS`, an entry without an on/off flag).
+- **Simulator scenario catalogue**:
+  `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md`.
+  It covers every scenario of the simulator's data file: what it tests, what
+  the simulator answers, what a run must show (no failed check, and the
+  warnings listed). `OSDM_Simulator/tests/datafile.test.js` fails when the
+  catalogue and the data file do not name the same scenarios. The scenario
+  lists in the collection's README and the simulator's operations document
+  now point to it.
+
+### Simulator 0.13.0
+
+- A profile may list `documents` (`gamma`: `PDF_A4`, `RETAILER_APP`). On
+  confirmation, the documents of the media the offers asked for are issued in
+  the 3.8 shape: one PDF for the whole booking, one PNG per ticket, each a
+  real file of its format. They are in the booking and in the answer of
+  `POST …/fulfillments`.
+- `GET /fulfillments/{id}`: the ticket and its documents, with a
+  `DOCUMENT_COVERS_MORE_FULFILLMENTS` Problem for the merged PDF. Other
+  providers answer `501`.
+- `refundReceiptDelaySeconds` (`gamma`: 30) after a refund is confirmed, a
+  receipt (type `INFORMATION`, `PDF_A4`) appears in the booking, on
+  `GET /bookings/{id}`.
+- The data file has `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` and
+  `SIM_REFUND_RECEIPT_RETURN_1ADT_38` (both media asked; the refund awaits
+  the receipt for up to 2 minutes).
+
+Checked:
+- **The two new scenarios.** Standalone against the simulator: 352 and 525
+  checks. Through OSCAR: 350 and 523. None failed. The receipt was found
+  30 s after the refund, and each ticket was read at 06b with the
+  merged-PDF warning.
+- **All 43 scenarios of the data file, standalone:** none failed. Their
+  warnings are the ones the catalogue lists.
+- **Against `main`'s collection:** nine of them differ only by the checks
+  of 06b (three per ticket on `gamma`; on `alpha` and `beta`, the "not
+  implemented" row).
+- **Counter-check:** with a simulator that never adds the receipt, 14b reads
+  the booking 8 times over 2 minutes and the receipt check fails.
+- **Not run** against a real provider (ČD).
+
+---
+
 ## [server-1.11.233] / [collection-OTST_V2.0.117] — 2026-10-10
 
 Issue #602, release 2026.262. Simulator 0.12.0.

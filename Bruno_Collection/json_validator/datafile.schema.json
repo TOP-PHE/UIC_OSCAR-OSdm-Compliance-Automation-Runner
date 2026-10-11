@@ -259,6 +259,12 @@
             "type": ["string", "null"],
             "enum": ["RESERVATION_SELECTION", "PLACE_SELECTION", "ADD_LATER", "", null]
           },
+          "refundReceiptMaxWaitMinutes": {
+            "description": "Refund receipt (#603). When set (1 to 60), after the refund the booking is read again every 15 seconds until a document of type INFORMATION appears in it (documents or fulfillmentDocuments), for up to this many minutes; none by then is a failure. The run's time limit grows by this wait. Empty or null: the receipt is not awaited.",
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 60
+          },
           "offersByTripIds": {
             "description": "Offers asked by trip id (#602). When on, the offer step first asks POST /trips-collection with the origin, destination and time of the scenario's SEARCH trip, takes the trip running the trip's train (vehicleNumber) or, without one, the first leaving at the time asked or later, and asks POST /offers with tripIds naming it. A one-way journey only: a return, or a SPECIFICATION trip, is asked as before with a WARNING. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
@@ -497,7 +503,13 @@
                     "ALLOCATOR_APP",
                     "RCCST",
                     "RCT2",
-                    "TICKETLESS"
+                    "TICKETLESS",
+                    "RETAILER_APP",
+                    "DISTRIBUTOR_APP",
+                    "WALLET",
+                    "APPLICATION",
+                    "CHIP_CARD",
+                    "FULFILLMENT_PARTS"
                   ]
                 },
                 "fulfillmentType": {

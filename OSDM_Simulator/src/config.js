@@ -85,6 +85,7 @@ function checkProvider(key, raw) {
     ...(secondClassOnlyCategories ? { secondClassOnlyCategories } : {}),
     ...(reservations ? { reservations } : {}),
     ...checkTripsCollection(raw.tripsCollection, bad),
+    ...checkDocuments(raw, bad),
   };
 }
 
@@ -150,6 +151,19 @@ function checkTripsCollection(value, bad) {
   if (value === undefined) return {};
   if (typeof value !== 'boolean') throw bad('tripsCollection');
   return value ? { tripsCollection: true } : {};
+}
+
+// #603: the media of the documents issued on confirmation (PDF_A4 merged for
+// the booking, RETAILER_APP one PNG per fulfilment), and how long after a
+// refund its receipt appears. Absent: no document, GET /fulfillments is 501.
+const DOCUMENT_MEDIA = new Set(['PDF_A4', 'RETAILER_APP']);
+function checkDocuments(raw, bad) {
+  if (raw.documents === undefined) return {};
+  const media = raw.documents;
+  if (!Array.isArray(media) || media.length === 0 || !media.every((m) => DOCUMENT_MEDIA.has(m)) || new Set(media).size !== media.length) throw bad('documents');
+  const delay = raw.refundReceiptDelaySeconds;
+  if (!Number.isInteger(delay) || delay < 0 || delay > 3600) throw bad('refundReceiptDelaySeconds');
+  return { documents: [...media], refundReceiptDelaySeconds: delay };
 }
 
 // The seat reservation of each train category (#601), by short name:

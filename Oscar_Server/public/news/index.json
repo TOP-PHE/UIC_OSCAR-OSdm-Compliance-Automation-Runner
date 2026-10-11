@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-fulfilment-documents",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Fulfilment documents checked, and the refund receipt awaited",
+    "summary": "OSCAR now checks the documents of a confirmed booking (the media asked for, their format and content), reads each ticket with GET /fulfillments/{id}, and can wait for the receipt some providers add after a refund.",
+    "content": "After a booking is confirmed, OSCAR now reads each ticket with GET /fulfillments/{id} (new step 06b) and checks the booking's documents: every medium asked for is delivered, each document's format fits its medium (PDF_A4 is a PDF, RETAILER_APP a PNG or JPEG image), its content is really that format, and there is one RETAILER_APP document per ticket. A PDF merged for the whole booking is reported when a single ticket is read. All of these are warnings; a provider that does not implement GET /fulfillments/{id} gets a passing \"not implemented\" row.\n\nSome providers add a receipt to the booking some minutes after a refund. In a refund scenario, set \"Refund receipt wait (min)\" (1 to 60): after the refund, OSCAR reads the booking every 15 seconds until the receipt (a document of type INFORMATION) appears. No receipt within the wait fails the scenario.\n\nThe fulfilment media of OSDM 3.8 (Retailer app, Distributor app, Wallet and others) can now be chosen in Test Config."
+  },
+  {
     "id": "2026-10-10-offers-by-trip-id",
     "date": "October 10, 2026",
     "tag": "New",

@@ -25,6 +25,7 @@
 
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
+const { noteRefund } = require('./documents');
 
 const REFUND_OFFER_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_FULFILLMENT_IDS = 20;
@@ -164,6 +165,8 @@ function confirmRefundOffer(booking, refundOfferId, body, provider, nowMs) {
   }
   offer.status = 'CONFIRMED';
   offer.confirmedOn = confirmedOn;
+  // #603: the refund receipt appears in the booking some time later.
+  noteRefund(booking, provider, nowMs);
   if (booking.confirmedPrice) {
     booking.confirmedPrice = price(booking.confirmedPrice.amount - offer.refundableAmount.amount, provider.currency);
   }

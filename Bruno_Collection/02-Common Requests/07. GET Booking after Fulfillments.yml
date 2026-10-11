@@ -155,6 +155,10 @@ runtime:
           }
         }
 
+        // #603: the documents of the confirmed booking (warnings), and the
+        // receipts already there before any refund.
+        require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").checkConfirmedBookingDocuments((jsonData && jsonData.booking) || null);
+
         // #600: the booking gives each leg the class the scenario names.
         if (bru.getEnvVar("legTravelClasses")) {
           const { checkLegClasses } = require(bru.getEnvVar("library_base") + "legClasses.js");

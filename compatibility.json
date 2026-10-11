@@ -1,8 +1,23 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.262",
+  "current_release": "2026.263",
   "releases": [
+    {
+      "release": "2026.263",
+      "date": "2026-10-11",
+      "server": "1.11.234",
+      "collection": "OTST_V2.0.118",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#603): fulfilment documents. Step 07 checks the documents of the confirmed booking, wherever the version puts them (nested up to 3.7; the booking's fulfillmentDocuments and each fulfillment's fulfillmentDocumentRefs in 3.8): every medium asked for is delivered, each format fits its medium, each content is its format, one RETAILER_APP document per fulfillment. All warnings (library-bruno/fulfillmentDocuments.js, pure).",
+        "New step 06b. GET Fulfillment reads each fulfillment with GET /fulfillments/{id}; a document covering more than that fulfillment (a PDF merged for the booking) is a warning; not implemented (501, 404, ...) is a passing row, as for the other optional reads (#488).",
+        "Refund receipt: refundReceiptMaxWaitMinutes (1 to 60) makes step 14b read the booking every 15 seconds after the refund until a document of type INFORMATION appears; none within the wait is a failure. The run's time limit grows by the wait.",
+        "Server 1.11.234: Test Config has the Refund receipt wait field and the OSDM 3.8 fulfilment media (RETAILER_APP, DISTRIBUTOR_APP, WALLET, ...); the runner extends the run budget for the receipt wait; the report counts 06b among the optional reads.",
+        "Simulator 0.13.0 (not part of a release): gamma issues documents (one PDF merged for the booking, one PNG per ticket), answers GET /fulfillments/{id}, and adds the refund receipt 30 s after a refund. Two scenarios on 3.8. New: Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md, the catalogue of every simulator scenario, kept complete by a test."
+      ]
+    },
     {
       "release": "2026.262",
       "date": "2026-10-10",
