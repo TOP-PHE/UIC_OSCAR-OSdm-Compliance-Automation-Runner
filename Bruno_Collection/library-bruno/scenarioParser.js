@@ -92,7 +92,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__tripIdsOutcome",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -715,6 +715,24 @@ function parseScenarioData(jsonData) {
       // #596: negative probe — the provider is expected to refuse this overrule code.
       bru.setEnvVar("overruleCodeExpectRejection", (scenario.overruleCodeExpectRejection === true || ["true", "on", "yes"].includes(String(scenario.overruleCodeExpectRejection).toLowerCase())) ? "true" : "false");
       bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);
+      // #602: offers asked for a trip of POST /trips-collection, by its id.
+      // Only a one-way journey from a SEARCH trip is asked this way.
+      const _flagOn = (v) => v === true || ["true", "on", "yes"].includes(String(v).toLowerCase());
+      let _byTripIds = _flagOn(scenario.offersByTripIds);
+      if (_byTripIds) {
+        const _tr = (jsonData.tripRequirements || []).find((t) => t && t.id === scenario.tripRequirementId);
+        const _offset = returnOptsFromScenario(scenario).offsetDays;
+        if (_tr && _tr.tripType !== "SEARCH") {
+          validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id need a SEARCH trip (origin, destination, time); this one is ${_tr.tripType}. The offers are asked by the trip as it is.`);
+          _byTripIds = false;
+        } else if (_offset !== undefined && _offset !== null && _offset !== "") {
+          validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id are asked for a one-way journey only; this scenario is a return. The offers are asked by search criteria.`);
+          _byTripIds = false;
+        }
+      }
+      bru.setEnvVar("offersByTripIds", _byTripIds ? "true" : "false");
+      // #602: negative probe — offers asked for a trip id the provider never gave.
+      bru.setEnvVar("tripIdsExpectRejection", _flagOn(scenario.tripIdsExpectRejection) ? "true" : "false");
 
       // ── Partial refund (issue #218) ─────────────────────────────────────
       // Two orthogonal scope axes: by leg (subset of admissions/reservations)

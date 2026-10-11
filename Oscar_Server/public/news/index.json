@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-10-offers-by-trip-id",
+    "date": "October 10, 2026",
+    "tag": "New",
+    "title": "Offers asked by trip id, after a trip search",
+    "summary": "A scenario can now ask the provider's trips first with POST /trips-collection, choose one, and ask the offers for it by its id, the third way OSDM gives to ask for offers. A negative test checks that an unknown trip id is refused.",
+    "content": "OSDM gives three ways to ask for offers: by search criteria, by a trip specification, and by the ids of trips the provider returned before. OSCAR now covers the third.\n\nTurn on \"Offers by trip id\" in a scenario whose trip is a SEARCH trip. Step 01 then first asks POST /trips-collection with the trip's origin, destination and time. It takes the trip running the train number the trip names, or, without one, the first trip leaving at the time asked or later, and asks the offers for that trip by its id. No such trip fails the scenario.\n\nOSCAR checks the trip answer (an id, trips with ids and legs) and that every offer covers the trip asked. These checks show in step 01.\n\n\"Unknown trip id refused\" is the negative test: the offer request names a trip id the provider never gave, and must be refused with an error.\n\nOnly a one-way journey is asked this way; a return keeps using the search criteria."
+  },
+  {
     "id": "2026-10-10-seat-reservations",
     "date": "October 10, 2026",
     "tag": "New",

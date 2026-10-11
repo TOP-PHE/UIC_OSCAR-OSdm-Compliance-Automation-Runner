@@ -40,6 +40,8 @@ module.exports = {
   checkGroupOffer,
   compareGroupOfferIndividual,
   checkOfferLegClasses,
+  prepareOfferRequestByTripIds,
+  checkOfferRequestByTripIds,
   routeAfterOfferStep,
 };
 
@@ -1861,13 +1863,6 @@ function handleOptionalReservationSelections(selectedOffer) {
     return;
   }
   validationLogger("[DEBUG] ➤ handleOptionalReservationSelections");
-  const recordChecks = (checks) => checks.forEach((c) => {
-    if (c.level === "warn") {
-      if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
-      return;
-    }
-    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
-  });
   recordChecks(sr.checkRelations(selectedOffer));
   const passengerRefs = (parseEnvJson("offerPassengerSpecifications", []) || []).map((p) => p?.externalRef).filter(Boolean);
   recordChecks(sr.checkProviderRules(selectedOffer, passengerRefs));
@@ -2128,6 +2123,105 @@ function compareGroupOfferIndividual(status, body) {
  * (#178, #594), the seat map before booking (#104), or the booking. Shared by
  * 01, 01c and 01d, which come between them.
  */
+// ── Offers by trip ids (#602) ─────────────────────────────────────────────
+// Called by 01's before-request once the offer request is built. With
+// offersByTripIds, it asks POST /trips-collection with the search's origin,
+// destination and time, chooses a trip (tripIds.js) and asks the offers for
+// it by id. The call is made from here, not from a request of its own, so
+// that every way into 01 (a retry, the next scenario, the rerun after an
+// expired offer) asks the trips again. Its checks are recorded by 01's
+// after-response (checkOfferRequestByTripIds), with the offer's. With
+// tripIdsExpectRejection, an id the provider never gave is sent instead.
+async function prepareOfferRequestByTripIds() {
+  bru.setEnvVar("__tripIdsOutcome", null);
+  const probe = String(bru.getEnvVar("tripIdsExpectRejection")) === "true";
+  if (!probe && String(bru.getEnvVar("offersByTripIds")) !== "true") return;
+  const ti = require("./tripIds.js");
+  const request = parseEnvJson("OfferCollectionRequest", {}) || {};
+  if (probe) {
+    bru.setEnvVar("OfferCollectionRequest", JSON.stringify(ti.offerRequestByTripIds(request, ti.UNKNOWN_TRIP_ID)));
+    bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ probe: true }));
+    validationLogger(`[INFO] 🧪 Trip id probe — POST /offers names trip "${ti.UNKNOWN_TRIP_ID}", which the provider never gave; a refusal is expected.`);
+    return;
+  }
+  const search = ti.tripsCollectionRequest(parseEnvJson("offerTripSearchCriteria", null));
+  if (!search) {
+    bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks: [{ name: "Trips collection: the scenario's SEARCH trip gives an origin and a destination", ok: false, message: "no tripSearchCriteria to ask the trips with" }], failed: true }));
+    return;
+  }
+  validationLogger(`[INFO] 🚆 Offers by trip id — POST /trips-collection: ${search.origin.stopPlaceRef} → ${search.destination.stopPlaceRef} at ${search.departureTime || search.arrivalTime}`);
+  const { status, body } = await sendTripsCollection(search);
+  const checks = ti.checkTripsCollection(status, body, search);
+  const choice = status === 200 ? ti.chooseTrip(body?.trips, { vehicleNumber: bru.getEnvVar("tripVehicleNumber"), departureTime: search.departureTime }) : { trip: null };
+  if (status === 200) {
+    checks.push({ name: `Trips collection: a trip to ask offers for — ${choice.trip ? choice.how + ", " + choice.trip.id : "none"}`, ok: !!choice.trip, message: choice.reason });
+  }
+  if (!choice.trip) {
+    bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, failed: true }));
+    validationLogger("[WARNING] Offers by trip id: no trip to ask offers for — the offer request goes out by search criteria, and its answer is not used.");
+    return;
+  }
+  bru.setEnvVar("OfferCollectionRequest", JSON.stringify(ti.offerRequestByTripIds(request, choice.trip.id)));
+  bru.setEnvVar("__tripIdsOutcome", JSON.stringify({ checks, tripId: choice.trip.id }));
+  validationLogger(`[INFO] 🚆 Offers by trip id — ${body.trips.length} trip(s) answered; asking offers for ${choice.how}: ${choice.trip.id}`);
+}
+
+// POST /trips-collection (#602), with the headers of the offer request.
+// { status, body }; status 0 when it could not be sent.
+async function sendTripsCollection(search) {
+  try {
+    const res = await new Promise((resolve, reject) => {
+      bru.sendRequest({
+        url: `${bru.getEnvVar("api_base")}/trips-collection`,
+        method: "POST",
+        headers: {
+          "Content-Type": `application/json;version=${bru.getEnvVar("osdmVersion")}`,
+          Accept: "application/json",
+          Authorization: `Bearer ${bru.getEnvVar("access_token")}`,
+          Requestor: bru.getEnvVar("requestor") || "",
+        },
+        data: JSON.stringify(search),
+      }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
+    });
+    let body = res?.data ?? res?.body ?? null;
+    if (typeof body === "string") {
+      try { body = JSON.parse(body); } catch { body = null; }
+    }
+    return { status: res?.status || res?.statusCode || 0, body };
+  } catch (err) {
+    validationLogger(`[ERROR] POST /trips-collection could not be sent: ${err?.message || err}`);
+    return { status: 0, body: null };
+  }
+}
+
+// 01's after-response: records the checks of POST /trips-collection and of
+// the offers asked by trip id, or grades the probe's refusal. True when the
+// scenario stops here: the probe always ends it, and so does a trip search
+// that gave no trip.
+function checkOfferRequestByTripIds(status, body) {
+  const outcome = parseEnvJson("__tripIdsOutcome", null);
+  if (!outcome) return false;
+  if (outcome.probe) {
+    const { validateProblemResponse } = require("./requestedInformation.js");
+    validateProblemResponse({
+      status,
+      body,
+      targets: [{ scenarioField: "tripIds" }],
+      prefix: "🧪 Trip id probe",
+      assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+      log: (level, msg) => validationLogger(`[${level}] ${msg}`),
+    });
+    if (typeof status === "number" && status < 300) {
+      validationLogger("[WARNING] Trip id probe: the provider answered offers for a trip it never gave.");
+    }
+    return true;
+  }
+  recordChecks(outcome.checks || []);
+  if (outcome.failed) return true;
+  if (status === 200) recordChecks(require("./tripIds.js").checkOffersForTrip(body, outcome.tripId));
+  return false;
+}
+
 function routeAfterOfferStep() {
   if (groupCompareDue()) {
     bru.runner.setNextRequest("01d. POST Get Offer Individual");

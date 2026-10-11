@@ -200,3 +200,13 @@ test('reservations: gamma\'s SuperCity mandatory, EuroCity optional; a wrong map
     assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ reservations: wrong }) })), /reservations/, JSON.stringify(wrong));
   }
 });
+
+test('trips collection: only gamma answers it; a value that is not true or false stops the start (#602)', () => {
+  const providers = loadProviders(PROVIDERS_DIR);
+  assert.equal(providers.get('gamma').tripsCollection, true);
+  assert.equal(providers.get('alpha').tripsCollection, undefined);
+  assert.equal(loadProviders(providersDir({ 'test.json': profile({ tripsCollection: false }) })).get('test').tripsCollection, undefined);
+  for (const wrong of ['yes', 1, null]) {
+    assert.throws(() => loadProviders(providersDir({ 'test.json': profile({ tripsCollection: wrong }) })), /tripsCollection/, JSON.stringify(wrong));
+  }
+});

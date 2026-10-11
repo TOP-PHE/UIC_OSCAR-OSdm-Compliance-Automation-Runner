@@ -22,6 +22,10 @@
  *    offers that cover the outbound and the inbound trip, with a return price.
  * An id this client was not given is refused, as is naming both.
  *
+ * Offers can be asked for trips named by id (`tripIds`, #602): trips this
+ * client was given by POST /trips-collection or in an earlier answer. An
+ * unknown id is refused.
+ *
  * A passenger's reduction card is applied when the provider knows it (#597):
  * the passenger's price is reduced and its admissions name the card in
  * `appliedPassengerTypes`. An unknown card is reported in `problems`.
@@ -202,7 +206,9 @@ function finishTrip(legs, externalRef, provider) {
 
 // A search: one direct trip, leaving when asked. Its length and its train
 // number come from the two places, so they do not change between two calls.
-function tripFromSearch(criteria, provider) {
+// `departure` (#602) is another departure of the same line, that many steps
+// from the one asked for, `shiftMs` later: it has a train number of its own.
+function tripFromSearch(criteria, provider, { departure = 0, shiftMs = 0 } = {}) {
   if (!criteria || typeof criteria !== 'object') throw bad('tripSearchCriteria is not valid');
   const from = stopPlace(criteria.origin, 'tripSearchCriteria.origin');
   const to = stopPlace(criteria.destination, 'tripSearchCriteria.destination');
@@ -212,16 +218,18 @@ function tripFromSearch(criteria, provider) {
   let end;
   if (criteria.departureTime !== undefined) {
     start = instant(criteria.departureTime, 'tripSearchCriteria.departureTime', provider);
+    start.ms += shiftMs;
     end = { ms: start.ms + lengthMs, offset: start.offset };
   } else {
     end = instant(criteria.arrivalTime, 'tripSearchCriteria.arrivalTime', provider);
+    end.ms += shiftMs;
     start = { ms: end.ms - lengthMs, offset: end.offset };
   }
   const asked = criteria.parameters?.dataFilter?.vehicleFilter;
   const askedNumber = asked?.exclude === false && Array.isArray(asked.vehicleNumbers) ? asked.vehicleNumbers[0] : undefined;
-  const vehicleNumber = typeof askedNumber === 'string' && askedNumber.length > 0 && askedNumber.length <= 20
+  const vehicleNumber = departure === 0 && typeof askedNumber === 'string' && askedNumber.length > 0 && askedNumber.length <= 20
     ? askedNumber
-    : String(1000 + (seed.readUInt16BE(2) % 9000));
+    : String(1000 + (((seed.readUInt16BE(2) + 37 * departure) % 9000) + 9000) % 9000);
   return finishTrip([buildLeg({ from, to, start, end, vehicleNumber }, provider)], undefined, provider);
 }
 
@@ -244,13 +252,27 @@ function tripFromSpecification(spec, provider) {
   return finishTrip(legs, spec.externalRef, provider);
 }
 
-function tripsOf(body, provider) {
+// Trips named by id (#602): each must be one this client was given, by
+// POST /trips-collection or in an earlier offer answer. A copy, so that what
+// is stored is never changed.
+function tripsById(body, known) {
+  if (body.tripIds.length > MAX_TRIPS) throw bad(`at most ${MAX_TRIPS} tripIds`);
+  if (body.inboundTripIds !== undefined && body.inboundTripIds !== null) throw bad('inboundTripIds: a return by trip ids is not provided by this simulator');
+  return body.tripIds.map((id, i) => {
+    const trip = known.trip?.(ref(id, `tripIds[${i}]`));
+    if (!trip) throw bad(`tripIds[${i}]: "${id}" is not a trip this client was given`);
+    return structuredClone(trip);
+  });
+}
+
+function tripsOf(body, provider, known) {
+  if (Array.isArray(body.tripIds) && body.tripIds.length > 0) return tripsById(body, known);
   if (Array.isArray(body.tripSpecifications) && body.tripSpecifications.length > 0) {
     if (body.tripSpecifications.length > MAX_TRIPS) throw bad(`at most ${MAX_TRIPS} tripSpecifications`);
     return body.tripSpecifications.map((spec) => tripFromSpecification(spec, provider));
   }
   if (body.tripSearchCriteria !== undefined) return [tripFromSearch(body.tripSearchCriteria, provider)];
-  throw bad('tripSearchCriteria or tripSpecifications is required');
+  throw bad('tripIds, tripSearchCriteria or tripSpecifications is required');
 }
 
 function passengersOf(body, provider) {
@@ -599,10 +621,10 @@ function problemsOf(passengers, offers, collective, refusals) {
  * The OfferCollectionResponse for this request and provider, and what has to
  * be remembered of each offer for the booking that may follow. `known` reads
  * back what this client was given before: `known.offer(id)`, `known.trip(id)`;
- * only a return request uses it.
+ * a return request and a request by trip ids (#602) use it.
  */
 function buildOfferCollection(body, provider, nowMs, known = {}) {
-  const trips = tripsOf(body, provider);
+  const trips = tripsOf(body, provider, known);
   const passengers = passengersOf(body, provider);
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
   const criteria = body.offerSearchCriteria;
@@ -635,4 +657,4 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   return { response, remembered, trips: allTrips };
 }
 
-module.exports = { buildOfferCollection, productsOf, OFFER_LIFETIME_MS };
+module.exports = { buildOfferCollection, productsOf, tripFromSearch, OFFER_LIFETIME_MS };

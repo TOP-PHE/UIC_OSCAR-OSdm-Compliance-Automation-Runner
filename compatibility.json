@@ -1,8 +1,22 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.261",
+  "current_release": "2026.262",
   "releases": [
+    {
+      "release": "2026.262",
+      "date": "2026-10-10",
+      "server": "1.11.233",
+      "collection": "OTST_V2.0.117",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#602): offers by trip id. With offersByTripIds, step 01 first asks POST /trips-collection with the origin, destination and time of the scenario's SEARCH trip, takes the trip running the trip's train (else the first leaving at the time asked or later), and asks POST /offers with tripIds naming it (library-bruno/tripIds.js, pure). One-way only: a return or a SPECIFICATION trip is asked as before, with a warning.",
+        "Checks: the TripCollectionResponse has an id, trips with ids and legs, none twice (fail), from the origin to the destination asked (warning); a trip to ask offers for (fail); every offer covers the trip asked (fail). tripIdsExpectRejection is the negative test: an id the provider never gave must be refused with a 4xx Problem, and the scenario ends there.",
+        "Server 1.11.233: Test Config has the Offers by trip id and Unknown trip id refused fields; the data file schema accepts offersByTripIds and tripIdsExpectRejection.",
+        "Simulator 0.12.0 (not part of a release): POST /trips-collection on gamma (four departures, each with a train of its own); POST /offers takes tripIds this client was given and refuses an unknown one. Three scenarios on 3.8."
+      ]
+    },
     {
       "release": "2026.261",
       "date": "2026-10-10",

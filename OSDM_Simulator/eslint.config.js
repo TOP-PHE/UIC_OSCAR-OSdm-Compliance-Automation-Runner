@@ -27,6 +27,7 @@ module.exports = [
         URL: 'readonly',
         URLSearchParams: 'readonly',
         fetch: 'readonly',
+        structuredClone: 'readonly',
       },
     },
     rules: {

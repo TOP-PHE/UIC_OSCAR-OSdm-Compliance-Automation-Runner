@@ -332,6 +332,21 @@ framework authorised.
   (an upgrade product) on that leg: both are accepted, and the check names the
   form found. The booking must give each leg the same class. Use a
   specification trip, whose legs are listed.
+- **Offers by trip id** (#602) — OSDM's third way to ask for offers, besides
+  search criteria and a trip specification. On, OSCAR first sends
+  `POST /trips-collection` with the origin, destination and time of the
+  scenario's SEARCH trip (without its train filter). From the trips answered it
+  takes the one running the trip's train number when the trip names one, or
+  else the first leaving at the time asked or later, and asks `POST /offers`
+  with `tripIds` naming it. No such trip fails the scenario and stops it. The
+  answer is checked (an `id`, trips with ids and legs, none twice; a trip from
+  another stop is a warning), and so are the offers: each must cover the trip
+  asked. These checks show in step `01. POST Get Offer`, which makes the call
+  itself, so that a retry or the next scenario asks the trips again. One-way
+  only: a return, or a SPECIFICATION trip, is asked as before, with a warning.
+- **Unknown trip id refused** (#602) — the negative test: on, `POST /offers`
+  names a trip id the provider never gave, and must be refused (`4xx` with an
+  RFC-9457 Problem). The scenario ends there.
 - **Requested offer parts** — `ADMISSION`, `RESERVATION`, `ANCILLARY`, `FARE_*`,
   `CONTINUOUS_SERVICE`, `ALL`. (Include `RESERVATION` if you intend to pick seats.)
 - **Flexibility** — `FULL_FLEXIBLE`, `SEMI_FLEXIBLE`, `NON_FLEXIBLE`.
@@ -963,6 +978,8 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
 | Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |
 | Expected product absent | `off` / `on` | negative test: no offer may hold the product |
+| Offers by trip id | `off` / `on` | `POST /trips-collection` first, then `POST /offers` with `tripIds` (one-way SEARCH trips) |
+| Unknown trip id refused | `off` / `on` | negative test: `POST /offers` with a trip id never given must be refused |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |
 | Overrule code | the codes the Test Framework declares (§4.10) | refund/exchange request |
 | Sales‑flow actions | patchPassengers, placeSelection, addAncillary, getBooking, deleteAncillary | inserts the matching step |
@@ -993,7 +1010,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 
 | Step (collection) | OSDM call |
 |---|---|
-| `01 POST Get Offer` | `POST /offers` |
+| `01 POST Get Offer` | `POST /offers`; with offers by trip id, `POST /trips-collection` first |
 | `01b POST Get Return Offer` | `POST /offers` (inward leg) |
 | `08 GET Place Maps` | `GET /availabilities/place-map?contextType=OFFER` |
 | `08b GET Place Map Post-Booking` | `GET /availabilities/place-map?contextType=BOOKING` |

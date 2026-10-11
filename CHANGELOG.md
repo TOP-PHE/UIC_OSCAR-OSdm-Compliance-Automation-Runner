@@ -62,6 +62,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.233] / [collection-OTST_V2.0.117] — 2026-10-10
+
+Issue #602, release 2026.262. Simulator 0.12.0.
+
+### Added
+
+- **Offers by trip id**, OSDM's third way to ask for offers, besides search
+  criteria and trip specifications. `library-bruno/tripIds.js` holds the rules
+  (pure).
+  - With `offersByTripIds`, step `01` first asks `POST /trips-collection` with
+    the origin, destination and time of the scenario's SEARCH trip (its train
+    filter left out), then asks `POST /offers` with `tripIds` naming one trip
+    of the answer: the one running the trip's train number when the trip names
+    one, else the first leaving at the time asked or later. No such trip fails
+    the scenario and ends it.
+  - The call is made by `01`'s own script (`prepareOfferRequestByTripIds`),
+    not by a request file of its own, so that every way into `01` (a retry,
+    the next scenario, the rerun after an expired offer) asks the trips again.
+    Its checks show in `01`.
+  - **Checks.** The answer has an `id` (required), trips with ids and legs,
+    no id twice (failures); every trip goes from the origin to the destination
+    asked (a warning: a provider may answer from an equivalent stop). Every
+    offer covers the trip asked (failure); an offer naming no trip, or an
+    answer whose trips leave the trip out, is a warning.
+  - **`tripIdsExpectRejection`** is the negative test: `POST /offers` names a
+    trip id the provider never gave, and must answer `4xx` with an RFC-9457
+    Problem. The scenario ends there.
+  - One-way only. A return, or a SPECIFICATION trip, is asked as before, with
+    a warning.
+- **Test Config**: "Offers by trip id" and "Unknown trip id refused" fields.
+  `datafile.schema.json` accepts `offersByTripIds` and
+  `tripIdsExpectRejection`.
+
+### Simulator 0.12.0
+
+- `POST /trips-collection` on `gamma` (profile `tripsCollection`): four
+  direct departures, half an hour before the time asked, at that time, one and
+  two hours after, each with a train number of its own. The departure at the
+  time asked is the trip, with the same id, that a search for offers gets. A
+  return is refused.
+- `POST /offers` takes `tripIds`: trips this client was given, by
+  `/trips-collection` or in an earlier answer. An unknown id is refused
+  (`400`), and so is `inboundTripIds`.
+- The data file has `SIM_SALE_BY_TRIP_ID_1ADT_38` (the 08:00 departure, not
+  the 07:30 one listed first), `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38` (train
+  1854, the 09:00 departure) and `SIM_SALE_BY_TRIP_ID_UNKNOWN_38`.
+
+Checked: the three scenarios standalone against the simulator (231, 231 and
+71 checks) and through OSCAR (two fewer each): none failed; the train scenario
+books the 09:00 train. Nine earlier gamma scenarios (sale, saver, combined
+return, refund, card, group, class per leg, reservation, overrule refusal):
+the same number of checks as with the collection of `main`, none failed.
+Counter-check: with the simulator answering a trip collection without an id
+and offers for another trip, both checks fail. Not yet run against a real
+provider.
+
+---
+
 ## [server-1.11.232] / [collection-OTST_V2.0.116] — 2026-10-10
 
 Issue #601, release 2026.261. Simulator 0.11.0.
