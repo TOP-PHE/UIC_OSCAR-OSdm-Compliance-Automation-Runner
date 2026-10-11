@@ -565,6 +565,9 @@ const CONFIG_SCHEMA = {
   // silently did nothing (min(max(base, scenario waits), ceiling)). Exposing
   // it makes the clamp visible and editable; the DB value overrides the env.
   RUN_HARD_MAX_TIMEOUT_MS: { description: 'Server-wide ceiling (ms) on the per-run budget, including expired-flow Max-wait extensions — the runner clamps anything above it (default 1800000 = 30 min). E.g. an expired-offer test against a provider whose offers stay bookable for 30 min needs ≥ 1920000.', type: 'number', min: 60000, max: 7200000 },
+  // #646: a run whose Bruno stays silent this long (a request the provider
+  // never answers) is stopped. 0 turns it off.
+  RUN_IDLE_TIMEOUT_MS: { description: 'Stop a run whose Bruno writes nothing for this long (ms): a request the provider never answers (default 300000 = 5 min, 0 = off). Not applied to scenarios that wait on purpose (expiry tests, refund receipts).', type: 'number', min: 0, max: 3600000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',

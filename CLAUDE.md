@@ -1022,6 +1022,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     provider may write a UIC code without its leading zeros.
   - A provider's gateway may answer HTTP 200 with an HTML "Request Rejected"
     page: that is the provider's finding, and it stays a FAIL.
+  - **A provider that stops answering must not hang a run** (#646, 1.11.240).
+    A gateway blocked the server's address after repeated rejected calls;
+    Bruno has no request timeout, so runs waited for ever. The runner stops a
+    run whose Bruno is silent for `RUN_IDLE_TIMEOUT_MS` (5 min; off when a
+    scenario arms a timer), its timeout escalates to SIGKILL through
+    `killRun()`, and `urlPolicy.js` gives the start-up DNS lookup 10 s. The
+    `[runner]` lines go to the run's log in the database, not to
+    `docker logs`: ask for the run's log in OSCAR when diagnosing a run.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

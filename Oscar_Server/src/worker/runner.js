@@ -424,6 +424,16 @@ const EXPIRED_FLOW_TIMERS = [
   // #603: the refund receipt wait has no on/off flag; the wait alone arms it.
   { flag: null,                             wait: 'refundReceiptMaxWaitMinutes',              label: 'refundReceiptMaxWaitMinutes'              },
 ];
+// How long Bruno may stay silent before the run is stopped as stalled
+// (RUN_IDLE_TIMEOUT_MS, default 5 min, 0 = off). Off when a scenario in scope
+// arms a timer: it waits on purpose, and may print nothing while it does.
+const IDLE_CHECK_EVERY_MS = 15000;
+function runIdleLimitMs(runBudget) {
+  if (runBudget && runBudget.requestedMs > 0) return 0;
+  const ms = Number.parseInt(getConfig('RUN_IDLE_TIMEOUT_MS', '300000'), 10);
+  return Number.isInteger(ms) && ms > 0 ? ms : 0;
+}
+
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const baseMs    = Number.parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
   const hardMaxMs = Number.parseInt(getConfig('RUN_HARD_MAX_TIMEOUT_MS', '1800000'), 10) || 1800000;
@@ -591,6 +601,7 @@ async function refusedApiBase(apiBase) {
   if (!apiBase) return null;
   const refusal = await usableUrlRefusal(apiBase, 'OSDM endpoint (API Config)');
   if (!refusal) return null;
+  if (refusal.includes('could not be resolved within')) return `This run was not started. ${refusal}`;
   return `This run was not started. ${refusal} Ask your Test Manager to set a public https endpoint in API Config.`;
 }
 
@@ -967,10 +978,26 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // wait when a scenario opted into a longer expired-flow per-scenario
     // max-wait (expiredBookingMaxWaitMinutes, expiredOfferMaxWaitMinutes, …).
     const runTimeoutMs = _runBudget.effectiveMs;
+    // killRun escalates to SIGKILL when SIGTERM does not end the process.
     const timeout = setTimeout(() => {
       logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);
-      proc.kill('SIGTERM');
+      killRun(runId);
     }, runTimeoutMs);
+
+    // A provider that stops answering leaves Bruno waiting on one request,
+    // silent, until the run's timeout (or for ever, if the process ignores
+    // SIGTERM). Bruno prints a line per request, so a long silence means a
+    // request got no answer: stop the run and say so. Not armed when the
+    // scenario waits on purpose (an expired-flow or receipt timer).
+    let lastOutputAt = Date.now();
+    const idleLimitMs = runIdleLimitMs(_runBudget);
+    const idleWatch = idleLimitMs > 0 ? setInterval(() => {
+      if (Date.now() - lastOutputAt < idleLimitMs) return;
+      clearInterval(idleWatch);
+      logEvent(runId, 'error', `[runner] No output from Bruno for ${Math.round(idleLimitMs / 1000)}s: a request to the provider got no answer (unreachable, or blocking this server). Run stopped.`);
+      killRun(runId);
+    }, Math.min(IDLE_CHECK_EVERY_MS, Math.max(10, Math.floor(idleLimitMs / 4)))) : null;
+    const stopIdleWatch = () => { if (idleWatch) clearInterval(idleWatch); };
 
     // #204 token-watchdog (Piece 3 / defense-in-depth): periodically refresh
     // the per-tester cached access token while the run is in flight, so the
@@ -1027,6 +1054,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     }
 
     proc.stdout.on('data', chunk => {
+      lastOutputAt = Date.now();
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
@@ -1038,6 +1066,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
       });
     });
     proc.stderr.on('data', chunk => {
+      lastOutputAt = Date.now();
       const lines = chunk.toString().split('\n');
       lines.forEach(line => {
         if (!line.trim()) return;
@@ -1051,6 +1080,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
 
     proc.on('close', code => {
       clearTimeout(timeout);
+      stopIdleWatch();
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: the child is gone; no more loopback calls
@@ -1058,6 +1088,7 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     });
     proc.on('error', err => {
       clearTimeout(timeout);
+      stopIdleWatch();
       stopTokenWatchdog();
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
@@ -1257,4 +1288,4 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
   return { exitCode };
 }
 
-module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST };
+module.exports = { executeRun, killRun, refusedRunScope, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs };
