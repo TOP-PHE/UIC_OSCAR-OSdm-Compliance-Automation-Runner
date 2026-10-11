@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (66 scenarios, SIM_…)  ──source──►  (31 reference scenarios, OTST_… / NHF_…)
+ (73 scenarios, SIM_…)  ──source──►  (35 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -123,8 +123,8 @@ WARNING.
 | 01d. POST Get Offer Individual | `POST /offers` again, as individuals | a group pays less than the same passengers alone |
 | 08 / 08b. GET place map | `GET /availabilities/place-map` | only for a scenario that chooses seats |
 | 02. POST Create Booking | `POST /bookings` | a booking with an id; `PREBOOKED` parts; a confirmation deadline in the future; `provisionalPrice` in the offer's currency and not below its `minimalPrice`; each booked part matches its offer part (paired by content, not by position): status, mode, prices, validity, refund and exchange conditions, passenger types and cards, reservations; exactly the passengers asked. For a return, both directions in one booking. With `Idempotency-Key`: the same key gives the same booking, another key a new one |
-| 03. PATCH Multi Passenger | `PATCH /bookings/{id}/passengers/{id}` | the update is accepted and the answer holds the new details; negative tests: an update without a demanded field, or with an invalid one, is refused with a 4xx Problem |
-| 04. GET Passenger | `GET /bookings/{id}/passengers/{id}` | each passenger has the details just written |
+| 03. PATCH Multi Passenger | `PATCH /bookings/{id}/passengers/{id}` | the update is accepted and the answer holds the new details (a detail the provider does not keep, such as the date of birth, is a WARNING; a different one is a FAIL). Every passenger is updated, or only the first when the scenario says `passengerUpdateScope: MAIN` (providers that let only the main passenger change); negative tests: an update without a demanded field, or with an invalid one, is refused with a 4xx Problem |
+| 04. GET Passenger | `GET /bookings/{id}/passengers/{id}` | each passenger has the details just written, or those of the booking when it was not updated |
 | 09. POST Add Reservation to Booking | `POST /bookings/{id}/booked-offers/{id}/offer-parts` | a reservation added afterwards is in the booking, on the right leg |
 | 12–14. Purchaser | `GET`, `PATCH`, `POST /bookings/{id}/purchaser` | a booking made without a purchaser has none, and gets one afterwards; a purchaser with a missing or invalid field is refused with a 4xx Problem |
 | 05. GET Booking before Fulfillments | `GET /bookings/{id}` | the same checks as 02, on the stored booking |
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (66 scenarios)
+### 4.1 The simulator's data file (73 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -177,17 +177,18 @@ In short:
 | Sale, two-offer return, full refund, partial refund by fulfillment | 5 per version | `alpha`, `beta`, `gamma` |
 | Return in one offer | 1 per version from 3.7 | `beta`, `gamma` |
 | Refund withdrawn, refund offer only, overrule codes (4 accepted, 1 refused) | 7 | `gamma` |
-| Reduction cards, named products, group tariffs (two of them negative), class per leg | 12 | `gamma` |
+| Refunds of a return in one offer (full, inbound only, overrule code, receipt) | 4 | `gamma` |
+| Reduction cards, named products, group tariffs (two of them negative), class per leg | 14 | `gamma` |
 | Seat reservations (mandatory, and the three ways of booking an optional one) | 4 | `gamma` |
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
 | Documents, refund receipt, `Idempotency-Key` | 3 | `gamma` |
 | Exchange, exchange withdrawn | 2 | `gamma` |
 | Expiry probes | 4 | `gamma` |
-| Response variants (per passenger, reordered, minimal) | 4 | `gamma` |
+| Response variants (per passenger, reordered, minimal, main passenger only) | 5 | `gamma` |
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (31)
+### 4.2 The reference scenarios of the catalogue (35)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -226,6 +227,10 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 328 | `SIM_REFUND_DELETE_1ADT_38` |
 | `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 295 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |
 | `OTST_REFUND_RECEIPT_RETURN_1ADT` | Full refund of a return, then the refund receipt waited for in the booking. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_FULL_1ADT` | Full refund of a return sold as one offer: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 592 | `SIM_REFUND_COMBINED_RETURN_1ADT_38` |
+| `OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT` | Partial refund by fulfillment of a return sold as one offer: the inbound ticket alone. | REFUND_PARTIAL, return model COMBINED, OSDM 3.7+ | 510 | `SIM_REFUND_COMBINED_INBOUND_1ADT_38` |
+| `OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT` | Technical cancellation of a return sold as one offer: overrule code, everything back and no fee. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 596 | `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` |
+| `OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT` | Full refund of a return sold as one offer, then the refund receipt waited for in the booking. | REFUND_FULL, return model COMBINED, OSDM 3.7+ | 595 | `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` |
 
 #### Exchange
 

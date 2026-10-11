@@ -88,6 +88,8 @@ defines from 3.7.
 | `SIM_RETURN_COMBINED_1ADT_38` | As `SIM_RETURN_COMBINED_1ADT_37`, in 3.8. | As on `beta`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_RETURN_1ADT_38` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.8. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_INBOUND_1ADT_38` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.8. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_COMBINED_RETURN_1ADT_38` | As `SIM_REFUND_RETURN_1ADT_38`, on a return sold as one offer (`outboundTripIds`), the only model some providers sell. | One offer covering both directions, one ticket per direction; one refund offer per ticket, each confirmed. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_COMBINED_INBOUND_1ADT_38` | As `SIM_REFUND_INBOUND_1ADT_38`, on a return sold as one offer: the inbound ticket alone. | One refund offer for the inbound ticket; the outbound one stays FULFILLED. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_DELETE_1ADT_38` | A one-way ticket: refund offer asked for (10), read (11), then withdrawn (15. DEL) instead of confirmed; the booking is read again (16). | The refund offer is `PROPOSED`; `DELETE` answers 204; the booking keeps its fulfilled ticket. (#611) | No failed check. |
 | `SIM_REFUND_ONLY_OFFER_1ADT_38` | A one-way ticket: refund offer asked for and read, then neither confirmed nor withdrawn (no `scenarioAction`); the run ends at 12. | The refund offer stays `PROPOSED` until it expires. (#611) | No failed check. |
 
@@ -104,6 +106,7 @@ without a code, it would cost a quarter of its price.
 | `SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38` | As above, with `SALES_STAFF_ERROR`. | As above. | As above. |
 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` | As above, with `TECHNICAL_FAILURE`. | As above. | As above. |
 | `SIM_REFUND_OVERRULE_REFUSED_38` | Negative test: a refund asked with `STRIKE`, a code gamma does not support, must be refused. The scenario ends at the refund offer request. | `400 OVERRULE_CODE_NOT_SUPPORTED` with a Problem. | No failed check (the refusal is graded); the same four warnings as above. On `alpha`, which accepts any code, this scenario fails, as it should. |
+| `SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38` | As `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38`, on a return sold as one offer. | As above. | As `SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38`. |
 
 ### Reduction cards (#597)
 
@@ -112,6 +115,7 @@ without a code, it would cost a quarter of its price.
 | `SIM_SALE_CARD_25_1ADT_38` | A passenger with a 25 % card: the card is sent, the chosen offer names it in `appliedPassengerTypes`, and step `01c` (the same request without cards) shows the offer costs less. | The card applied: 25 % off, named on the admission. | No failed check. |
 | `SIM_SALE_CARD_50_2ADT_38` | Two adults, one with a 50 % card: only that passenger pays less. | 50 % off that passenger's price only. | No failed check. |
 | `SIM_SALE_CARD_STUDENT_1YTH_38` | A young traveller with the student card. | 30 % off. | No failed check. |
+| `SIM_SALE_CARD_STUDENT_RETURN_1YTH_38` | The student card on a return sold as one offer, one ticket per direction: the card is applied on the outbound and on the return offer, and kept in the booking. | 30 % off, named on the admissions of both directions. | No failed check; the two merged-PDF warnings. |
 
 ### Named products (#598)
 
@@ -120,6 +124,7 @@ without a code, it would cost a quarter of its price.
 | `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38` | The offer chosen by its product code `SIM_TRAIN_BOUND`; the booking and each ticket hold that product. | One offer per named product; the train-bound saver is booked. | No failed check. |
 | `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38` | The product `SIM_ALL_DAY`, which is not the first fully flexible offer: chosen by its code, not by flexibility. | As above. | No failed check. |
 | `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38` | The product named by words of its name, "flexi saver". | As above. | No failed check. |
+| `SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38` | The all-day ticket on a return sold as one offer: the product is chosen on the outbound and on the return offer, and every ticket holds it. | The all-day product offered on both, one ticket per direction. | No failed check; the two merged-PDF warnings. |
 
 ### Group tariffs (#599)
 
@@ -166,6 +171,7 @@ optional. Each is one reservation for all the passengers, on one leg.
 |---|---|---|---|
 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` | A return whose offers ask for `PDF_A4` and `RETAILER_APP`. The booking delivers both media; each document's format fits its medium and its content is that format; there is one PNG per ticket. Step 06b reads each ticket with `GET /fulfillments/{id}`. | In the 3.8 shape: one PDF for the whole booking and one PNG per ticket, in the booking's `fulfillmentDocuments`, each ticket naming its documents in `fulfillmentDocumentRefs`. `GET /fulfillments/{id}` gives the ticket and its two documents, with a `DOCUMENT_COVERS_MORE_FULFILLMENTS` Problem for the merged PDF. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_RECEIPT_RETURN_1ADT_38` | The same booking, refunded in full. The scenario waits for the refund receipt (`refundReceiptMaxWaitMinutes` 2): step 14b reads the booking every 15 seconds until a document of type INFORMATION appears. | The receipt (`PDF_A4`, type INFORMATION) appears in the booking 30 seconds after the refund, and only in `GET /bookings/{id}`. | No failed check; the receipt found after about 30 s; the two merged-PDF warnings. If the receipt does not come within the 2 minutes, the receipt check fails. |
+| `SIM_REFUND_COMBINED_RECEIPT_1ADT_38` | As above, on a return sold as one offer. | As above. | As above. |
 
 ### Idempotency-Key (#604)
 
@@ -193,7 +199,7 @@ These four are negative probes: each waits until a deadline has passed and expec
 
 ### Response variants (#611)
 
-A variant is chosen by a passenger's last name at booking time: `Simvariant-<name>` (passenger lists 11 to 17). It holds for the life of the booking. gamma only (profile `variants`).
+A variant is chosen by a passenger's last name at booking time: `Simvariant-<name>` (passenger lists 11 to 18). It holds for the life of the booking. gamma only (profile `variants`).
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
@@ -201,6 +207,7 @@ A variant is chosen by a passenger's last name at booking time: `Simvariant-<nam
 | `SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38` | The same booking, then the last passenger refunded alone (`partialRefundByPax`, `last`). The refund must name the fulfillment that holds that passenger (#610). | With this variant, a refund scoped by `passengerIds` or `bookingPartIds` within one fulfillment is offered; it refunds those parts, and the fulfillment is `REFUNDED` once all its parts are. | No failed check; the two merged-PDF warnings. The log shows "Partial refund resolved: fulfillmentId=…" naming the second fulfillment. |
 | `SIM_VARIANT_REORDERED_2ADT_38` | Variant `reordered`: booked parts and passengers in the reverse order of the offer (#550). | The admissions of each booked offer and the booking's passengers reversed. | No failed check; three WARNINGs that the passengers were re-aligned by externalRef. |
 | `SIM_VARIANT_MINIMAL_2ADT_38` | Variant `minimal`: optional members left out. | No `bookingCode`, no `summary` on the booked offers and parts. | No failed check. |
+| `SIM_VARIANT_MAIN_PASSENGER_2ADT_38` | Variants `main-passenger-only` and `main-names-only` (passenger list 18), as with some providers: the scenario updates the main passenger only (`passengerUpdateScope` `MAIN`) and reads both back. | A PATCH of another passenger than the first is `400 BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE`; only the main passenger's names are kept, no date of birth and no contact. | No failed check; eleven warnings "… not returned by the provider": date of birth, phone and email of the main passenger (each at 03 and at 04), and first name, last name, date of birth, phone and email of the other. Without `passengerUpdateScope` `MAIN`, the PATCH of the second passenger fails, as it would on such a provider. |
 
 ### Deliberately wrong answers (#611)
 

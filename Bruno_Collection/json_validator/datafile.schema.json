@@ -254,6 +254,11 @@
             "type": ["array", "string", "null"],
             "items": { "type": "string" }
           },
+          "passengerUpdateScope": {
+            "description": "Which passengers step 03 updates after the booking (PATCH /bookings/{id}/passengers/{id}). ALL (default): every passenger. MAIN: the first passenger only, for providers that let only the main passenger be changed. Passengers not updated are read back at step 04 against the values the booking sent.",
+            "type": ["string", "null"],
+            "enum": ["ALL", "MAIN", "", null]
+          },
           "reservationBookingForm": {
             "description": "How the optional seat reservations are booked (#601). A mandatory reservation (a relation of an admission with minGroupItemsToBeBooked above 0) is always booked with the booking. RESERVATION_SELECTION: optionalReservationSelections; PLACE_SELECTION: placeSelections naming the trip and leg; ADD_LATER: added after the booking by POST /bookings/{id}/booked-offers/{id}/offer-parts. Empty or null: optional reservations are not booked.",
             "type": ["string", "null"],

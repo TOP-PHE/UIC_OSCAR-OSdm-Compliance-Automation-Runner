@@ -58,6 +58,8 @@ const ENUMS = {
   overruleCodeExpectRejection:       ['off', 'on'],
   // #601: how the optional seat reservations are booked; mandatory ones always are.
   reservationBookingForm:            [null, 'RESERVATION_SELECTION', 'PLACE_SELECTION', 'ADD_LATER'],
+  // Which passengers step 03 updates.
+  passengerUpdateScope:              [null, 'ALL', 'MAIN'],
   // #599: negative test, the expected product must not be offered.
   expectedProductAbsent:             ['off', 'on'],
   // #602: offers asked by trip id, after POST /trips-collection; and its negative test.
@@ -2299,6 +2301,8 @@ function buildSalesFlowActionsSection(idx, sc) {
         ${accommodationPickerHtml}
         ${genderPickerHtml}
         ${mandatoryReservationHtml}
+        ${buildSelect(idx, 'passengerUpdateScope', 'Passengers updated', ENUMS.passengerUpdateScope,
+          'Which passengers PATCH passengers updates after the booking. ALL (or empty): every passenger. MAIN: the first passenger only, for providers that let only the main passenger be changed. The others are read back against what the booking sent.')}
         ${buildSelect(idx, 'reservationBookingForm', 'Optional reservations', ENUMS.reservationBookingForm,
           'How the optional seat reservations are booked (#601); mandatory ones always go with the booking. RESERVATION_SELECTION: optionalReservationSelections. PLACE_SELECTION: placeSelections naming the trip and leg. ADD_LATER: added after the booking (09, /offer-parts). Empty: optional reservations are not booked.')}
         <div style="font-size:11px;color:#90a4ae;margin-top:10px;line-height:1.5">

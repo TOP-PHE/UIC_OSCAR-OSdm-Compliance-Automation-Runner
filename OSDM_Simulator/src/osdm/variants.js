@@ -19,6 +19,10 @@
  *                           scoped by passenger or booking part is offered
  *   reordered               booked parts and passengers in the reverse order
  *   minimal                 optional members left out (bookingCode, summaries)
+ *   main-passenger-only     a passenger other than the first cannot be
+ *                           changed (400 BOOKING_PASSENGER_PROPERTY_NOT_MODIFIABLE)
+ *   main-names-only         only the first passenger's names are kept: no
+ *                           date of birth, no contact, nothing for the others
  *   wrong-booking-price     provisionalPrice one cent off the sum of its parts
  *   wrong-fulfillment-status the fulfillments issued say AVAILABLE
  *   wrong-refund-amount     refundableAmount one cent off its breakdown
@@ -31,7 +35,7 @@
 
 const PREFIX = 'simvariant-';
 const NAMES = new Set([
-  'per-passenger', 'reordered', 'minimal',
+  'per-passenger', 'reordered', 'minimal', 'main-passenger-only', 'main-names-only',
   'wrong-booking-price', 'wrong-fulfillment-status', 'wrong-refund-amount', 'wrong-exchange-amount',
 ]);
 
@@ -68,7 +72,26 @@ function shapeNewBooking(booking) {
     }
   }
   if (has(booking, 'wrong-booking-price')) booking.provisionalPrice.amount += 1;
+  shapePassengers(booking);
 }
+
+/**
+ * Some providers keep only the main passenger's first name and last name, and no date of
+ * birth (main-names-only): what else a booking or an update gives is dropped.
+ */
+function shapePassengers(booking) {
+  if (!has(booking, 'main-names-only')) return;
+  booking.passengers.forEach((passenger, index) => {
+    delete passenger.dateOfBirth;
+    const { firstName, lastName } = passenger.detail || {};
+    if (index === 0 && (firstName || lastName)) passenger.detail = { firstName, lastName };
+    else delete passenger.detail;
+  });
+}
+
+/** Some providers let only the main passenger be changed (main-passenger-only). */
+const mayChangePassenger = (booking, passengerId) =>
+  !has(booking, 'main-passenger-only') || booking.passengers[0]?.id === passengerId;
 
 /** One group of parts per passenger, for the per-passenger variant. */
 function groupsByPassenger(parts) {
@@ -102,5 +125,5 @@ function scopedPartIds(booking, fulfillment, spec, parts) {
 }
 
 module.exports = {
-  variantsOf, keepVariants, has, shapeNewBooking, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds,
+  variantsOf, keepVariants, has, shapeNewBooking, shapePassengers, mayChangePassenger, groupsByPassenger, shapeIssuedFulfillments, scopedPartIds,
 };

@@ -68,6 +68,30 @@
       "checks": 525
     },
     {
+      "code": "OTST_REFUND_RETURN_COMBINED_FULL_1ADT",
+      "source": "SIM_REFUND_COMBINED_RETURN_1ADT_38",
+      "purpose": "Full refund of a return sold as one offer covering both directions: every refund offer confirmed, every fulfillment refunded.",
+      "checks": 592
+    },
+    {
+      "code": "OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT",
+      "source": "SIM_REFUND_COMBINED_INBOUND_1ADT_38",
+      "purpose": "Partial refund of a return sold as one offer, by fulfillment: the inbound ticket alone.",
+      "checks": 510
+    },
+    {
+      "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
+      "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
+      "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
+      "checks": 596
+    },
+    {
+      "code": "OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT",
+      "source": "SIM_REFUND_COMBINED_RECEIPT_1ADT_38",
+      "purpose": "Full refund of a return sold as one offer, then the refund receipt waited for in the booking.",
+      "checks": 595
+    },
+    {
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
