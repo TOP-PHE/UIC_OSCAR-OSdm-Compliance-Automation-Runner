@@ -108,6 +108,7 @@ const OPTIONAL_READ_PROBES = new Set([
   '04. GET Passenger Categories', '05. GET Promotion Codes', '06. GET Reduction Cards',
   '07. GET Zones', '08. GET Products', '09. GET Product By ProductId', '10. GET Product Tags',
   '04. GET Passenger', '11. GET Refund Offer', '12. GET Exchange Offer',
+  '06b. GET Fulfillment',
 ]);
 function isOptionalReadProbe(reqName) {
   return OPTIONAL_READ_PROBES.has(String(reqName || '').trim());

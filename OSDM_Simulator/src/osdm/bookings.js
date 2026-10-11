@@ -20,6 +20,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
 const { reservationsToBook, reservationFrom, linkReservations } = require('./reservations');
+const { issueDocuments } = require('./documents');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 19;
@@ -216,6 +217,8 @@ function confirmBooking(booking, provider, nowMs) {
     issuer: provider.carrier.ref,
     bookingParts: group.map((a) => ({ id: a.id, summary: a.summary })),
   }));
+  // #603: the documents of the media asked for, when the provider issues them.
+  if (provider.documents) issueDocuments(booking, provider);
   return booking.fulfillments;
 }
 

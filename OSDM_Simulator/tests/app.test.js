@@ -955,3 +955,92 @@ test('offers by trip ids: offers for the trip named, which can be booked; an unk
   const tooMany = await call(sim.base, token, 'POST', '/gamma/offers', { ...request, tripIds: Array(5).fill(trips[0].id) });
   assert.equal(tooMany.status, 400);
 });
+
+// ── fulfilment documents and the refund receipt (#603) ──────────────────────
+
+const bothMedia = [{ type: 'ETICKET', media: 'PDF_A4' }, { type: 'ETICKET', media: 'RETAILER_APP' }];
+
+// A confirmed return on gamma, both media asked: two fulfilments.
+async function documentedReturn() {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const outbound = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest({ requestedFulfillmentOptions: bothMedia }))).body;
+  const request = { ...inboundRequest({ outboundTripIds: [outbound.trips[0].id] }), requestedFulfillmentOptions: bothMedia };
+  const offer = (await call(sim.base, token, 'POST', '/gamma/offers', request)).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  const confirmed = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body;
+  return { token, booking, confirmed, base: `/gamma/bookings/${booking.id}` };
+}
+
+test('documents: one merged PDF for the booking, one PNG per fulfillment, in the 3.8 shape', async () => {
+  const { token, confirmed, base } = await documentedReturn();
+  const { fulfillments, fulfillmentDocuments } = confirmed;
+  assert.equal(fulfillments.length, 2);
+  const pdfs = fulfillmentDocuments.filter((d) => d.medium === 'PDF_A4');
+  const pngs = fulfillmentDocuments.filter((d) => d.medium === 'RETAILER_APP');
+  assert.equal(pdfs.length, 1);
+  assert.equal(pngs.length, 2);
+  assert.equal(pdfs[0].format, 'application/pdf');
+  assert.ok(Buffer.from(pdfs[0].content, 'base64').toString('latin1').startsWith('%PDF-'));
+  assert.ok(pngs.every((d) => d.format === 'image/png' && Buffer.from(d.content, 'base64').subarray(1, 4).toString() === 'PNG'));
+  fulfillments.forEach((f, i) => {
+    assert.deepEqual(f.fulfillmentDocumentRefs, [pdfs[0].id, pngs[i].id]);
+    assert.equal(f.fulfillmentDocuments, undefined, 'not the deprecated nested list');
+  });
+  // The booking holds the same documents.
+  const booking = (await call(sim.base, token, 'GET', base)).body.booking;
+  assert.deepEqual(booking.fulfillmentDocuments, fulfillmentDocuments);
+});
+
+test('documents: only the media asked for; a provider without documents issues none', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const offer = (await call(sim.base, token, 'POST', '/gamma/offers', offerRequest())).body.offers[0];
+  const booking = (await call(sim.base, token, 'POST', '/gamma/bookings', bookingRequest(offer))).body.booking;
+  const confirmed = (await call(sim.base, token, 'POST', `/gamma/bookings/${booking.id}/fulfillments`, {})).body;
+  assert.deepEqual(confirmed.fulfillmentDocuments.map((d) => d.medium), ['PDF_A4']);
+
+  const alpha = await tokenFor(sim.base, 'alpha', alphaOne);
+  const alphaOffer = (await call(sim.base, alpha, 'POST', '/alpha/offers', offerRequest({ requestedFulfillmentOptions: bothMedia }))).body.offers[0];
+  const alphaBooking = (await call(sim.base, alpha, 'POST', '/alpha/bookings', bookingRequest(alphaOffer))).body.booking;
+  const alphaConfirmed = (await call(sim.base, alpha, 'POST', `/alpha/bookings/${alphaBooking.id}/fulfillments`, {})).body;
+  assert.equal(alphaConfirmed.fulfillmentDocuments, undefined);
+  assert.equal(alphaConfirmed.fulfillments[0].fulfillmentDocumentRefs, undefined);
+  assert.equal((await call(sim.base, alpha, 'GET', `/alpha/fulfillments/${alphaConfirmed.fulfillments[0].id}`)).status, 501);
+});
+
+test('GET /fulfillments/{id}: the fulfillment and its documents; the merged PDF comes with a Problem', async () => {
+  const { token, confirmed } = await documentedReturn();
+  const [first, second] = confirmed.fulfillments;
+  const res = await call(sim.base, token, 'GET', `/gamma/fulfillments/${second.id}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.fulfillment, second);
+  assert.deepEqual(res.body.fulfillmentDocuments.map((d) => d.id), second.fulfillmentDocumentRefs);
+  assert.equal(res.body.problems[0].code, 'DOCUMENT_COVERS_MORE_FULFILLMENTS');
+  assert.match(res.body.problems[0].detail, new RegExp(second.id));
+  assert.ok(!res.body.fulfillmentDocuments.some((d) => d.id === first.fulfillmentDocumentRefs[1]), 'not the other fulfillment\'s PNG');
+
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/fulfillments/GAMMA-FUL-unknown')).status, 404);
+  assert.equal((await call(sim.base, token, 'DELETE', `/gamma/fulfillments/${first.id}`)).status, 405);
+  // Another client does not see it.
+  const other = await call(sim.base, await tokenFor(sim.base, 'alpha', alphaOne), 'GET', `/gamma/fulfillments/${first.id}`);
+  assert.equal(other.status, 401);
+});
+
+test('refund receipt: in the booking 30 seconds after the refund, not before, and once', async (t) => {
+  const { token, confirmed, base } = await documentedReturn();
+  const started = sim.clock.ms;
+  t.after(() => { sim.clock.ms = started; });
+  const offers = (await call(sim.base, token, 'POST', `${base}/refund-offers`, { fulfillmentIds: confirmed.fulfillments.map((f) => f.id) })).body.refundOffers;
+  const receipts = async () => (await call(sim.base, token, 'GET', base)).body.booking.fulfillmentDocuments.filter((d) => d.type === 'INFORMATION');
+  assert.deepEqual(await receipts(), [], 'none before the refund');
+  await call(sim.base, token, 'PATCH', `${base}/refund-offers/${offers[0].id}`, { status: 'CONFIRMED' });
+  sim.clock.ms += 29000;
+  assert.deepEqual(await receipts(), [], 'not yet');
+  await call(sim.base, token, 'PATCH', `${base}/refund-offers/${offers[1].id}`, { status: 'CONFIRMED' });
+  sim.clock.ms += 1000;
+  const [receipt, ...more] = await receipts();
+  assert.deepEqual(more, []);
+  assert.equal(receipt.medium, 'PDF_A4');
+  assert.equal(receipt.format, 'application/pdf');
+  sim.clock.ms += 60000;
+  assert.equal((await receipts()).length, 1, 'still one');
+});

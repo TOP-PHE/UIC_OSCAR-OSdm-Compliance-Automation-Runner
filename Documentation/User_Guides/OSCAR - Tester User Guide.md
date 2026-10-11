@@ -502,8 +502,32 @@ allocates the seats.
   the chosen offer names the card on the passenger (`appliedPassengerTypes`),
   and asks the same offers again without cards (`01c. POST Get Offer without
   Cards`): the card holder must pay less, the others the same (a warning).
-- **Fulfillment** — media (`PDF_A4`, `UIC_PDF`, …) and type (`ETICKET`, …),
-  constrained to the framework's `fulfillment`.
+- **Fulfillment** — media (`PDF_A4`, `UIC_PDF`, `RETAILER_APP`, …) and type
+  (`ETICKET`, …), constrained to the framework's `fulfillment`.
+- **Fulfilment documents** (#603) — after the booking is confirmed:
+  - OSCAR reads each ticket with `GET /fulfillments/{id}` (step `06b. GET
+    Fulfillment`). A provider that does not implement it (`501`, `404`, …)
+    gets a passing "not implemented" row, as for the other optional reads.
+  - Step 07 checks the booking's documents. They are read where the version
+    puts them: in each fulfillment up to 3.7; in 3.8, in the booking's
+    `fulfillmentDocuments`, each fulfillment naming its own in
+    `fulfillmentDocumentRefs`.
+  - What is checked: every medium asked for is delivered; each document's
+    format fits its medium (`PDF_A4` is `application/pdf`, `RETAILER_APP` a
+    PNG or JPEG image); its content is that format; for `RETAILER_APP`, one
+    document per fulfillment.
+  - A PDF that covers more than the fulfillment read (one PDF merged for the
+    whole booking, as ČD delivers it) is reported at 06b.
+  - **Every one of these is a warning, never a failure.**
+- **Refund receipt wait (min)** (#603, refund scenarios) — some providers add
+  a receipt (a document of type `INFORMATION`) to the booking some minutes
+  after a refund.
+  - Set 1 to 60 minutes. After the refund, step `14b. GET Booking Refund
+    Receipt` reads the booking every 15 seconds until the receipt appears, in
+    `documents` or in `fulfillmentDocuments`.
+  - No receipt within the wait fails the scenario. Leave the field empty not
+    to wait.
+  - The run's time limit grows by the wait, as for the expiry tests.
 
 > **Passenger reference format (since server‑v1.11.98).** The wizard generates
 > passenger references as 5‑digit zero‑padded strings (`"00001"`, `"00002"`,
@@ -978,6 +1002,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Flexibility | `FULL_FLEXIBLE` `SEMI_FLEXIBLE` `NON_FLEXIBLE` | `offerSearchCriteria` |
 | Expected product | a product code, or words of its name | which offer is chosen; checked on the booking |
 | Expected product absent | `off` / `on` | negative test: no offer may hold the product |
+| Refund receipt wait (min) | `1`–`60` (optional) | after the refund, reads `GET /bookings/{id}` until a receipt (type `INFORMATION`) appears; none within the wait fails |
 | Offers by trip id | `off` / `on` | `POST /trips-collection` first, then `POST /offers` with `tripIds` (one-way SEARCH trips) |
 | Unknown trip id refused | `off` / `on` | negative test: `POST /offers` with a trip id never given must be refused |
 | Offer mode | `INDIVIDUAL` `COLLECTIVE` | `offerSearchCriteria` |
@@ -1015,6 +1040,8 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | `08 GET Place Maps` | `GET /availabilities/place-map?contextType=OFFER` |
 | `08b GET Place Map Post-Booking` | `GET /availabilities/place-map?contextType=BOOKING` |
 | `02 POST Create Booking` | `POST /bookings` |
+| `06b GET Fulfillment` | `GET /fulfillments/{id}`, once per fulfillment |
+| `14b GET Booking Refund Receipt` | `GET /bookings/{id}`, every 15 s until the refund receipt appears |
 | `09 POST Add Reservation` | `POST /bookings/{id}/booked-offers/{id}/{offer-parts\|reservations}` |
 | `03 PATCH Multi Passenger` | `PATCH …/passengers` |
 | `06 POST Fulfillments` | `POST /fulfillments` |

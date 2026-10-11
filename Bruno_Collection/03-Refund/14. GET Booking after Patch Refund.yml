@@ -89,6 +89,12 @@ runtime:
           return;
         }
         checkFullRefundDone(jsonData.booking);
+        // #603: the refund receipt, when the scenario waits for it: 14b reads
+        // the booking again until it is there or the wait is over.
+        if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").armRefundReceiptWait(jsonData.booking)) {
+          bru.runner.setNextRequest("14b. GET Booking Refund Receipt");
+          return;
+        }
         // ── Multi-scenario: loop to next scenario or truly stop ────────────────
         // #385: a skipped expired-flow sub-run must not behead the queue —
         // hand the remaining timers their pass before the next scenario.

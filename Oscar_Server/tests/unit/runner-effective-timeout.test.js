@@ -271,6 +271,18 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.source).toMatch(srcRe);
   });
 
+  // #603: the refund receipt wait has no on/off flag; the wait alone arms it.
+  test('extends the run budget for refundReceiptMaxWaitMinutes alone, and not for a wait out of range', async () => {
+    const p = await writeEncryptedDatafile({
+      scenariosToRun: ['SC_R', 'SC_BAD'],
+      scenarios: [makeScenario('SC_R', { refundReceiptMaxWaitMinutes: 3 }), makeScenario('SC_BAD', { refundReceiptMaxWaitMinutes: 61 })],
+    });
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_R');
+    expect(r.requestedMs).toBe(3 * 60 * 1000 + 60000);
+    expect(r.source).toMatch(/refundReceiptMaxWaitMinutes/);
+    expect((await computeEffectiveRunTimeoutMs(p, 'SC_BAD')).requestedMs).toBe(0);
+  });
+
   // ── PR B: auto-expansion budget = SUM within scenario, MAX across ──────
   // The per-scenario budget is the sum of armed-timer max-waits because the
   // scenario runs N sub-runs sequentially. Across scenarios the max wins

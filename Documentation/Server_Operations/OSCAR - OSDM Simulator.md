@@ -171,38 +171,18 @@ rebuilds its Test Framework from the file.
      one somebody else already uses. Scope is left empty.
 3. **Test data** (Test Manager, Test Config → *Upload datafile*): upload
    [`Bruno_Collection/data_base/simulator_datafile.json`](../../Bruno_Collection/data_base/simulator_datafile.json).
-   It holds two sale scenarios, shared with the company's testers, once per
-   OSDM version: `SIM_SALE_SEARCH_1ADT_36` and `SIM_SALE_SEARCH_2ADT_SAVER_36`
-   for `alpha`, `…_37` for `beta`, `…_38` for `gamma`, and return journeys
-   (#594): `SIM_RETURN_SEPARATE_1ADT_…` on each version and
-   `SIM_RETURN_COMBINED_1ADT_…` (one offer for both directions) on 3.7 and 3.8,
-   and refunds of a return (#595): `SIM_REFUND_RETURN_1ADT_…` (full: each
-   refund offer, one per ticket, is confirmed) and `SIM_REFUND_INBOUND_1ADT_…`
-   (the inbound ticket only) on each version, and technical cancellations
-   (#596) on 3.8 only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
-   `gamma` accepts and `SIM_REFUND_OVERRULE_REFUSED_38`, which expects the
-   refusal of a code it does not accept, and sales with a reduction card
-   (#597) on 3.8 only: `SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38`
-   and `SIM_SALE_CARD_STUDENT_1YTH_38`, and sales of a named product (#598)
-   on 3.8 only: `SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38`,
-   `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38` and `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38`,
-   and group tariffs (#599) on 3.8 only: `SIM_GROUP_WEEKEND_2ADT_2CHD_38`,
-   `SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38`, `SIM_GROUP_6ADT_38`, and the
-   negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
-   `SIM_GROUP_WEEKEND_3ADT_ABSENT_38`, and a travel class per leg (#600) on
-   3.8 only: `SIM_SALE_CLASS_PER_LEG_1ADT_38`, and seat reservations (#601)
-   on 3.8 only: `SIM_SALE_RESERVATION_MANDATORY_2ADT_38`,
-   `SIM_SALE_RESERVATION_SELECTION_2ADT_38`,
-   `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` and
-   `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38`, and offers by trip id (#602) on
-   3.8 only: `SIM_SALE_BY_TRIP_ID_1ADT_38`, `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38`
-   and the negative test `SIM_SALE_BY_TRIP_ID_UNKNOWN_38`.
+   Its scenarios are shared with the company's testers. Each ends in the
+   OSDM version of its provider (`_36` `alpha`, `_37` `beta`, `_38` `gamma`);
+   the new functions are on `gamma` only. What each one tests, what the
+   simulator answers and what a run must show: the
+   [scenario catalogue](OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
    The file's run list is the `gamma` scenarios; for `alpha` or `beta`, tick
    that provider's in Test Config.
 4. **Run** the scenarios of the provider's version. Expected: the version check and the sale steps answer
    200, the nine optional information requests answer 501 and are reported as
    "not implemented by this provider" (on `gamma`, `GET /reduction-cards` and
-   `GET /products` answer 200), and no check fails.
+   `GET /products` answer 200), and no check fails. The warnings each
+   scenario shows are listed in the catalogue.
 
 The same data file runs without OSCAR too, with Bruno on a PC: see
 [Run standalone](../../Bruno_Collection/README.md#run-standalone) in the

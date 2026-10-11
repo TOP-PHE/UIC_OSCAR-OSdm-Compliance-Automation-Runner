@@ -107,51 +107,15 @@ secret variables nor the token). Do not commit that; put the file back with
 
 ### 5. What to expect
 
-The scenarios exist once per OSDM version: `_36` for `alpha`, `_37` for
-`beta`, `_38` for `gamma`, the file's run list. On another provider, set
-`api_base` to it and name its scenario with `scenario_override`. Besides the two
-sales there are return journeys (#594): `SIM_RETURN_SEPARATE_1ADT` on every
-version, and `SIM_RETURN_COMBINED_1ADT` (one offer for both directions) from
-3.7, so not on `alpha`. Refunds of a return (#595), on every version:
-`SIM_REFUND_RETURN_1ADT` (full refund, every refund offer confirmed) and
-`SIM_REFUND_INBOUND_1ADT` (the inbound ticket only). Technical cancellations
-(#596), on `gamma` only: `SIM_REFUND_OVERRULE_<code>_38` for each overrule code
-it accepts (`CONNECTION_BROKEN`, `PAYMENT_FAILURE`, `SALES_STAFF_ERROR`,
-`TECHNICAL_FAILURE`), and `SIM_REFUND_OVERRULE_REFUSED_38`, which sends
-`STRIKE` and expects the refusal. Reduction cards (#597), on `gamma` only:
-`SIM_SALE_CARD_25_1ADT_38`, `SIM_SALE_CARD_50_2ADT_38` (one of two adults holds
-the card) and `SIM_SALE_CARD_STUDENT_1YTH_38`; each also runs `01c. POST Get
-Offer without Cards` to compare the prices. Products (#598), on `gamma` only:
-`SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38` and `SIM_SALE_PRODUCT_ALL_DAY_1ADT_38`
-name the product by its code, `SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38` by its
-name. Group tariffs (#599), on `gamma` only, in the `COLLECTIVE` offer mode:
-`SIM_GROUP_WEEKEND_2ADT_2CHD_38` (on a Saturday),
-`SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38` (Saturday out, Sunday back, one ticket
-for both) and `SIM_GROUP_6ADT_38`; each also runs `01d. POST Get Offer
-Individual` to compare the group price with the same passengers alone. The
-negative tests `SIM_GROUP_WEEKEND_6PAX_ABSENT_38` and
-`SIM_GROUP_WEEKEND_3ADT_ABSENT_38` expect no weekend group offer and end after
-the offer. Travel class per leg (#600), on `gamma` only:
-`SIM_SALE_CLASS_PER_LEG_1ADT_38`, a trip in two legs (an InterCity, then a
-regional train with no first class), first class on the first leg through a
-supplement and second class on the second. Seat reservations (#601), on
-`gamma` only, on a SuperCity (reservation mandatory) then a EuroCity
-(optional): `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` (the mandatory one only),
-`SIM_SALE_RESERVATION_SELECTION_2ADT_38`, `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38`
-and `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` (the optional one too, in each
-form). Offers by trip id (#602), on `gamma` only, after `POST
-/trips-collection`: `SIM_SALE_BY_TRIP_ID_1ADT_38` (the first departure at the
-time asked), `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38` (the train the trip names,
-a later departure) and the negative test `SIM_SALE_BY_TRIP_ID_UNKNOWN_38`.
+The scenarios end in the OSDM version of the provider they are for: `_36`
+for `alpha`, `_37` for `beta`, `_38` for `gamma` (the file's run list). On
+another provider, set `api_base` to it and name its scenario with
+`scenario_override`. A scenario run on a provider of another version gets a
+warning from the version check.
 
-`SIM_SALE_SEARCH_1ADT_38` and `SIM_SALE_SEARCH_2ADT_SAVER_38` pass with no failed
-check: the version check and the sale steps answer 200, and the nine optional
-information requests answer 501, reported as "not implemented by this
-provider", except `GET /reduction-cards` and `GET /products`, which `gamma`
-answers with its three cards (#597) and its six products (#598, #599). The same holds for the `_36` pair on `alpha` and the `_37` pair on
-`beta`, and for the return scenarios, which also check the inbound answer and
-expect one ticket per direction. A scenario run on a provider of another
-version gets a warning from the version check.
+Every scenario, what it tests, what the simulator answers and what a run must
+show (no failed check, and the warnings listed) is in the
+[scenario catalogue](../Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator%20scenarios.md).
 
 Through OSCAR, the same data file gives the same checks: OSCAR obtains the
 token itself, so its run has two checks fewer, those of the token request.

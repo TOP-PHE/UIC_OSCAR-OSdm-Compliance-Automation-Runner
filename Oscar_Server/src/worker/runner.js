@@ -421,6 +421,8 @@ const EXPIRED_FLOW_TIMERS = [
   { flag: 'expiredAddAncillaryOfferTest',   wait: 'expiredAddAncillaryOfferMaxWaitMinutes',   label: 'expiredAddAncillaryOfferMaxWaitMinutes'   },
   { flag: 'expiredRefundOfferTest',         wait: 'expiredRefundOfferMaxWaitMinutes',         label: 'expiredRefundOfferMaxWaitMinutes'         },
   { flag: 'expiredExchangeOfferTest',       wait: 'expiredExchangeOfferMaxWaitMinutes',       label: 'expiredExchangeOfferMaxWaitMinutes'       },
+  // #603: the refund receipt wait has no on/off flag; the wait alone arms it.
+  { flag: null,                             wait: 'refundReceiptMaxWaitMinutes',              label: 'refundReceiptMaxWaitMinutes'              },
 ];
 async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   const baseMs    = Number.parseInt(getConfig('RUN_TIMEOUT_MS',          '600000'),  10) || 600000;
@@ -467,7 +469,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
       let scenarioBudgetMs = 0;
       const armedInScenario = [];
       for (const timer of EXPIRED_FLOW_TIMERS) {
-        const flagVal = s[timer.flag];
+        const flagVal = timer.flag ? s[timer.flag] : true;
         const isOn = flagVal === true || (typeof flagVal === 'string' && ['true', 'on', 'yes'].includes(flagVal.toLowerCase()));
         if (!isOn) continue;
         const m = Number(s[timer.wait]);

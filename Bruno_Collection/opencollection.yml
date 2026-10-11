@@ -150,6 +150,12 @@ request:
           var _isPurchaserPost  = _rn.includes('post booking purchaser');
           var _isPurchaserStep  = _isPurchaserGet || _isPurchaserPatch || _isPurchaserPost;
           var _isReturnOffer    = _rn.includes('return offer');
+          // #603: 06b reads the fulfillments 06 listed, 14b waits for a refund
+          // receipt: both only when a script sent there.
+          var _isFulfillmentRead = _rn.includes('get fulfillment');
+          var _isRefundReceipt   = _rn.includes('refund receipt');
+          var _toReadRaw = bru.getEnvVar('__fulfillmentsToRead');
+          var _hasFulfillmentsToRead = Array.isArray(_toReadRaw) ? _toReadRaw.length > 0 : String(_toReadRaw || '[]') !== '[]';
           var _isRefund   = _ru.includes('refund')   && !_isToken;
           var _isExchange = _ru.includes('exchange') && !_isToken;
           var _st         = (bru.getEnvVar('scenarioType') || '').toUpperCase().trim();
@@ -227,6 +233,8 @@ request:
             else if (_isPurchaserStep && bru.getEnvVar('__purchaserStepDone') === 'true') { _skipReason = 'purchaser step already done this scenario'; }
             else if (_isPurchaserPatch && _purWriteMethod !== 'PATCH')    { _skipReason = 'purchaser exists-check selected POST (or has not run yet)'; }
             else if (_isPurchaserPost && _purWriteMethod !== 'POST')      { _skipReason = 'purchaser exists-check selected PATCH (or has not run yet)'; }
+            else if (_isFulfillmentRead && !_hasFulfillmentsToRead)      { _skipReason = 'no fulfillment to read (06 lists them)'; }
+            else if (_isRefundReceipt && !bru.getEnvVar('__refundReceiptDeadline')) { _skipReason = 'no refund receipt awaited (refundReceiptMaxWaitMinutes)'; }
             else if (_isReturnOffer && !_isReturnScenario)                { _skipReason = 'not a return-trip scenario'; }
             else if (_isReturnOffer && bru.getEnvVar('__returnInboundDone') === 'true') { _skipReason = 'inward (return) offer already fetched this scenario'; }
             else if (_st === 'SALE'         && (_isRefund || _isExchange)) { _skipReason = 'not in SALE scope'; }
@@ -295,7 +303,7 @@ request:
                 "loggingType", "scenarioType", "scenarioAction", "osdmVersion", "stepFailurePolicy",
                 "selectedAccommodation",
                 "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__tripIdsOutcome",
+                "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline",
                 "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
                 "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
                 "tripProductCategoryName", "tripProductCategoryShortName",

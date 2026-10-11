@@ -71,7 +71,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -83,8 +83,10 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
-  // The weekend group return (#599) is the group test below.
-  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE' && !s.code.startsWith('SIM_GROUP_'));
+  // The weekend group return (#599) is the group test below; the documents
+  // return (#603), the documents test.
+  const returns = datafile.scenarios.filter((s) => s.offerSearchCriteria.returnOffsetDays != null && s.scenarioType === 'SALE'
+    && !s.code.startsWith('SIM_GROUP_') && !s.code.startsWith('SIM_SALE_DOCUMENTS_'));
   assert.equal(returns.length, 5);
   for (const scenario of returns) {
     const model = scenario.offerSearchCriteria.returnModel;
@@ -98,7 +100,7 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND');
-  assert.equal(refunds.length, 11);
+  assert.equal(refunds.length, 12);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
     const partial = scenario.partialRefundByFulfillment === 'on';
@@ -283,4 +285,27 @@ test('the trip id scenarios: the train named is a later departure of POST /trips
   for (const scenario of byId) {
     assert.equal(datafile.tripRequirements.find((t) => t.id === scenario.tripRequirementId).tripType, 'SEARCH', scenario.code);
   }
+});
+
+test('the scenario catalogue names every scenario of the data file, and no other', () => {
+  const fs = require('node:fs');
+  const catalogue = fs.readFileSync(path.join(__dirname, '..', '..', 'Documentation', 'Server_Operations', 'OSCAR - OSDM Simulator scenarios.md'), 'utf8');
+  // A row of the catalogue starts with the scenario's code.
+  const rows = [...catalogue.matchAll(/^\| `(SIM_[A-Z0-9_]+)` \|/gm)].map((m) => m[1]);
+  const codes = datafile.scenarios.map((s) => s.code);
+  assert.deepEqual([...rows].sort(), [...codes].sort());
+  assert.equal(new Set(rows).size, rows.length, 'a scenario has two rows');
+});
+
+test('the document scenarios: a return asking both media, and its refund awaiting the receipt (#603)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const documented = datafile.scenarios.filter((s) => s.requestedFulfillmentOptionsListId === 2);
+  assert.deepEqual(documented.map((s) => s.code), ['SIM_SALE_DOCUMENTS_RETURN_1ADT_38', 'SIM_REFUND_RECEIPT_RETURN_1ADT_38']);
+  const media = datafile.requestedFulfillmentOptionsList.find((l) => l.id === 2).requestedFulfillmentOptions.map((o) => o.fulfillmentMedia);
+  assert.deepEqual(media, gamma.documents);
+  for (const scenario of documented) assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code}: two tickets, so a merged PDF`);
+  const awaiting = datafile.scenarios.filter((s) => s.refundReceiptMaxWaitMinutes != null);
+  assert.deepEqual(awaiting.map((s) => s.code), ['SIM_REFUND_RECEIPT_RETURN_1ADT_38']);
+  // The receipt comes well within the wait.
+  assert.ok(gamma.refundReceiptDelaySeconds < awaiting[0].refundReceiptMaxWaitMinutes * 60);
 });

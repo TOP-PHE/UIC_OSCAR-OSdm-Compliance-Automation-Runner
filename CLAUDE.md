@@ -953,6 +953,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `__tripIdsOutcome` and recorded by 01's after-response, ahead of the status
   check, because the negative test (`tripIdsExpectRejection`) expects a 4xx
   there. One-way SEARCH trips only.
+- **Fulfilment documents are warnings; the refund receipt is awaited, and
+  every simulator scenario is catalogued** (#603, 1.11.234 / OTST_V2.0.118).
+  `library-bruno/fulfillmentDocuments.js` (pure) reads documents where the
+  version puts them (nested up to 3.7; the booking's `fulfillmentDocuments` +
+  `fulfillmentDocumentRefs` in 3.8). `fulfillmentSteps.js` is the glue: 06
+  arms `06b. GET Fulfillment` (one read per fulfillment, an optional read under
+  #488), 07 checks the documents and keeps the INFORMATION documents already
+  there, 14 arms `14b. GET Booking Refund Receipt` when
+  `refundReceiptMaxWaitMinutes` is set. 06b and 14b are only ever reached by a
+  script, and the run filter skips them otherwise. The wait has no on/off flag:
+  its `EXPIRED_FLOW_TIMERS` entry has `flag: null`. The scripts decode base64 by
+  hand, because Bruno's sandbox need not give them a `Buffer`.
+  `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md` lists
+  every scenario of the simulator's data file with its expected warnings.
+  `datafile.test.js` fails when the two disagree, so a new scenario needs its
+  row in the same change.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
@@ -1196,6 +1212,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Bruno_Collection/data_base/simulator_datafile.json` | the simulator's data file, two sale scenarios per OSDM version (#614), the one copy for OSCAR and for a standalone run (#593); `OSDM_Simulator/tests/datafile.test.js` keeps it valid and answerable |
 | `Bruno_Collection/README.md` | running the collection standalone (Bruno desktop and `bru run`), against the simulator's `gamma` (#593) |
 | `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` | installing the simulator on its own host and pointing a company at it |
+| `Documentation/Server_Operations/OSCAR - OSDM Simulator scenarios.md` | every scenario of the simulator's data file: what it tests, what the simulator answers, the expected result and warnings (#603); pinned to the data file by `OSDM_Simulator/tests/datafile.test.js` |
 
 ## 6. Next steps
 

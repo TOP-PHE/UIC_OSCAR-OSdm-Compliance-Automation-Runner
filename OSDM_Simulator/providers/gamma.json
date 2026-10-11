@@ -11,6 +11,11 @@
   "utcOffset": "+02:00",
   "tokenLifetimeSeconds": 900,
   "tripsCollection": true,
+  "documents": [
+    "PDF_A4",
+    "RETAILER_APP"
+  ],
+  "refundReceiptDelaySeconds": 30,
   "reservations": {
     "SC": "MANDATORY",
     "EC": "OPTIONAL"
