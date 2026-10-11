@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.270",
+  "current_release": "2026.271",
   "releases": [
+    {
+      "release": "2026.271",
+      "date": "2026-10-11",
+      "server": "1.11.237",
+      "collection": "OTST_V2.0.126",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#612): Test Config's Copy scenarios from… offers a Scenario catalogue: 31 reference scenarios (sale, return, refund, exchange, reservations, trip ids, documents, idempotency, expiry, requested information, purchaser), each made from a scenario of the simulator's data file and proven there by the replay. GET /v1/company/scenario-catalogue lists them with what the Test Framework must declare and what the company's framework lacks; the copy is the ordinary scenario copy (source_id catalogue), which re-maps trips onto the company's Test Data. Entries needing an undeclared capability are greyed out and refused (400). Collection OTST_V2.0.126: data_base/scenario_catalogue.json and the README.",
+        "Simulator 0.20.0 (not part of a release): replay.js catalogue checks the catalogue against a recording."
+      ]
+    },
     {
       "release": "2026.270",
       "date": "2026-10-11",

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-scenario-catalogue",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Scenario catalogue in Test Config",
+    "summary": "Test Config can copy ready-made reference scenarios from a catalogue, limited to what your Test Framework declares.",
+    "content": "In Test Config, 📋 Copy scenarios from… now offers a Scenario catalogue: 31 reference scenarios covering sales, returns, refunds, exchanges, seat reservations, offers by trip id, documents, idempotency, expiry probes, requested information and the purchaser. Each one says what it tests and how many checks it gave on the OSDM simulator.\n\nCopied scenarios use your own Test Data: their trips are re-mapped as in any scenario copy. A scenario that needs something your Test Framework does not declare (a sales flow, a return model, an OSDM version or a passenger type) is greyed out, with what is missing. Testers can copy too; their copies are their own scenarios."
+  },
+  {
     "id": "2026-10-11-simulator-exchange",
     "date": "October 11, 2026",
     "tag": "New",

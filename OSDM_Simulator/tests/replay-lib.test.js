@@ -11,7 +11,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { providerOf, normalize, recordOf, compareRecordings, lineCoverage } = require('../scripts/replay-lib');
+const { providerOf, normalize, recordOf, compareRecordings, lineCoverage, catalogueDrift } = require('../scripts/replay-lib');
 
 test('the provider of a scenario is the one of its version', () => {
   assert.equal(providerOf('SIM_SALE_SEARCH_1ADT_36'), 'alpha');
@@ -72,4 +72,18 @@ test('line coverage: the innermost range decides; blank and comment lines are no
   const { files, total } = lineCoverage(v8, '/library-bruno/', () => text);
   assert.deepEqual(files, { '/x/library-bruno/m.js': { lines: 6, covered: 3 } });
   assert.deepEqual(total, { lines: 6, covered: 3 });
+});
+
+test('the catalogue agrees with a recording only when every entry ran clean with its number of checks', () => {
+  const catalogue = { entries: [{ code: 'OTST_A', source: 'SIM_A_38', checks: 10 }, { code: 'OTST_B', source: 'SIM_B_38', checks: 5 }] };
+  const clean = { SIM_A_38: { checks: 10, failed: 0 }, SIM_B_38: { checks: 5, failed: 0 } };
+  assert.deepEqual(catalogueDrift(catalogue, clean), []);
+  assert.deepEqual(catalogueDrift(catalogue, { ...clean, SIM_B_38: { checks: 6, failed: 1 } }), [
+    'OTST_B: SIM_B_38 failed 1 check(s)',
+    'OTST_B: the catalogue says 5 checks, SIM_B_38 gave 6',
+  ]);
+  assert.deepEqual(catalogueDrift(catalogue, { SIM_A_38: { error: 'no report' } }), [
+    'OTST_A: SIM_A_38 did not run: no report',
+    'OTST_B: SIM_B_38 is not in the recording',
+  ]);
 });
