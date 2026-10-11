@@ -191,3 +191,26 @@ These four are negative probes: each waits until a deadline has passed and expec
 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` | `expiredRefundOfferTest`: a one-way ticket, refund offer asked for; step 13 waits until past its `validUntil`, then confirms it. | `409`, "the refund offer has expired". | No failed check. |
 | `SIM_NHF_EXPIRED_EXCHANGE_OFFER_38` | `expiredExchangeOfferTest`: a one-way ticket, exchange offers asked for; step 11 waits until past the first one's `preBookableUntil`, then takes it. | `409 OFFER_EXPIRED`. | No failed check. |
 
+### Response variants (#611)
+
+A variant is chosen by a passenger's last name at booking time: `Simvariant-<name>` (passenger lists 11 to 17). It holds for the life of the booking. gamma only (profile `variants`).
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_VARIANT_PER_PASSENGER_2ADT_38` | A sale for two passengers with variant `per-passenger`. | One fulfillment per passenger, and one PDF for the booking. | No failed check; the two merged-PDF warnings. |
+| `SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38` | The same booking, then the last passenger refunded alone (`partialRefundByPax`, `last`). The refund must name the fulfillment that holds that passenger (#610). | With this variant, a refund scoped by `passengerIds` or `bookingPartIds` within one fulfillment is offered; it refunds those parts, and the fulfillment is `REFUNDED` once all its parts are. | No failed check; the two merged-PDF warnings. The log shows "Partial refund resolved: fulfillmentId=…" naming the second fulfillment. |
+| `SIM_VARIANT_REORDERED_2ADT_38` | Variant `reordered`: booked parts and passengers in the reverse order of the offer (#550). | The admissions of each booked offer and the booking's passengers reversed. | No failed check; three WARNINGs that the passengers were re-aligned by externalRef. |
+| `SIM_VARIANT_MINIMAL_2ADT_38` | Variant `minimal`: optional members left out. | No `bookingCode`, no `summary` on the booked offers and parts. | No failed check. |
+
+### Deliberately wrong answers (#611)
+
+Each of these makes one validator family fail on purpose, so that its FAIL path runs. They are not in the data file's run list. The offer one uses the trip from station `0000098` (`variants.wrongOffersFrom`); the others a passenger list naming the variant.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_WRONG_OFFER_PRICE_38` | Offers. | `offerSummary.minimalPrice` one cent above the sum of the parts. | Fails: "provisionalPrice is not below the offer's minimalPrice" (4 failed checks). |
+| `SIM_WRONG_BOOKING_PRICE_38` | Booking. | `provisionalPrice` one cent above the sum of the parts. | **No check fails: known gap.** The collection does not compare `provisionalPrice` with the parts. When such a check is added, this scenario must start failing. |
+| `SIM_WRONG_FULFILLMENT_STATUS_38` | Fulfillments. | The fulfillments issued say `AVAILABLE`. | Fails: "Fulfillment[0] status comparison" (4 failed checks). |
+| `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds" (4 failed checks). |
+| `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice" (7 failed checks). |
+

@@ -27,6 +27,7 @@ const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
 const { lifetimeOf } = require('./bookings');
+const variants = require('./variants');
 
 const REFUND_OFFER_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_FULFILLMENT_IDS = 20;
@@ -69,10 +70,12 @@ function requestedFulfillments(booking, body) {
 
 // A refund by booking part or passenger is not offered: one refund offer
 // always holds every part and passenger of its fulfillment.
-function refuseScopedRefund(body) {
+function refuseScopedRefund(body, booking) {
   const specs = body.refundSpecifications;
   if (specs == null) return;
   if (!Array.isArray(specs)) throw bad('refundSpecifications is not a list');
+  // #611: the per-passenger variant offers a refund scoped within a fulfillment.
+  if (variants.has(booking, 'per-passenger')) return;
   const scoped = specs.some((s) => (Array.isArray(s?.bookingPartIds) && s.bookingPartIds.length > 0)
     || (Array.isArray(s?.passengerIds) && s.passengerIds.length > 0));
   if (scoped) {
@@ -81,8 +84,8 @@ function refuseScopedRefund(body) {
   }
 }
 
-function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs) {
-  const partIds = new Set(fulfillment.bookingParts.map((p) => p.id));
+function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs, scoped = null) {
+  const partIds = new Set(scoped || fulfillment.bookingParts.map((p) => p.id));
   const parts = admissionsOf(booking).filter((a) => partIds.has(a.id));
   const items = parts.map((part) => ({ part, ...refundOfPart(part, !!overruleCode) }));
   const sum = (key) => items.reduce((total, item) => total + item[key], 0);
@@ -95,7 +98,8 @@ function buildRefundOffer(booking, fulfillment, overruleCode, provider, nowMs) {
     status: 'PROPOSED',
     fulfillments: [{ id: fulfillment.id, status: fulfillment.status, bookingRef: booking.id, bookingParts: fulfillment.bookingParts }],
     refundFee: price(sum('fee'), provider.currency),
-    refundableAmount: price(sum('refundable'), provider.currency),
+    // #611: one cent off its breakdown in the wrong-refund-amount variant.
+    refundableAmount: price(sum('refundable') + (variants.has(booking, 'wrong-refund-amount') ? 1 : 0), provider.currency),
     refundOfferBreakdown: items.map((item) => ({
       refundFee: price(item.fee, provider.currency),
       refundableAmount: price(item.refundable, provider.currency),
@@ -123,9 +127,15 @@ function overruleCodeOf(body, provider) {
  */
 function createRefundOffers(booking, body, provider, nowMs) {
   if (booking.fulfillments.length === 0) throw conflict('the booking is not confirmed: it has no fulfillment to refund');
-  refuseScopedRefund(body);
+  refuseScopedRefund(body, booking);
   const overruleCode = overruleCodeOf(body, provider);
-  const offers = requestedFulfillments(booking, body).map((f) => buildRefundOffer(booking, f, overruleCode, provider, nowMs));
+  const specs = Array.isArray(body.refundSpecifications) ? body.refundSpecifications : [];
+  const offers = requestedFulfillments(booking, body).map((f) => {
+    const spec = specs.find((s) => s?.fulfillmentId === f.id) || (specs.length === 1 && !specs[0]?.fulfillmentId ? specs[0] : null);
+    const scoped = spec ? variants.scopedPartIds(booking, f, spec, admissionsOf(booking)) : null;
+    if (scoped && scoped.length === 0) throw bad(`the refund specification names no part of fulfillment ${f.id}`);
+    return buildRefundOffer(booking, f, overruleCode, provider, nowMs, scoped);
+  });
   booking.refundOffers = [...(booking.refundOffers || []), ...offers];
   return offers;
 }
@@ -155,14 +165,17 @@ function confirmRefundOffer(booking, refundOfferId, body, provider, nowMs) {
     const fulfillment = booking.fulfillments.find((f) => f.id === held.id);
     if (fulfillment.status === 'REFUNDED') throw conflict(`fulfillment ${fulfillment.id} is already refunded`);
   }
+  // The parts the offer refunds: all of its fulfillment, or those a scoped
+  // refund named (#611); the fulfillment is refunded once all its parts are.
+  const refunded = new Set(offer.refundOfferBreakdown.flatMap((b) => b.bookingParts.map((p) => p.id)));
+  for (const part of admissionsOf(booking)) {
+    if (refunded.has(part.id)) part.status = 'REFUNDED';
+  }
   for (const held of offer.fulfillments) {
     const fulfillment = booking.fulfillments.find((f) => f.id === held.id);
-    fulfillment.status = 'REFUNDED';
-    held.status = 'REFUNDED';
-    const partIds = new Set(fulfillment.bookingParts.map((p) => p.id));
-    for (const part of admissionsOf(booking)) {
-      if (partIds.has(part.id)) part.status = 'REFUNDED';
-    }
+    const statusOf = new Map(admissionsOf(booking).map((p) => [p.id, p.status]));
+    if (fulfillment.bookingParts.every((p) => statusOf.get(p.id) === 'REFUNDED')) fulfillment.status = 'REFUNDED';
+    held.status = fulfillment.status;
   }
   offer.status = 'CONFIRMED';
   offer.confirmedOn = confirmedOn;
