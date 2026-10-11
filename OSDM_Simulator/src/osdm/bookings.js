@@ -21,6 +21,7 @@ const { HttpError } = require('../http');
 const { cardsOf } = require('./reductionCards');
 const { reservationsToBook, reservationFrom, linkReservations } = require('./reservations');
 const { issueDocuments } = require('./documents');
+const variants = require('./variants');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 19;
@@ -179,6 +180,9 @@ function createBooking(body, findOffer, provider, nowMs) {
   booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), provider.currency);
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
   Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
+  // #611: the variants its passengers' last names name.
+  variants.keepVariants(booking, variants.variantsOf(specs, provider));
+  variants.shapeNewBooking(booking);
   return booking;
 }
 
@@ -228,7 +232,8 @@ function confirmBooking(booking, provider, nowMs) {
   booking.confirmedPrice = sumOf(admissions.map((a) => a.price), provider.currency);
   booking.provisionalPrice = { amount: 0, currency: provider.currency, scale: 2 };
   delete booking.confirmationTimeLimit;
-  const groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
+  let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
+  if (variants.has(booking, 'per-passenger')) groups = variants.groupsByPassenger(admissions);
   booking.fulfillments = groups.map((group) => ({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',
@@ -241,6 +246,7 @@ function confirmBooking(booking, provider, nowMs) {
   }));
   // #603: the documents of the media asked for, when the provider issues them.
   if (provider.documents) issueDocuments(booking, provider);
+  variants.shapeIssuedFulfillments(booking);
   return booking.fulfillments;
 }
 

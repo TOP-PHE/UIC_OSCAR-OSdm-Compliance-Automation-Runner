@@ -30,6 +30,7 @@
 const crypto = require('node:crypto');
 const { HttpError } = require('../http');
 const { buildOfferCollection } = require('./offers');
+const variants = require('./variants');
 
 const MAX_FULFILLMENT_IDS = 20;
 const SEMI_FLEXIBLE_FEE_SHARE = 0.25;
@@ -100,7 +101,8 @@ function exchangeOfferFrom(booking, entry, given, overruleCode, provider) {
   const { offer } = entry;
   const exchangePrice = offer.offerSummary.minimalPrice.amount;
   const exchangeFee = feeOf(given.parts, !!overruleCode);
-  const balance = exchangePrice + exchangeFee - given.parts.reduce((total, p) => total + p.price.amount, 0);
+  const balance = exchangePrice + exchangeFee - given.parts.reduce((total, p) => total + p.price.amount, 0)
+    + (variants.has(booking, 'wrong-exchange-amount') ? 1 : 0);
   return {
     offerId: offer.offerId,
     summary: `Exchange: ${offer.summary}`,

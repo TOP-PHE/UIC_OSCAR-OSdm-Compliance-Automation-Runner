@@ -13,6 +13,9 @@
   "tripsCollection": true,
   "idempotency": true,
   "exchange": true,
+  "variants": {
+    "wrongOffersFrom": "urn:uic:stn:0000098"
+  },
   "shortDeadlines": {
     "stopPlaceRef": "urn:uic:stn:0000099",
     "seconds": 60

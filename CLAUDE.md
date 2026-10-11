@@ -1109,6 +1109,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     limit is read with its parts `RELEASED` (the collection checks that).
     Scenario data is appended to `simulator_datafile.json` as text, never by
     re-dumping the file (its formatting is hand-kept).
+  - **Variants are chosen by a passenger's last name at booking**
+    (`Simvariant-<name>`, #611, 0.17.0), because offers are anonymous; a
+    variant holds for the booking's life (hidden `Symbol`). The
+    `SIM_WRONG_*` scenarios fail on purpose and stay out of the run list;
+    `SIM_WRONG_BOOKING_PRICE_38` fails nothing today (the collection does not
+    compare `provisionalPrice` with the parts) — when such a check lands, it
+    must start failing.
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes

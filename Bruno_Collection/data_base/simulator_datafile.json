@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -1855,6 +1855,308 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_VARIANT_PER_PASSENGER_2ADT_38",
+      "description": "Simulated provider, variant: one fulfillment per passenger (last name Simvariant-Per-Passenger). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 11,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38",
+      "description": "Simulated provider, variant: one fulfillment per passenger; the last passenger refunded alone (partialRefundByPax), the refund naming the fulfillment that holds that passenger (#610). OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 11,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByPax": "on",
+      "partialRefundPaxSelection": "last",
+      "partialRefundByFulfillment": "off"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_VARIANT_REORDERED_2ADT_38",
+      "description": "Simulated provider, variant: booked parts and passengers in the reverse order of the offer (#550). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 12,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_VARIANT_MINIMAL_2ADT_38",
+      "description": "Simulated provider, variant: optional members left out (bookingCode, summaries). OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 13,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_OFFER_PRICE_38",
+      "description": "Simulated provider, deliberately wrong: offerSummary.minimalPrice one cent off (trip from station 0000098). EXPECTED TO FAIL. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 8,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_BOOKING_PRICE_38",
+      "description": "Simulated provider, deliberately wrong: provisionalPrice one cent off the sum of its parts. Known gap: the collection does not compare them yet, so no check fails. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 14,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_FULFILLMENT_STATUS_38",
+      "description": "Simulated provider, deliberately wrong: the fulfillments issued say AVAILABLE. EXPECTED TO FAIL. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 15,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_REFUND_AMOUNT_38",
+      "description": "Simulated provider, deliberately wrong: refundableAmount one cent off its breakdown. EXPECTED TO FAIL. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 16,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_WRONG_EXCHANGE_AMOUNT_38",
+      "description": "Simulated provider, deliberately wrong: amountToBePaid one cent off exchangePrice + exchangeFee - price given up. EXPECTED TO FAIL. OSDM 3.8.0, for gamma.",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 17,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -2026,6 +2328,22 @@
         "productCategoryName": "",
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000099 (short deadlines on gamma: everything made from it expires after 60 s) to station 0000002"
+      }
+    },
+    {
+      "id": 8,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000098",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000098 (on gamma, its offers are deliberately one cent off) to station 0000002"
       }
     }
   ],
@@ -2527,6 +2845,251 @@
           "updateDateOfBirth": "2016-08-15",
           "updatePhoneNumber": "+33199000062",
           "updateEmail": "cyrus.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Per-Passenger",
+          "phoneNumber": "+33199000003",
+          "email": "variant.per-passenger@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Reordered",
+          "phoneNumber": "+33199000003",
+          "email": "variant.reordered@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Minimal",
+          "phoneNumber": "+33199000003",
+          "email": "variant.minimal@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Wrong-Booking-Price",
+          "phoneNumber": "+33199000003",
+          "email": "variant.wrong-booking-price@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Wrong-Fulfillment-Status",
+          "phoneNumber": "+33199000003",
+          "email": "variant.wrong-fulfillment-status@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Wrong-Refund-Amount",
+          "phoneNumber": "+33199000003",
+          "email": "variant.wrong-refund-amount@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "1985-06-01",
+          "firstName": "Sam",
+          "lastName": "Simvariant-Wrong-Exchange-Amount",
+          "phoneNumber": "+33199000003",
+          "email": "variant.wrong-exchange-amount@example.org",
+          "gender": "X",
+          "updateFirstName": "Samuel",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1985-06-02",
+          "updatePhoneNumber": "+33199000004",
+          "updateEmail": "samuel.sample@example.org",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "1987-03-20",
+          "firstName": "Robin",
+          "lastName": "Example",
+          "phoneNumber": "+33199000005",
+          "email": "robin.example@example.org",
+          "gender": "X",
+          "updateFirstName": "Robyn",
+          "updateLastName": "Sample",
+          "updateDateOfBirth": "1987-03-21",
+          "updatePhoneNumber": "+33199000006",
+          "updateEmail": "robyn.sample@example.org",
           "type": "PERSON"
         }
       ]

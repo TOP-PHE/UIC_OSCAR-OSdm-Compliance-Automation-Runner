@@ -661,6 +661,11 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
       }
     }
   }
+  // #611: the offers of a trip from the wrong-offers stop place are one cent off.
+  const wrongFrom = provider.variants?.wrongOffersFrom;
+  if (wrongFrom && trips.some((t) => t.origin?.stopPlaceRef === wrongFrom)) {
+    for (const offer of offers) offer.offerSummary.minimalPrice.amount += 1;
+  }
   const allTrips = [...outboundTrips, ...trips];
   const problems = problemsOf(passengers, offers, collective, refusals);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };

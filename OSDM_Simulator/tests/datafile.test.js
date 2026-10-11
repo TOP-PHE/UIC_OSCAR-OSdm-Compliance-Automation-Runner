@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -83,7 +83,9 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
     assert.deepEqual(sales, expected, version);
   }
   const gamma = providers.find((p) => p.key === 'gamma');
-  assert.deepEqual(datafile.scenariosToRun, datafile.scenarios.filter((s) => s.osdmVersion === gamma.osdmVersion).map((s) => s.code));
+  // The deliberately wrong scenarios (#611) fail on purpose: not in the run list.
+  assert.deepEqual(datafile.scenariosToRun, datafile.scenarios
+    .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_')).map((s) => s.code));
 });
 
 test('the return scenarios name a model their version defines, and expect a ticket per direction', () => {
@@ -104,7 +106,8 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
-  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH' && !s.code.startsWith('SIM_NHF_'));
+  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
+    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.code.startsWith(prefix)));
   assert.equal(refunds.length, 12);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
@@ -160,6 +163,37 @@ test('the expiry probes: one per deadline, on the short-deadline trip, with a wa
   for (const scenario of datafile.scenarios) {
     if (!scenario.code.startsWith('SIM_NHF_EXPIRED_')) assert.notEqual(scenario.tripRequirementId, shortTrips[0], scenario.code);
   }
+});
+
+test('the variants and the deliberately wrong answers: each named by a passenger of its own list (#611)', () => {
+  const variantOf = (scenario) => {
+    const list = datafile.passengersList.find((l) => l.id === scenario.passengersListId);
+    const named = list.passengers.map((p) => p.lastName).filter((n) => n.startsWith('Simvariant-'));
+    return named.map((n) => n.slice('Simvariant-'.length).toLowerCase());
+  };
+  const expected = {
+    SIM_VARIANT_PER_PASSENGER_2ADT_38: ['per-passenger'],
+    SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38: ['per-passenger'],
+    SIM_VARIANT_REORDERED_2ADT_38: ['reordered'],
+    SIM_VARIANT_MINIMAL_2ADT_38: ['minimal'],
+    SIM_WRONG_OFFER_PRICE_38: [],
+    SIM_WRONG_BOOKING_PRICE_38: ['wrong-booking-price'],
+    SIM_WRONG_FULFILLMENT_STATUS_38: ['wrong-fulfillment-status'],
+    SIM_WRONG_REFUND_AMOUNT_38: ['wrong-refund-amount'],
+    SIM_WRONG_EXCHANGE_AMOUNT_38: ['wrong-exchange-amount'],
+  };
+  const found = Object.fromEntries(datafile.scenarios
+    .filter((s) => s.code.startsWith('SIM_VARIANT_') || s.code.startsWith('SIM_WRONG_')).map((s) => [s.code, variantOf(s)]));
+  assert.deepEqual(found, expected);
+  // No other scenario carries a variant by accident.
+  for (const scenario of datafile.scenarios) {
+    if (!(scenario.code in expected)) assert.deepEqual(variantOf(scenario), [], scenario.code);
+  }
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  const wrongTrip = datafile.tripRequirements.find((t) => t.trip?.origin === gamma.variants.wrongOffersFrom);
+  assert.deepEqual(datafile.scenarios.filter((s) => s.tripRequirementId === wrongTrip.id).map((s) => s.code), ['SIM_WRONG_OFFER_PRICE_38']);
+  const byPax = datafile.scenarios.find((s) => s.code === 'SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38');
+  assert.equal(byPax.partialRefundByPax, 'on');
 });
 
 test('the overrule scenarios: each code gamma accepts, and one it refuses (#596)', () => {

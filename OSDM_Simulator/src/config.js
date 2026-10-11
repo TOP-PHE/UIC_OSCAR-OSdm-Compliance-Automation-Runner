@@ -89,6 +89,7 @@ function checkProvider(key, raw) {
     ...checkIdempotency(raw.idempotency, bad),
     ...checkExchange(raw.exchange, bad),
     ...checkShortDeadlines(raw.shortDeadlines, bad),
+    ...checkVariants(raw.variants, bad),
   };
 }
 
@@ -180,6 +181,15 @@ function checkShortDeadlines(value, bad) {
     && Number.isInteger(value.seconds) && value.seconds >= 10 && value.seconds <= 600;
   if (!ok) throw bad('shortDeadlines');
   return { shortDeadlines: { stopPlaceRef: value.stopPlaceRef, seconds: value.seconds } };
+}
+
+// #611: answers that differ from the happy path, chosen per booking by the
+// passengers' last names; `wrongOffersFrom` is a stop place whose offers are
+// deliberately wrong. Absent: no variant.
+function checkVariants(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || !isText(value.wrongOffersFrom, 1, 120)) throw bad('variants');
+  return { variants: { wrongOffersFrom: value.wrongOffersFrom } };
 }
 
 // #603: the media of the documents issued on confirmation (PDF_A4 merged for
