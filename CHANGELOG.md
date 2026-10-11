@@ -115,7 +115,8 @@ Issue #642, release 2026.272. Simulator 0.22.0.
 Checked: every new scenario on `gamma` standalone with no failed check, and
 the main-passenger scenario failing without `MAIN` (the second PATCH is
 refused); a full recording of the 73 scenarios (`replay.js catalogue`:
-agrees); new unit tests mutation-checked (scope, the booked-details
+agrees; `compare` with the 0.21.0 recording: the 66 earlier scenarios make
+the same checks), from which `OSCAR - Checks by scenario.md` is regenerated; new unit tests mutation-checked (scope, the booked-details
 expectation, the WARNING rule); simulator tests 193 → 195. Not checked: a
 run against a real provider that keeps only the main passenger.
 
