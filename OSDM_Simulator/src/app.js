@@ -29,6 +29,7 @@ const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOff
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
+const { version: VERSION } = require('../package.json');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -342,7 +343,8 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     }
     if (segments.length === 1 && segments[0] === 'healthz') {
       requireMethod(req, 'GET');
-      sendJson(res, 200, { status: 'ok' });
+      // #617: the version, so that an installed simulator can be told apart.
+      sendJson(res, 200, { status: 'ok', version: VERSION });
       return 200;
     }
     if (!allow(callerAddress(req))) {

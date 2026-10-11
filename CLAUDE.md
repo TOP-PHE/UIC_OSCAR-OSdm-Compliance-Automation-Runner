@@ -1085,6 +1085,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A body over the limit is read to its end before the 413**, without being
     kept, up to a second limit. Answering while the caller is still sending
     closes the connection under its feet and it never sees the status.
+  - **Its version is visible and released on its own** (#617, 0.15.0):
+    `/healthz` returns `{status, version}`; a version change on `main` tags
+    `simulator-<version>` with a GitHub release whose notes
+    `scripts/release-notes.js` reads from the CHANGELOG (the section whose
+    first line says `Simulator <version>.`; a version it does not find stops
+    the workflow, and `tests/release-notes.test.js` fails first). The same
+    change updates the installed simulator (`simulator-deploy.yml`, forced SSH
+    command = a copy of `deploy/update.sh` outside the checkout). Only on a
+    version change: a restart clears every booking and token.
   - It is linted and tested in the required `Lint, audit, test` job (a new
     workflow would not be a required check), with the ESLint that
     `Oscar_Server` installs.

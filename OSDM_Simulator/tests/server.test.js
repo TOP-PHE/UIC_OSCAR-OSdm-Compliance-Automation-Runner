@@ -54,6 +54,7 @@ test('started with a clients file, it listens where told and serves a token', as
   });
   assert.equal(res.status, 200);
   assert.match(lines[0], /listening on 127\.0\.0\.1:\d+, providers: alpha, beta, gamma$/);
+  assert.ok(lines[0].startsWith(`OSDM simulator ${require('../package.json').version} listening`), lines[0]);
   const tokenLine = lines.find((line) => line.includes('/alpha/oauth/token'));
   assert.match(tokenLine, /POST \/alpha\/oauth\/token 200 \d+ms provider=alpha client=alpha-one$/);
 });
