@@ -138,7 +138,7 @@ function scenarioWarnings(scenario, framework, rules) {
   // no returnModels at all has not been asked yet (before 1.11.236): no
   // warning until the lazy migration below has filled it in.
   const model = scenarioReturnModel(scenario);
-  const declared = framework && Array.isArray(framework.returnModels) ? framework.returnModels : null;
+  const declared = Array.isArray(framework?.returnModels) ? framework.returnModels : null;
   if (model && declared && !declared.includes(model)) out.push('returnModel');
   return out;
 }
