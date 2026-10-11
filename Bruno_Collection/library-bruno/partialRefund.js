@@ -33,10 +33,11 @@
  *
  * The original resolver picked `booking.fulfillments[0].id` unconditionally —
  * fine for Bileto / Sqills, wrong for Paxone when the chosen passenger isn't
- * the one bound to fulfillments[0]. This rewrite picks the fulfillment by
- * matching `fulfillment.fulfillmentParts[].passengerRef` against the chosen
- * passenger's `externalRef`, with a fallback to fulfillments[0] for single-
- * fulfillment bookings (or when the matching info isn't present).
+ * the one bound to fulfillments[0]. Since #610 the fulfillment is the one
+ * whose `bookingParts` hold the parts refunded (else the chosen passenger's,
+ * by `fulfillmentParts[].passengerRef`); fulfillments[0] only when the
+ * booking has one. Parts spread over several fulfillments, or no way to tell,
+ * degrade to a full refund with the reason, never a guess.
  *
  * Leg ordering
  * ────────────
@@ -221,19 +222,56 @@ function collectPassengers(booking) {
 }
 
 // Find the fulfillment whose fulfillmentParts[].passengerRef matches the
-// chosen passenger's externalRef. Falls back to fulfillments[0] when no
-// match (single-fulfillment-per-booking providers — Bileto, Sqills — and
-// fixtures with no externalRef on passengers).
+// chosen passenger's externalRef, or null.
 function findFulfillmentForPassenger(fulfillments, externalRef) {
-  if (!Array.isArray(fulfillments) || fulfillments.length === 0) return null;
-  if (externalRef) {
-    const match = fulfillments.find(f => {
-      const parts = Array.isArray(f && f.fulfillmentParts) ? f.fulfillmentParts : [];
-      return parts.some(fp => fp && String(fp.passengerRef) === String(externalRef));
-    });
-    if (match) return match;
+  if (!Array.isArray(fulfillments) || fulfillments.length === 0 || !externalRef) return null;
+  return fulfillments.find(f => {
+    const parts = Array.isArray(f && f.fulfillmentParts) ? f.fulfillmentParts : [];
+    return parts.some(fp => fp && String(fp.passengerRef) === String(externalRef));
+  }) || null;
+}
+
+// The fulfillments listing any of these booking parts in their bookingParts.
+function fulfillmentsHoldingParts(fulfillments, partIds) {
+  const wanted = new Set(partIds.map(String));
+  return fulfillments.filter(f => (Array.isArray(f && f.bookingParts) ? f.bookingParts : [])
+    .some(p => p && wanted.has(String(p.id))));
+}
+
+/**
+ * #610: the fulfillment a RefundSpecification names. It must hold the parts
+ * the refund lists: a provider that issues one fulfillment per passenger
+ * holds each passenger's parts in their own. Never a guess:
+ *   - one fulfillment in the booking: that one, as before;
+ *   - the fulfillments listing the parts (bookingParts): exactly one → it;
+ *     several → none (one specification names one fulfillment);
+ *   - none listing them: the chosen passenger's (fulfillmentParts), else none.
+ * Returns { fulfillment } or { reason }.
+ */
+function fulfillmentForScope(fulfillments, partIds, passenger) {
+  if (fulfillments.length === 1) return { fulfillment: fulfillments[0] };
+  const holders = partIds.length > 0 ? fulfillmentsHoldingParts(fulfillments, partIds) : [];
+  if (holders.length === 1) return { fulfillment: holders[0] };
+  if (holders.length > 1) {
+    return { reason: `the parts to refund are in ${holders.length} fulfillments (${holders.map(f => f.id).join(', ')}); one RefundSpecification names one fulfillment` };
   }
-  return fulfillments[0] || null;
+  const own = passenger ? findFulfillmentForPassenger(fulfillments, passenger.externalRef) : null;
+  if (own) return { fulfillment: own };
+  return { reason: `the booking has ${fulfillments.length} fulfillments and none of them is shown to hold the parts to refund${passenger ? ' or the chosen passenger' : ''} — refusing to name one blindly` };
+}
+
+// The chosen passenger's parts: admissions naming the passenger, and their
+// reservations and ancillaries. Empty when admissions do not name passengers.
+function passengerPartIds(allAdms, passenger) {
+  const out = [];
+  if (!passenger) return out;
+  for (const a of allAdms) {
+    const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : [];
+    if (!owners.includes(String(passenger.id))) continue;
+    const refs = expandAdmissionRefs(a);
+    out.push(String(a.id), ...refs.reservationIds, ...refs.ancillaryIds);
+  }
+  return out;
 }
 
 // Flatten admissions across all bookedOffers, preserving offer order. Each
@@ -352,14 +390,6 @@ function resolvePartialRefundScope(booking, opts) {
     }
   }
 
-  // ── Resolve fulfillment by passenger externalRef (else fallback to [0]) ──
-  const chosenFulfillment = chosenPassenger
-    ? findFulfillmentForPassenger(fulfillments, chosenPassenger.externalRef)
-    : fulfillments[0];
-  if (!chosenFulfillment || !chosenFulfillment.id) {
-    return { armed: true, degraded: true, reason: 'could not resolve a fulfillment.id for the chosen passenger — refusing to scope blindly' };
-  }
-
   // ── Compute bookingPartIds ───────────────────────────────────────────────
   // OSDM v3.8 semantics: `bookingPartIds` is the per-leg axis. We populate it
   // ONLY when the wizard armed the leg axis. Per-pax-only requests leave the
@@ -413,6 +443,13 @@ function resolvePartialRefundScope(booking, opts) {
   }
 
   const passengerIds = chosenPassenger ? [chosenPassenger.id] : [];
+
+  // ── The fulfillment holding what is refunded (#610) ──────────────────────
+  const scopeParts = byLeg ? bookingPartIds : passengerPartIds(allAdms, chosenPassenger);
+  const { fulfillment: chosenFulfillment, reason: noFulfillment } = fulfillmentForScope(fulfillments, scopeParts, chosenPassenger);
+  if (!chosenFulfillment || !chosenFulfillment.id) {
+    return { armed: true, degraded: true, reason: noFulfillment || 'could not resolve a fulfillment.id for the scope — refusing to scope blindly' };
+  }
 
   return {
     armed: true,
