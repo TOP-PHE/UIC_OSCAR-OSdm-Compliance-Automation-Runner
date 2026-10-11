@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -1577,6 +1577,284 @@
         "offerMode": null,
         "requestedOfferParts": []
       }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_1ADT_38",
+      "description": "Simulated provider: exchange of a one-way ticket. Exchange offers for the same journey, one taken (pre-booked), read again, confirmed: the old part and fulfillment EXCHANGED, a new booked offer and fulfillment. OSDM 3.8.0, for gamma.",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_EXCHANGE_DELETE_1ADT_38",
+      "description": "Simulated provider: exchange of a one-way ticket withdrawn before its confirmation (DELETE of the exchange operation): the booking keeps its ticket. OSDM 3.8.0, for gamma.",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": "DELETE",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_REFUND_DELETE_1ADT_38",
+      "description": "Simulated provider: a refund offer of a one-way ticket withdrawn (DELETE) instead of confirmed: the booking keeps its ticket. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "DELETE",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_REFUND_ONLY_OFFER_1ADT_38",
+      "description": "Simulated provider: refund offer of a one-way ticket asked for and read, neither confirmed nor withdrawn (it expires on its own). OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 1,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_EXPIRED_OFFER_38",
+      "description": "Simulated provider, negative probe: booking an offer after its preBookableUntil must be refused (409 OFFER_EXPIRED). A trip from station 0000099, where gamma lets everything expire after 60 s. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "expiredOfferTest": "on",
+      "expiredOfferMaxWaitMinutes": 3,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 7,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_EXPIRED_BOOKING_38",
+      "description": "Simulated provider, negative probe: confirming a booking after its confirmation time limit must be refused (409 BOOKING_EXPIRED). Station 0000099: 60 s. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "expiredBookingTest": "on",
+      "expiredBookingMaxWaitMinutes": 3,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 7,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
+      "description": "Simulated provider, negative probe: confirming a refund offer after its validUntil must be refused (409). Station 0000099: 60 s. OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "expiredRefundOfferTest": "on",
+      "expiredRefundOfferMaxWaitMinutes": 3,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 7,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByFulfillment": "off",
+      "partialRefundFulfillmentSelection": "first"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
+      "description": "Simulated provider, negative probe: taking an exchange offer after its preBookableUntil must be refused (409 OFFER_EXPIRED). Station 0000099: 60 s. OSDM 3.8.0, for gamma.",
+      "scenarioType": "EXCHANGE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "expiredExchangeOfferTest": "on",
+      "expiredExchangeOfferMaxWaitMinutes": 3,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 7,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -1732,6 +2010,22 @@
         "productCategoryName": "",
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000001 to station 0000002, train 1854: on gamma, the 09:00 departure of POST /trips-collection"
+      }
+    },
+    {
+      "id": 7,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000099",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000099 (short deadlines on gamma: everything made from it expires after 60 s) to station 0000002"
       }
     }
   ],

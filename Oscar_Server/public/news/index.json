@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-simulator-exchange",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Simulator: exchanges and expiry probes",
+    "summary": "The OSDM simulator now exchanges tickets, and its data file has expiry probes that run in about a minute.",
+    "content": "The simulator's gamma provider exchanges a confirmed booking: exchange offers priced against the ticket given up, an exchange pre-booked, confirmed or withdrawn. The simulator data file has new scenarios for it, and for a refund offer withdrawn instead of confirmed.\n\nFour negative probes check that an expired offer, booking, refund offer or exchange offer is refused. They use a trip on which everything expires after 60 seconds, so each one runs in about a minute. The scenario catalogue describes each scenario and what a run must show."
+  },
+  {
     "id": "2026-10-11-return-models-framework",
     "date": "October 11, 2026",
     "tag": "New",

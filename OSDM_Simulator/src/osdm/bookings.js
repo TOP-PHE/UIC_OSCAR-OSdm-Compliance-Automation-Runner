@@ -69,6 +69,11 @@ function passengerFrom(spec, externalRef, provider) {
 // A booking whose tickets are one for every direction (#599, a weekend group):
 // a hidden property, never sent back with the booking.
 const ONE_FULFILLMENT = Symbol('one fulfillment');
+// #611: how long what is made from a short-deadline booking lasts, or null.
+const SHORT_LIVED = Symbol('short lived');
+
+/** The lifetime of an offer made from this booking (refund): short or the default. */
+const lifetimeOf = (booking, defaultMs) => booking[SHORT_LIVED] || defaultMs;
 
 const sumOf = (prices, currency) => ({ amount: prices.reduce((total, p) => total + p.amount, 0), currency, scale: 2 });
 // Every part of a booking: its admissions and, since #601, its reservations.
@@ -127,7 +132,10 @@ function createBooking(body, findOffer, provider, nowMs) {
   const specByRef = new Map(specs.filter((s) => typeof s?.externalRef === 'string').map((s) => [s.externalRef, s]));
 
   const createdOn = new Date(nowMs).toISOString();
-  const confirmableUntil = new Date(nowMs + CONFIRMATION_DELAY_MS).toISOString();
+  // #611: a booking of short-lived offers is short-lived too.
+  const shortLivedMs = selections.map((s) => (typeof s?.offerId === 'string' ? findOffer(s.offerId)?.shortLivedMs : null))
+    .find((ms) => typeof ms === 'number') || null;
+  const confirmableUntil = new Date(nowMs + (shortLivedMs || CONFIRMATION_DELAY_MS)).toISOString();
   const passengers = new Map();
   const trips = new Map();
   const bookedOffers = [];
@@ -170,6 +178,7 @@ function createBooking(body, findOffer, provider, nowMs) {
   if (externalRef) booking.externalRef = externalRef;
   booking.provisionalPrice = sumOf(partsOf(booking).map((a) => a.price), provider.currency);
   Object.defineProperty(booking, ONE_FULFILLMENT, { value: oneFulfillment });
+  Object.defineProperty(booking, SHORT_LIVED, { value: shortLivedMs });
   return booking;
 }
 
@@ -191,9 +200,22 @@ function admissionsByTrip(booking) {
  * Asked again on a booking that is already confirmed, it gives the fulfilments
  * it issued the first time.
  */
+/**
+ * #611: a pre-booked booking whose time limit has passed has its parts
+ * RELEASED, as a read of it shows. True when it is (now) expired.
+ */
+function releaseIfExpired(booking, nowMs) {
+  if (booking.fulfillments.length > 0 || !booking.confirmationTimeLimit) return false;
+  if (Date.parse(booking.confirmationTimeLimit) > nowMs) return false;
+  for (const part of partsOf(booking)) {
+    if (part.status === 'PREBOOKED') part.status = 'RELEASED';
+  }
+  return true;
+}
+
 function confirmBooking(booking, provider, nowMs) {
   if (booking.fulfillments.length > 0) return booking.fulfillments;
-  if (Date.parse(booking.confirmationTimeLimit) <= nowMs) {
+  if (releaseIfExpired(booking, nowMs)) {
     throw new HttpError(409, 'BOOKING_EXPIRED', 'Booking expired', 'The time limit to confirm this booking has passed.');
   }
   const confirmedOn = new Date(nowMs).toISOString();
@@ -275,4 +297,29 @@ function setPurchaser(booking, body) {
   return booking.purchaser;
 }
 
-module.exports = { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser };
+/**
+ * #611: the booked offer an exchange adds, made from a remembered offer for
+ * the passengers the booking already has. Its mandatory reservations come
+ * with it, as in a booking.
+ */
+function exchangedBookedOffer(booking, entry, nowMs) {
+  const { offer, trips } = entry;
+  const passengers = new Map(booking.passengers.map((p) => [p.externalRef, p]));
+  const createdOn = new Date(nowMs).toISOString();
+  for (const trip of trips) {
+    if (!booking.trips.some((t) => t.id === trip.id)) booking.trips.push(trip);
+  }
+  const bookedOffer = {
+    offerId: offer.offerId,
+    summary: offer.summary,
+    tripCoverage: offer.tripCoverage,
+    products: offer.products,
+    admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, undefined)),
+    reservations: reservationsToBook(offer, {}).map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, trips, createdOn, undefined)),
+    ancillaries: [],
+  };
+  linkReservations(bookedOffer);
+  return bookedOffer;
+}
+
+module.exports = { createBooking, confirmBooking, releaseIfExpired, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer, lifetimeOf };

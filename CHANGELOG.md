@@ -91,6 +91,50 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.236] / [collection-OTST_V2.0.122] — 2026-10-11
+
+Issue #611, release 2026.267. Simulator 0.16.0.
+
+### Added
+
+- **Simulator data file**: the `03-Refund` and `04-Exchange` folders run end
+  to end on `gamma`. No request or validator of the collection changed.
+  - `SIM_EXCHANGE_1ADT_38` (exchange confirmed: steps 10 to 15) and
+    `SIM_EXCHANGE_DELETE_1ADT_38` (withdrawn: 16, 17).
+  - `SIM_REFUND_DELETE_1ADT_38` (refund offer withdrawn: 15, 16) and
+    `SIM_REFUND_ONLY_OFFER_1ADT_38` (asked for and read only).
+  - Four expiry probes, `SIM_NHF_EXPIRED_{OFFER,BOOKING,REFUND_OFFER,EXCHANGE_OFFER}_38`,
+    on a new trip from station `0000099` (trip requirement 7), each waiting
+    at most 3 minutes.
+  - The scenario catalogue has a row for each, with what a run must show.
+
+### Simulator 0.16.0
+
+- **Exchange** (profile `exchange`, `gamma`): `POST /bookings/{id}/exchange-offers`
+  gives one exchange offer per offer of the request, priced against the
+  fulfillments given up (`exchangeFee` by their exchangeability: none, a
+  quarter, the whole price; an accepted overrule code waives it;
+  `amountToBePaid` = new price + fee − price given up, else
+  `refundableAmount`). `POST …/exchange-operations` pre-books one (the parts
+  `EXCHANGE_ONGOING`); `POST …/fulfillments` confirms it (old parts and
+  fulfillments `EXCHANGED`, a new booked offer and fulfillment `FULFILLED`,
+  the confirmed price updated); `GET` reads it; `DELETE` withdraws it while
+  pre-booked (204), not after (409).
+- **Short deadlines** (profile `shortDeadlines`, `gamma`: station
+  `urn:uic:stn:0000099`, 60 s): offers from a trip leaving there, and the
+  booking, refund offers and exchange offers made from them, expire after 60 s.
+- A pre-booked booking past its time limit is read, and refused at
+  confirmation, with its parts `RELEASED` (the collection's expired-booking
+  check expects that). This applies to every provider.
+
+Checked: the eight new scenarios standalone on the simulator (exchange 379
+and 352 checks, refund withdrawn 328, refund offer only 295, the probes 120,
+188, 298 and 264), none failed; every probe graded its refusal, none skipped.
+Simulator tests 164 → 170 (exchange routes, deadlines, profile fields).
+Not run through OSCAR, nor against a real provider.
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.121] — 2026-10-11
 
 Issue #619, release 2026.266.

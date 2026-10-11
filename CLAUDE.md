@@ -1100,6 +1100,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **A body over the limit is read to its end before the 413**, without being
     kept, up to a second limit. Answering while the caller is still sending
     closes the connection under its feet and it never sees the status.
+  - **`gamma` exchanges, and has a short-deadline stop place** (#611, 0.16.0).
+    Exchange state is a hidden `Symbol` on the booking (never serialised);
+    with an exchange pre-booked, `POST …/fulfillments` confirms the exchange,
+    not the booking. A trip from `urn:uic:stn:0000099` makes everything that
+    comes from it expire after 60 s: only the `SIM_NHF_EXPIRED_*` scenarios use
+    that trip, and the data-file test keeps it so. A pre-booked booking past its
+    limit is read with its parts `RELEASED` (the collection checks that).
+    Scenario data is appended to `simulator_datafile.json` as text, never by
+    re-dumping the file (its formatting is hand-kept).
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes

@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.266",
+  "current_release": "2026.267",
   "releases": [
+    {
+      "release": "2026.267",
+      "date": "2026-10-11",
+      "server": "1.11.236",
+      "collection": "OTST_V2.0.122",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#611, part 1): the simulator's data file runs the 03-Refund and 04-Exchange folders end to end on gamma. New scenarios: an exchange confirmed and one withdrawn, a refund offer withdrawn and one only asked for, and four expiry probes (offer, booking, refund offer, exchange offer) on a trip whose deadlines are 60 s. No request or validator of the collection changed; collection OTST_V2.0.122 for the data file.",
+        "Simulator 0.16.0 (not part of a release): exchange-offers and exchange-operations on gamma (profile exchange); a short-deadline stop place (profile shortDeadlines); a pre-booked booking past its time limit is read with its parts RELEASED."
+      ]
+    },
     {
       "release": "2026.266",
       "date": "2026-10-11",
