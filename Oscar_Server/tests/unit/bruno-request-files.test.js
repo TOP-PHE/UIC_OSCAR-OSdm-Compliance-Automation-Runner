@@ -88,3 +88,35 @@ describe('Bruno request files (#613 F1)', () => {
     expect(doc.http.headers[1]).toHaveProperty('type', 'after-response');
   });
 });
+
+// #644: a by-id system-information request is not sent with "null" in its
+// path when no id was configured and the list call gave none.
+describe('#644: by-id requests without an id are skipped', () => {
+  const CASES = [
+    ['01-System Infos Requests/02. GET Coach By Id.yml', 'coachId', 'coachListCandidateIds'],
+    ['01-System Infos Requests/09. GET Product By ProductId.yml', 'productId', 'productListCandidateIds'],
+  ];
+  const beforeRequest = (file) => yaml.load(fs.readFileSync(path.join(COLLECTION, file), 'utf8'))
+    .runtime.scripts.find((s) => s.type === 'before-request').code;
+  const runScript = (file, env) => {
+    let skipped = false;
+    const bru = {
+      getEnvVar: (k) => env[k],
+      setEnvVar: (k, v) => { env[k] = v; },
+      setVar: () => {},
+      runner: { skipRequest: () => { skipped = true; } },
+    };
+    const fakeRequire = () => ({ resolveEffectiveVersion: () => '3.8.0', atLeast: () => true });
+    new Function('bru', 'require', 'console', beforeRequest(file))(bru, fakeRequire, { log: () => {} });
+    return { skipped, env };
+  };
+
+  test.each(CASES)('%s', (file, idVar, listVar) => {
+    expect(runScript(file, { [idVar]: 'null' }).skipped).toBe(true);
+    expect(runScript(file, { [idVar]: '', [listVar]: '[]' }).skipped).toBe(true);
+    const picked = runScript(file, { [idVar]: null, [listVar]: '["A1"]' });
+    expect(picked.skipped).toBe(false);
+    expect(picked.env[idVar]).toBe('A1');
+    expect(runScript(file, { [idVar]: 'X9' }).skipped).toBe(false);
+  });
+});

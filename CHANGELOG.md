@@ -62,6 +62,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.239] / [collection-OTST_V2.0.128] — 2026-10-11
+
+Issue #644, release 2026.273. Server code unchanged (tests only).
+
+### Fixed
+
+False failures seen on the first runs of a provider's own sell scenarios
+(OSDM 3.8; the whole sale went through):
+
+- **Step 07 no longer checks the confirmation deadline of a confirmed
+  booking.** OSDM 3.8: `confirmableUntil` "must be provided for a booking part
+  in PREBOOKED state. For later states, the value is ignored and can be null".
+  A provider that leaves a placeholder (`0001-01-01`) there failed every run.
+  The deadline is still checked on the pre-booking (02, 05).
+- **A fulfillment's `createdOn` may be up to two minutes ahead of OSCAR's
+  clock.** The provider's server and OSCAR's are two clocks; 24 ms ahead
+  failed "at or before now".
+- **`GET /coach-deck-layouts/{id}` and `GET /products/{id}` are skipped when
+  there is no id** (none configured, none from the list call), instead of
+  being sent as `…/null`.
+- **`requestedInformation` may name the purchaser without an index**
+  (`purchaser.detail.contact.email`). The purchaser is one object; OSCAR
+  already ignored its index. A passenger still needs `[index]`.
+- **A return trip given with the station codes written without leading
+  zeros** (`urn:uic:stn:5433295` for `urn:uic:stn:005433295`) is the same
+  stop place; it failed "a trip goes back".
+
+### Added
+
+- **Step 02 checks that each reservation asked for with the booking is in
+  it**, not only step 07. A reservation part the offer gives without a trip
+  coverage is named by its summary instead of "on leg " (empty), and is
+  matched by any booked reservation not already counted.
+
+### Default decisions (taken without asking)
+
+- The clock tolerance is two minutes.
+- Only `purchaser` may go without an index; every other root keeps the
+  grammar's `[index]`.
+- The station codes compared without leading zeros are `urn:uic:stn:` ones
+  only.
+
+Not changed, and reported to the provider instead: system-information URLs
+answered by a gateway with an HTML page and HTTP 200, an optional reservation
+accepted but not booked, a placeholder `confirmableUntil` on the pre-booking.
+Two checks the same runs failed are left as they are and put to the
+maintainer: a group tariff dearer than the same passengers alone, and a
+student card that changes neither the price nor `appliedPassengerTypes`.
+
+Checked: each new unit test fails with its fix undone; RECORDCHECK
+
+---
+
 ## [server-1.11.238] / [collection-OTST_V2.0.127] — 2026-10-11
 
 Issue #642, release 2026.272. Simulator 0.22.0.

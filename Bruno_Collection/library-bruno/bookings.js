@@ -786,6 +786,10 @@ function validateAccommodationGoal(selectedOffer, bookedOffers) {
 // provisionalPrice "includes booking parts from exchange operations" — so
 // `13. GET Booking before Fulfillment` keeps asserting provisionalPrice.
 const POST_CONFIRMATION_STAGE_RE = /CONFIRMED|FULFILLED|REFUNDED|EXCHANGED/i;
+// How far a provider's clock may be ahead of OSCAR's before a time it says is
+// "now" counts as in the future.
+const CLOCK_TOLERANCE_MS = 120000;
+
 function isPostConfirmationStage(expectedBookedOffersStatus) {
   return POST_CONFIRMATION_STAGE_RE.test(String(expectedBookedOffersStatus || ''));
 }
@@ -909,7 +913,12 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     }
   }
 
-  if (_confirmDeadline) {
+  // OSDM: confirmableUntil "must be provided for a booking part in PREBOOKED
+  // state. For later states, the value is ignored and can be null". Once the
+  // booking is confirmed, whatever deadline it still shows is not checked.
+  if (_confirmDeadline && isPostConfirmationStage(expectedBookedOffersStatus)) {
+    validationLogger(`[INFO] Booking already confirmed: its confirmation deadline (${_confirmDeadline}, source: ${_confirmSource}) is ignored, as OSDM says for every state after PREBOOKED.`);
+  } else if (_confirmDeadline) {
     const confirmLimit = new Date(_confirmDeadline);
     // #204: stash the effective booking deadline so 06. fulfillments can wait
     // until just past it before attempting confirmation.
@@ -1274,9 +1283,11 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     // D4: createdOn must always be a valid ISO datetime (OSDM: Fulfillment.createdOn required)
     const createdOnDate = new Date(fulfillment.createdOn);
     if (!isNaN(createdOnDate.getTime())) {
-      test(`Fulfillment[${idx}] createdOn is a valid datetime at or before now`, () => {
+      // The provider's clock and OSCAR's are not the same clock: a fulfillment
+      // created a few milliseconds "in the future" is not a defect.
+      test(`Fulfillment[${idx}] createdOn is a valid datetime at or before now (clock tolerance ${CLOCK_TOLERANCE_MS / 1000} s)`, () => {
         expect(fulfillment.createdOn).to.be.a("string").and.not.be.empty;
-        expect(createdOnDate.getTime()).to.be.at.most(Date.now());
+        expect(createdOnDate.getTime()).to.be.at.most(Date.now() + CLOCK_TOLERANCE_MS);
         validationLogger(`[DEBUG] Fulfillment[${idx}] createdOn: ${fulfillment.createdOn}`);
       });
     } else {

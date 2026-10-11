@@ -1007,6 +1007,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - `admissionReservationAncillaryBookingPartsIds` holds every part of the
     booking, including those no part of the selected offer pairs with (the
     other direction of a two-offer return), each once.
+- **What a real provider's first runs taught** (#644, OTST_V2.0.128). The
+  simulator answers the way the collection expects, so some false failures
+  only show on a real system. Rules that came out of those first runs:
+  - **A deadline is checked only in the state where OSDM requires it.**
+    `confirmableUntil` is ignored after PREBOOKED; step 07 logs it at INFO.
+  - **"At or before now" allows `CLOCK_TOLERANCE_MS`** (2 min, `bookings.js`):
+    the provider's clock is not OSCAR's. Use it for any new such check.
+  - **A by-id system-information request without an id is skipped**
+    (`bru.runner.skipRequest()`, the last bru call), never sent as `/null`.
+  - **`purchaser` may go without an index in `requestedInformation`**; every
+    other root keeps `[index]`.
+  - **Compare stop places with `sameStopPlace()`** (`returnJourney.js`): a
+    provider may write a UIC code without its leading zeros.
+  - A provider's gateway may answer HTTP 200 with an HTML "Request Rejected"
+    page: that is the provider's finding, and it stays a FAIL.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

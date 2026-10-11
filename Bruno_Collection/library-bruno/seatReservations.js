@@ -137,24 +137,31 @@ function checkProviderRules(offer, passengerRefs) {
  * The checks of a booking against the reservations booked: for each, a
  * reservation of the booking on the same trip and leg (the booking may give
  * it another id), and the place it was given. No place allocation is a
- * warning: OSDM does not require it.
+ * warning: OSDM does not require it. A reservation part the offer gives
+ * without a trip coverage is matched by any booked reservation not already
+ * taken. `places: false` leaves out the place check (a pre-booking may not
+ * have allocated one yet).
  */
-function checkBookedReservations(booking, offer, reservationIds) {
+function checkBookedReservations(booking, offer, reservationIds, { places = true } = {}) {
   const parts = listOf(offer?.reservationOfferParts).filter((p) => reservationIds.includes(p?.id));
   const booked = listOf(booking?.bookedOffers).flatMap((o) => listOf(o?.reservations));
   const keyOf = (coverage) => `${coverage?.coveredTripId}|${listOf(coverage?.coveredLegIds).join(',')}`;
+  const taken = new Set();
   return parts.flatMap((part) => {
-    const match = booked.find((r) => keyOf(r?.tripCoverage) === keyOf(part.tripCoverage));
-    const leg = listOf(part.tripCoverage?.coveredLegIds).join(', ');
+    const covered = !!part.tripCoverage;
+    const match = booked.find((r) => !taken.has(r) && (!covered || keyOf(r?.tripCoverage) === keyOf(part.tripCoverage)));
+    if (match) taken.add(match);
+    const legs = listOf(part.tripCoverage?.coveredLegIds).join(', ');
+    const what = legs ? `on leg ${legs}` : `${part.summary || part.id} (the offer gives it no leg)`;
     const checks = [{
-      name: `Booking: holds the reservation on leg ${leg}`,
+      name: `Booking: holds the reservation ${what}`,
       ok: !!match,
-      message: match ? undefined : `no reservation of the booking covers leg ${leg}; the booking holds ${booked.length} reservation(s)`,
+      message: match ? undefined : `the booking holds ${booked.length} reservation(s), none for the reservation ${part.id} ${what}`,
     }];
-    if (match) {
-      const places = listOf(match.placeAllocation?.reservedPlaces);
-      const where = places.map((p) => `coach ${p?.coachNumber}, places ${listOf(p?.placeNumbers).join(', ') || p?.placeDescription || '?'}`).join('; ');
-      checks.push({ name: `Booking: reservation ${match.id} gives a place — ${where || 'none'}`, ok: places.length > 0, level: 'warn', message: 'no placeAllocation.reservedPlaces' });
+    if (match && places) {
+      const reserved = listOf(match.placeAllocation?.reservedPlaces);
+      const where = reserved.map((p) => `coach ${p?.coachNumber}, places ${listOf(p?.placeNumbers).join(', ') || p?.placeDescription || '?'}`).join('; ');
+      checks.push({ name: `Booking: reservation ${match.id} gives a place — ${where || 'none'}`, ok: reserved.length > 0, level: 'warn', message: 'no placeAllocation.reservedPlaces' });
     }
     return checks;
   });

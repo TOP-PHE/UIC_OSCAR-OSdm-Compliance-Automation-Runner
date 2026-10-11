@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.272",
+  "current_release": "2026.273",
   "releases": [
+    {
+      "release": "2026.273",
+      "date": "2026-10-11",
+      "server": "1.11.239",
+      "collection": "OTST_V2.0.128",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#644): false failures from the first runs of a provider's sell scenarios. Step 07 no longer checks the confirmation deadline of a confirmed booking (OSDM: ignored after PREBOOKED); a fulfillment's createdOn may be two minutes ahead of OSCAR's clock; GET coach-deck-layouts/{id} and products/{id} are skipped without an id instead of sent as /null; requestedInformation may name the purchaser without an index; UIC station codes compare without leading zeros in the return-trip check. Step 02 checks that each reservation asked for is in the booking. Collection OTST_V2.0.128; server tests only."
+      ]
+    },
     {
       "release": "2026.272",
       "date": "2026-10-11",
