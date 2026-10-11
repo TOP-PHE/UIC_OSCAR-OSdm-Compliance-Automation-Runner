@@ -145,4 +145,23 @@ function lineCoverage(v8Results, include, read) {
   return { files, total };
 }
 
-module.exports = { providerOf, normalize, recordOf, compareRecordings, lineCoverage };
+/**
+ * Where the scenario catalogue (#612) and a recording disagree: an entry
+ * whose source was not recorded, could not run, failed a check, or gave
+ * another number of checks than the catalogue says. None when they agree.
+ */
+function catalogueDrift(catalogue, recording) {
+  const out = [];
+  for (const entry of catalogue?.entries || []) {
+    const r = recording[entry.source];
+    if (!r) out.push(`${entry.code}: ${entry.source} is not in the recording`);
+    else if (r.error) out.push(`${entry.code}: ${entry.source} did not run: ${r.error}`);
+    else {
+      if (r.failed > 0) out.push(`${entry.code}: ${entry.source} failed ${r.failed} check(s)`);
+      if (r.checks !== entry.checks) out.push(`${entry.code}: the catalogue says ${entry.checks} checks, ${entry.source} gave ${r.checks}`);
+    }
+  }
+  return out;
+}
+
+module.exports = { providerOf, normalize, recordOf, compareRecordings, lineCoverage, catalogueDrift };

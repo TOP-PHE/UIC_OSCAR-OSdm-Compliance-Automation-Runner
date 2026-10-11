@@ -1046,6 +1046,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `property`, `at.least`/`at.most`, `true`/`false`. A chain it lacks throws
     inside the check and is recorded as a failure, so assert on the check
     you mean by name.
+- **The scenario catalogue is the simulator's scenarios under generic codes**
+  (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
+  entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says
+  what it tests (`purpose`), how many checks it gave in the replay (`checks`)
+  and may change only `…MaxWaitMinutes` fields (`set`).
+  `utils/scenarioCatalogue.js` (pure) builds the data file from both and the
+  requirements of each entry; the copy is the #540 one with `source_id:
+  "catalogue"`, and an entry needing what the framework does not declare is
+  refused (golden rule). `tests/unit/scenario-catalogue.test.js` keeps the file
+  sound and schema-valid; `node scripts/replay.js catalogue` (simulator) checks
+  the numbers against a recording. A scenario of the simulator that a
+  catalogue entry names cannot be renamed or removed without the catalogue.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
@@ -1166,6 +1178,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
 | **golden rule** | "what's not declared in the framework can't be tested" (#218) |
 | **`wizData`** | the frontend's in-browser working copy of `{framework, resources, datafile}`, edited by `scenarios.js`, persisted via debounced auto-save |
 | **`fw-*` actions** | the generic `data-action="fw-*"` convention for Test-Framework pill/toggle clicks (e.g. `fw-pill` → `fwTogglePill(el, modeKey, subKey, value)`) |
+| **Bruno collection / OSCAR server** | `Bruno_Collection/` (requests + `library-bruno/` validators, versioned by `Bruno_Collection/VERSION`) / `Oscar_Server/` (API, Test Config, Test Framework, versioned by its `package.json`) |
+| **Reference scenario** | a generic scenario of the scenario catalogue, offered to every company and copied into a company's data file as an ordinary scenario (#612) |
+| **Scenario catalogue** | `Bruno_Collection/data_base/scenario_catalogue.json`: the reference scenarios, each naming the simulator scenario that supplies its data, what it tests and its number of checks on the simulator (#612) |
 | **run / batch** | one Bruno CLI execution of one scenario is a *run*; a set submitted together is a *batch* |
 
 ## 4. Build / test / run

@@ -91,6 +91,50 @@ automatic update watched on the host (needs the secrets and the host set-up).
 
 ---
 
+## [server-1.11.237] / [collection-OTST_V2.0.126] — 2026-10-11
+
+Issue #612, release 2026.271. Simulator 0.20.0.
+
+### Added
+
+- **Scenario catalogue** (`Bruno_Collection/data_base/scenario_catalogue.json`,
+  `Oscar_Server/src/utils/scenarioCatalogue.js` pure, `GET
+  /v1/company/scenario-catalogue`). 31 reference scenarios under generic
+  `OTST_` / `NHF_` codes. Each names the scenario of the simulator's data
+  file that supplies its data (`source`), so the catalogue holds no scenario
+  data of its own, with its purpose and the number of checks it gave on the
+  simulator. `set` may only change `*MaxWaitMinutes` (the expiry probes wait
+  40 minutes on a real provider). Test Config's copy panel lists it as a
+  source; the copy is the ordinary scenario copy (`source_id: "catalogue"`),
+  so trips are re-mapped onto the company's Test Data and every entry gets a
+  fresh id. What each entry needs the Test Framework to declare (sales flows,
+  return model, OSDM 3.7 for a combined return, passenger types) is worked
+  out from its scenario; an entry the framework does not cover is greyed out
+  in the panel and refused by the copy (400).
+- **`node OSDM_Simulator/scripts/replay.js catalogue`** checks the catalogue
+  against the last recording: every source ran, failed nothing, and gave the
+  stated number of checks.
+
+### Default decisions (taken without asking)
+
+- One file, one copy of the data: the catalogue points at the simulator's
+  scenarios instead of duplicating them.
+- Testers may copy from the catalogue; their copies are private, like any
+  scenario they create.
+- Undeclared entries are shown greyed out with what is missing, and refused
+  by the server, rather than hidden.
+- The expiry probes wait 40 minutes on a real provider instead of the
+  simulator's one.
+
+Checked: 21 server tests (unit and routes), the refusal mutation-checked; in
+a browser, the panel listed the 31 entries, 6 locked for a framework without
+exchange, and a copy wrote `OTST_SALE_ONE_WAY_1ADT` into the data file.
+`replay.js catalogue` against a full recording of the 66 simulator
+scenarios: agrees; one `checks` changed on purpose: reported. Simulator
+tests 188 → 189.
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.125] — 2026-10-11
 
 Issue #611, release 2026.270. Simulator 0.19.0.

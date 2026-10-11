@@ -148,6 +148,7 @@ git switch my-branch
 node scripts/replay.js record after
 node scripts/replay.js compare      # no output but "the same": nothing changed
 node scripts/replay.js coverage     # which lines of library-bruno/ the recording ran
+node scripts/replay.js catalogue    # the scenario catalogue against replay/after.json
 ```
 
 Each scenario runs on the provider of its version (`_36` alpha, `_37` beta,
@@ -155,7 +156,15 @@ Each scenario runs on the provider of its version (`_36` alpha, `_37` beta,
 `OSDM_Simulator/clients.json`. Give scenario codes after `before` / `after`
 to record only those. The recordings and the coverage data go to
 `OSDM_Simulator/replay/` (not in git). `REPLAY_SIM_BASE` and
-`REPLAY_DATA_URL` point elsewhere when needed.
+`REPLAY_DATA_URL` point elsewhere when needed. The Bruno CLI is run with the
+same Node: from `REPLAY_BRU_JS` when set, else from `Oscar_Server/bruno-cli`
+(after `npm ci` there, the version OSCAR pins), else from the global install.
+
+`catalogue` checks `data_base/scenario_catalogue.json` against the last
+`after` recording: every reference scenario's source ran, failed nothing, and
+gave the number of checks the catalogue states. Run it after a full
+recording whenever the collection or the simulator changes, and update the
+`checks` of an entry only for a change you meant.
 
 What changes on its own between two runs (ids, booking codes, instants,
 durations, client ids) is replaced by a placeholder before the comparison,

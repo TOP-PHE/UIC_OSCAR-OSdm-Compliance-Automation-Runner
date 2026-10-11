@@ -7,8 +7,9 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 // ── Copy scenarios from another company or provider (#540) ────────────────────
-// Test Config's "Copy scenarios from…" panel. Shown when the user may work on
-// more than one company (their own and at least one provider). The server does
+// Test Config's "Copy scenarios from…" panel. The sources are the scenario
+// catalogue (#612, always), and the other companies the user may work on
+// (their own and its providers, #540). The server does
 // the copy (POST /v1/company/scenario-copy): this panel picks the source, the
 // scenarios, and a train or journey of this company's Test Data for each trip
 // entry they use (asked once per trip, not per scenario).
@@ -45,7 +46,13 @@
 
   // The companies this user may copy from: their own and its providers they may
   // use, minus the one this tab works on.
+  const CATALOGUE = { id: 'catalogue', name: '📚 Scenario catalogue (reference scenarios)' };
+
   async function sources() {
+    return [CATALOGUE, ...await companySources()];
+  }
+
+  async function companySources() {
     const res = await fetch('/v1/company/providers', {});
     if (!res.ok) return [];
     const providers = (await res.json()).providers || [];
@@ -99,6 +106,21 @@
         ? `<div style="${NOTE_STYLE}${ERR_COLORS}">A trip with several legs needs a journey, and this company's Test Data has none.</div>` : '');
   }
 
+  // One scenario of the preview. A reference scenario of the catalogue (#612)
+  // says what it tests; one that needs what the Test Framework does not
+  // declare is greyed out and cannot be ticked (the server refuses it too).
+  function scenarioRow(s) {
+    const missing = Array.isArray(s.missing) ? s.missing : [];
+    const locked = missing.length > 0;
+    const probe = s.kind === 'NHF' ? '🚫 Negative probe · ' : '';
+    const purpose = s.purpose ? `<br><span style="font-size:12px;color:#546e7a">${probe}${esc(s.purpose)}</span>` : '';
+    const needs = locked ? `<br><span style="font-size:12px;color:#90a4ae">Needs in the Test Framework: ${esc(missing.join(', '))}</span>` : '';
+    return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:${locked ? 'not-allowed' : 'pointer'};${locked ? 'opacity:.55' : ''}">
+        <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px"${locked ? ' disabled' : ''}>
+        <span><strong>${esc(s.code)}</strong> <span style="color:#90a4ae">${esc(s.scenarioType)}${s.scenarioAction ? ' · ' + esc(s.scenarioAction) : ''}</span>
+        ${purpose}${needs}${s.warnings.map(warningLine).join('')}</span></label>`;
+  }
+
   function renderPreview() {
     const list = document.getElementById('sc-copy-scenarios');
     if (!preview.scenarios.length) {
@@ -106,10 +128,7 @@
       document.getElementById('sc-copy-trips').innerHTML = '';
       return;
     }
-    list.innerHTML = preview.scenarios.map(s => `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:pointer">
-        <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px">
-        <span><strong>${esc(s.code)}</strong> <span style="color:#90a4ae">${esc(s.scenarioType)}${s.scenarioAction ? ' · ' + esc(s.scenarioAction) : ''}</span>
-        ${s.warnings.map(warningLine).join('')}</span></label>`).join('');
+    list.innerHTML = preview.scenarios.map(scenarioRow).join('');
     renderTrips();
   }
 
@@ -160,7 +179,7 @@
     const panel = document.createElement('div');
     panel.id = panelId;
     panel.className = 'card';
-    panel.innerHTML = `<div class="card-head"><div class="card-head-title">📋 Copy scenarios from another company or provider</div>
+    panel.innerHTML = `<div class="card-head"><div class="card-head-title">📋 Copy scenarios from the catalogue or another company</div>
         <button class="btn btn-secondary btn-sm" data-copy-action="close">✕</button></div>
       <div class="card-body">
         <div style="font-size:12px;color:#78909c;margin-bottom:10px">Copies become your scenarios here, adapted to this company's Test Data and Test Framework.
@@ -193,15 +212,13 @@
     else if (el.dataset.copyAction === 'toggle-code' && preview) renderTrips();
   });
 
-  // The button, only when there is somewhere to copy from.
-  sources().then(list => {
-    if (!list.length) return;
-    const bar = document.getElementById('header-actions');
-    if (!bar) return;
+  // The button: the catalogue is always a source.
+  const bar = document.getElementById('header-actions');
+  if (bar) {
     const btn = document.createElement('button');
     btn.className = 'btn btn-secondary';
     btn.dataset.copyAction = 'open';
     btn.textContent = '📋 Copy scenarios from…';
     bar.insertBefore(btn, bar.firstChild);
-  }).catch(() => { /* no button: nothing to copy from */ });
+  }
 }());

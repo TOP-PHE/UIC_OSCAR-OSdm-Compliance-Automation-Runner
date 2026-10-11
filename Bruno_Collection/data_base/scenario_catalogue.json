@@ -1,0 +1,203 @@
+{
+  "$comment": "Scenario catalogue (#612): reference scenarios a company can copy into its data file from Test Config. Each entry names the scenario of simulator_datafile.json that supplies its data (source), says what it tests (purpose), and gives the number of checks it produced on the OSDM simulator (checks, from node OSDM_Simulator/scripts/replay.js). set changes only the *MaxWaitMinutes waits, for a real provider. Kept sound by Oscar_Server/tests/unit/scenario-catalogue.test.js.",
+  "entries": [
+    {
+      "code": "OTST_SALE_ONE_WAY_1ADT",
+      "source": "SIM_SALE_SEARCH_1ADT_38",
+      "purpose": "One-way sale for one adult: offers, booking, passenger update, confirmation, documents.",
+      "checks": 231
+    },
+    {
+      "code": "OTST_SALE_ONE_WAY_2ADT_SAVER",
+      "source": "SIM_SALE_SEARCH_2ADT_SAVER_38",
+      "purpose": "One-way sale for two adults, choosing the non-flexible (saver) offer.",
+      "checks": 290
+    },
+    {
+      "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
+      "source": "SIM_RETURN_SEPARATE_1ADT_38",
+      "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
+      "checks": 310
+    },
+    {
+      "code": "OTST_SALE_RETURN_COMBINED_1ADT",
+      "source": "SIM_RETURN_COMBINED_1ADT_38",
+      "purpose": "Return sold as one offer covering both directions (outboundTripIds, OSDM 3.7 and later).",
+      "checks": 352
+    },
+    {
+      "code": "OTST_REFUND_RETURN_FULL_1ADT",
+      "source": "SIM_REFUND_RETURN_1ADT_38",
+      "purpose": "Full refund of a return: every refund offer confirmed, every fulfillment refunded.",
+      "checks": 522
+    },
+    {
+      "code": "OTST_REFUND_RETURN_INBOUND_1ADT",
+      "source": "SIM_REFUND_INBOUND_1ADT_38",
+      "purpose": "Partial refund of a return by fulfillment: the inbound ticket alone.",
+      "checks": 449
+    },
+    {
+      "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
+      "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
+      "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
+      "checks": 526
+    },
+    {
+      "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
+      "source": "SIM_REFUND_OVERRULE_REFUSED_38",
+      "purpose": "A refund with an overrule code the provider does not accept must be refused.",
+      "checks": 315
+    },
+    {
+      "code": "OTST_REFUND_WITHDRAWN_1ADT",
+      "source": "SIM_REFUND_DELETE_1ADT_38",
+      "purpose": "Refund offer asked for, then withdrawn instead of confirmed: the ticket stays.",
+      "checks": 328
+    },
+    {
+      "code": "OTST_REFUND_OFFER_ONLY_1ADT",
+      "source": "SIM_REFUND_ONLY_OFFER_1ADT_38",
+      "purpose": "Refund offer asked for and read, neither confirmed nor withdrawn.",
+      "checks": 295
+    },
+    {
+      "code": "OTST_REFUND_RECEIPT_RETURN_1ADT",
+      "source": "SIM_REFUND_RECEIPT_RETURN_1ADT_38",
+      "purpose": "Full refund of a return, then the refund receipt waited for in the booking.",
+      "checks": 525
+    },
+    {
+      "code": "OTST_EXCHANGE_1ADT",
+      "source": "SIM_EXCHANGE_1ADT_38",
+      "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
+      "checks": 379
+    },
+    {
+      "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
+      "source": "SIM_EXCHANGE_DELETE_1ADT_38",
+      "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",
+      "checks": 352
+    },
+    {
+      "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
+      "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
+      "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",
+      "checks": 285
+    },
+    {
+      "code": "OTST_SALE_RESERVATION_MANDATORY_2ADT",
+      "source": "SIM_SALE_RESERVATION_MANDATORY_2ADT_38",
+      "purpose": "A mandatory seat reservation, detected from the admission and booked with it.",
+      "checks": 341
+    },
+    {
+      "code": "OTST_SALE_RESERVATION_SELECTION_2ADT",
+      "source": "SIM_SALE_RESERVATION_SELECTION_2ADT_38",
+      "purpose": "An optional seat reservation booked with optionalReservationSelections.",
+      "checks": 369
+    },
+    {
+      "code": "OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT",
+      "source": "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38",
+      "purpose": "An optional seat reservation booked with placeSelections.",
+      "checks": 369
+    },
+    {
+      "code": "OTST_SALE_RESERVATION_ADD_LATER_2ADT",
+      "source": "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38",
+      "purpose": "An optional seat reservation added to the pre-booked booking afterwards.",
+      "checks": 367
+    },
+    {
+      "code": "OTST_SALE_BY_TRIP_ID_1ADT",
+      "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
+      "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",
+      "checks": 238
+    },
+    {
+      "code": "NHF_SALE_BY_TRIP_ID_UNKNOWN",
+      "source": "SIM_SALE_BY_TRIP_ID_UNKNOWN_38",
+      "purpose": "Offers asked for a trip id the provider never gave must be refused.",
+      "checks": 71
+    },
+    {
+      "code": "OTST_SALE_DOCUMENTS_RETURN_1ADT",
+      "source": "SIM_SALE_DOCUMENTS_RETURN_1ADT_38",
+      "purpose": "Fulfillment documents of a return, and each fulfillment read with GET /fulfillments/{id}.",
+      "checks": 352
+    },
+    {
+      "code": "OTST_SALE_IDEMPOTENCY_1ADT",
+      "source": "SIM_SALE_IDEMPOTENCY_1ADT_38",
+      "purpose": "Idempotency-Key on the booking and the confirmation: the same key gives the same answer.",
+      "checks": 237
+    },
+    {
+      "code": "NHF_EXPIRED_OFFER",
+      "source": "SIM_NHF_EXPIRED_OFFER_38",
+      "purpose": "Booking an offer after its preBookableUntil must be refused.",
+      "checks": 120,
+      "set": {
+        "expiredOfferMaxWaitMinutes": 40
+      }
+    },
+    {
+      "code": "NHF_EXPIRED_BOOKING",
+      "source": "SIM_NHF_EXPIRED_BOOKING_38",
+      "purpose": "Confirming a booking after its confirmation time limit must be refused.",
+      "checks": 188,
+      "set": {
+        "expiredBookingMaxWaitMinutes": 40
+      }
+    },
+    {
+      "code": "NHF_EXPIRED_REFUND_OFFER",
+      "source": "SIM_NHF_EXPIRED_REFUND_OFFER_38",
+      "purpose": "Confirming a refund offer after its validUntil must be refused.",
+      "checks": 298,
+      "set": {
+        "expiredRefundOfferMaxWaitMinutes": 40
+      }
+    },
+    {
+      "code": "NHF_EXPIRED_EXCHANGE_OFFER",
+      "source": "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38",
+      "purpose": "Taking an exchange offer after its preBookableUntil must be refused.",
+      "checks": 264,
+      "set": {
+        "expiredExchangeOfferMaxWaitMinutes": 40
+      }
+    },
+    {
+      "code": "OTST_SALE_REQUESTED_INFORMATION_1ADT",
+      "source": "SIM_RI_AUTOFEED_1ADT_38",
+      "purpose": "Requested information: what the offers ask for is checked and supplied.",
+      "checks": 234
+    },
+    {
+      "code": "NHF_REQUESTED_INFORMATION_OMITTED",
+      "source": "SIM_NHF_RI_OMIT_1ADT_38",
+      "purpose": "A passenger update without a demanded field must be refused.",
+      "checks": 145
+    },
+    {
+      "code": "NHF_PASSENGER_DATA_INVALID",
+      "source": "SIM_NHF_RI_INVALID_1ADT_38",
+      "purpose": "A passenger update with an invalid field, one field per pass, must be refused.",
+      "checks": 156
+    },
+    {
+      "code": "OTST_PURCHASER_DEFERRED_1ADT",
+      "source": "SIM_PURCHASER_DEFERRED_1ADT_38",
+      "purpose": "Booking made without its purchaser, which is written afterwards.",
+      "checks": 235
+    },
+    {
+      "code": "NHF_PURCHASER_INVALID",
+      "source": "SIM_NHF_PURCHASER_INVALID_1ADT_38",
+      "purpose": "A purchaser with a missing or invalid field, one per pass, must be refused.",
+      "checks": 243
+    }
+  ]
+}

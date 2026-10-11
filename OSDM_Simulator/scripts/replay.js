@@ -15,6 +15,7 @@
  *   node scripts/replay.js record after    [CODE ...]   → replay/after.json
  *   node scripts/replay.js compare                       before.json vs after.json
  *   node scripts/replay.js coverage                      library-bruno lines run
+ *   node scripts/replay.js catalogue                     scenario_catalogue.json vs after.json
  *
  * Needs: the simulator listening (REPLAY_SIM_BASE, default
  * http://127.0.0.1:3002), the repository root served over HTTP
@@ -32,11 +33,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { providerOf, recordOf, compareRecordings, lineCoverage } = require('./replay-lib');
+const { providerOf, recordOf, compareRecordings, lineCoverage, catalogueDrift } = require('./replay-lib');
 
 const ROOT = path.join(__dirname, '..', '..');
 const COLLECTION = path.join(ROOT, 'Bruno_Collection');
 const DATA_FILE = path.join(COLLECTION, 'data_base', 'simulator_datafile.json');
+const CATALOGUE_FILE = path.join(COLLECTION, 'data_base', 'scenario_catalogue.json');
 const ENV_FILE = path.join(COLLECTION, 'environments', 'OTST_Simulator_Env.yml');
 const CLIENTS_FILE = path.join(__dirname, '..', 'clients.json');
 const OUT = path.join(__dirname, '..', 'replay');
@@ -135,13 +137,28 @@ function coverage() {
   process.stdout.write(`${percent(total)} % of the lines of the ${known.size} loaded file(s) ran; ${all.length - known.size} file(s) never loaded.\n`);
 }
 
+// The scenario catalogue (#612) against the last recording: every reference
+// scenario ran, failed nothing, and gave the number of checks it states.
+function catalogue() {
+  const recording = JSON.parse(fs.readFileSync(RECORDINGS.after, 'utf8'));
+  const entries = JSON.parse(fs.readFileSync(CATALOGUE_FILE, 'utf8'));
+  const drift = catalogueDrift(entries, recording);
+  if (drift.length === 0) {
+    process.stdout.write(`The catalogue agrees with replay/after.json (${entries.entries.length} entries).\n`);
+    return 0;
+  }
+  process.stdout.write(`${drift.join('\n')}\n`);
+  return 1;
+}
+
 if (require.main === module) {
   const [command, which, ...only] = process.argv.slice(2);
   try {
     if (command === 'record') record(which, only);
     else if (command === 'compare') process.exitCode = compare();
     else if (command === 'coverage') coverage();
-    else throw new Error('usage: replay.js record before|after [CODE ...] | compare | coverage');
+    else if (command === 'catalogue') process.exitCode = catalogue();
+    else throw new Error('usage: replay.js record before|after [CODE ...] | compare | coverage | catalogue');
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 2;
