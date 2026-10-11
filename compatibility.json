@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.264",
+  "current_release": "2026.265",
   "releases": [
+    {
+      "release": "2026.265",
+      "date": "2026-10-11",
+      "server": "1.11.235",
+      "collection": "OTST_V2.0.120",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#610): a partial refund by leg or by passenger names, in its RefundSpecification, the fulfillment that holds the parts it refunds (bookingParts), else the chosen passenger's (fulfillmentParts). fulfillments[0] only when the booking has one. Parts spread over several fulfillments, or no way to tell, degrade to a full refund with a WARNING giving the reason, instead of naming a fulfillment that may not hold them (library-bruno/partialRefund.js)."
+      ]
+    },
     {
       "release": "2026.264",
       "date": "2026-10-11",
