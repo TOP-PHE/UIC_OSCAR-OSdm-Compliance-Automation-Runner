@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-11-passenger-update-scope",
+    "date": "October 11, 2026",
+    "tag": "New",
+    "title": "Update the main passenger only",
+    "summary": "A scenario can update only the first passenger, and a detail the provider does not keep is now a warning.",
+    "content": "Test Config → Booking Flow Actions has a new choice, Passengers updated: all of them (as before) or the main passenger only, for providers that let only the main passenger be changed.\n\nAfter the update, a passenger detail the provider does not return (for example the date of birth) is reported as a warning instead of a failure: OSDM does not require a provider to keep it. A detail returned with a different value still fails. A scenario with the passenger update turned off no longer fails the passenger read.\n\nThe scenario catalogue has four new reference scenarios: refunds of a return sold as one offer (full, inbound only, technical cancellation, refund receipt)."
+  },
+  {
     "id": "2026-10-11-scenario-catalogue",
     "date": "October 11, 2026",
     "tag": "New",

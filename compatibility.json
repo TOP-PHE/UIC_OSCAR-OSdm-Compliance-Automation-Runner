@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.271",
+  "current_release": "2026.272",
   "releases": [
+    {
+      "release": "2026.272",
+      "date": "2026-10-11",
+      "server": "1.11.238",
+      "collection": "OTST_V2.0.127",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "feat(#642): scenario field passengerUpdateScope (ALL default, MAIN = first passenger only) for providers that let only the main passenger be updated; a passenger detail the provider does not return is a WARNING at steps 03/04, a different one still a FAIL; fix: 04. GET Passenger no longer expects the update values when patchPassengers is off. Catalogue: four refunds of a return sold as one offer (35 reference scenarios). Collection OTST_V2.0.127.",
+        "Simulator 0.22.0 (not part of a release): main-passenger-only and main-names-only variants on gamma; seven scenarios (COMBINED-return refunds, return with a card, return of an all-day product, main passenger only)."
+      ]
+    },
     {
       "release": "2026.271",
       "date": "2026-10-11",
