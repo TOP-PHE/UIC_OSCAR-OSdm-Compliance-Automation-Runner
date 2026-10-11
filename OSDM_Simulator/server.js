@@ -22,6 +22,7 @@ const { ConfigError, loadProviders, loadClients, loadSettings } = require('./src
 const { createTokenService } = require('./src/tokens');
 const { createStore } = require('./src/store');
 const { createApp } = require('./src/app');
+const { version } = require('./package.json');
 
 // What came from the caller is reduced to printable ASCII before it is
 // written, so that a request cannot start a log line of its own.
@@ -59,7 +60,7 @@ function start(env = process.env, baseDir = __dirname) {
   server.maxHeadersCount = 60;
   server.listen(settings.port, settings.host, () => {
     const { port } = server.address();
-    console.log(`OSDM simulator listening on ${settings.host}:${port}, providers: ${[...providers.keys()].join(', ')}`);
+    console.log(`OSDM simulator ${version} listening on ${settings.host}:${port}, providers: ${[...providers.keys()].join(', ')}`);
   });
   return server;
 }

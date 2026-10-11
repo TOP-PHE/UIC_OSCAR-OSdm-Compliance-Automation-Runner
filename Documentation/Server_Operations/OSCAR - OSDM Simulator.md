@@ -147,11 +147,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $T" $H/beta/v
 curl -s -o /dev/null -w '%{http_code}\n' $H/alpha/versions                                 # 401: no token
 ```
 
-Expected: `{"status":"ok"}`, then `200`, `401`, `401`. If the first number is
+Expected: `{"status":"ok","version":"<version>"}`, then `200`, `401`, `401`. If the first number is
 `401`, no token was issued: the secret is not the one of that client.
 
 What needs no secret can be checked at any time: `/healthz` answers
-`{"status":"ok"}` over https with a valid certificate, `/alpha/versions`
+`{"status":"ok","version":"<version>"}` over https with a valid certificate, `/alpha/versions`
 without a token answers 401, and an unknown provider answers 404.
 
 ## 5. Point a company at it
@@ -249,7 +249,8 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 | To do | How |
 |---|---|
 | See what is being called | `docker compose logs -f` (one line per request: time, method, path, status, provider, client; no header, no body) |
-| Update the simulator | `git -C /opt/osdm-simulator pull && docker compose restart` |
+| Update the simulator | automatic on a new version, once set up (see below); by hand: `git -C /opt/osdm-simulator pull && docker compose restart` |
+| See which version runs | `curl -s https://<simulator-host>/healthz` (`"version"`), or the first line of `docker compose logs` (`OSDM simulator <version> listening on …`) |
 | Replace all clients and secrets | see below |
 | Add a client | add an entry to `clients.json` in the deploy folder (an id of the same form, a secret of 32 characters or more), `docker compose restart` |
 | Clear every booking and end every token | `docker compose restart` |
@@ -257,6 +258,44 @@ cd /opt/osdm-simulator/OSDM_Simulator/deploy
 
 A restart clears everything: bookings are kept in memory only, and the key that
 signs the tokens is drawn at start-up.
+
+**Automatic update** (#617). Each simulator version is tagged
+`simulator-<version>`, with a GitHub release whose notes come from the
+CHANGELOG. When a merge to `main` changes the version, the workflow
+*Simulator · update the installed simulator* connects to this host, runs the
+update and checks that `/healthz` reports the new version. It runs only on a
+version change, or when started by hand (Actions → the workflow → *Run
+workflow*): a restart clears every booking and token, so an edit to the
+documentation does not interrupt a campaign. Until the set-up below is done,
+the workflow says that the secrets are missing and stops, green.
+
+Set-up, once, as root on this host:
+
+```bash
+# 1. The update command, copied OUTSIDE the checkout: a merge cannot change
+#    what the key may run. Read it before copying it again after an update.
+install -m 0755 /opt/osdm-simulator/OSDM_Simulator/deploy/update.sh /usr/local/sbin/osdm-simulator-update
+# 2. A user that may run it and nothing else (docker group for the restart).
+useradd --create-home --shell /bin/sh simdeploy && usermod -aG docker simdeploy
+chown -R simdeploy /opt/osdm-simulator
+chown 1000:1000 /opt/osdm-simulator/OSDM_Simulator/deploy/clients.json   # the container's user reads it
+# 3. A key pair; the private half goes to GitHub, the public half here,
+#    restricted to the one command.
+ssh-keygen -t ed25519 -N '' -C simulator-deploy -f /root/simulator-deploy
+install -d -m 700 -o simdeploy /home/simdeploy/.ssh
+echo "command=\"/usr/local/sbin/osdm-simulator-update\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty $(cat /root/simulator-deploy.pub)" > /home/simdeploy/.ssh/authorized_keys
+chown simdeploy /home/simdeploy/.ssh/authorized_keys && chmod 600 /home/simdeploy/.ssh/authorized_keys
+ssh-keyscan -t ed25519 <simulator-host>     # the known_hosts line
+```
+
+Then in the repository, Settings → Secrets and variables → Actions:
+`SIMULATOR_SSH_KEY` (the content of `/root/simulator-deploy`, then delete that
+file), `SIMULATOR_KNOWN_HOSTS` (the `ssh-keyscan` line),
+`SIMULATOR_SSH_TARGET` (`simdeploy@<simulator-host>`), `SIMULATOR_URL`
+(`https://<simulator-host>`). Start the workflow by hand once and watch it: it
+must end with "The simulator reports <version>". The checkout must belong to
+`simdeploy` (step 2), or `git pull` fails; `clients.json` stays with user
+1000, or the container cannot read it.
 
 **Replacing all clients and secrets**, for instance to move a simulator
 installed before the `provider.role` ids to them. The script never replaces a

@@ -1,0 +1,115 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Simulator · update the installed simulator
+
+# #617: when a merge to main changes the OSDM_Simulator/package.json version,
+# connect to the simulator host, run its update (git pull, docker compose
+# restart) and check that /healthz reports the new version. Also by hand
+# (workflow_dispatch).
+#
+# Only on a version change: a restart clears every booking and token on the
+# simulator, and a campaign in progress must not be wiped by an edit to the
+# documentation.
+#
+# Like refresh-collection.yml, the key it uses is restricted on the host to
+# one command (authorized_keys command="…"), whatever is typed here. That
+# command is a copy of OSDM_Simulator/deploy/update.sh installed outside the
+# checkout, so that a merge cannot change what the key may run. See the
+# operations page, "Update the simulator".
+#
+# Secrets (repository): SIMULATOR_SSH_KEY (private key), SIMULATOR_KNOWN_HOSTS
+# (the host's line), SIMULATOR_SSH_TARGET (user@host), SIMULATOR_URL
+# (https://<simulator-host>). Without them the job says so and stops, green.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'OSDM_Simulator/package.json'
+  workflow_dispatch: {}
+
+concurrency:
+  group: simulator-deploy
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update the simulator host
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout (with previous commit for diff)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Decide
+        id: decide
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          HAS_KEY: ${{ secrets.SIMULATOR_SSH_KEY != '' }}
+          HAS_HOSTS: ${{ secrets.SIMULATOR_KNOWN_HOSTS != '' }}
+          HAS_TARGET: ${{ secrets.SIMULATOR_SSH_TARGET != '' }}
+          HAS_URL: ${{ secrets.SIMULATOR_URL != '' }}
+        run: |
+          set -euo pipefail
+          new=$(jq -r '.version' OSDM_Simulator/package.json)
+          old=$(git show HEAD~1:OSDM_Simulator/package.json 2>/dev/null | jq -r '.version' 2>/dev/null || echo "")
+          go=false
+          if [[ "$EVENT" != "workflow_dispatch" && "$new" == "$old" ]]; then
+            echo "::notice::The simulator version did not change (${new}): no update, nothing restarted."
+          elif [[ "$HAS_KEY" != "true" || "$HAS_HOSTS" != "true" || "$HAS_TARGET" != "true" || "$HAS_URL" != "true" ]]; then
+            echo "::notice::The SIMULATOR_* secrets are not all set: the installed simulator is not updated."
+          else
+            go=true
+          fi
+          echo "version=${new}" >> "$GITHUB_OUTPUT"
+          echo "go=${go}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up SSH
+        if: steps.decide.outputs.go == 'true'
+        env:
+          KEY: ${{ secrets.SIMULATOR_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SIMULATOR_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run the update on the host
+        if: steps.decide.outputs.go == 'true'
+        env:
+          TARGET: ${{ secrets.SIMULATOR_SSH_TARGET }}
+        # The host runs its one allowed command, whatever is sent.
+        run: ssh -o StrictHostKeyChecking=yes -o BatchMode=yes "$TARGET" update
+
+      - name: Check the version it reports
+        if: steps.decide.outputs.go == 'true'
+        env:
+          URL: ${{ secrets.SIMULATOR_URL }}
+          VERSION: ${{ steps.decide.outputs.version }}
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            got=$(curl -fsS --max-time 5 "${URL%/}/healthz" | jq -r '.version' 2>/dev/null || true)
+            if [[ "$got" == "$VERSION" ]]; then
+              echo "The simulator reports ${got}."
+              echo "Updated the simulator to \`${got}\`." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Attempt ${attempt}: the simulator reports '${got}', expected ${VERSION}."
+            sleep 5
+          done
+          echo "::error::The simulator does not report ${VERSION} one minute after its update."
+          exit 1

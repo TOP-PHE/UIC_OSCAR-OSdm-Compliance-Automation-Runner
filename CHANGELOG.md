@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [simulator-0.15.0] — 2026-10-11
+
+Issue #617. Simulator 0.15.0. Server and collection unchanged.
+
+### Simulator 0.15.0
+
+- `GET /healthz` answers `{"status":"ok","version":"<version>"}`, and the
+  start line names the version (`OSDM simulator 0.15.0 listening on …`).
+  Nothing else is added: no build or host information.
+- **Tagged releases**: `simulator-release.yml` tags `simulator-<version>` and
+  creates a GitHub release when a merge to `main` changes the version. The
+  notes are this file's lines for that version
+  (`OSDM_Simulator/scripts/release-notes.js`); a version that this file does
+  not name stops the workflow. The server and release tags are untouched.
+- **Automatic update of the installed simulator**: `simulator-deploy.yml`, on
+  a version change or by hand, connects to the simulator host with a key
+  restricted to one command (`deploy/update.sh`, copied outside the checkout:
+  `git pull`, `docker compose restart`) and checks that `/healthz` reports
+  the new version. Not on other changes: a restart clears bookings and tokens.
+  Without its four `SIMULATOR_*` secrets it says so and stops, green. Set-up
+  on the operations page.
+
+Checked: the simulator's tests (158), the notes of 0.14.0 and 0.9.0 read from
+this file, and the version detection of both workflows run by hand on the
+last bump of `main`. Not checked: a workflow run on GitHub, and a first
+automatic update watched on the host (needs the secrets and the host set-up).
+
+---
+
 ## [server-1.11.236] / [collection-OTST_V2.0.121] — 2026-10-11
 
 Issue #619, release 2026.266.

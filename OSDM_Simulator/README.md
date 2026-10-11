@@ -64,7 +64,7 @@ and what a run must show:
 | `GET /<provider>/products`, `GET /<provider>/products/{id}` | `gamma`: its six named products (#598, #599), in both classes except the group ticket (second class only); an unknown id is `404`; the others answer `501` |
 | `GET /<provider>/reduction-cards` | `gamma`: its three cards (`SIM_CARD_25`, `SIM_CARD_50`, `SIM_STUDENT`, its profile's `reductionCards`, #597); the others answer `501` |
 | any other OSDM resource (places, products, exchanges, seat maps, …) | `501`, which the collection reports as "not implemented by this provider" |
-| `GET /healthz` | `{"status":"ok"}`, for the container health check |
+| `GET /healthz` | `{"status":"ok","version":"<package.json version>"}`, for the container health check and to see which version runs (#617) |
 
 There is no timetable. A trip is built from the request: the same origin,
 destination and time give the same trip and the same prices every time.
