@@ -88,6 +88,8 @@ defines from 3.7.
 | `SIM_RETURN_COMBINED_1ADT_38` | As `SIM_RETURN_COMBINED_1ADT_37`, in 3.8. | As on `beta`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_RETURN_1ADT_38` | As `SIM_REFUND_RETURN_1ADT_36`, in 3.8. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_INBOUND_1ADT_38` | As `SIM_REFUND_INBOUND_1ADT_36`, in 3.8. | As on `alpha`. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_DELETE_1ADT_38` | A one-way ticket: refund offer asked for (10), read (11), then withdrawn (15. DEL) instead of confirmed; the booking is read again (16). | The refund offer is `PROPOSED`; `DELETE` answers 204; the booking keeps its fulfilled ticket. (#611) | No failed check. |
+| `SIM_REFUND_ONLY_OFFER_1ADT_38` | A one-way ticket: refund offer asked for and read, then neither confirmed nor withdrawn (no `scenarioAction`); the run ends at 12. | The refund offer stays `PROPOSED` until it expires. (#611) | No failed check. |
 
 ### Technical cancellation (overrule codes, #596)
 
@@ -170,3 +172,10 @@ optional. Each is one reservation for all the passengers, on one leg.
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
 | `SIM_SALE_IDEMPOTENCY_1ADT_38` | `POST /bookings` and `POST /bookings/{id}/fulfillments` carry an `Idempotency-Key`. Steps 02 and 06 send each again with the same key: the same booking, or the same fulfillments, must come back. Step 02 also sends the booking with another key, which must give a new booking. | gamma (profile `idempotency`) keeps each answer per client and key, as it was when first given, and gives it again. The same key with another body is `409 IDEMPOTENCY_KEY_REUSED`. A booking made with a new key is left pre-booked. | No failed check. |
+
+### Exchange (#611)
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_EXCHANGE_1ADT_38` | The `04-Exchange` folder end to end on a one-way ticket: exchange offers for the same journey (10), one taken (11), read (12), the booking during the exchange (13), the exchange confirmed (14), the booking after it (15). | gamma (profile `exchange`) gives one exchange offer per offer of the request, priced against the ticket given up: `exchangeFee` by its exchangeability (none when fully flexible), `amountToBePaid` = new price + fee − price given up (else `refundableAmount`). The operation is `PREBOOKED` and the parts `EXCHANGE_ONGOING`; `POST /fulfillments` confirms it: the old part and fulfillment `EXCHANGED`, a new booked offer and fulfillment `FULFILLED`. | No failed check. |
+| `SIM_EXCHANGE_DELETE_1ADT_38` | The same exchange, withdrawn before its confirmation (`scenarioAction` DELETE: 16. DEL, then 17). | `DELETE` of the pre-booked operation answers 204 and the parts go back to `FULFILLED`. A confirmed exchange cannot be withdrawn (409). | No failed check. |

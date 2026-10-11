@@ -275,4 +275,29 @@ function setPurchaser(booking, body) {
   return booking.purchaser;
 }
 
-module.exports = { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser };
+/**
+ * #611: the booked offer an exchange adds, made from a remembered offer for
+ * the passengers the booking already has. Its mandatory reservations come
+ * with it, as in a booking.
+ */
+function exchangedBookedOffer(booking, entry, nowMs) {
+  const { offer, trips } = entry;
+  const passengers = new Map(booking.passengers.map((p) => [p.externalRef, p]));
+  const createdOn = new Date(nowMs).toISOString();
+  for (const trip of trips) {
+    if (!booking.trips.some((t) => t.id === trip.id)) booking.trips.push(trip);
+  }
+  const bookedOffer = {
+    offerId: offer.offerId,
+    summary: offer.summary,
+    tripCoverage: offer.tripCoverage,
+    products: offer.products,
+    admissions: offer.admissionOfferParts.map((part) => admissionFrom(part, passengers, createdOn, undefined)),
+    reservations: reservationsToBook(offer, {}).map((part) => reservationFrom(part, (ref) => passengers.get(ref).id, trips, createdOn, undefined)),
+    ancillaries: [],
+  };
+  linkReservations(bookedOffer);
+  return bookedOffer;
+}
+
+module.exports = { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer };

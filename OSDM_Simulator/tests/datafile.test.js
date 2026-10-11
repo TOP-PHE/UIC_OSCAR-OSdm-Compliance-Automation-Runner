@@ -43,9 +43,12 @@ test('every scenario points at entries that exist, and the run list at scenarios
     assert.ok(ids('purchaserList').has(scenario.purchaserListId), scenario.code);
     assert.ok(ids('requestedFulfillmentOptionsList').has(scenario.requestedFulfillmentOptionsListId), scenario.code);
     assert.ok(ids('offerSearchCriteriaList').has(scenario.offerSearchCriteriaListId), scenario.code);
-    // A sale, or the refund of one (#595); exchanges are not simulated.
-    assert.ok(['SALE', 'REFUND'].includes(scenario.scenarioType), `${scenario.code}: ${scenario.scenarioType}`);
-    if (scenario.scenarioType === 'REFUND') assert.equal(scenario.scenarioAction, 'PATCH', `${scenario.code}: a refund is confirmed`);
+    // A sale, the refund of one (#595), or its exchange (#611).
+    assert.ok(['SALE', 'REFUND', 'EXCHANGE'].includes(scenario.scenarioType), `${scenario.code}: ${scenario.scenarioType}`);
+    // A refund is confirmed (PATCH), withdrawn (DELETE) or only asked for; an
+    // exchange is confirmed (no action) or withdrawn (DELETE).
+    const actions = { SALE: [null], REFUND: ['PATCH', 'DELETE', null], EXCHANGE: [null, 'DELETE'] }[scenario.scenarioType];
+    assert.ok(actions.includes(scenario.scenarioAction), `${scenario.code}: ${scenario.scenarioAction}`);
     assert.equal(scenario.shared, true, 'a tester must see the scenario');
     assert.equal(scenario.created_by, undefined, 'the file belongs to no one in particular');
     // The collection checks a passenger against the updated values even when
@@ -59,7 +62,8 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600) and reservations (#601) are gamma's only.
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601) and,
+  // with the rest of #592 and #611, the later functions are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
   for (const scenario of datafile.scenarios) {
@@ -71,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -99,7 +103,8 @@ test('the return scenarios name a model their version defines, and expect a tick
 test('the refund scenarios refund a return: in full, and the inbound ticket alone', () => {
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
-  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND');
+  // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
+  const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH');
   assert.equal(refunds.length, 12);
   for (const scenario of refunds) {
     assert.notEqual(scenario.offerSearchCriteria.returnOffsetDays, null, `${scenario.code} is a return`);
@@ -109,6 +114,26 @@ test('the refund scenarios refund a return: in full, and the inbound ticket alon
     for (const axis of ['partialRefundByLeg', 'partialRefundByPax']) {
       assert.ok([undefined, 'off', false].includes(scenario[axis]), `${scenario.code}: the provider refuses a scope by leg or passenger`);
     }
+  }
+});
+
+test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the way each ends (#611)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  assert.equal(gamma.exchange, true);
+  const ends = Object.fromEntries(datafile.scenarios
+    .filter((s) => s.code.startsWith('SIM_EXCHANGE_') || (s.scenarioType === 'REFUND' && s.scenarioAction !== 'PATCH'))
+    .map((s) => [s.code, `${s.scenarioType} ${s.scenarioAction}`]));
+  assert.deepEqual(ends, {
+    SIM_EXCHANGE_1ADT_38: 'EXCHANGE null',
+    SIM_EXCHANGE_DELETE_1ADT_38: 'EXCHANGE DELETE',
+    SIM_REFUND_DELETE_1ADT_38: 'REFUND DELETE',
+    SIM_REFUND_ONLY_OFFER_1ADT_38: 'REFUND null',
+  });
+  for (const code of Object.keys(ends)) {
+    const scenario = datafile.scenarios.find((s) => s.code === code);
+    assert.equal(scenario.offerSearchCriteria.returnOffsetDays, undefined, `${code} is one-way`);
+    assert.equal(scenario.osdmVersion, gamma.osdmVersion);
+    assert.equal(scenario.desiredFlexibility, 'FULL_FLEXIBLE', code);
   }
 });
 

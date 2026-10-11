@@ -12,6 +12,7 @@
   "tokenLifetimeSeconds": 900,
   "tripsCollection": true,
   "idempotency": true,
+  "exchange": true,
   "documents": [
     "PDF_A4",
     "RETAILER_APP"

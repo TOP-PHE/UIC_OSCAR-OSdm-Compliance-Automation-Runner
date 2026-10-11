@@ -24,11 +24,12 @@ const crypto = require('node:crypto');
 const { HttpError, BASE_HEADERS, sendJson, sendProblem, readBody, parseJsonObject } = require('./http');
 const { clientMatches } = require('./config');
 const { buildOfferCollection, productsOf } = require('./osdm/offers');
-const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser } = require('./osdm/bookings');
+const { createBooking, confirmBooking, addOfferParts, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
 const { buildTripCollection } = require('./osdm/trips');
 const { fulfillmentWithDocuments, showRefundReceipt } = require('./osdm/documents');
+const exchanges = require('./osdm/exchanges');
 
 // OSDM resources this simulator knows of and does not provide. They answer
 // 501, the HTTP status for functionality a server does not support (RFC 9110
@@ -206,6 +207,9 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     requireMethod(req, 'POST');
     return idempotent(req, provider, scope, `POST /bookings/${bookingId}/fulfillments`, () => {
       const booking = bookingOf(scope, bookingId);
+      // #611: with an exchange pre-booked, this confirms the exchange.
+      const pending = exchanges.pendingExchange(booking);
+      if (pending) return { fulfillments: exchanges.confirmExchange(booking, pending, provider, now(), (entry) => exchangedBookedOffer(booking, entry, now())) };
       const issued = confirmBooking(booking, provider, now());
       for (const fulfillment of issued) store.put('fulfillment', scope, fulfillment.id, booking.id);
       return booking.fulfillmentDocuments ? { fulfillments: issued, fulfillmentDocuments: booking.fulfillmentDocuments } : { fulfillments: issued };
@@ -253,6 +257,26 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
     return NO_CONTENT;
   }
 
+  // #611: POST .../exchange-offers; POST .../exchange-operations; GET, DELETE
+  // .../exchange-operations/{id}, on a provider that exchanges.
+  async function exchangeRoute(req, provider, scope, bookingId, part, operationId) {
+    const booking = bookingOf(scope, bookingId);
+    if (part === 'exchange-offers') {
+      if (operationId !== undefined) throw notFound();
+      requireMethod(req, 'POST');
+      const known = { trip: (id) => store.get('trip', scope, id) };
+      return { exchangeOffers: exchanges.createExchangeOffers(booking, await bodyOf(req), provider, now(), known) };
+    }
+    if (operationId === undefined) {
+      requireMethod(req, 'POST');
+      return { exchangeOperation: exchanges.createExchangeOperation(booking, await bodyOf(req), provider, now()) };
+    }
+    requireMethod(req, 'GET', 'DELETE');
+    if (req.method === 'GET') return { exchangeOperation: exchanges.findExchangeOperation(booking, operationId) };
+    exchanges.deleteExchangeOperation(booking, operationId);
+    return NO_CONTENT;
+  }
+
   // POST /bookings/{id}/booked-offers/{bookedOfferId}/offer-parts (#601); the
   // other booked-offer resources are not provided.
   async function bookedOfferRoute(req, scope, bookingId, bookedOfferId, more) {
@@ -270,6 +294,9 @@ function createApp({ providers, clients, tokens, store, limits, trustProxy = fal
       const booking = bookingOf(scope, bookingId);
       showRefundReceipt(booking, provider, now());
       return { booking };
+    }
+    if (provider.exchange && (part === 'exchange-offers' || part === 'exchange-operations') && more.length === 0) {
+      return exchangeRoute(req, provider, scope, bookingId, part, partId);
     }
     if (BOOKING_PARTS_NOT_PROVIDED.has(part)) throw notProvided();
     if (part === 'booked-offers') return bookedOfferRoute(req, scope, bookingId, partId, more);
