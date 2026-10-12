@@ -107,6 +107,23 @@ describe('computeEffectiveRunTimeoutMs (#204 datafile-decrypt regression guard)'
     expect(r.scenariosInScope).toBe(1);
   });
 
+  // #656: switched on with no max wait — no extension, but the test is armed.
+  test('counts an expiry test switched on without a max wait as armed', async () => {
+    const datafile = {
+      scenariosToRun: ['SC_NOWAIT'],
+      scenarios: [makeScenario('SC_NOWAIT', { expiredBookingTest: 'on', expiredBookingMaxWaitMinutes: '' })],
+    };
+    const p = await writeEncryptedDatafile(datafile);
+    const r = await computeEffectiveRunTimeoutMs(p, 'SC_NOWAIT');
+    expect(r.requestedMs).toBe(0);
+    expect(r.armedTimers).toBe(1);
+    expect(r.effectiveMs).toBe(r.baseMs);
+    const off = await computeEffectiveRunTimeoutMs(await writeEncryptedDatafile({
+      scenariosToRun: ['SC_OFF'], scenarios: [makeScenario('SC_OFF', { expiredBookingTest: 'off' })],
+    }), 'SC_OFF');
+    expect(off.armedTimers).toBe(0);
+  });
+
   test('clamps to RUN_HARD_MAX_TIMEOUT_MS when scenario asks for more than the server cap', async () => {
     // Wizard caps at 60 min in the input; helper clamp is what matters server-side.
     // RUN_HARD_MAX_TIMEOUT_MS defaults to 1800000 (30 min); 45 min request gets clamped.

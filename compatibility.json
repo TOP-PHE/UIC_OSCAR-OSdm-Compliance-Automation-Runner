@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.278",
+  "current_release": "2026.279",
   "releases": [
+    {
+      "release": "2026.279",
+      "date": "2026-10-12",
+      "server": "1.11.245",
+      "collection": "OTST_V2.0.132",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#656: an expiry test switched on without a max wait no longer gets the run stopped after 5 min of silence (no JSON report, no Download); the stop message no longer blames the provider"
+      ]
+    },
     {
       "release": "2026.278",
       "date": "2026-10-12",

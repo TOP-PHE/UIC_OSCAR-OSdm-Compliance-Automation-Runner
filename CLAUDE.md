@@ -1026,7 +1026,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     A gateway blocked the server's address after repeated rejected calls;
     Bruno has no request timeout, so runs waited for ever. The runner stops a
     run whose Bruno is silent for `RUN_IDLE_TIMEOUT_MS` (5 min; off when a
-    scenario arms a timer), its timeout escalates to SIGKILL through
+    scenario arms a timer, by its flag alone since #656: without a max wait
+    the collection still waits, on `RUN_TIMEOUT_MS`, silently), its timeout escalates to SIGKILL through
     `killRun()`, and `urlPolicy.js` gives the start-up DNS lookup 10 s. The
     `[runner]` lines go to the run's log in the database, not to
     `docker logs`: ask for the run's log in OSCAR when diagnosing a run.

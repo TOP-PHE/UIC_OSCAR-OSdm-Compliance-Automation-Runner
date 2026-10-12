@@ -411,7 +411,8 @@ function _authLogger(runId) {
  * the largest single-scenario sum wins (the worker only runs one scenario at
  * a time). The effective timeout is `min(hardMaxMs, max(baseMs, maxSum))`.
  *
- * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, clamped, source }.
+ * Returns: { effectiveMs, baseMs, hardMaxMs, requestedMs, armedTimers, clamped, source }.
+ * `armedTimers` counts the expiry tests switched on in scope, max wait or not.
  * Never throws — datafile read/parse errors fall back to baseMs.
  */
 const EXPIRED_FLOW_TIMERS = [
@@ -427,9 +428,11 @@ const EXPIRED_FLOW_TIMERS = [
 // How long Bruno may stay silent before the run is stopped as stalled
 // (RUN_IDLE_TIMEOUT_MS, default 5 min, 0 = off). Off when a scenario in scope
 // arms a timer: it waits on purpose, and may print nothing while it does.
+// #656: armed is the flag, not the flag plus a max wait. Without a max wait
+// the collection still waits, on the server's RUN_TIMEOUT_MS.
 const IDLE_CHECK_EVERY_MS = 15000;
 function runIdleLimitMs(runBudget) {
-  if (runBudget && runBudget.requestedMs > 0) return 0;
+  if (runBudget && (runBudget.requestedMs > 0 || runBudget.armedTimers > 0)) return 0;
   const ms = Number.parseInt(getConfig('RUN_IDLE_TIMEOUT_MS', '300000'), 10);
   return Number.isInteger(ms) && ms > 0 ? ms : 0;
 }
@@ -443,6 +446,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   let helperError = null;
   let scenariosConsidered = 0;
   let scenariosInScope = 0;
+  let armedTimers = 0;
   try {
     // CRITICAL: since OSCAR v1.11.0 (Phase 2 of issue #60) the datafile on disk
     // is AES-256-GCM encrypted under the OSCAR1 envelope. Plain fs.readFile here
@@ -483,6 +487,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
         const isOn = flagVal === true || (typeof flagVal === 'string' && ['true', 'on', 'yes'].includes(flagVal.toLowerCase()));
         if (!isOn) continue;
         const m = Number(s[timer.wait]);
+        if (timer.flag) armedTimers++;
         if (Number.isFinite(m) && m >= 1 && m <= 60) {
           scenarioBudgetMs += Math.ceil(m * 60 * 1000) + 60000;
           armedInScenario.push(timer.label);
@@ -515,7 +520,7 @@ async function computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride) {
   } else {
     source = `RUN_TIMEOUT_MS (no in-scope scenario requested an extension; ${scenariosConsidered} scenarios in datafile, ${scenariosInScope} matched the run scope)`;
   }
-  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, clamped, source, helperError, scenariosConsidered, scenariosInScope };
+  return { effectiveMs: effective, baseMs, hardMaxMs, requestedMs, armedTimers, clamped, source, helperError, scenariosConsidered, scenariosInScope };
 }
 
 // ── One way to write a value into the Bruno environment file (tracker NEW-02) ─
@@ -991,10 +996,13 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     // scenario waits on purpose (an expired-flow or receipt timer).
     let lastOutputAt = Date.now();
     const idleLimitMs = runIdleLimitMs(_runBudget);
+    if (idleLimitMs === 0 && _runBudget.armedTimers > 0) {
+      logEvent(runId, 'info', `[runner] No stop on silence for this run: ${_runBudget.armedTimers} expiry test(s) armed, which wait on purpose. RUN_TIMEOUT_MS still applies.`);
+    }
     const idleWatch = idleLimitMs > 0 ? setInterval(() => {
       if (Date.now() - lastOutputAt < idleLimitMs) return;
       clearInterval(idleWatch);
-      logEvent(runId, 'error', `[runner] No output from Bruno for ${Math.round(idleLimitMs / 1000)}s: a request to the provider got no answer (unreachable, or blocking this server). Run stopped.`);
+      logEvent(runId, 'error', `[runner] No output from Bruno for ${Math.round(idleLimitMs / 1000)}s: run stopped. Most often a request to the provider got no answer (unreachable, or blocking this server); the last step logged above is where it waited.`);
       killRun(runId);
     }, Math.min(IDLE_CHECK_EVERY_MS, Math.max(10, Math.floor(idleLimitMs / 4)))) : null;
     const stopIdleWatch = () => { if (idleWatch) clearInterval(idleWatch); };

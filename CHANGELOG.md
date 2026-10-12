@@ -62,6 +62,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.245] / [collection-OTST_V2.0.132] — 2026-10-12
+
+Issue #656, release 2026.279. Collection unchanged.
+
+### Fixed
+
+- **An expiry test without a max wait is no longer stopped as a silent
+  provider.** A scenario that switches on an expiry test (booking, offer,
+  refund offer…) but leaves its max wait empty asked for no extension, so the
+  5-minute stop on silence (#646) stayed on. The collection still waits, up to
+  the server's `RUN_TIMEOUT_MS`, and prints nothing while it does: the run was
+  stopped after 300 s with a message blaming the provider, and Bruno, killed,
+  never wrote its JSON report (no Download). Seen on a real provider's run.
+  The stop on silence is now off as soon as an expiry test is switched on in
+  scope, max wait or not; the run log says so. The run timeout still applies.
+- The stop message no longer states that the provider did not answer: it says
+  that this is the most frequent cause, and that the last step logged is where
+  the run waited.
+
+### Default decisions
+
+- No heartbeat line from the collection during the wait: the fix is in the
+  runner, which decides alone whether a run is stalled, and it needs no
+  collection release.
+- The refund-receipt wait, which has no on/off flag, still counts only with
+  its max wait set: without one the collection does not wait for it.
+
+### Not verified
+
+- Not rerun against the provider: checked with the runner's unit tests (a
+  silent run with such a scenario is not stopped; the same test fails without
+  the fix).
+
+---
+
 ## [server-1.11.244] / [collection-OTST_V2.0.132] — 2026-10-12
 
 Issue #652, release 2026.278. Server code unchanged (tests only).

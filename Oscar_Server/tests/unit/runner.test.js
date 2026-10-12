@@ -677,7 +677,7 @@ describe('executeRun — a silent Bruno is stopped', () => {
     expect(fakeProc.kill).toHaveBeenCalledWith('SIGTERM');
     fakeProc.emit('close', 143);
     await runPromise;
-    expect(getDecryptedEvents(runId).some((e) => /No output from Bruno for \d+s: a request to the provider got no answer/.test(e.message))).toBe(true);
+    expect(getDecryptedEvents(runId).some((e) => /No output from Bruno for \d+s: run stopped\. Most often a request to the provider got no answer/.test(e.message))).toBe(true);
     clearConfig('RUN_IDLE_TIMEOUT_MS');
   }, 10000);
 
@@ -699,6 +699,31 @@ describe('executeRun — a silent Bruno is stopped', () => {
     await runPromise;
     clearConfig('RUN_IDLE_TIMEOUT_MS');
     expect(killed).toBe(0);
+  }, 10000);
+
+  // #656: the scenario waits for its booking to expire; with no max wait the
+  // collection's budget is the run timeout, and it prints nothing meanwhile.
+  test('an expiry test armed without a max wait is not stopped for silence', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'runner-armed-'));
+    const file = path.join(dir, 'datafile.json');
+    fs.writeFileSync(file, JSON.stringify({ scenariosToRun: 'ALL', scenarios: [{ code: 'WAITS', expiredBookingTest: 'on', expiredBookingMaxWaitMinutes: '' }] }));
+    run('UPDATE companies SET datafile_path = ? WHERE id = ?', [file, companyId]);
+    resolveAccessToken.mockResolvedValueOnce('tok-abc');
+    setConfig('RUN_IDLE_TIMEOUT_MS', '80');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    await new Promise((r) => setTimeout(r, 400));
+    const killed = fakeProc.kill.mock.calls.length;
+    fakeProc.emit('close', 0);
+    await runPromise;
+    clearConfig('RUN_IDLE_TIMEOUT_MS');
+    fs.rmSync(dir, { recursive: true, force: true });
+    expect(killed).toBe(0);
+    expect(getDecryptedEvents(runId).some((e) => /No stop on silence for this run: 1 expiry test/.test(e.message))).toBe(true);
   }, 10000);
 
   test('a process that ignores SIGTERM at the timeout gets SIGKILL', async () => {
@@ -724,6 +749,9 @@ describe('executeRun — a silent Bruno is stopped', () => {
     clearConfig('RUN_IDLE_TIMEOUT_MS');
     expect(runIdleLimitMs({ requestedMs: 0 })).toBe(300000);
     expect(runIdleLimitMs({ requestedMs: 2460000 })).toBe(0);
+    // #656: an expiry test armed without a max wait still waits.
+    expect(runIdleLimitMs({ requestedMs: 0, armedTimers: 1 })).toBe(0);
+    expect(runIdleLimitMs({ requestedMs: 0, armedTimers: 0 })).toBe(300000);
     setConfig('RUN_IDLE_TIMEOUT_MS', '0');
     expect(runIdleLimitMs({ requestedMs: 0 })).toBe(0);
     clearConfig('RUN_IDLE_TIMEOUT_MS');
