@@ -10,7 +10,7 @@
 // Import needed library files
 require('./displays.js');
 require('./requestsBuilder.js');
-const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
+const { bruTest: test, expectTypeOrNull, expectScale } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES, checkExtensibleCode } = require('./osdmEnums.js');
 const { parseEnvJson } = require('./envUtils.js');
 const { processRequestedInformation } = require('./requestedInformation.js');
@@ -941,29 +941,31 @@ function validateOfferParts(selectedOffer) {
   });
   logMinimalBelowAllParts(minimalPrice, sumPartsPrice);
 
-  // Flexibility consistency. The offer's overall flexibility is the MOST
-  // RESTRICTIVE of its products (least-flexible leg governs the journey). When
-  // the provider sends offerSummary.overallFlexibility we assert it matches that
-  // derivation; when it omits offerSummary (OPTIONAL in OSDM) there is nothing to
-  // be consistent with — we just log the derived value. (#223)
+  // Flexibility of the summary (#223, #650). OSDM 3.8 OfferSummary: the
+  // overall values "best represent this offer … this does not imply that these
+  // values exactly apply to all parts of the offer". So the summary need not be
+  // the most restrictive product (a FULL_FLEXIBLE admission with a
+  // NON_FLEXIBLE reservation may be summed up FULL_FLEXIBLE). It should be the
+  // flexibility of one of the products: that passes as a check; one no product
+  // has is a warning line; a difference from the most restrictive one is
+  // information. When offerSummary is absent (optional) the derived value is
+  // logged.
   const productFlex = Array.from(new Set((selectedOffer?.products || []).map(p => p.flexibility).filter(Boolean)));
   const derivedFlex = deriveOfferFlexibilityFromProducts(selectedOffer);
   const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
 
   if (overallFlex) {
-    test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
-      validationLogger(`[DEBUG] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
-      // Log-audit round 2: plain throw with the decoded reasoning instead of
-      // expect().to.eql and its chai tail ("expected 'FULL_FLEXIBLE' to
-      // deeply equal 'NON_FLEXIBLE'").
-      if (overallFlex !== derivedFlex) {
-        throw new Error(
-          `offerSummary.overallFlexibility says "${overallFlex}" but the most restrictive product flexibility in the offer is "${derivedFlex}" ` +
-          `(product flexibilities: ${productFlex.join(", ") || "none"}). Per the least-flexible-part rule (#223) the summary should reflect ` +
-          `the most restrictive product — typically the NON_FLEXIBLE reservations. Provider should align offerSummary.overallFlexibility with its products.`
-        );
+    validationLogger(`[DEBUG] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
+    if (productFlex.length === 0 || productFlex.includes(overallFlex)) {
+      test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
+        validationLogger(`[DEBUG] overallFlexibility ${overallFlex} is the flexibility of a product of the offer`);
+      });
+      if (derivedFlex && overallFlex !== derivedFlex) {
+        validationLogger(`[INFO] offerSummary.overallFlexibility is "${overallFlex}", the most restrictive product is "${derivedFlex}" (product flexibilities: ${productFlex.join(", ")}). OSDM lets the summary give the value that best represents the offer.`);
       }
-    });
+    } else {
+      validationLogger(`[WARNING] Offer overallFlexibility consistency - offerSummary.overallFlexibility says "${overallFlex}", which none of the offer's products has (product flexibilities: ${productFlex.join(", ")}).`);
+    }
   } else {
     validationLogger(`[INFO] offerSummary absent — overall flexibility derived from products [${productFlex.join(", ")}] → most restrictive = ${derivedFlex}`);
   }
@@ -1125,7 +1127,7 @@ function validateAdmissions(selectedOffer) {
         expect(admission.price, "price should exist").to.be.an("object");
         expect(admission.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(admission.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expectTypeOrNull(admission.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
+        expectScale(admission.price.scale, "price.scale should be a number, null or absent (nullable per OSDM)");
       });
 
       // offerMode is defined
@@ -1245,7 +1247,7 @@ function validateAdmissions(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
+              expectScale(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number, null or absent (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1302,7 +1304,7 @@ function validateReservations(selectedOffer) {
         expect(reservation.price, "price should exist").to.be.an("object");
         expect(reservation.price.amount, "price.amount should be a number >= 0").to.be.a("number").and.at.least(0);
         expect(reservation.price.currency, "price.currency should exist").to.exist.and.be.a("string");
-        expectTypeOrNull(reservation.price.scale, "number", "price.scale should be a number or null (nullable per OSDM)");
+        expectScale(reservation.price.scale, "price.scale should be a number, null or absent (nullable per OSDM)");
       });
 
       // refundable and exchangeable are valid OSDM values
@@ -1480,7 +1482,7 @@ function validateReservations(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
+              expectScale(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number, null or absent (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
@@ -1569,7 +1571,7 @@ function validateAncillaries(selectedOffer) {
               expect(condition.afterSaleFee, `afterSalesCondition[${condIndex}].afterSaleFee should exist`).to.be.an('object');
               expect(condition.afterSaleFee.currency, `afterSalesCondition[${condIndex}].afterSaleFee.currency should exist`).to.exist;
               expect(condition.afterSaleFee.amount, `afterSalesCondition[${condIndex}].afterSaleFee.amount should be a number`).to.be.a('number');
-              expectTypeOrNull(condition.afterSaleFee.scale, "number", `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number or null (nullable per OSDM)`);
+              expectScale(condition.afterSaleFee.scale, `afterSalesCondition[${condIndex}].afterSaleFee.scale should be a number, null or absent (nullable per OSDM)`);
               validationLogger(`[DEBUG] afterSalesCondition[${condIndex}].afterSaleFee: ${condition.afterSaleFee.amount} ${condition.afterSaleFee.currency}`);
 
               const scenarioType = bru.getEnvVar("scenarioType") || "";
