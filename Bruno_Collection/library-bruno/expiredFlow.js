@@ -355,6 +355,7 @@ function advanceExpiredFlowQueueOrFinish(opts) {
   bru.setEnvVar(next.flag, 'true');
   bru.setEnvVar('__expiredFlowQueueIndex', String(idx + 1));
   bru.setEnvVar('__expiredFlowSubRunPending', 'true');
+  clearSubRunSaleState();
 
   validationLogger(`[INFO] ${scenarioLabel}: queue advancing to sub-run ${idx + 2}/${queue.length} — ${next.code} (${next.label}). Routing back to 01. POST Get Offer.`);
   bru.runner.setNextRequest('01. POST Get Offer');
@@ -442,13 +443,43 @@ function advanceExpiredFlowQueueAfterSkip() {
   bru.setEnvVar(next.flag, 'true');
   bru.setEnvVar('__expiredFlowQueueIndex', String(idx + 1));
   bru.setEnvVar('__expiredFlowSubRunPending', 'true');
+  clearSubRunSaleState();
   validationLogger(`[INFO] expired-flow queue advancing to sub-run ${idx + 2}/${queue.length} — ${next.code} (${next.label}). Routing back to 01. POST Get Offer.`);
   bru.runner.setNextRequest('01. POST Get Offer');
   return true;
 }
 
+/**
+ * #658: what one sub-run's sale leaves behind, cleared when the queue sends
+ * the next sub-run back to 01. 01 does not re-read the scenario then (it does
+ * only on `__loopback`), so the scenario's own settings stay; everything here
+ * is set again by the sale. Left in place, the previous `bookingId` made the
+ * next sub-run skip the seat map and send the seat it had booked.
+ */
+const SUBRUN_SALE_STATE = [
+  // booking
+  'bookingId', 'bookedOfferId', 'BookingRequest', 'admissionReservationAncillaryBookingPartsIds',
+  'provisionalPrice', 'provisionalPriceAmount', 'confirmedPriceAmount', 'bookingConfirmedPrice',
+  '__addReservationDone', '__addAncillaryDone', '__reservationsBooked', '__reservationsAddedLater',
+  '__purchaserStepDone',
+  // places
+  'placeSelections', 'layoutId', 'preselectedCoach', 'preselectedPlace', 'preselectedPlaces',
+  '__placeMapAtOfferFailed', '__postBookingPlaceMapDone',
+  // fulfillments, refund, exchange
+  'fulfillmentIds', '__bookingFulfillmentIds',
+  'refundOffersOfferId', 'isRefundConfirmed', '__refundProposed', '__refundedFulfillmentIds',
+  '__refundOfferIds', '__refundOfferIndex', '__refundOfferRetryCount', '__bookingForRefund',
+  'exchangeOffersOfferId', 'exchangeOperationId', '__partIdsBeforeExchange',
+  '__offerRetryCount',
+];
+
+function clearSubRunSaleState() {
+  SUBRUN_SALE_STATE.forEach((key) => bru.deleteEnvVar(key));
+}
+
 module.exports = {
   planExpiredFlow, runExpiredFlowWait, gradeExpiredFlowResponse,
+  SUBRUN_SALE_STATE, clearSubRunSaleState,
   BUFFER_MS, POST_MARGIN_MS,
   EXPIRED_FLOW_TIMERS_DEF,
   buildAndArmExpiredFlowQueue,

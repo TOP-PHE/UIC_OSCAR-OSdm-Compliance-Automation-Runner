@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.279",
+  "current_release": "2026.280",
   "releases": [
+    {
+      "release": "2026.280",
+      "date": "2026-10-12",
+      "server": "1.11.246",
+      "collection": "OTST_V2.0.133",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#658: each sub-run of chained expiry tests starts a new sale (the previous booking and seat are no longer reused)"
+      ]
+    },
     {
       "release": "2026.279",
       "date": "2026-10-12",

@@ -1060,6 +1060,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     decide in the routing step, with the filter's own conditions
     (`routeAfterOfferStep()` for the seat map). The simulator scenario
     `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` holds it.
+  - **Each expiry sub-run sells again from a clean sale** (#658,
+    OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
+    re-read the scenario (only `__loopback` does), so the previous booking id
+    and seats stayed: the seat map was skipped and the booked seat resent.
+    `clearSubRunSaleState()` (`SUBRUN_SALE_STATE` in `expiredFlow.js`) runs in
+    both queue advances; a new per-sale variable goes in that list too. The
+    continuation branch of `getScenarioData` is not where to do it: it never
+    runs on that path. Not shown on the simulator: it has no seat map (501).
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,
