@@ -1233,6 +1233,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     record and regenerate after a collection release, never edit it. The
     reference-scenario tables of `OSCAR - What is tested.md` are pinned to
     `scenario_catalogue.json` by `tests/what-is-tested.test.js`.
+  - **A load test of OSCAR needs the simulator's limits raised** (#676): every
+    run comes from the OSCAR server's address, about 4 requests a second
+    each, against 50/s in nginx and 3,000/min in the simulator. The page's
+    section 7 raises them through `deploy/docker-compose.override.yml`
+    (git-ignored, so the update's `pull --ff-only` still works; applied by
+    `up -d`, never by `restart`) and puts them back. OSCAR caps first: 10 per
+    company (Test Framework), 20 per server (`MAX_CONCURRENT_RUNS`).
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes
