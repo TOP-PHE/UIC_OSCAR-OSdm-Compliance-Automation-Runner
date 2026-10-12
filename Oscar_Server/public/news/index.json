@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-refund-confirmed-fulfillments",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Clearer report when a confirmed refund names other tickets",
+    "summary": "When a provider confirms a refund naming tickets that are not the booking's, the report says so at the confirmation instead of failing every refunded ticket afterwards.",
+    "content": "Some providers answer the confirmation of a refund with different ticket records from those of the booking. OSCAR then believed nothing of the booking had been refunded and reported each refunded ticket as a failure. The confirmation step now reports the mismatch once, naming the tickets, and the booking is checked against the refund that was actually requested."
+  },
+  {
     "id": "2026-10-12-exchange-new-parts",
     "date": "October 12, 2026",
     "tag": "Fix",

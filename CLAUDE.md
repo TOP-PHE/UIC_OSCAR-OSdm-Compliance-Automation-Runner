@@ -1079,6 +1079,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     wizard's default, so wizard-made exchanges never confirmed while every
     check passed. A REFUND without an Action asks for the refund offer only,
     on purpose (`SIM_REFUND_ONLY_OFFER_1ADT_38`).
+  - **A confirmed refund offer may name other fulfillments** (#674,
+    OTST_V2.0.140): one provider's PATCH answer lists new ids, CANCELLED, with
+    another booking's `bookingRef`, while the booking's own are refunded.
+    `recordRefundOfferStates()` fails that once at 13 and takes the refunded
+    set from the offer as PROPOSED (`__refundProposed[id].fulfillmentIds`).
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

@@ -19,6 +19,7 @@ module.exports = {
   isScopedRefundOnBooking,
   checkRefundScopeOnBooking,
   checkRefundOfferFulfillments,
+  recordRefundOfferStates,
   rememberRefundOffersToConfirm,
   nextRefundOfferToConfirm,
   checkFullRefundDone,
@@ -108,7 +109,7 @@ function recordRefundOfferStates(refundOffers) {
       fee: ro.refundFee && typeof ro.refundFee.amount === "number" ? ro.refundFee.amount : null,
     };
     if (ro.status === "PROPOSED") {
-      proposed[ro.id] = amounts;
+      proposed[ro.id] = { ...amounts, fulfillmentIds: _fulfillmentIdsOf(ro) };
     } else if (ro.status === "CONFIRMED") {
       const before = proposed[ro.id];
       if (before) {
@@ -117,12 +118,36 @@ function recordRefundOfferStates(refundOffers) {
           expect(amounts.fee, "refundFee changed between PROPOSED and CONFIRMED").to.eql(before.fee);
         });
       }
-      _fulfillmentIdsOf(ro).forEach((id) => refunded.add(id));
+      _confirmedFulfillmentIds(ro, index, before).forEach((id) => refunded.add(id));
       bru.setEnvVar("isRefundConfirmed", "true");
     }
   });
   bru.setEnvVar("__refundProposed", JSON.stringify(proposed));
   bru.setEnvVar("__refundedFulfillmentIds", JSON.stringify([...refunded]));
+}
+
+// #674: a CONFIRMED refund offer names the booking's fulfillments it refunded.
+// A provider was seen answering the PATCH with other fulfillments (new ids,
+// CANCELLED, another bookingRef) while the booking's own were refunded: that
+// is one failure here, and the refunded set falls back to what the same offer
+// named when PROPOSED, else to those of its ids that are the booking's.
+function _confirmedFulfillmentIds(refundOffer, index, before) {
+  const ids = _fulfillmentIdsOf(refundOffer);
+  const bookingIds = _readJson("__bookingFulfillmentIds", []);
+  if (bookingIds.length === 0) return ids;
+  const foreign = ids.filter((id) => !bookingIds.includes(id));
+  if (foreign.length === 0) return ids;
+  const refs = (refundOffer.fulfillments || [])
+    .filter((f) => foreign.includes(f?.id))
+    .map((f) => `${f.id} (status ${f.status}, bookingRef ${f.bookingRef})`);
+  test(`Confirmed refund offer[${index}] (${refundOffer.id}) names fulfillments of this booking`, () => {
+    throw new Error(`[${refs.join(", ")}] not among the booking's fulfillments [${bookingIds.join(", ")}]`);
+  });
+  const fallback = Array.isArray(before?.fulfillmentIds) && before.fulfillmentIds.length > 0
+    ? before.fulfillmentIds
+    : ids.filter((id) => bookingIds.includes(id));
+  validationLogger(`[INFO] Refund scope: the booking is checked against the fulfillments the refund offer named when PROPOSED: [${fallback.join(", ")}].`);
+  return fallback;
 }
 
 // ─── #595: every refund offer of the answer, one per fulfillment or not ────

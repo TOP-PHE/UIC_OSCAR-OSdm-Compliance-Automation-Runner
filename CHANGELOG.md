@@ -62,6 +62,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.253] / [collection-OTST_V2.0.140] — 2026-10-12
+
+Issue #674, release 2026.287. Server code unchanged (tests only).
+
+### Fixed
+
+- **A confirmed refund offer that names other fulfillments is reported where
+  it happens.** A real provider answers `PATCH …/refund-offers/{id}`
+  (CONFIRMED) with fulfillments that are not the booking's: new ids, status
+  `CANCELLED`, a `bookingRef` of another booking. The booking's own
+  fulfillments are refunded. Step 13 passed, and step 14 then failed every
+  fulfillment and part as "is not REFUNDED (left out of the refund) - status:
+  REFUNDED", plus "Full refund: 0/N": three to five failures pointing at the
+  wrong thing.
+  - Step 13: one failure, "Confirmed refund offer[n] names fulfillments of
+    this booking", naming each foreign id with its status and `bookingRef`.
+  - The refunded set then comes from what the same offer named when it was
+    PROPOSED (kept in `__refundProposed`), else from those of its ids that are
+    the booking's. Step 14 checks the refund that was asked for.
+
+### Default decisions
+
+- A FAIL, not a WARNING: `RefundOffer.fulfillments` are the fulfillments the
+  offer refunds, and an offer of this booking naming another booking's is not
+  conformant.
+- When the booking's fulfillments are not known (`__bookingFulfillmentIds`
+  empty), the confirmed offer is taken as it is, as before.
+
+### Not verified
+
+- Not rerun against the provider. On the simulator, ten refund scenarios
+  (return, inbound, 3.6, overrule, delete, offer only, per passenger, wrong
+  amount, two COMBINED) give the same recording before and after: its
+  confirmed offers name the booking's fulfillments.
+
+---
+
 ## [server-1.11.252] / [collection-OTST_V2.0.139] — 2026-10-12
 
 Issue #671, release 2026.286. Server code unchanged (tests only).
