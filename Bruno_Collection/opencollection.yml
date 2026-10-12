@@ -349,6 +349,7 @@ request:
                 "requestRefundOffersBodyData",
                 // Partial refund (#218) — runtime-only side channels
                 "__bookingForRefund",
+                "__partIdsBeforeExchange",
                 "__partialRefundDegradedToFull", "__partialRefundResolvedSpec",
                 "__partialRefundExpectedAmount", "__partialRefundExpectedPartIds",
                 "__partialRefundScopeFulfillmentId",

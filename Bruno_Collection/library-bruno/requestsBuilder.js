@@ -666,9 +666,11 @@ function requestExchangeOffersBody(overruleCode) {
       const entry = {
         externalRef: spec.externalRef || String(i + 1).padStart(5, '0'),
         dateOfBirth: bru.getEnvVar('updateDateOfBirth_' + i) || spec.dateOfBirth || null,
-        age: spec.age != null ? spec.age : 0,
         type: spec.type || "PERSON"
       };
+      // #649: an age only when the scenario gives one. `age: 0` next to the
+      // date of birth made a provider price every passenger as a child.
+      if (spec.age != null) entry.age = spec.age;
       if (updateGender != null) entry.gender = updateGender;
       // #597: the passenger's reduction cards go with the exchange too.
       if (Array.isArray(spec.cards) && spec.cards.length > 0) entry.cards = spec.cards;
@@ -681,7 +683,6 @@ function requestExchangeOffersBody(overruleCode) {
     anonymousPassengerSpecifications = [{
       externalRef: "00001",
       dateOfBirth: bru.getEnvVar('updateDateOfBirth_0'),
-      age: 0,
       type: "PERSON",
       ...(updateGender_0 != null && { gender: updateGender_0 })
     }];
