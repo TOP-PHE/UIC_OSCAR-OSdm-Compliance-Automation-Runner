@@ -232,3 +232,31 @@ describe('reservationInBookingRequest', () => {
     expect(reservationInBookingRequest({ offers: [{ placeSelections: [{ reservationId: 'R1' }] }] }, undefined)).toBe(false);
   });
 });
+
+// #669: one PlaceSelection per reservation part.
+describe('splitByReservation', () => {
+  const sel = {
+    reservationId: 'R1', tripLegCoverage: { tripId: 'T1', legId: 'L1' },
+    accommodations: [{ passengerRefs: ['P1', 'P2'], accommodationType: 'SEAT' }],
+    places: [{ coachNumber: 'A', placeNumber: '1', passengerRef: 'P1' }, { coachNumber: 'A', placeNumber: '2', passengerRef: 'P2' }],
+  };
+  const per = { reservationOfferParts: [reservation('R1', 'L1', ['P1']), reservation('R2', 'L1', ['P2']), reservation('R9', 'L2', ['P1'])] };
+
+  test('a part per passenger on the leg: one selection each, the other leg left out', () => {
+    expect(sr.splitByReservation(sel, per)).toEqual([
+      { reservationId: 'R1', tripLegCoverage: sel.tripLegCoverage, accommodations: [{ passengerRefs: ['P1'], accommodationType: 'SEAT' }], places: [sel.places[0]] },
+      { reservationId: 'R2', tripLegCoverage: sel.tripLegCoverage, accommodations: [{ passengerRefs: ['P2'], accommodationType: 'SEAT' }], places: [sel.places[1]] },
+    ]);
+  });
+
+  test('kept as it is: one part for all, a passenger no part holds, no offer', () => {
+    expect(sr.splitByReservation(sel, { reservationOfferParts: [reservation('R1', 'L1', ['P1', 'P2'])] })).toEqual([sel]);
+    expect(sr.splitByReservation(sel, { reservationOfferParts: [reservation('R1', 'L1', ['P1']), reservation('R2', 'L1', ['P3'])] })).toEqual([sel]);
+    expect(sr.splitByReservation(sel, null)).toEqual([sel]);
+  });
+
+  test('the booking request does not name a reservation twice', () => {
+    expect(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno', 'requestsBuilder.js'), 'utf8'))
+      .toMatch(/parseEnvJson\("reservationPlaceSelections", \[\]\)\.filter\(\(p\) => !seatMapIds\.has\(p\?\.reservationId\)\)/);
+  });
+});

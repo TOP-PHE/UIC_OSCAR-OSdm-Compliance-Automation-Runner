@@ -168,7 +168,12 @@ function buildBookingRequest() {
 
   // #601: reservations booked by placeSelections (reservationBookingForm
   // PLACE_SELECTION) go with the seat map's own selections.
-  const placeSelections = [...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])];
+  // #669: a reservation the seat map's selections already book is not named
+  // again by the #601 list.
+  const seatMapSelections = parseEnvJson("placeSelections", []);
+  const seatMapIds = new Set(seatMapSelections.map((p) => p?.reservationId).filter(Boolean));
+  const placeSelections = [...seatMapSelections,
+    ...parseEnvJson("reservationPlaceSelections", []).filter((p) => !seatMapIds.has(p?.reservationId))];
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
   // #652: a reservation the placeSelections already book is not named again
@@ -566,7 +571,13 @@ function accommodationAndPlaceSelection() {
     );
   }
 
-  bru.setEnvVar("placeSelections", JSON.stringify([placeSelection]));
+  // #669: one selection per reservation part when the offer gives one per
+  // passenger; unchanged when one part holds everyone.
+  const selections = require('./seatReservations.js').splitByReservation(placeSelection, parseEnvJson("offer", null));
+  if (selections.length > 1) {
+    validationLogger(`[INFO] Seats sent per reservation part: the offer has one reservation part per passenger, so ${selections.length} placeSelections (${selections.map((s) => s.reservationId).join(', ')}).`);
+  }
+  bru.setEnvVar("placeSelections", JSON.stringify(selections));
 }
 
 // Parse fulfillmentIds from env var (handles both array and JSON string)

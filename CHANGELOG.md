@@ -62,6 +62,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.251] / [collection-OTST_V2.0.138] — 2026-10-12
+
+Issue #669, release 2026.285. Server code unchanged (tests only).
+
+### Fixed
+
+- **Seats are sent under each passenger's own reservation.** A provider's
+  offer for several passengers on one leg had one reservation part per
+  passenger. The booking request carried one `placeSelection`, under the
+  first passenger's reservation, with every passenger's seat; the provider
+  answered 404 "Seat not available" although its seat map showed those seats
+  free. When the parts on the leg each hold some of the passengers and
+  together hold all of them, the request now carries one `placeSelection` per
+  part, with that part's passengers' seats and accommodations. One part for
+  everyone (the usual case) is sent as before.
+- A reservation the seat map's selections already book is no longer named a
+  second time by the mandatory-reservation list (#601).
+
+### Default decisions
+
+- When the parts do not account for every passenger, the single selection is
+  kept: dividing it would leave a passenger without a seat.
+
+### Not verified
+
+- Not rerun against the provider. The simulator gives one reservation part
+  for all passengers, so it cannot show the split; its six reservation and
+  seat scenarios give the same 2,021 checks before and after.
+
+---
+
 ## [server-1.11.250] / [collection-OTST_V2.0.137] — 2026-10-12
 
 Issue #663, release 2026.284.
