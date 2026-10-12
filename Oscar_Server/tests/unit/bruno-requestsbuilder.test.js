@@ -112,6 +112,25 @@ describe('buildBookingRequest', () => {
     expect(body.externalRef).toBe('00001');
   });
 
+  // #652: one booking request named the same reservation in both lists.
+  test('a reservation in placeSelections is not repeated in optionalReservationSelections', () => {
+    setEnv({
+      requiresPlaceSelection: 'false',
+      accommodationSelection: 'NONE',
+      api_base: 'https://x',
+      bookingPassengerSpecifications: '[{"externalRef":"00001","detail":{"firstName":"John","lastName":"Doe"}}]',
+      bookingPassengerReferences: '["00001"]',
+      bookingPurchaserSpecifications: '{"detail":{"firstName":"P"}}',
+      offerId: 'OFFER-1',
+      reservationPlaceSelections: '[{"reservationId":"R1","tripLegCoverage":{"tripId":"T","legId":"L"}}]',
+      optionalReservationSelections: '[{"reservationId":"R1"},{"reservationId":"R2"}]',
+    });
+    rb.buildBookingRequest();
+    const offer = JSON.parse(store.BookingRequest).offers[0];
+    expect(offer.placeSelections.map((p) => p.reservationId)).toEqual(['R1']);
+    expect(offer.optionalReservationSelections).toEqual([{ reservationId: 'R2' }]);
+  });
+
   test('falls back to offerPassengerSpecifications when booking spec lacks names', () => {
     setEnv({
       requiresPlaceSelection: 'false',
@@ -254,6 +273,17 @@ describe('buildOfferCollectionRequest: the inbound date of a return (#594)', () 
     setEnv({ ...env, osdmVersion: '3.7.0' });
     rb.buildOfferCollectionRequest();
     expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria).toEqual({ currency: 'EUR', inboundDate: '2026-06-05T09:22:00' });
+  });
+  test('#652: an outbound departure with an offset gives the inboundDate with its offset', () => {
+    setEnv({ ...env, osdmVersion: '3.8.0', offerTripSearchCriteria: '{"departureTime":"2026-06-03T09:22:00+01:00"}' });
+    rb.buildOfferCollectionRequest();
+    expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria.inboundDate).toBe('2026-06-05T09:22:00+01:00');
+  });
+  test('#652: a trip specification gives the form of its first leg', () => {
+    setEnv({ ...env, osdmVersion: '3.8.0', TripType: 'SPECIFICATION',
+      offerTripSpecifications: '[{"legs":[{"timedLeg":{"start":{"serviceDeparture":{"timetabledTime":"2026-06-03T09:22:00+01:00"}}}}]}]' });
+    rb.buildOfferCollectionRequest();
+    expect(JSON.parse(store.OfferCollectionRequest).offerSearchCriteria.inboundDate).toBe('2026-06-05T09:22:00+01:00');
   });
   test('before 3.7, or one-way: no inboundDate', () => {
     setEnv({ ...env, osdmVersion: '3.6.0' });

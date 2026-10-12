@@ -188,13 +188,14 @@ optional. Each is one reservation for all the passengers, on one leg.
 
 ### Expiry probes (#611)
 
-These four are negative probes: each waits until a deadline has passed and expects the next request to be refused. They use the trip from station `0000099`, where gamma (profile `shortDeadlines`) makes offers, the booking, refund offers and exchange offers expire after 60 seconds instead of 30 minutes; each scenario waits at most 3 minutes. A run takes a little over a minute each.
+These five are negative probes: each waits until a deadline has passed and expects the next request to be refused. They use the trip from station `0000099`, where gamma (profile `shortDeadlines`) makes offers, the booking, refund offers and exchange offers expire after 60 seconds instead of 30 minutes; each scenario waits at most 3 minutes. A run takes a little over a minute each.
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
 | `SIM_NHF_EXPIRED_OFFER_38` | `expiredOfferTest`: step 02 waits until past the chosen offer's `preBookableUntil`, then books it. | `409 OFFER_EXPIRED`, a Problem. | No failed check: the refusal (4xx) and its Problem body are graded as passing. The scenario ends there. |
 | `SIM_NHF_EXPIRED_BOOKING_38` | `expiredBookingTest`: step 06 waits until past the booking's confirmation time limit, then confirms it; 07 reads the booking. | `409 BOOKING_EXPIRED`; the booking read afterwards has its parts `RELEASED`. | No failed check. |
 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` | `expiredRefundOfferTest`: a one-way ticket, refund offer asked for; step 13 waits until past its `validUntil`, then confirms it. | `409`, "the refund offer has expired". | No failed check. |
+| `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` | `expiredBookingTest` then `expiredRefundOfferTest` in one scenario (#652): each sub-run sells again, and seat selection is asked for on an offer that has no reservation part. | As the two scenarios above, in turn. | No failed check: two sales, the booking refused at 06, the refund offer refused at 13. Before #652 the run went from 01 straight to `10. POST Refund Offers` with no booking (404). |
 | `SIM_NHF_EXPIRED_EXCHANGE_OFFER_38` | `expiredExchangeOfferTest`: a one-way ticket, exchange offers asked for; step 11 waits until past the first one's `preBookableUntil`, then takes it. | `409 OFFER_EXPIRED`. | No failed check. |
 
 ### Response variants (#611)

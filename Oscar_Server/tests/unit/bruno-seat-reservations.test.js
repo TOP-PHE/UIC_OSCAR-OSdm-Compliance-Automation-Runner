@@ -212,3 +212,23 @@ describe('the steps, the builder and the parser', () => {
     }
   });
 });
+
+// #652: after a failed seat map, step 09 added a reservation the booking
+// request had already asked for; the provider answered 200 with nothing added.
+describe('reservationInBookingRequest', () => {
+  const { reservationInBookingRequest } = require('../../../Bruno_Collection/library-bruno/seatReservations.js');
+  test('found in placeSelections or optionalReservationSelections, of any offer', () => {
+    const request = { offers: [
+      { offerId: 'O1', placeSelections: [{ reservationId: 'R1' }] },
+      { offerId: 'O2', optionalReservationSelections: [{ reservationId: 'R2' }] },
+    ] };
+    expect(reservationInBookingRequest(request, 'R1')).toBe(true);
+    expect(reservationInBookingRequest(request, 'R2')).toBe(true);
+    expect(reservationInBookingRequest(request, 'R3')).toBe(false);
+  });
+  test('nothing to compare: false', () => {
+    expect(reservationInBookingRequest(null, 'R1')).toBe(false);
+    expect(reservationInBookingRequest({ offers: [{ offerId: 'O1' }] }, 'R1')).toBe(false);
+    expect(reservationInBookingRequest({ offers: [{ placeSelections: [{ reservationId: 'R1' }] }] }, undefined)).toBe(false);
+  });
+});

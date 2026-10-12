@@ -217,6 +217,15 @@ describe('the steps: checks recorded, 01c asked for once, routing shared', () =>
     envStore.__returnInboundDone = 'true';
     envStore.placeSelectionMode = 'SEATMAP_AT_OFFER';
     envStore.salesFlow_placeSelection = 'true';
+    // #652: no reservation part to map, or a booking already there: the run
+    // filter would skip 08, and a skipped step routes nowhere.
+    offers.routeAfterOfferStep();
+    expect(envStore.__next).toBe('02. POST Create Booking');
+    envStore.reservationId = 'R1';
+    envStore.bookingId = 'B0';
+    offers.routeAfterOfferStep();
+    expect(envStore.__next).toBe('02. POST Create Booking');
+    delete envStore.bookingId;
     offers.routeAfterOfferStep();
     expect([envStore.__next, envStore['global:skipPlaceMaps']]).toEqual(['08. GET Place Maps', false]);
     envStore.salesFlow_placeSelection = 'false';

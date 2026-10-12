@@ -552,3 +552,26 @@ describe('#650: optional members are not failures', () => {
     expect(warned(semi, 'which none of the offer')).toBe(true);
   });
 });
+
+// ─── #652: a new offer in the same scenario takes its own reservation ───────
+describe('#652: the reservation of a previous offer is not kept', () => {
+  const offer = (resId, tripId) => ({
+    offerId: `O-${resId}`,
+    tripCoverage: { coveredTripId: tripId, coveredLegIds: [`${tripId}-L1`] },
+    reservationOfferParts: [{ id: resId, availablePlaces: [{ accommodationType: 'SEAT', tripLegCoverage: { tripId, legId: `${tripId}-L1` } }] }],
+  });
+  test('after the expired-offer probe, the second offer gives reservationId and tripLegCoverage', () => {
+    envStore = { accommodationSelection: 'SEAT', salesFlow_placeSelection: 'true' };
+    run(() => offers.handleAccommodationAndPlaceSelection(offer('R-first', 'T-first')));
+    expect(envStore.reservationId).toBe('R-first');
+    run(() => offers.handleAccommodationAndPlaceSelection(offer('R-second', 'T-second')));
+    expect(envStore.reservationId).toBe('R-second');
+    expect(JSON.parse(envStore.tripLegCoverage)[0].tripId).toBe('T-second');
+  });
+  test('a reservation of the same offer is kept', () => {
+    envStore = { accommodationSelection: 'SEAT', salesFlow_placeSelection: 'true', reservationId: 'R-first' };
+    run(() => offers.handleAccommodationAndPlaceSelection(offer('R-first', 'T-first')));
+    expect(envStore.reservationId).toBe('R-first');
+    expect(envStore.tripLegCoverage).toBeUndefined();
+  });
+});

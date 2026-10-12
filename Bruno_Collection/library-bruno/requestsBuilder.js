@@ -8,7 +8,7 @@
  */
 const { parseEnvJson } = require('./envUtils.js');
 const { getComplianceVersion } = require('./osdmVersion.js');
-const { normaliseReturnModel, returnUsesInboundDate, localDateTime, buildInboundOfferRequest } = require('./returnJourney.js');
+const { normaliseReturnModel, returnUsesInboundDate, inboundDateLike, buildInboundOfferRequest } = require('./returnJourney.js');
 const { withIssuers } = require('./reductionCards.js');
 
 // #597: the passengers of a request, each reduction card with the issuer the
@@ -128,7 +128,9 @@ function buildOfferCollectionRequest() {
   // (before, in the trip's returnSearchParameters.inwardReturnDate).
   const inboundDate = bru.getEnvVar("returnInboundDate");
   if (inboundDate && returnUsesInboundDate(getComplianceVersion())) {
-    body.offerSearchCriteria = { ...body.offerSearchCriteria, inboundDate: localDateTime(inboundDate) };
+    const departure = body.tripSearchCriteria?.departureTime || body.tripSearchCriteria?.arrivalTime
+      || body.tripSpecifications?.[0]?.legs?.[0]?.timedLeg?.start?.serviceDeparture?.timetabledTime;
+    body.offerSearchCriteria = { ...body.offerSearchCriteria, inboundDate: inboundDateLike(inboundDate, departure) };
   }
 
   const fulfillmentOptions = bru.getEnvVar("offerFulfillmentOptions");
@@ -169,7 +171,11 @@ function buildBookingRequest() {
   const placeSelections = [...parseEnvJson("placeSelections", []), ...parseEnvJson("reservationPlaceSelections", [])];
   // #239: OSDM's mechanism for booking a mandatory reservation without
   // stating a specific place/compartment — independent of placeSelections.
-  const optionalReservationSelections = parseEnvJson("optionalReservationSelections", []);
+  // #652: a reservation the placeSelections already book is not named again
+  // (one booking request sent the same reservationId in both lists).
+  const placedIds = new Set(placeSelections.map((p) => p?.reservationId).filter(Boolean));
+  const optionalReservationSelections = parseEnvJson("optionalReservationSelections", [])
+    .filter((s) => !placedIds.has(s?.reservationId));
   const passengerRefs = parseEnvJson("bookingPassengerReferences");
 
   // Two-step return (#178/#180): when an inbound offer was fetched, book the
@@ -626,6 +632,13 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
     }
   }
 
+  // #652: RefundOfferRequest requires fulfillmentIds. A request without them
+  // (a booking that was not fulfilled in this run) used to go out as "{}" and
+  // came back 400 with nothing to say why.
+  if (!Array.isArray(fulfillmentIds) || fulfillmentIds.length === 0) {
+    validationLogger("[ERROR] No fulfillment to refund: this run has not fulfilled the booking it refunds (fulfillmentIds is empty). The refund offer request is sent with an empty list and the provider is expected to refuse it.");
+    fulfillmentIds = [];
+  }
   const body = { fulfillmentIds };
   if (overruleCode != null) body.overruleCode = overruleCode;
   if (refundDate != null)   body.refundDate   = refundDate;
