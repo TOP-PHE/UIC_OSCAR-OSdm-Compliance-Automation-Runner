@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-sweep-patch-type",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Passenger probes send a real passenger type",
+    "summary": "The invalid-passenger-details probe no longer sends a placeholder as the passenger type.",
+    "content": "The probe that sends one invalid passenger detail at a time also sent the text {{patchType}} as the passenger type, so a strict provider could refuse each request for the wrong reason. It now sends the booked passenger’s type."
+  },
+  {
     "id": "2026-10-12-subrun-sale-state",
     "date": "October 12, 2026",
     "tag": "Fix",
