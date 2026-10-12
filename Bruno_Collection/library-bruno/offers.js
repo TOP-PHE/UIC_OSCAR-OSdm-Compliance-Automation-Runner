@@ -884,6 +884,37 @@ function logMinimalBelowAllParts(minimalPrice, sumPartsPrice) {
   }
 }
 
+function checkOverallFlexibility(selectedOffer) {
+  // Flexibility of the summary (#223, #650). OSDM 3.8 OfferSummary: the
+  // overall values "best represent this offer … this does not imply that these
+  // values exactly apply to all parts of the offer". So the summary need not be
+  // the most restrictive product (a FULL_FLEXIBLE admission with a
+  // NON_FLEXIBLE reservation may be summed up FULL_FLEXIBLE). It should be the
+  // flexibility of one of the products: that passes as a check; one no product
+  // has is a warning line; a difference from the most restrictive one is
+  // information. When offerSummary is absent (optional) the derived value is
+  // logged.
+  const productFlex = Array.from(new Set((selectedOffer?.products || []).map(p => p.flexibility).filter(Boolean)));
+  const derivedFlex = deriveOfferFlexibilityFromProducts(selectedOffer);
+  const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
+
+  if (overallFlex) {
+    validationLogger(`[DEBUG] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
+    if (productFlex.length === 0 || productFlex.includes(overallFlex)) {
+      test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
+        validationLogger(`[DEBUG] overallFlexibility ${overallFlex} is the flexibility of a product of the offer`);
+      });
+      if (derivedFlex && overallFlex !== derivedFlex) {
+        validationLogger(`[INFO] offerSummary.overallFlexibility is "${overallFlex}", the most restrictive product is "${derivedFlex}" (product flexibilities: ${productFlex.join(", ")}). OSDM lets the summary give the value that best represents the offer.`);
+      }
+    } else {
+      validationLogger(`[WARNING] Offer overallFlexibility consistency - offerSummary.overallFlexibility says "${overallFlex}", which none of the offer's products has (product flexibilities: ${productFlex.join(", ")}).`);
+    }
+  } else {
+    validationLogger(`[INFO] offerSummary absent — overall flexibility derived from products [${productFlex.join(", ")}] → most restrictive = ${derivedFlex}`);
+  }
+}
+
 function validateOfferParts(selectedOffer) {
   validationLogger("[DEBUG] ➤ validateOfferParts");
 
@@ -941,34 +972,7 @@ function validateOfferParts(selectedOffer) {
   });
   logMinimalBelowAllParts(minimalPrice, sumPartsPrice);
 
-  // Flexibility of the summary (#223, #650). OSDM 3.8 OfferSummary: the
-  // overall values "best represent this offer … this does not imply that these
-  // values exactly apply to all parts of the offer". So the summary need not be
-  // the most restrictive product (a FULL_FLEXIBLE admission with a
-  // NON_FLEXIBLE reservation may be summed up FULL_FLEXIBLE). It should be the
-  // flexibility of one of the products: that passes as a check; one no product
-  // has is a warning line; a difference from the most restrictive one is
-  // information. When offerSummary is absent (optional) the derived value is
-  // logged.
-  const productFlex = Array.from(new Set((selectedOffer?.products || []).map(p => p.flexibility).filter(Boolean)));
-  const derivedFlex = deriveOfferFlexibilityFromProducts(selectedOffer);
-  const overallFlex = selectedOffer.offerSummary?.overallFlexibility;
-
-  if (overallFlex) {
-    validationLogger(`[DEBUG] productFlex: ${productFlex.join(", ")}, derived (most restrictive): ${derivedFlex}`);
-    if (productFlex.length === 0 || productFlex.includes(overallFlex)) {
-      test(`Offer overallFlexibility consistency - overallFlex: ${overallFlex}, derived (most restrictive): ${derivedFlex}`, () => {
-        validationLogger(`[DEBUG] overallFlexibility ${overallFlex} is the flexibility of a product of the offer`);
-      });
-      if (derivedFlex && overallFlex !== derivedFlex) {
-        validationLogger(`[INFO] offerSummary.overallFlexibility is "${overallFlex}", the most restrictive product is "${derivedFlex}" (product flexibilities: ${productFlex.join(", ")}). OSDM lets the summary give the value that best represents the offer.`);
-      }
-    } else {
-      validationLogger(`[WARNING] Offer overallFlexibility consistency - offerSummary.overallFlexibility says "${overallFlex}", which none of the offer's products has (product flexibilities: ${productFlex.join(", ")}).`);
-    }
-  } else {
-    validationLogger(`[INFO] offerSummary absent — overall flexibility derived from products [${productFlex.join(", ")}] → most restrictive = ${derivedFlex}`);
-  }
+  checkOverallFlexibility(selectedOffer);
 
   // capture coveredTripId if value exists
   const coveredTripId = selectedOffer.tripCoverage && selectedOffer.tripCoverage.coveredTripId;
