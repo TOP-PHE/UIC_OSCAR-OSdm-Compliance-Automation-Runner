@@ -22,7 +22,7 @@
 
 const PART_LISTS = ['admissions', 'reservations', 'ancillaries'];
 
-const bookingOf = (data) => (data && data.booking) ? data.booking : data;
+const bookingOf = (data) => (data?.booking ? data.booking : data);
 const bookedOffersOf = (booking) => (booking && Array.isArray(booking.bookedOffers) ? booking.bookedOffers : []);
 
 /** Every booked part id of a booking (or a response holding one). */
@@ -31,7 +31,7 @@ function partIdsOf(data) {
   for (const bookedOffer of bookedOffersOf(bookingOf(data))) {
     for (const list of PART_LISTS) {
       for (const part of (Array.isArray(bookedOffer?.[list]) ? bookedOffer[list] : [])) {
-        if (part && part.id != null) ids.push(String(part.id));
+        if (part?.id != null) ids.push(String(part.id));
       }
     }
   }
@@ -69,7 +69,7 @@ function splitExchangeBooking(data, idsBefore) {
     if (held > 0) keptOffers.push(kept);
   }
   const keptBooking = { ...booking, bookedOffers: keptOffers };
-  const original = (data && data.booking) ? { ...data, booking: keptBooking } : keptBooking;
+  const original = data?.booking ? { ...data, booking: keptBooking } : keptBooking;
   return { original, added };
 }
 

@@ -333,7 +333,8 @@ function checkBookingAroundExchange(jsonData, stage) {
   postCreateBookingResponse(bru.getEnvVar("offer"), original, rule.old, rule.fulfillments);
   if (!rule.added) {
     if (added.length > 0) {
-      validationLogger(`[INFO] Parts of the withdrawn exchange still in the booking: ${added.map(({ part }) => `${part.id} ${part.status}`).join(', ')}.`);
+      const left = added.map(({ part }) => part.id + ' ' + part.status).join(', ');
+      validationLogger(`[INFO] Parts of the withdrawn exchange still in the booking: ${left}.`);
     }
     return;
   }
