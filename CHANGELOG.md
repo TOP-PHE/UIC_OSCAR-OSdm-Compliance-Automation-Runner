@@ -62,6 +62,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.243] / [collection-OTST_V2.0.131] — 2026-10-12
+
+Issue #650, release 2026.277. Server code unchanged (tests only).
+
+### Fixed
+
+Three members OSDM 3.8 allows to be left out were checked as required. Seen
+on two providers' runs: most of one provider's failures, one in every run of
+the other.
+
+- **A booked part without `afterSaleConditions` is a warning, not a
+  failure.** The offer part carries `afterSalesConditions`
+  (`AbstractOfferPart`); a booked part carries `afterSaleConditions`
+  (`AbstractBookingPart`, no "s"), which OSDM does not require. A provider
+  returned `[]` on every part, and every part failed. When the booking gives
+  them, each is still compared with the offer's.
+- **A price without `scale` reads as the default 2.** `Price.required` is
+  `[currency, amount]`; `scale` is nullable with a default of 2. The refund
+  offer checks failed a price without it ("scale=MISSING(got undefined)"),
+  and the booking asked for it in "Price fields exist". That check now asks
+  for currency and amount; the part and fee comparisons read an absent scale
+  as 2.
+- **`offerSummary.overallFlexibility` may be the flexibility of any of the
+  offer's products.** OSCAR required the most restrictive one (#223). OSDM
+  3.8 `OfferSummary`: the overall values "best represent this offer … this
+  does not imply that these values exactly apply to all parts of the offer".
+  A FULL_FLEXIBLE admission with a NON_FLEXIBLE reservation summed up
+  FULL_FLEXIBLE passes; a difference from the most restrictive is an INFO
+  line; a flexibility none of the products has is a warning.
+
+### Default decisions (taken without asking)
+
+- A summary flexibility that no product has is a warning, not a failure: the
+  specification only says the value should best represent the offer.
+- The check still counts when it passes, so the simulator's runs keep their
+  check counts.
+
+Checked: each new test fails on the old code (5 of the 6; the sixth, a
+booking that gives its conditions, passes on both). A full recording of the
+73 simulator scenarios, compared with the OTST_V2.0.130 one: the only
+difference is the renamed check "Price fields exist (currency, amount)"
+(it asked for currency and scale), same counts, same results; the simulator
+sends every member these checks now allow to be left out.
+`OSCAR - Checks by scenario.md` is regenerated. Not checked: a new run
+against the providers.
+
+---
+
 ## [server-1.11.242] / [collection-OTST_V2.0.130] — 2026-10-12
 
 Issue #649, release 2026.276. Server code unchanged (tests only).

@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-optional-members",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Three optional OSDM members no longer fail a run",
+    "summary": "After-sales conditions left out of a booking, a price without scale, and an offer summed up by one of its products' flexibilities are accepted, as OSDM allows.",
+    "content": "OSDM does not require a booking to repeat the after-sales conditions of the offer, lets a price leave out its scale (2 by default), and lets an offer's summary give the flexibility that best represents it rather than the most restrictive of its parts. OSCAR failed all three. A booking without its conditions is now a warning, a missing scale is read as 2, and a summary flexibility that one of the offer's products has passes."
+  },
+  {
     "id": "2026-10-12-exchange-checks",
     "date": "October 12, 2026",
     "tag": "Fix",
