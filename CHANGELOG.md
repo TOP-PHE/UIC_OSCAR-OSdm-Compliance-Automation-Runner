@@ -62,6 +62,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.244] / [collection-OTST_V2.0.132] — 2026-10-12
+
+Issue #652, release 2026.278. Server code unchanged (tests only).
+
+### Fixed
+
+Found in two providers' runs of 2026-10-11:
+
+- **A seat-map scenario goes to the seat map only when it will run.** After
+  the offer, such a scenario was sent to `08. GET Place Maps` even when the
+  run filter would skip it (no reservation part in the offer, or a booking
+  already made). A skipped step runs no script, so its "go on to the
+  booking" never came: Bruno went on down the folder, skipping every step,
+  and reached `10. POST Refund Offers` with no booking. On a provider this
+  sent `POST /refund-offers` as `{}`; the chained expiry probes (expired
+  booking, then expired refund offer) never sold anything for the second
+  probe. Reproduced on the simulator, and fixed: 418 checks, no failure,
+  where the same scenario stopped at 120 with two.
+- **The return's `inboundDate` keeps the outbound departure's form.** With an
+  offset when the outbound `departureTime` (or, for a trip specification, the
+  first leg's time) has one, without otherwise. Both forms match the 3.8
+  pattern; a provider refused the local one with 400.
+- **A reservation is named once in a booking request.** One that
+  `placeSelections` books is no longer repeated in
+  `optionalReservationSelections`.
+- **Step 09 does not add a reservation the booking request already asked
+  for.** After a failed seat map, the fallback added it a second time and
+  failed on the provider's empty answer.
+- **A new offer in the same scenario takes its own reservation.** The first
+  offer's `reservationId` was kept when already set, so after the
+  expired-offer probe the booking named the first offer's trip and leg.
+- A refund offer request without fulfillment ids now says so in the run log
+  (`RefundOfferRequest` requires them).
+
+### Added
+
+- Simulator scenario `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38`: the expired-booking
+  and expired-refund-offer probes chained in one scenario, with seat
+  selection asked for on an offer without a reservation part.
+
+### Not changed
+
+- The negative purchaser probe (a purchaser without `firstName` or
+  `lastName` must be refused) is right: OSDM 3.8 `PersonDetail` requires both.
+  A provider that accepts it keeps the failure.
+
+### Default decisions (taken without asking)
+
+- Clearing the previous booking's state between expiry sub-runs was tried
+  and dropped: it changed nothing on the simulator, so nothing showed it was
+  needed.
+
+Checked: each new unit test fails on the old code; the chained scenario on
+the simulator before and after (above); a full recording of the 74 simulator
+scenarios, compared with the OTST_V2.0.131 one: the 73 that were there give
+the same checks and results, the new one 418 checks with no failure.
+`OSCAR - Checks by scenario.md` is regenerated. Not checked: a seat map with
+a real reservation part on the simulator (it answers 501 to
+`/availabilities`), and a new run against the providers.
+
+---
+
 ## [server-1.11.243] / [collection-OTST_V2.0.131] — 2026-10-12
 
 Issue #650, release 2026.277. Server code unchanged (tests only).

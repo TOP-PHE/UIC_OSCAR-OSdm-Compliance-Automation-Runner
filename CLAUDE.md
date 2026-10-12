@@ -1051,6 +1051,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `overallFlexibility` that one of the offer's products has passes (OSDM:
     "best represent this offer"). Read `required` in the 3.8 file before
     writing an "exists" check.
+  - **A step a script routes to must not be one the run filter skips**
+    (#652, OTST_V2.0.132). A skipped request runs no script, so its routing
+    never happens and Bruno goes on down the folder (a skipped 08 reached
+    `10. POST Refund Offers` with no booking). `setNextRequest` before
+    `skipRequest()` in the filter did not help (checked with the real CLI):
+    decide in the routing step, with the filter's own conditions
+    (`routeAfterOfferStep()` for the seat map). The simulator scenario
+    `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` holds it.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

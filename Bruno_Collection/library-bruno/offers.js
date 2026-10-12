@@ -1747,7 +1747,7 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
     // for a new offer (after the expired-offer probe) used to keep the first
     // offer's reservation and trip, and booked them with the second offer.
     const _keptRes = bru.getEnvVar("reservationId");
-    if (_keptRes && _seatResParts.some((p) => p && p.id === _keptRes)) {
+    if (_keptRes && _seatResParts.some((p) => p?.id === _keptRes)) {
       validationLogger(`[DEBUG] reservationId already set (${_keptRes}) → keeping it`);
       return;
     }
