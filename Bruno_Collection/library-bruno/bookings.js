@@ -1221,7 +1221,12 @@ function checkFulfillmentSummaryStatus(booking) {
   }
 }
 
-function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false, siblingDocs = undefined) {
+// options.deferUnknownParts (#671): at the confirmation of an exchange the
+// provider answers with fulfillments only, and the parts the exchange made
+// may carry ids not seen before (one provider gives them new ids on
+// confirmation). Such a part is said at INFO and checked at the next read of
+// the booking, where it is known.
+function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, requireFulfillments = false, siblingDocs = undefined, options = {}) {
   validationLogger("[DEBUG] ► validateFulfillments");
   if (!Array.isArray(fulfillments) || fulfillments.length === 0) {
     if (requireFulfillments) {
@@ -1329,9 +1334,14 @@ function validateFulfillments(fulfillments, index, expectedFulfillmentStatus, re
     // the member "must be provided" then: its absence fails this check.
     const _fulfillmentPartIds = Array.isArray(fulfillment.bookingParts)
       ? fulfillment.bookingParts.map(bp => bp?.id) : '(no bookingParts)';
+    const _unknownParts = (options.deferUnknownParts && Array.isArray(fulfillment.bookingParts))
+      ? fulfillment.bookingParts.filter(part => !bookedPartIds.includes(part?.id)) : [];
+    if (_unknownParts.length > 0) {
+      validationLogger(`[INFO] Fulfillment[${idx}] holds part(s) not seen before (${_unknownParts.map(part => part?.id).join(', ')}): made by the exchange; checked against the booking at the next read.`);
+    }
     test(`Fulfillment[${idx}] bookingParts.id exist in admissionReservationAncillaryBookingPartsIds - expected: [${bookedPartIds}], actual: [${_fulfillmentPartIds}]`, () => {
       expect(fulfillment.bookingParts, 'bookingParts must be provided for a fulfillment made from booking parts').to.be.an("array").that.is.not.empty;
-      fulfillment.bookingParts.forEach(part => {
+      fulfillment.bookingParts.filter(part => !_unknownParts.includes(part)).forEach(part => {
         validationLogger(`[DEBUG] Fulfillment[${idx}] bookingPart.id: ${part.id} exists in admissionReservationAncillaryBookingPartsIds`);
         expect(bookedPartIds).to.include(part.id);
       });

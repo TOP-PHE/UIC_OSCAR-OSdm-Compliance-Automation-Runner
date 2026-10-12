@@ -62,6 +62,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.252] / [collection-OTST_V2.0.139] — 2026-10-12
+
+Issue #671, release 2026.286. Server code unchanged (tests only).
+
+### Fixed
+
+- **After a confirmed exchange, the new fulfillments' parts are known.** At
+  steps 14 and 15 of an exchange, "Fulfillment[n] bookingParts.id exist in
+  admissionReservationAncillaryBookingPartsIds" failed for every fulfillment
+  the exchange made: the list held the booking's parts before the exchange
+  and the exchange offer's part ids, not the booked parts the exchange
+  created. A real provider's 5-passenger exchange failed 10 times; its new
+  parts even change id between the pre-booked exchange and its confirmation.
+  - Steps 13 and 15: the parts the exchange added (#649's split) are added to
+    the list before the booking's fulfillments are checked.
+  - Step 14 (`POST …/fulfillments`, which answers with fulfillments only): a
+    part not seen before is said at INFO and checked at step 15; known parts
+    are still checked.
+
+### Default decisions
+
+- The given-up fulfillments that a provider shows as REFUNDED rather than
+  EXCHANGED still fail: FulfillmentStatus has EXCHANGED, and that is the
+  provider's to fix.
+
+### Not verified
+
+- Not rerun against the provider. On the simulator, `SIM_EXCHANGE_1ADT_38`
+  and `SIM_EXCHANGE_DELETE_1ADT_38` give the same 731 checks before and after
+  (its new parts keep their ids, so it never showed the failure).
+
+---
+
 ## [server-1.11.251] / [collection-OTST_V2.0.138] — 2026-10-12
 
 Issue #669, release 2026.285. Server code unchanged (tests only).

@@ -173,3 +173,41 @@ describe('requestExchangeOffersBody: no age unless the scenario gives one', () =
     expect(JSON.parse(envStore.requestExchangeOffersBodyData).anonymousPassengerSpecifications[0]).not.toHaveProperty('age');
   });
 });
+
+// #671: once the exchange is confirmed, a fulfillment that holds the parts it
+// made failed "bookingParts.id exist …": 10 failures on a real provider, whose
+// new parts even change id between the pre-booked exchange and its
+// confirmation.
+describe('#671: the fulfillments of the parts an exchange made', () => {
+  const ff = (id, status, ...parts) => ({ id, status, bookingRef: 'B1', createdOn: now, controlNumber: 'C', bookingParts: parts.map((p) => ({ id: p })) });
+  const confirmed = { booking: { id: 'B1', confirmedPrice: price(210), bookedOffers: [
+    { offerId: 'BO1', admissions: [part('A1', 'P1', 'ADULT', 'EXCHANGED', 'T1'), part('A2', 'P2', 'YOUTH', 'EXCHANGED', 'T1')] },
+    { offerId: 'BO2', admissions: [part('N7', 'P1', 'CHILD', 'FULFILLED', 'T2', 'PAX01'), part('N8', 'P2', 'CHILD', 'FULFILLED', 'T2', 'PAX02')] },
+  ], fulfillments: [ff('F1', 'EXCHANGED', 'A1', 'A2'), ff('F2', 'FULFILLED', 'N7', 'N8')] } };
+  const partChecks = (results) => results.filter((r) => r.name.includes('bookingParts.id exist'));
+
+  test('step 15: the booking\'s new parts are known, every fulfillment passes', () => {
+    envStore.__partIdsBeforeExchange = JSON.stringify(['A1', 'A2']);
+    envStore.bookingId = 'B1';
+    const results = run(() => exchanges.checkBookingAroundExchange(confirmed, 'confirmed'));
+    expect(partChecks(results).map((r) => r.ok)).toEqual([true, true]);
+  });
+
+  test('step 14: a part not seen before is said, not failed; a known one is still checked', () => {
+    const { validateFulfillments } = require('../../../Bruno_Collection/library-bruno/bookings.js');
+    envStore.admissionReservationAncillaryBookingPartsIds = JSON.stringify(['A1', 'A2']);
+    envStore.bookingId = 'B1';
+    const deferred = run(() => validateFulfillments([ff('F2', 'FULFILLED', 'N7', 'N8')], 0, ['FULFILLED'], false, undefined, { deferUnknownParts: true }));
+    expect(partChecks(deferred).map((r) => r.ok)).toEqual([true]);
+    expect(mockLogs.some((l) => l.startsWith('[INFO] Fulfillment[0] holds part(s) not seen before (N7, N8)'))).toBe(true);
+    const strict = run(() => validateFulfillments([ff('F2', 'FULFILLED', 'N7', 'N8')], 0, ['FULFILLED'], false));
+    expect(partChecks(strict).map((r) => r.ok)).toEqual([false]);
+  });
+
+  test('step 14 of an exchange asks for it', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    expect(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', '04-Exchange', '14. POST Obtaining Fulfillments from Booking.yml'), 'utf8'))
+      .toMatch(/jsonData\.fulfillmentDocuments, \{ deferUnknownParts: true \}\);/);
+  });
+});

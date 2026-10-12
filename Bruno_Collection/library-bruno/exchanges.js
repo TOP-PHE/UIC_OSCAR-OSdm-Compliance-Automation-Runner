@@ -330,6 +330,14 @@ function checkBookingAroundExchange(jsonData, stage) {
   }
   const { original, added } = splitExchangeBooking(jsonData, idsBefore);
   validationLogger(`[INFO] Exchange (${stage}): ${idsBefore.length} part(s) held before it checked against the original offer; ${added.length} part(s) added since.`);
+  // #671: the parts the exchange made are parts of this booking: a
+  // fulfillment that holds them is not refused.
+  if (rule.added && added.length > 0) {
+    let known = bru.getEnvVar("admissionReservationAncillaryBookingPartsIds");
+    if (typeof known === 'string') { try { known = JSON.parse(known); } catch { known = []; } }
+    const ids = Array.isArray(known) ? known : [];
+    bru.setEnvVar("admissionReservationAncillaryBookingPartsIds", [...new Set([...ids, ...added.map(({ part }) => part.id).filter(Boolean)])]);
+  }
   postCreateBookingResponse(bru.getEnvVar("offer"), original, rule.old, rule.fulfillments);
   if (!rule.added) {
     if (added.length > 0) {
