@@ -1143,6 +1143,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   sound and schema-valid; `node scripts/replay.js catalogue` (simulator) checks
   the numbers against a recording. A scenario of the simulator that a
   catalogue entry names cannot be renamed or removed without the catalogue.
+  **Each entry carries `needs`** (#681, OTST_V2.0.141): what it needs from
+  the provider's data, equal to `dataNeedsOf()` of its source with
+  `simulatorFacts(gamma.json)` (a test pins it; regenerate, never hand-edit).
+  A reservation counts only if the scenario exercises it; an overrule code is
+  a provider value, not a tariff need. Parts 2–3 of #681 use it to choose the
+  train and tariff at copy time and to report what is left to complete.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is

@@ -116,6 +116,10 @@ describe('copy from the catalogue', () => {
     const one = res.body.scenarios.find(s => s.code === 'OTST_SALE_ONE_WAY_1ADT');
     expect(one).toMatchObject({ kind: 'OTST', missing: [] });
     expect(one.purpose).toMatch(/One-way sale/);
+    // #681: what it needs from the provider's data, as phrases.
+    expect(one.dataNeeds).toEqual(['1 passenger']);
+    const mandatory = res.body.scenarios.find(s => s.code === 'OTST_SALE_RESERVATION_MANDATORY_2ADT');
+    expect(mandatory.dataNeeds).toEqual(['a journey of 2 legs', 'a train with a mandatory seat reservation', '2 passengers']);
     expect(res.body.trips.length).toBeGreaterThan(0);
   });
 

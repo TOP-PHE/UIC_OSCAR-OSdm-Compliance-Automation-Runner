@@ -62,6 +62,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.254] / [collection-OTST_V2.0.141] — 2026-10-12
+
+Issue #681 (part 1 of 3), release 2026.288.
+
+### Added
+
+- **Each reference scenario says what it needs from the provider's data.**
+  Every entry of `scenario_catalogue.json` now carries `needs`: the kind of
+  trip (and its number of legs), the return model, the seat reservation it
+  exercises (mandatory, or optional when it books one), travel classes per
+  leg, the tariff (refundable or exchangeable for an after-sale, non-flexible
+  when the sale asks for it), the number of passengers, a reduction card,
+  the values only the provider can give (an overrule code, a product), a trip
+  where the provider asks for passenger details, and the deadlines it waits
+  for.
+  - `dataNeedsOf()` (`utils/scenarioCatalogue.js`, pure) works them out from
+    the source scenario and the simulator's profile; a test keeps every entry
+    equal to it, so the file cannot drift from what the scenario exercises.
+  - Test Config → Copy scenarios shows them under each reference scenario
+    ("Needs in the data: …"), to help choose the train of each trip.
+- Parts 2 and 3 will use them to choose the train and tariff by themselves
+  and to report what is left to complete.
+
+### Default decisions
+
+- A reservation the trip merely carries is not a need: the selection
+  scenarios need an optional one, the mandatory scenario a mandatory one.
+- An overrule code refunds whatever the tariff, so those scenarios need no
+  refundable tariff; their code is listed as a value only the provider gives.
+- The simulator's special stop places are not needs: the deadline scenarios
+  need the deadlines (`expiry`), the passenger-details scenarios a trip
+  where the provider asks for them (`requestedInformation`).
+
+### Not verified
+
+- Not shown in a browser; the preview's text is checked by the route test.
+
+---
+
 ## [server-1.11.253] / [collection-OTST_V2.0.140] — 2026-10-12
 
 Issue #674, release 2026.287. Server code unchanged (tests only).

@@ -182,12 +182,13 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
   const codes = (Array.isArray(ctx.source.scenarios) ? ctx.source.scenarios : [])
     .map(s => s?.code).filter(c => typeof c === 'string' && c !== '');
   const plan = planCopy(ctx.source, codes, ctx.frameworkConfig);
-  // #612: what each reference scenario is for, and what it needs declared.
+  // #612: what each reference scenario is for, and what it needs declared;
+  // #681: what it needs from the provider's data.
   if (ctx.entries) {
     const byCode = new Map(ctx.entries.map(e => [e.code, e]));
     plan.scenarios = plan.scenarios.map(s => {
       const e = byCode.get(s.code);
-      return { ...s, kind: e.kind, purpose: e.purpose, checks: e.checks, missing: e.missing };
+      return { ...s, kind: e.kind, purpose: e.purpose, checks: e.checks, missing: e.missing, dataNeeds: e.needsText };
     });
   }
   return res.json({

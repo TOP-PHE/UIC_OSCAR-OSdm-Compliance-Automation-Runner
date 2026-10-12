@@ -28,6 +28,13 @@
  * requirementsOf() says what a reference scenario needs the Test Framework to
  * declare (sales flow, return model, OSDM version, passenger types), and
  * missingFor() which of those a framework does not: the golden rule (#218).
+ *
+ * #681: each entry also says what it needs from the provider's data
+ * (`needs`): the trip, the reservations its trains carry, the tariff, the
+ * passengers, the values only the provider can give. dataNeedsOf() works
+ * them out from the source scenario and the simulator's profile, and a test
+ * keeps the file equal to it; the copy will use them to pick a provider's
+ * train and tariff, and needsText() says them to the person copying.
  */
 
 const { scenarioReturnModel } = require('./frameworkGating');
@@ -47,6 +54,9 @@ const CODE = /^(OTST|NHF)_[A-Z0-9_]{3,60}$/;
 // Fields of a scenario that `set` may change: waits and nothing that points
 // at another entry or changes what the scenario is.
 const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
+// The keys of `needs` (#681), in the order dataNeedsOf() writes them.
+const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
+  'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
 
 // The problems of one entry of the catalogue.
 function entryProblems(e, at, scenarios, codes) {
@@ -59,7 +69,14 @@ function entryProblems(e, at, scenarios, codes) {
   if (!Number.isInteger(e.checks) || e.checks <= 0) problems.push(`${at}.checks must be the number of checks it gives on the simulator`);
   for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
   if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
+  problems.push(...needsProblems(e.needs, at));
   return problems;
+}
+
+// The problems of an entry's `needs` (#681): there, and only known keys.
+function needsProblems(needs, at) {
+  if (!isObj(needs)) return [`${at}.needs is missing`];
+  return Object.keys(needs).filter((key) => !NEEDS_KEYS.includes(key)).map((key) => `${at}.needs.${key} is not a known need`);
 }
 
 /** The problems of a catalogue against the simulator's data file; none when it is sound. */
@@ -122,6 +139,102 @@ function missingFor(requirements, framework) {
   return missing;
 }
 
+// ─── #681: what a reference scenario needs from the provider's data ───────
+
+/** What dataNeedsOf() reads from the simulator's profile of the source's provider. */
+function simulatorFacts(profile) {
+  return {
+    reservations: isObj(profile?.reservations) ? profile.reservations : {},
+    requestedInformationFrom: profile?.personChecks?.requestedInformationFrom || null,
+  };
+}
+
+const EXPIRY_TESTS = [
+  ['expiredOfferTest', 'OFFER'], ['expiredBookingTest', 'BOOKING'],
+  ['expiredRefundOfferTest', 'REFUND_OFFER'], ['expiredExchangeOfferTest', 'EXCHANGE_OFFER'],
+];
+const NO_OVERRULE = new Set(['', 'null', 'CODE_DOES_NOT_EXIST']);
+
+// The tariff a scenario needs: one that can be refunded or exchanged for an
+// after-sale, the non-flexible one when the sale asks for it. An overrule
+// code refunds whatever the tariff, so it needs none.
+function tariffNeed(scenario, overrule) {
+  const type = String(scenario.scenarioType || 'SALE').toUpperCase();
+  if (type === 'REFUND') return overrule ? null : 'REFUNDABLE';
+  if (type === 'EXCHANGE') return 'EXCHANGEABLE';
+  return scenario.desiredFlexibility === 'NON_FLEXIBLE' ? 'NON_FLEXIBLE' : null;
+}
+
+// The reservation a scenario exercises: an optional one when it says how to
+// book it (reservationBookingForm), else a mandatory one when its trip has
+// it. A reservation the trip merely carries is not a need.
+function reservationNeed(scenario, kinds) {
+  if (scenario.reservationBookingForm) return kinds.has('OPTIONAL') ? ['OPTIONAL'] : [];
+  return kinds.has('MANDATORY') ? ['MANDATORY'] : [];
+}
+
+/**
+ * What a scenario needs from the provider's data, worked out from the
+ * scenario, the data file it lives in and the facts of the simulator that
+ * answers it (simulatorFacts). Only the needs that apply are written.
+ */
+function dataNeedsOf(scenario, datafile, facts) {
+  const trip = arr(datafile.tripRequirements).find((t) => isObj(t) && t.id === scenario.tripRequirementId) || {};
+  const legs = arr(trip.legs).filter(isObj);
+  const stops = [trip.trip?.origin, trip.trip?.destination, ...legs.flatMap((l) => [l.origin, l.destination])];
+  const passengers = arr(arr(datafile.passengersList).find((l) => isObj(l) && l.id === scenario.passengersListId)?.passengers);
+  const kinds = new Set(legs.map((l) => facts.reservations[l.productCategoryShortName]).filter(Boolean));
+  const overrule = typeof scenario.overruleCode === 'string' && !NO_OVERRULE.has(scenario.overruleCode) ? scenario.overruleCode : null;
+  const providerValues = [
+    ...(overrule ? ['overruleCode'] : []),
+    ...(scenario.expectedProduct ? ['expectedProduct'] : []),
+  ];
+  const needs = {
+    trip: trip.tripType === 'SPECIFICATION' ? 'SPECIFICATION' : 'SEARCH',
+    legs: legs.length > 1 ? legs.length : null,
+    return: scenarioReturnModel(scenario),
+    reservations: reservationNeed(scenario, kinds),
+    legClasses: arr(scenario.legTravelClasses).length ? [...scenario.legTravelClasses] : null,
+    tariff: tariffNeed(scenario, overrule),
+    passengers: passengers.length,
+    reductionCards: passengers.some((p) => arr(p?.reductionCards).length > 0),
+    providerValues,
+    requestedInformation: Boolean(scenario.requestedInformationProbe)
+      || (facts.requestedInformationFrom !== null && stops.includes(facts.requestedInformationFrom)),
+    expiry: EXPIRY_TESTS.filter(([flag]) => ARMED.has(scenario[flag])).map(([, name]) => name),
+  };
+  const out = {};
+  for (const key of NEEDS_KEYS) {
+    const v = needs[key];
+    if (v === null || v === false || (Array.isArray(v) && v.length === 0)) continue;
+    out[key] = v;
+  }
+  return out;
+}
+
+const TARIFF_TEXT = { REFUNDABLE: 'a refundable tariff', EXCHANGEABLE: 'an exchangeable tariff', NON_FLEXIBLE: 'a non-flexible tariff' };
+const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one offer per direction' };
+
+// The phrase of each need, in the order of NEEDS_KEYS; null when it says nothing.
+const NEED_PHRASES = {
+  legs: (v) => `a journey of ${v} legs`,
+  return: (v) => `a return (${RETURN_TEXT[v] || v})`,
+  reservations: (v) => v.map((kind) => `a train with ${kind === 'MANDATORY' ? 'a mandatory' : 'an optional'} seat reservation`),
+  legClasses: (v) => `travel classes per leg: ${v.join(', ')}`,
+  tariff: (v) => TARIFF_TEXT[v] || `tariff ${v}`,
+  passengers: (v) => `${v} passenger${v > 1 ? 's' : ''}`,
+  reductionCards: () => 'a reduction card the provider accepts',
+  providerValues: (v) => v.map((field) => `the provider's own ${field}`),
+  requestedInformation: () => 'a trip where the provider asks for passenger details',
+  expiry: (v) => (v.length ? `waits for the provider's deadline: ${v.join(', ').toLowerCase().replaceAll('_', ' ')}` : null),
+};
+
+/** The needs of an entry, as short phrases for the person copying it. */
+function needsText(needs) {
+  const n = isObj(needs) ? needs : {};
+  return NEEDS_KEYS.filter((key) => NEED_PHRASES[key] && n[key]).flatMap((key) => NEED_PHRASES[key](n[key])).filter(Boolean);
+}
+
 /**
  * The data file the catalogue makes: its reference scenarios, under their
  * catalogue codes, and the list entries they use. Throws when the catalogue
@@ -159,8 +272,13 @@ function catalogueFor(catalogue, simulator, framework) {
       checks: entry.checks,
       requirements,
       missing: missingFor(requirements, framework),
+      needs: entry.needs,
+      needsText: needsText(entry.needs),
     };
   });
 }
 
-module.exports = { catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf };
+module.exports = {
+  catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
+  dataNeedsOf, needsText, simulatorFacts, NEEDS_KEYS,
+};

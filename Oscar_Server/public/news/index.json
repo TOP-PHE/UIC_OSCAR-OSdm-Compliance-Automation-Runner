@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-catalogue-data-needs",
+    "date": "October 12, 2026",
+    "tag": "Improvement",
+    "title": "Reference scenarios say what data they need",
+    "summary": "When you copy reference scenarios, each one now says what it needs from your provider's data: a journey of two legs, a mandatory reservation, a refundable tariff, the number of passengers, and so on.",
+    "content": "In Test Config, Copy scenarios from the catalogue now lists under each reference scenario what it needs from the provider's data, so that you can choose a matching train for each trip. Coming next: OSCAR will choose the train and the tariff by itself and tell you what is left to complete."
+  },
+  {
     "id": "2026-10-12-refund-confirmed-fulfillments",
     "date": "October 12, 2026",
     "tag": "Fix",
