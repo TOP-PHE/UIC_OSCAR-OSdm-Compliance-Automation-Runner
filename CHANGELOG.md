@@ -62,6 +62,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.246] / [collection-OTST_V2.0.133] — 2026-10-12
+
+Issue #658, release 2026.280. Server code unchanged (tests only).
+
+### Fixed
+
+- **Each sub-run of chained expiry tests starts a new sale from scratch.** A
+  scenario that switches on several expiry tests runs them one after the
+  other, each one selling again from `01. POST Get Offer`. The previous
+  sub-run's sale state was kept: its booking id made the seat map be skipped,
+  and its booked seat was sent for the new offer's reservation. On a real
+  provider the third probe of a chain was refused with 404 "Seat not
+  available" and never ran. The booking, chosen places, steps done, and
+  refund and exchange ids are now cleared when the queue moves to the next
+  sub-run; the scenario's own settings are kept.
+- In the same way, the part ids that the next sub-run's checks expect no
+  longer include the previous booking's parts.
+
+### Default decisions
+
+- The clearing is done where the queue moves on, not when the scenario is
+  read: the next sub-run does not re-read the scenario.
+- No new simulator scenario: the simulator serves no seat map (501), so a
+  chain with a seat map would fail on every replay for that reason alone.
+
+### Not verified
+
+- The seat map in the second sub-run is shown by unit tests, not on the
+  simulator. On the simulator, `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` gives the
+  same 418 checks with no failure; the one check whose text changes lists the
+  booking's own part ids, without the previous booking's.
+
+---
+
 ## [server-1.11.245] / [collection-OTST_V2.0.132] — 2026-10-12
 
 Issue #656, release 2026.279. Collection unchanged.

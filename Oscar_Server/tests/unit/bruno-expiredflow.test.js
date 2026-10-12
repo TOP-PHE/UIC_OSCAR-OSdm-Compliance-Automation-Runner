@@ -58,6 +58,8 @@ const {
   BUFFER_MS,
   buildAndArmExpiredFlowQueue,
   advanceExpiredFlowQueueOrFinish,
+  advanceExpiredFlowQueueAfterSkip,
+  SUBRUN_SALE_STATE,
   nhfTestPrefix,
 } = require('../../../Bruno_Collection/library-bruno/expiredFlow.js');
 
@@ -364,6 +366,43 @@ describe('advanceExpiredFlowQueueOrFinish', () => {
     expect(envStore.__expiredFlowQueueIndex).toBe('1');
     expect(envStore.__expiredFlowSubRunPending).toBe('true');
     expect(mockSetNextRequest).toHaveBeenCalledWith('01. POST Get Offer');
+  });
+
+  // #658: the next sub-run sells again. The previous sub-run's booking made
+  // routeAfterOfferStep() skip the seat map, and its seat was sent again.
+  const QUEUE = JSON.stringify([
+    { code: 'BTO', flag: 'expiredBookingTest',     wait: 'expiredBookingMaxWaitMinutes',     label: 'Expired booking' },
+    { code: 'RTO', flag: 'expiredRefundOfferTest', wait: 'expiredRefundOfferMaxWaitMinutes', label: 'Expired refund offer' },
+  ]);
+  const kept = () => ({
+    scenarioCode: 'CHAIN', salesFlow_placeSelection: 'true', placeSelectionMode: 'SEATMAP_AT_OFFER',
+    passengerAdditionalData: '[{}]', reservationId: 'R-NEW-OFFER',
+  });
+  const leftOver = () => Object.fromEntries(SUBRUN_SALE_STATE.map((key) => [key, 'left over']));
+
+  test.each([
+    ['advanceExpiredFlowQueueOrFinish', () => advanceExpiredFlowQueueOrFinish({ scenarioLabel: 'Expired booking' }), 'true'],
+    ['advanceExpiredFlowQueueAfterSkip', () => advanceExpiredFlowQueueAfterSkip(), 'false'],
+  ])('%s: the next sub-run starts without the previous sale (#658)', (_name, advance, armed) => {
+    envStore = { ...kept(), ...leftOver(), __expiredFlowQueue: QUEUE, __expiredFlowQueueIndex: '0',
+      expiredBookingTest: 'true', __expiredBookingArmed: armed };
+    if (armed === 'true') delete envStore.__expiredBookingArmed;
+    envStore.bookingId = 'B-2';
+    envStore.preselectedPlaces = JSON.stringify([{ coachNumber: 'A', placeNumber: '83' }]);
+    expect(advance()).toBe(true);
+    for (const key of SUBRUN_SALE_STATE) expect(envStore).not.toHaveProperty(key);
+    expect(envStore).toMatchObject(kept());
+    expect(envStore.__expiredFlowQueueIndex).toBe('1');
+  });
+
+  test('the list holds what made the seat map be skipped and the seat be resent (#658)', () => {
+    expect(SUBRUN_SALE_STATE).toEqual(expect.arrayContaining(['bookingId', 'preselectedPlaces', 'preselectedCoach', 'preselectedPlace']));
+  });
+
+  test('a scenario that ends its queue keeps its booking (#658)', () => {
+    envStore = { __expiredFlowQueue: QUEUE, __expiredFlowQueueIndex: '1', bookingId: 'B-LAST' };
+    expect(advanceExpiredFlowQueueOrFinish({ scenarioLabel: 'Expired refund offer' })).toBe(false);
+    expect(envStore.bookingId).toBe('B-LAST');
   });
 
   test('queue of 2, idx=1 (last) → returns false (no further advance)', () => {

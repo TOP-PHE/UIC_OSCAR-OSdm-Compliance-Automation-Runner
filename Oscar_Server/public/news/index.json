@@ -1,5 +1,12 @@
 [
   {
+    "id": "2026-10-12-subrun-sale-state",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Chained expiry tests each sell again from scratch",
+    "summary": "A scenario that chains several expiry tests no longer reuses the previous sales booking or seat.,content:When a scenario switched on several expiry tests, each test after the first reused the previous sales booking and seat: the seat map was skipped and the seat already booked was asked for again, which a provider refuses. Each test now starts a new sale from scratch."
+  },
+  {
     "id": "2026-10-12-idle-stop-expiry",
     "date": "October 12, 2026",
     "tag": "Fix",
