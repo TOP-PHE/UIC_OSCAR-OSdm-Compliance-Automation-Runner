@@ -62,6 +62,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.249] / [collection-OTST_V2.0.136] — 2026-10-12
+
+Issue #662, release 2026.283. Server code unchanged (tests only).
+
+### Fixed
+
+- **A partial refund of a booking priced 0 no longer fails "strictly less
+  than the confirmed price".** A provider's test system prices every booking
+  at 0, so `refundFee + refundableAmount < confirmedPrice` read 0 < 0 and
+  failed on every partial refund, at steps 10 and 11. With a confirmed price
+  of 0 the amount cannot tell a partial refund from a full one: the check is
+  not run, and the run log says so at INFO. The bounds check (non-negative,
+  sum not above the confirmed price) still runs; a booking with a price is
+  checked as before, with or without an overrule code.
+
+### Default decisions
+
+- INFO rather than WARNING: a price of 0 is the provider's test data, not
+  something its answer did wrong.
+
+### Not verified
+
+- Not rerun against the provider. The simulator prices every booking above
+  0, so its runs are unchanged by construction.
+
+---
+
 ## [server-1.11.248] / [collection-OTST_V2.0.135] — 2026-10-12
 
 Issue #661, release 2026.282. Server code unchanged (tests only).

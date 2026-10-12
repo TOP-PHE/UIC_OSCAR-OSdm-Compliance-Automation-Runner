@@ -240,6 +240,13 @@ function checkOverruleRejected(status, body) {
 
 // #595: this refund offer leaves out some of the booking's fulfillments, so
 // it is one of several that together refund the booking.
+// #662: a booking priced 0 (a provider's test system) gives 0 for a full and
+// a partial refund alike, so "partial < confirmed" cannot hold and says
+// nothing: not checked, said once.
+function logZeroPricePartial() {
+  validationLogger('[INFO] Partial refund: the booking\'s confirmed price is 0, so a partial refund cannot be told from a full one by its amount; the "strictly less than the confirmed price" check is not run.');
+}
+
 function _oneOfSeveral(refundOffer) {
   const bookingIds = _readJson("__bookingFulfillmentIds", []);
   const ids = _fulfillmentIdsOf(refundOffer);
@@ -786,7 +793,8 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
         expect(_feeInt, `Overrule(${overruleCode}) was sent but provider still charged a fee: ${_feeInt} (scaled). Overrule contract: waive fees on top of partial scope.`).to.eql(0);
         validationLogger(`[DEBUG] Overrule(${overruleCode}) honoured on partial scope — fee waived.`);
       });
-      test(`Partial refund WITH overrule (${overruleCode}): refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
+      if (_confirmedInt === 0) logZeroPricePartial();
+      else test(`Partial refund WITH overrule (${overruleCode}): refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
         expect(_feeInt + _refundInt,
           `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)
           .to.be.below(_confirmedInt);
@@ -828,7 +836,9 @@ function validateRefundableAmountLocal(refundOffer, overruleCode, confirmedPrice
       validationLogger(`[DEBUG] No overrule sent and provider returned refundableAmount=${refundOffer.refundableAmount.amount} ${refundOffer.refundableAmount.currency} (fee=${refundOffer.refundFee.amount}) — provider applied its rules and the conditions permit a refund. OSCAR does NOT assert a specific value in the normal flow; the provider's response is authoritative. To force a specific expected amount, set an overruleCode on the scenario (overrule contract: amount = confirmedPrice, fee = 0).`);
     }
     // Partial-refund identity still applies in the normal flow.
-    if (_isPartial) {
+    if (_isPartial && _confirmedInt === 0) {
+      logZeroPricePartial();
+    } else if (_isPartial) {
       test(`Partial refund: refundFee(${refundOffer.refundFee.amount}) + refundableAmount(${refundOffer.refundableAmount.amount}) < confirmedPrice(${confirmedPriceAmount}) (partial scope returns strictly less than full)`, () => {
         expect(_feeInt + _refundInt,
           `Partial-refund identity broken: scoped fee+refundable(${_feeInt + _refundInt}) is NOT < confirmed(${_confirmedInt}). Provider refunded the full booking despite refundSpecifications being sent — possible non-conformance.`)

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.282",
+  "current_release": "2026.283",
   "releases": [
+    {
+      "release": "2026.283",
+      "date": "2026-10-12",
+      "server": "1.11.249",
+      "collection": "OTST_V2.0.136",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#662: a partial refund of a booking priced 0 no longer fails the 'strictly less than the confirmed price' check (not run, logged at INFO)"
+      ]
+    },
     {
       "release": "2026.282",
       "date": "2026-10-12",
