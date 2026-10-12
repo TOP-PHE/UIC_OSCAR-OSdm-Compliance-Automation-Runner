@@ -1232,7 +1232,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     its steps and the checks at most four scenarios make. It is generated:
     record and regenerate after a collection release, never edit it. The
     reference-scenario tables of `OSCAR - What is tested.md` are pinned to
-    `scenario_catalogue.json` by `tests/what-is-tested.test.js`.
+    `scenario_catalogue.json` by `tests/what-is-tested.test.js`. The failure
+    counts of the `SIM_WRONG_*` rows in `OSCAR - OSDM Simulator scenarios.md`
+    are not pinned: they had drifted to twice the real number (#678). Check
+    them against the regenerated page when a collection change moves a check.
   - **A load test of OSCAR needs the simulator's limits raised** (#676): every
     run comes from the OSCAR server's address, about 4 requests a second
     each, against 50/s in nginx and 3,000/min in the simulator. The page's
