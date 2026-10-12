@@ -62,6 +62,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.241] / [collection-OTST_V2.0.129] — 2026-10-12
+
+Issue #648, release 2026.275. Server code unchanged (tests only).
+
+### Fixed
+
+- **Query parameters are written in the request URL.** Bruno 4.2.1 sends the
+  URL as written and ignores a request file's `http.params` list (checked with
+  the real CLI on a local listener: `/x` with a `params` entry arrives as
+  `/x`, `/y?embed=ALL` arrives with its parameter). Nine request files
+  declared their parameters that way:
+  - `08. GET Place Maps` and `08b. GET Place Map Post-Booking`: `contextId`,
+    `contextType`, `resourceId` and `resourceType`, all four required by OSDM
+    3.8. A provider answered 400 "Required parameter 'contextId' is not
+    present": the seat map had never been asked for correctly, so what runs
+    reported about it said nothing about the provider.
+  - The GET Booking steps 12, 14, 16 (refund) and 13, 15, 17 (exchange), and
+    `10. POST Exchange Offers`: `embed=ALL`. That is OSDM's default, so the
+    answers do not change.
+- A test refuses a `params` list in any request file, and pins the seat-map
+  URLs.
+
+### Default decisions (taken without asking)
+
+- The parameters keep the values the files declared; none was added or
+  dropped.
+- `embed=ALL` is kept although it is the default, so the request says what
+  it expects.
+
+Checked: the new test fails on the old files (11 failures) and passes on the
+new ones; the real `bru` fills `{{offerId}}` and `{{reservationId}}` in the
+query string. A full recording of the 73 simulator scenarios gives the same
+checks as the OTST_V2.0.128 one, and the refund and exchange booking reads
+now carry `embed=ALL`. Not checked: a seat map from a real provider (no
+simulator scenario chooses seats, and the simulator answers 501 to
+`/availabilities`).
+
+---
+
 ## [server-1.11.240] — 2026-10-11
 
 Issue #646, release 2026.274. Collection unchanged (OTST_V2.0.128).

@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/availabilities/place-map"
+  url: "{{api_base}}/availabilities/place-map?contextId={{bookingId}}&contextType=BOOKING&resourceId={{reservationId}}&resourceType=RESERVATION"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
@@ -15,19 +15,6 @@ http:
       value: application/json
     - name: Requestor
       value: "{{requestor}}"
-  params:
-    - name: contextId
-      value: "{{bookingId}}"
-      type: query
-    - name: contextType
-      value: BOOKING
-      type: query
-    - name: resourceId
-      value: "{{reservationId}}"
-      type: query
-    - name: resourceType
-      value: RESERVATION
-      type: query
   auth: inherit
 
 runtime:

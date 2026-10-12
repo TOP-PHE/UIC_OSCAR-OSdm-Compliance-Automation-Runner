@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-seat-map-parameters",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "The seat map is now asked for correctly",
+    "summary": "The seat map request and a few booking reads went without their query parameters; they now carry them.",
+    "content": "The Bruno version OSCAR runs ignores query parameters that a request file lists separately from its URL. The seat map request (GET /availabilities/place-map) was therefore sent without the four parameters OSDM requires, and providers answered 400; the seat map had in fact never been asked for correctly. The parameters are now part of the URL.\n\nThe booking reads of the refund and exchange flows also lost their embed=ALL parameter. That is OSDM's default, so their answers do not change.\n\nIf a scenario of yours chooses seats from the seat map, run it again: what was reported for the seat map before this release says nothing about the provider."
+  },
+  {
     "id": "2026-10-11-silent-provider",
     "date": "October 11, 2026",
     "tag": "Fix",
