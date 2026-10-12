@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-idle-stop-expiry",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Expiry tests are no longer cut short",
+    "summary": "A run that waits for a booking or an offer to expire is no longer stopped after five minutes of silence.",
+    "content": "When a scenario switched on an expiry test without a maximum wait, OSCAR mistook the wait for a provider that had stopped answering and stopped the run after five minutes, so its results could not be downloaded. Such a run now waits as intended; the run timeout still applies."
+  },
+  {
     "id": "2026-10-12-collection-fixes",
     "date": "October 12, 2026",
     "tag": "Fix",
