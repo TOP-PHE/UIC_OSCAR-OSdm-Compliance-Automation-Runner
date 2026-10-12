@@ -95,8 +95,9 @@
     const journeys = journeyOptions(preview.testData);
     el.innerHTML = '<div style="font-weight:700;margin:14px 0 6px">For each trip, the train or journey of this company\'s Test Data to use</div>'
       + trips.map(t => {
+        // #681: a reference scenario's trip comes with a proposed train or journey.
         const opts = (t.needsJourney ? journeys : trains.concat(journeys))
-          .map(o => `<option value="${esc(o.value)}">${esc(o.text)}</option>`).join('');
+          .map(o => `<option value="${esc(o.value)}"${o.value === t.suggested ? ' selected' : ''}>${esc(o.text)}</option>`).join('');
         const label = `${stnShort(t.origin)} → ${stnShort(t.destination)}${t.vehicleNumber ? ' · ' + t.vehicleNumber : ''}${t.legs > 1 ? ' · ' + t.legs + ' legs' : ''}`;
         return `<div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
           <div style="flex:1;font-size:12px"><strong>${esc(label)}</strong><br><span style="color:#90a4ae">used by ${esc(t.usedBy.join(', '))}</span></div>
@@ -118,10 +119,15 @@
     // #681: what the scenario needs from this provider's data, to pick its train.
     const dataNeeds = Array.isArray(s.dataNeeds) && s.dataNeeds.length
       ? `<br><span style="font-size:12px;color:#78909c">Needs in the data: ${esc(s.dataNeeds.join(', '))}</span>` : '';
+    // #681: what the copy cannot fill in, and what it cannot see in the Test Data.
+    const toComplete = Array.isArray(s.toComplete) && s.toComplete.length
+      ? `<br><span style="font-size:12px;color:#e65100">To complete after the copy: ${esc(s.toComplete.join('; '))}</span>` : '';
+    const toCheck = Array.isArray(s.toCheck) && s.toCheck.length
+      ? `<br><span style="font-size:12px;color:#78909c">To check: ${esc(s.toCheck.join('; '))}</span>` : '';
     return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:${locked ? 'not-allowed' : 'pointer'};${locked ? 'opacity:.55' : ''}">
         <input type="checkbox" value="${esc(s.code)}" data-copy-action="toggle-code" style="width:auto;margin-top:3px"${locked ? ' disabled' : ''}>
         <span><strong>${esc(s.code)}</strong> <span style="color:#90a4ae">${esc(s.scenarioType)}${s.scenarioAction ? ' · ' + esc(s.scenarioAction) : ''}</span>
-        ${purpose}${dataNeeds}${needs}${s.warnings.map(warningLine).join('')}</span></label>`;
+        ${purpose}${dataNeeds}${toCheck}${toComplete}${needs}${s.warnings.map(warningLine).join('')}</span></label>`;
   }
 
   function renderPreview() {
@@ -171,8 +177,10 @@
     if (!res.ok) { showMsg(await readError(res, 'The copy failed.'), 'error'); return; }
     const done = (await res.json()).copied || [];
     const renamed = done.filter(c => c.from !== c.to).map(c => `${c.from} → ${c.to}`);
+    const incomplete = done.filter(c => Array.isArray(c.toComplete) && c.toComplete.length).map(c => c.to);
     oscarToastAfterNav(`${done.length} scenario${done.length === 1 ? '' : 's'} copied from ${preview.source.name}.`
-      + (renamed.length ? ` Renamed: ${renamed.join(', ')}.` : ''), 'success');
+      + (renamed.length ? ` Renamed: ${renamed.join(', ')}.` : '')
+      + (incomplete.length ? ` To complete before running: ${incomplete.join(', ')}.` : ''), 'success');
     location.reload();
   }
 

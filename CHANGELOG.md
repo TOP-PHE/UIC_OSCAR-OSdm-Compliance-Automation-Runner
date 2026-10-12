@@ -62,6 +62,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.255] / [collection-OTST_V2.0.141] — 2026-10-12
+
+Issue #681 (part 2 of 3), release 2026.289. Collection unchanged.
+
+### Added
+
+- **Reference scenarios are adapted to the company they are copied into.**
+  `utils/catalogueMatch.js` (pure), applied to the catalogue before the copy:
+  - an overrule code is one the company's Test Framework declares for
+    refunds (the scenario's own when declared, else the first); the refusal
+    probe sends a listed code the framework does not declare;
+  - a product code (`expectedProduct`) is the provider's: removed;
+  - an after-sale never keeps the non-flexible tariff (it gets
+    `FULL_FLEXIBLE`).
+- **Each trip of the copy comes with a proposed train or journey** from the
+  company's Test Data: a journey of as many legs when the trip has several,
+  else the first train's first service. It is preselected; the person can
+  change it.
+- **What is left is said, before and after the copy.** The preview lists per
+  reference scenario what is *to complete* (an overrule code with none
+  declared, the provider's product) and what is *to check* because the Test
+  Data cannot show it (a mandatory or optional reservation on the chosen
+  train, a class per leg, passenger details asked for, reduction cards). The
+  copy answers with the scenarios to complete and the page names them.
+
+### Default decisions
+
+- Trains are proposed in Test Data order, not by category: the Test Data
+  says nothing of reservations or classes, so those needs are listed to check
+  rather than guessed.
+- A scenario to complete is still copied; part 3 will leave it out of the
+  run list.
+
+### Not verified
+
+- Not looked at in a browser; the preview and copy answers are checked by the
+  route tests.
+
+---
+
 ## [server-1.11.254] / [collection-OTST_V2.0.141] — 2026-10-12
 
 Issue #681 (part 1 of 3), release 2026.288.
