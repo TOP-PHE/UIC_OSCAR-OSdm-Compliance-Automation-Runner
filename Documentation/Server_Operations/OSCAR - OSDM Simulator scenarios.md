@@ -216,11 +216,11 @@ Each of these makes one validator family fail on purpose, so that its FAIL path 
 
 | Scenario | What it tests | What the simulator answers | Expected |
 |---|---|---|---|
-| `SIM_WRONG_OFFER_PRICE_38` | Offers. | `offerSummary.minimalPrice` one cent above the sum of the parts. | Fails: "provisionalPrice is not below the offer's minimalPrice" (4 failed checks). |
+| `SIM_WRONG_OFFER_PRICE_38` | Offers. | `offerSummary.minimalPrice` one cent above the sum of the parts. | Fails: "provisionalPrice is not below the offer's minimalPrice", at 02 and 05 (2 failed checks). |
 | `SIM_WRONG_BOOKING_PRICE_38` | Booking. | `provisionalPrice` one cent above the sum of the parts. | **No check fails: known gap.** The collection does not compare `provisionalPrice` with the parts. When such a check is added, this scenario must start failing. |
-| `SIM_WRONG_FULFILLMENT_STATUS_38` | Fulfillments. | The fulfillments issued say `AVAILABLE`. | Fails: "Fulfillment[0] status comparison" (4 failed checks). |
-| `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds" (4 failed checks). |
-| `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice" (7 failed checks). |
+| `SIM_WRONG_FULFILLMENT_STATUS_38` | Fulfillments. | The fulfillments issued say `AVAILABLE`. | Fails: "Fulfillment[0] status comparison", at 06 and 07 (2 failed checks). |
+| `SIM_WRONG_REFUND_AMOUNT_38` | Refund. | `refundableAmount` one cent above its breakdown. | Fails: "Refund response bounds", at 10 and 11 (2 failed checks). |
+| `SIM_WRONG_EXCHANGE_AMOUNT_38` | Exchange. | `amountToBePaid` one cent off `exchangePrice + exchangeFee − price given up`. | Fails: "amountToBePaid = exchangePrice + exchangeFee - confirmedPrice", for both exchange offers at 10 and for the chosen one at 11 and 12 (4 failed checks). |
 
 ### Requested information and purchaser (#611)
 
