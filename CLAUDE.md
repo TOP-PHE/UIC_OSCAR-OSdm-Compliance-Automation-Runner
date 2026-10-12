@@ -854,7 +854,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   EXCHANGE_ONGOING deliberately stays provisional (the exchange creates new
   pre-booked parts). The other member is optional at every stage. At
   REFUNDED/EXCHANGED an `[INFO]` line shows confirmedPrice before/after —
-  logged, not asserted (open OTST point, see §6).
+  logged, not asserted (open OTST point, see §6). At those two stages an
+  absent `confirmedPrice` is a WARNING (#661): OSDM requires neither member,
+  and a real provider leaves it out after a full refund.
 - **Offer parts and booked parts are paired by content, never by position**
   (#550, OTST_V2.0.105). OSDM gives a booked part no reference to its offer
   part and does not fix their order. `bookings.js` `pairOfferParts()` (pure)
