@@ -20,12 +20,15 @@ const path = require('node:path');
 process.env.COLLECTION_PATH = path.resolve(__dirname, '../../../Bruno_Collection');
 const {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
+  dataNeedsOf, needsText, simulatorFacts,
 } = require('../../src/utils/scenarioCatalogue');
 const { schemaProblems, loadDatafileSchema } = require('../../src/utils/datafileSchema');
 
 const DATA = path.resolve(__dirname, '../../../Bruno_Collection/data_base');
 const catalogue = require(path.join(DATA, 'scenario_catalogue.json'));
 const simulator = require(path.join(DATA, 'simulator_datafile.json'));
+// The reference scenarios' sources are the simulator's 3.8 ones, answered by gamma.
+const gamma = require(path.resolve(__dirname, '../../../OSDM_Simulator/providers/gamma.json'));
 
 describe('the catalogue file', () => {
   test('is sound against the simulator data file', () => {
@@ -62,7 +65,7 @@ describe('the catalogue file', () => {
 
 describe('problems a catalogue can have', () => {
   const sim = { scenarios: [{ code: 'SIM_A_38', scenarioType: 'SALE' }, { code: 'SIM_WRONG_X_38' }] };
-  const entry = (over) => ({ code: 'OTST_A_ONE', source: 'SIM_A_38', purpose: 'A sale for one person.', checks: 10, ...over });
+  const entry = (over) => ({ code: 'OTST_A_ONE', source: 'SIM_A_38', purpose: 'A sale for one person.', checks: 10, needs: {}, ...over });
   test.each([
     [[], /no entry/],
     [[entry({ code: 'A_ONE' })], /OTST_/],
@@ -72,6 +75,8 @@ describe('problems a catalogue can have', () => {
     [[entry({ checks: 0 })], /checks/],
     [[entry({ set: { tripRequirementId: 2 } })], /may change/],
     [[entry({ source: 'SIM_WRONG_X_38' })], /deliberately wrong/],
+    [[entry({ needs: undefined })], /needs is missing/],
+    [[entry({ needs: { train: 'SC' } })], /needs\.train is not a known need/],
   ])('%#', (entries, problem) => {
     expect(catalogueProblems({ entries }, sim).join('; ')).toMatch(problem);
     expect(() => catalogueDatafile({ entries }, sim)).toThrow(/not valid/);
@@ -97,5 +102,74 @@ describe('requirements and the golden rule', () => {
     expect(missingFor(r, { salesFlows: ['SALE'], osdmVersion: '3.8', passengerTypes: ['YOUTH'] })).toEqual([]);
     expect(missingFor({ salesFlows: ['SALE', 'REFUND_FULL'], returnModel: null, minOsdmVersion: null, passengerTypes: [] }, null))
       .toEqual(['sales flow SALE', 'sales flow REFUND_FULL']);
+  });
+});
+
+describe('#681 what a reference scenario needs from the provider\'s data', () => {
+  const facts = simulatorFacts(gamma);
+
+  test('every entry\'s needs are those of its source scenario on the simulator', () => {
+    for (const e of catalogue.entries) {
+      const source = simulator.scenarios.find(s => s.code === e.source);
+      expect([e.code, e.needs]).toEqual([e.code, dataNeedsOf(source, simulator, facts)]);
+    }
+  });
+
+  const df = {
+    tripRequirements: [
+      { id: 1, tripType: 'SEARCH', trip: { origin: 'urn:A', destination: 'urn:B' } },
+      { id: 2, tripType: 'SPECIFICATION', legs: [{ productCategoryShortName: 'SC' }, { productCategoryShortName: 'EC' }] },
+      { id: 3, tripType: 'SEARCH', trip: { origin: 'urn:RI', destination: 'urn:B' } },
+    ],
+    passengersList: [
+      { id: 1, passengers: [{ type: 'PERSON' }] },
+      { id: 2, passengers: [{ type: 'PERSON', reductionCards: [{ code: 'C' }] }, { type: 'PERSON' }] },
+    ],
+  };
+  const f = { reservations: { SC: 'MANDATORY', EC: 'OPTIONAL' }, requestedInformationFrom: 'urn:RI' };
+  const sc = (over) => ({ scenarioType: 'SALE', tripRequirementId: 1, passengersListId: 1, ...over });
+
+  test('a plain sale needs a searched trip and its passengers, nothing else', () => {
+    expect(dataNeedsOf(sc(), df, f)).toEqual({ trip: 'SEARCH', passengers: 1 });
+  });
+
+  test('the reservation exercised, not every one the trip carries', () => {
+    expect(dataNeedsOf(sc({ tripRequirementId: 2 }), df, f)).toEqual({ trip: 'SPECIFICATION', legs: 2, reservations: ['MANDATORY'], passengers: 1 });
+    expect(dataNeedsOf(sc({ tripRequirementId: 2, reservationBookingForm: 'PLACE_SELECTION' }), df, f).reservations).toEqual(['OPTIONAL']);
+    expect(dataNeedsOf(sc({ reservationBookingForm: 'PLACE_SELECTION' }), df, f).reservations).toBeUndefined();
+  });
+
+  test('the tariff an after-sale needs; an overrule code refunds any tariff and is the provider\'s own value', () => {
+    expect(dataNeedsOf(sc({ scenarioType: 'REFUND' }), df, f).tariff).toBe('REFUNDABLE');
+    expect(dataNeedsOf(sc({ scenarioType: 'EXCHANGE' }), df, f).tariff).toBe('EXCHANGEABLE');
+    expect(dataNeedsOf(sc({ desiredFlexibility: 'NON_FLEXIBLE' }), df, f).tariff).toBe('NON_FLEXIBLE');
+    const overrule = dataNeedsOf(sc({ scenarioType: 'REFUND', overruleCode: 'TECHNICAL_FAILURE' }), df, f);
+    expect(overrule.tariff).toBeUndefined();
+    expect(overrule.providerValues).toEqual(['overruleCode']);
+    expect(dataNeedsOf(sc({ scenarioType: 'REFUND', overruleCode: 'CODE_DOES_NOT_EXIST' }), df, f).tariff).toBe('REFUNDABLE');
+  });
+
+  test('return model, classes per leg, cards, product, requested information, deadlines', () => {
+    const n = dataNeedsOf(sc({
+      passengersListId: 2, tripRequirementId: 3, legTravelClasses: ['FIRST', 'SECOND'], expectedProduct: 'P1',
+      offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' }, expiredOfferTest: 'on', expiredBookingTest: 'off',
+    }), df, f);
+    expect(n).toEqual({
+      trip: 'SEARCH', return: 'COMBINED', legClasses: ['FIRST', 'SECOND'], passengers: 2, reductionCards: true,
+      providerValues: ['expectedProduct'], requestedInformation: true, expiry: ['OFFER'],
+    });
+    expect(dataNeedsOf(sc({ requestedInformationProbe: 'omit' }), df, f).requestedInformation).toBe(true);
+  });
+
+  test('said to the person copying, and given with each entry of the catalogue', () => {
+    expect(needsText({ trip: 'SPECIFICATION', legs: 2, reservations: ['MANDATORY'], tariff: 'REFUNDABLE', passengers: 2, providerValues: ['overruleCode'], expiry: ['REFUND_OFFER'] }))
+      .toEqual(['a journey of 2 legs', 'a train with a mandatory seat reservation', 'a refundable tariff', '2 passengers',
+        'the provider\'s own overruleCode', 'waits for the provider\'s deadline: refund offer']);
+    expect(needsText(undefined)).toEqual([]);
+    const listed = catalogueFor(catalogue, simulator, {});
+    for (const e of listed) {
+      expect(e.needs).toEqual(catalogue.entries.find(x => x.code === e.code).needs);
+      expect(e.needsText).toEqual(needsText(e.needs));
+    }
   });
 });

@@ -1,161 +1,318 @@
 {
-  "$comment": "Scenario catalogue (#612): reference scenarios a company can copy into its data file from Test Config. Each entry names the scenario of simulator_datafile.json that supplies its data (source), says what it tests (purpose), and gives the number of checks it produced on the OSDM simulator (checks, from node OSDM_Simulator/scripts/replay.js). set changes only the *MaxWaitMinutes waits, for a real provider. Kept sound by Oscar_Server/tests/unit/scenario-catalogue.test.js.",
+  "$comment": "Scenario catalogue (#612): reference scenarios a company can copy into its data file from Test Config. Each entry names the scenario of simulator_datafile.json that supplies its data (source), says what it tests (purpose), and gives the number of checks it produced on the OSDM simulator (checks, from node OSDM_Simulator/scripts/replay.js). set changes only the *MaxWaitMinutes waits, for a real provider. needs is what the scenario needs from the provider's data (#681), equal to dataNeedsOf() of its source: the trip, the reservation it exercises, the tariff, the passengers, the values only the provider gives. Kept sound by Oscar_Server/tests/unit/scenario-catalogue.test.js.",
   "entries": [
     {
       "code": "OTST_SALE_ONE_WAY_1ADT",
       "source": "SIM_SALE_SEARCH_1ADT_38",
       "purpose": "One-way sale for one adult: offers, booking, passenger update, confirmation, documents.",
-      "checks": 230
+      "checks": 230,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_ONE_WAY_2ADT_SAVER",
       "source": "SIM_SALE_SEARCH_2ADT_SAVER_38",
       "purpose": "One-way sale for two adults, choosing the non-flexible (saver) offer.",
-      "checks": 289
+      "checks": 289,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "NON_FLEXIBLE",
+        "passengers": 2
+      }
     },
     {
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
-      "checks": 309
+      "checks": 309,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_RETURN_COMBINED_1ADT",
       "source": "SIM_RETURN_COMBINED_1ADT_38",
       "purpose": "Return sold as one offer covering both directions (outboundTripIds, OSDM 3.7 and later).",
-      "checks": 351
+      "checks": 351,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_RETURN_FULL_1ADT",
       "source": "SIM_REFUND_RETURN_1ADT_38",
       "purpose": "Full refund of a return: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 521
+      "checks": 521,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_RETURN_INBOUND_1ADT",
       "source": "SIM_REFUND_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return by fulfillment: the inbound ticket alone.",
-      "checks": 448
+      "checks": 448,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
-      "checks": 525
+      "checks": 525,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "passengers": 1,
+        "providerValues": [
+          "overruleCode"
+        ]
+      }
     },
     {
       "code": "NHF_REFUND_OVERRULE_CODE_REFUSED",
       "source": "SIM_REFUND_OVERRULE_REFUSED_38",
       "purpose": "A refund with an overrule code the provider does not accept must be refused.",
-      "checks": 314
+      "checks": 314,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "passengers": 1,
+        "providerValues": [
+          "overruleCode"
+        ]
+      }
     },
     {
       "code": "OTST_REFUND_WITHDRAWN_1ADT",
       "source": "SIM_REFUND_DELETE_1ADT_38",
       "purpose": "Refund offer asked for, then withdrawn instead of confirmed: the ticket stays.",
-      "checks": 327
+      "checks": 327,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_OFFER_ONLY_1ADT",
       "source": "SIM_REFUND_ONLY_OFFER_1ADT_38",
       "purpose": "Refund offer asked for and read, neither confirmed nor withdrawn.",
-      "checks": 294
+      "checks": 294,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_RECEIPT_RETURN_1ADT",
       "source": "SIM_REFUND_RECEIPT_RETURN_1ADT_38",
       "purpose": "Full refund of a return, then the refund receipt waited for in the booking.",
-      "checks": 524
+      "checks": 524,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "SEPARATE",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_RETURN_COMBINED_FULL_1ADT",
       "source": "SIM_REFUND_COMBINED_RETURN_1ADT_38",
       "purpose": "Full refund of a return sold as one offer covering both directions: every refund offer confirmed, every fulfillment refunded.",
-      "checks": 591
+      "checks": 591,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_RETURN_COMBINED_INBOUND_1ADT",
       "source": "SIM_REFUND_COMBINED_INBOUND_1ADT_38",
       "purpose": "Partial refund of a return sold as one offer, by fulfillment: the inbound ticket alone.",
-      "checks": 509
+      "checks": 509,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation of a return sold as one offer: refund with an overrule code, everything back and no fee.",
-      "checks": 595
+      "checks": 595,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "passengers": 1,
+        "providerValues": [
+          "overruleCode"
+        ]
+      }
     },
     {
       "code": "OTST_REFUND_RECEIPT_RETURN_COMBINED_1ADT",
       "source": "SIM_REFUND_COMBINED_RECEIPT_1ADT_38",
       "purpose": "Full refund of a return sold as one offer, then the refund receipt waited for in the booking.",
-      "checks": 594
+      "checks": 594,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
-      "checks": 380
+      "checks": 380,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",
       "source": "SIM_EXCHANGE_DELETE_1ADT_38",
       "purpose": "Exchange pre-booked, then withdrawn before its confirmation: the ticket stays.",
-      "checks": 351
+      "checks": 351,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_CLASS_PER_LEG_1ADT",
       "source": "SIM_SALE_CLASS_PER_LEG_1ADT_38",
       "purpose": "Travel class per leg on a two-leg trip: first class where the train has one.",
-      "checks": 284
+      "checks": 284,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "legClasses": [
+          "FIRST",
+          "SECOND"
+        ],
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_RESERVATION_MANDATORY_2ADT",
       "source": "SIM_SALE_RESERVATION_MANDATORY_2ADT_38",
       "purpose": "A mandatory seat reservation, detected from the admission and booked with it.",
-      "checks": 341
+      "checks": 341,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "reservations": [
+          "MANDATORY"
+        ],
+        "passengers": 2
+      }
     },
     {
       "code": "OTST_SALE_RESERVATION_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with optionalReservationSelections.",
-      "checks": 370
+      "checks": 370,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2
+      }
     },
     {
       "code": "OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT",
       "source": "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38",
       "purpose": "An optional seat reservation booked with placeSelections.",
-      "checks": 370
+      "checks": 370,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2
+      }
     },
     {
       "code": "OTST_SALE_RESERVATION_ADD_LATER_2ADT",
       "source": "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38",
       "purpose": "An optional seat reservation added to the pre-booked booking afterwards.",
-      "checks": 367
+      "checks": 367,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "reservations": [
+          "OPTIONAL"
+        ],
+        "passengers": 2
+      }
     },
     {
       "code": "OTST_SALE_BY_TRIP_ID_1ADT",
       "source": "SIM_SALE_BY_TRIP_ID_1ADT_38",
       "purpose": "Offers asked by trip id, after a trip search (POST /trips-collection).",
-      "checks": 237
+      "checks": 237,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     },
     {
       "code": "NHF_SALE_BY_TRIP_ID_UNKNOWN",
       "source": "SIM_SALE_BY_TRIP_ID_UNKNOWN_38",
       "purpose": "Offers asked for a trip id the provider never gave must be refused.",
-      "checks": 70
+      "checks": 70,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_DOCUMENTS_RETURN_1ADT",
       "source": "SIM_SALE_DOCUMENTS_RETURN_1ADT_38",
       "purpose": "Fulfillment documents of a return, and each fulfillment read with GET /fulfillments/{id}.",
-      "checks": 351
+      "checks": 351,
+      "needs": {
+        "trip": "SEARCH",
+        "return": "COMBINED",
+        "passengers": 1
+      }
     },
     {
       "code": "OTST_SALE_IDEMPOTENCY_1ADT",
       "source": "SIM_SALE_IDEMPOTENCY_1ADT_38",
       "purpose": "Idempotency-Key on the booking and the confirmation: the same key gives the same answer.",
-      "checks": 236
+      "checks": 236,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     },
     {
       "code": "NHF_EXPIRED_OFFER",
@@ -164,6 +321,13 @@
       "checks": 119,
       "set": {
         "expiredOfferMaxWaitMinutes": 40
+      },
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "expiry": [
+          "OFFER"
+        ]
       }
     },
     {
@@ -173,6 +337,13 @@
       "checks": 187,
       "set": {
         "expiredBookingMaxWaitMinutes": 40
+      },
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "expiry": [
+          "BOOKING"
+        ]
       }
     },
     {
@@ -182,6 +353,14 @@
       "checks": 297,
       "set": {
         "expiredRefundOfferMaxWaitMinutes": 40
+      },
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1,
+        "expiry": [
+          "REFUND_OFFER"
+        ]
       }
     },
     {
@@ -191,37 +370,68 @@
       "checks": 263,
       "set": {
         "expiredExchangeOfferMaxWaitMinutes": 40
+      },
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "EXCHANGEABLE",
+        "passengers": 1,
+        "expiry": [
+          "EXCHANGE_OFFER"
+        ]
       }
     },
     {
       "code": "OTST_SALE_REQUESTED_INFORMATION_1ADT",
       "source": "SIM_RI_AUTOFEED_1ADT_38",
       "purpose": "Requested information: what the offers ask for is checked and supplied.",
-      "checks": 233
+      "checks": 233,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "requestedInformation": true
+      }
     },
     {
       "code": "NHF_REQUESTED_INFORMATION_OMITTED",
       "source": "SIM_NHF_RI_OMIT_1ADT_38",
       "purpose": "A passenger update without a demanded field must be refused.",
-      "checks": 144
+      "checks": 144,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "requestedInformation": true
+      }
     },
     {
       "code": "NHF_PASSENGER_DATA_INVALID",
       "source": "SIM_NHF_RI_INVALID_1ADT_38",
       "purpose": "A passenger update with an invalid field, one field per pass, must be refused.",
-      "checks": 155
+      "checks": 155,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1,
+        "requestedInformation": true
+      }
     },
     {
       "code": "OTST_PURCHASER_DEFERRED_1ADT",
       "source": "SIM_PURCHASER_DEFERRED_1ADT_38",
       "purpose": "Booking made without its purchaser, which is written afterwards.",
-      "checks": 234
+      "checks": 234,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     },
     {
       "code": "NHF_PURCHASER_INVALID",
       "source": "SIM_NHF_PURCHASER_INVALID_1ADT_38",
       "purpose": "A purchaser with a missing or invalid field, one per pass, must be refused.",
-      "checks": 242
+      "checks": 242,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
     }
   ]
 }
