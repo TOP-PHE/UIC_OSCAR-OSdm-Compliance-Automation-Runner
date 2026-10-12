@@ -103,8 +103,9 @@ function validatePartEqualityFields(part, bookedPart, partType, index, fields) {
 }
 
 function validatePartPrices(offerParts, bookedParts, partType) {
-  const offerPrices   = offerParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale }));
-  const bookingPrices = bookedParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale }));
+  // #650: an absent or null scale is the OSDM default 2.
+  const offerPrices   = offerParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale ?? 2 }));
+  const bookingPrices = bookedParts.filter(p => p.price).map(p => ({ amount: p.price.amount, currency: p.price.currency, scale: p.price.scale ?? 2 }));
   if (offerPrices.length > 0 && bookingPrices.length > 0) {
     test(`${partType} prices have at least one member in common between offer and booking`, () => {
       ['amount', 'currency', 'scale'].forEach(field => {
@@ -153,27 +154,16 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
     }
     return;
   }
-  // #337 cascade-kill: when the booking has NO afterSalesConditions at all,
-  // emit ONE parent failure naming the root cause (per part) and skip the
-  // per-condition child REFUND-exists tests below. Previously each
-  // offerConditions[N] iteration fired a child test that ALSO failed with
-  // "Condition 'REFUND' not found in booking", producing N+1 failures per
-  // affected part — for a 3-admission, 3-reservation, 2-conditions-each offer
-  // that meant 18 cascading failures from a single provider-side gap
-  // (booking response missing afterSalesConditions).
+  // #650: a booked part carries `afterSaleConditions` (AbstractBookingPart,
+  // no "s"), and OSDM does not require it: only the offer part must give its
+  // conditions. A booking that leaves them out is a WARNING (the client loses
+  // what it sold), not a failure. When the booking gives them, each is still
+  // compared with the offer's below. (Before #650 this was one failure per
+  // part, after #337 had already cut the cascade of per-condition failures.)
   const _offerConditionTypes = offerConditions
     .map(c => c && c.condition).filter(Boolean);
   if (!Array.isArray(bookedConditions) || bookedConditions.length === 0) {
-    test(`${partType}[${index}] afterSalesConditions exist in both offer and booking`, () => {
-      expect(bookedConditions.length,
-        `afterSalesConditions missing or empty in booking. ` +
-        `Offer declared ${offerConditions.length} condition(s) (${_offerConditionTypes.join(', ') || '?'}) ` +
-        `— booking returned 0. The provider did not echo afterSalesConditions ` +
-        `back into the booking object. Per-condition checks for this part are ` +
-        `SKIPPED to avoid duplicate cascading failures (one root cause).`
-      ).to.be.above(0);
-    });
-    validationLogger(`[ERROR] ${partType}[${index}] afterSalesConditions missing in booking — offer had ${offerConditions.length} (${_offerConditionTypes.join(', ') || '?'}). Per-condition tests skipped (cascade-kill).`);
+    validationLogger(`[WARNING] ${partType}[${index}] afterSaleConditions not given in the booking (optional in OSDM); the offer had ${offerConditions.length} (${_offerConditionTypes.join(', ') || '?'}). Not compared.`);
     return;
   }
   test(`${partType}[${index}] afterSalesConditions exist in both offer and booking`, () => {
@@ -234,8 +224,9 @@ function validateAfterSalesConditions(part, bookedPart, partType, index) {
         validationLogger(`[DEBUG] ${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee exists in both offer and booking`);
       });
       ['currency', 'amount', 'scale'].forEach(field => {
-        const _offerVal  = condition.afterSaleFee[field];
-        const _bookedVal = bookedCondition.afterSaleFee[field];
+        // #650: an absent or null scale is the OSDM default 2.
+        const _offerVal  = field === 'scale' ? (condition.afterSaleFee.scale ?? 2) : condition.afterSaleFee[field];
+        const _bookedVal = field === 'scale' ? (bookedCondition.afterSaleFee.scale ?? 2) : bookedCondition.afterSaleFee[field];
         const _name = `${partType}[${index}] afterSalesConditions[${condIndex}].afterSaleFee.${field} matches`;
         if (_bookedVal === _offerVal) {
           test(_name, () => {
@@ -1067,12 +1058,14 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validationLogger(_otherPrice
     ? `[DEBUG] ${_otherName} also present at this stage — allowed (optional member).`
     : `[DEBUG] ${_otherName} absent at this stage — allowed (lifecycle-scoped member).`);
-  test(`Price fields exist (currency, scale) in ${_stageName}`, () => {
+  // #650: OSDM Price requires currency and amount; scale is optional
+  // (default 2), so it is not asked for.
+  test(`Price fields exist (currency, amount) in ${_stageName}`, () => {
     if (!_stagePrice) throw new Error(`${_stageName} missing — its fields cannot be checked (see the assertion above).`);
-    ['currency', 'scale'].forEach(field => {
+    ['currency', 'amount'].forEach(field => {
       if (_stagePrice[field] == null) throw new Error(`${_stageName}.${field} missing in booking (got: ${JSON.stringify(_stagePrice[field])})`);
     });
-    validationLogger(`[DEBUG] ${_stageName} fields present (currency, scale)`);
+    validationLogger(`[DEBUG] ${_stageName} fields present (currency, amount), scale ${_stagePrice.scale ?? '2 (default)'}`);
   });
   if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
   if (confirmed) {

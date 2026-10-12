@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.276",
+  "current_release": "2026.277",
   "releases": [
+    {
+      "release": "2026.277",
+      "date": "2026-10-12",
+      "server": "1.11.243",
+      "collection": "OTST_V2.0.131",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#650): three members OSDM 3.8 allows to be left out are no longer failures: afterSaleConditions on a booked part (a warning), Price.scale (default 2), and an offerSummary.overallFlexibility that one of the offer's products has. Server 1.11.243 is tests only."
+      ]
+    },
     {
       "release": "2026.276",
       "date": "2026-10-12",

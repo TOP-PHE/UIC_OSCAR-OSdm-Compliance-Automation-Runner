@@ -38,6 +38,7 @@ jest.mock('../../../Bruno_Collection/library-bruno/testCapture.js', () => ({
     try { fn(); mockResults.push({ name, ok: true }); } catch (e) { mockResults.push({ name, ok: false, message: e.message }); }
   },
   expectTypeOrNull: () => {},
+  expectScale: () => {},
 }));
 jest.mock('../../../Bruno_Collection/library-bruno/requestedInformation.js', () => ({
   processRequestedInformation: () => {},
@@ -482,5 +483,72 @@ describe('#644: what a confirmed booking and a fulfillment are held to', () => {
     expect(after.r.logs.some((l) => l.startsWith('[INFO] Booking already confirmed'))).toBe(true);
     const before = deadlineChecks(['PREBOOKED'], '0001-01-01T00:00:00+00:00');
     expect(before.checks.map((c) => c.ok)).toEqual([false]);
+  });
+});
+
+// ─── #650: optional members a real provider left out ────────────────────────
+describe('#650: optional members are not failures', () => {
+  const price = (amount, scale) => (scale === undefined ? { amount, currency: 'CZK' } : { amount, currency: 'CZK', scale });
+  const conditions = [
+    { condition: 'REFUND', validFrom: '2026-10-11T18:25:31Z', validUntil: '2026-10-21T07:12:00Z', afterSaleFee: price(0, 2) },
+    { condition: 'REFUND', validFrom: '2026-10-11T18:25:31Z', validUntil: '2026-10-21T07:22:00Z', afterSaleFee: price(0, 2) },
+  ];
+  const offerPart = { id: 'OP1', passengerRefs: ['PAX1'], price: price(30500, 2), refundable: 'YES', exchangeable: 'NO', afterSalesConditions: conditions };
+  const bookedPart = (extra) => ({ id: 'BP1', status: 'PREBOOKED', passengerIds: ['P1'], price: price(30500, 2), refundable: 'YES', exchangeable: 'NO', ...extra });
+
+  // Old code: one failure per part, "afterSalesConditions missing or empty in booking".
+  test('a booked part with no afterSaleConditions: a warning, no failure', () => {
+    envStore.admissionReservationAncillaryBookingPartsIds = '[]';
+    const r = run(() => bookings.validateBookedOfferParts([offerPart], [bookedPart({ afterSaleConditions: [] })], 'admission', 'PREBOOKED'));
+    expect(named(r, 'afterSalesConditions')).toEqual([]);
+    expect(warned(r, 'afterSaleConditions not given in the booking')).toBe(true);
+  });
+
+  test('a booked part that gives them still has them compared', () => {
+    envStore.admissionReservationAncillaryBookingPartsIds = '[]';
+    const r = run(() => bookings.validateBookedOfferParts([offerPart], [bookedPart({ afterSaleConditions: conditions })], 'admission', 'PREBOOKED'));
+    expect(named(r, 'afterSalesConditions exist in both offer and booking')[0].ok).toBe(true);
+  });
+
+  // Old code: "scale=MISSING(got undefined)" in the title and a failure.
+  test('a refund offer price without scale reads as scale 2 (title)', () => {
+    const ro = {
+      id: 'RO1', status: 'PROPOSED', createdOn: '2026-01-01T10:00:00Z', validFrom: '2026-01-01T10:00:00Z', validUntil: '2099-01-01T10:00:00Z',
+      refundableAmount: price(0), refundFee: price(0),
+      fulfillments: [{ id: 'F1', status: 'FULFILLED', bookingParts: [{ id: 'bp-F1' }] }],
+    };
+    const r = run(() => refunds.validateRefundOfferResponse(ro, 0, ['PROPOSED'], ['FULFILLED']));
+    expect(named(r, 'refundableAmount Price structure is well-formed — amount=0, currency=CZK, scale=2 (default)')[0].ok).toBe(true);
+    expect(named(r, 'MISSING')).toEqual([]);
+  });
+
+  test('expectScale: absent and null pass, another type fails', () => {
+    const { expectScale } = jest.requireActual('../../../Bruno_Collection/library-bruno/testCapture.js');
+    const throws = (value) => withBrunoExpect(() => {
+      try { expectScale(value, 'x'); return false; } catch { return true; }
+    });
+    expect([undefined, null, 2, '2'].map(throws)).toEqual([false, false, false, true]);
+  });
+
+  test('the booking price needs currency and amount, not scale', () => {
+    const offer = { offerId: 'O1', createdOn: new Date().toISOString(), admissionOfferParts: [], offerSummary: { minimalPrice: price(100) } };
+    const booking = { booking: { id: 'B1', provisionalPrice: price(100), confirmationTimeLimit: '2099-01-01T00:00:00Z', bookedOffers: [{ offerId: 'BO1', admissions: [] }] } };
+    const r = run(() => { try { bookings.postCreateBookingResponse(offer, booking, ['PREBOOKED'], ['CONFIRMED']); } catch { /* the rest of this small fixture is not what is checked here */ } });
+    expect(named(r, 'Price fields exist (currency, amount) in provisionalPrice')[0].ok).toBe(true);
+  });
+
+  // Old code: FAIL "Per the least-flexible-part rule (#223) …".
+  test('overallFlexibility of one of the products passes; a value no product has is a warning', () => {
+    const offer = (overall) => ({
+      offerSummary: { minimalPrice: price(100, 2), overallFlexibility: overall },
+      products: [{ id: 'P1', flexibility: 'FULL_FLEXIBLE' }, { id: 'P2', flexibility: 'NON_FLEXIBLE' }],
+      admissionOfferParts: [{ id: 'adm-1', price: price(100, 2) }],
+    });
+    const full = run(() => offers.validateOfferParts(offer('FULL_FLEXIBLE')));
+    expect(named(full, 'overallFlexibility consistency')[0].ok).toBe(true);
+    expect(full.logs.some((l) => l.startsWith('[INFO]') && l.includes('best represents'))).toBe(true);
+    const semi = run(() => offers.validateOfferParts(offer('SEMI_FLEXIBLE')));
+    expect(named(semi, 'overallFlexibility consistency')).toEqual([]);
+    expect(warned(semi, 'which none of the offer')).toBe(true);
   });
 });

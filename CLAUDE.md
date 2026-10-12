@@ -1044,6 +1044,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     content would otherwise take the new parts, whose passenger references
     match the offer's. Never send `age: 0` for an unknown age: it reads as a
     baby.
+  - **Optional is optional** (#650, OTST_V2.0.131): a booked part's
+    `afterSaleConditions` (no "s"; not required) absent is a WARNING;
+    `Price.scale` absent reads as 2 (`expectScale()` in `testCapture.js`,
+    which every `testCapture` mock in the tests must also provide); an
+    `overallFlexibility` that one of the offer's products has passes (OSDM:
+    "best represent this offer"). Read `required` in the 3.8 file before
+    writing an "exists" check.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

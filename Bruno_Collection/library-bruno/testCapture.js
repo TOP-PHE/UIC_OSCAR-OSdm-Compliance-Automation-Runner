@@ -18,7 +18,7 @@
 
 'use strict';
 
-module.exports = { bruTest, resetTests, expectTypeOrNull };
+module.exports = { bruTest, resetTests, expectTypeOrNull, expectScale };
 
 /**
  * Drop-in replacement for Bruno's test(name, fn).
@@ -101,4 +101,20 @@ function expectTypeOrNull(value, jsType, label) {
     return;
   }
   expect(value, label).to.be.a(jsType);
+}
+
+/**
+ * Assert a Price `scale` (#650). OSDM 3.8 `Price.required` is
+ * `[currency, amount]`; `scale` is a nullable integer with a default of 2, so
+ * an absent or null scale is the default, and only another type fails.
+ */
+function expectScale(value, label) {
+  if (value === undefined) {
+    try {
+      const { validationLogger } = require('./displays.js');
+      validationLogger(`[DEBUG] ${label || 'scale'} — absent, read as the OSDM default 2`);
+    } catch { /* displays.js not available — safe to ignore */ }
+    return;
+  }
+  expectTypeOrNull(value, 'number', label);
 }

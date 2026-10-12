@@ -40,6 +40,7 @@ jest.mock('../../../Bruno_Collection/library-bruno/testCapture.js', () => ({
     try { fn(); mockResults.push({ name, ok: true }); } catch (e) { mockResults.push({ name, ok: false, message: e.message }); }
   },
   expectTypeOrNull: () => {},
+  expectScale: () => {},
 }));
 global.validationLogger = (line) => { mockLogs.push(line); };
 

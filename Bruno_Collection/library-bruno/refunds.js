@@ -7,7 +7,7 @@
  */
 // Import needed library files
 require('./displays.js');
-const { bruTest: test, expectTypeOrNull } = require('./testCapture.js');
+const { bruTest: test, expectScale } = require('./testCapture.js');
 
 module.exports = {
   postPatchRefundOfferResponse,
@@ -567,8 +567,10 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     if (obj == null) return 'missing';
     const _hasA = typeof obj.amount   === 'number';
     const _hasC = typeof obj.currency === 'string' && obj.currency !== '';
-    const _hasS = typeof obj.scale    === 'number';
-    if (_hasA && _hasC && _hasS) return `amount=${obj.amount}, currency=${obj.currency}, scale=${obj.scale}`;
+    // #650: scale is optional (OSDM default 2); absent or null is not a defect.
+    const _hasS = typeof obj.scale    === 'number' || obj.scale == null;
+    const _scaleText = typeof obj.scale === 'number' ? obj.scale : '2 (default)';
+    if (_hasA && _hasC && _hasS) return `amount=${obj.amount}, currency=${obj.currency}, scale=${_scaleText}`;
     // SHAPE report: mark each sub-field present/MISSING so the broken one
     // shows in the test title even when other fields look normal.
     const _badge = (ok, name, val) => ok ? `${name}=${val}` : `${name}=MISSING(got ${JSON.stringify(val)})`;
@@ -585,7 +587,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundableAmount, 'refundableAmount is not an object').to.be.an('object');
     expect(refundOffer.refundableAmount.amount,   'refundableAmount.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundableAmount.currency, 'refundableAmount.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expectTypeOrNull(refundOffer.refundableAmount.scale, "number", 'refundableAmount.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
+    expectScale(refundOffer.refundableAmount.scale, 'refundableAmount.scale should be a number, null or absent (OSDM Price.scale: nullable integer, default 2)');
 
     if (expectedFulfillmentStatuses.includes("CONFIRMED") || expectedFulfillmentStatuses.includes("FULFILLED")) {
       const confirmedPriceAmount = Number(bru.getEnvVar("confirmedPriceAmount"));
@@ -624,7 +626,7 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
     expect(refundOffer.refundFee, 'refundFee is not an object').to.be.an('object');
     expect(refundOffer.refundFee.amount,   'refundFee.amount is not a number (OSDM Price.amount: integer)').to.be.a('number');
     expect(refundOffer.refundFee.currency, 'refundFee.currency is not a string (OSDM Price.currency: ISO-4217 code)').to.be.a('string');
-    expectTypeOrNull(refundOffer.refundFee.scale, "number", 'refundFee.scale should be a number or null (OSDM Price.scale: nullable integer, default 2)');
+    expectScale(refundOffer.refundFee.scale, 'refundFee.scale should be a number, null or absent (OSDM Price.scale: nullable integer, default 2)');
     expect(refundOffer.refundFee.amount).to.be.at.least(0);
   });
 
@@ -663,11 +665,11 @@ function validateRefundOfferResponse(refundOffer, index, expectedRefundOperation
         expect(breakdown.refundFee, 'breakdown.refundFee is required').to.exist;
         expect(breakdown.refundFee.amount).to.be.a('number').and.at.least(0);
         expect(breakdown.refundFee.currency).to.be.a('string');
-        expectTypeOrNull(breakdown.refundFee.scale, "number", 'breakdown.refundFee.scale should be a number or null (nullable per OSDM)');
+        expectScale(breakdown.refundFee.scale, 'breakdown.refundFee.scale should be a number, null or absent (nullable per OSDM)');
         expect(breakdown.refundableAmount, 'breakdown.refundableAmount is required').to.exist;
         expect(breakdown.refundableAmount.amount).to.be.a('number');
         expect(breakdown.refundableAmount.currency).to.be.a('string');
-        expectTypeOrNull(breakdown.refundableAmount.scale, "number", 'breakdown.refundableAmount.scale should be a number or null (nullable per OSDM)');
+        expectScale(breakdown.refundableAmount.scale, 'breakdown.refundableAmount.scale should be a number, null or absent (nullable per OSDM)');
         expect(breakdown.bookingParts, 'breakdown.bookingParts is required').to.be.an('array').that.is.not.empty;
       });
     });
