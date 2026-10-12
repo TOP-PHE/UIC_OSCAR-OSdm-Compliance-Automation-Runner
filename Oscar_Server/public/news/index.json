@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-seat-per-reservation",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Seats booked under each passenger’s reservation",
+    "summary": "When a provider gives one seat reservation per passenger, each seat is now booked under the right one.",
+    "content": "Some providers offer a separate seat reservation for each passenger. OSCAR sent every chosen seat under the first passenger’s reservation, and the provider refused the booking as if the seats were taken. Each seat now goes with its own passenger’s reservation."
+  },
+  {
     "id": "2026-10-12-scenario-action",
     "date": "October 12, 2026",
     "tag": "Fix",

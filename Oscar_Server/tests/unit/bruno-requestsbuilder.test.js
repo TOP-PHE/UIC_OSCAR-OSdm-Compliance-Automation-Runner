@@ -352,6 +352,41 @@ describe('accommodationAndPlaceSelection', () => {
     expect(ps[0].places[1]).toEqual({ coachNumber: '12', placeNumber: '22', passengerRef: '00002' });
   });
 
+  // #669: a provider gave one reservation part per passenger; every seat was
+  // sent under PAX1's part and refused as "Seat not available".
+  test('one reservation part per passenger → one placeSelection per part, each with its passenger\'s seat', () => {
+    const part = (id, ref) => ({ id, passengerRefs: [ref], tripCoverage: { coveredTripId: 'T1', coveredLegIds: ['L1'] } });
+    setEnv({
+      accommodationSelection: 'NONE',
+      tripLegCoverage: '[{"tripId":"T1","legId":"L1"}]',
+      bookingPassengerReferences: '["PAX1","PAX2","PAX3"]',
+      reservationId: 'R1',
+      preselectedPlaces: '[{"coachNumber":"A","placeNumber":"57"},{"coachNumber":"A","placeNumber":"56"},{"coachNumber":"A","placeNumber":"55"}]',
+      offer: JSON.stringify({ reservationOfferParts: [part('R1', 'PAX1'), part('R3', 'PAX3'), part('R2', 'PAX2')] }),
+    });
+    rb.accommodationAndPlaceSelection();
+    const ps = JSON.parse(store.placeSelections);
+    expect(ps.map((s) => [s.reservationId, s.places.map((p) => `${p.passengerRef}:${p.placeNumber}`)])).toEqual([
+      ['R1', ['PAX1:57']], ['R3', ['PAX3:55']], ['R2', ['PAX2:56']],
+    ]);
+    expect(ps.every((s) => s.tripLegCoverage.legId === 'L1')).toBe(true);
+  });
+
+  test('one reservation part for everyone → one placeSelection, as before', () => {
+    setEnv({
+      accommodationSelection: 'NONE',
+      tripLegCoverage: '[{"tripId":"T1","legId":"L1"}]',
+      bookingPassengerReferences: '["PAX1","PAX2"]',
+      reservationId: 'R1',
+      preselectedPlaces: '[{"coachNumber":"A","placeNumber":"57"},{"coachNumber":"A","placeNumber":"56"}]',
+      offer: JSON.stringify({ reservationOfferParts: [{ id: 'R1', passengerRefs: ['PAX1', 'PAX2'], tripCoverage: { coveredLegIds: ['L1'] } }] }),
+    });
+    rb.accommodationAndPlaceSelection();
+    const ps = JSON.parse(store.placeSelections);
+    expect(ps).toHaveLength(1);
+    expect(ps[0].places).toHaveLength(2);
+  });
+
   test('preselectedPlaces fewer than passengers → surplus pax reuse the last place', () => {
     setEnv({
       accommodationSelection: 'NONE',

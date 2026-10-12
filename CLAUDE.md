@@ -1063,6 +1063,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     decide in the routing step, with the filter's own conditions
     (`routeAfterOfferStep()` for the seat map). The simulator scenario
     `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` holds it.
+  - **One placeSelection per reservation part** (#669, OTST_V2.0.138): a
+    provider may give one ReservationOfferPart per passenger on a leg; each
+    passenger's seat goes under their own part (`splitByReservation()` in
+    `seatReservations.js`). The simulator gives one part for everyone, so it
+    cannot show this.
   - **A body template sends every `{{name}}` it holds** (#660): a branch that
     returns early must set them all, or the literal text goes out. The
     passenger sweep of step 03 sent `"type": "{{patchType}}"` for months.

@@ -180,4 +180,50 @@ function reservationInBookingRequest(request, reservationId) {
     .some((selection) => selection?.reservationId === reservationId));
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, placeSelectionsFor, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest };
+/**
+ * #669: one PlaceSelection per reservation part. Some providers give one
+ * ReservationOfferPart per passenger on a leg; the seats of a passenger then
+ * go under that passenger's part, not all under the first one (refused as
+ * "Seat not available"). The selection is split when the parts on its leg
+ * each hold some of its passengers and together hold all of them; otherwise
+ * it is returned as it is (one part for everyone is the usual case).
+ *
+ * @param {object} selection the PlaceSelection built for the booking
+ * @param {object} offer     the selected offer
+ * @returns {object[]}       the selections to send
+ */
+function splitByReservation(selection, offer) {
+  if (!selection || typeof selection !== 'object') return [];
+  const legId = selection.tripLegCoverage?.legId;
+  const parts = (Array.isArray(offer?.reservationOfferParts) ? offer.reservationOfferParts : [])
+    .filter((part) => part?.id && Array.isArray(part.passengerRefs) && part.passengerRefs.length > 0)
+    .filter((part) => {
+      const legs = part.tripCoverage?.coveredLegIds;
+      return !legId || !Array.isArray(legs) || legs.length === 0 || legs.includes(legId);
+    });
+  if (parts.length < 2) return [selection];
+  const places = Array.isArray(selection.places) ? selection.places : [];
+  const accommodations = Array.isArray(selection.accommodations) ? selection.accommodations : [];
+  const wanted = new Set([
+    ...places.map((place) => place?.passengerRef),
+    ...accommodations.flatMap((acc) => (Array.isArray(acc?.passengerRefs) ? acc.passengerRefs : [])),
+  ].filter(Boolean));
+  if (wanted.size === 0) return [selection];
+  const holding = parts.filter((part) => part.passengerRefs.some((ref) => wanted.has(ref)));
+  const held = new Set(holding.flatMap((part) => part.passengerRefs));
+  if (holding.length < 2 || [...wanted].some((ref) => !held.has(ref))) return [selection];
+  return holding.map((part) => {
+    const mine = new Set(part.passengerRefs);
+    const out = { reservationId: part.id };
+    if (selection.tripLegCoverage) out.tripLegCoverage = selection.tripLegCoverage;
+    const accs = accommodations
+      .map((acc) => ({ ...acc, passengerRefs: (acc.passengerRefs || []).filter((ref) => mine.has(ref)) }))
+      .filter((acc) => acc.passengerRefs.length > 0);
+    if (accs.length > 0) out.accommodations = accs;
+    const own = places.filter((place) => mine.has(place?.passengerRef));
+    if (own.length > 0) out.places = own;
+    return out;
+  });
+}
+
+module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, placeSelectionsFor, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };
