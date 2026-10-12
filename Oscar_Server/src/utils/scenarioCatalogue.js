@@ -69,9 +69,14 @@ function entryProblems(e, at, scenarios, codes) {
   if (!Number.isInteger(e.checks) || e.checks <= 0) problems.push(`${at}.checks must be the number of checks it gives on the simulator`);
   for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
   if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
-  if (!isObj(e.needs)) problems.push(`${at}.needs is missing`);
-  else for (const key of Object.keys(e.needs)) if (!NEEDS_KEYS.includes(key)) problems.push(`${at}.needs.${key} is not a known need`);
+  problems.push(...needsProblems(e.needs, at));
   return problems;
+}
+
+// The problems of an entry's `needs` (#681): there, and only known keys.
+function needsProblems(needs, at) {
+  if (!isObj(needs)) return [`${at}.needs is missing`];
+  return Object.keys(needs).filter((key) => !NEEDS_KEYS.includes(key)).map((key) => `${at}.needs.${key} is not a known need`);
 }
 
 /** The problems of a catalogue against the simulator's data file; none when it is sound. */
@@ -207,21 +212,27 @@ function dataNeedsOf(scenario, datafile, facts) {
   return out;
 }
 
+const TARIFF_TEXT = { REFUNDABLE: 'a refundable tariff', EXCHANGEABLE: 'an exchangeable tariff', NON_FLEXIBLE: 'a non-flexible tariff' };
+const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one offer per direction' };
+
+// The phrase of each need, in the order of NEEDS_KEYS; null when it says nothing.
+const NEED_PHRASES = {
+  legs: (v) => `a journey of ${v} legs`,
+  return: (v) => `a return (${RETURN_TEXT[v] || v})`,
+  reservations: (v) => v.map((kind) => `a train with ${kind === 'MANDATORY' ? 'a mandatory' : 'an optional'} seat reservation`),
+  legClasses: (v) => `travel classes per leg: ${v.join(', ')}`,
+  tariff: (v) => TARIFF_TEXT[v] || `tariff ${v}`,
+  passengers: (v) => `${v} passenger${v > 1 ? 's' : ''}`,
+  reductionCards: () => 'a reduction card the provider accepts',
+  providerValues: (v) => v.map((field) => `the provider's own ${field}`),
+  requestedInformation: () => 'a trip where the provider asks for passenger details',
+  expiry: (v) => (v.length ? `waits for the provider's deadline: ${v.join(', ').toLowerCase().replaceAll('_', ' ')}` : null),
+};
+
 /** The needs of an entry, as short phrases for the person copying it. */
 function needsText(needs) {
   const n = isObj(needs) ? needs : {};
-  const out = [];
-  if (n.legs) out.push(`a journey of ${n.legs} legs`);
-  if (n.return) out.push(`a return (${n.return === 'COMBINED' ? 'one offer for both directions' : 'one offer per direction'})`);
-  for (const kind of arr(n.reservations)) out.push(`a train with ${kind === 'MANDATORY' ? 'a mandatory' : 'an optional'} seat reservation`);
-  if (n.legClasses) out.push(`travel classes per leg: ${n.legClasses.join(', ')}`);
-  if (n.tariff) out.push({ REFUNDABLE: 'a refundable tariff', EXCHANGEABLE: 'an exchangeable tariff', NON_FLEXIBLE: 'a non-flexible tariff' }[n.tariff] || `tariff ${n.tariff}`);
-  if (n.passengers) out.push(`${n.passengers} passenger${n.passengers > 1 ? 's' : ''}`);
-  if (n.reductionCards) out.push('a reduction card the provider accepts');
-  for (const field of arr(n.providerValues)) out.push(`the provider's own ${field}`);
-  if (n.requestedInformation) out.push('a trip where the provider asks for passenger details');
-  if (arr(n.expiry).length) out.push(`waits for the provider's deadline: ${n.expiry.join(', ').toLowerCase().replaceAll('_', ' ')}`);
-  return out;
+  return NEEDS_KEYS.filter((key) => NEED_PHRASES[key] && n[key]).flatMap((key) => NEED_PHRASES[key](n[key])).filter(Boolean);
 }
 
 /**
