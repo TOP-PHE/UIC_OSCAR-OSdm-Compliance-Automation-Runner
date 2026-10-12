@@ -1035,6 +1035,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     its four required parameters for months. `bruno-request-files.test.js`
     refuses a `params` list. The simulator answers 501 to `/availabilities`,
     so it cannot show such a gap: read a real provider's request URLs.
+  - **After an exchange, the booking holds two sets of parts** (#649,
+    OTST_V2.0.130). Step 07 keeps the part ids held before the exchange
+    (`__partIdsBeforeExchange`, `exchangeParts.js`); 13/15/17 check those
+    against the original offer and the others for their status
+    (`checkBookingAroundExchange`). A provider may show the pre-booked
+    exchange before its confirmation (the simulator does not); the pairing by
+    content would otherwise take the new parts, whose passenger references
+    match the offer's. Never send `age: 0` for an unknown age: it reads as a
+    baby.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,
