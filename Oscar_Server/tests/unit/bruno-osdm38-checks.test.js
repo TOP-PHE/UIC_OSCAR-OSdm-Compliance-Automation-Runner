@@ -575,3 +575,30 @@ describe('#652: the reservation of a previous offer is not kept', () => {
     expect(envStore.tripLegCoverage).toBeUndefined();
   });
 });
+
+// ─── #661: confirmedPrice after a full refund or an exchange ────────────────
+describe('#661: confirmedPrice absent after the after-sales operation is a warning', () => {
+  const offer = { offerId: 'O1', createdOn: new Date().toISOString(), admissionOfferParts: [], offerSummary: { minimalPrice: { amount: 0, currency: 'CZK' } } };
+  const booking = (extra) => ({ booking: { id: 'B1', bookedOffers: [{ offerId: 'BO1', admissions: [] }], ...extra } });
+  const priceChecks = (stage, extra) => {
+    const r = run(() => { try { bookings.postCreateBookingResponse(offer, booking(extra), stage, ['REFUNDED']); } catch { /* the rest of this small fixture is not what is checked here */ } });
+    return { checks: [...named(r, 'confirmedPrice structure exists'), ...named(r, 'in confirmedPrice')], r };
+  };
+
+  // Old code: two failures at REFUNDED.
+  test('absent at REFUNDED or EXCHANGED: no check, a warning', () => {
+    for (const stage of [['REFUNDED'], ['EXCHANGED']]) {
+      const { checks, r } = priceChecks(stage, {});
+      expect(checks).toEqual([]);
+      expect(warned(r, 'confirmedPrice absent at booking stage')).toBe(true);
+    }
+  });
+
+  test('absent once confirmed: still two failures', () => {
+    expect(priceChecks(['FULFILLED', 'CONFIRMED'], {}).checks.map((c) => c.ok)).toEqual([false, false]);
+  });
+
+  test('present at REFUNDED: checked as before', () => {
+    expect(priceChecks(['REFUNDED'], { confirmedPrice: { amount: 0, currency: 'CZK' } }).checks.map((c) => c.ok)).toEqual([true, true]);
+  });
+});

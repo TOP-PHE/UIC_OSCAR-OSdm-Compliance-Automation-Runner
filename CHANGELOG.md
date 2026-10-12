@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.248] / [collection-OTST_V2.0.135] — 2026-10-12
+
+Issue #661, release 2026.282. Server code unchanged (tests only).
+
+### Fixed
+
+- **`confirmedPrice` absent after a full refund or an exchange is a
+  warning.** OSDM requires neither price member of a booking (`Booking`
+  requires only `id`, `createdOn`, `passengers`). After a full refund,
+  `confirmedPrice` would hold what is still confirmed, often 0, and a real
+  provider leaves it out: steps 14 and 16 of a refund failed twice for it.
+  At REFUNDED and EXCHANGED an absent `confirmedPrice` is now a WARNING; once
+  confirmed (CONFIRMED, FULFILLED) it is still required; when present, its
+  fields are checked as before.
+
+### Default decisions
+
+- The rule follows #650: an optional member left out is a warning, a member
+  given in the wrong shape still fails.
+
+### Not verified
+
+- Not rerun against the provider, and not replayed on the simulator: the
+  change only touches a booking without `confirmedPrice` after the
+  after-sales operation; unit tests cover REFUNDED, EXCHANGED, confirmed, and
+  present.
+
+---
+
 ## [server-1.11.247] / [collection-OTST_V2.0.134] — 2026-10-12
 
 Issue #660, release 2026.281. Server code unchanged (tests only).

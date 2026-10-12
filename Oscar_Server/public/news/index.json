@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-confirmed-price-after-sale",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Refunded bookings without a confirmed price",
+    "summary": "A booking read after a full refund or an exchange no longer fails because it shows no confirmed price.",
+    "content": "OSDM does not require a booking to show its confirmed price, and after a full refund there is nothing left confirmed. A provider that leaves the confirmed price out at that point now gets a warning instead of two failures. Before the refund or exchange, the confirmed price is still required."
+  },
+  {
     "id": "2026-10-12-sweep-patch-type",
     "date": "October 12, 2026",
     "tag": "Fix",

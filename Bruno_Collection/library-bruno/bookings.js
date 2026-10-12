@@ -1051,22 +1051,30 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   const _otherPrice = _expectsConfirmed ? prov : confirmed;
   const _otherName  = _expectsConfirmed ? 'provisionalPrice' : 'confirmedPrice';
 
-  test(`${_stageName} structure exists (booking stage: ${expectedBookedOffersStatus || 'pre-confirmation'})`, () => {
-    if (!_stagePrice) throw new Error(`${_stageName} missing — OSDM expects it at this booking stage (${expectedBookedOffersStatus || 'pre-confirmation'}).`);
-    validationLogger(`[DEBUG] ${_stageName} structure exists`);
-  });
+  // #661: OSDM requires neither price member. After a full refund or an
+  // exchange, confirmedPrice would be what is left confirmed (often 0), and a
+  // provider may leave it out: a warning there, a failure before.
+  const _afterSale = _expectsConfirmed && /REFUNDED|EXCHANGED/i.test(_stageLabel);
+  if (!_stagePrice && _afterSale) {
+    validationLogger(`[WARNING] ${_stageName} absent at booking stage ${_stageLabel}: OSDM does not require it, and after the after-sales operation it would hold only what is still confirmed.`);
+  } else {
+    test(`${_stageName} structure exists (booking stage: ${expectedBookedOffersStatus || 'pre-confirmation'})`, () => {
+      if (!_stagePrice) throw new Error(`${_stageName} missing — OSDM expects it at this booking stage (${expectedBookedOffersStatus || 'pre-confirmation'}).`);
+      validationLogger(`[DEBUG] ${_stageName} structure exists`);
+    });
+    // #650: OSDM Price requires currency and amount; scale is optional
+    // (default 2), so it is not asked for.
+    test(`Price fields exist (currency, amount) in ${_stageName}`, () => {
+      if (!_stagePrice) throw new Error(`${_stageName} missing — its fields cannot be checked (see the assertion above).`);
+      ['currency', 'amount'].forEach(field => {
+        if (_stagePrice[field] == null) throw new Error(`${_stageName}.${field} missing in booking (got: ${JSON.stringify(_stagePrice[field])})`);
+      });
+      validationLogger(`[DEBUG] ${_stageName} fields present (currency, amount), scale ${_stagePrice.scale ?? '2 (default)'}`);
+    });
+  }
   validationLogger(_otherPrice
     ? `[DEBUG] ${_otherName} also present at this stage — allowed (optional member).`
     : `[DEBUG] ${_otherName} absent at this stage — allowed (lifecycle-scoped member).`);
-  // #650: OSDM Price requires currency and amount; scale is optional
-  // (default 2), so it is not asked for.
-  test(`Price fields exist (currency, amount) in ${_stageName}`, () => {
-    if (!_stagePrice) throw new Error(`${_stageName} missing — its fields cannot be checked (see the assertion above).`);
-    ['currency', 'amount'].forEach(field => {
-      if (_stagePrice[field] == null) throw new Error(`${_stageName}.${field} missing in booking (got: ${JSON.stringify(_stagePrice[field])})`);
-    });
-    validationLogger(`[DEBUG] ${_stageName} fields present (currency, amount), scale ${_stagePrice.scale ?? '2 (default)'}`);
-  });
   if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
   if (confirmed) {
     // #496: after an after-sales operation, surface confirmedPrice before vs
