@@ -1060,6 +1060,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     decide in the routing step, with the filter's own conditions
     (`routeAfterOfferStep()` for the seat map). The simulator scenario
     `SIM_NHF_EXPIRED_CHAIN_SEATMAP_38` holds it.
+  - **A body template sends every `{{name}}` it holds** (#660): a branch that
+    returns early must set them all, or the literal text goes out. The
+    passenger sweep of step 03 sent `"type": "{{patchType}}"` for months.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

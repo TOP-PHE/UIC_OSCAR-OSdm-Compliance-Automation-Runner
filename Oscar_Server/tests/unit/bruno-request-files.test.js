@@ -139,3 +139,37 @@ describe('#644: by-id requests without an id are skipped', () => {
     expect(runScript(file, { [idVar]: 'X9' }).skipped).toBe(false);
   });
 });
+
+// #660: the passenger negative sweep of step 03 sends the body template, which
+// names {{patchType}}; the sweep branch never set it, so the literal text went.
+describe('#660: the passenger sweep sends a body with no template left', () => {
+  const FILE = '02-Common Requests/03. PATCH Multi Passenger.yml';
+  const doc = yaml.load(fs.readFileSync(path.join(COLLECTION, FILE), 'utf8'));
+  const beforeRequest = doc.runtime.scripts.find((s) => s.type === 'before-request').code;
+  const template = doc.http.body.data;
+  const LIB = path.join(COLLECTION, 'library-bruno');
+
+  const sweepBody = (specs) => {
+    const env = {
+      requestedInformationProbe: 'invalid', __passengerSweepIndex: '0',
+      passengerIdList: ['P-1'], bookingPassengerReferences: '["PAX1"]', passengerSpecificationExternalRef: 'PAX1',
+      bookingPassengerSpecifications: JSON.stringify(specs), osdmVersion: '3.8.0', library_base: LIB + '/',
+    };
+    const bru = { getEnvVar: (k) => env[k], setEnvVar: (k, v) => { env[k] = v; }, setVar: () => {}, getVar: () => undefined };
+    global.bru = bru;
+    const fakeRequire = (p) => (p.endsWith('displays.js')
+      ? { logStepStart: () => {}, validationLogger: () => {} }
+      : require(p));
+    new Function('bru', 'require', 'req', 'console', beforeRequest)(bru, fakeRequire, { setBody: () => {} }, { log: () => {} });
+    return template.replaceAll(/\{\{(\w+)\}\}/g, (all, name) => (env[name] === undefined ? all : String(env[name])));
+  };
+
+  afterAll(() => { delete global.bru; });
+
+  test('the type is the booked passenger\'s, PERSON when unknown', () => {
+    const body = sweepBody([{ type: 'PERSON', gender: 'MALE' }]);
+    expect(body).not.toContain('{{');
+    expect(JSON.parse(body).type).toBe('PERSON');
+    expect(JSON.parse(sweepBody([])).type).toBe('PERSON');
+  });
+});

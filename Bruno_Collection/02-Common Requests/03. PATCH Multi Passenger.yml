@@ -81,6 +81,10 @@ runtime:
             bru.setEnvVar("patchLastName",    v.lastName);
             bru.setEnvVar("patchEmail",       v.email);
             bru.setEnvVar("patchPhoneNumber", v.phoneNumber);
+            // #660: the body template names {{patchType}} too; unset, it went
+            // out as that literal text.
+            const _specs = JSON.parse(bru.getEnvVar("bookingPassengerSpecifications") || "[]");
+            bru.setEnvVar("patchType", (_specs[0] && _specs[0].type) || "PERSON");
             bru.setEnvVar("__passengerSweepTarget", JSON.stringify(target));
             validationLogger(`[WARNING] Passenger negative sweep ${sIdx + 1}/${SWEEP.length}: `
                 + (target.value !== undefined ? `INVALID '${sField}' = '${target.value}'` : `OMIT required '${sField}'`)

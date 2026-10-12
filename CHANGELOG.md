@@ -62,6 +62,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.247] / [collection-OTST_V2.0.134] — 2026-10-12
+
+Issue #660, release 2026.281. Server code unchanged (tests only).
+
+### Fixed
+
+- **The passenger negative sweep sends a real passenger type.** With
+  `requestedInformationProbe: invalid`, step `03. PATCH Multi Passenger` sends
+  one request per passenger field, each with exactly one field made invalid.
+  Its body template names `{{patchType}}`, which the sweep never set, so every
+  request went out with `"type": "{{patchType}}"`. A provider that refuses
+  that would have answered for the type, not for the field under test. The
+  type is now the booked passenger's (PERSON when unknown).
+
+### Default decisions
+
+- The sweep sets `patchType` and keeps the body template; it does not switch
+  to `req.setBody` as the normal branch does. The body stays the one the
+  sweep has always sent, including its deliberately empty fields.
+
+### Not verified
+
+- Not rerun against the provider where it was seen. On the simulator,
+  `SIM_NHF_RI_INVALID_1ADT_38` gives the same checks before and after; the
+  requests now carry `"type": "PERSON"`.
+
+---
+
 ## [server-1.11.246] / [collection-OTST_V2.0.133] — 2026-10-12
 
 Issue #658, release 2026.280. Server code unchanged (tests only).

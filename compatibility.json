@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.280",
+  "current_release": "2026.281",
   "releases": [
+    {
+      "release": "2026.281",
+      "date": "2026-10-12",
+      "server": "1.11.247",
+      "collection": "OTST_V2.0.134",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#660: the passenger negative sweep sends the passenger's type, not the text {{patchType}}"
+      ]
+    },
     {
       "release": "2026.280",
       "date": "2026-10-12",
