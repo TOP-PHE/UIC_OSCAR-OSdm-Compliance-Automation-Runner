@@ -1030,6 +1030,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `killRun()`, and `urlPolicy.js` gives the start-up DNS lookup 10 s. The
     `[runner]` lines go to the run's log in the database, not to
     `docker logs`: ask for the run's log in OSCAR when diagnosing a run.
+  - **Query parameters go in the URL** (#648, OTST_V2.0.129). Bruno 4.2.1
+    ignores a request file's `http.params` list; the seat map went without
+    its four required parameters for months. `bruno-request-files.test.js`
+    refuses a `params` list. The simulator answers 501 to `/availabilities`,
+    so it cannot show such a gap: read a real provider's request URLs.
 - **A check follows the specification of the version it reads, and an
   extensible list is never a FAIL** (#613, OTST_V2.0.107). A review of the
   collection against OSDM 3.8 found checks that failed conformant answers,

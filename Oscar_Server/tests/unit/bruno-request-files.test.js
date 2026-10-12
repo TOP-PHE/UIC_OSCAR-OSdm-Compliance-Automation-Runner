@@ -89,6 +89,25 @@ describe('Bruno request files (#613 F1)', () => {
   });
 });
 
+// #648: Bruno 4.2.1 sends the URL as written and ignores an `http.params`
+// list, so a query parameter declared there never reaches the provider
+// (checked with the real CLI on a local listener). The seat map went without
+// its four required parameters for that reason.
+describe('#648: query parameters are written in the URL', () => {
+  test.each(FILES)('%s: no params list', (file) => {
+    const doc = yaml.load(fs.readFileSync(path.join(COLLECTION, file), 'utf8'));
+    expect(doc.http).not.toHaveProperty('params');
+  });
+
+  test.each([
+    ['02-Common Requests/08. GET Place Maps.yml', 'contextId={{offerId}}&contextType=OFFER'],
+    ['02-Common Requests/08b. GET Place Map Post-Booking.yml', 'contextId={{bookingId}}&contextType=BOOKING'],
+  ])('%s asks for the seat map with the four OSDM parameters', (file, context) => {
+    const url = yaml.load(fs.readFileSync(path.join(COLLECTION, file), 'utf8')).http.url;
+    expect(url).toBe(`{{api_base}}/availabilities/place-map?${context}&resourceId={{reservationId}}&resourceType=RESERVATION`);
+  });
+});
+
 // #644: a by-id system-information request is not sent with "null" in its
 // path when no id was configured and the list call gave none.
 describe('#644: by-id requests without an id are skipped', () => {

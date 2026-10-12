@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{api_base}}/bookings/{{bookingId}}"
+  url: "{{api_base}}/bookings/{{bookingId}}?embed=ALL"
   headers:
     - name: Authorization
       value: Bearer {{access_token}}
@@ -15,10 +15,6 @@ http:
       value: application/json
     - name: Requestor
       value: "{{requestor}}"
-  params:
-    - name: embed
-      value: ALL
-      type: query
   auth: inherit
 
 runtime:
