@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-partial-refund-zero-price",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Partial refunds of free bookings",
+    "summary": "A partial refund of a booking priced 0 no longer fails its amount check.",
+    "content": "Some providers’ test systems price every booking at 0. The partial-refund check that the refund is smaller than the booking price then could never pass. With a price of 0 it is now skipped, and the run log says why; bookings with a price are checked as before."
+  },
+  {
     "id": "2026-10-12-confirmed-price-after-sale",
     "date": "October 12, 2026",
     "tag": "Fix",

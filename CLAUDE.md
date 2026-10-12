@@ -887,8 +887,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `fulfillmentIds` only: providers that refund per fulfillment refuse
   `refundSpecifications` with `bookingPartIds` / `passengerIds`. A partial
   refund is armed by any of `partialRefundArmed()`'s three flags; use it
-  instead of reading the leg and passenger flags. A refund by leg or by
-  passenger names the fulfillment that holds its parts
+  instead of reading the leg and passenger flags. A booking priced 0 (a
+  provider's test system) skips "partial < confirmed" at INFO (#662). A
+  refund by leg or by passenger names the fulfillment that holds its parts
   (`fulfillmentForScope()`, #610, OTST_V2.0.120): the only one, else the one
   whose `bookingParts` list them, else the passenger's. Parts in several
   fulfillments, or none shown, degrade to a full refund: never fall back to

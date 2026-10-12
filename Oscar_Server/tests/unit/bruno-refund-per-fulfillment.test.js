@@ -189,3 +189,26 @@ describe('an overrule on a refund given per fulfillment', () => {
     expect(failed(r)).toEqual([]);
   });
 });
+
+// #662: a provider's test system prices every booking at 0; 0 < 0 failed every
+// partial refund.
+describe('a partial refund of a booking priced 0', () => {
+  const ro = (fee, refundable) => ({ id: 'R1', refundFee: price(fee), refundableAmount: price(refundable), fulfillments: [{ id: 'F-OUT' }] });
+  const strictly = (r) => r.results.filter((x) => x.name.includes('strictly less than full'));
+
+  test.each([[null], ['STRIKE']])('overrule %s: not checked, said at INFO', (overrule) => {
+    envStore.__bookingFulfillmentIds = JSON.stringify(['F-OUT', 'F-IN']);
+    envStore.partialRefundByPax = 'true';
+    const r = run(() => refunds.validateRefundableAmount(ro(0, 0), overrule, 0));
+    expect(strictly(r)).toEqual([]);
+    expect(failed(r)).toEqual([]);
+    expect(r.logs.some((l) => l.startsWith('[INFO] Partial refund: the booking\'s confirmed price is 0'))).toBe(true);
+  });
+
+  test('a booking with a price is still checked', () => {
+    envStore.__bookingFulfillmentIds = JSON.stringify(['F-OUT', 'F-IN']);
+    envStore.partialRefundByPax = 'true';
+    expect(strictly(run(() => refunds.validateRefundableAmount(ro(0, 1850), null, 1850))).map((x) => x.ok)).toEqual([false]);
+    expect(strictly(run(() => refunds.validateRefundableAmount(ro(0, 900), null, 1850))).map((x) => x.ok)).toEqual([true]);
+  });
+});
