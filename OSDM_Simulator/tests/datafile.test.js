@@ -143,7 +143,7 @@ test('the refund offers not confirmed, and the exchanges: one-way, on gamma, the
   }
 });
 
-test('the expiry probes: one per deadline, on the short-deadline trip, with a wait that covers it (#611)', () => {
+test('the expiry probes: one per deadline (and one chain, #652), on the short-deadline trip, with a wait that covers it (#611)', () => {
   const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
   const station = gamma.shortDeadlines.stopPlaceRef;
   const shortTrips = datafile.tripRequirements.filter((t) => t.trip?.origin === station).map((t) => t.id);
@@ -154,13 +154,15 @@ test('the expiry probes: one per deadline, on the short-deadline trip, with a wa
     SIM_NHF_EXPIRED_OFFER_38: ['expiredOfferTest'],
     SIM_NHF_EXPIRED_BOOKING_38: ['expiredBookingTest'],
     SIM_NHF_EXPIRED_REFUND_OFFER_38: ['expiredRefundOfferTest'],
+    SIM_NHF_EXPIRED_CHAIN_SEATMAP_38: ['expiredBookingTest', 'expiredRefundOfferTest'],
     SIM_NHF_EXPIRED_EXCHANGE_OFFER_38: ['expiredExchangeOfferTest'],
   });
   for (const scenario of probes) {
     assert.equal(scenario.tripRequirementId, shortTrips[0], scenario.code);
-    const [flag] = flags[scenario.code];
-    // The deadline plus the collection's 15 s margin and 45 s of headroom.
-    assert.ok(scenario[flag.replace(/Test$/, 'MaxWaitMinutes')] * 60 >= gamma.shortDeadlines.seconds + 60, scenario.code);
+    for (const flag of flags[scenario.code]) {
+      // The deadline plus the collection's 15 s margin and 45 s of headroom.
+      assert.ok(scenario[flag.replace(/Test$/, 'MaxWaitMinutes')] * 60 >= gamma.shortDeadlines.seconds + 60, scenario.code);
+    }
   }
   // No other scenario uses the short-deadline trip: its runs would expire under it.
   for (const scenario of datafile.scenarios) {

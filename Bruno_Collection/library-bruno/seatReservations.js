@@ -167,4 +167,17 @@ function checkBookedReservations(booking, offer, reservationIds, { places = true
   });
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, placeSelectionsFor, checkRelations, checkProviderRules, checkBookedReservations };
+/**
+ * Whether a booking request already asked for the reservation (#652), in the
+ * placeSelections or the optionalReservationSelections of any of its offers.
+ * The post-booking add-reservation step must not add it a second time.
+ */
+function reservationInBookingRequest(request, reservationId) {
+  if (!reservationId) return false;
+  const offers = Array.isArray(request?.offers) ? request.offers : [];
+  return offers.some((offer) => [...(Array.isArray(offer?.placeSelections) ? offer.placeSelections : []),
+    ...(Array.isArray(offer?.optionalReservationSelections) ? offer.optionalReservationSelections : [])]
+    .some((selection) => selection?.reservationId === reservationId));
+}
+
+module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, placeSelectionsFor, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest };

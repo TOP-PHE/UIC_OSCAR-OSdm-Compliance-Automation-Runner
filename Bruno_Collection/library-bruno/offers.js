@@ -1742,11 +1742,15 @@ function handleAccommodationAndPlaceSelection(selectedOffer) {
       validationLogger(`[DEBUG] accommodationSelection is ${accommodationSelection}, place selection not enabled → skipping place selection`);
       return;
     }
-    if (bru.getEnvVar("reservationId")) {
-      validationLogger(`[DEBUG] reservationId already set (${bru.getEnvVar("reservationId")}) → keeping it`);
+    const _seatResParts = selectedOffer.reservationOfferParts || [];
+    // #652: kept only when it is a part of this offer. A scenario that asks
+    // for a new offer (after the expired-offer probe) used to keep the first
+    // offer's reservation and trip, and booked them with the second offer.
+    const _keptRes = bru.getEnvVar("reservationId");
+    if (_keptRes && _seatResParts.some((p) => p?.id === _keptRes)) {
+      validationLogger(`[DEBUG] reservationId already set (${_keptRes}) → keeping it`);
       return;
     }
-    const _seatResParts = selectedOffer.reservationOfferParts || [];
     if (_seatResParts.length === 0) {
       validationLogger(`[WARN] Place selection enabled but this offer has no reservationOfferParts → seat map not applicable (nothing to reserve).`);
       return;
@@ -2251,7 +2255,15 @@ function routeAfterOfferStep() {
   const psOptIn = String(bru.getEnvVar("salesFlow_placeSelection")) === "true";
   const reqPlace = bru.getEnvVar("requiresPlaceSelection");
   const runPlaceMap = (psMode === "SEATMAP_AT_OFFER" && psOptIn) || (reqPlace === true || reqPlace === "true");
-  if (runPlaceMap) {
+  // #652: only to a seat map the run filter will not skip (it needs a
+  // reservation of this offer, and no booking yet). A skipped step runs no
+  // script, so its "go on to 02" never came: Bruno went on down the folder,
+  // skipping every step, and reached the refund with no booking.
+  const mapAsked = runPlaceMap && !!bru.getEnvVar("reservationId") && !bru.getEnvVar("bookingId");
+  if (runPlaceMap && !mapAsked) {
+    console.log("[INFO] No seat map for this offer (no reservation part, or a booking already exists): going on to the booking.");
+  }
+  if (mapAsked) {
     bru.setGlobalEnvVar("skipPlaceMaps", false);
     bru.runner.setNextRequest("08. GET Place Maps");
   } else {

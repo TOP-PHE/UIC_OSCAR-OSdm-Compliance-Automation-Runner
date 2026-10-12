@@ -238,10 +238,20 @@ runtime:
         //    here even though the scenario's nominal mode was SEATMAP_AT_OFFER —
         //    "pre-book, then pick the seat" (the customer-natural flow that
         //    providers like Bileto support).
+        // #652: not when this booking request already asked for the
+        // reservation (it is then in the booking; step 02 checks it), which
+        // the fallback after a failed seat map used to add a second time.
+        const _seatRes = require(bru.getEnvVar("library_base") + "seatReservations.js");
+        const _alreadyAsked = _seatRes.reservationInBookingRequest(
+            _seatRes.fromEnv(bru.getEnvVar("BookingRequest"), null), bru.getEnvVar("reservationId"));
         const _addRes = (bru.getEnvVar("placeSelectionMode") === "ADD_TO_BOOKING"
                           || bru.getEnvVar("__placeMapAtOfferFailed") === "true")
             && String(bru.getEnvVar("salesFlow_placeSelection")) === "true"
-            && bru.getEnvVar("__addReservationDone") !== "true";
+            && bru.getEnvVar("__addReservationDone") !== "true"
+            && !_alreadyAsked;
+        if (_alreadyAsked && bru.getEnvVar("__placeMapAtOfferFailed") === "true") {
+            console.log(`[INFO] The reservation ${bru.getEnvVar("reservationId")} was asked for with the booking: it is not added again after it.`);
+        }
         const _addAnc = String(bru.getEnvVar("salesFlow_addAncillary")) === "true"
             && bru.getEnvVar("__addAncillaryDone") !== "true";
         // #184: when an add-reservation is due, first fetch the BOOKING-context

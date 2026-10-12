@@ -48,6 +48,15 @@ function localDateTime(value) {
   return text.length > 19 ? text.slice(0, 19) : text;
 }
 
+// #652: the inboundDate in the same form as the outbound search's
+// departureTime. Both forms match the 3.8 pattern (it is not anchored), and a
+// provider that reads date-times with an offset refused the local one (400)
+// while it took the outbound's. So the offset stays when the outbound has one,
+// and goes when it has none.
+function inboundDateLike(inbound, outboundDeparture) {
+  return String(outboundDeparture || '').length > 19 ? String(inbound || '') : localDateTime(inbound);
+}
+
 /**
  * The body of the second (inbound) POST /offers call.
  *
@@ -214,6 +223,7 @@ module.exports = {
   returnUsesInboundDate,
   combinedReturnDefined,
   localDateTime,
+  inboundDateLike,
   buildInboundOfferRequest,
   checkReturnOffers,
   checkReturnFulfillmentCount,

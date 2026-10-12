@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-collection-fixes",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Seat maps, returns and expiry tests: five fixes",
+    "summary": "Scenarios that chain expiry tests, ask for a return or book a reservation with a seat map run as intended again.",
+    "content": "A scenario that asks for seat selection could skip its whole sale and go straight to a refund when the offer had no seat to choose; scenarios that chain several expiry tests were affected most. The sale now always runs.\n\nThe return date is sent in the same form as the outbound date, a reservation is no longer named twice in a booking, a reservation booked with the booking is not added again afterwards, and a new offer in the same scenario no longer reuses the previous offer's reservation."
+  },
+  {
     "id": "2026-10-12-optional-members",
     "date": "October 12, 2026",
     "tag": "Fix",

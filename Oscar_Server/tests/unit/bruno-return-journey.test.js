@@ -110,6 +110,15 @@ describe('buildInboundOfferRequest', () => {
     expect(rj.buildInboundOfferRequest({ ...base, model: 'COMBINED', outboundTripId: null }).reason).toMatch(/names no trip/);
   });
 
+  // #652: a provider refused the local inboundDate (400 "Failed to read
+  // request") while it took the outbound departureTime with its offset.
+  test('inboundDateLike keeps the form of the outbound departure', () => {
+    expect(rj.inboundDateLike('2026-10-23T07:00:00+02:00', '2026-10-21T07:00:00+02:00')).toBe('2026-10-23T07:00:00+02:00');
+    expect(rj.inboundDateLike('2026-10-23T07:00:00+02:00', '2026-10-21T07:00:00')).toBe('2026-10-23T07:00:00');
+    expect(rj.inboundDateLike('2026-10-23T07:00:00', '2026-10-21T07:00:00Z')).toBe('2026-10-23T07:00:00');
+    expect(rj.inboundDateLike('2026-10-23T07:00:00', undefined)).toBe('2026-10-23T07:00:00');
+  });
+
   test('localDateTime drops an offset and keeps a local date-time', () => {
     expect(rj.localDateTime('2026-11-22T17:00:00+01:00')).toBe('2026-11-22T17:00:00');
     expect(rj.localDateTime('2026-11-22T17:00:00Z')).toBe('2026-11-22T17:00:00');

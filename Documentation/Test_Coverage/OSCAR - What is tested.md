@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (73 scenarios, SIM_…)  ──source──►  (35 reference scenarios, OTST_… / NHF_…)
+ (74 scenarios, SIM_…)  ──source──►  (35 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (73 scenarios)
+### 4.1 The simulator's data file (74 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -183,7 +183,7 @@ In short:
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
 | Documents, refund receipt, `Idempotency-Key` | 3 | `gamma` |
 | Exchange, exchange withdrawn | 2 | `gamma` |
-| Expiry probes | 4 | `gamma` |
+| Expiry probes (one per deadline, and two chained in one scenario) | 5 | `gamma` |
 | Response variants (per passenger, reordered, minimal, main passenger only) | 5 | `gamma` |
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |

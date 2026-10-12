@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.277",
+  "current_release": "2026.278",
   "releases": [
+    {
+      "release": "2026.278",
+      "date": "2026-10-12",
+      "server": "1.11.244",
+      "collection": "OTST_V2.0.132",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "fix(#652): a seat-map scenario goes to the seat map only when it will run (a skipped 08 fell through to the refund with no booking; chained expiry probes never sold for the second probe); the return's inboundDate keeps the outbound departure's form; a reservation is named once in a booking and not added again at 09; a new offer takes its own reservation. New simulator scenario SIM_NHF_EXPIRED_CHAIN_SEATMAP_38. Server 1.11.244 is tests only."
+      ]
+    },
     {
       "release": "2026.277",
       "date": "2026-10-12",
