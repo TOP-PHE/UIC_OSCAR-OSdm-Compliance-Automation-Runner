@@ -14,7 +14,8 @@ module.exports = {
   postPatchExchangeOperationsResponse,
   validateExchangeOfferResponse,
   validateExchangeFeesConsistentWithAfterSalesConditions,
-  validateExchangeAppliedOverruleCode
+  validateExchangeAppliedOverruleCode,
+  checkBookingAroundExchange
 };
 
 // Function to validate exchange offers response
@@ -297,6 +298,49 @@ function validateExchangeAppliedOverruleCode(appliedOverruleCode, expectedOverru
 
   test(title, () => {
     expect(appliedOverruleCode).to.equal(expectedOverruleCode);
+  });
+}
+
+// #649: the booking read at steps 13, 15 and 17 holds the parts sold first and,
+// once the provider shows it, the new booked offer of the exchange. The parts
+// held before the exchange (kept at step 07) are checked against the original
+// offer, the others for their own status. Without the ids (a run started
+// before 07 kept them) the whole booking is checked, as before.
+const EXCHANGE_STAGES = {
+  // 13: exchange pre-booked
+  prebooked: { old: ['EXCHANGE_ONGOING'], fulfillments: ['FULFILLED', 'CONFIRMED', 'ON_HOLD'], added: ['PREBOOKED'], confirmed: false },
+  // 15: exchange confirmed
+  confirmed: { old: ['EXCHANGED'], fulfillments: ['EXCHANGED', 'FULFILLED', 'CONFIRMED'], added: ['FULFILLED', 'CONFIRMED'], confirmed: true },
+  // 17: exchange withdrawn
+  withdrawn: { old: ['FULFILLED', 'CONFIRMED'], fulfillments: ['EXCHANGED', 'FULFILLED', 'CONFIRMED', 'CANCELLED'], added: null, confirmed: false },
+};
+
+function checkBookingAroundExchange(jsonData, stage) {
+  const { postCreateBookingResponse } = require('./bookings.js');
+  const { splitExchangeBooking, checkAddedParts } = require('./exchangeParts.js');
+  const rule = EXCHANGE_STAGES[stage];
+  let idsBefore = bru.getEnvVar("__partIdsBeforeExchange");
+  if (typeof idsBefore === 'string') {
+    try { idsBefore = JSON.parse(idsBefore); } catch { idsBefore = null; }
+  }
+  if (!Array.isArray(idsBefore) || idsBefore.length === 0) {
+    validationLogger("[INFO] The booking's parts before the exchange were not kept: the whole booking is checked against the original offer.");
+    postCreateBookingResponse(bru.getEnvVar("offer"), jsonData, rule.old, rule.fulfillments);
+    return;
+  }
+  const { original, added } = splitExchangeBooking(jsonData, idsBefore);
+  validationLogger(`[INFO] Exchange (${stage}): ${idsBefore.length} part(s) held before it checked against the original offer; ${added.length} part(s) added since.`);
+  postCreateBookingResponse(bru.getEnvVar("offer"), original, rule.old, rule.fulfillments);
+  if (!rule.added) {
+    if (added.length > 0) {
+      const left = added.map(({ part }) => part.id + ' ' + part.status).join(', ');
+      validationLogger(`[INFO] Parts of the withdrawn exchange still in the booking: ${left}.`);
+    }
+    return;
+  }
+  checkAddedParts(added, rule.added, { confirmed: rule.confirmed }).forEach((c) => {
+    if (c.level === 'info') { validationLogger(`[INFO] ${c.name}: ${c.message}`); return; }
+    test(c.name, () => { if (!c.ok) throw new Error(c.message); });
   });
 }
 

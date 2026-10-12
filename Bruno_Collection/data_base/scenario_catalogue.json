@@ -95,7 +95,7 @@
       "code": "OTST_EXCHANGE_1ADT",
       "source": "SIM_EXCHANGE_1ADT_38",
       "purpose": "Exchange of a one-way ticket: exchange offers, one taken, confirmed.",
-      "checks": 378
+      "checks": 380
     },
     {
       "code": "OTST_EXCHANGE_WITHDRAWN_1ADT",

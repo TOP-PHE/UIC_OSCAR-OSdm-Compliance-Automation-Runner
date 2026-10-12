@@ -183,6 +183,13 @@ runtime:
             catch (_e) { /* leave unset on serialise failure */ }
         }
 
+        // #649: the parts the booking holds before an exchange, so that 13, 15
+        // and 17 tell them from the parts the exchange adds.
+        if (bru.getEnvVar("scenarioType")?.includes("EXCHANGE")) {
+            const { partIdsOf } = require(bru.getEnvVar("library_base") + "exchangeParts.js");
+            bru.setEnvVar("__partIdsBeforeExchange", JSON.stringify(partIdsOf(jsonData)));
+        }
+
         if(bru.getEnvVar("scenarioType")?.includes("REFUND")) {
             bru.runner.setNextRequest("10. POST Refund Offers");
             console.log("[INFO] scenarioType in data file contains 'REFUND' keyword, executing 10. POST Refund Offers")

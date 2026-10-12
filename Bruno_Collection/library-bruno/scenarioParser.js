@@ -154,6 +154,7 @@ function resetScenarioEnvVars() {
     "__partialRefundExpectedAmount", "__partialRefundExpectedPartIds", "__partialRefundScopeFulfillmentId",
     "__refundOfferRetryCount", "__refundOfferIds", "__refundOfferIndex",
     "__bookingForRefund",
+    "__partIdsBeforeExchange",
     // Misc
     "data_base_tmp", "scriptContent", "swaggerJson",
     "scenarioCode",

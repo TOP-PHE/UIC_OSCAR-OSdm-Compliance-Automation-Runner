@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-exchange-checks",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Exchange runs: two false failures fixed",
+    "summary": "An exchange no longer sends every passenger with age 0, and the booking after an exchange checks the old and the new tickets apart.",
+    "content": "The request for exchange offers sent each passenger with age 0 next to the date of birth, and a provider priced every passenger as a child. Only the date of birth is sent now, as in the offer request.\n\nAfter an exchange is pre-booked, some providers already show the new tickets in the booking. OSCAR compared them with the original offer and reported failures that were not there. The tickets sold first are now checked against the original offer, and the new ones for their own status."
+  },
+  {
     "id": "2026-10-12-seat-map-parameters",
     "date": "October 12, 2026",
     "tag": "Fix",

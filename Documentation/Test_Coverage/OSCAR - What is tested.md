@@ -150,8 +150,8 @@ WARNING.
 |---|---|---|
 | 10. POST Exchange Offers | `POST /bookings/{id}/exchange-offers` | exchange offers with an id, a pre-booking deadline in the future, admissions, price, fee, and `amountToBePaid = exchangePrice + exchangeFee − confirmedPrice` |
 | 11. POST Exchange Operations | `POST …/exchange-operations` | the operation is created `PREBOOKED` with the offer taken |
-| 12. GET Exchange Offer, 13. GET Booking | reads | the booking is in exchange, with the new parts pre-booked |
-| 14. POST Obtaining Fulfillments, 15. / 17. GET Booking | confirmation and reads | the old parts are `EXCHANGED`, the new ones fulfilled, the confirmed price updated |
+| 12. GET Exchange Offer, 13. GET Booking | reads | the parts sold first are `EXCHANGE_ONGOING`, checked against the original offer; the exchange's new parts, when the provider already shows them, are `PREBOOKED` (OSDM does not say whether they show before the confirmation) |
+| 14. POST Obtaining Fulfillments, 15. / 17. GET Booking | confirmation and reads | the old parts are `EXCHANGED`, checked against the original offer; the new admissions are in the booking, fulfilled; the confirmed price updated. After a withdrawn exchange (17), the old parts are back |
 | 16. DEL Exchange Offer | `DELETE …/exchange-operations/{id}` | a withdrawn exchange leaves the original ticket |
 
 ### Expiry probes
@@ -236,7 +236,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 
 | Code | Scope | Needs declared | Checks | Source |
 |---|---|---|---|---|
-| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 378 | `SIM_EXCHANGE_1ADT_38` |
+| `OTST_EXCHANGE_1ADT` | Exchange of a one-way ticket: exchange offers, one taken, confirmed. | EXCHANGE_FULL | 380 | `SIM_EXCHANGE_1ADT_38` |
 | `OTST_EXCHANGE_WITHDRAWN_1ADT` | Exchange pre-booked, then withdrawn before its confirmation: the ticket stays. | EXCHANGE_FULL | 351 | `SIM_EXCHANGE_DELETE_1ADT_38` |
 
 #### Negative tests (NHF: the provider must refuse)

@@ -62,6 +62,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.242] / [collection-OTST_V2.0.130] — 2026-10-12
+
+Issue #649, release 2026.276. Server code unchanged (tests only).
+
+### Fixed
+
+Found in a provider's exchange run (5 passengers, two legs): 26 failures,
+none of them the provider's.
+
+- **The exchange offer request no longer sends `age: 0`.** Each passenger
+  went with its date of birth and `age: 0`; the provider priced all five (13
+  to 64 years old) as children. `age` is sent only when the scenario gives
+  one, as in the offer request.
+- **After an exchange, the parts sold first and the parts the exchange adds
+  are checked apart** (steps 13, 15 and 17). The provider showed the
+  pre-booked exchange in the booking (the original booked offer
+  `EXCHANGE_ONGOING`, the new one `PREBOOKED`), and OSCAR compared the
+  original offer with every booked part: the new ones were taken (their
+  passenger references matched the offer's), and 25 checks failed. Step 07
+  now keeps the part ids the booking holds before the exchange; those parts
+  are checked against the original offer, the others for their status:
+  `PREBOOKED` at 13, `FULFILLED` or `CONFIRMED` at 15. At 15 the new
+  admissions must be in the booking; at 13, OSDM does not say whether they
+  show before the confirmation (the simulator shows them only after), so
+  their absence is information. After a withdrawn exchange (17), what is
+  left of it is listed.
+
+### Default decisions (taken without asking)
+
+- The parts are told apart by the ids held at step 07: OSDM gives a booked
+  offer no link back to the offer it came from that every provider fills in
+  the same way.
+- A run without those ids (a scenario that did not go through 07) is checked
+  as before, with an INFO line.
+
+Checked: the new tests fail with the fixes undone (the age, and the old
+comparison on a booking shaped like the provider's); the provider's own
+booking of that run, checked again offline, gives the 25 failures with the
+old comparison and none with the new one. A full recording of the 73
+simulator scenarios, compared with the OTST_V2.0.129 one: two exchange
+scenarios gain the new checks at step 15 (the new admissions there, and
+`FULFILLED`; all pass), their old parts are compared alone, nothing else
+changes. The catalogue's exchange entry goes from 378 to 380 checks and
+`OSCAR - Checks by scenario.md` is regenerated. The simulator shows the new
+booked offer only once confirmed, so step 13's new branch is covered by the
+unit tests only. Not checked: a new run against the provider.
+
+---
+
 ## [server-1.11.241] / [collection-OTST_V2.0.129] — 2026-10-12
 
 Issue #648, release 2026.275. Server code unchanged (tests only).
