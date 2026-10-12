@@ -149,6 +149,29 @@ describe('copy from the catalogue', () => {
     expect(file.systemInfoParameters).toBeUndefined();
   });
 
+  // #681: the company's values replace the simulator's, and the page is told what is left.
+  test('the preview proposes the company\'s train and says what is left to complete or check', async () => {
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
+    for (const t of preview.trips.filter(x => !x.needsJourney)) expect(t.suggested).toBe(`train::${train(ids.P)[0]}::0`);
+    expect(preview.trips.filter(x => x.needsJourney).every(t => t.suggested === null)).toBe(true);
+    const tech = preview.scenarios.find(s => s.code === 'OTST_REFUND_TECHNICAL_CANCELLATION_1ADT');
+    expect(tech.toComplete).toEqual([expect.stringMatching(/overrule code/)]);
+    expect(preview.scenarios.find(s => s.code === 'OTST_SALE_RESERVATION_MANDATORY_2ADT').toCheck)
+      .toEqual(['the chosen train must carry a mandatory seat reservation']);
+  });
+
+  test('a reference scenario with an overrule code is copied with none when the framework declares none, and says so', async () => {
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
+    const codes = ['OTST_REFUND_TECHNICAL_CANCELLATION_1ADT'];
+    const tripMap = Object.fromEntries(preview.trips.filter(t => t.usedBy.some(c => codes.includes(c)))
+      .map(t => [t.id, { type: 'train', train_id: train(ids.P)[0], service_index: 0 }]));
+    const res = await request(app).post('/v1/company/scenario-copy').set(as('TM', 'P')).send({ source_id: 'catalogue', codes, trip_map: tripMap });
+    expect(res.status).toBe(200);
+    expect(res.body.copied[0].toComplete).toEqual([expect.stringMatching(/overrule code/)]);
+    const copied = (await readFile(ids.P)).scenarios.find(s => s.code === res.body.copied[0].to);
+    expect(copied.overruleCode).toBeNull();
+  });
+
   test('a certifier cannot copy from it', async () => {
     const res = await request(app).post('/v1/company/scenario-copy/preview').set(as('CE')).send({ source_id: 'catalogue' });
     expect(res.status).toBe(403);

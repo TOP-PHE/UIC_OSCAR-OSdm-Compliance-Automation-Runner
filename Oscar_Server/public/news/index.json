@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-catalogue-adapt",
+    "date": "October 12, 2026",
+    "tag": "Improvement",
+    "title": "Reference scenarios adapted to your provider",
+    "summary": "Copying reference scenarios now proposes a train from your Test Data for each trip, uses your declared overrule codes, and tells you what is left to complete or check.",
+    "content": "When you copy reference scenarios from the catalogue, each trip comes with a train or journey of your Test Data already chosen (you can change it). Values that only your provider can give are taken from your Test Framework, such as the overrule codes declared for refunds, and the preview says what is left to complete and what to check that the Test Data cannot show, such as a mandatory seat reservation on the chosen train."
+  },
+  {
     "id": "2026-10-12-catalogue-data-needs",
     "date": "October 12, 2026",
     "tag": "Improvement",

@@ -1149,6 +1149,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   A reservation counts only if the scenario exercises it; an overrule code is
   a provider value, not a tariff need. Parts 2–3 of #681 use it to choose the
   train and tariff at copy time and to report what is left to complete.
+  **Part 2 (1.11.255): `utils/catalogueMatch.js`, pure.** `adaptCatalogueDatafile()`
+  runs in `copyContext()` on the catalogue only, so preview and copy see the
+  same adapted scenarios: overrule code from `iropsCodes.refund` (a listed
+  code it does *not* declare for the refusal probe), product removed,
+  after-sale tariff never NON_FLEXIBLE. `suggestTrip()` preselects a journey
+  of as many legs, else the first train; Test Data carries no reservation or
+  class, so those needs come back as `toCheck`, never guessed.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is

@@ -42,6 +42,7 @@ const { writeDatafile } = require('../../utils/datafileWrite');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
 const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
 const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
+const { adaptCatalogueDatafile, suggestTrip } = require('../../utils/catalogueMatch');
 const TripApply = require('../../../public/js/trip-apply');
 const log = require('../../utils/logger').child({ module: 'scenario-copy' });
 
@@ -152,7 +153,9 @@ async function copyContext(req, res) {
       .map(c => [c.id, c]));
     if (fromCatalogue) names[CATALOGUE] = { id: CATALOGUE, name: CATALOGUE_NAME };
     const entries = catalogue ? catalogueFor(catalogue.catalogue, catalogue.simulator, frameworkConfig) : null;
-    return { targetId, sourceId, source, frameworkConfig, resources, names, entries };
+    // #681: reference scenarios take this company's values, and say what is left.
+    const adapted = entries ? adaptCatalogueDatafile(source, entries, frameworkConfig) : { datafile: source, notes: {} };
+    return { targetId, sourceId, source: adapted.datafile, notes: adapted.notes, frameworkConfig, resources, names, entries };
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     res.status(err.status).json({ status: err.status, title: REFUSAL_TITLES[err.status] || 'Conflict', detail: err.message });
@@ -188,14 +191,21 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
     const byCode = new Map(ctx.entries.map(e => [e.code, e]));
     plan.scenarios = plan.scenarios.map(s => {
       const e = byCode.get(s.code);
-      return { ...s, kind: e.kind, purpose: e.purpose, checks: e.checks, missing: e.missing, dataNeeds: e.needsText };
+      const notes = ctx.notes[s.code] || { toComplete: [], toCheck: [] };
+      return {
+        ...s, kind: e.kind, purpose: e.purpose, checks: e.checks, missing: e.missing, dataNeeds: e.needsText,
+        toComplete: notes.toComplete, toCheck: notes.toCheck,
+      };
     });
   }
+  const testData = testDataChoices(ctx.resources);
+  // #681: a proposed train or journey for each trip of a reference scenario.
+  if (ctx.entries) plan.trips = plan.trips.map(t => ({ ...t, suggested: suggestTrip(t, testData) }));
   return res.json({
     source: { id: ctx.sourceId, name: ctx.names[ctx.sourceId]?.name || '' },
     target: { id: ctx.targetId, name: ctx.names[ctx.targetId]?.name || '' },
     ...plan,
-    testData: testDataChoices(ctx.resources),
+    testData,
   });
 });
 
@@ -242,7 +252,9 @@ router.post('/scenario-copy', copyLimiter, async (req, res) => {
       return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
     }
     auditLog(req.user.id, ctx.targetId, req.user.email, `scenarios_copied:${ctx.sourceId}:${result.copied.length}`);
-    return res.json({ copied: result.copied, hash });
+    // #681: what a copied reference scenario still needs before it can run.
+    const copied = result.copied.map(c => (ctx.notes[c.from] ? { ...c, toComplete: ctx.notes[c.from].toComplete } : c));
+    return res.json({ copied, hash });
   });
 });
 

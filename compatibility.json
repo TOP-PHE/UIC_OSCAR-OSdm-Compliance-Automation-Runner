@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.288",
+  "current_release": "2026.289",
   "releases": [
+    {
+      "release": "2026.289",
+      "date": "2026-10-12",
+      "server": "1.11.255",
+      "collection": "OTST_V2.0.141",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.255 (#681, part 2): reference scenarios take the company's overrule codes and tariff, each trip gets a proposed train or journey, and the copy says what is left to complete or check."
+      ]
+    },
     {
       "release": "2026.288",
       "date": "2026-10-12",
