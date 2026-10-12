@@ -138,6 +138,11 @@ const LABELS = {
 };
 
 function lbl(val) { return val == null ? '— none —' : (LABELS[val] || val); }
+// #663: what each Action does, shown under the field.
+const ACTION_HINT = {
+  REFUND:   'PATCH confirms the refund offer, DELETE withdraws it; none stops after asking for the refund offer.',
+  EXCHANGE: 'PATCH or none confirms the exchange (its fulfilment, step 14); DELETE withdraws the exchange offer.',
+};
 // S11: the one shared HTML escaper now lives in js/esc.js (loaded before
 // scenarios.js on scenarios.html). It has the identical rule set this local
 // copy used — the full & < > " ' encoder, built with chained .replace(/…/g)
@@ -1587,7 +1592,8 @@ function buildDetailHTML(idx) {
           // same way (see renderWizardStep3, 's3-action-row' section).
           const scType = state.scenarios[idx]?.scenarioType;
           if (scType !== 'REFUND' && scType !== 'EXCHANGE') return '';
-          return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction);
+          // #663: "none" stops after the offer; it read as a blank to fill.
+          return buildSelect(idx, 'scenarioAction', 'Action', ENUMS.scenarioAction, ACTION_HINT[scType]);
         })()}
         ${/* requestedInformationProbe moved to the Non Happy Flow customisation
             section in v1.11.100 — sits alongside passengerExternalRefFormat in

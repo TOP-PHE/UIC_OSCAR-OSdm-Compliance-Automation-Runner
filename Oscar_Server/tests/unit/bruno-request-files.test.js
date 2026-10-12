@@ -173,3 +173,20 @@ describe('#660: the passenger sweep sends a body with no template left', () => {
     expect(JSON.parse(sweepBody([])).type).toBe('PERSON');
   });
 });
+
+// #663: an exchange is confirmed by its fulfilment (14); Action PATCH, the
+// wizard's default, used to stop at 13 (318 checks on the simulator, 380 now).
+describe('#663: step 13 of an exchange confirms it unless the Action is DELETE', () => {
+  const routing = (action) => {
+    const code = yaml.load(fs.readFileSync(path.join(COLLECTION, '04-Exchange/13. GET Booking before Fulfillment.yml'), 'utf8'))
+      .runtime.scripts.find((s) => s.type === 'after-response').code;
+    const tail = code.slice(code.indexOf('#663'));
+    let next = null;
+    const bru = { getEnvVar: (k) => (k === 'scenarioAction' ? action : undefined), runner: { setNextRequest: (n) => { next = n; } } };
+    new Function('bru', 'require', 'console', tail.replace(/^[^\n]*\n/, ''))(bru, () => ({ loopbackOrStop: () => { next = 'stopped'; } }), { log: () => {} });
+    return next;
+  };
+  test.each([['PATCH', '14. POST Obtaining Fulfillments from Booking'], [null, '14. POST Obtaining Fulfillments from Booking'], ['DELETE', '16. DEL Exchange Offer']])('Action %s → %s', (action, next) => {
+    expect(routing(action)).toBe(next);
+  });
+});

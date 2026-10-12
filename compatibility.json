@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.283",
+  "current_release": "2026.284",
   "releases": [
+    {
+      "release": "2026.284",
+      "date": "2026-10-12",
+      "server": "1.11.250",
+      "collection": "OTST_V2.0.137",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "#663: an exchange with Action PATCH is confirmed (it stopped before); Test Config explains the Action field; a refund without an Action says what it did not test"
+      ]
+    },
     {
       "release": "2026.283",
       "date": "2026-10-12",

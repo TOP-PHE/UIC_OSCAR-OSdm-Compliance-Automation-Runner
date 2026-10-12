@@ -323,6 +323,18 @@ to exercise them.
 | **REFUND** | Sale, then refund‑offer → refund. An `overruleCode` makes it a technical cancellation (§4.10). |
 | **EXCHANGE** | Sale, then exchange‑offer → exchange operation. |
 
+For REFUND and EXCHANGE, the **Action** field says how the after-sale ends
+(#663):
+
+| Action | REFUND | EXCHANGE |
+|---|---|---|
+| **PATCH** | The refund offer is confirmed (`13. PATCH Refund Offer`). | The exchange is confirmed by its fulfilment (step 14). |
+| **DELETE** | The refund offer is withdrawn (`15. DEL Refund Offer`). | The exchange offer is withdrawn (`16. DEL Exchange Offer`). |
+| — none — | Stops after asking for the refund offer: only that request is tested, and the run log says so. | Same as PATCH. |
+
+Before 1.11.250, an exchange with Action PATCH (the wizard's default) stopped
+before its confirmation without saying so.
+
 ### 4.3 Offer criteria (optional)
 
 Narrow what you ask the vendor for. Each value is constrained to what the
@@ -1098,7 +1110,7 @@ exactly what OSCAR sent (e.g. that `resourceId` resolved, or that
 | Intermittent `500`, same request sometimes works | Vendor **fragile under parallel load** | Lower the company **concurrency limit** to 1. |
 | `501 parameter_not_supported` | Vendor conformantly **declines an optional capability** (e.g. no BOOKING‑context map) | Expected; the adaptive fallback continues. It's a capability finding, not a bug. |
 | A step **passes** with `… not implemented by this provider (auto-detected)` plus an `[INFO]` or `[WARNING]` line | The vendor doesn't implement an **optional** endpoint (System-Info catalogs, GET Passenger, GET Refund/Exchange Offer) | Expected — nothing to fix in OSCAR. If the line is a `[WARNING]` (bare 403/405/500), ask the vendor to answer 404 or 501 with an OSDM Problem body. A `401` on the same step is a token problem and still fails. |
-| `confirmedPrice missing` at booking stage REFUNDED / EXCHANGED | The vendor's booking omits `confirmedPrice` after a refund or exchange | A conformance finding: OSDM keeps `confirmedPrice` (confirmed parts minus confirmed refunds) on the booking at that stage; `provisionalPrice` is no longer expected there. |
+| `[WARNING] confirmedPrice absent at booking stage` REFUNDED / EXCHANGED | The vendor's booking omits `confirmedPrice` after a refund or exchange | A warning since 1.11.248 (#661): OSDM does not require the member, and after a full refund it would hold only what is still confirmed. Before the refund it is still required. |
 | Seat map step (`08`) **missing** from the report on a `SEATMAP_AT_OFFER` scenario | The scenario's **mode wasn't actually saved** (stale value), so it ran `ADD_TO_BOOKING` | Open the scenario, click the **Seat map at offer** pill, save, re‑run. |
 | Many "failed" assertions on `200` responses | OSDM **compliance** deviations in the vendor's responses | These are the conformance findings — review them; they're the point of the tool. |
 | Test Config shows **❌ Error: … could not be loaded …** instead of the editor, or the scenario wizard answers **The scenario was not generated** | OSCAR could not read what is stored (connection lost, server busy, rate limit). It stops there on purpose: carrying on from an empty page could replace the stored configuration | **Reload the page.** Nothing was changed. If it keeps happening, wait a minute and try again, and report the reason shown in the message. |

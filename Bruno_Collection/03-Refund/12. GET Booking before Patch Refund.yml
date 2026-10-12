@@ -68,7 +68,8 @@ runtime:
             bru.runner.setNextRequest("15. DEL Refund Offer");
             console.log("[INFO] scenarioAction in data file contains 'DELETE' keyword, executing 15. DEL Refund Offer")    
         } else {
-            console.log("[INFO] scenarioAction in data file doesn't contain 'PATCH' or 'DELETE' keyword, ending test scenario ...");
+            // #663: say what was not tested; an action left empty read as a pass.
+            validationLogger("[INFO] Scenario Action is neither PATCH nor DELETE: the refund offer is neither confirmed nor withdrawn, so only the refund offer request was tested. Set the scenario's Action to PATCH to confirm it.");
             // ── Multi-scenario: loop to next scenario or truly stop ────────────────
             // #385: a skipped expired-flow sub-run must not behead the queue —
             // hand the remaining timers their pass before the next scenario.

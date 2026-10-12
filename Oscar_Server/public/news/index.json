@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-scenario-action",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Exchanges are confirmed again; the Action field explained",
+    "summary": "An exchange scenario with Action PATCH now goes on to confirm the exchange, and Test Config says what each Action does.",
+    "content": "An exchange created with the scenario wizard (Action PATCH) stopped before the exchange was confirmed, while every check passed. It now confirms the exchange; DELETE still withdraws the offer.\n\nTest Config now explains the Action field under it, and a refund scenario without an Action says in its run log that the refund offer was neither confirmed nor withdrawn."
+  },
+  {
     "id": "2026-10-12-partial-refund-zero-price",
     "date": "October 12, 2026",
     "tag": "Fix",
