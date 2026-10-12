@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-12-exchange-new-parts",
+    "date": "October 12, 2026",
+    "tag": "Fix",
+    "title": "Exchanged tickets no longer reported as unknown",
+    "summary": "After an exchange is confirmed, the tickets it issued are checked against the booking instead of failing as unknown.",
+    "content": "Once an exchange was confirmed, every new ticket failed a check because OSCAR did not count the parts the exchange had just created as part of the booking. It now does, and when a provider gives those parts new identifiers on confirmation, they are checked at the next reading of the booking."
+  },
+  {
     "id": "2026-10-12-seat-per-reservation",
     "date": "October 12, 2026",
     "tag": "Fix",

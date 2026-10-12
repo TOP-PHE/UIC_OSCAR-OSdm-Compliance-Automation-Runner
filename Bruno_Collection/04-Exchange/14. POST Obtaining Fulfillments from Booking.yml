@@ -54,7 +54,8 @@ runtime:
             return;
         }
 
-        validateFulfillments(jsonData.fulfillments, 0, ["EXCHANGED", "FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments);
+        // #671: parts the exchange made may be new here; step 15 checks them.
+        validateFulfillments(jsonData.fulfillments, 0, ["EXCHANGED", "FULFILLED", "CONFIRMED"], false, jsonData.fulfillmentDocuments, { deferUnknownParts: true });
 
         console.log("Fulfillment status processing from CONFIRMED to FULFILLED");
         console.log("Waiting 2 secs before executing 15. GET Booking after Fulfillment...");

@@ -1047,7 +1047,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     exchange before its confirmation (the simulator does not); the pairing by
     content would otherwise take the new parts, whose passenger references
     match the offer's. Never send `age: 0` for an unknown age: it reads as a
-    baby.
+    baby. The parts an exchange made go into
+    `admissionReservationAncillaryBookingPartsIds` at 13/15, and step 14 says
+    an unknown part at INFO (`deferUnknownParts`, #671): one provider gives
+    them new ids on confirmation.
   - **Optional is optional** (#650, OTST_V2.0.131): a booked part's
     `afterSaleConditions` (no "s"; not required) absent is a WARNING;
     `Price.scale` absent reads as 2 (`expectScale()` in `testCapture.js`,
