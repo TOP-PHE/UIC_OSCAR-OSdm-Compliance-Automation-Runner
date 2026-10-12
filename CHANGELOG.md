@@ -62,6 +62,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.250] / [collection-OTST_V2.0.137] — 2026-10-12
+
+Issue #663, release 2026.284.
+
+### Fixed
+
+- **An exchange with Action PATCH is confirmed.** An exchange is confirmed by
+  its fulfilment (step 14). Step 13 stopped the scenario when the Action was
+  PATCH ("not implemented"), and Test Config's wizard creates every exchange
+  with Action PATCH: every exchange made with the wizard ended before its
+  confirmation, with every check passed. Seen on a real provider (1,321
+  checks, no confirmation). PATCH now confirms the exchange like no Action
+  does; DELETE still withdraws it. On the simulator, `SIM_EXCHANGE_1ADT_38`
+  with Action PATCH gives 380 checks instead of 318, all passed, as without
+  an Action.
+- **A refund scenario without an Action says what it did not test.** Step 12
+  ended such a scenario with "scenarioAction … doesn't contain 'PATCH' or
+  'DELETE'"; it now says that the refund offer was neither confirmed nor
+  withdrawn, and to set the Action to PATCH to confirm it. Asking for a
+  refund offer alone stays a valid test.
+
+### Changed
+
+- Test Config shows under the Action field what each choice does, for a
+  refund and for an exchange.
+- The Tester User Guide describes the Action field (§4.2), and its
+  troubleshooting row on `confirmedPrice` follows #661.
+
+### Default decisions
+
+- No warning for a refund without an Action: the simulator's
+  `SIM_REFUND_ONLY_OFFER_1ADT_38` does this on purpose, and the field's
+  hint now says what "none" means.
+- The wizard keeps PATCH as its default: with this change it confirms both
+  a refund and an exchange, which is what a new scenario is meant to test.
+
+### Not verified
+
+- Not rerun against the provider. The Test Config hint was not looked at in
+  a browser; `ui-scripts.test.js` compiles the page.
+
+---
+
 ## [server-1.11.249] / [collection-OTST_V2.0.136] — 2026-10-12
 
 Issue #662, release 2026.283. Server code unchanged (tests only).
