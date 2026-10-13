@@ -1097,6 +1097,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     did not, and keeps the asked ones as the refunded set (`widerThanAsked`),
     which the CONFIRMED branch then uses. A full refund asks for all, so it
     is never narrowed.
+  - **An unset variable in a header template goes out as text** (#692,
+    OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
+    provider without a requestor got that text on every request. The
+    collection's before-request removes the header then
+    (`requestHeaders.js`); a request a script sends uses `requestorHeader()`.
+    A new optional header template needs the same treatment.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

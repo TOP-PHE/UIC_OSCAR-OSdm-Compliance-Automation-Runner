@@ -62,6 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.262] / [collection-OTST_V2.0.143] — 2026-10-13
+
+Issue #692, release 2026.296.
+
+### Fixed
+
+- **No requestor configured, no `Requestor` header.** 47 request files carry
+  `Requestor: {{requestor}}`, and the runner writes the `requestor` variable
+  only when the tester's API Config has one. Without it, Bruno sent the
+  template as text: a real provider's run carried `Requestor: {{requestor}}`
+  on all 457 requests. The collection's before-request now removes the
+  header when no requestor is set, and says so once per run
+  (`dropUnsetRequestor()` in `library-bruno/requestHeaders.js`); the
+  Idempotency-Key replays leave it out too, where they used to send it
+  empty.
+
+### Not verified
+
+- Not run against the provider. Checked with the real Bruno CLI on the
+  simulator: without a requestor no request carries the header; with one,
+  every sent request carries its value; 229 checks, none failed, both ways.
+
+---
+
 ## [server-1.11.261] / [collection-OTST_V2.0.142] — 2026-10-13
 
 Issue #691, release 2026.295. Collection unchanged.

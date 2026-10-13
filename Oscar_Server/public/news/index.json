@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-requestor-header",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "No empty Requestor header",
+    "summary": "When your API Config has no requestor, runs no longer send a Requestor header holding the text {{requestor}}.",
+    "content": "The Requestor header is sent only when a requestor is configured in API Config. Before, a run without one sent the placeholder text to the provider on every request. The run log says once that the header is left out."
+  },
+  {
     "id": "2026-10-13-catalogue-sale-flexibility",
     "date": "October 13, 2026",
     "tag": "Fix",

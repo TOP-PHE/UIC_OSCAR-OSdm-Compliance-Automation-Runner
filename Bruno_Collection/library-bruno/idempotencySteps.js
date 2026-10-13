@@ -23,6 +23,7 @@ http://www.apache.org/licenses/LICENSE-2.0
 const { validationLogger } = require('./displays.js');
 const { bruTest: test } = require('./testCapture.js');
 const idem = require('./idempotency.js');
+const { requestorHeader } = require('./requestHeaders.js');
 
 let counter = 0;
 
@@ -68,7 +69,7 @@ async function send(path, body, key) {
           'Content-Type': `application/json;version=${bru.getEnvVar('osdmVersion')}`,
           Accept: 'application/json',
           Authorization: `Bearer ${bru.getEnvVar('access_token')}`,
-          Requestor: bru.getEnvVar('requestor') || '',
+          ...requestorHeader(bru.getEnvVar('requestor')),
           'Idempotency-Key': key,
         },
         data: typeof body === 'string' ? body : JSON.stringify(body ?? {}),

@@ -560,6 +560,14 @@ request:
             console.log('[WARNING] dedicated headers injection failed: ' + (_ehErr && _ehErr.message));
         }
 
+        // #692: no requestor configured → no Requestor header, rather than
+        // the text "{{requestor}}". Said once per run.
+        const { dropUnsetRequestor } = require(bru.getEnvVar("library_base") + "requestHeaders.js");
+        if (dropUnsetRequestor(req, bru.getEnvVar("requestor")) && bru.getEnvVar("__requestorAnnounced") !== "true") {
+            bru.setEnvVar("__requestorAnnounced", "true");
+            console.log("[INFO] No requestor is configured in API Config: the Requestor header is left out of the requests.");
+        }
+
         } // end RUNSCRIPT
     - type: after-response
       code: |-
