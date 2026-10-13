@@ -62,6 +62,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.269] / [collection-OTST_V2.0.151] — 2026-10-13
+
+Issue #709, release 2026.304.
+
+A real provider's runs of the reference scenarios showed three false
+failures on OSCAR's side.
+
+### Added
+
+- **Test Framework → Passenger Types → *The provider lets a booked passenger
+  be updated*** (`passengerUpdate`). Off: scenarios copied from the catalogue
+  get `patchPassengers: false`, so step 03 is not sent. The provider had no
+  `PATCH /bookings/{id}/passengers/{id}` (404, no such route), and every copy
+  stopped there: nothing after step 03 was tested.
+
+### Fixed
+
+- **Transfer and continuous legs** are no longer checked for a train number:
+  "Trip N Leg M is a transfer leg with a start and an end" replaces "has
+  TrainID, Origin & Destination" for them (`otherLegOf()` in `offers.js`).
+- **`PERSON` in `appliedPassengerTypes`** states no age band: a passenger
+  expected as CHILD or ADULT and named only `PERSON` is a WARNING, as when the
+  member is absent, and the prices are still compared (`passengerAges.js`).
+
+### Default decisions (taken without asking)
+
+- `passengerUpdate` absent means "yes", so no existing framework changes.
+- Scenarios already copied keep their setting: switch *Update passengers* off
+  in Test Config for them, or copy them again.
+- A leg of no kind OSDM names is still checked as a timed leg.
+
+### Not verified
+
+- Not run again against the provider.
+- The simulator gives no transfer leg and names each passenger's band, so
+  neither fix shows on it.
+
+Checked: unit tests for each fix, each shown to fail with the fix removed.
+A full replay of the 88 simulator scenarios gives the same checks as before.
+
+---
+
 ## [server-1.11.268] / [collection-OTST_V2.0.150] — 2026-10-13
 
 Issue #705, release 2026.303. Simulator 0.25.0.

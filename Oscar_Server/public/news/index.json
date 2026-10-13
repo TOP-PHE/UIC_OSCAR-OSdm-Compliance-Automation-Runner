@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-provider-run-fixes",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "Passenger update optional, transfer legs, PERSON passenger type",
+    "summary": "Declare in the Test Framework that a provider does not offer the passenger update; transfer legs and the generic PERSON type no longer cause false failures.",
+    "content": "Test Framework → Passenger Types has a new checkbox: when a provider does not let a booked passenger be updated, scenarios copied from the catalogue skip that step instead of stopping there. A change of platform within a station (a transfer leg) is no longer expected to have a train number. A provider that names every passenger PERSON in an offer gets a warning, not a failure, in the age scenarios."
+  },
+  {
     "id": "2026-10-13-age-limits",
     "date": "October 13, 2026",
     "tag": "New",
