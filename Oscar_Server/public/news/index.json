@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-names-no-passenger",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "Accented names and an empty passenger list",
+    "summary": "Two new reference scenarios: accented and long passenger names must come back unchanged, and an offer request without passengers must be refused.",
+    "content": "OTST_SALE_ACCENTED_LONG_NAMES books two passengers with Czech accented and long names and updates them to other accented names; every name read back must be exactly the one sent. NHF_SALE_NO_PASSENGER asks for offers with no passenger at all, which OSDM does not allow, and expects a refusal."
+  },
+  {
     "id": "2026-10-13-after-sale-refusals",
     "date": "October 13, 2026",
     "tag": "New",

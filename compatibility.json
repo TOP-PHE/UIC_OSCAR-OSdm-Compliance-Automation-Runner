@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.300",
+  "current_release": "2026.301",
   "releases": [
+    {
+      "release": "2026.301",
+      "date": "2026-10-13",
+      "server": "1.11.266",
+      "collection": "OTST_V2.0.148",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Accented and long names kept as sent, and an offer request with no passenger refused (#703): two reference scenarios, OTST_SALE_ACCENTED_LONG_NAMES and NHF_SALE_NO_PASSENGER."
+      ]
+    },
     {
       "release": "2026.300",
       "date": "2026-10-13",
