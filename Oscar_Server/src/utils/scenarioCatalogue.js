@@ -59,8 +59,8 @@ const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
 // (OVER_MAX_PASSENGERS) at copy time. #704: one that tests the sales
 // horizon departs on its last day (SALES_HORIZON) or the day after
 // (OVER_SALES_HORIZON), from the Test Framework's salesHorizonDays.
-const PASSENGER_LIMITS = ['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS'];
-const HORIZON_LIMITS = ['SALES_HORIZON', 'OVER_SALES_HORIZON'];
+const PASSENGER_LIMITS = new Set(['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS']);
+const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
 const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
@@ -147,6 +147,12 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  return [...missing, ...limitsMissing(requirements, fw)];
+}
+
+// #699 / #704: the limits a limit entry needs declared, as sentences.
+function limitsMissing(requirements, fw) {
+  const missing = [];
   if (requirements.maxPassengers && !maxPassengersOf(fw)) missing.push('the maximum number of passengers (Passenger Types)');
   if (requirements.salesHorizon && !salesHorizonOf(fw)) missing.push('the sales horizon (Tariff Flexibility)');
   return missing;
@@ -287,7 +293,7 @@ function salesHorizonOf(framework) {
 
 // #699: the needs of a limit entry say the framework's number, not the simulator's.
 function limitNeedsText(needs, limit) {
-  if (HORIZON_LIMITS.includes(limit)) {
+  if (HORIZON_LIMITS.has(limit)) {
     const day = limit === 'OVER_SALES_HORIZON' ? 'the day after the last day' : 'the last day';
     return [`a departure on ${day} of the sales horizon the Test Framework declares`, ...needsText(needs)];
   }
@@ -302,8 +308,8 @@ function catalogueFor(catalogue, simulator, framework) {
   return catalogue.entries.map((entry) => {
     const scenario = datafile.scenarios.find((s) => s.code === entry.code);
     const requirements = requirementsOf(scenario, datafile);
-    if (PASSENGER_LIMITS.includes(entry.limit)) requirements.maxPassengers = true;
-    if (HORIZON_LIMITS.includes(entry.limit)) requirements.salesHorizon = true;
+    if (PASSENGER_LIMITS.has(entry.limit)) requirements.maxPassengers = true;
+    if (HORIZON_LIMITS.has(entry.limit)) requirements.salesHorizon = true;
     return {
       code: entry.code,
       kind: kindOf(entry.code),

@@ -254,7 +254,7 @@ function scenarioTripDate(scenario, baseIso, departureDay, now = new Date()) {
   if (!Number.isInteger(n) || n < -366 || n > 1000) return resolveTripDateForWeekday(baseIso, departureDay);
   // Counted on the UTC calendar, so that a server in any time zone names the
   // same day.
-  const d = new Date(now.getTime());
+  const d = new Date(now);
   d.setUTCDate(d.getUTCDate() + n);
   const out = d.toISOString().slice(0, 10);
   validationLogger('[INFO] 📅 Departure ' + (n >= 0 ? n + ' day(s) from today' : (-n) + ' day(s) ago') + ' (departureDaysFromToday) → ' + out);
@@ -1000,7 +1000,7 @@ function parseScenarioData(jsonData) {
           // "Invalid date format".
           try {
           switch (tripRequirement.tripType) {
-            case "SPECIFICATION":
+            case "SPECIFICATION": {
               validationLogger('[INFO] ⏳ processing a specification');
               const legDefinitions = [];
               // #363: per-trip departure day (Auto when unset).
@@ -1038,8 +1038,9 @@ function parseScenarioData(jsonData) {
 
               osdmTripSpecification(legDefinitions, returnOptsFromScenario(scenario));
               break;
+            }
 
-            case "SEARCH":
+            case "SEARCH": {
               validationLogger('[INFO] ⏳ processing a search');
               // #363: per-trip departure day (Auto when unset).
               const _searchTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
@@ -1083,6 +1084,7 @@ function parseScenarioData(jsonData) {
                 // Trip Search Criteria sub-panel (flat fields).
                 tripRequirement.trip.searchCriteria || null);
               break;
+            }
           }
           } catch (_branchErr) {
             // #330 (v1.11.110): name the context so the user sees which
