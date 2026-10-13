@@ -1025,3 +1025,25 @@ describe('#704 the sales horizon in the Test Framework, and the departure date o
     expect(src).toContain("departureExpectRejection:          ['off', 'on']");
   });
 });
+
+describe('#705 a passenger\'s age on the day of travel, in the passenger editor', () => {
+  const paxAgeValue = loadFunction('js/scenarios.js', 'paxAgeValue');
+
+  test('years 0 to 120, days -366 to 366; empty clears; anything else is refused', () => {
+    expect(paxAgeValue('bornYearsBeforeTravel', '15')).toBe(15);
+    expect(paxAgeValue('bornYearsBeforeTravel', ' 0 ')).toBe(0);
+    expect(paxAgeValue('bornYearsBeforeTravel', '')).toBeNull();
+    expect(paxAgeValue('bornDaysAfter', '-1')).toBe(-1);
+    expect(paxAgeValue('bornDaysAfter', '366')).toBe(366);
+    for (const bad of ['-1', '121', '2.5', 'x', '1e2']) expect(paxAgeValue('bornYearsBeforeTravel', bad)).toBeUndefined();
+    for (const bad of ['367', '-367', '1.5']) expect(paxAgeValue('bornDaysAfter', bad)).toBeUndefined();
+  });
+
+  test('the fields are labelled, and their changes go through their checks', () => {
+    const src = read('js/scenarios.js');
+    expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
+    expect(src).toContain('data-action="set-pax-expected-type"');
+    expect(src).toMatch(/case 'set-pax-age': \{[\s\S]{0,400}const value = paxAgeValue\(field, el\.value\);/);
+    expect(src).toMatch(/case 'set-pax-expected-type': \{\s*const type = PAX_EXPECTED_TYPES\.includes\(el\.value\)/);
+  });
+});

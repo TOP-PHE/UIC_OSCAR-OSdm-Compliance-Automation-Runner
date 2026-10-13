@@ -61,7 +61,9 @@ const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
 // (OVER_SALES_HORIZON), from the Test Framework's salesHorizonDays.
 const PASSENGER_LIMITS = new Set(['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS']);
 const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
-const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS];
+// #705: one whose passengers stand on the edges of the age ranges the Test
+// Framework declares for CHILD and ADULT (AGE_RANGES).
+const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS, 'AGE_RANGES'];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
   'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
@@ -150,11 +152,12 @@ function missingFor(requirements, framework) {
   return [...missing, ...limitsMissing(requirements, fw)];
 }
 
-// #699 / #704: the limits a limit entry needs declared, as sentences.
+// #699 / #704 / #705: the limits a limit entry needs declared, as sentences.
 function limitsMissing(requirements, fw) {
   const missing = [];
   if (requirements.maxPassengers && !maxPassengersOf(fw)) missing.push('the maximum number of passengers (Passenger Types)');
   if (requirements.salesHorizon && !salesHorizonOf(fw)) missing.push('the sales horizon (Tariff Flexibility)');
+  if (requirements.ageRanges && !ageRangesOf(fw)) missing.push('passenger types CHILD and ADULT with their age ranges (Passenger Types)');
   return missing;
 }
 
@@ -284,6 +287,20 @@ function maxPassengersOf(framework) {
   return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null;
 }
 
+/**
+ * #705: the CHILD and ADULT age ranges a framework declares, { child, adult,
+ * ranges, types }, or null when either type is not declared or its range is
+ * not whole years with min <= max.
+ */
+function ageRangesOf(framework) {
+  const fw = isObj(framework?.config) ? framework.config : framework;
+  const types = arr(fw?.passengerTypes);
+  const ranges = isObj(fw?.passengerAgeRanges) ? fw.passengerAgeRanges : {};
+  const valid = (r) => isObj(r) && Number.isInteger(r.min) && Number.isInteger(r.max) && r.min >= 0 && r.min <= r.max && r.max <= 120;
+  if (!types.includes('CHILD') || !types.includes('ADULT') || !valid(ranges.CHILD) || !valid(ranges.ADULT)) return null;
+  return { child: ranges.CHILD, adult: ranges.ADULT, ranges, types };
+}
+
 /** #704: the sales horizon a framework declares, in days, or null. */
 function salesHorizonOf(framework) {
   const fw = isObj(framework?.config) ? framework.config : framework;
@@ -293,6 +310,9 @@ function salesHorizonOf(framework) {
 
 // #699: the needs of a limit entry say the framework's number, not the simulator's.
 function limitNeedsText(needs, limit) {
+  if (limit === 'AGE_RANGES') {
+    return ['a child on the last day of the CHILD age range, a passenger the day it leaves it, and an adult on the first day of the ADULT range, as the Test Framework declares them', ...needsText({ ...needs, passengers: undefined })];
+  }
   if (HORIZON_LIMITS.has(limit)) {
     const day = limit === 'OVER_SALES_HORIZON' ? 'the day after the last day' : 'the last day';
     return [`a departure on ${day} of the sales horizon the Test Framework declares`, ...needsText(needs)];
@@ -310,6 +330,7 @@ function catalogueFor(catalogue, simulator, framework) {
     const requirements = requirementsOf(scenario, datafile);
     if (PASSENGER_LIMITS.has(entry.limit)) requirements.maxPassengers = true;
     if (HORIZON_LIMITS.has(entry.limit)) requirements.salesHorizon = true;
+    if (entry.limit === 'AGE_RANGES') requirements.ageRanges = true;
     return {
       code: entry.code,
       kind: kindOf(entry.code),
@@ -327,5 +348,5 @@ function catalogueFor(catalogue, simulator, framework) {
 
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
-  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, NEEDS_KEYS, LIMITS,
+  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, ageRangesOf, NEEDS_KEYS, LIMITS,
 };

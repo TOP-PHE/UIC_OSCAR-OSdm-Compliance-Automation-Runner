@@ -25,6 +25,8 @@
  * several, else the first train. The person copying can change it.
  */
 
+const { ageRangesOf } = require('./scenarioCatalogue');
+
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const ARMED = new Set(['on', 'true', 'yes', true]);
@@ -158,32 +160,76 @@ function makeDistinct(p, n) {
  * entry gets a passenger list of its own, of the framework's maximum (or one
  * more); without a declared maximum it is left as it is (and cannot be copied).
  * #704: a sales-horizon entry departs on the horizon's last day, or the day after.
+ * #705: the age entry gets a passenger list of its own, on the edges of the
+ * framework's age ranges.
  */
 function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
-  const max = maxPassengersOf(frameworkOf(frameworkConfig));
+  const fw = frameworkOf(frameworkConfig);
   const notes = {};
   const lists = arr(datafile.passengersList).slice();
-  let nextId = Math.max(0, ...lists.filter(isObj).map((l) => Number(l.id) || 0)) + 1;
+  const ids = { next: Math.max(0, ...lists.filter(isObj).map((l) => Number(l.id) || 0)) + 1 };
   const scenarios = arr(datafile.scenarios).map((sc) => {
     if (!isObj(sc) || !byCode.has(sc.code)) return sc;
     const entry = byCode.get(sc.code);
     const { scenario, toComplete, toCheck } = adaptReferenceScenario(sc, entry.needs, frameworkConfig);
-    if (entry.limit === 'SALES_HORIZON' || entry.limit === 'OVER_SALES_HORIZON') {
-      // #704: the last day the provider sells, or the day after.
-      const horizon = salesHorizonOf(frameworkOf(frameworkConfig));
-      if (horizon) scenario.departureDaysFromToday = entry.limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
-    } else if (entry.limit && max) {
-      const count = entry.limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max;
-      const source = lists.find((l) => isObj(l) && l.id === sc.passengersListId);
-      lists.push({ id: nextId, passengers: resizedPassengers(source?.passengers, count) });
-      scenario.passengersListId = nextId;
-      nextId += 1;
-    }
+    const source = lists.find((l) => isObj(l) && l.id === sc.passengersListId);
+    const ownList = (passengers) => {
+      lists.push({ id: ids.next, passengers });
+      scenario.passengersListId = ids.next;
+      ids.next += 1;
+    };
+    applyLimit(entry.limit, scenario, source, fw, { ownList, toCheck });
     notes[sc.code] = { toComplete, toCheck };
     return scenario;
   });
   return { datafile: { ...datafile, scenarios, passengersList: lists }, notes };
+}
+
+// What a limit entry takes from the framework: #699 its passenger count, #704
+// its departure day, #705 its passengers' ages. Nothing when the framework
+// does not declare it (the entry then cannot be copied).
+function applyLimit(limit, scenario, source, fw, { ownList, toCheck }) {
+  if (limit === 'SALES_HORIZON' || limit === 'OVER_SALES_HORIZON') {
+    const horizon = salesHorizonOf(fw);
+    if (horizon) scenario.departureDaysFromToday = limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
+  } else if (limit === 'AGE_RANGES') {
+    const declared = ageRangesOf(fw);
+    if (declared) ownList(agedPassengers(source?.passengers, declared, toCheck));
+  } else if (limit) {
+    const max = maxPassengersOf(fw);
+    if (max) ownList(resizedPassengers(source?.passengers, limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max));
+  }
+}
+
+// #705: the type, other than CHILD, a passenger of this age is priced as: the
+// first of these the framework declares with a range holding the age.
+const NEXT_TYPES = ['YOUTH', 'ADULT', 'SENIOR'];
+function typeAtAge(age, { ranges, types }) {
+  return NEXT_TYPES.find((t) => types.includes(t) && isObj(ranges[t]) && ranges[t].min <= age && age <= ranges[t].max) || null;
+}
+
+/**
+ * #705: the three passengers of the age entry, on the framework's edges: a
+ * child on the last day of the CHILD range, a passenger the day it leaves it
+ * (priced as the declared type that holds that age, unchecked when none
+ * does), an adult on the first day of the ADULT range. Copies; the source
+ * list is not changed.
+ */
+function agedPassengers(source, declared, toCheck) {
+  const leaving = declared.child.max + 1;
+  const next = typeAtAge(leaving, declared);
+  if (!next) toCheck.push(`the type a passenger of ${leaving} is priced as: no declared passenger type's age range holds ${leaving}`);
+  const edges = [
+    { bornYearsBeforeTravel: leaving, bornDaysAfter: 1, expectedPassengerType: 'CHILD' },
+    { bornYearsBeforeTravel: leaving, bornDaysAfter: undefined, expectedPassengerType: next || undefined },
+    { bornYearsBeforeTravel: declared.adult.min, bornDaysAfter: undefined, expectedPassengerType: 'ADULT' },
+  ];
+  return arr(source).slice(0, edges.length).map((p, i) => {
+    const out = { ...structuredClone(p), ...edges[i] };
+    for (const key of ['bornDaysAfter', 'expectedPassengerType']) if (out[key] === undefined) delete out[key];
+    return out;
+  });
 }
 
 // #699: the maximum number of passengers a framework declares, or null.

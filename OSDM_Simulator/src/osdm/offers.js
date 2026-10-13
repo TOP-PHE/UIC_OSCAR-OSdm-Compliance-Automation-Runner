@@ -45,6 +45,7 @@ const { reservationsOfDirection, reservationProductOf } = require('./reservation
 const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
+const ageTariffs = require('./ageTariffs');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -459,14 +460,15 @@ function admissionsOfDirection(trip, ctx) {
   }
   const secondOnly = travelClass === 'FIRST' ? secondClassOnlyLegs(trip, provider) : [];
   if (secondOnly.length > 0) return upgradedAdmissions(trip, ctx, secondOnly);
-  const admissions = passengers.map((passenger) => ({
+  // #705: priced by age on a trip from the age-tariff stop place.
+  const admissions = passengers.map((passenger) => ageTariffs.priced({
     passengers: [passenger],
     amount: singlePrice(trip, passenger, travelClass),
     applied: appliedPassengerTypesOf(passenger, provider),
     offerMode: 'INDIVIDUAL',
     product,
     legIds: legIdsOf(trip.legs),
-  }));
+  }, trip, provider));
   // #697: a trip sold per leg has one admission per passenger and leg.
   return ticketing.modeOf([trip], provider) === 'per-leg' ? ticketing.splitByLeg(trip, admissions) : admissions;
 }

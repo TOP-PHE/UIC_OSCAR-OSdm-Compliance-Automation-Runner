@@ -186,6 +186,8 @@ runtime:
           return;
         }
         require(bru.getEnvVar("library_base") + "offers.js").checkOfferLegClasses(jsonData);
+        // #705: passengers on the edges of the age ranges, priced as expected.
+        require(bru.getEnvVar("library_base") + "passengerAges.js").checkOfferAges();
 
         //swaggerSchemaValidatorContent();
 

@@ -23,6 +23,26 @@
     "perPassengerFrom": "urn:uic:stn:0000096",
     "perLegFrom": "urn:uic:stn:0000095"
   },
+  "ageTariffs": {
+    "from": "urn:uic:stn:0000093",
+    "bands": [
+      {
+        "type": "YOUNG_CHILD",
+        "maxAge": 5,
+        "percent": 0
+      },
+      {
+        "type": "CHILD",
+        "maxAge": 14,
+        "percent": 50
+      },
+      {
+        "type": "YOUTH",
+        "maxAge": 25,
+        "percent": 75
+      }
+    ]
+  },
   "salesHorizon": {
     "from": "urn:uic:stn:0000094",
     "days": 90

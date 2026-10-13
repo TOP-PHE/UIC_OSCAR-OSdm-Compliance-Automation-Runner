@@ -55,6 +55,17 @@
       }
     },
     {
+      "code": "OTST_SALE_AGE_LIMITS",
+      "source": "SIM_SALE_AGE_LIMITS_38",
+      "purpose": "Three passengers on the edges of the age ranges: a child on the last day of its range, a passenger the day it leaves it, an adult on the first day of the adult range; each priced as its type.",
+      "checks": 1,
+      "limit": "AGE_RANGES",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 3
+      }
+    },
+    {
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",

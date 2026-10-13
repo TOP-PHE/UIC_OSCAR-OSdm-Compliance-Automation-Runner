@@ -152,6 +152,43 @@ describe('suggestTrip', () => {
   });
 });
 
+describe('#705 the age entry takes the framework\'s age ranges', () => {
+  const source = catalogueDatafile(catalogue, simulator);
+  const base = { salesFlows: ['SALE'], passengerTypes: ['ADULT', 'CHILD', 'YOUTH'], passengerAgeRanges: { ADULT: { min: 26, max: 99 }, CHILD: { min: 4, max: 15 }, YOUTH: { min: 12, max: 25 } } };
+  const adapted = (config) => adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, config), config);
+  const listOf = (df) => {
+    const sc = df.scenarios.find(s => s.code === 'OTST_SALE_AGE_LIMITS');
+    return df.passengersList.find(l => l.id === sc.passengersListId).passengers;
+  };
+  const edges = (df) => listOf(df).map(p => [p.bornYearsBeforeTravel, p.bornDaysAfter, p.expectedPassengerType]);
+
+  test('the last day of CHILD, the day after it, the first day of ADULT, on a list of its own', () => {
+    const { datafile, notes } = adapted(base);
+    expect(edges(datafile)).toEqual([[16, 1, 'CHILD'], [16, undefined, 'YOUTH'], [26, undefined, 'ADULT']]);
+    expect(notes.OTST_SALE_AGE_LIMITS.toCheck).toEqual([]);
+    const id = datafile.scenarios.find(s => s.code === 'OTST_SALE_AGE_LIMITS').passengersListId;
+    expect(source.passengersList.some(l => l.id === id)).toBe(false);
+    // The source keeps the simulator's ages.
+    expect(edges(source)).toEqual([[15, 1, 'CHILD'], [15, undefined, 'YOUTH'], [26, undefined, 'ADULT']]);
+    expect(listOf(datafile).map(p => p.firstName)).toEqual(listOf(source).map(p => p.firstName));
+  });
+
+  test('the type after CHILD is the declared one holding that age, else ADULT\'s, else unchecked', () => {
+    const noYouth = { ...base, passengerTypes: ['ADULT', 'CHILD'], passengerAgeRanges: { ADULT: { min: 16, max: 99 }, CHILD: { min: 4, max: 15 } } };
+    expect(edges(adapted(noYouth).datafile)[1]).toEqual([16, undefined, 'ADULT']);
+    const gap = { ...base, passengerTypes: ['ADULT', 'CHILD'] };
+    const { datafile, notes } = adapted(gap);
+    expect(edges(datafile)[1]).toEqual([16, undefined, undefined]);
+    expect(notes.OTST_SALE_AGE_LIMITS.toCheck).toEqual([expect.stringContaining('no declared passenger type\'s age range holds 16')]);
+  });
+
+  test('without CHILD and ADULT ranges, left as it is (and cannot be copied)', () => {
+    const { datafile } = adapted({ salesFlows: ['SALE'], passengerTypes: ['ADULT'] });
+    const sc = datafile.scenarios.find(s => s.code === 'OTST_SALE_AGE_LIMITS');
+    expect(sc.passengersListId).toBe(source.scenarios.find(s => s.code === 'OTST_SALE_AGE_LIMITS').passengersListId);
+  });
+});
+
 describe('#704 a sales-horizon entry departs on the framework\'s horizon, or the day after', () => {
   const source = catalogueDatafile(catalogue, simulator);
   const fw = { salesFlows: ['SALE'], passengerTypes: ['ADULT'], maxPassengers: 9 };

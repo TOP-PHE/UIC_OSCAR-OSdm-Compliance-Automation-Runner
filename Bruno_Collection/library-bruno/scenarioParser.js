@@ -13,6 +13,7 @@ require('./validators.js');
 require('./model.js');
 const { getComplianceVersion } = require('./osdmVersion.js');
 const { cardsOfPassenger } = require('./reductionCards.js');
+const { birthDateFor, expectedTypesOf } = require('./passengerAges.js');
 const {
   normaliseReturnModel, normaliseReturnFulfillments, returnUsesInboundDate, combinedReturnDefined,
 } = require('./returnJourney.js');
@@ -101,7 +102,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "__travelDay", "__expectedPassengerTypes", "OfferCollectionRequestWithoutCards", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1005,6 +1006,8 @@ function parseScenarioData(jsonData) {
               const legDefinitions = [];
               // #363: per-trip departure day (Auto when unset).
               const _specTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
+              // #705: the day ages are counted on.
+              bru.setEnvVar("__travelDay", _specTripDate);
 
               tripRequirement.legs.forEach(function (leg, legIndex) {
                 const legPrefix = `leg${legIndex + 1}`;
@@ -1044,6 +1047,8 @@ function parseScenarioData(jsonData) {
               validationLogger('[INFO] ⏳ processing a search');
               // #363: per-trip departure day (Auto when unset).
               const _searchTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
+              // #705: the day ages are counted on.
+              bru.setEnvVar("__travelDay", _searchTripDate);
               const _searchStart = subTripDate(tripRequirement.trip.startDatetime, _searchTripDate, 'startDatetime', 'tripRequirement (SEARCH)');
               // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
               // per OSDM spec — you specify a departure time, not a window. And
@@ -1191,6 +1196,12 @@ function parseScenarioData(jsonData) {
           }
 
           passengersList.passengers.forEach(function (passenger) {
+            // #705: an age on the day of travel gives the date of birth.
+            const _born = birthDateFor(passenger, bru.getEnvVar("__travelDay"));
+            if (_born) {
+              passenger.dateOfBirth = _born;
+              validationLogger('[INFO] 🎂 Passenger ' + passenger.reference + ': born ' + _born + ', ' + passenger.bornYearsBeforeTravel + ' years before the day of travel' + (passenger.bornDaysAfter ? ' plus ' + passenger.bornDaysAfter + ' day(s)' : '') + (passenger.expectedPassengerType ? '; expected to be priced as ' + passenger.expectedPassengerType : ''));
+            }
             // #597: the passenger's reduction cards, sent with the offer and
             // the booking requests.
             const cards = cardsOfPassenger(passenger);
@@ -1277,6 +1288,7 @@ function parseScenarioData(jsonData) {
           });
 
           validationLogger('[DEBUG] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
+          bru.setEnvVar("__expectedPassengerTypes", JSON.stringify(expectedTypesOf(passengersList.passengers)));
           bru.setEnvVar("offerPassengerSpecifications", JSON.stringify(offerPassengerSpecs));
           bru.setEnvVar("bookingPassengerSpecifications", JSON.stringify(passengerSpecs));
           bru.setEnvVar("bookingPassengerReferences", JSON.stringify(passengerReferences));
