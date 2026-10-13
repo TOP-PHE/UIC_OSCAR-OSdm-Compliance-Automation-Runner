@@ -62,6 +62,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.268] / [collection-OTST_V2.0.150] — 2026-10-13
+
+Issue #705, release 2026.303. Simulator 0.25.0.
+
+### Added
+
+- **A passenger can be given an age on the day of travel**:
+  `bornYearsBeforeTravel` (whole years) and `bornDaysAfter` (1 = the birthday
+  is the day after travel) give the date of birth, worked out from the
+  departure day at each run (`library-bruno/passengerAges.js`). Passenger
+  editor → *Age on the day of travel*, *Birthday in (days)*.
+- **`expectedPassengerType`** (passenger editor → *Expected passenger type*):
+  the chosen offer must price the passenger as that type, read from
+  `appliedPassengerTypes` at step 01. Another type fails; none given is a
+  WARNING (OSDM does not require the member). A child or youth that does not
+  pay less than the adult is a WARNING.
+- **`OTST_SALE_AGE_LIMITS`** (catalogue: 49): a child on the last day of the
+  CHILD range, a passenger the day it leaves it, an adult on the first day of
+  the ADULT range. At copy time the ages come from the Test Framework's
+  `passengerAgeRanges` (catalogue `limit` `AGE_RANGES`); the second
+  passenger's type is the declared one (YOUTH, ADULT, SENIOR) whose range
+  holds that age, else it is left unchecked and listed to check. The copy is
+  refused without CHILD and ADULT declared with their ranges.
+
+### Simulator 0.25.0
+
+- Profile key `ageTariffs` `{ from, bands }`: a trip from that stop place
+  prices each passenger by its age on the day of travel and names the type in
+  `appliedPassengerTypes`. `gamma`: station `0000093`; free to 5
+  (`YOUNG_CHILD`), half price to 14 (`CHILD`), three quarters to 25
+  (`YOUTH`), full price from 26 (`ADULT`). Scenario `SIM_SALE_AGE_LIMITS_38`,
+  trip requirement 13, passenger list 22.
+
+### Default decisions (taken without asking)
+
+- The simulator prices by age on one stop place only, so that the other
+  scenarios keep their prices.
+- The types are checked on the chosen offer, not again on the booking: the
+  booking's parts are already paired with the offer's.
+- A 29 February that the year of birth lacks becomes the 28th.
+- A passenger with an age gets no `updateDateOfBirth`: step 03 would change
+  the age the offer was priced at.
+
+### Not verified
+
+- Not run against a real provider.
+- Providers that price by age without `appliedPassengerTypes` give warnings
+  only: the price comparison is then the only signal.
+
+Checked: `SIM_SALE_AGE_LIMITS_38` runs with no failed check (402 checks).
+With gamma's CHILD band changed to 15 or to 13 years, it fails one check
+(the passenger on the edge is priced as the neighbouring type). Unit tests
+for the date of birth (leap day, out of range), the type check, the price
+comparison, the catalogue (missing ranges, ages at copy time, no type holding
+the age) and the editor fields. A full replay of the 88 simulator scenarios:
+the 87 earlier ones are unchanged, and `OSCAR - Checks by scenario.md` is
+regenerated from it.
+
+---
+
 ## [server-1.11.267] / [collection-OTST_V2.0.149] — 2026-10-13
 
 Issue #704, release 2026.302. Simulator 0.24.0.

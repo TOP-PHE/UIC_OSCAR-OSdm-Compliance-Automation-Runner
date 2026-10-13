@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.302",
+  "current_release": "2026.303",
   "releases": [
+    {
+      "release": "2026.303",
+      "date": "2026-10-13",
+      "server": "1.11.268",
+      "collection": "OTST_V2.0.150",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Ages on the edges of the age ranges: a passenger may be given an age on the day of travel (bornYearsBeforeTravel, bornDaysAfter) and the type it must be priced as (expectedPassengerType, checked in appliedPassengerTypes); reference scenario OTST_SALE_AGE_LIMITS takes the Test Framework's CHILD and ADULT ranges; simulator 0.25.0 (ageTariffs on gamma)."
+      ]
+    },
     {
       "release": "2026.302",
       "date": "2026-10-13",
