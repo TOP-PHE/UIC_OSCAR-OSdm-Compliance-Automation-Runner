@@ -39,7 +39,8 @@ module.exports = {
   osdmFulfillmentOptions,
   buildReturnSearchParameters,
   featureNotDeclaredWarning,
-  applyExternalRefFormat
+  applyExternalRefFormat,
+  scenarioTripDate
 };
 
 // Which passengers step 03 updates: "MAIN" (the first only) when the scenario
@@ -242,6 +243,22 @@ function subTripDate(value, replacement, fieldLabel, ctx) {
     );
   }
   return value.replace("%TRIP_DATE%", replacement);
+}
+
+// #704: a scenario may set its own departure date, `departureDaysFromToday`
+// days from today (negative = in the past), for the sales-horizon and
+// past-departure tests. It replaces the run's lead time and the weekday
+// adjustment: the exact day is what is tested. Otherwise, as before.
+function scenarioTripDate(scenario, baseIso, departureDay, now = new Date()) {
+  const n = scenario ? scenario.departureDaysFromToday : undefined;
+  if (!Number.isInteger(n) || n < -366 || n > 1000) return resolveTripDateForWeekday(baseIso, departureDay);
+  // Counted on the UTC calendar, so that a server in any time zone names the
+  // same day.
+  const d = new Date(now.getTime());
+  d.setUTCDate(d.getUTCDate() + n);
+  const out = d.toISOString().slice(0, 10);
+  validationLogger('[INFO] 📅 Departure ' + (n >= 0 ? n + ' day(s) from today' : (-n) + ' day(s) ago') + ' (departureDaysFromToday) → ' + out);
+  return out;
 }
 
 // #363: optional per-trip departure DAY (weekend-only trains). Keeps the
@@ -751,6 +768,10 @@ function parseScenarioData(jsonData) {
       bru.setEnvVar("passengerLimitExpectRejection", _flagOn(scenario.passengerLimitExpectRejection) ? "true" : "false");
       // #703: negative probe — an offer request with no passenger.
       bru.setEnvVar("emptyPassengersExpectRejection", _flagOn(scenario.emptyPassengersExpectRejection) ? "true" : "false");
+      // #704: a departure date of the scenario's own, and the probe that
+      // expects it refused (past, or beyond the sales horizon).
+      bru.setEnvVar("departureDaysFromToday", Number.isInteger(scenario.departureDaysFromToday) ? String(scenario.departureDaysFromToday) : null);
+      bru.setEnvVar("departureExpectRejection", _flagOn(scenario.departureExpectRejection) ? "true" : "false");
       // #700: after-sale requests that must be refused.
       bru.setEnvVar("refundAgainProbe", _flagOn(scenario.refundAgainProbe) ? "true" : "false");
       bru.setEnvVar("exchangeRefundedProbe", _flagOn(scenario.exchangeRefundedProbe) ? "true" : "false");
@@ -983,7 +1004,7 @@ function parseScenarioData(jsonData) {
               validationLogger('[INFO] ⏳ processing a specification');
               const legDefinitions = [];
               // #363: per-trip departure day (Auto when unset).
-              const _specTripDate = resolveTripDateForWeekday(nextWeekdayString, tripRequirement.departureDay);
+              const _specTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
 
               tripRequirement.legs.forEach(function (leg, legIndex) {
                 const legPrefix = `leg${legIndex + 1}`;
@@ -1021,7 +1042,7 @@ function parseScenarioData(jsonData) {
             case "SEARCH":
               validationLogger('[INFO] ⏳ processing a search');
               // #363: per-trip departure day (Auto when unset).
-              const _searchTripDate = resolveTripDateForWeekday(nextWeekdayString, tripRequirement.departureDay);
+              const _searchTripDate = scenarioTripDate(scenario, nextWeekdayString, tripRequirement.departureDay);
               const _searchStart = subTripDate(tripRequirement.trip.startDatetime, _searchTripDate, 'startDatetime', 'tripRequirement (SEARCH)');
               // #333 (v1.11.112): endDatetime is OPTIONAL on a TripSearchCriteria
               // per OSDM spec — you specify a departure time, not a window. And

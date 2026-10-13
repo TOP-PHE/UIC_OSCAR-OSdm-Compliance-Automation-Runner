@@ -92,6 +92,7 @@ function checkProvider(key, raw) {
     ...checkVariants(raw.variants, bad),
     ...checkPersonChecks(raw.personChecks, bad),
     ...checkTicketing(raw.ticketing, bad),
+    ...checkSalesHorizon(raw.salesHorizon, bad),
   };
 }
 
@@ -200,6 +201,16 @@ function checkPersonChecks(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || !isText(value.requestedInformationFrom, 1, 120)) throw bad('personChecks');
   return { personChecks: { requestedInformationFrom: value.requestedInformationFrom } };
+}
+
+// #704: how many days ahead the provider sells, for trips from one stop
+// place (`from`). Absent: no limit.
+function checkSalesHorizon(value, bad) {
+  if (value === undefined) return {};
+  const ok = value && typeof value === 'object' && isText(value.from, 1, 120)
+    && Number.isInteger(value.days) && value.days >= 1 && value.days <= 1000;
+  if (!ok) throw bad('salesHorizon');
+  return { salesHorizon: { from: value.from, days: value.days } };
 }
 
 // #697: the stop places whose trips are sold with one ticket per passenger

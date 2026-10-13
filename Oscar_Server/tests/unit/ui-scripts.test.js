@@ -1002,3 +1002,26 @@ describe('#699 the maximum number of passengers in the Test Framework', () => {
     expect(src).toMatch(/case 'fw-max-pax': \{\s*\/\/[^\n]*\n\s*const value = fwMaxPassengers\(el\.value\);/);
   });
 });
+
+describe('#704 the sales horizon in the Test Framework, and the departure date of a scenario', () => {
+  const fwSalesHorizonDays = loadFunction('js/scenarios.js', 'fwSalesHorizonDays');
+
+  test('a whole number of days from 1 to 1000; empty is "not declared"; anything else is refused', () => {
+    expect(fwSalesHorizonDays('90')).toBe(90);
+    expect(fwSalesHorizonDays(' 1 ')).toBe(1);
+    expect(fwSalesHorizonDays('1000')).toBe(1000);
+    expect(fwSalesHorizonDays('')).toBeNull();
+    expect(fwSalesHorizonDays(undefined)).toBeNull();
+    for (const bad of ['0', '1001', '-3', '2.5', 'ten', '1e2', '12345']) expect(fwSalesHorizonDays(bad)).toBeUndefined();
+  });
+
+  test('the fields are labelled or hinted, and their changes go through their checks', () => {
+    const src = read('js/scenarios.js');
+    expect(src).toContain('<label class="fw-subsection-label" for="fw-sales-horizon"');
+    expect(src).toContain('id="fw-sales-horizon"');
+    expect(src).toMatch(/case 'fw-sales-horizon': \{\s*\/\/[^\n]*\n\s*const value = fwSalesHorizonDays\(el\.value\);/);
+    expect(src).toContain('data-action="set-scenario-departure-days"');
+    expect(src).toMatch(/case 'set-scenario-departure-days': \{[\s\S]{0,400}n >= -366 && n <= 1000/);
+    expect(src).toContain("departureExpectRejection:          ['off', 'on']");
+  });
+});

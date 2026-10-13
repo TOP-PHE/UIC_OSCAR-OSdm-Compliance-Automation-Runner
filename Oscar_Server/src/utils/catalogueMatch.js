@@ -157,6 +157,7 @@ function makeDistinct(p, n) {
  * copy from, and per code what is left to complete or check. #699: a limit
  * entry gets a passenger list of its own, of the framework's maximum (or one
  * more); without a declared maximum it is left as it is (and cannot be copied).
+ * #704: a sales-horizon entry departs on the horizon's last day, or the day after.
  */
 function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
@@ -168,7 +169,11 @@ function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
     if (!isObj(sc) || !byCode.has(sc.code)) return sc;
     const entry = byCode.get(sc.code);
     const { scenario, toComplete, toCheck } = adaptReferenceScenario(sc, entry.needs, frameworkConfig);
-    if (entry.limit && max) {
+    if (entry.limit === 'SALES_HORIZON' || entry.limit === 'OVER_SALES_HORIZON') {
+      // #704: the last day the provider sells, or the day after.
+      const horizon = salesHorizonOf(frameworkOf(frameworkConfig));
+      if (horizon) scenario.departureDaysFromToday = entry.limit === 'OVER_SALES_HORIZON' ? horizon + 1 : horizon;
+    } else if (entry.limit && max) {
       const count = entry.limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max;
       const source = lists.find((l) => isObj(l) && l.id === sc.passengersListId);
       lists.push({ id: nextId, passengers: resizedPassengers(source?.passengers, count) });
@@ -185,6 +190,12 @@ function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
 function maxPassengersOf(framework) {
   const n = framework?.maxPassengers;
   return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null;
+}
+
+// #704: the sales horizon a framework declares, in days, or null.
+function salesHorizonOf(framework) {
+  const n = framework?.salesHorizonDays;
+  return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : null;
 }
 
 /**

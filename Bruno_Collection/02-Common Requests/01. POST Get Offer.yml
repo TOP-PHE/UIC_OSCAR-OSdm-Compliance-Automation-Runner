@@ -90,6 +90,14 @@ runtime:
           return;
         }
 
+        // #704: a departure in the past or beyond the sales horizon must not
+        // be sold; the scenario ends here either way.
+        if (require(bru.getEnvVar("library_base") + "departureLimit.js").checkDepartureRefused(res.getStatus(), _tripIdsBody)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (departure date probe)");
+          return;
+        }
+
         // #699: one passenger over the provider's maximum. A refusal here, or
         // no offer, ends the scenario; offers given go on to the booking,
         // where the refusal is then expected.

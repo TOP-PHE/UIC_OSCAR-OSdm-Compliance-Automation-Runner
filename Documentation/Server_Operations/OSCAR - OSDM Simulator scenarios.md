@@ -129,6 +129,20 @@ Negative probes sent from the step's own script (the flow of the scenario does n
 | `SIM_SALE_ACCENTED_NAMES_38` | Two adults with accented (Czech) and long names (passenger list 21), updated after booking to other accented names; 03 and 04 compare every name read back with the one sent. | The names exactly as sent. | No failed check. |
 | `SIM_NHF_NO_PASSENGER_38` | Negative test: POST /offers with an empty `anonymousPassengerSpecifications` list (`emptyPassengersExpectRejection`). | 400 `VALIDATION_ERROR`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
 
+### Departure dates: the sales horizon and the past (#704)
+
+`gamma` sells trips from station `0000094` up to 90 days ahead
+(`salesHorizon` in its profile), never in the past. Only that station, so that
+the other scenarios and the simulator's tests, which use fixed dates, keep
+their answers whatever the day they run. The scenarios set their own date
+with `departureDaysFromToday`.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_AT_SALES_HORIZON_38` | A sale of a departure 90 days from today, the last day of the horizon. | A normal sale. | No failed check. |
+| `SIM_NHF_BEYOND_SALES_HORIZON_38` | Negative test: a departure 91 days from today (`departureExpectRejection`). | 200 with no offer and a Problem `SALES_HORIZON_EXCEEDED`. | No failed check. |
+| `SIM_NHF_DEPARTURE_IN_PAST_38` | Negative test: a departure yesterday (`departureExpectRejection`). | 400 `DEPARTURE_IN_PAST`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an
