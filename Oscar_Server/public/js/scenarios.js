@@ -2815,6 +2815,22 @@ function buildPassengersSection(idx, sc, paxGroup) {
             <input class="param-input" type="text" value="${esc(p.phoneNumber||'')}"
               data-action="set-pax-text" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="phoneNumber" ${readOnly?'disabled':''}>
           </label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Age on the day of travel (years)
+            <input class="param-input" type="number" min="0" max="120" value="${esc(p.bornYearsBeforeTravel ?? '')}" placeholder="empty = date of birth above"
+              data-action="set-pax-age" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="bornYearsBeforeTravel" ${readOnly?'disabled':''}>
+            <span style="font-size:10px;color:#90a4ae;font-weight:400">#705: the date of birth is worked out from the departure day at each run, and replaces the one above.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Birthday in (days)
+            <input class="param-input" type="number" min="-366" max="366" value="${esc(p.bornDaysAfter ?? '')}" placeholder="empty = on the day of travel"
+              data-action="set-pax-age" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" data-field="bornDaysAfter" ${readOnly?'disabled':''}>
+            <span style="font-size:10px;color:#90a4ae;font-weight:400">1 = the birthday is the day after travel: one year younger on the day.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Expected passenger type
+            <select class="param-input param-select" data-action="set-pax-expected-type" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" ${readOnly?'disabled':''}>
+              ${['', ...PAX_EXPECTED_TYPES].map(t => `<option value="${esc(t)}" ${(p.expectedPassengerType || '') === t ? 'selected' : ''}>${t ? esc(t) : '— not checked —'}</option>`).join('')}
+            </select>
+            <span style="font-size:10px;color:#90a4ae;font-weight:400">The chosen offer must price the passenger as this type (appliedPassengerTypes).</span>
+          </label>
           <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#546e7a;font-weight:600">Family group
             <select class="param-input param-select" data-action="set-pax-family" data-pidx="${esc(pIdx)}" data-pi="${esc(pi)}" ${readOnly?'disabled':''}>
               <option value="" ${famN==null?'selected':''}>— no family —</option>
@@ -3234,6 +3250,39 @@ function setTripFieldByPath(tIdx, path, value) {
   const lastKey = Number.isNaN(Number(parts[parts.length-1])) ? parts[parts.length-1] : Number.parseInt(parts[parts.length-1]);
   obj[lastKey] = value;
   markDirty();
+}
+
+// #705: the passenger types an offer may be expected to apply.
+const PAX_EXPECTED_TYPES = new Set(['YOUNG_CHILD', 'CHILD', 'YOUTH', 'ADULT', 'SENIOR', 'FAMILY_CHILD', 'PRM', 'PRM_CHILD', 'ACCOMP_PRM']);
+
+// #705: what an age field holds: a whole number in its range, null when
+// emptied, undefined when it is not valid.
+function paxAgeValue(field, raw) {
+  const text = String(raw ?? '').trim();
+  if (text === '') return null;
+  if (!/^-?\d{1,3}$/.test(text)) return undefined;
+  const n = Number.parseInt(text, 10);
+  const [min, max] = field === 'bornDaysAfter' ? [-366, 366] : [0, 120];
+  return n >= min && n <= max ? n : undefined;
+}
+
+// #705: the passenger editor's age fields, outside the change switch. True
+// when the action was one of them.
+function changePaxAge(action, el) {
+  const pIdx = Number.parseInt(el.dataset.pidx);
+  const pi = Number.parseInt(el.dataset.pi);
+  if (action === 'set-pax-expected-type') {
+    setPaxField(pIdx, pi, 'expectedPassengerType', PAX_EXPECTED_TYPES.has(el.value) ? el.value : null);
+    return true;
+  }
+  if (action !== 'set-pax-age') return false;
+  // An age on the day of travel; empty clears it, anything not valid puts
+  // the stored value back.
+  const field = el.dataset.field === 'bornDaysAfter' ? 'bornDaysAfter' : 'bornYearsBeforeTravel';
+  const value = paxAgeValue(field, el.value);
+  if (value === undefined) el.value = state.passengersList[pIdx]?.passengers?.[pi]?.[field] ?? '';
+  else setPaxField(pIdx, pi, field, value);
+  return true;
 }
 
 function setPaxField(pIdx, paxIdx, field, value) {
@@ -7151,6 +7200,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
+  if (changePaxAge(action, el)) return;
 
   switch (action) {
     case 'file-upload':

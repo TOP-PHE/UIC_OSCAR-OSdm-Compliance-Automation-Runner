@@ -249,6 +249,22 @@ describe('#704 the departure-date entries', () => {
   });
 });
 
+describe('#705 the age entry', () => {
+  const fw = { salesFlows: ['SALE'], passengerTypes: ['ADULT', 'CHILD'], passengerAgeRanges: { ADULT: { min: 26, max: 99 }, CHILD: { min: 4, max: 15 } } };
+  const ageEntry = (config) => catalogueFor(catalogue, simulator, config).find(x => x.code === 'OTST_SALE_AGE_LIMITS');
+
+  test('needs CHILD and ADULT declared with whole-year ranges', () => {
+    expect(catalogue.entries.find(e => e.code === 'OTST_SALE_AGE_LIMITS').limit).toBe('AGE_RANGES');
+    expect(ageEntry(fw).missing).toEqual([]);
+    const missing = ['passenger types CHILD and ADULT with their age ranges (Passenger Types)'];
+    expect(ageEntry({ ...fw, passengerTypes: ['ADULT'] }).missing).toEqual(missing);
+    expect(ageEntry({ ...fw, passengerAgeRanges: { ADULT: fw.passengerAgeRanges.ADULT } }).missing).toEqual(missing);
+    expect(ageEntry({ ...fw, passengerAgeRanges: { ...fw.passengerAgeRanges, CHILD: { min: 9, max: 4 } } }).missing).toEqual(missing);
+    expect(ageEntry({ config: fw }).missing).toEqual([]);
+    expect(ageEntry(fw).needsText[0]).toMatch(/^a child on the last day of the CHILD age range/);
+  });
+});
+
 describe('#700 the after-sale refusals', () => {
   test('three negative entries; the exchange of a refunded ticket needs the exchange declared', () => {
     const listed = catalogueFor(catalogue, simulator, { salesFlows: ['SALE', 'REFUND_FULL'], passengerTypes: ['ADULT'] });

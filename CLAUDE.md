@@ -1194,6 +1194,18 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   covers that one stop place on purpose: its tests use fixed dates, and a
   horizon or past check everywhere would make them fail once those dates
   pass. Do the same for any new date rule there.
+- **A passenger can be given an age on the day of travel** (#705, 1.11.268 /
+  OTST_V2.0.150). `bornYearsBeforeTravel` (+ `bornDaysAfter`) becomes the date
+  of birth in the parser (`passengerAges.js` `birthDateFor()`), counted from
+  `__travelDay`, which both trip branches set. `expectedPassengerType` is
+  checked on the chosen offer's `appliedPassengerTypes` at 01: none given is a
+  WARNING (OSDM does not require it), another type a FAIL; a younger
+  passenger not cheaper than the adult is a WARNING. The catalogue's
+  `AGE_RANGES` entry takes CHILD and ADULT from `passengerAgeRanges` at copy
+  time (`agedPassengers()` in `catalogueMatch.js`). Do not give such a
+  passenger an `updateDateOfBirth`: step 03 would change the age it was
+  priced at. The simulator's age bands (`ageTariffs`) cover station `0000093`
+  only, like its sales horizon.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

@@ -143,6 +143,19 @@ with `departureDaysFromToday`.
 | `SIM_NHF_BEYOND_SALES_HORIZON_38` | Negative test: a departure 91 days from today (`departureExpectRejection`). | 200 with no offer and a Problem `SALES_HORIZON_EXCEEDED`. | No failed check. |
 | `SIM_NHF_DEPARTURE_IN_PAST_38` | Negative test: a departure yesterday (`departureExpectRejection`). | 400 `DEPARTURE_IN_PAST`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
 
+### Prices by age (#705)
+
+`gamma` prices trips from station `0000093` by each passenger's age on the
+day of travel (`ageTariffs` in its profile): free up to 5 (`YOUNG_CHILD`),
+half price up to 14 (`CHILD`), three quarters up to 25 (`YOUTH`), the full
+price from 26 (`ADULT`). Each admission names the type in
+`appliedPassengerTypes`. Only that station, so that the other scenarios keep
+their prices.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_AGE_LIMITS_38` | Three passengers whose dates of birth are worked out from the day of travel (passenger list 22): 14 with the birthday tomorrow (`CHILD`), 15 today (`YOUTH`), 26 today (`ADULT`). The chosen offer must apply each expected type. | Each admission priced and typed by age. | No failed check. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an

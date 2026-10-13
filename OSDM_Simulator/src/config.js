@@ -93,6 +93,7 @@ function checkProvider(key, raw) {
     ...checkPersonChecks(raw.personChecks, bad),
     ...checkTicketing(raw.ticketing, bad),
     ...checkSalesHorizon(raw.salesHorizon, bad),
+    ...checkAgeTariffs(raw.ageTariffs, bad),
   };
 }
 
@@ -201,6 +202,27 @@ function checkPersonChecks(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || !isText(value.requestedInformationFrom, 1, 120)) throw bad('personChecks');
   return { personChecks: { requestedInformationFrom: value.requestedInformationFrom } };
+}
+
+// #705: prices by age for trips from one stop place (`from`): `bands` in
+// increasing `maxAge`, each a passenger type and a share of the full price
+// (0 to 100 percent). Older passengers are adults at the full price. Absent:
+// no age tariff.
+const PASSENGER_TYPE = /^[A-Z][A-Z_]{1,29}$/;
+function checkAgeTariffs(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || !isText(value.from, 1, 120) || !Array.isArray(value.bands)) throw bad('ageTariffs');
+  if (value.bands.length === 0 || value.bands.length > 10) throw bad('ageTariffs');
+  let previous = -1;
+  const bands = value.bands.map((b) => {
+    const ok = b && typeof b === 'object' && typeof b.type === 'string' && PASSENGER_TYPE.test(b.type)
+      && Number.isInteger(b.maxAge) && b.maxAge > previous && b.maxAge <= 120
+      && Number.isInteger(b.percent) && b.percent >= 0 && b.percent <= 100;
+    if (!ok) throw bad('ageTariffs');
+    previous = b.maxAge;
+    return { type: b.type, maxAge: b.maxAge, percent: b.percent };
+  });
+  return { ageTariffs: { from: value.from, bands } };
 }
 
 // #704: how many days ahead the provider sells, for trips from one stop

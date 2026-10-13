@@ -694,6 +694,19 @@
                 "updateGender": {
                   "type": "string"
                 },
+                "bornYearsBeforeTravel": {
+                  "description": "The passenger's age on the day of travel, in whole years (#705): the date of birth is worked out from the departure day at each run and replaces dateOfBirth. 0 to 120.",
+                  "type": ["integer", "null"]
+                },
+                "bornDaysAfter": {
+                  "description": "Days added to the date of birth that bornYearsBeforeTravel gives (#705): 1 = the birthday is tomorrow, so the passenger is still one year younger on the day of travel. -366 to 366.",
+                  "type": ["integer", "null"]
+                },
+                "expectedPassengerType": {
+                  "description": "The passenger type the chosen offer must price the passenger as (#705), checked in appliedPassengerTypes: none given is a warning, another type a failure.",
+                  "type": ["string", "null"],
+                  "enum": ["YOUNG_CHILD", "CHILD", "YOUTH", "ADULT", "SENIOR", "FAMILY_CHILD", "PRM", "PRM_CHILD", "ACCOMP_PRM", "", null]
+                },
                 "reductionCards": {
                   "description": "Reduction cards of the passenger (#597): codes from the provider's list (GET /reduction-cards), sent as CardReferences { type: REDUCTION_CARD, code, issuer } in the offer and booking requests. An entry may also be an object { code, issuer, number }.",
                   "type": "array",

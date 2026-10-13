@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38", "SIM_SALE_MAX_PASSENGERS_38", "SIM_NHF_TOO_MANY_PASSENGERS_38", "SIM_REFUND_PAX_THIRD_19PAX_38", "SIM_NHF_REFUND_AGAIN_38", "SIM_NHF_EXCHANGE_REFUNDED_38", "SIM_NHF_CONFIRM_AGAIN_38", "SIM_SALE_ACCENTED_NAMES_38", "SIM_NHF_NO_PASSENGER_38", "SIM_SALE_AT_SALES_HORIZON_38", "SIM_NHF_BEYOND_SALES_HORIZON_38", "SIM_NHF_DEPARTURE_IN_PAST_38", "SIM_SALE_AGE_LIMITS_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -3079,6 +3079,39 @@
       },
       "departureDaysFromToday": -1,
       "departureExpectRejection": "on"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_SALE_AGE_LIMITS_38",
+      "description": "Simulated provider: sale for three passengers on the edges of gamma's age bands (trip from station 0000093, #705): a child on the last day it is 14, a passenger who turned 15 today (youth), an adult who turned 26 today; each must be priced as its expected type. OSDM 3.8.0, for gamma.",
+      "scenarioType": "SALE",
+      "scenarioAction": null,
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 13,
+      "passengersListId": 22,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      }
     }
   ],
   "offerSearchCriteriaList": [
@@ -3344,6 +3377,22 @@
         "productCategoryName": "",
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000094 (on gamma, sold up to 90 days ahead and never in the past) to station 0000002"
+      }
+    },
+    {
+      "id": 13,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000093",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000093 (on gamma, priced by age: free to 5, half price to 14, three quarters to 25) to station 0000002"
       }
     }
   ],
@@ -4755,6 +4804,54 @@
           "updateDateOfBirth": "1979-11-04",
           "updatePhoneNumber": "+420601000004",
           "updateEmail": "dobromil.cermak@example.org",
+          "type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "passengers": [
+        {
+          "reference": "00001",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 15,
+          "bornDaysAfter": 1,
+          "expectedPassengerType": "CHILD",
+          "firstName": "Ema",
+          "lastName": "Child",
+          "phoneNumber": "+420601000011",
+          "email": "ema.child@example.org",
+          "gender": "X",
+          "updateFirstName": "Emaa",
+          "updatePhoneNumber": "+420601000012",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00002",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 15,
+          "expectedPassengerType": "YOUTH",
+          "firstName": "Adam",
+          "lastName": "Youth",
+          "phoneNumber": "+420601000013",
+          "email": "adam.youth@example.org",
+          "gender": "X",
+          "updateFirstName": "Adama",
+          "updatePhoneNumber": "+420601000014",
+          "type": "PERSON"
+        },
+        {
+          "reference": "00003",
+          "dateOfBirth": "2000-01-01",
+          "bornYearsBeforeTravel": 26,
+          "expectedPassengerType": "ADULT",
+          "firstName": "Jana",
+          "lastName": "Adult",
+          "phoneNumber": "+420601000015",
+          "email": "jana.adult@example.org",
+          "gender": "X",
+          "updateFirstName": "Janaa",
+          "updatePhoneNumber": "+420601000016",
           "type": "PERSON"
         }
       ]

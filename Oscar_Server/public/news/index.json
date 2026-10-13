@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-age-limits",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "Passengers on the edges of the age ranges",
+    "summary": "A passenger can be given an age on the day of travel and the type it must be priced as; a new reference scenario tests the edges of the age ranges.",
+    "content": "In the passenger editor, an age on the day of travel replaces the date of birth, which is worked out at each run, and an expected passenger type is checked in the chosen offer. OTST_SALE_AGE_LIMITS books a child on the last day of the CHILD range, a passenger the day it leaves it and an adult on the first day of the ADULT range, with the ages taken from your Test Framework when it is copied."
+  },
+  {
     "id": "2026-10-13-sales-horizon",
     "date": "October 13, 2026",
     "tag": "New",
