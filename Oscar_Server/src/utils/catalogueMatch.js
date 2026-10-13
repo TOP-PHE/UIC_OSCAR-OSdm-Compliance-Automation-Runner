@@ -14,8 +14,8 @@
  * A reference scenario comes from the simulator's data file. Before it is
  * copied, adaptReferenceScenario() replaces what only the simulator's
  * provider gives with what the company's Test Framework declares (an overrule
- * code), removes what cannot be guessed (a product code), makes sure the
- * tariff fits the after-sale, and says what is left: `toComplete` (the
+ * code), removes what cannot be guessed (a product code), takes a tariff
+ * the framework declares that fits the after-sale, and says what is left: `toComplete` (the
  * scenario cannot run as it is) and `toCheck` (it can, if the provider's data
  * has what it needs and OSCAR cannot see it in the Test Data: a mandatory
  * reservation, a first class, passenger details asked for).
@@ -55,6 +55,21 @@ function overruleFor(scenario, framework) {
   return declared.includes(scenario.overruleCode) ? scenario.overruleCode : (declared[0] || null);
 }
 
+// Most flexible first: the order in which an after-sale tariff is chosen.
+const FLEXIBILITIES = ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'];
+
+// The flexibility of an after-sale scenario (#687). The scenario's own when
+// the framework declares it, unless it is the non-flexible one; else the most
+// flexible the framework declares. A provider may sell only non-flexible
+// tariffs and still refund them: then NON_FLEXIBLE, never a flexibility it
+// does not sell. With nothing declared, FULL_FLEXIBLE, as before.
+function afterSaleFlexibility(own, framework) {
+  const declared = arr(framework.offerCriteria?.flexibilities).filter((f) => typeof f === 'string' && f !== '');
+  if (!declared.length) return own && own !== 'NON_FLEXIBLE' ? own : 'FULL_FLEXIBLE';
+  if (own && own !== 'NON_FLEXIBLE' && declared.includes(own)) return own;
+  return FLEXIBILITIES.find((f) => declared.includes(f)) || declared[0];
+}
+
 // What a reference scenario needs that OSCAR cannot see in the Test Data.
 function needsToCheck(needs) {
   const out = [];
@@ -86,12 +101,16 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
     delete out.expectedProduct;
     toComplete.push('the provider\'s product (expectedProduct)');
   }
-  // An after-sale needs a tariff that allows it; the non-flexible one never does.
-  if ((n.tariff === 'REFUNDABLE' || n.tariff === 'EXCHANGEABLE')
-    && (!out.desiredFlexibility || out.desiredFlexibility === 'NON_FLEXIBLE')) {
-    out.desiredFlexibility = 'FULL_FLEXIBLE';
+  const toCheck = needsToCheck(n);
+  // An after-sale needs a tariff that allows it, among those the provider
+  // sells: the Test Framework's flexibilities (#687).
+  if (n.tariff === 'REFUNDABLE' || n.tariff === 'EXCHANGEABLE') {
+    out.desiredFlexibility = afterSaleFlexibility(out.desiredFlexibility, framework);
+    if (out.desiredFlexibility === 'NON_FLEXIBLE') {
+      toCheck.push(`the provider's non-flexible tariff must allow the ${n.tariff === 'REFUNDABLE' ? 'refund' : 'exchange'}`);
+    }
   }
-  return { scenario: out, toComplete, toCheck: needsToCheck(n) };
+  return { scenario: out, toComplete, toCheck };
 }
 
 /**

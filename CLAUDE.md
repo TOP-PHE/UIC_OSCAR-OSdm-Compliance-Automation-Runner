@@ -1166,7 +1166,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   runs in `copyContext()` on the catalogue only, so preview and copy see the
   same adapted scenarios: overrule code from `iropsCodes.refund` (a listed
   code it does *not* declare for the refusal probe), product removed,
-  after-sale tariff never NON_FLEXIBLE. `suggestTrip()` preselects a journey
+  after-sale tariff from `offerCriteria.flexibilities` (#687,
+  `afterSaleFlexibility()`: own if declared and not NON_FLEXIBLE, else the
+  most flexible declared, FULL_FLEXIBLE if none). A provider may sell only
+  non-flexible tariffs and refund them; never ask it for one it does not sell. `suggestTrip()` preselects a journey
   of as many legs, else the first train; Test Data carries no reservation or
   class, so those needs come back as `toCheck`, never guessed.
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser

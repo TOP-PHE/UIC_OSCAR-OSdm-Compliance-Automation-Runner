@@ -8,6 +8,14 @@
     "content": "A partial refund asks the provider to refund some fulfillments of a booking. If the refund offer names others as well, the run now reports one failure at the refund offer step, naming them, and then checks the booking for the fulfillments you asked for: refunded, and every other one unchanged. Before, every fulfillment of the offer was expected refunded, which gave many failures without saying which passenger had been refunded by mistake."
   },
   {
+    "id": "2026-10-13-catalogue-flexibility",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "Reference scenarios use a tariff your provider sells",
+    "summary": "Refund and exchange scenarios copied from the catalogue now take their flexibility from your Test Framework instead of always asking for a fully flexible tariff.",
+    "content": "If your provider sells only non-flexible tariffs and refunds them, copied refund and exchange scenarios now ask for the non-flexible tariff, and the copy preview reminds you to check that the provider allows the refund or exchange on it. Scenarios copied before this release keep their flexibility: copy them again or change it in Test Config."
+  },
+  {
     "id": "2026-10-13-drop-refused-token",
     "date": "October 13, 2026",
     "tag": "Fix",
