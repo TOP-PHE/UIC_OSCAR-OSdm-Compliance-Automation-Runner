@@ -28,7 +28,7 @@ const { randomUUID: uuidv4 } = require('node:crypto');
 const { get, run: dbRun, decrypt, colEncrypt, colDecrypt, getConfig } = require('../db/db');
 const { copyAndEncryptFileAsync, decryptFromFileAsync } = require('../utils/at-rest');
 const log = require('../utils/logger').child({ module: 'runner' });
-const { resolveAccessToken } = require('./access-token');
+const { resolveAccessToken, dropCachedToken } = require('./access-token');
 const { credentialsFor } = require('../utils/testerCredentials');
 const { canUseCompany } = require('../api/helpers/provider-access');
 const { normalizeRole } = require('../api/middleware/auth');
@@ -1286,6 +1286,15 @@ async function executeRun({ runId, companyId, userId, scenarioOverride }) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_AUTH_ERROR' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',
       '[runner] ⚠️ HTTP 401 detected — the API token configured in your profile is invalid or has expired. Please update it.');
+    // #680: a refused token is not served again from the cache. Never fails
+    // the end of the run: the status is already written.
+    try {
+      if (dropCachedToken(userRow, accessToken)) {
+        logEvent(runId, 'info', '[runner] The cached token was refused (401); it is dropped and the next run will request a new one.');
+      }
+    } catch (err) {
+      logEvent(runId, 'warn', `[runner] The refused token could not be dropped from the cache: ${err?.message ? err.message : err}`);
+    }
   }
 
   logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);

@@ -39,7 +39,7 @@ jest.mock('child_process');
 const { spawn } = require('child_process');
 
 jest.mock('../../src/worker/access-token');
-const { resolveAccessToken } = require('../../src/worker/access-token');
+const { resolveAccessToken, dropCachedToken } = require('../../src/worker/access-token');
 
 // The real module. viewForTester is wrapped so that one test can make it throw.
 jest.mock('../../src/utils/datafileOwnership', () => {
@@ -583,6 +583,55 @@ describe('executeRun — auth/token-format error detection from CLI output', () 
     await runPromise;
 
     expect(getRunRow(runId).error_message).toBe('TOKEN_AUTH_ERROR');
+  });
+
+  // #680: the refused token is taken out of the cache, through dropCachedToken
+  // (its own rule is tested against the database in access-token-drop.test.js).
+  async function runWithStdout(text, drop) {
+    const { companyId, userId } = seedCompanyUser({ authMode: 'oauth2' });
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-refused');
+    dropCachedToken.mockReset();
+    if (drop) dropCachedToken.mockImplementationOnce(drop);
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const runPromise = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(1);
+    fakeProc.stdout.emit('data', Buffer.from(text));
+    fakeProc.emit('close', 1);
+    await runPromise;
+    return { runId, userId, companyId, messages: getDecryptedEvents(runId).map(e => e.message) };
+  }
+  const DROPPED = 'The cached token was refused (401); it is dropped';
+
+  test('a 401 drops the token the run used from the cache, and says so (#680)', async () => {
+    const r = await runWithStdout('Wrong response status: 401\n', () => true);
+    expect(dropCachedToken).toHaveBeenCalledTimes(1);
+    const [row, token] = dropCachedToken.mock.calls[0];
+    expect([row.user_id, row.company_id, token]).toEqual([r.userId, r.companyId, 'tok-refused']);
+    expect(getRunRow(r.runId).error_message).toBe('TOKEN_AUTH_ERROR');
+    expect(r.messages.some(m => m.includes(DROPPED))).toBe(true);
+  });
+
+  test('a 401 with a token the cache no longer holds says nothing more (#680)', async () => {
+    const r = await runWithStdout('Wrong response status: 401\n', () => false);
+    expect(dropCachedToken).toHaveBeenCalledTimes(1);
+    expect(getRunRow(r.runId).error_message).toBe('TOKEN_AUTH_ERROR');
+    expect(r.messages.some(m => m.includes('HTTP 401 detected'))).toBe(true);
+    expect(r.messages.some(m => m.includes(DROPPED))).toBe(false);
+  });
+
+  test('a run without 401 keeps the cache (#680)', async () => {
+    const r = await runWithStdout('all good\n', () => true);
+    expect(dropCachedToken).not.toHaveBeenCalled();
+    expect(r.messages.some(m => m.includes(DROPPED))).toBe(false);
+  });
+
+  test('a cache that cannot be cleared does not change the run\'s outcome (#680)', async () => {
+    const r = await runWithStdout('Wrong response status: 401\n', () => { throw new Error('db locked'); });
+    expect(getRunRow(r.runId).error_message).toBe('TOKEN_AUTH_ERROR');
+    expect(r.messages.some(m => m.includes('could not be dropped from the cache: db locked'))).toBe(true);
+    expect(r.messages.some(m => m.includes('Run finished'))).toBe(true);
   });
 
   test('sets error_message = TOKEN_FORMAT_ERROR when a YAML parse error appears in stderr', async () => {

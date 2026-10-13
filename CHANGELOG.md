@@ -62,6 +62,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.257] / [collection-OTST_V2.0.141] — 2026-10-13
+
+Issue #680, release 2026.291. Collection unchanged.
+
+### Fixed
+
+- **A token the provider refuses with 401 is no longer served again from the
+  cache.** When a run ends with a 401 (`TOKEN_AUTH_ERROR`), the runner drops
+  the token it used from the tester's cache for that company or provider, and
+  the run log says "The cached token was refused (401); it is dropped and the
+  next run will request a new one." Before, every following run reused the
+  same refused token until it expired: after a provider restarted with a new
+  signing key (the OSDM simulator does), 74 runs in a row failed with 401 for
+  up to 15 minutes. `dropCachedToken()` in `worker/access-token.js`.
+
+### Default decisions
+
+- The cache is cleared only if it still holds the token the run sent. A token
+  the watchdog or a refresh put there during the run is left alone.
+- The token is dropped whether it came from the cache or was fetched for the
+  run: a freshly fetched token that the provider refuses would otherwise be
+  reused by the next runs too.
+- No automatic retry: the run stays FAILED with `TOKEN_AUTH_ERROR`, and the
+  next run fetches a new token. A 401 can also mean wrong credentials, and a
+  retry would only repeat it.
+- Clearing the cache never changes the run's outcome: an error there is
+  logged as a warning.
+
+### Not verified
+
+- Not run against the restarted simulator: covered by unit tests on the real
+  database (`access-token-drop.test.js`) and on the runner with the token
+  module mocked.
+
+---
+
 ## [server-1.11.256] / [collection-OTST_V2.0.141] — 2026-10-13
 
 Issue #681 (part 3 of 3), release 2026.290. Collection unchanged.
