@@ -1034,6 +1034,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `killRun()`, and `urlPolicy.js` gives the start-up DNS lookup 10 s. The
     `[runner]` lines go to the run's log in the database, not to
     `docker logs`: ask for the run's log in OSCAR when diagnosing a run.
+  - **A run that gets 401 drops its token from the cache** (#680, 1.11.257).
+    `dropCachedToken()` (`access-token.js`) clears the (user, company) cache
+    only while it still holds the token the run sent, so a token the watchdog
+    put there meanwhile stays. No retry: the run stays `TOKEN_AUTH_ERROR`.
+    The simulator draws a new signing key at each restart; before this, every
+    run reused the refused token until it expired (15 min on gamma).
   - **Query parameters go in the URL** (#648, OTST_V2.0.129). Bruno 4.2.1
     ignores a request file's `http.params` list; the seat map went without
     its four required parameters for months. `bruno-request-files.test.js`

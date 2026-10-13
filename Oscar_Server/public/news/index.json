@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-drop-refused-token",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "A refused token is not reused",
+    "summary": "When the provider refuses a run's access token (HTTP 401), OSCAR forgets it, and your next run asks for a new token.",
+    "content": "Before, OSCAR kept serving the same cached token until it expired, so after a provider changed its signing keys every run failed with 401 for up to 15 minutes. Now the run that receives the 401 drops the token from the cache and says so in its log; the next run requests a fresh one. If the 401 comes back, check the credentials in API Config."
+  },
+  {
     "id": "2026-10-12-catalogue-adapt",
     "date": "October 12, 2026",
     "tag": "Improvement",
