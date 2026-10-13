@@ -1,4 +1,4 @@
-/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty */  // defined in esc.js, nav.js and scenarios.js
+/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty, OscarCopyReport */  // defined in esc.js, nav.js, scenarios.js and copy-report.js
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -130,6 +130,18 @@
         ${purpose}${dataNeeds}${toCheck}${toComplete}${needs}${s.warnings.map(warningLine).join('')}</span></label>`;
   }
 
+  // #681: what the ticked reference scenarios will be once copied: ready,
+  // to complete first, or not allowed by the Test Framework.
+  function renderReport() {
+    const el = document.getElementById('sc-copy-report');
+    if (!el) return;
+    if (!preview || preview.source?.id !== CATALOGUE.id || typeof OscarCopyReport === 'undefined') { el.innerHTML = ''; return; }
+    const lines = OscarCopyReport.reportLines(OscarCopyReport.copyReport(preview.scenarios, selectedCodes()), preview.runsAll);
+    const details = lines.slice(1).map(l => '<br><span style="font-size:12px">' + esc(l) + '</span>').join('');
+    el.innerHTML = `<div style="${NOTE_STYLE}background:#eceff1;color:#37474f;border:1px solid #cfd8dc">`
+      + `<strong>${esc(lines[0])}</strong>${details}</div>`;
+  }
+
   function renderPreview() {
     const list = document.getElementById('sc-copy-scenarios');
     if (!preview.scenarios.length) {
@@ -139,6 +151,7 @@
     }
     list.innerHTML = preview.scenarios.map(scenarioRow).join('');
     renderTrips();
+    renderReport();
   }
 
   async function loadPreview() {
@@ -175,12 +188,15 @@
     });
     btn.disabled = false;
     if (!res.ok) { showMsg(await readError(res, 'The copy failed.'), 'error'); return; }
-    const done = (await res.json()).copied || [];
+    const answer = await res.json();
+    const done = answer.copied || [];
     const renamed = done.filter(c => c.from !== c.to).map(c => `${c.from} → ${c.to}`);
-    const incomplete = done.filter(c => Array.isArray(c.toComplete) && c.toComplete.length).map(c => c.to);
+    const incomplete = answer.report ? answer.report.toComplete.map(t => t.code)
+      : done.filter(c => Array.isArray(c.toComplete) && c.toComplete.length).map(c => c.to);
     oscarToastAfterNav(`${done.length} scenario${done.length === 1 ? '' : 's'} copied from ${preview.source.name}.`
       + (renamed.length ? ` Renamed: ${renamed.join(', ')}.` : '')
-      + (incomplete.length ? ` To complete before running: ${incomplete.join(', ')}.` : ''), 'success');
+      + (incomplete.length ? ` To complete before running: ${incomplete.join(', ')}.` : '')
+      + (incomplete.length && answer.report?.runsAll ? ' Your run list is ALL: untick them or complete them first.' : ''), 'success');
     location.reload();
   }
 
@@ -201,6 +217,7 @@
           <option value="">— choose —</option>${choices.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
         <div id="sc-copy-scenarios"></div>
         <div id="sc-copy-trips"></div>
+        <div id="sc-copy-report"></div>
         <div style="margin-top:14px"><button class="btn btn-primary" id="sc-copy-go" data-copy-action="copy">📋 Copy</button></div>
       </div>`;
     const anchor = document.getElementById('msg');
@@ -220,7 +237,7 @@
     const el = e.target.closest('[data-copy-action]');
     if (!el) return;
     if (el.dataset.copyAction === 'source') loadPreview().catch(reportError);
-    else if (el.dataset.copyAction === 'toggle-code' && preview) renderTrips();
+    else if (el.dataset.copyAction === 'toggle-code' && preview) { renderTrips(); renderReport(); }
   });
 
   // The button: the catalogue is always a source.
