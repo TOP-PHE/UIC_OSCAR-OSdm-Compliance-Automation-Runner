@@ -213,7 +213,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_MAX_PASSENGERS` | Sale at the provider's maximum number of passengers per offer and booking, every passenger updated after booking. | the maximum number of passengers | 1292 | `SIM_SALE_MAX_PASSENGERS_38` |
 | `OTST_SALE_ACCENTED_LONG_NAMES` | Accented (Czech) and long names, updated after booking to other accented names: every read must give them back unchanged. | — | 289 | `SIM_SALE_ACCENTED_NAMES_38` |
 | `OTST_SALE_AT_SALES_HORIZON` | Sale of a departure on the last day of the provider's sales horizon. | the sales horizon | 230 | `SIM_SALE_AT_SALES_HORIZON_38` |
-| `OTST_SALE_AGE_LIMITS` | Three passengers on the edges of the age ranges: a child on the last day of its range, a passenger the day it leaves it, an adult on the first day of the adult range; each priced as its type. | CHILD and ADULT age ranges | 1 | `SIM_SALE_AGE_LIMITS_38` |
+| `OTST_SALE_AGE_LIMITS` | Three passengers on the edges of the age ranges: a child on the last day of its range, a passenger the day it leaves it, an adult on the first day of the adult range; each priced as its type. | CHILD and ADULT age ranges | 402 | `SIM_SALE_AGE_LIMITS_38` |
 | `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 309 | `SIM_RETURN_SEPARATE_1ADT_38` |
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 351 | `SIM_RETURN_COMBINED_1ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 284 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
