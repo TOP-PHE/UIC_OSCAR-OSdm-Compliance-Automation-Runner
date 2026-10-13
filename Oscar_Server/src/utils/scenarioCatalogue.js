@@ -107,6 +107,8 @@ function salesFlowsOf(scenario) {
   if (type === 'SALE') return flows;
   const partial = ['partialRefundByLeg', 'partialRefundByPax', 'partialRefundByFulfillment'].some((f) => ARMED.has(scenario[f]));
   flows.push(type === 'REFUND' && partial ? 'REFUND_PARTIAL' : `${type}_FULL`);
+  // #700: the exchange of a refunded ticket is asked of a provider that exchanges.
+  if (ARMED.has(scenario.exchangeRefundedProbe) && !flows.includes('EXCHANGE_FULL')) flows.push('EXCHANGE_FULL');
   return flows;
 }
 

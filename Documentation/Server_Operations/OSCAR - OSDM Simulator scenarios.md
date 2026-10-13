@@ -112,6 +112,16 @@ gamma sells at most 19 passengers in one offer and one booking; a request for mo
 | `SIM_NHF_TOO_MANY_PASSENGERS_38` | Negative test: 20 adults (`passengerLimitExpectRejection`). POST /offers, or else POST /bookings, must refuse them; the scenario ends at the refusal. | POST /offers answers 400 with a Problem. | No failed check; one warning: the Problem has no `pointers`. |
 | `SIM_REFUND_PAX_THIRD_19PAX_38` | 19 adults on the trip sold with one ticket per passenger (trip requirement 10), then the last third of them, 7, refunded (`partialRefundPaxSelection: third`): one RefundSpecification per ticket. | Seven refund offers, each confirmed; those seven tickets `REFUNDED`, the other twelve `FULFILLED`. | No failed check; the two merged-PDF warnings. |
 
+### After-sale refusals (#700)
+
+Negative probes sent from the step's own script (the flow of the scenario does not change). gamma refuses a refund or an exchange of a fulfillment that is not valid any more with 409, and answers a second confirmation with the fulfillments it issued the first time.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_NHF_REFUND_AGAIN_38` | A one-way ticket refunded in full; then, at 14, a refund offer asked again for it (`refundAgainProbe`). | 409 `already refunded`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
+| `SIM_NHF_EXCHANGE_REFUNDED_38` | The same refund; then, at 14, an exchange offer asked for the refunded ticket (`exchangeRefundedProbe`). | 409 `only a valid ticket can be exchanged`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
+| `SIM_NHF_CONFIRM_AGAIN_38` | A sale; at 06, POST /fulfillments sent again without an Idempotency-Key (`confirmAgainProbe`). | 200 with the same fulfillments. | No failed check. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an

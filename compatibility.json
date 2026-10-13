@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.299",
+  "current_release": "2026.300",
   "releases": [
+    {
+      "release": "2026.300",
+      "date": "2026-10-13",
+      "server": "1.11.265",
+      "collection": "OTST_V2.0.147",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "After-sale refusals (#700): a refunded ticket refunded again or exchanged must be refused, and a booking confirmed twice must not issue new tickets; three reference scenarios (NHF_CONFIRM_TWICE, NHF_REFUND_TWICE, NHF_EXCHANGE_REFUNDED)."
+      ]
+    },
     {
       "release": "2026.299",
       "date": "2026-10-13",

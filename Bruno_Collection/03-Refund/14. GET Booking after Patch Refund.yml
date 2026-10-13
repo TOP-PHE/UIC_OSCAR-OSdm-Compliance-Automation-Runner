@@ -85,6 +85,9 @@ runtime:
           return;
         }
         checkFullRefundDone(jsonData.booking);
+        // #700: the tickets just refunded can be neither refunded nor
+        // exchanged again (sent from here; the flow does not change).
+        await require(bru.getEnvVar("library_base") + "afterSaleRefusals.js").probeRefundedFulfillments(jsonData.booking);
         // #603: the refund receipt, when the scenario waits for it: 14b reads
         // the booking again until it is there or the wait is over.
         if (require(bru.getEnvVar("library_base") + "fulfillmentSteps.js").armRefundReceiptWait(jsonData.booking)) {

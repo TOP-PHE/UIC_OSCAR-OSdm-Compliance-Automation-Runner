@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (79 scenarios, SIM_…)  ──source──►  (40 reference scenarios, OTST_… / NHF_…)
+ (82 scenarios, SIM_…)  ──source──►  (43 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (79 scenarios)
+### 4.1 The simulator's data file (82 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -180,6 +180,7 @@ In short:
 | Refunds of a return in one offer (full, inbound only, overrule code, receipt) | 4 | `gamma` |
 | Partial refund by passenger and by leg, on trips sold with one ticket per passenger or per leg | 2 | `gamma` |
 | Passenger limits: the maximum, one over it, a third of the maximum refunded | 3 | `gamma` |
+| After-sale refusals: refund again, exchange a refunded ticket, confirm again | 3 | `gamma` |
 | Reduction cards, named products, group tariffs (two of them negative), class per leg | 14 | `gamma` |
 | Seat reservations (mandatory, and the three ways of booking an optional one) | 4 | `gamma` |
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
@@ -190,7 +191,7 @@ In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (40)
+### 4.2 The reference scenarios of the catalogue (43)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -252,6 +253,9 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `NHF_REFUND_OVERRULE_CODE_REFUSED` | A refund with an overrule code the provider does not accept must be refused. | REFUND_FULL, return model SEPARATE | 314 | `SIM_REFUND_OVERRULE_REFUSED_38` |
 | `NHF_SALE_BY_TRIP_ID_UNKNOWN` | Offers asked for a trip id the provider never gave must be refused. | — | 70 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` |
 | `NHF_SALE_TOO_MANY_PASSENGERS` | One passenger more than the provider's maximum: the offer request, or else the booking, must be refused. | the maximum number of passengers | 70 | `SIM_NHF_TOO_MANY_PASSENGERS_38` |
+| `NHF_CONFIRM_TWICE` | A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones. | — | 231 | `SIM_NHF_CONFIRM_AGAIN_38` |
+| `NHF_REFUND_TWICE` | A ticket refunded in full cannot be refunded again: the second refund offer request must be refused. | REFUND_FULL | 346 | `SIM_NHF_REFUND_AGAIN_38` |
+| `NHF_EXCHANGE_REFUNDED` | A ticket refunded in full cannot be exchanged: the exchange offer request must be refused. | REFUND_FULL, EXCHANGE_FULL | 346 | `SIM_NHF_EXCHANGE_REFUNDED_38` |
 | `NHF_EXPIRED_OFFER` | Booking an offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | — | 119 | `SIM_NHF_EXPIRED_OFFER_38` |
 | `NHF_EXPIRED_BOOKING` | Confirming a booking after its confirmation time limit must be refused. Waits up to 40 minutes. | — | 187 | `SIM_NHF_EXPIRED_BOOKING_38` |
 | `NHF_EXPIRED_REFUND_OFFER` | Confirming a refund offer after its `validUntil` must be refused. Waits up to 40 minutes. | REFUND_FULL | 297 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` |
