@@ -257,3 +257,29 @@ describe('#699 a limit entry takes the framework\'s maximum number of passengers
     expect(datafile.passengersList).toHaveLength(source.passengersList.length);
   });
 });
+
+describe('#709 a provider without the passenger update', () => {
+  const source = catalogueDatafile(catalogue, simulator);
+  const fw = { salesFlows: ['SALE', 'REFUND_FULL', 'REFUND_PARTIAL', 'EXCHANGE_FULL'], passengerTypes: ['ADULT'] };
+  const patching = (df) => df.scenarios.filter(s => s.salesFlowActions?.patchPassengers === true).length;
+
+  test('passengerUpdate false: no copied scenario updates its passengers; the rest of their actions is kept', () => {
+    const config = { ...fw, passengerUpdate: false };
+    const { datafile } = adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, config), config);
+    expect(patching(source)).toBeGreaterThan(0);
+    expect(patching(datafile)).toBe(0);
+    for (const sc of datafile.scenarios) {
+      const before = source.scenarios.find(s => s.code === sc.code).salesFlowActions;
+      if (before) expect(sc.salesFlowActions).toEqual({ ...before, patchPassengers: false });
+    }
+    // The source is not changed.
+    expect(patching(source)).toBe(source.scenarios.filter(s => s.salesFlowActions?.patchPassengers === true).length);
+  });
+
+  test('absent or true: as before', () => {
+    for (const config of [fw, { ...fw, passengerUpdate: true }]) {
+      const { datafile } = adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, config), config);
+      expect(patching(datafile)).toBe(patching(source));
+    }
+  });
+});

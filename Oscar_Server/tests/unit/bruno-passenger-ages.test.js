@@ -117,3 +117,25 @@ describe('the passenger types applied by the chosen offer', () => {
     }
   });
 });
+
+describe('#709 PERSON as the applied type', () => {
+  const ages = require(path.join(LIB, 'passengerAges.js'));
+  const part = (ref, types, amount) => ({ passengerRefs: [ref], price: { amount }, appliedPassengerTypes: types.map((type) => ({ passengerRef: ref, type })) });
+
+  test('PERSON alone states no age band: a warning, not a failure', () => {
+    const offer = { admissionOfferParts: [part('c', ['PERSON'], 1900), part('a', ['PERSON'], 5300)] };
+    const checks = ages.checkAppliedTypes(offer, [{ ref: 'c', type: 'CHILD' }, { ref: 'a', type: 'ADULT' }]);
+    expect(checks.map((c) => c.level)).toEqual(['warn', 'warn']);
+    expect(checks[0].message).toMatch(/name only PERSON in appliedPassengerTypes, which states no age band/);
+    // The prices are still compared.
+    expect(ages.compareWithAdult(offer, [{ ref: 'c', type: 'CHILD' }, { ref: 'a', type: 'ADULT' }])).toEqual([
+      { ok: true, text: 'passenger c (CHILD) pays 1900, the adult a 5300' },
+    ]);
+  });
+
+  test('PERSON beside a band, or expected itself, is read as before', () => {
+    expect(ages.checkAppliedTypes({ admissionOfferParts: [part('c', ['PERSON', 'CHILD'], 1)] }, [{ ref: 'c', type: 'CHILD' }])[0]).toMatchObject({ ok: true, level: 'fail' });
+    expect(ages.checkAppliedTypes({ admissionOfferParts: [part('c', ['PERSON', 'YOUTH'], 1)] }, [{ ref: 'c', type: 'CHILD' }])[0]).toMatchObject({ ok: false, level: 'fail' });
+    expect(ages.checkAppliedTypes({ admissionOfferParts: [part('p', ['PERSON'], 1)] }, [{ ref: 'p', type: 'PERSON' }])[0]).toMatchObject({ ok: true, level: 'fail' });
+  });
+});

@@ -1206,6 +1206,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   passenger an `updateDateOfBirth`: step 03 would change the age it was
   priced at. The simulator's age bands (`ageTariffs`) cover station `0000093`
   only, like its sales horizon.
+- **What a real provider's catalogue run taught** (#709, 1.11.269 /
+  OTST_V2.0.151). `passengerUpdate: false` in the Test Framework (Passenger
+  Types; absent = yes) turns `patchPassengers` off in every catalogue copy:
+  a provider without `PATCH …/passengers/{id}` stopped every copy at 03. It
+  is handled before the change switch (`changePassengerUpdate()`), like the
+  age fields: that switch is at Sonar's 30-case limit (S1479). A transfer or
+  continuous leg is checked for its start and end, not a train
+  (`otherLegOf()`). `PERSON` alone in `appliedPassengerTypes` is "no band
+  stated" (WARNING) in `passengerAges.js`.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

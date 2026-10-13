@@ -25,6 +25,7 @@ module.exports = {
   validateOfferSummary,
   validatePassengers,
   validateTripsAndLegs,
+  otherLegOf,
   validateOfferParts,
   validateAdmissions,
   validateReservations,
@@ -804,6 +805,18 @@ function validatePassengers(jsonData) {
 }
 
 // Trips & Legs validation
+// #709: a leg that is not a timed leg, as { kind, from, to } (the stop place
+// references of its start and end, undefined when absent); null for a timed
+// leg, or a leg of no kind OSDM names (both are checked as timed legs).
+function otherLegOf(leg) {
+  if (!leg || leg.timedLeg) return null;
+  const kind = ['transfer', 'continuous'].find((k) => leg[`${k}Leg`] && typeof leg[`${k}Leg`] === 'object');
+  if (!kind) return null;
+  const place = (p) => p?.stopPlaceRef ?? p?.stopPlaceName ?? p?.name ?? undefined;
+  const part = leg[`${kind}Leg`];
+  return { kind, from: place(part.start), to: place(part.end) };
+}
+
 function validateTripsAndLegs(jsonData) {
   validationLogger("[DEBUG] ➤ validateTripsAndLegs");
   const trips = jsonData.trips || [];
@@ -863,6 +876,16 @@ function validateTripsAndLegs(jsonData) {
     }
 
     legs.forEach((leg, legIndex) => {
+      // #709: a transfer or continuous leg (a change of platform, a walk) has
+      // no train: its start and end are checked instead.
+      const moving = otherLegOf(leg);
+      if (moving) {
+        test(`Trip ${tripIndex + 1} Leg ${legIndex + 1} is a ${moving.kind} leg with a start and an end - ${moving.from} → ${moving.to}`, function () {
+          expect(moving.from, `${moving.kind}Leg.start`).to.not.be.undefined;
+          expect(moving.to, `${moving.kind}Leg.end`).to.not.be.undefined;
+        });
+        return;
+      }
       const trainId = leg.timedLeg?.service?.vehicleNumbers?.[0];
       const origin = leg.timedLeg?.start?.stopPlaceName;
       const destination = leg.timedLeg?.end?.stopPlaceName;

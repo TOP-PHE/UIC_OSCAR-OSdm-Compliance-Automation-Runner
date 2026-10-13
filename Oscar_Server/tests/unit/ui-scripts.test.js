@@ -1044,9 +1044,21 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
     // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el)) return;");
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el)) return;");
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
+  });
+});
+
+describe('#709 the passenger update in the Test Framework', () => {
+  test('a labelled checkbox, checked unless the framework says false, handled before the change switch', () => {
+    const src = read('js/scenarios.js');
+    expect(src).toContain('<label class="fw-subsection-label" for="fw-passenger-update"');
+    expect(src).toContain(`<input type="checkbox" id="fw-passenger-update" data-action="fw-passenger-update" \${fw.passengerUpdate === false ? '' : 'checked'}>`);
+    const fn = src.slice(src.indexOf('function changePassengerUpdate('), src.indexOf('function setPaxField('));
+    expect(fn).toContain('if (el.checked) delete wizData.framework.passengerUpdate;');
+    expect(fn).toContain('else wizData.framework.passengerUpdate = false;');
+    expect(src).not.toContain("case 'fw-passenger-update'");
   });
 });
