@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (84 scenarios, SIM_…)  ──source──►  (45 reference scenarios, OTST_… / NHF_…)
+ (87 scenarios, SIM_…)  ──source──►  (48 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (84 scenarios)
+### 4.1 The simulator's data file (87 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -182,6 +182,7 @@ In short:
 | Passenger limits: the maximum, one over it, a third of the maximum refunded | 3 | `gamma` |
 | After-sale refusals: refund again, exchange a refunded ticket, confirm again | 3 | `gamma` |
 | Accented and long names; an offer request with no passenger | 2 | `gamma` |
+| Departure dates: the last day of the sales horizon, the day after, yesterday | 3 | `gamma` |
 | Reduction cards, named products, group tariffs (two of them negative), class per leg | 14 | `gamma` |
 | Seat reservations (mandatory, and the three ways of booking an optional one) | 4 | `gamma` |
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
@@ -192,7 +193,7 @@ In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (45)
+### 4.2 The reference scenarios of the catalogue (48)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -210,6 +211,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_ONE_WAY_2ADT_SAVER` | One-way sale for two adults, choosing the non-flexible (saver) offer. | — | 289 | `SIM_SALE_SEARCH_2ADT_SAVER_38` |
 | `OTST_SALE_MAX_PASSENGERS` | Sale at the provider's maximum number of passengers per offer and booking, every passenger updated after booking. | the maximum number of passengers | 1292 | `SIM_SALE_MAX_PASSENGERS_38` |
 | `OTST_SALE_ACCENTED_LONG_NAMES` | Accented (Czech) and long names, updated after booking to other accented names: every read must give them back unchanged. | — | 289 | `SIM_SALE_ACCENTED_NAMES_38` |
+| `OTST_SALE_AT_SALES_HORIZON` | Sale of a departure on the last day of the provider's sales horizon. | the sales horizon | 230 | `SIM_SALE_AT_SALES_HORIZON_38` |
 | `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 309 | `SIM_RETURN_SEPARATE_1ADT_38` |
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 351 | `SIM_RETURN_COMBINED_1ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 284 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
@@ -256,6 +258,8 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `NHF_SALE_BY_TRIP_ID_UNKNOWN` | Offers asked for a trip id the provider never gave must be refused. | — | 70 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` |
 | `NHF_SALE_TOO_MANY_PASSENGERS` | One passenger more than the provider's maximum: the offer request, or else the booking, must be refused. | the maximum number of passengers | 70 | `SIM_NHF_TOO_MANY_PASSENGERS_38` |
 | `NHF_SALE_NO_PASSENGER` | An offer request with no passenger at all must be refused. | — | 70 | `SIM_NHF_NO_PASSENGER_38` |
+| `NHF_SALE_BEYOND_SALES_HORIZON` | A departure one day beyond the provider's sales horizon: the offer request must be refused, or give no offer. | the sales horizon | 69 | `SIM_NHF_BEYOND_SALES_HORIZON_38` |
+| `NHF_SALE_DEPARTURE_IN_PAST` | A departure yesterday: the offer request must be refused, or give no offer. | — | 70 | `SIM_NHF_DEPARTURE_IN_PAST_38` |
 | `NHF_CONFIRM_TWICE` | A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones. | — | 231 | `SIM_NHF_CONFIRM_AGAIN_38` |
 | `NHF_REFUND_TWICE` | A ticket refunded in full cannot be refunded again: the second refund offer request must be refused. | REFUND_FULL | 346 | `SIM_NHF_REFUND_AGAIN_38` |
 | `NHF_EXCHANGE_REFUNDED` | A ticket refunded in full cannot be exchanged: the exchange offer request must be refused. | REFUND_FULL, EXCHANGE_FULL | 346 | `SIM_NHF_EXCHANGE_REFUNDED_38` |

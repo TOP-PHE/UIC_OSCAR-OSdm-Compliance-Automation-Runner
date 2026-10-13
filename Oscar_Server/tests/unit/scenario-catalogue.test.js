@@ -175,7 +175,7 @@ describe('#681 what a reference scenario needs from the provider\'s data', () =>
 });
 
 describe('#699 the passenger limit entries', () => {
-  const limits = catalogue.entries.filter(e => e.limit);
+  const limits = catalogue.entries.filter(e => ['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS'].includes(e.limit));
 
   test('three entries: the maximum, one over it, a third of them refunded', () => {
     expect(limits.map(e => [e.code, e.limit])).toEqual([
@@ -211,6 +211,41 @@ describe('#699 the passenger limit entries', () => {
     const broken = structuredClone(catalogue);
     broken.entries[0].limit = 'MANY';
     expect(catalogueProblems(broken, simulator)).toEqual([expect.stringContaining('limit "MANY"')]);
+  });
+});
+
+describe('#704 the departure-date entries', () => {
+  const horizon = catalogue.entries.filter(e => ['SALES_HORIZON', 'OVER_SALES_HORIZON'].includes(e.limit));
+  const fw = { salesFlows: ['SALE'], passengerTypes: ['ADULT'] };
+
+  test('the last day of the horizon, the day after, and yesterday', () => {
+    expect(horizon.map(e => [e.code, e.limit])).toEqual([
+      ['OTST_SALE_AT_SALES_HORIZON', 'SALES_HORIZON'],
+      ['NHF_SALE_BEYOND_SALES_HORIZON', 'OVER_SALES_HORIZON'],
+    ]);
+    expect(catalogue.entries.find(e => e.code === 'NHF_SALE_DEPARTURE_IN_PAST').limit).toBeUndefined();
+  });
+
+  test('a horizon entry cannot be copied without a declared horizon; can with one; the past one always can', () => {
+    const without = catalogueFor(catalogue, simulator, fw);
+    const withHorizon = catalogueFor(catalogue, simulator, { ...fw, salesHorizonDays: 60 });
+    for (const e of horizon) {
+      expect(without.find(x => x.code === e.code).missing).toEqual(['the sales horizon (Tariff Flexibility)']);
+      expect(withHorizon.find(x => x.code === e.code).missing).toEqual([]);
+    }
+    expect(without.find(x => x.code === 'NHF_SALE_DEPARTURE_IN_PAST').missing).toEqual([]);
+    for (const bad of [0, 1001, 2.5, '60']) {
+      expect(catalogueFor(catalogue, simulator, { ...fw, salesHorizonDays: bad })
+        .find(x => x.code === 'OTST_SALE_AT_SALES_HORIZON').missing).toEqual(['the sales horizon (Tariff Flexibility)']);
+    }
+  });
+
+  test('say the day of the framework\'s horizon', () => {
+    const listed = catalogueFor(catalogue, simulator, {});
+    expect(listed.find(x => x.code === 'OTST_SALE_AT_SALES_HORIZON').needsText[0])
+      .toBe('a departure on the last day of the sales horizon the Test Framework declares');
+    expect(listed.find(x => x.code === 'NHF_SALE_BEYOND_SALES_HORIZON').needsText[0])
+      .toBe('a departure on the day after the last day of the sales horizon the Test Framework declares');
   });
 });
 

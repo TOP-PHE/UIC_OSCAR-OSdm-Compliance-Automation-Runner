@@ -71,6 +71,8 @@ const ENUMS = {
   passengerLimitExpectRejection:     ['off', 'on'],
   // #703: negative test, an offer request with no passenger must be refused.
   emptyPassengersExpectRejection:    ['off', 'on'],
+  // #704: negative test, a departure in the past or beyond the sales horizon must be refused.
+  departureExpectRejection:          ['off', 'on'],
   // #700: after-sale requests that must be refused.
   refundAgainProbe:                  ['off', 'on'],
   exchangeRefundedProbe:             ['off', 'on'],
@@ -1641,6 +1643,15 @@ function buildDetailHTML(idx) {
           'Negative test (#700). On: once the refund is confirmed, a refund offer is asked again for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}
         ${buildSelect(idx, 'exchangeRefundedProbe', 'Refunded ticket exchanged', ENUMS.exchangeRefundedProbe,
           'Negative test (#700). On: once the refund is confirmed, an exchange offer is asked for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}` : ''}
+        <div class="param-field">
+          <span class="param-label">Departure in days from today <span class="param-hint">${esc('The scenario\'s own departure date (#704), in days from the day of the run: 0 today, -1 yesterday, 90 in ninety days (between -366 and 1000). It replaces the lead time and the trip\'s weekday. For the sales-horizon and past-departure tests. Empty: the run\'s usual date.')}</span></span>
+          <input class="param-input" type="number" min="-366" max="1000"
+            value="${esc(state.scenarios[idx]?.departureDaysFromToday ?? '')}"
+            placeholder="leave empty = usual date"
+            data-action="set-scenario-departure-days" data-idx="${esc(idx)}">
+        </div>
+        ${buildSelect(idx, 'departureExpectRejection', 'Departure date refused', ENUMS.departureExpectRejection,
+          'Negative test (#704). On: the departure date above is one the provider must not sell, in the past or beyond its sales horizon (Test Framework → Offer Criteria). POST /offers must refuse it (4xx + RFC-9457 Problem) or give no offer; offers given fail. The scenario ends there.')}
         ${buildSelect(idx, 'emptyPassengersExpectRejection', 'No passenger refused', ENUMS.emptyPassengersExpectRejection,
           'Negative test (#703). On: POST /offers is sent with no passenger (OSDM requires at least one) and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
         ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
@@ -3963,6 +3974,11 @@ function renderWizardStep1() {
         <div style="font-size:11px;color:#90a4ae;margin-top:8px;line-height:1.5">
           Tick only what the provider sells. Scenarios copied from the catalogue ask for one of these, and the scenario editor offers only these.
         </div>
+        <label class="fw-subsection-label" for="fw-sales-horizon" style="display:block;margin:14px 0 8px">
+          Sales horizon, in days
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — how far ahead the provider sells; the date scenarios of the catalogue ask for its last day and the day after (empty = not declared)</span>
+        </label>
+        <input type="number" id="fw-sales-horizon" min="1" max="1000" value="${Number.isInteger(fw.salesHorizonDays) ? fw.salesHorizonDays : ''}" data-action="fw-sales-horizon" style="width:90px">
       </div>
     </div>
   </div>
@@ -4149,6 +4165,16 @@ function fwMaxPassengers(raw) {
   if (!/^\d{1,3}$/.test(text)) return undefined;
   const n = Number.parseInt(text, 10);
   return n >= 1 ? n : undefined;
+}
+
+// #704: what the sales-horizon field holds: a whole number of days from 1 to
+// 1000, null when emptied (not declared), undefined when it is not valid.
+function fwSalesHorizonDays(raw) {
+  const text = String(raw ?? '').trim();
+  if (text === '') return null;
+  if (!/^\d{1,4}$/.test(text)) return undefined;
+  const n = Number.parseInt(text, 10);
+  return n >= 1 && n <= 1000 ? n : undefined;
 }
 
 function fwToggleOfferPill(el, subKey, value) {
@@ -7523,6 +7549,19 @@ document.body.addEventListener('change', function(e) {
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-seatmap':
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
+    case 'fw-sales-horizon': {
+      // #704: how many days ahead the provider sells; empty = not declared.
+      const value = fwSalesHorizonDays(el.value);
+      if (value === undefined) {
+        const stored = wizData.framework?.salesHorizonDays;
+        el.value = Number.isInteger(stored) ? stored : '';
+        break;
+      }
+      if (value === null) delete wizData.framework.salesHorizonDays;
+      else wizData.framework.salesHorizonDays = value;
+      saveFrameworkDebounced();
+      break;
+    }
     case 'fw-max-pax': {
       // #699: the provider's maximum number of passengers; empty = not declared.
       const value = fwMaxPassengers(el.value);
@@ -7596,6 +7635,16 @@ document.body.addEventListener('input', function(e) {
           setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
         }
       }
+      break;
+    }
+    case 'set-scenario-departure-days': {
+      // #704: the scenario's own departure date, in days from the run. Empty
+      // clears it; otherwise an integer in [-366, 1000], anything else
+      // ignored mid-edit.
+      const v = el.value.trim();
+      const n = Number(v);
+      if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', null);
+      else if (Number.isInteger(n) && n >= -366 && n <= 1000) setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', n);
       break;
     }
     case 'set-scenario-receipt-wait-minutes': {

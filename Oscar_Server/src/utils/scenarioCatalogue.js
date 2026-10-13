@@ -56,8 +56,12 @@ const CODE = /^(OTST|NHF)_[A-Z0-9_]{3,60}$/;
 const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
 // #699: an entry that tests the provider's passenger limit: its passengers
 // become the Test Framework's maxPassengers (MAX_PASSENGERS) or one more
-// (OVER_MAX_PASSENGERS) at copy time.
-const LIMITS = ['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS'];
+// (OVER_MAX_PASSENGERS) at copy time. #704: one that tests the sales
+// horizon departs on its last day (SALES_HORIZON) or the day after
+// (OVER_SALES_HORIZON), from the Test Framework's salesHorizonDays.
+const PASSENGER_LIMITS = new Set(['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS']);
+const HORIZON_LIMITS = new Set(['SALES_HORIZON', 'OVER_SALES_HORIZON']);
+const LIMITS = [...PASSENGER_LIMITS, ...HORIZON_LIMITS];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
   'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
@@ -143,7 +147,14 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  return [...missing, ...limitsMissing(requirements, fw)];
+}
+
+// #699 / #704: the limits a limit entry needs declared, as sentences.
+function limitsMissing(requirements, fw) {
+  const missing = [];
   if (requirements.maxPassengers && !maxPassengersOf(fw)) missing.push('the maximum number of passengers (Passenger Types)');
+  if (requirements.salesHorizon && !salesHorizonOf(fw)) missing.push('the sales horizon (Tariff Flexibility)');
   return missing;
 }
 
@@ -273,8 +284,19 @@ function maxPassengersOf(framework) {
   return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null;
 }
 
+/** #704: the sales horizon a framework declares, in days, or null. */
+function salesHorizonOf(framework) {
+  const fw = isObj(framework?.config) ? framework.config : framework;
+  const n = fw?.salesHorizonDays;
+  return Number.isInteger(n) && n >= 1 && n <= 1000 ? n : null;
+}
+
 // #699: the needs of a limit entry say the framework's number, not the simulator's.
 function limitNeedsText(needs, limit) {
+  if (HORIZON_LIMITS.has(limit)) {
+    const day = limit === 'OVER_SALES_HORIZON' ? 'the day after the last day' : 'the last day';
+    return [`a departure on ${day} of the sales horizon the Test Framework declares`, ...needsText(needs)];
+  }
   const text = needsText({ ...needs, passengers: undefined });
   const count = limit === 'OVER_MAX_PASSENGERS' ? 'one passenger more than the maximum' : 'the maximum number of passengers';
   return [`${count} the Test Framework declares`, ...text];
@@ -286,7 +308,8 @@ function catalogueFor(catalogue, simulator, framework) {
   return catalogue.entries.map((entry) => {
     const scenario = datafile.scenarios.find((s) => s.code === entry.code);
     const requirements = requirementsOf(scenario, datafile);
-    if (entry.limit) requirements.maxPassengers = true;
+    if (PASSENGER_LIMITS.has(entry.limit)) requirements.maxPassengers = true;
+    if (HORIZON_LIMITS.has(entry.limit)) requirements.salesHorizon = true;
     return {
       code: entry.code,
       kind: kindOf(entry.code),
@@ -304,5 +327,5 @@ function catalogueFor(catalogue, simulator, framework) {
 
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
-  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, NEEDS_KEYS, LIMITS,
+  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, salesHorizonOf, NEEDS_KEYS, LIMITS,
 };

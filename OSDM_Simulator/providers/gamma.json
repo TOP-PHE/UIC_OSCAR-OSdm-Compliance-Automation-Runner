@@ -23,6 +23,10 @@
     "perPassengerFrom": "urn:uic:stn:0000096",
     "perLegFrom": "urn:uic:stn:0000095"
   },
+  "salesHorizon": {
+    "from": "urn:uic:stn:0000094",
+    "days": 90
+  },
   "shortDeadlines": {
     "stopPlaceRef": "urn:uic:stn:0000099",
     "seconds": 60

@@ -1183,6 +1183,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   every scenario). `emptyPassengersExpectRejection` empties
   `anonymousPassengerSpecifications` in 01's before-request
   (`passengerLimit.js`). OSDM gives names no maximum length.
+- **A scenario can name its own departure day, and the sales horizon is
+  declared** (#704, 1.11.267 / OTST_V2.0.149). `departureDaysFromToday` goes
+  through `scenarioTripDate()` (`scenarioParser.js`), on the UTC calendar,
+  and replaces the lead time and the weekday. `departureExpectRejection`
+  (`departureLimit.js`) ends the scenario at 01 whatever the answer; a 4xx and
+  "no offer" both pass. `salesHorizonDays` in the Test Framework; catalogue
+  `limit` `SALES_HORIZON` / `OVER_SALES_HORIZON` sets the day at copy time.
+  The simulator's horizon (`salesHorizon`, station `0000094` on `gamma`)
+  covers that one stop place on purpose: its tests use fixed dates, and a
+  horizon or past check everywhere would make them fail once those dates
+  pass. Do the same for any new date rule there.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

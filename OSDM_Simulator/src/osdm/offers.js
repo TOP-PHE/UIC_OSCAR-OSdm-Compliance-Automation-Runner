@@ -44,6 +44,7 @@ const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType }
 const { reservationsOfDirection, reservationProductOf } = require('./reservations');
 const persons = require('./persons');
 const ticketing = require('./ticketing');
+const { horizonProblem } = require('./salesHorizon');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -642,6 +643,8 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const shortLivedMs = shortLivedMsOf(trips, provider);
   const passengers = passengersOf(body, provider);
   const outboundTrips = outboundTripsOf(returnOf(body), known, trips);
+  // #704: a departure in the past is refused; one beyond the horizon gets no offer.
+  const beyondHorizon = horizonProblem([...outboundTrips, ...trips], provider, nowMs);
   const criteria = body.offerSearchCriteria;
   const askedFlexibilities = wanted(criteria, 'flexibilities', FLEXIBILITIES.map((f) => f.key));
   const flexibilities = tariffsOf(provider).filter((f) => !askedFlexibilities || askedFlexibilities.includes(f.key));
@@ -655,7 +658,7 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   const pairs = outboundTrips.length > 0
     ? outboundTrips.flatMap((outbound) => trips.map((inbound) => ({ trip: outbound, inboundTrip: inbound })))
     : trips.map((trip) => ({ trip }));
-  for (const { trip, inboundTrip } of pairs) {
+  for (const { trip, inboundTrip } of beyondHorizon ? [] : pairs) {
     const covered = inboundTrip ? [trip, inboundTrip] : [trip];
     for (const travelClass of classes) {
       for (const flexibility of flexibilities.filter((f) => isOffered(f, { collective, passengers, covered, travelClass, refusals, provider }))) {
@@ -679,6 +682,7 @@ function buildOfferCollection(body, provider, nowMs, known = {}) {
   }
   const allTrips = [...outboundTrips, ...trips];
   const problems = problemsOf(passengers, offers, collective, refusals);
+  if (beyondHorizon) problems.push(beyondHorizon);
   const response = { anonymousPassengerSpecifications: passengers, trips: allTrips, offers };
   if (problems.length > 0) response.problems = problems;
   return { response, remembered, trips: allTrips };

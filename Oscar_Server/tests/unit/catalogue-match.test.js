@@ -152,6 +152,30 @@ describe('suggestTrip', () => {
   });
 });
 
+describe('#704 a sales-horizon entry departs on the framework\'s horizon, or the day after', () => {
+  const source = catalogueDatafile(catalogue, simulator);
+  const fw = { salesFlows: ['SALE'], passengerTypes: ['ADULT'], maxPassengers: 9 };
+  const days = (df, code) => df.scenarios.find(s => s.code === code).departureDaysFromToday;
+
+  test('the horizon\'s last day, the day after; the past one and the source unchanged', () => {
+    const config = { ...fw, salesHorizonDays: 60 };
+    const { datafile } = adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, config), config);
+    expect(days(datafile, 'OTST_SALE_AT_SALES_HORIZON')).toBe(60);
+    expect(days(datafile, 'NHF_SALE_BEYOND_SALES_HORIZON')).toBe(61);
+    expect(days(datafile, 'NHF_SALE_DEPARTURE_IN_PAST')).toBe(-1);
+    expect(days(source, 'OTST_SALE_AT_SALES_HORIZON')).toBe(90);
+    expect(days(source, 'NHF_SALE_BEYOND_SALES_HORIZON')).toBe(91);
+    // A horizon entry is not a passenger-limit entry: its list is kept.
+    const list = (df) => df.scenarios.find(s => s.code === 'OTST_SALE_AT_SALES_HORIZON').passengersListId;
+    expect(list(datafile)).toBe(list(source));
+  });
+
+  test('without a declared horizon, left as it is (and cannot be copied)', () => {
+    const { datafile } = adaptCatalogueDatafile(source, catalogueFor(catalogue, simulator, fw), fw);
+    expect(days(datafile, 'OTST_SALE_AT_SALES_HORIZON')).toBe(90);
+  });
+});
+
 describe('#699 a limit entry takes the framework\'s maximum number of passengers', () => {
   const { resizedPassengers } = require('../../src/utils/catalogueMatch');
   const source = catalogueDatafile(catalogue, simulator);
