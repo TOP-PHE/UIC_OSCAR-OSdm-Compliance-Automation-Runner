@@ -1090,6 +1090,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     another booking's `bookingRef`, while the booking's own are refunded.
     `recordRefundOfferStates()` fails that once at 13 and takes the refunded
     set from the offer as PROPOSED (`__refundProposed[id].fulfillmentIds`).
+  - **A refund offer is held to what was asked** (#688, OTST_V2.0.142): one
+    provider was asked for one passenger's fulfillment, offered all five and
+    refunded another passenger's. `_proposedScope()` fails once at 10 when a
+    PROPOSED offer names fulfillments the request (`requestRefundOffersBodyData`)
+    did not, and keeps the asked ones as the refunded set (`widerThanAsked`),
+    which the CONFIRMED branch then uses. A full refund asks for all, so it
+    is never narrowed.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id

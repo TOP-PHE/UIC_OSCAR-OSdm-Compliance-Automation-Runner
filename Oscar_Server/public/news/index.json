@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-refund-wider-than-asked",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "Partial refunds name the right fault",
+    "summary": "When a provider's refund offer covers more than you asked to refund, the run now says so once, and checks that what you asked for was refunded.",
+    "content": "A partial refund asks the provider to refund some fulfillments of a booking. If the refund offer names others as well, the run now reports one failure at the refund offer step, naming them, and then checks the booking for the fulfillments you asked for: refunded, and every other one unchanged. Before, every fulfillment of the offer was expected refunded, which gave many failures without saying which passenger had been refunded by mistake."
+  },
+  {
     "id": "2026-10-13-drop-refused-token",
     "date": "October 13, 2026",
     "tag": "Fix",
