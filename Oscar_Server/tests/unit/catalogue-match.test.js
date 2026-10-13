@@ -60,6 +60,43 @@ describe('adaptReferenceScenario', () => {
     expect(adaptReferenceScenario({ desiredFlexibility: 'NON_FLEXIBLE' }, { tariff: 'NON_FLEXIBLE' }, {}).scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
   });
 
+  // #687: the tariff is one the provider sells, from the Test Framework.
+  describe('after-sale flexibility from the Test Framework (#687)', () => {
+    const fw = (...flexibilities) => ({ offerCriteria: { flexibilities } });
+    const flex = (own, framework, tariff = 'REFUNDABLE') =>
+      adaptReferenceScenario(own ? { desiredFlexibility: own } : {}, { tariff }, framework);
+
+    test('a provider that sells only non-flexible tariffs keeps them, and the refund is to check', () => {
+      const r = flex(undefined, fw('NON_FLEXIBLE'));
+      expect(r.scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
+      expect(r.toCheck).toEqual(['the provider\'s non-flexible tariff must allow the refund']);
+      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE'), 'EXCHANGEABLE').toCheck)
+        .toEqual(['the provider\'s non-flexible tariff must allow the exchange']);
+    });
+
+    test('the scenario\'s own flexibility stays when declared, unless it is the non-flexible one', () => {
+      expect(flex('SEMI_FLEXIBLE', fw('FULL_FLEXIBLE', 'SEMI_FLEXIBLE')).scenario.desiredFlexibility).toBe('SEMI_FLEXIBLE');
+      expect(flex('NON_FLEXIBLE', fw('NON_FLEXIBLE', 'SEMI_FLEXIBLE')).scenario.desiredFlexibility).toBe('SEMI_FLEXIBLE');
+    });
+
+    test('otherwise the most flexible declared one', () => {
+      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE', 'SEMI_FLEXIBLE')).scenario.desiredFlexibility).toBe('SEMI_FLEXIBLE');
+      expect(flex(undefined, fw('SEMI_FLEXIBLE', 'FULL_FLEXIBLE', 'NON_FLEXIBLE')).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+      expect(flex(undefined, fw('PROMO')).scenario.desiredFlexibility).toBe('PROMO');
+      expect(flex(undefined, fw('SEMI_FLEXIBLE')).toCheck).toEqual([]);
+    });
+
+    test('nothing declared, or a legacy framework under `config`: as before', () => {
+      expect(flex(undefined, fw()).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+      expect(flex(undefined, { offerCriteria: {} }).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+      expect(flex(undefined, { config: fw('NON_FLEXIBLE') }).scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
+    });
+
+    test('a sale is not touched', () => {
+      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE'), null).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+    });
+  });
+
   test('what the Test Data cannot show is to check; the scenario given is not changed', () => {
     const sc = { code: 'X', expectedProduct: 'P' };
     const r = adaptReferenceScenario(sc, {

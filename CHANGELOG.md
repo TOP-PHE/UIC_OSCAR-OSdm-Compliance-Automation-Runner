@@ -62,6 +62,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.259] / [collection-OTST_V2.0.141] — 2026-10-13
+
+Issue #687, release 2026.293. Collection unchanged.
+
+### Fixed
+
+- **A reference scenario's after-sale tariff is one the provider sells.**
+  The copy from the catalogue used to set every refund or exchange scenario
+  to `FULL_FLEXIBLE`. A real provider sells non-flexible tariffs only, and
+  refunds them: on it, every copied after-sale scenario found no offer of
+  that flexibility and failed "Selected offer has expected flexibility". The
+  flexibility now comes from the Test Framework's declared flexibilities
+  (`afterSaleFlexibility()` in `utils/catalogueMatch.js`):
+  - the scenario's own, when declared and not the non-flexible one;
+  - else the most flexible declared (full, semi, non);
+  - `FULL_FLEXIBLE` when the framework declares none, as before.
+  When the result is `NON_FLEXIBLE`, the preview lists "the provider's
+  non-flexible tariff must allow the refund" (or exchange) to check.
+
+### Default decisions
+
+- A scenario's own `NON_FLEXIBLE` is replaced when the framework declares a
+  more flexible tariff: a non-flexible ticket usually refunds nothing, the
+  reason the rule was there.
+- Scenarios already copied are not changed: copy them again, or set their
+  flexibility in Test Config.
+
+### Not verified
+
+- Not run against the provider: unit tests on the rule only.
+
+---
+
 ## [server-1.11.258] / [collection-OTST_V2.0.141] — 2026-10-13
 
 Release 2026.292. Collection unchanged.
