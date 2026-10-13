@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-after-sale-refusals",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "After-sale refusals",
+    "summary": "Three new negative tests: a refunded ticket refunded again, a refunded ticket exchanged, and a booking confirmed twice.",
+    "content": "Three reference scenarios check what a provider must refuse after a sale. NHF_REFUND_TWICE asks for a refund of a ticket already refunded, NHF_EXCHANGE_REFUNDED asks to exchange it, and both expect a 4xx Problem. NHF_CONFIRM_TWICE confirms a booking a second time and expects the same tickets, or a refusal, never new ones. The probes are also available on any scenario in Test Config."
+  },
+  {
     "id": "2026-10-13-passenger-limits",
     "date": "October 13, 2026",
     "tag": "New",

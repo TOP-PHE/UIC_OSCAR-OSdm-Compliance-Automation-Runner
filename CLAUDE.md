@@ -1168,6 +1168,14 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`severalPassengersScope()`), and step 10 adds up every refund offer's
   amount and fee: it read the first offer only, which a provider answering
   one offer per fulfillment always failed.
+- **After-sale refusals are probes sent from the step's own script** (#700,
+  1.11.265 / OTST_V2.0.147, `library-bruno/afterSaleRefusals.js`), like the
+  Idempotency-Key test: `refundAgainProbe` and `exchangeRefundedProbe` at 14
+  once the refund is done (the REFUNDED fulfillments only), `confirmAgainProbe`
+  at 06 (no Idempotency-Key; the same fulfillments or a 4xx pass, new ones or a
+  5xx fail). A probe needs no request file and no routing, so the run filter
+  cannot skip it (#652). A catalogue entry with `exchangeRefundedProbe` needs
+  EXCHANGE_FULL declared (`salesFlowsOf`).
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

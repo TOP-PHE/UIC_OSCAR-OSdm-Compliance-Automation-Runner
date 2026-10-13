@@ -62,6 +62,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.265] / [collection-OTST_V2.0.147] — 2026-10-13
+
+Issue #700, release 2026.300.
+
+### Added
+
+- **Three after-sale requests that must be refused**, each sent from the
+  script of the step after which it makes sense (`bru.sendRequest`, as the
+  Idempotency-Key test does), so the flow of the scenario does not change.
+  `library-bruno/afterSaleRefusals.js`.
+  - `refundAgainProbe` (14, once the refund is done): a refund offer asked
+    again for the refunded fulfillments must be refused with a 4xx Problem.
+  - `exchangeRefundedProbe` (14, once the refund is done): an exchange offer
+    asked for the refunded fulfillments, with the sale's search and
+    passengers, must be refused with a 4xx Problem.
+  - `confirmAgainProbe` (06, once the booking is confirmed): POST
+    …/fulfillments sent again **without** an Idempotency-Key must give the
+    same fulfillments, or a 4xx Problem; new fulfillments, or a 5xx, fail.
+  Test Config shows the three (the refund ones on REFUND scenarios only).
+- **Three reference scenarios** (catalogue: 43): `NHF_CONFIRM_TWICE`,
+  `NHF_REFUND_TWICE`, `NHF_EXCHANGE_REFUNDED`. The last one needs the sales
+  flow EXCHANGE_FULL declared as well (golden rule).
+
+### Default decisions (taken without asking)
+
+- A second confirmation may be answered with the same tickets (idempotent)
+  or refused: both are conformant; only new tickets or a server error fail.
+- The probes are sent after a refund of every fulfillment; a partial refund
+  probes the fulfillments it refunded. With none refunded, a WARNING and
+  nothing sent.
+- No simulator change: gamma already refuses both (409 with a Problem) and
+  answers a second confirmation with the first tickets.
+
+### Not verified
+
+- Not run against a real provider. One real provider answers 500 to an
+  exchange of a non-exchangeable ticket; how it answers these probes is not
+  known yet.
+
+Checked: the three simulator scenarios run with no failed check (346, 346
+and 231 checks); unit tests (`bruno-after-sale-refusals.test.js`) send each
+probe to a faked provider that accepts, answers 500, or issues new tickets,
+and each fails as it should; a full replay of the 82 simulator scenarios is
+the same as the recording made before the change, and
+`OSCAR - Checks by scenario.md` is regenerated from it.
+
+---
+
 ## [server-1.11.264] / [collection-OTST_V2.0.146] — 2026-10-13
 
 Issue #699, release 2026.299.
