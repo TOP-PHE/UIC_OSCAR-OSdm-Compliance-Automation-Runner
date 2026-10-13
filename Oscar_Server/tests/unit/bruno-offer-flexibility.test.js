@@ -64,3 +64,37 @@ describe('offerFlexibility', () => {
     expect(offers.offerFlexibility({ products: [] })).toBeUndefined();
   });
 });
+
+describe('#709 legs that are not timed legs', () => {
+  test('a transfer or continuous leg gives its kind and its start and end stop places', () => {
+    const at = (ref) => ({ objectType: 'StopPlaceRef', stopPlaceRef: ref });
+    expect(offers.otherLegOf({ id: '1', timedLeg: null, transferLeg: { start: at('urn:uic:stn:8502113'), end: at('urn:uic:stn:8502113') } }))
+      .toEqual({ kind: 'transfer', from: 'urn:uic:stn:8502113', to: 'urn:uic:stn:8502113' });
+    expect(offers.otherLegOf({ continuousLeg: { start: { name: 'A' }, end: {} } })).toEqual({ kind: 'continuous', from: 'A', to: undefined });
+  });
+
+  test('a timed leg, or a leg of no known kind, is checked as before', () => {
+    expect(offers.otherLegOf({ timedLeg: { start: {} }, transferLeg: { start: {} } })).toBeNull();
+    expect(offers.otherLegOf({ id: '1' })).toBeNull();
+    expect(offers.otherLegOf(null)).toBeNull();
+  });
+
+  test('validateTripsAndLegs checks a transfer leg for its start and end, not for a train', () => {
+    const recorded = [];
+    const jestTest = global.test;
+    global.test = (name, body) => { try { body(); recorded.push([name, 'pass']); } catch (e) { recorded.push([name, 'fail']); } };
+    const jestExpect = global.expect;
+    global.expect = require('../helpers/bruno-chai.js').chaiExpect;
+    const timed = { timedLeg: { service: { vehicleNumbers: ['IC 1'] }, start: { stopPlaceName: 'A' }, end: { stopPlaceName: 'B' } } };
+    const walk = { transferLeg: { start: { stopPlaceRef: 'urn:uic:stn:2' }, end: { stopPlaceRef: 'urn:uic:stn:2' } } };
+    try {
+      offers.validateTripsAndLegs({ trips: [{ id: 't', legs: [timed, walk, timed] }] });
+    } finally { global.test = jestTest; global.expect = jestExpect; }
+    const legs = recorded.filter(([name]) => / Leg /.test(name));
+    expect(legs).toEqual([
+      ['Trip 1 Leg 1 has TrainID, Origin & Destination - TrainID: IC 1, Origin: A, Destination: B', 'pass'],
+      ['Trip 1 Leg 2 is a transfer leg with a start and an end - urn:uic:stn:2 → urn:uic:stn:2', 'pass'],
+      ['Trip 1 Leg 3 has TrainID, Origin & Destination - TrainID: IC 1, Origin: A, Destination: B', 'pass'],
+    ]);
+  });
+});

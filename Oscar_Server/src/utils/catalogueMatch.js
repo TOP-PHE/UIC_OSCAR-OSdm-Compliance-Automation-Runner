@@ -161,7 +161,8 @@ function makeDistinct(p, n) {
  * more); without a declared maximum it is left as it is (and cannot be copied).
  * #704: a sales-horizon entry departs on the horizon's last day, or the day after.
  * #705: the age entry gets a passenger list of its own, on the edges of the
- * framework's age ranges.
+ * framework's age ranges. #709: with `passengerUpdate: false` in the framework,
+ * no scenario updates its passengers.
  */
 function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
   const byCode = new Map(arr(entries).map((e) => [e.code, e]));
@@ -180,6 +181,10 @@ function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
       ids.next += 1;
     };
     applyLimit(entry.limit, scenario, source, fw, { ownList, toCheck });
+    // #709: a provider without the passenger update gets none.
+    if (fw.passengerUpdate === false && isObj(scenario.salesFlowActions)) {
+      scenario.salesFlowActions = { ...scenario.salesFlowActions, patchPassengers: false };
+    }
     notes[sc.code] = { toComplete, toCheck };
     return scenario;
   });

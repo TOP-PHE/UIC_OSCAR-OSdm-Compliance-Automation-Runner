@@ -18,7 +18,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  * With `expectedPassengerType`, the chosen offer must price the passenger as
  * that type: an admission of the passenger names it in
  * `appliedPassengerTypes`. OSDM does not require that member, so none given
- * is a WARNING; another type is a failure. A child or youth that does not pay
+ * is a WARNING, as is the generic type PERSON alone (#709); another type is a
+ * failure. A child or youth that does not pay
  * less than an adult is a WARNING (a commercial choice, not an OSDM rule).
  */
 
@@ -26,6 +27,7 @@ require('./displays.js');
 
 const DAY_MS = 86400000;
 const listOf = (value) => (Array.isArray(value) ? value : []);
+const GENERIC_TYPE = 'PERSON';
 const YOUNGER = new Set(['YOUNG_CHILD', 'CHILD', 'FAMILY_CHILD', 'PRM_CHILD', 'YOUTH']);
 
 /**
@@ -68,13 +70,18 @@ const appliedTypes = (offer, ref) => [...new Set(admissionsOf(offer)
  */
 function checkAppliedTypes(offer, expected, label = 'Offer') {
   return listOf(expected).map(({ ref, type }) => {
-    const named = appliedTypes(offer, ref);
+    const given = appliedTypes(offer, ref);
+    // #709: PERSON is the generic type; it says nothing of the age band.
+    const named = given.filter((t) => t !== GENERIC_TYPE || type === GENERIC_TYPE);
     if (named.length === 0) {
+      const why = given.length > 0
+        ? `the admissions of passenger ${ref} name only ${GENERIC_TYPE} in appliedPassengerTypes, which states no age band`
+        : `no admission of passenger ${ref} gives appliedPassengerTypes`;
       return {
         name: `${label}: passenger ${ref} is priced as ${type}`,
         ok: false,
         level: 'warn',
-        message: `no admission of passenger ${ref} gives appliedPassengerTypes, so the type it was priced as cannot be checked (OSDM does not require it)`,
+        message: `${why}, so the type it was priced as cannot be checked (OSDM does not require it)`,
       };
     }
     const ok = named.includes(type);

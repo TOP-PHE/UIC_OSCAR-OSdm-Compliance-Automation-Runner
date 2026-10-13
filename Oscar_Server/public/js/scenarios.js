@@ -3285,6 +3285,16 @@ function changePaxAge(action, el) {
   return true;
 }
 
+// #709: whether the provider lets a booked passenger be updated, outside the
+// change switch. Absent means yes, as before. True when the action was it.
+function changePassengerUpdate(action, el) {
+  if (action !== 'fw-passenger-update') return false;
+  if (el.checked) delete wizData.framework.passengerUpdate;
+  else wizData.framework.passengerUpdate = false;
+  saveFrameworkDebounced();
+  return true;
+}
+
 function setPaxField(pIdx, paxIdx, field, value) {
   if (pIdx < 0) return;
   const paxList = state.passengersList[pIdx];
@@ -4071,6 +4081,13 @@ function renderWizardStep1() {
           <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the provider's limit; the limit scenarios of the catalogue test it and one more (empty = not declared)</span>
         </label>
         <input type="number" id="fw-max-passengers" min="1" max="999" value="${Number.isInteger(fw.maxPassengers) ? fw.maxPassengers : ''}" data-action="fw-max-pax" style="width:90px">
+      </div>
+      <div class="fw-subsection">
+        <label class="fw-subsection-label" for="fw-passenger-update" style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="fw-passenger-update" data-action="fw-passenger-update" ${fw.passengerUpdate === false ? '' : 'checked'}>
+          The provider lets a booked passenger be updated (PATCH /bookings/{id}/passengers/{id})
+        </label>
+        <div style="font-size:11px;color:#90a4ae;margin-top:4px;line-height:1.5">Off: scenarios copied from the catalogue do not update their passengers (step 03 is skipped).</div>
       </div>
     </div>
   </div>
@@ -7200,7 +7217,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el)) return;
+  if (changePaxAge(action, el) || changePassengerUpdate(action, el)) return;
 
   switch (action) {
     case 'file-upload':
