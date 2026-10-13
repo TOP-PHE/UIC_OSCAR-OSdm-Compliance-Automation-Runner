@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-catalogue-copy-report",
+    "date": "October 13, 2026",
+    "tag": "Improvement",
+    "title": "A report when you copy reference scenarios",
+    "summary": "Copying from the scenario catalogue now tells you how many scenarios are ready to run, how many to complete first and why, and how many your Test Framework does not allow.",
+    "content": "As you tick reference scenarios in Copy scenarios, a short report shows how many will be ready to run, which ones you need to complete first (and what for), and which ones your Test Framework does not allow. If your run list is ALL, it also warns that the scenarios to complete would run before they are completed."
+  },
+  {
     "id": "2026-10-12-catalogue-adapt",
     "date": "October 12, 2026",
     "tag": "Improvement",

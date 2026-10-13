@@ -62,6 +62,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.256] / [collection-OTST_V2.0.141] — 2026-10-13
+
+Issue #681 (part 3 of 3), release 2026.290. Collection unchanged.
+
+### Added
+
+- **A report of the copy from the catalogue**, before and after it. Under
+  the trips, Copy scenarios now shows, as scenarios are ticked:
+  "N ready to run · M to complete first · K not allowed by the Test
+  Framework", then what each scenario to complete still needs. The copy's
+  answer carries the same report, under the codes the scenarios have once
+  copied. One implementation, `public/js/copy-report.js`, for the page and
+  the server (as `trip-apply.js`).
+- **A run list of ALL is named.** A copied scenario is never added to a run
+  list; but when the run list of the person copying is "ALL" (the file's for
+  a Test Manager; a tester's own, else the file's), a scenario to complete
+  would run and fail. The report says so, before and after the copy.
+
+### Default decisions
+
+- The run list is not changed by the copy, not even to leave out the
+  scenarios to complete when it is "ALL": turning "ALL" into a list would stop
+  new scenarios from running without anyone ticking them. The report says it
+  instead.
+
+### Not verified
+
+- Not looked at in a browser; the report's text is tested on its own, and
+  the answers the page reads by the route tests.
+
+---
+
 ## [server-1.11.255] / [collection-OTST_V2.0.141] — 2026-10-12
 
 Issue #681 (part 2 of 3), release 2026.289. Collection unchanged.

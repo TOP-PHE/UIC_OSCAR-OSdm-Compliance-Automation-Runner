@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.289",
+  "current_release": "2026.290",
   "releases": [
+    {
+      "release": "2026.290",
+      "date": "2026-10-13",
+      "server": "1.11.256",
+      "collection": "OTST_V2.0.141",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.256 (#681, part 3): Copy scenarios reports ready, to complete and not allowed scenarios before and after the copy, and warns when the run list is ALL."
+      ]
+    },
     {
       "release": "2026.289",
       "date": "2026-10-12",

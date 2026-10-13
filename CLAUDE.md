@@ -1156,6 +1156,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   after-sale tariff never NON_FLEXIBLE. `suggestTrip()` preselects a journey
   of as many legs, else the first train; Test Data carries no reservation or
   class, so those needs come back as `toCheck`, never guessed.
+  **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser
+  global and CommonJS, like `trip-apply.js`): ready / to complete / not
+  allowed, shown live in Copy scenarios and returned by the copy. A copy never
+  adds to a run list; when the copier's list is "ALL" (`runsAllAfterCopy()`,
+  the same reading as `POST /v1/runs`) the report warns that scenarios to
+  complete would run. It does not rewrite "ALL" into a list, on purpose.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
