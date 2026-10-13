@@ -1043,7 +1043,10 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     const src = read('js/scenarios.js');
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
-    expect(src).toMatch(/case 'set-pax-age': \{[\s\S]{0,400}const value = paxAgeValue\(field, el\.value\);/);
-    expect(src).toMatch(/case 'set-pax-expected-type': \{\s*const type = PAX_EXPECTED_TYPES\.includes\(el\.value\)/);
+    // Handled before the change switch (Sonar S1479 caps its cases).
+    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el)) return;");
+    const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
+    expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
+    expect(fn).toContain("const value = paxAgeValue(field, el.value);");
   });
 });

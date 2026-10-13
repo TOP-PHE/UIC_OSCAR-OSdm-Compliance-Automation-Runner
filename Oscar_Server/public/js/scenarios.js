@@ -3253,7 +3253,7 @@ function setTripFieldByPath(tIdx, path, value) {
 }
 
 // #705: the passenger types an offer may be expected to apply.
-const PAX_EXPECTED_TYPES = ['YOUNG_CHILD', 'CHILD', 'YOUTH', 'ADULT', 'SENIOR', 'FAMILY_CHILD', 'PRM', 'PRM_CHILD', 'ACCOMP_PRM'];
+const PAX_EXPECTED_TYPES = new Set(['YOUNG_CHILD', 'CHILD', 'YOUTH', 'ADULT', 'SENIOR', 'FAMILY_CHILD', 'PRM', 'PRM_CHILD', 'ACCOMP_PRM']);
 
 // #705: what an age field holds: a whole number in its range, null when
 // emptied, undefined when it is not valid.
@@ -3264,6 +3264,25 @@ function paxAgeValue(field, raw) {
   const n = Number.parseInt(text, 10);
   const [min, max] = field === 'bornDaysAfter' ? [-366, 366] : [0, 120];
   return n >= min && n <= max ? n : undefined;
+}
+
+// #705: the passenger editor's age fields, outside the change switch. True
+// when the action was one of them.
+function changePaxAge(action, el) {
+  const pIdx = Number.parseInt(el.dataset.pidx);
+  const pi = Number.parseInt(el.dataset.pi);
+  if (action === 'set-pax-expected-type') {
+    setPaxField(pIdx, pi, 'expectedPassengerType', PAX_EXPECTED_TYPES.has(el.value) ? el.value : null);
+    return true;
+  }
+  if (action !== 'set-pax-age') return false;
+  // An age on the day of travel; empty clears it, anything not valid puts
+  // the stored value back.
+  const field = el.dataset.field === 'bornDaysAfter' ? 'bornDaysAfter' : 'bornYearsBeforeTravel';
+  const value = paxAgeValue(field, el.value);
+  if (value === undefined) el.value = state.passengersList[pIdx]?.passengers?.[pi]?.[field] ?? '';
+  else setPaxField(pIdx, pi, field, value);
+  return true;
 }
 
 function setPaxField(pIdx, paxIdx, field, value) {
@@ -7181,6 +7200,7 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
+  if (changePaxAge(action, el)) return;
 
   switch (action) {
     case 'file-upload':
@@ -7346,25 +7366,6 @@ document.body.addEventListener('change', function(e) {
           });
         });
       }
-      break;
-    }
-    case 'set-pax-age': {
-      // #705: an age on the day of travel; empty clears it, anything not
-      // valid puts the stored value back.
-      const field = el.dataset.field === 'bornDaysAfter' ? 'bornDaysAfter' : 'bornYearsBeforeTravel';
-      const pIdx = Number.parseInt(el.dataset.pidx);
-      const pi = Number.parseInt(el.dataset.pi);
-      const value = paxAgeValue(field, el.value);
-      if (value === undefined) {
-        el.value = state.passengersList[pIdx]?.passengers?.[pi]?.[field] ?? '';
-        break;
-      }
-      setPaxField(pIdx, pi, field, value);
-      break;
-    }
-    case 'set-pax-expected-type': {
-      const type = PAX_EXPECTED_TYPES.includes(el.value) ? el.value : null;
-      setPaxField(Number.parseInt(el.dataset.pidx), Number.parseInt(el.dataset.pi), 'expectedPassengerType', type);
       break;
     }
     case 'set-pax-family': {

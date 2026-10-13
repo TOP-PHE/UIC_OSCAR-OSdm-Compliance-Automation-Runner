@@ -45,11 +45,12 @@ function priced(admission, trip, provider) {
   const band = admission.passengers.length === 1 ? bandOf(passenger, trip, provider) : null;
   if (!band) return admission;
   const named = admission.applied?.appliedPassengerTypes?.[0];
+  const card = named ? ` (${named.description})` : '';
   const applied = {
-    ...(named || {}),
+    ...named,
     passengerRef: passenger.externalRef,
     type: band.type,
-    description: `${band.type}, aged ${band.age} on the day of travel${named ? ` (${named.description})` : ''}`,
+    description: `${band.type}, aged ${band.age} on the day of travel${card}`,
   };
   return {
     ...admission,
