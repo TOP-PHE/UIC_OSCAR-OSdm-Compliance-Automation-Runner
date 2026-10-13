@@ -62,6 +62,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.264] / [collection-OTST_V2.0.146] — 2026-10-13
+
+Issue #699, release 2026.299.
+
+### Added
+
+- **The provider's maximum number of passengers** (Test Framework →
+  Passenger Types → *Maximum passengers per offer and booking*,
+  `maxPassengers`, 1 to 999; empty = not declared). OSDM sets no maximum;
+  each provider has one.
+- **Three reference scenarios that test it** (catalogue: 40). Their passenger
+  list is resized at copy time to the framework's maximum, or one more for the
+  negative test; without a declared maximum they cannot be copied (golden
+  rule: "Needs in the Test Framework: the maximum number of passengers").
+  - `OTST_SALE_MAX_PASSENGERS`: a sale at the maximum, every passenger
+    updated after booking.
+  - `NHF_SALE_TOO_MANY_PASSENGERS`: one passenger more. POST /offers must
+    refuse them (4xx with a Problem, or no offer); if it gives offers, POST
+    /bookings must refuse them. The scenario ends at the refusal; a booking
+    made over the limit fails. New scenario field
+    `passengerLimitExpectRejection` (Test Config → *Over the passenger
+    limit*), `library-bruno/passengerLimit.js`.
+  - `OTST_REFUND_PARTIAL_PASSENGERS_THIRD`: at the maximum, the last third of
+    the passengers refunded. New value `third` of `partialRefundPaxSelection`
+    (the last third, rounded up). One RefundSpecification per fulfillment
+    holding them when each passenger has a ticket of their own, one listing
+    them all when one ticket holds everyone; a passenger whose parts are in
+    no ticket shown degrades the refund to full, as before.
+
+### Fixed
+
+- **"Partial refund: request/response alignment" read the first refund offer
+  only.** A provider that answers one refund offer per fulfillment refunded
+  gave the price of one fulfillment against the expected price of all of
+  them, and the check failed. The offers' amounts and fees are now added up.
+
+### Default decisions (taken without asking)
+
+- "A third" is the **last** third of the passengers, rounded up (7 of 19,
+  1 of 2): the main passenger stays booked.
+- The negative test accepts a refusal at either step, because a provider may
+  price any number of passengers and enforce its limit at the booking only.
+  A 2xx answer to POST /offers that holds no offer counts as a refusal; a
+  Problem saying why is then only recommended (WARNING when missing).
+- At copy time, passengers beyond those of the source list are copies of
+  them, each with its own reference, first name, e-mail and phone number.
+- The simulator's own limit stays 19 (as before); no simulator change.
+
+### Not verified
+
+- Not run against a real provider. On the simulator (gamma, 19 maximum):
+  the three scenarios run standalone with no failed check (1,292, 70 and
+  5,207 checks); the refund of a third gives seven refund offers, each
+  confirmed, seven tickets `REFUNDED` and twelve `FULFILLED`.
+- The Test Framework field was not clicked in a browser; its value parsing
+  and its wiring are covered by `ui-scripts.test.js`.
+
+Checked: new unit tests (`bruno-passenger-limit.test.js`, catalogue limit and
+resize tests, the framework field), each mutation-checked (the missing
+requirement, the resize, the several-specifications path); the alignment fix
+was found by the simulator run (one failed check before, none after); a full
+replay of the 79 simulator scenarios is the same as the recording made
+before the change (the 76 earlier scenarios check the same things), and
+`OSCAR - Checks by scenario.md` is regenerated from it.
+
+---
+
 ## [server-1.11.263] / [collection-OTST_V2.0.145] — 2026-10-13
 
 Issue #697, release 2026.298. Simulator 0.23.0.
