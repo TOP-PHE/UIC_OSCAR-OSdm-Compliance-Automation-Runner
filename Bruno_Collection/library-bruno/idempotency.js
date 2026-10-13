@@ -17,7 +17,9 @@ http://www.apache.org/licenses/LICENSE-2.0
  * With `idempotencyCheck` on, each of these two requests is sent with a key,
  * then sent again with the same key: the answer must be the same booking, or
  * the same fulfillments, and no second booking. The booking is also sent a
- * third time with another key: that one must be a new booking.
+ * third time with another key: that one must be a new booking. A provider
+ * may book an offer only once and refuse that third request (#693): then new
+ * offers are asked for and the booking with another key is made on one.
  *
  * Pure module: no Bruno globals. Unit-tested in
  * Oscar_Server/tests/unit/bruno-idempotency.test.js.
@@ -78,4 +80,47 @@ function checkFulfillmentReplay(first, replay, status) {
   return checks;
 }
 
-module.exports = { uuidFromBytes, checkBookingReplay, checkBookingOtherKey, checkFulfillmentReplay };
+/** A refusal of the request (4xx) that made no booking. */
+function refusedWithoutBooking(status, body) {
+  return status >= 400 && status < 500 && !body?.booking?.id;
+}
+
+const flexibilityOf = (offer) => offer?.offerSummary?.overallFlexibility ?? null;
+const travelClassOf = (offer) => offer?.offerSummary?.overallTravelClass ?? null;
+const priceOf = (offer) => offer?.offerSummary?.minimalPrice?.amount ?? null;
+
+/**
+ * #693: among new offers, the one that stands for the offer chosen before:
+ * same flexibility, travel class and price, else same flexibility and class,
+ * else the first. { offer, how }, or null when there is no offer.
+ */
+function matchingOffer(chosen, offers) {
+  const list = listOf(offers).filter((o) => o && typeof o.offerId === 'string');
+  if (list.length === 0) return null;
+  const sameKind = (o) => flexibilityOf(o) === flexibilityOf(chosen) && travelClassOf(o) === travelClassOf(chosen);
+  const exact = list.find((o) => sameKind(o) && priceOf(o) === priceOf(chosen));
+  if (exact) return { offer: exact, how: 'the same flexibility, travel class and price' };
+  const kind = list.find(sameKind);
+  if (kind) return { offer: kind, how: 'the same flexibility and travel class' };
+  return { offer: list[0], how: 'the first offer (none of the same flexibility and travel class)' };
+}
+
+/**
+ * #693: the booking request made again on another offer. Only a booking of
+ * one offer is made again. The seats and reservations chosen name the old
+ * offer's parts, so they are left out. { body, droppedSelections }, or null.
+ */
+function bookingOnOffer(bookingRequest, offerId) {
+  const offers = listOf(bookingRequest?.offers);
+  if (offers.length !== 1 || typeof offerId !== 'string') return null;
+  const { placeSelections, optionalReservationSelections, ...rest } = offers[0];
+  return {
+    body: { ...bookingRequest, offers: [{ ...rest, offerId }] },
+    droppedSelections: placeSelections !== undefined || optionalReservationSelections !== undefined,
+  };
+}
+
+module.exports = {
+  uuidFromBytes, checkBookingReplay, checkBookingOtherKey, checkFulfillmentReplay,
+  refusedWithoutBooking, matchingOffer, bookingOnOffer,
+};
