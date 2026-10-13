@@ -1097,6 +1097,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     did not, and keeps the asked ones as the refunded set (`widerThanAsked`),
     which the CONFIRMED branch then uses. A full refund asks for all, so it
     is never narrowed.
+  - **An unset variable in a header template goes out as text** (#692,
+    OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
+    provider without a requestor got that text on every request. The
+    collection's before-request removes the header then
+    (`requestHeaders.js`); a request a script sends uses `requestorHeader()`.
+    A new optional header template needs the same treatment.
   - **Each expiry sub-run sells again from a clean sale** (#658,
     OTST_V2.0.133). The queue sends the next sub-run to 01, which does not
     re-read the scenario (only `__loopback` does), so the previous booking id
@@ -1169,7 +1175,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   after-sale tariff from `offerCriteria.flexibilities` (#687,
   `afterSaleFlexibility()`: own if declared and not NON_FLEXIBLE, else the
   most flexible declared, FULL_FLEXIBLE if none). A provider may sell only
-  non-flexible tariffs and refund them; never ask it for one it does not sell. `suggestTrip()` preselects a journey
+  non-flexible tariffs and refund them; never ask it for one it does not sell.
+  Any other scenario with a flexibility (#691, `saleFlexibility()`): own if
+  declared, else the most flexible declared, unchanged if none declared.
+  The list is set in the Test Framework's 💶 Tariff Flexibility section
+  (`fw-offer-pill`): before #691 no page showed it, so it was always the
+  default three. `suggestTrip()` preselects a journey
   of as many legs, else the first train; Test Data carries no reservation or
   class, so those needs come back as `toCheck`, never guessed.
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser
