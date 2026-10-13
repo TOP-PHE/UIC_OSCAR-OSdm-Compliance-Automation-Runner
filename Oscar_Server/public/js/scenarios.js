@@ -69,6 +69,10 @@ const ENUMS = {
   tripIdsExpectRejection:            ['off', 'on'],
   // #699: negative test, one passenger over the provider's maximum must be refused.
   passengerLimitExpectRejection:     ['off', 'on'],
+  // #700: after-sale requests that must be refused.
+  refundAgainProbe:                  ['off', 'on'],
+  exchangeRefundedProbe:             ['off', 'on'],
+  confirmAgainProbe:                 ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -1629,6 +1633,12 @@ function buildDetailHTML(idx) {
           'Offers asked by trip id (#602). On: POST /trips-collection is asked with the origin, destination and time of the SEARCH trip; the trip of its train number, or else the first leaving at that time or later, is taken, and POST /offers names it in tripIds. One-way only: a return or a SPECIFICATION trip is asked as before.')}
         ${buildSelect(idx, 'tripIdsExpectRejection', 'Unknown trip id refused', ENUMS.tripIdsExpectRejection,
           'Negative test (#602). On: POST /offers names a trip id the provider never gave, and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
+        ${buildSelect(idx, 'confirmAgainProbe', 'Booking confirmed twice', ENUMS.confirmAgainProbe,
+          'Negative test (#700). On: once the booking is confirmed, POST /bookings/{id}/fulfillments is sent again without an Idempotency-Key. The same fulfillments, or a 4xx refusal, are expected; new tickets fail.')}
+        ${state.scenarios[idx]?.scenarioType === 'REFUND' ? `${buildSelect(idx, 'refundAgainProbe', 'Refunded ticket refunded again', ENUMS.refundAgainProbe,
+          'Negative test (#700). On: once the refund is confirmed, a refund offer is asked again for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}
+        ${buildSelect(idx, 'exchangeRefundedProbe', 'Refunded ticket exchanged', ENUMS.exchangeRefundedProbe,
+          'Negative test (#700). On: once the refund is confirmed, an exchange offer is asked for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}` : ''}
         ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
           'Negative test (#699). On: the scenario\'s passengers are one more than the provider\'s maximum (Test Framework → Passenger Types). POST /offers must refuse them (4xx + RFC-9457 Problem, or no offer), or else POST /bookings must; the scenario ends at the refusal, and a booking made over the limit fails.')}
         ${(() => {

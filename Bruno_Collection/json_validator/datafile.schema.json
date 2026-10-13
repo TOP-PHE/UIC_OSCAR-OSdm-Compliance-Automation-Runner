@@ -285,6 +285,21 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "refundAgainProbe": {
+            "description": "Negative test (#700). When on, once the refund is confirmed (14), POST /bookings/{id}/refund-offers is sent again for the refunded fulfillments and must be refused (4xx with an RFC-9457 Problem). Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "exchangeRefundedProbe": {
+            "description": "Negative test (#700). When on, once the refund is confirmed (14), POST /bookings/{id}/exchange-offers is sent for the refunded fulfillments and must be refused (4xx with an RFC-9457 Problem). Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "confirmAgainProbe": {
+            "description": "Negative test (#700). When on, once the booking is confirmed (06), POST /bookings/{id}/fulfillments is sent again without an Idempotency-Key: the same fulfillments, or a 4xx refusal; never new tickets. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "passengerLimitExpectRejection": {
             "description": "Negative test (#699). When on, the scenario's passengers are one more than the provider's maximum (Test Framework maxPassengers): POST /offers must refuse them (4xx with an RFC-9457 Problem, or no offer), or else POST /bookings must (4xx). The scenario ends at the refusal. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

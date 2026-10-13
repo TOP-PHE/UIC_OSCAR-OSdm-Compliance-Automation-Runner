@@ -126,6 +126,8 @@ runtime:
 
         // #604: the same confirmation sent again with the same key.
         await require(bru.getEnvVar("library_base") + "idempotencySteps.js").checkConfirmationIdempotency(jsonData);
+        // #700: the confirmation sent again, without a key, issues no new ticket.
+        await require(bru.getEnvVar("library_base") + "afterSaleRefusals.js").probeConfirmAgain(jsonData);
 
         // #603: read each fulfillment with GET /fulfillments/{id} (06b), then
         // the booking (07).

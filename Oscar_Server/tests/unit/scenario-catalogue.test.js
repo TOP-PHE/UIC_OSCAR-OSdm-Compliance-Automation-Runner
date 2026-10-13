@@ -213,3 +213,15 @@ describe('#699 the passenger limit entries', () => {
     expect(catalogueProblems(broken, simulator)).toEqual([expect.stringContaining('limit "MANY"')]);
   });
 });
+
+describe('#700 the after-sale refusals', () => {
+  test('three negative entries; the exchange of a refunded ticket needs the exchange declared', () => {
+    const listed = catalogueFor(catalogue, simulator, { salesFlows: ['SALE', 'REFUND_FULL'], passengerTypes: ['ADULT'] });
+    const byCode = Object.fromEntries(listed.map(e => [e.code, e]));
+    expect(byCode.NHF_CONFIRM_TWICE.missing).toEqual([]);
+    expect(byCode.NHF_REFUND_TWICE.missing).toEqual([]);
+    expect(byCode.NHF_EXCHANGE_REFUNDED.missing).toEqual(['sales flow EXCHANGE_FULL']);
+    expect(byCode.NHF_EXCHANGE_REFUNDED.requirements.salesFlows).toEqual(['SALE', 'REFUND_FULL', 'EXCHANGE_FULL']);
+    expect(salesFlowsOf({ scenarioType: 'EXCHANGE', exchangeRefundedProbe: 'on' })).toEqual(['SALE', 'EXCHANGE_FULL']);
+  });
+});

@@ -129,6 +129,38 @@
       }
     },
     {
+      "code": "NHF_CONFIRM_TWICE",
+      "source": "SIM_NHF_CONFIRM_AGAIN_38",
+      "purpose": "A booking confirmed twice: the second confirmation must give the same tickets, or be refused; never new ones.",
+      "checks": 231,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_REFUND_TWICE",
+      "source": "SIM_NHF_REFUND_AGAIN_38",
+      "purpose": "A ticket refunded in full cannot be refunded again: the second refund offer request must be refused.",
+      "checks": 346,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_EXCHANGE_REFUNDED",
+      "source": "SIM_NHF_EXCHANGE_REFUNDED_38",
+      "purpose": "A ticket refunded in full cannot be exchanged: the exchange offer request must be refused.",
+      "checks": 346,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
       "code": "NHF_SALE_TOO_MANY_PASSENGERS",
       "source": "SIM_NHF_TOO_MANY_PASSENGERS_38",
       "purpose": "One passenger more than the provider's maximum: the offer request, or else the booking, must be refused.",
