@@ -102,6 +102,16 @@ By default gamma gives one ticket per direction holding every passenger, and an 
 | `SIM_REFUND_PAX_2ADT_38` | Two adults, then the last passenger refunded alone (`partialRefundByPax`, `last`): the refund names the ticket that holds that passenger, and only that passenger's parts are refunded. | One ticket per passenger; one refund offer for the second, which becomes `REFUNDED`, the first stays `FULFILLED`. | No failed check; the two merged-PDF warnings. |
 | `SIM_REFUND_LEG_1ADT_38` | A two-leg trip, then the last leg refunded alone (`partialRefundByLeg`, `last`): `bookingPartIds` names that leg's parts. | One admission and one ticket per leg; the refund offer gives back a third of the price (one hour of three) and the first leg's ticket stays `FULFILLED`. | No failed check; the two merged-PDF warnings. |
 
+### Passenger limits (#699)
+
+gamma sells at most 19 passengers in one offer and one booking; a request for more is refused with 400 `VALIDATION_ERROR`. The limit scenarios use passenger lists 19 (19 adults) and 20 (20 adults). In the catalogue their lists are resized at copy time to the provider's own maximum (Test Framework → Passenger Types).
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_MAX_PASSENGERS_38` | Sale for 19 adults, gamma's maximum, every passenger updated after booking. | One offer, booking and ticket for all 19. | No failed check. |
+| `SIM_NHF_TOO_MANY_PASSENGERS_38` | Negative test: 20 adults (`passengerLimitExpectRejection`). POST /offers, or else POST /bookings, must refuse them; the scenario ends at the refusal. | POST /offers answers 400 with a Problem. | No failed check; one warning: the Problem has no `pointers`. |
+| `SIM_REFUND_PAX_THIRD_19PAX_38` | 19 adults on the trip sold with one ticket per passenger (trip requirement 10), then the last third of them, 7, refunded (`partialRefundPaxSelection: third`): one RefundSpecification per ticket. | Seven refund offers, each confirmed; those seven tickets `REFUNDED`, the other twelve `FULFILLED`. | No failed check; the two merged-PDF warnings. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an

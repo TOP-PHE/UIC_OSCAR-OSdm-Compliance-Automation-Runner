@@ -620,7 +620,7 @@ function requestRefundOffersBody(overruleCode, refundDate = null, refundSpecific
     const wanted = new Set(
       _hasSpec
         ? refundSpecifications.map(s => s && s.fulfillmentId).filter(Boolean).map(String)
-        : [String(_scopeOnly)]
+        : String(_scopeOnly).split(",").filter(Boolean)
     );
     const trimmed = Array.isArray(fulfillmentIds)
       ? fulfillmentIds.filter(id => wanted.has(String(id)))

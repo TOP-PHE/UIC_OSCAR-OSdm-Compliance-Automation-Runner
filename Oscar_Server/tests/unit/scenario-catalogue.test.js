@@ -169,7 +169,47 @@ describe('#681 what a reference scenario needs from the provider\'s data', () =>
     const listed = catalogueFor(catalogue, simulator, {});
     for (const e of listed) {
       expect(e.needs).toEqual(catalogue.entries.find(x => x.code === e.code).needs);
-      expect(e.needsText).toEqual(needsText(e.needs));
+      if (!e.limit) expect(e.needsText).toEqual(needsText(e.needs));
     }
+  });
+});
+
+describe('#699 the passenger limit entries', () => {
+  const limits = catalogue.entries.filter(e => e.limit);
+
+  test('three entries: the maximum, one over it, a third of them refunded', () => {
+    expect(limits.map(e => [e.code, e.limit])).toEqual([
+      ['OTST_SALE_MAX_PASSENGERS', 'MAX_PASSENGERS'],
+      ['OTST_REFUND_PARTIAL_PASSENGERS_THIRD', 'MAX_PASSENGERS'],
+      ['NHF_SALE_TOO_MANY_PASSENGERS', 'OVER_MAX_PASSENGERS'],
+    ]);
+  });
+
+  test('cannot be copied without a declared maximum; can with one; others are not affected', () => {
+    const fw = { salesFlows: ['SALE', 'REFUND_PARTIAL'], passengerTypes: ['ADULT'] };
+    const without = catalogueFor(catalogue, simulator, fw);
+    const withMax = catalogueFor(catalogue, simulator, { ...fw, maxPassengers: 9 });
+    for (const e of limits) {
+      expect(without.find(x => x.code === e.code).missing).toContain('the maximum number of passengers (Passenger Types)');
+      expect(withMax.find(x => x.code === e.code).missing).toEqual([]);
+    }
+    const other = without.find(x => x.code === 'OTST_SALE_ONE_WAY_1ADT');
+    expect(other.missing).toEqual([]);
+    expect(catalogueFor(catalogue, simulator, { ...fw, config: undefined, maxPassengers: 0 })
+      .find(x => x.code === 'OTST_SALE_MAX_PASSENGERS').missing).toContain('the maximum number of passengers (Passenger Types)');
+  });
+
+  test('say the framework\'s number, not the simulator\'s', () => {
+    const listed = catalogueFor(catalogue, simulator, {});
+    expect(listed.find(x => x.code === 'NHF_SALE_TOO_MANY_PASSENGERS').needsText[0])
+      .toBe('one passenger more than the maximum the Test Framework declares');
+    expect(listed.find(x => x.code === 'OTST_SALE_MAX_PASSENGERS').needsText)
+      .toEqual(['the maximum number of passengers the Test Framework declares']);
+  });
+
+  test('an unknown limit is a problem of the file', () => {
+    const broken = structuredClone(catalogue);
+    broken.entries[0].limit = 'MANY';
+    expect(catalogueProblems(broken, simulator)).toEqual([expect.stringContaining('limit "MANY"')]);
   });
 });

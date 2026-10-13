@@ -982,3 +982,23 @@ describe('Test Config partial refund per fulfillment (#595)', () => {
     expect(render(0, { partialRefundByFulfillment: 'off', partialRefundByPax: 'on' }, false)).not.toContain('not used');
   });
 });
+
+describe('#699 the maximum number of passengers in the Test Framework', () => {
+  const fwMaxPassengers = loadFunction('js/scenarios.js', 'fwMaxPassengers');
+
+  test('a whole number from 1 to 999; empty is "not declared"; anything else is refused', () => {
+    expect(fwMaxPassengers('9')).toBe(9);
+    expect(fwMaxPassengers(' 19 ')).toBe(19);
+    expect(fwMaxPassengers('999')).toBe(999);
+    expect(fwMaxPassengers('')).toBeNull();
+    expect(fwMaxPassengers(undefined)).toBeNull();
+    for (const bad of ['0', '1000', '-3', '2.5', 'ten', '1e2']) expect(fwMaxPassengers(bad)).toBeUndefined();
+  });
+
+  test('the field is labelled, and its change goes through fwMaxPassengers', () => {
+    const src = read('js/scenarios.js');
+    expect(src).toContain('<label class="fw-subsection-label" for="fw-max-passengers"');
+    expect(src).toContain('id="fw-max-passengers"');
+    expect(src).toMatch(/case 'fw-max-pax': \{\s*\/\/[^\n]*\n\s*const value = fwMaxPassengers\(el\.value\);/);
+  });
+});
