@@ -137,8 +137,9 @@
     if (!el) return;
     if (!preview || preview.source?.id !== CATALOGUE.id || typeof OscarCopyReport === 'undefined') { el.innerHTML = ''; return; }
     const lines = OscarCopyReport.reportLines(OscarCopyReport.copyReport(preview.scenarios, selectedCodes()), preview.runsAll);
+    const details = lines.slice(1).map(l => '<br><span style="font-size:12px">' + esc(l) + '</span>').join('');
     el.innerHTML = `<div style="${NOTE_STYLE}background:#eceff1;color:#37474f;border:1px solid #cfd8dc">`
-      + `<strong>${esc(lines[0])}</strong>${lines.slice(1).map(l => `<br><span style="font-size:12px">${esc(l)}</span>`).join('')}</div>`;
+      + `<strong>${esc(lines[0])}</strong>${details}</div>`;
   }
 
   function renderPreview() {

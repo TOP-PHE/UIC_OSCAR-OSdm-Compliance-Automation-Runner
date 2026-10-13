@@ -47,11 +47,13 @@
    * then run, and fail, before it is completed.
    */
   function reportLines(report, runsAll) {
-    const r = report || { ready: [], toComplete: [], refused: [] };
-    const lines = [`${r.ready.length} ready to run · ${r.toComplete.length} to complete first · ${r.refused.length} not allowed by the Test Framework`];
-    for (const t of r.toComplete) lines.push(`${t.code}: ${t.reasons.join('; ')}`);
-    if (runsAll && r.toComplete.length) {
-      lines.push(`Your run list is ALL: ${r.toComplete.map(t => t.code).join(', ')} will run, and fail, until completed. Untick them in Test Config or complete them first.`);
+    const ready = arr(report?.ready);
+    const toComplete = arr(report?.toComplete);
+    const refused = arr(report?.refused);
+    const lines = [`${ready.length} ready to run · ${toComplete.length} to complete first · ${refused.length} not allowed by the Test Framework`];
+    for (const t of toComplete) lines.push(`${t.code}: ${arr(t.reasons).join('; ')}`);
+    if (runsAll && toComplete.length) {
+      lines.push(`Your run list is ALL: ${toComplete.map(t => t.code).join(', ')} will run, and fail, until completed. Untick them in Test Config or complete them first.`);
     }
     return lines;
   }
