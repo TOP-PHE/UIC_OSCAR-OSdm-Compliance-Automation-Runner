@@ -58,15 +58,28 @@ function overruleFor(scenario, framework) {
 // Most flexible first: the order in which an after-sale tariff is chosen.
 const FLEXIBILITIES = ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'];
 
+// The flexibilities the Test Framework declares.
+const declaredFlexibilities = (framework) => arr(framework.offerCriteria?.flexibilities)
+  .filter((f) => typeof f === 'string' && f !== '');
+
 // The flexibility of an after-sale scenario (#687). The scenario's own when
 // the framework declares it, unless it is the non-flexible one; else the most
 // flexible the framework declares. A provider may sell only non-flexible
 // tariffs and still refund them: then NON_FLEXIBLE, never a flexibility it
 // does not sell. With nothing declared, FULL_FLEXIBLE, as before.
 function afterSaleFlexibility(own, framework) {
-  const declared = arr(framework.offerCriteria?.flexibilities).filter((f) => typeof f === 'string' && f !== '');
+  const declared = declaredFlexibilities(framework);
   if (!declared.length) return own && own !== 'NON_FLEXIBLE' ? own : 'FULL_FLEXIBLE';
   if (own && own !== 'NON_FLEXIBLE' && declared.includes(own)) return own;
+  return FLEXIBILITIES.find((f) => declared.includes(f)) || declared[0];
+}
+
+// The flexibility of any other scenario that asks for one (#691): its own
+// when the framework declares it, else the most flexible declared. With
+// nothing declared, unchanged.
+function saleFlexibility(own, framework) {
+  const declared = declaredFlexibilities(framework);
+  if (!declared.length || declared.includes(own)) return own;
   return FLEXIBILITIES.find((f) => declared.includes(f)) || declared[0];
 }
 
@@ -109,6 +122,8 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
     if (out.desiredFlexibility === 'NON_FLEXIBLE') {
       toCheck.push(`the provider's non-flexible tariff must allow the ${n.tariff === 'REFUNDABLE' ? 'refund' : 'exchange'}`);
     }
+  } else if (out.desiredFlexibility) {
+    out.desiredFlexibility = saleFlexibility(out.desiredFlexibility, framework);
   }
   return { scenario: out, toComplete, toCheck };
 }

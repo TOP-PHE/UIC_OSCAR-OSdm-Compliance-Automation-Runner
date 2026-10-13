@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.261] / [collection-OTST_V2.0.142] — 2026-10-13
+
+Issue #691, release 2026.295. Collection unchanged.
+
+### Fixed
+
+- **A copied sale scenario asks for a flexibility the provider sells.**
+  Since 2026.293 an after-sale scenario takes its flexibility from the Test
+  Framework (#687); a sale scenario kept the simulator's, mostly
+  `FULL_FLEXIBLE`. On a provider that sells non-flexible tariffs only, the
+  copied sale scenarios then failed "Selected offer has expected
+  flexibility". Now every reference scenario that asks for a flexibility
+  keeps it when the framework declares it, else takes the most flexible
+  declared one (`saleFlexibility()` in `utils/catalogueMatch.js`). A
+  scenario without a flexibility, or a framework that declares none, is
+  left as it is.
+
+### Default decisions
+
+- A sale may keep `NON_FLEXIBLE` when it is declared: unlike an after-sale,
+  a sale needs nothing from the tariff.
+- Scenarios already copied are not changed: copy them again.
+
+### Not verified
+
+- Not run against the provider; unit tests on the rule.
+
+---
+
 ## [server-1.11.260] / [collection-OTST_V2.0.142] — 2026-10-13
 
 Issue #688, release 2026.294.

@@ -92,8 +92,18 @@ describe('adaptReferenceScenario', () => {
       expect(flex(undefined, { config: fw('NON_FLEXIBLE') }).scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
     });
 
-    test('a sale is not touched', () => {
-      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE'), null).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+    // #691: a sale asks for a flexibility the provider sells too.
+    test('a sale keeps its flexibility when declared, else takes the most flexible declared', () => {
+      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE'), null).scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
+      expect(flex('FULL_FLEXIBLE', fw('NON_FLEXIBLE', 'SEMI_FLEXIBLE'), null).scenario.desiredFlexibility).toBe('SEMI_FLEXIBLE');
+      expect(flex('NON_FLEXIBLE', fw('FULL_FLEXIBLE', 'NON_FLEXIBLE'), null).scenario.desiredFlexibility).toBe('NON_FLEXIBLE');
+      expect(flex('SEMI_FLEXIBLE', fw('SEMI_FLEXIBLE'), null).toCheck).toEqual([]);
+    });
+
+    test('a sale with no flexibility, or a framework that declares none, is not touched', () => {
+      expect(flex(undefined, fw('NON_FLEXIBLE'), null).scenario).not.toHaveProperty('desiredFlexibility');
+      expect(flex('FULL_FLEXIBLE', fw(), null).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
+      expect(flex('FULL_FLEXIBLE', {}, null).scenario.desiredFlexibility).toBe('FULL_FLEXIBLE');
     });
   });
 
