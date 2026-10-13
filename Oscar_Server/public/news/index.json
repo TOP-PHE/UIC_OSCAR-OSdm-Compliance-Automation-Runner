@@ -8,6 +8,14 @@
     "content": "The Requestor header is sent only when a requestor is configured in API Config. Before, a run without one sent the placeholder text to the provider on every request. The run log says once that the header is left out."
   },
   {
+    "id": "2026-10-13-catalogue-sale-flexibility",
+    "date": "October 13, 2026",
+    "tag": "Fix",
+    "title": "Copied sales use a tariff your provider sells",
+    "summary": "Sale scenarios copied from the catalogue now take their flexibility from your Test Framework, as refund and exchange scenarios already do.",
+    "content": "The Test Framework has a new section, Tariff Flexibility: tick only the flexibilities your provider sells. When a reference scenario asks for a flexibility you do not declare, the copy now asks for the most flexible one you declare. Scenarios copied before keep their flexibility: copy them again."
+  },
+  {
     "id": "2026-10-13-refund-wider-than-asked",
     "date": "October 13, 2026",
     "tag": "Fix",

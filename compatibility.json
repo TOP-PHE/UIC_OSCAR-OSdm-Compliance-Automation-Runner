@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.295",
+      "date": "2026-10-13",
+      "server": "1.11.261",
+      "collection": "OTST_V2.0.142",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Copied sale scenarios take their flexibility from the Test Framework too (#691)."
+      ]
+    },
+    {
       "release": "2026.294",
       "date": "2026-10-13",
       "server": "1.11.260",

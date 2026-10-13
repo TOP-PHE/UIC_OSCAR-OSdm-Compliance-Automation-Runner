@@ -86,6 +86,46 @@ Issue #692, release 2026.296.
 
 ---
 
+## [server-1.11.261] / [collection-OTST_V2.0.142] — 2026-10-13
+
+Issue #691, release 2026.295. Collection unchanged.
+
+### Fixed
+
+- **A copied sale scenario asks for a flexibility the provider sells.**
+  Since 2026.293 an after-sale scenario takes its flexibility from the Test
+  Framework (#687); a sale scenario kept the simulator's, mostly
+  `FULL_FLEXIBLE`. On a provider that sells non-flexible tariffs only, the
+  copied sale scenarios then failed "Selected offer has expected
+  flexibility". Now every reference scenario that asks for a flexibility
+  keeps it when the framework declares it, else takes the most flexible
+  declared one (`saleFlexibility()` in `utils/catalogueMatch.js`). A
+  scenario without a flexibility, or a framework that declares none, is
+  left as it is.
+- **The Test Framework shows the flexibilities the provider sells**
+  (💶 Tariff Flexibility, after Seat Selection). `offerCriteria.flexibilities`
+  drove the scenario editor's flexibility picker and, since 2026.293, the
+  catalogue copy, but no page let anyone set it: every framework kept the
+  default, all three, so the #687 rule never saw a provider that sells
+  non-flexible tariffs only.
+
+### Default decisions
+
+- A sale may keep `NON_FLEXIBLE` when it is declared: unlike an after-sale,
+  a sale needs nothing from the tariff.
+- Scenarios already copied are not changed: copy them again.
+- Only the flexibilities are shown. The other `offerCriteria` lists (service
+  and travel classes, offer parts) stay hidden: nothing reads them at copy
+  time yet.
+
+### Not verified
+
+- Not run against the provider; unit tests on the rule.
+- The new section was not looked at in a browser; a test checks what it
+  draws and what a click does.
+
+---
+
 ## [server-1.11.260] / [collection-OTST_V2.0.142] — 2026-10-13
 
 Issue #688, release 2026.294.
