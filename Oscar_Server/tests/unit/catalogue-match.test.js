@@ -151,3 +151,48 @@ describe('suggestTrip', () => {
     expect(suggestTrip({ legs: 1 }, { trains: [], journeys: [] })).toBeNull();
   });
 });
+
+describe('#699 a limit entry takes the framework\'s maximum number of passengers', () => {
+  const { resizedPassengers } = require('../../src/utils/catalogueMatch');
+  const source = catalogueDatafile(catalogue, simulator);
+  const fw = { salesFlows: ['SALE', 'REFUND_PARTIAL'], passengerTypes: ['ADULT'] };
+  const listOf = (df, code) => {
+    const sc = df.scenarios.find(s => s.code === code);
+    return df.passengersList.find(l => l.id === sc.passengersListId).passengers;
+  };
+
+  test('the maximum, and one more for the negative test, each on a list of its own', () => {
+    const entries = catalogueFor(catalogue, simulator, { ...fw, maxPassengers: 9 });
+    const { datafile } = adaptCatalogueDatafile(source, entries, { ...fw, maxPassengers: 9 });
+    expect(listOf(datafile, 'OTST_SALE_MAX_PASSENGERS')).toHaveLength(9);
+    expect(listOf(datafile, 'OTST_REFUND_PARTIAL_PASSENGERS_THIRD')).toHaveLength(9);
+    expect(listOf(datafile, 'NHF_SALE_TOO_MANY_PASSENGERS')).toHaveLength(10);
+    const ids = ['OTST_SALE_MAX_PASSENGERS', 'OTST_REFUND_PARTIAL_PASSENGERS_THIRD', 'NHF_SALE_TOO_MANY_PASSENGERS']
+      .map(c => datafile.scenarios.find(s => s.code === c).passengersListId);
+    expect(new Set(ids).size).toBe(3);
+    for (const id of ids) expect(source.passengersList.some(l => l.id === id)).toBe(false);
+    // Another scenario keeps its list; the source data file is not changed.
+    const other = datafile.scenarios.find(s => s.code === 'OTST_SALE_ONE_WAY_1ADT');
+    expect(other.passengersListId).toBe(source.scenarios.find(s => s.code === 'OTST_SALE_ONE_WAY_1ADT').passengersListId);
+    expect(listOf(source, 'OTST_SALE_MAX_PASSENGERS')).toHaveLength(19);
+  });
+
+  test('a maximum above the source list makes copies with their own reference, name, e-mail and phone', () => {
+    const given = listOf(source, 'OTST_SALE_MAX_PASSENGERS');
+    const out = resizedPassengers(given, 25);
+    expect(out.map(p => p.reference)).toEqual(Array.from({ length: 25 }, (_, i) => String(i + 1).padStart(5, '0')));
+    for (const key of ['firstName', 'email', 'phoneNumber']) expect(new Set(out.map(p => p[key])).size).toBe(25);
+    expect(out.slice(0, 19).map(p => p.firstName)).toEqual(given.map(p => p.firstName));
+    expect(out[19].firstName).toBe(`${given[0].firstName} 20`);
+    expect(given).toHaveLength(19);
+    expect(resizedPassengers([], 3)).toEqual([]);
+    expect(resizedPassengers(given, 2).map(p => p.reference)).toEqual(['00001', '00002']);
+  });
+
+  test('without a declared maximum the entry is left as it is', () => {
+    const entries = catalogueFor(catalogue, simulator, fw);
+    const { datafile } = adaptCatalogueDatafile(source, entries, fw);
+    expect(listOf(datafile, 'OTST_SALE_MAX_PASSENGERS')).toHaveLength(19);
+    expect(datafile.passengersList).toHaveLength(source.passengersList.length);
+  });
+});

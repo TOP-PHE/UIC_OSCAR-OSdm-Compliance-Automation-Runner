@@ -128,20 +128,63 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   return { scenario: out, toComplete, toCheck };
 }
 
+// #699: a passenger list of `count` passengers made from `source`: its own
+// passengers first, then copies of them, each with its own reference, first
+// name, e-mail and phone number.
+function resizedPassengers(source, count) {
+  const given = arr(source).filter(isObj);
+  if (given.length === 0) return [];
+  return Array.from({ length: count }, (_, i) => {
+    const p = structuredClone(given[i % given.length]);
+    p.reference = String(i + 1).padStart(5, '0');
+    if (i >= given.length) makeDistinct(p, i + 1);
+    return p;
+  });
+}
+
+// A copied passenger made the n-th: its own first name, e-mail and phone number.
+function makeDistinct(p, n) {
+  const text = (key) => typeof p[key] === 'string';
+  for (const key of ['firstName', 'updateFirstName'].filter(text)) p[key] = `${p[key]} ${n}`;
+  for (const key of ['email', 'updateEmail'].filter(text)) p[key] = p[key].replace('@', `+${n}@`);
+  for (const key of ['phoneNumber', 'updatePhoneNumber'].filter((k) => text(k) && /\d{3}$/.test(p[k]))) {
+    p[key] = p[key].slice(0, -3) + String(n % 1000).padStart(3, '0');
+  }
+}
+
 /**
  * The reference scenarios of a catalogue data file, adapted: the data file to
- * copy from, and per code what is left to complete or check.
+ * copy from, and per code what is left to complete or check. #699: a limit
+ * entry gets a passenger list of its own, of the framework's maximum (or one
+ * more); without a declared maximum it is left as it is (and cannot be copied).
  */
 function adaptCatalogueDatafile(datafile, entries, frameworkConfig) {
-  const needsByCode = new Map(arr(entries).map((e) => [e.code, e.needs]));
+  const byCode = new Map(arr(entries).map((e) => [e.code, e]));
+  const max = maxPassengersOf(frameworkOf(frameworkConfig));
   const notes = {};
+  const lists = arr(datafile.passengersList).slice();
+  let nextId = Math.max(0, ...lists.filter(isObj).map((l) => Number(l.id) || 0)) + 1;
   const scenarios = arr(datafile.scenarios).map((sc) => {
-    if (!isObj(sc) || !needsByCode.has(sc.code)) return sc;
-    const { scenario, toComplete, toCheck } = adaptReferenceScenario(sc, needsByCode.get(sc.code), frameworkConfig);
+    if (!isObj(sc) || !byCode.has(sc.code)) return sc;
+    const entry = byCode.get(sc.code);
+    const { scenario, toComplete, toCheck } = adaptReferenceScenario(sc, entry.needs, frameworkConfig);
+    if (entry.limit && max) {
+      const count = entry.limit === 'OVER_MAX_PASSENGERS' ? max + 1 : max;
+      const source = lists.find((l) => isObj(l) && l.id === sc.passengersListId);
+      lists.push({ id: nextId, passengers: resizedPassengers(source?.passengers, count) });
+      scenario.passengersListId = nextId;
+      nextId += 1;
+    }
     notes[sc.code] = { toComplete, toCheck };
     return scenario;
   });
-  return { datafile: { ...datafile, scenarios }, notes };
+  return { datafile: { ...datafile, scenarios, passengersList: lists }, notes };
+}
+
+// #699: the maximum number of passengers a framework declares, or null.
+function maxPassengersOf(framework) {
+  const n = framework?.maxPassengers;
+  return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null;
 }
 
 /**
@@ -163,4 +206,4 @@ function suggestTrip(trip, testData) {
   return `train::${train.id}::${service ? service.index : 0}`;
 }
 
-module.exports = { adaptReferenceScenario, adaptCatalogueDatafile, suggestTrip, OVERRULE_CODES };
+module.exports = { adaptReferenceScenario, adaptCatalogueDatafile, resizedPassengers, suggestTrip, OVERRULE_CODES };

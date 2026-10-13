@@ -66,6 +66,17 @@ runtime:
         const { postCreateBookingResponse } = require(bru.getEnvVar("library_base") + "bookings.js");
         const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
 
+        // #699: one passenger over the provider's maximum, offers given at 01:
+        // the booking must be refused. Graded, then the scenario ends.
+        {
+          let _limitBody;
+          try { _limitBody = res.getBody(); } catch (_e) { _limitBody = null; }
+          if (require(bru.getEnvVar("library_base") + "passengerLimit.js").checkBookingOverLimit(res.getStatus(), _limitBody)) {
+            loopbackOrStop("POST Create Booking (passenger limit probe)");
+            return;
+          }
+        }
+
         // #expired-offer: when armed, the booking MUST be rejected — an expired
         // offer must not be bookable. Grade the rejection here and short-circuit
         // (skip the normal happy-path postCreateBookingResponse + downstream

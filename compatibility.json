@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.298",
+  "current_release": "2026.299",
   "releases": [
+    {
+      "release": "2026.299",
+      "date": "2026-10-13",
+      "server": "1.11.264",
+      "collection": "OTST_V2.0.146",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Passenger limits (#699): the Test Framework declares the provider's maximum number of passengers; three reference scenarios test a sale at it, one passenger over it (refusal expected) and a refund of the last third of them. Partial refund alignment adds up every refund offer."
+      ]
+    },
     {
       "release": "2026.298",
       "date": "2026-10-13",

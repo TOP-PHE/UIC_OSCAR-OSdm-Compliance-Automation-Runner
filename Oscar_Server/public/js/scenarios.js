@@ -49,7 +49,7 @@ const ENUMS = {
   partialRefundByLeg:             ['off', 'on'],
   partialRefundByPax:             ['off', 'on'],
   partialRefundLegSelection:      ['first', 'last', 'outbound', 'inbound'],
-  partialRefundPaxSelection:      ['first', 'last'],
+  partialRefundPaxSelection:      ['first', 'last', 'third'],
   // #595: the refund of one whole fulfillment, for providers that refund per
   // fulfillment only. Outbound / inbound only for a return.
   partialRefundByFulfillment:        ['off', 'on'],
@@ -67,6 +67,8 @@ const ENUMS = {
   // #604: booking and confirmation sent again with the same Idempotency-Key.
   idempotencyCheck:                  ['off', 'on'],
   tripIdsExpectRejection:            ['off', 'on'],
+  // #699: negative test, one passenger over the provider's maximum must be refused.
+  passengerLimitExpectRejection:     ['off', 'on'],
   loggingType:        ['INFO', 'DEBUG'],
   // #361: what a failed NON-critical step does — abandon the scenario
   // (historical) or record the failure and keep testing the remaining steps.
@@ -1627,6 +1629,8 @@ function buildDetailHTML(idx) {
           'Offers asked by trip id (#602). On: POST /trips-collection is asked with the origin, destination and time of the SEARCH trip; the trip of its train number, or else the first leaving at that time or later, is taken, and POST /offers names it in tripIds. One-way only: a return or a SPECIFICATION trip is asked as before.')}
         ${buildSelect(idx, 'tripIdsExpectRejection', 'Unknown trip id refused', ENUMS.tripIdsExpectRejection,
           'Negative test (#602). On: POST /offers names a trip id the provider never gave, and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
+        ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
+          'Negative test (#699). On: the scenario\'s passengers are one more than the provider\'s maximum (Test Framework → Passenger Types). POST /offers must refuse them (4xx + RFC-9457 Problem, or no offer), or else POST /bookings must; the scenario ends at the refusal, and a booking made over the limit fails.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE
@@ -1877,7 +1881,7 @@ function buildPartialRefundFields(idx, sc) {
       ${buildSelect(idx, 'partialRefundByPax', 'Per-passenger', ENUMS.partialRefundByPax,
         'When on, scope the refund to one passenger via OSDM RefundSpecification.passengerIds. Requires ≥2 passengers in the booking.')}
       ${byPaxOn ? buildSelect(idx, 'partialRefundPaxSelection', 'Passenger target', ENUMS.partialRefundPaxSelection,
-        'Which passenger to refund (first or last in the booking order).') : ''}
+        'Which passengers to refund: the first, the last, or the last third (rounded up) in the booking order.') : ''}
       ${buildRefundByFulfillmentFields(idx, sc, isReturn)}
       ${warnings}
       <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
@@ -3982,6 +3986,13 @@ function renderWizardStep1() {
           ? '<div style="color:#90a4ae;font-size:12px;padding:6px 0">Select a human passenger type above to configure its age range.</div>'
           : ''}
       </div>
+      <div class="fw-subsection">
+        <label class="fw-subsection-label" for="fw-max-passengers" style="display:block;margin-bottom:8px">
+          Maximum passengers per offer and booking
+          <span style="font-weight:400;color:#b0bec5;text-transform:none;letter-spacing:0"> — the provider's limit; the limit scenarios of the catalogue test it and one more (empty = not declared)</span>
+        </label>
+        <input type="number" id="fw-max-passengers" min="1" max="999" value="${Number.isInteger(fw.maxPassengers) ? fw.maxPassengers : ''}" data-action="fw-max-pax" style="width:90px">
+      </div>
     </div>
   </div>
 
@@ -4116,6 +4127,16 @@ function fwToggleSimplePill(el, key, value) {
 }
 
 // ── Offer criteria helpers ────────────────────────────────────────────────────
+// #699: what the maximum-passengers field holds: a whole number from 1 to
+// 999, null when emptied (not declared), undefined when it is not valid.
+function fwMaxPassengers(raw) {
+  const text = String(raw ?? '').trim();
+  if (text === '') return null;
+  if (!/^\d{1,3}$/.test(text)) return undefined;
+  const n = Number.parseInt(text, 10);
+  return n >= 1 ? n : undefined;
+}
+
 function fwToggleOfferPill(el, subKey, value) {
   const oc  = wizData.framework.offerCriteria;
   if (!oc[subKey]) oc[subKey] = [];
@@ -7488,6 +7509,19 @@ document.body.addEventListener('change', function(e) {
       fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
     case 'fw-toggle-seatmap':
       fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
+    case 'fw-max-pax': {
+      // #699: the provider's maximum number of passengers; empty = not declared.
+      const value = fwMaxPassengers(el.value);
+      if (value === undefined) {
+        const stored = wizData.framework?.maxPassengers;
+        el.value = Number.isInteger(stored) ? stored : '';
+        break;
+      }
+      if (value === null) delete wizData.framework.maxPassengers;
+      else wizData.framework.maxPassengers = value;
+      saveFrameworkDebounced();
+      break;
+    }
     case 'fw-pax-age': {
       const raw = (el.value || '').trim();
       const n = Number.parseInt(raw, 10);

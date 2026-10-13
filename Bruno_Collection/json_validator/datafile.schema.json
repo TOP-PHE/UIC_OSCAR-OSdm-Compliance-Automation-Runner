@@ -224,9 +224,9 @@
             "enum": ["on", "off", true, false, "", null]
           },
           "partialRefundPaxSelection": {
-            "description": "Which passenger to refund when partialRefundByPax is on. 'first' refunds passenger #1, 'last' refunds the last passenger. Default 'first'.",
+            "description": "Which passenger to refund when partialRefundByPax is on. 'first' refunds passenger #1, 'last' refunds the last passenger, 'third' the last third of the passengers, rounded up (#699). Default 'first'.",
             "type": ["string", "null"],
-            "enum": ["first", "last", "", null]
+            "enum": ["first", "last", "third", "", null]
           },
           "partialRefundByFulfillment": {
             "description": "#595: when on, the refund is that of one whole fulfillment: only fulfillmentIds is sent, no refundSpecifications. For providers that refund per fulfillment only. Requires the booking to have 2 fulfillments or more, else the run degrades to a full refund with a [WARNING]. Takes precedence over partialRefundByLeg / partialRefundByPax. Accepts boolean true/false or the strings 'on'/'off'.",
@@ -282,6 +282,11 @@
           },
           "tripIdsExpectRejection": {
             "description": "Negative test (#602). When on, POST /offers names a trip id the provider never gave: it must answer 4xx with an RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
+          "passengerLimitExpectRejection": {
+            "description": "Negative test (#699). When on, the scenario's passengers are one more than the provider's maximum (Test Framework maxPassengers): POST /offers must refuse them (4xx with an RFC-9457 Problem, or no offer), or else POST /bookings must (4xx). The scenario ends at the refusal. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },

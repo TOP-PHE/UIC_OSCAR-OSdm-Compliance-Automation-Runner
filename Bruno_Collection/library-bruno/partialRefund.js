@@ -171,6 +171,7 @@ module.exports = {
   resolvePartialRefundScope,
   buildRefundSpecifications,
   resolveFulfillmentRefundScope,
+  wireSpecs,
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -366,17 +367,20 @@ function resolvePartialRefundScope(booking, opts) {
   const legIds     = legSrc.ids;
   const legMode    = legSrc.mode; // 'trips' or 'admissions'
 
-  // ── Pick the passenger (drives passengerIds + fulfillment selection) ─────
-  let chosenPassenger = null;
+  // ── Pick the passenger(s) (drive passengerIds + fulfillment selection) ──
+  // #699: 'third' picks the last third of the passengers, rounded up.
+  let chosenPassengers = [];
   if (byPax) {
     if (passengers.length < 2) {
       return { armed: true, degraded: true, reason: `booking has only ${passengers.length} passenger(s) — per-passenger partial refund requires >=2` };
     }
-    chosenPassenger = pickFromArray(passengers, opts.paxSel);
-    if (!chosenPassenger || !chosenPassenger.id) {
+    chosenPassengers = choosePassengers(passengers, opts.paxSel);
+    if (chosenPassengers.length === 0 || chosenPassengers.some((p) => !p?.id)) {
       return { armed: true, degraded: true, reason: 'passenger selection resolved to a row with no id — cannot scope' };
     }
   }
+  const chosenPassenger = chosenPassengers.length === 1 ? chosenPassengers[0] : null;
+  const chosenIds = new Set(chosenPassengers.map((p) => String(p.id)));
 
   // ── Pick the leg ─────────────────────────────────────────────────────────
   let chosenLegId = null;
@@ -415,10 +419,10 @@ function resolvePartialRefundScope(booking, opts) {
     // only apply the pax filter when admissions actually expose
     // `passengerIds[]`; minimal fixtures don't, and we mustn't drop everything
     // just because the field is missing.
-    if (chosenPassenger && chosenPassenger.id) {
+    if (chosenIds.size > 0) {
       const filtered = scopedAdms.filter(a => {
         const owners = Array.isArray(a && a.passengerIds) ? a.passengerIds.map(String) : null;
-        return owners == null /* unknown ownership → keep */ || owners.includes(String(chosenPassenger.id));
+        return owners == null /* unknown ownership → keep */ || owners.some((o) => chosenIds.has(o));
       });
       scopedAdms = filtered;
     }
@@ -442,9 +446,12 @@ function resolvePartialRefundScope(booking, opts) {
     });
   }
 
-  const passengerIds = chosenPassenger ? [chosenPassenger.id] : [];
+  const passengerIds = chosenPassengers.map((p) => p.id);
 
   // ── The fulfillment holding what is refunded (#610) ──────────────────────
+  if (chosenPassengers.length > 1) {
+    return severalPassengersScope({ fulfillments, allAdms, chosenPassengers, byLeg, bookingPartIds, passengerIds, chosenLegId });
+  }
   const scopeParts = byLeg ? bookingPartIds : passengerPartIds(allAdms, chosenPassenger);
   const { fulfillment: chosenFulfillment, reason: noFulfillment } = fulfillmentForScope(fulfillments, scopeParts, chosenPassenger);
   if (!chosenFulfillment || !chosenFulfillment.id) {
@@ -459,6 +466,50 @@ function resolvePartialRefundScope(booking, opts) {
     passengerIds,
     chosenLegId,
     chosenPassenger,
+    specs: [{ fulfillmentId: chosenFulfillment.id, bookingPartIds, passengerIds }],
+  };
+}
+
+// #699: the passengers a selection names: the first, the last, or the last
+// third of them, rounded up.
+function choosePassengers(passengers, sel) {
+  if (String(sel || '').toLowerCase() === 'third') {
+    return passengers.slice(passengers.length - Math.ceil(passengers.length / 3));
+  }
+  const one = pickFromArray(passengers, sel);
+  return one ? [one] : [];
+}
+
+// #699: several passengers refunded. Each one's parts are in one
+// fulfillment (#610's rule, per passenger); one RefundSpecification per
+// fulfillment, naming its passengers (and, with the leg axis, its parts).
+// One fulfillment for everyone gives one specification listing them all.
+function severalPassengersScope({ fulfillments, allAdms, chosenPassengers, byLeg, bookingPartIds, passengerIds, chosenLegId }) {
+  const legParts = new Set(bookingPartIds.map(String));
+  const groups = new Map();
+  for (const passenger of chosenPassengers) {
+    const own = passengerPartIds(allAdms, passenger).filter((id) => !byLeg || legParts.has(String(id)));
+    const { fulfillment, reason } = fulfillmentForScope(fulfillments, own, passenger);
+    if (!fulfillment?.id) {
+      return { armed: true, degraded: true, reason: `passenger ${passenger.id}: ${reason || 'no fulfillment holds their parts'}` };
+    }
+    const key = String(fulfillment.id);
+    if (!groups.has(key)) groups.set(key, { fulfillmentId: fulfillment.id, bookingPartIds: [], passengerIds: [] });
+    const group = groups.get(key);
+    group.passengerIds.push(passenger.id);
+    if (byLeg) group.bookingPartIds.push(...own.filter((id) => !group.bookingPartIds.includes(id)));
+  }
+  const specs = [...groups.values()];
+  return {
+    armed: true,
+    degraded: false,
+    fulfillmentId: specs[0].fulfillmentId,
+    bookingPartIds,
+    passengerIds,
+    chosenLegId,
+    chosenPassenger: chosenPassengers[0],
+    chosenPassengers,
+    specs,
   };
 }
 
@@ -474,11 +525,17 @@ function resolvePartialRefundScope(booking, opts) {
 function buildRefundSpecifications(booking, opts) {
   const r = resolvePartialRefundScope(booking, opts);
   if (!r.armed || r.degraded) return null;
+  return wireSpecs(r.specs);
+}
 
-  const spec = { fulfillmentId: r.fulfillmentId };
-  if (r.bookingPartIds.length > 0) spec.bookingPartIds = r.bookingPartIds;
-  if (r.passengerIds.length   > 0) spec.passengerIds   = r.passengerIds;
-  return [spec];
+// The RefundSpecification[] to send: empty lists left out.
+function wireSpecs(specs) {
+  return (Array.isArray(specs) ? specs : []).map((s) => {
+    const spec = { fulfillmentId: s.fulfillmentId };
+    if (Array.isArray(s.bookingPartIds) && s.bookingPartIds.length > 0) spec.bookingPartIds = s.bookingPartIds;
+    if (Array.isArray(s.passengerIds) && s.passengerIds.length > 0) spec.passengerIds = s.passengerIds;
+    return spec;
+  });
 }
 
 // Expose to globalThis for the eval/require loader path (matches other library-bruno modules).

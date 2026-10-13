@@ -23,6 +23,17 @@
       }
     },
     {
+      "code": "OTST_SALE_MAX_PASSENGERS",
+      "source": "SIM_SALE_MAX_PASSENGERS_38",
+      "purpose": "Sale at the provider's maximum number of passengers per offer and booking, every passenger updated after booking.",
+      "checks": 1292,
+      "limit": "MAX_PASSENGERS",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 19
+      }
+    },
+    {
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
@@ -92,6 +103,18 @@
       }
     },
     {
+      "code": "OTST_REFUND_PARTIAL_PASSENGERS_THIRD",
+      "source": "SIM_REFUND_PAX_THIRD_19PAX_38",
+      "purpose": "Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay.",
+      "checks": 5207,
+      "limit": "MAX_PASSENGERS",
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 19
+      }
+    },
+    {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",
@@ -103,6 +126,17 @@
         "providerValues": [
           "overruleCode"
         ]
+      }
+    },
+    {
+      "code": "NHF_SALE_TOO_MANY_PASSENGERS",
+      "source": "SIM_NHF_TOO_MANY_PASSENGERS_38",
+      "purpose": "One passenger more than the provider's maximum: the offer request, or else the booking, must be refused.",
+      "checks": 70,
+      "limit": "OVER_MAX_PASSENGERS",
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 20
       }
     },
     {

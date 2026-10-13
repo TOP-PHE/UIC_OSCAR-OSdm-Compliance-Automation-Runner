@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (76 scenarios, SIM_…)  ──source──►  (37 reference scenarios, OTST_… / NHF_…)
+ (79 scenarios, SIM_…)  ──source──►  (40 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (76 scenarios)
+### 4.1 The simulator's data file (79 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -179,6 +179,7 @@ In short:
 | Refund withdrawn, refund offer only, overrule codes (4 accepted, 1 refused) | 7 | `gamma` |
 | Refunds of a return in one offer (full, inbound only, overrule code, receipt) | 4 | `gamma` |
 | Partial refund by passenger and by leg, on trips sold with one ticket per passenger or per leg | 2 | `gamma` |
+| Passenger limits: the maximum, one over it, a third of the maximum refunded | 3 | `gamma` |
 | Reduction cards, named products, group tariffs (two of them negative), class per leg | 14 | `gamma` |
 | Seat reservations (mandatory, and the three ways of booking an optional one) | 4 | `gamma` |
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
@@ -189,7 +190,7 @@ In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (37)
+### 4.2 The reference scenarios of the catalogue (40)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -205,6 +206,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 |---|---|---|---|---|
 | `OTST_SALE_ONE_WAY_1ADT` | One-way sale for one adult: offers, booking, passenger update, confirmation, documents. | — | 230 | `SIM_SALE_SEARCH_1ADT_38` |
 | `OTST_SALE_ONE_WAY_2ADT_SAVER` | One-way sale for two adults, choosing the non-flexible (saver) offer. | — | 289 | `SIM_SALE_SEARCH_2ADT_SAVER_38` |
+| `OTST_SALE_MAX_PASSENGERS` | Sale at the provider's maximum number of passengers per offer and booking, every passenger updated after booking. | the maximum number of passengers | 1292 | `SIM_SALE_MAX_PASSENGERS_38` |
 | `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 309 | `SIM_RETURN_SEPARATE_1ADT_38` |
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 351 | `SIM_RETURN_COMBINED_1ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 284 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
@@ -226,6 +228,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 448 | `SIM_REFUND_INBOUND_1ADT_38` |
 | `OTST_REFUND_PARTIAL_PASSENGER_2ADT` | Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays. | REFUND_PARTIAL | 469 | `SIM_REFUND_PAX_2ADT_38` |
 | `OTST_REFUND_PARTIAL_LEG_1ADT` | Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays. | REFUND_PARTIAL | 447 | `SIM_REFUND_LEG_1ADT_38` |
+| `OTST_REFUND_PARTIAL_PASSENGERS_THIRD` | Partial refund of a third of the passengers, at the provider's maximum number of passengers: only theirs are refunded, the others' tickets stay. | REFUND_PARTIAL, the maximum number of passengers | 5207 | `SIM_REFUND_PAX_THIRD_19PAX_38` |
 | `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
 | `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 327 | `SIM_REFUND_DELETE_1ADT_38` |
 | `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 294 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |
@@ -248,6 +251,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 |---|---|---|---|---|
 | `NHF_REFUND_OVERRULE_CODE_REFUSED` | A refund with an overrule code the provider does not accept must be refused. | REFUND_FULL, return model SEPARATE | 314 | `SIM_REFUND_OVERRULE_REFUSED_38` |
 | `NHF_SALE_BY_TRIP_ID_UNKNOWN` | Offers asked for a trip id the provider never gave must be refused. | — | 70 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` |
+| `NHF_SALE_TOO_MANY_PASSENGERS` | One passenger more than the provider's maximum: the offer request, or else the booking, must be refused. | the maximum number of passengers | 70 | `SIM_NHF_TOO_MANY_PASSENGERS_38` |
 | `NHF_EXPIRED_OFFER` | Booking an offer after its `preBookableUntil` must be refused. Waits up to 40 minutes. | — | 119 | `SIM_NHF_EXPIRED_OFFER_38` |
 | `NHF_EXPIRED_BOOKING` | Confirming a booking after its confirmation time limit must be refused. Waits up to 40 minutes. | — | 187 | `SIM_NHF_EXPIRED_BOOKING_38` |
 | `NHF_EXPIRED_REFUND_OFFER` | Confirming a refund offer after its `validUntil` must be refused. Waits up to 40 minutes. | REFUND_FULL | 297 | `SIM_NHF_EXPIRED_REFUND_OFFER_38` |

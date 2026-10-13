@@ -1155,6 +1155,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `property`, `at.least`/`at.most`, `true`/`false`. A chain it lacks throws
     inside the check and is recorded as a failure, so assert on the check
     you mean by name.
+- **Limits are declared, then tested at the limit and one past it** (#699,
+  1.11.264 / OTST_V2.0.146). `maxPassengers` in the Test Framework (Passenger
+  Types); a catalogue entry with `limit` (`MAX_PASSENGERS`,
+  `OVER_MAX_PASSENGERS`) cannot be copied without it, and its passenger list
+  is resized at copy time (`resizedPassengers()` in `catalogueMatch.js`, a
+  list of its own, never the shared one). `passengerLimitExpectRejection`
+  (`library-bruno/passengerLimit.js`) accepts the refusal at 01 or 02: a
+  provider may price any number and enforce its limit at the booking.
+  `partialRefundPaxSelection: third` refunds the last third, rounded up; a
+  refund of several passengers sends one RefundSpecification per fulfillment
+  (`severalPassengersScope()`), and step 10 adds up every refund offer's
+  amount and fee: it read the first offer only, which a provider answering
+  one offer per fulfillment always failed.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

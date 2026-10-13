@@ -54,6 +54,10 @@ const CODE = /^(OTST|NHF)_[A-Z0-9_]{3,60}$/;
 // Fields of a scenario that `set` may change: waits and nothing that points
 // at another entry or changes what the scenario is.
 const SETTABLE = /^[a-z][A-Za-z]*MaxWaitMinutes$/;
+// #699: an entry that tests the provider's passenger limit: its passengers
+// become the Test Framework's maxPassengers (MAX_PASSENGERS) or one more
+// (OVER_MAX_PASSENGERS) at copy time.
+const LIMITS = ['MAX_PASSENGERS', 'OVER_MAX_PASSENGERS'];
 // The keys of `needs` (#681), in the order dataNeedsOf() writes them.
 const NEEDS_KEYS = ['trip', 'legs', 'return', 'reservations', 'legClasses', 'tariff', 'passengers',
   'reductionCards', 'providerValues', 'requestedInformation', 'expiry'];
@@ -69,6 +73,7 @@ function entryProblems(e, at, scenarios, codes) {
   if (!Number.isInteger(e.checks) || e.checks <= 0) problems.push(`${at}.checks must be the number of checks it gives on the simulator`);
   for (const key of Object.keys(e.set || {})) if (!SETTABLE.test(key)) problems.push(`${at}.set.${key} is not a field the catalogue may change`);
   if (String(e.source).startsWith('SIM_WRONG_')) problems.push(`${at}.source is a deliberately wrong scenario`);
+  if (e.limit !== undefined && !LIMITS.includes(e.limit)) problems.push(`${at}.limit "${e.limit}" is not one of ${LIMITS.join(', ')}`);
   problems.push(...needsProblems(e.needs, at));
   return problems;
 }
@@ -136,6 +141,7 @@ function missingFor(requirements, framework) {
   if (requirements.minOsdmVersion && !versionAtLeast(fw.osdmVersion, 3, 7)) missing.push(`OSDM ${requirements.minOsdmVersion} or later`);
   const declared = arr(fw.passengerTypes);
   for (const type of requirements.passengerTypes) if (!declared.includes(type)) missing.push(`passenger type ${type}`);
+  if (requirements.maxPassengers && !maxPassengersOf(fw)) missing.push('the maximum number of passengers (Passenger Types)');
   return missing;
 }
 
@@ -258,12 +264,27 @@ function catalogueDatafile(catalogue, simulator) {
   return out;
 }
 
+/** #699: the maximum number of passengers a framework declares, or null. */
+function maxPassengersOf(framework) {
+  const fw = isObj(framework?.config) ? framework.config : framework;
+  const n = fw?.maxPassengers;
+  return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null;
+}
+
+// #699: the needs of a limit entry say the framework's number, not the simulator's.
+function limitNeedsText(needs, limit) {
+  const text = needsText({ ...needs, passengers: undefined });
+  const count = limit === 'OVER_MAX_PASSENGERS' ? 'one passenger more than the maximum' : 'the maximum number of passengers';
+  return [`${count} the Test Framework declares`, ...text];
+}
+
 /** The catalogue as a company sees it: each entry, what it needs, what is missing. */
 function catalogueFor(catalogue, simulator, framework) {
   const datafile = catalogueDatafile(catalogue, simulator);
   return catalogue.entries.map((entry) => {
     const scenario = datafile.scenarios.find((s) => s.code === entry.code);
     const requirements = requirementsOf(scenario, datafile);
+    if (entry.limit) requirements.maxPassengers = true;
     return {
       code: entry.code,
       kind: kindOf(entry.code),
@@ -273,12 +294,13 @@ function catalogueFor(catalogue, simulator, framework) {
       requirements,
       missing: missingFor(requirements, framework),
       needs: entry.needs,
-      needsText: needsText(entry.needs),
+      needsText: entry.limit ? limitNeedsText(entry.needs, entry.limit) : needsText(entry.needs),
+      ...(entry.limit ? { limit: entry.limit } : {}),
     };
   });
 }
 
 module.exports = {
   catalogueProblems, catalogueDatafile, catalogueFor, requirementsOf, missingFor, salesFlowsOf,
-  dataNeedsOf, needsText, simulatorFacts, NEEDS_KEYS,
+  dataNeedsOf, needsText, simulatorFacts, maxPassengersOf, NEEDS_KEYS, LIMITS,
 };

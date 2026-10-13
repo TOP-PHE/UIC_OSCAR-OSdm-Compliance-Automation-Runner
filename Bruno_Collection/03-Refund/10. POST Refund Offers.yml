@@ -99,17 +99,19 @@ runtime:
               const _osdmOk = _osdmParts.length >= 2 && !isNaN(_osdmParts[0]) && !isNaN(_osdmParts[1])
                 && (_osdmParts[0] > 3 || (_osdmParts[0] === 3 && _osdmParts[1] >= 8));
               if (_osdmOk) {
-                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId }];
-                if (_r.bookingPartIds.length > 0) _refundSpecs[0].bookingPartIds = _r.bookingPartIds;
-                if (_r.passengerIds.length   > 0) _refundSpecs[0].passengerIds   = _r.passengerIds;
+                // #699: one RefundSpecification per fulfillment holding what is refunded.
+                const { wireSpecs } = require(bru.getEnvVar("library_base") + "partialRefund.js");
+                _refundSpecs = wireSpecs(_r.specs);
                 bru.setEnvVar("__partialRefundResolvedSpec", JSON.stringify(_refundSpecs));
-                validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_r.fulfillmentId}, bookingPartIds=[${_r.bookingPartIds.join(", ")}], passengerIds=[${_r.passengerIds.join(", ")}]`);
+                for (const _sp of _refundSpecs) {
+                  validationLogger(`[INFO] Partial refund resolved: fulfillmentId=${_sp.fulfillmentId}, bookingPartIds=[${(_sp.bookingPartIds || []).join(", ")}], passengerIds=[${(_sp.passengerIds || []).join(", ")}]`);
+                }
               } else {
                 // Still scope via fulfillmentIds[] — requestRefundOffersBody
                 // will trim the list down because _refundSpecs is non-null.
                 // We attach the bare {fulfillmentId} so the trimmer keeps only
                 // the target fulfillment but we don't actually send the field.
-                _refundSpecs = [{ fulfillmentId: _r.fulfillmentId, __scopeOnly: true }];
+                _refundSpecs = _r.specs.map((_sp) => ({ fulfillmentId: _sp.fulfillmentId, __scopeOnly: true }));
                 validationLogger(`[INFO] Partial refund scope resolved but osdmVersion=${_osdm || "(unset)"} < 3.8 — refundSpecifications[] omitted from the request; scoping via fulfillmentIds[] only.`);
                 // The wire can only carry the per-pax axis (via fulfillmentIds).
                 // If the wizard ALSO armed per-leg, that axis is silently dropped
@@ -148,26 +150,26 @@ runtime:
               // it cries wolf whenever an axis was dropped at the wire (e.g.
               // per-leg on OSDM v3.5) even though the response is consistent
               // with the request.
-              const _wireSpec = _refundSpecs && _refundSpecs[0];
-              const _hasSpecBookingPartIds = _wireSpec
-                && Array.isArray(_wireSpec.bookingPartIds)
+              // #699: several specifications (one per fulfillment) add up.
+              let _expectedIds = new Set();
+              const _shapes = [];
+              for (const _wireSpec of (Array.isArray(_refundSpecs) && _refundSpecs.length ? _refundSpecs : [{ fulfillmentId: _r.fulfillmentId, __scopeOnly: true }])) {
+              const _hasSpecBookingPartIds = Array.isArray(_wireSpec.bookingPartIds)
                 && _wireSpec.bookingPartIds.length > 0
                 && !_wireSpec.__scopeOnly;
-              const _hasSpecPassengerIds = _wireSpec
-                && Array.isArray(_wireSpec.passengerIds)
+              const _hasSpecPassengerIds = Array.isArray(_wireSpec.passengerIds)
                 && _wireSpec.passengerIds.length > 0
                 && !_wireSpec.__scopeOnly;
-              let _expectedIds = new Set();
-              let _expectedShape = "";
               if (_hasSpecBookingPartIds) {
                 // Direct enumeration on the wire.
                 for (const _id of _wireSpec.bookingPartIds) _expectedIds.add(String(_id));
-                _expectedShape = `refundSpecifications.bookingPartIds (${_expectedIds.size} part(s))`;
+                _shapes.push(`refundSpecifications.bookingPartIds (${_wireSpec.bookingPartIds.length} part(s))`);
               } else if (_hasSpecPassengerIds) {
                 // Provider expands passenger-by-passenger. Walk admissions /
                 // reservations / ancillaries and keep anything owned by one
                 // of the target passenger ids.
                 const _targetPax = new Set(_wireSpec.passengerIds.map(String));
+                let _n = 0;
                 const _bos2 = Array.isArray(_bk.bookedOffers) ? _bk.bookedOffers : [];
                 for (const _bo of _bos2) {
                   for (const _grp of ["admissions", "reservations", "ancillaries"]) {
@@ -175,21 +177,23 @@ runtime:
                     for (const _p of _arr) {
                       if (!_p || !_p.id) continue;
                       const _owners = Array.isArray(_p.passengerIds) ? _p.passengerIds.map(String) : [];
-                      if (_owners.some(o => _targetPax.has(o))) _expectedIds.add(String(_p.id));
+                      if (_owners.some(o => _targetPax.has(o))) { _expectedIds.add(String(_p.id)); _n++; }
                     }
                   }
                 }
-                _expectedShape = `refundSpecifications.passengerIds → ${_expectedIds.size} part(s) owned by [${_wireSpec.passengerIds.join(", ")}]`;
+                _shapes.push(`refundSpecifications.passengerIds → ${_n} part(s) owned by [${_wireSpec.passengerIds.join(", ")}]`);
               } else {
                 // No refundSpecifications on the wire — scope is just the
                 // referenced fulfillment(s). Use the fulfillment.bookingParts[].id
                 // list as the authoritative set.
-                const _scopeFFId = (_wireSpec && _wireSpec.fulfillmentId) || _r.fulfillmentId;
+                const _scopeFFId = _wireSpec.fulfillmentId || _r.fulfillmentId;
                 const _ff = (_bk.fulfillments || []).find(f => f && String(f.id) === String(_scopeFFId));
                 const _ffParts = (_ff && Array.isArray(_ff.bookingParts)) ? _ff.bookingParts : [];
                 for (const _p of _ffParts) { if (_p && _p.id) _expectedIds.add(String(_p.id)); }
-                _expectedShape = `fulfillment[${_scopeFFId}].bookingParts (${_expectedIds.size} part(s))`;
+                _shapes.push(`fulfillment[${_scopeFFId}].bookingParts (${_ffParts.length} part(s))`);
               }
+              }
+              const _expectedShape = _shapes.join(" + ");
               // Sum prices over _expectedIds across all bookedOffer part-arrays.
               let _expected = 0;
               let _currency = null;
@@ -219,7 +223,7 @@ runtime:
         if (Array.isArray(_refundSpecs) && _refundSpecs[0] && _refundSpecs[0].__scopeOnly) {
           // The trimmer in requestRefundOffersBody still needs the fulfillmentId
           // to scope fulfillmentIds[]; pass it via a side channel instead.
-          bru.setEnvVar("__partialRefundScopeFulfillmentId", _refundSpecs[0].fulfillmentId);
+          bru.setEnvVar("__partialRefundScopeFulfillmentId", _refundSpecs.map((_sp) => _sp.fulfillmentId).join(","));
           _refundSpecs = null;
         } else {
           bru.setEnvVar("__partialRefundScopeFulfillmentId", "");
@@ -323,24 +327,26 @@ runtime:
             const _expRaw     = bru.getEnvVar("__partialRefundExpectedAmount") || "";
             if (!_degraded && _expRaw) {
               const _exp = JSON.parse(_expRaw);
-              const _firstOffer = jsonData.refundOffers[0] || {};
-              const _refAmount  = (_firstOffer.refundableAmount && typeof _firstOffer.refundableAmount.amount === "number")
-                ? _firstOffer.refundableAmount.amount : null;
-              const _refCurrency = (_firstOffer.refundableAmount && _firstOffer.refundableAmount.currency) || null;
+              // #699: one refund offer per fulfillment refunded — the offers add up.
+              const _offers = jsonData.refundOffers.filter((o) => o && typeof o === "object");
+              const _amounts = _offers.map((o) => o.refundableAmount?.amount);
+              const _refAmount  = _offers.length > 0 && _amounts.every((a) => typeof a === "number")
+                ? _amounts.reduce((sum, a) => sum + a, 0) : null;
+              const _refCurrency = _offers[0]?.refundableAmount?.currency || null;
               // #595: what the parts cost is what is refunded plus the fee kept
               // (RefundOffer: refundableAmount = price of the parts − refundFee).
-              const _refFee = (_firstOffer.refundFee && typeof _firstOffer.refundFee.amount === "number") ? _firstOffer.refundFee.amount : 0;
+              const _refFee = _offers.reduce((sum, o) => sum + (typeof o.refundFee?.amount === "number" ? o.refundFee.amount : 0), 0);
 
               test("Partial refund: request/response alignment — refundableAmount + refundFee match the price of the in-scope parts", () => {
                 if (_refAmount == null) {
-                  throw new Error("[ERROR] response refundOffers[0].refundableAmount.amount missing — cannot verify partial scope was honoured");
+                  throw new Error("[ERROR] a refund offer has no refundableAmount.amount — cannot verify partial scope was honoured");
                 }
                 if (_exp.currency && _refCurrency && _exp.currency !== _refCurrency) {
                   throw new Error(`[ERROR] Currency mismatch: expected ${_exp.currency}, got ${_refCurrency}`);
                 }
                 if (_refAmount + _refFee !== _exp.amount) {
                   throw new Error(
-                    `[ERROR] Provider returned refundableAmount=${_refAmount} + refundFee=${_refFee} but the parts in the wire scope cost ${_exp.amount}` +
+                    `[ERROR] Provider returned refundableAmount=${_refAmount} + refundFee=${_refFee} (${_offers.length} refund offer(s)) but the parts in the wire scope cost ${_exp.amount}` +
                     ` (${_refCurrency || _exp.currency || ""}, scale=${_exp.scale}; ${_exp.shape || "n/a"}). ` +
                     `Provider likely ignored refundSpecifications[] (see response.warnings.OSDM_EXTRA_REQUEST_FIELDS_IGNORED) ` +
                     `or refunded the full booking instead of the requested scope.`

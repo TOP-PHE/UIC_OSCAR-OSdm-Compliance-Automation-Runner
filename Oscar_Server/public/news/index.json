@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-passenger-limits",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "Passenger limit tests",
+    "summary": "Declare the provider's maximum number of passengers in the Test Framework; three reference scenarios test a sale at that maximum, one passenger over it, and a refund of a third of the passengers.",
+    "content": "The Test Framework's Passenger Types section now takes the provider's maximum number of passengers per offer and booking. Three reference scenarios use it: OTST_SALE_MAX_PASSENGERS sells to that many passengers, NHF_SALE_TOO_MANY_PASSENGERS asks for one more and expects a refusal, and OTST_REFUND_PARTIAL_PASSENGERS_THIRD refunds the last third of them. Their passenger lists are sized to the declared maximum when they are copied. A partial refund by passenger can now target the last third of the passengers."
+  },
+  {
     "id": "2026-10-13-catalogue-partial-refunds",
     "date": "October 13, 2026",
     "tag": "New",
