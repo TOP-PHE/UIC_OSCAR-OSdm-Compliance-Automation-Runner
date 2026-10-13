@@ -1171,7 +1171,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   most flexible declared, FULL_FLEXIBLE if none). A provider may sell only
   non-flexible tariffs and refund them; never ask it for one it does not sell.
   Any other scenario with a flexibility (#691, `saleFlexibility()`): own if
-  declared, else the most flexible declared, unchanged if none declared. `suggestTrip()` preselects a journey
+  declared, else the most flexible declared, unchanged if none declared.
+  The list is set in the Test Framework's 💶 Tariff Flexibility section
+  (`fw-offer-pill`): before #691 no page showed it, so it was always the
+  default three. `suggestTrip()` preselects a journey
   of as many legs, else the first train; Test Data carries no reservation or
   class, so those needs come back as `toCheck`, never guessed.
   **Part 3 (1.11.256): the copy report, `public/js/copy-report.js`** (browser

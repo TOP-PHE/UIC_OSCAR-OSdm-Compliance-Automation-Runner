@@ -3933,6 +3933,22 @@ function renderWizardStep1() {
     </div>
   </div>
 
+  <!-- ②-ter Flexibilities the provider sells (#691) -->
+  <div class="fw-section">
+    <div class="fw-section-head" data-action="fw-toggle">💶 Tariff Flexibility<span class="fw-toggle-icon">▶</span></div>
+    <div class="fw-section-body">
+      <div style="padding:12px 14px">
+        <div class="fw-subsection-label" style="margin-bottom:8px">Flexibilities the provider sells</div>
+        <div class="pill-group">
+          ${WIZ_FLEXIBILITIES.map(f=>`<div class="pill${(fw.offerCriteria.flexibilities||[]).includes(f)?' selected':''}" data-action="fw-offer-pill" data-group="flexibilities" data-val="${esc(f)}">${esc(f.replaceAll('_',' '))}</div>`).join('')}
+        </div>
+        <div style="font-size:11px;color:#90a4ae;margin-top:8px;line-height:1.5">
+          Tick only what the provider sells. Scenarios copied from the catalogue ask for one of these, and the scenario editor offers only these.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ③ Passenger Types + age limits -->
   <div class="fw-section">
     <div class="fw-section-head open" data-action="fw-toggle">👥 Passenger Types<span class="fw-toggle-icon">▶</span></div>
@@ -6958,6 +6974,8 @@ document.body.addEventListener('click', function(e) {
       fwToggleAfterSales(el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-pill':
       fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-offer-pill':
+      fwToggleOfferPill(el, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-pax-type':
       fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-ancillary':
