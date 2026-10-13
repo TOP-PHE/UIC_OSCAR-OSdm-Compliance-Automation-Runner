@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.291",
+  "current_release": "2026.292",
   "releases": [
+    {
+      "release": "2026.292",
+      "date": "2026-10-13",
+      "server": "1.11.258",
+      "collection": "OTST_V2.0.141",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Dependency updates only: express 5.3.0 (qs and proxy-addr security fixes), nodemailer 10.0.16 (#673)."
+      ]
+    },
     {
       "release": "2026.291",
       "date": "2026-10-13",

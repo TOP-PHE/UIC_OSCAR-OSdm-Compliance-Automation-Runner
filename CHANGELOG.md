@@ -62,6 +62,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.258] / [collection-OTST_V2.0.141] — 2026-10-13
+
+Release 2026.292. Collection unchanged.
+
+### Security
+
+- **Dependency updates only; no code change.** Dependabot's #673, its commit
+  cherry-picked unchanged.
+
+  | Package | From | To | Why |
+  |---|---|---|---|
+  | express | 5.2.1 | 5.3.0 | brings `qs` 6.16 (CVE-2026-2391, CVE-2026-82417, CVE-2026-82562: `arrayLimit` bypasses and a denial of service) and `proxy-addr` 2.0.8 (CVE-2026-90711) |
+  | nodemailer | 10.0.15 | 10.0.16 | address parser and cookie fixes |
+
+  Express 5.3.0 also changes two behaviours: `res.download()` /
+  `res.attachment()` no longer quote a file name that is a valid HTTP token
+  (equivalent per RFC 6266), and `res.send()` no longer throws on a
+  `Content-Type` it cannot parse. No test asserts the quoted form; the full
+  suite passes unchanged.
+
+### Not verified
+
+- Report and data file downloads were not opened in a browser after the
+  update; the header change is equivalent by the RFC.
+
+---
+
 ## [server-1.11.257] / [collection-OTST_V2.0.141] — 2026-10-13
 
 Issue #680, release 2026.291. Collection unchanged.
