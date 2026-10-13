@@ -62,6 +62,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.260] / [collection-OTST_V2.0.142] — 2026-10-13
+
+Issue #688, release 2026.294.
+
+### Fixed
+
+- **A refund offer wider than the request is one failure, and the refund is
+  checked against what was asked.** A real provider was asked to refund one
+  passenger's fulfillment of five. It answered with a refund offer naming
+  all five, one of them twice, and after the confirmation refunded another
+  passenger's. The collection took the offer's list as what was refunded, so
+  step 14 reported 8 failures, and none of them said that the wrong passenger
+  had been refunded. Now (`_proposedScope()` in `library-bruno/refunds.js`):
+  - step 10 fails once, "Refund offer[i] covers only the fulfillments asked
+    for", naming the asked fulfillments and the ones added; a fulfillment
+    named twice is a WARNING; re-reads of the same offer (11, 13) say
+    nothing more;
+  - the refunded set is the asked fulfillments that the offer names (or the
+    asked ones, if it names none of them), so step 14 expects those REFUNDED
+    and every other one unchanged. On that provider's run, step 14 now gives
+    two failures: the asked fulfillment is not REFUNDED, and another one is.
+  - A full refund asks for every fulfillment, and is not affected. Neither
+    is a run without a recorded request.
+
+### Not verified
+
+- Not rerun on the provider. The real validators were run on its shapes,
+  anonymised (`bruno-refund-wider-than-asked.test.js`). The simulator's nine
+  refund scenarios give the same recording before and after (replay).
+
+---
+
 ## [server-1.11.259] / [collection-OTST_V2.0.141] — 2026-10-13
 
 Issue #687, release 2026.293. Collection unchanged.

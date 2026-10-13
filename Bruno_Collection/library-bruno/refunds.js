@@ -109,7 +109,8 @@ function recordRefundOfferStates(refundOffers) {
       fee: ro.refundFee && typeof ro.refundFee.amount === "number" ? ro.refundFee.amount : null,
     };
     if (ro.status === "PROPOSED") {
-      proposed[ro.id] = { ...amounts, fulfillmentIds: _fulfillmentIdsOf(ro) };
+      const firstSeen = !proposed[ro.id];
+      proposed[ro.id] = { ...amounts, ..._proposedScope(ro, index, firstSeen) };
     } else if (ro.status === "CONFIRMED") {
       const before = proposed[ro.id];
       if (before) {
@@ -118,12 +119,50 @@ function recordRefundOfferStates(refundOffers) {
           expect(amounts.fee, "refundFee changed between PROPOSED and CONFIRMED").to.eql(before.fee);
         });
       }
-      _confirmedFulfillmentIds(ro, index, before).forEach((id) => refunded.add(id));
+      // #688: an offer wider than the request refunds what was asked.
+      const named = _confirmedFulfillmentIds(ro, index, before);
+      const confirmedIds = before?.widerThanAsked ? before.fulfillmentIds : named;
+      confirmedIds.forEach((id) => refunded.add(id));
       bru.setEnvVar("isRefundConfirmed", "true");
     }
   });
   bru.setEnvVar("__refundProposed", JSON.stringify(proposed));
   bru.setEnvVar("__refundedFulfillmentIds", JSON.stringify([...refunded]));
+}
+
+// #688: the fulfillments the POST /refund-offers asked to refund.
+function _askedFulfillmentIds() {
+  const body = _readJson("requestRefundOffersBodyData", {});
+  return Array.isArray(body?.fulfillmentIds) ? body.fulfillmentIds.filter((id) => typeof id === "string" && id !== "") : [];
+}
+
+// #688: what a PROPOSED refund offer covers. A provider was asked for one
+// fulfillment and answered with an offer naming all five of the booking (one
+// of them twice), then refunded another passenger's. The offer naming
+// fulfillments that were not asked for is one failure, said once per offer;
+// the refunded set is then what was asked, so step 14 says which fulfillment
+// was refunded in its place. A full refund asks for every fulfillment and is
+// not affected.
+function _proposedScope(refundOffer, index, firstSeen) {
+  const ids = _fulfillmentIdsOf(refundOffer);
+  const asked = _askedFulfillmentIds();
+  const twice = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+  if (firstSeen && twice.length > 0) {
+    validationLogger(`[WARNING] Refund offer[${index}] (${refundOffer.id}) names a fulfillment more than once: [${twice.join(", ")}].`);
+  }
+  const notAsked = [...new Set(ids.filter((id) => !asked.includes(id)))];
+  if (asked.length === 0 || notAsked.length === 0) return { fulfillmentIds: ids };
+  if (firstSeen) {
+    test(`Refund offer[${index}] (${refundOffer.id}) covers only the fulfillments asked for`, () => {
+      throw new Error(`asked for [${asked.join(", ")}]; the offer also names [${notAsked.join(", ")}]`);
+    });
+  }
+  const kept = asked.filter((id) => ids.includes(id));
+  const scope = kept.length > 0 ? kept : asked;
+  if (firstSeen) {
+    validationLogger(`[INFO] Refund scope: the booking is checked against the fulfillments asked for: [${scope.join(", ")}].`);
+  }
+  return { fulfillmentIds: scope, widerThanAsked: true };
 }
 
 // #674: a CONFIRMED refund offer names the booking's fulfillments it refunded.
