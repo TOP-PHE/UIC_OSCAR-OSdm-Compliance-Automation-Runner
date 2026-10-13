@@ -15,6 +15,17 @@
       ]
     },
     {
+      "release": "2026.290",
+      "date": "2026-10-13",
+      "server": "1.11.256",
+      "collection": "OTST_V2.0.141",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.256 (#681, part 3): Copy scenarios reports ready, to complete and not allowed scenarios before and after the copy, and warns when the run list is ALL."
+      ]
+    },
+    {
       "release": "2026.289",
       "date": "2026-10-12",
       "server": "1.11.255",

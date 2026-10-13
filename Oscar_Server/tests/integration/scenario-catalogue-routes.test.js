@@ -158,6 +158,7 @@ describe('copy from the catalogue', () => {
     expect(tech.toComplete).toEqual([expect.stringMatching(/overrule code/)]);
     expect(preview.scenarios.find(s => s.code === 'OTST_SALE_RESERVATION_MANDATORY_2ADT').toCheck)
       .toEqual(['the chosen train must carry a mandatory seat reservation']);
+    expect(preview.runsAll).toBe(false);
   });
 
   test('a reference scenario with an overrule code is copied with none when the framework declares none, and says so', async () => {
@@ -168,8 +169,24 @@ describe('copy from the catalogue', () => {
     const res = await request(app).post('/v1/company/scenario-copy').set(as('TM', 'P')).send({ source_id: 'catalogue', codes, trip_map: tripMap });
     expect(res.status).toBe(200);
     expect(res.body.copied[0].toComplete).toEqual([expect.stringMatching(/overrule code/)]);
+    // #681 part 3: the report of the copy, under the code it has here.
+    expect(res.body.report).toMatchObject({ ready: [], toComplete: [{ code: res.body.copied[0].to }] });
+    expect(res.body.report.runsAll).toBe(false);
     const copied = (await readFile(ids.P)).scenarios.find(s => s.code === res.body.copied[0].to);
     expect(copied.overruleCode).toBeNull();
+  });
+
+  test('with a run list of ALL, the preview and the copy say that a scenario to complete would run', async () => {
+    const { writeDatafile } = require('../../src/utils/datafileWrite');
+    const slug = get('SELECT slug FROM companies WHERE id = ?', [ids.P]).slug;
+    const stored = await readFile(ids.P);
+    await writeDatafile({ id: ids.P, slug }, { ...stored, scenariosToRun: 'ALL' });
+    const preview = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TM', 'P')).send({ source_id: 'catalogue' })).body;
+    expect(preview.runsAll).toBe(true);
+    // A tester with a list of their own does not run ALL.
+    require('../../src/utils/runSelections').setRunSelection(ids.P, ids.TS, ['OTST_SALE_ONE_WAY_1ADT']);
+    const forTester = (await request(app).post('/v1/company/scenario-copy/preview').set(as('TS', 'P')).send({ source_id: 'catalogue' })).body;
+    expect(forTester.runsAll).toBe(false);
   });
 
   test('a certifier cannot copy from it', async () => {

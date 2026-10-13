@@ -44,6 +44,8 @@ const { planCopy, applyCopy } = require('../../utils/scenarioCopy');
 const { catalogueDatafile, catalogueFor } = require('../../utils/scenarioCatalogue');
 const { adaptCatalogueDatafile, suggestTrip } = require('../../utils/catalogueMatch');
 const TripApply = require('../../../public/js/trip-apply');
+const { copyReport } = require('../../../public/js/copy-report');
+const { getRunSelection } = require('../../utils/runSelections');
 const log = require('../../utils/logger').child({ module: 'scenario-copy' });
 
 const router = express.Router();
@@ -178,6 +180,19 @@ function testDataChoices(resources) {
   return { trains, journeys };
 }
 
+// #681: whether the run list of this user, once the copy is written, is
+// "ALL", so that a copied scenario runs without being ticked. The same reading
+// as POST /v1/runs: a tester's own list when they have one, else the file's;
+// a missing file list becomes [] with the copy.
+function runsAllAfterCopy(user, companyId, stored) {
+  const fileList = stored && 'scenariosToRun' in stored ? stored.scenariosToRun : [];
+  if (user.role === 'company_user') {
+    const selection = getRunSelection(companyId, user.id);
+    return (selection == null ? fileList : selection) === 'ALL';
+  }
+  return !Array.isArray(fileList);
+}
+
 // ── POST /scenario-copy/preview ───────────────────────────────────────────────
 router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
   const ctx = await copyContext(req, res);
@@ -201,7 +216,11 @@ router.post('/scenario-copy/preview', previewLimiter, async (req, res) => {
   const testData = testDataChoices(ctx.resources);
   // #681: a proposed train or journey for each trip of a reference scenario.
   if (ctx.entries) plan.trips = plan.trips.map(t => ({ ...t, suggested: suggestTrip(t, testData) }));
+  let runsAll = false;
+  try { runsAll = runsAllAfterCopy(req.user, ctx.targetId, await readDatafile(ctx.targetId)); }
+  catch (err) { if (!(err instanceof Refusal)) throw err; }
   return res.json({
+    runsAll,
     source: { id: ctx.sourceId, name: ctx.names[ctx.sourceId]?.name || '' },
     target: { id: ctx.targetId, name: ctx.names[ctx.targetId]?.name || '' },
     ...plan,
@@ -252,9 +271,12 @@ router.post('/scenario-copy', copyLimiter, async (req, res) => {
       return res.status(500).json({ status: 500, title: 'Internal Server Error', detail: 'Failed to save data file to disk.' });
     }
     auditLog(req.user.id, ctx.targetId, req.user.email, `scenarios_copied:${ctx.sourceId}:${result.copied.length}`);
-    // #681: what a copied reference scenario still needs before it can run.
+    // #681: what a copied reference scenario still needs before it can run,
+    // and the report of the copy (under the codes it now has here).
     const copied = result.copied.map(c => (ctx.notes[c.from] ? { ...c, toComplete: ctx.notes[c.from].toComplete } : c));
-    return res.json({ copied, hash });
+    const report = ctx.entries ? copyReport(copied.map(c => ({ code: c.to, toComplete: c.toComplete })), copied.map(c => c.to)) : null;
+    if (report) report.runsAll = runsAllAfterCopy(req.user, ctx.targetId, result.datafile);
+    return res.json({ copied, hash, report });
   });
 });
 

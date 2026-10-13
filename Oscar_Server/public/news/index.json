@@ -8,6 +8,14 @@
     "content": "Before, OSCAR kept serving the same cached token until it expired, so after a provider changed its signing keys every run failed with 401 for up to 15 minutes. Now the run that receives the 401 drops the token from the cache and says so in its log; the next run requests a fresh one. If the 401 comes back, check the credentials in API Config."
   },
   {
+    "id": "2026-10-13-catalogue-copy-report",
+    "date": "October 13, 2026",
+    "tag": "Improvement",
+    "title": "A report when you copy reference scenarios",
+    "summary": "Copying from the scenario catalogue now tells you how many scenarios are ready to run, how many to complete first and why, and how many your Test Framework does not allow.",
+    "content": "As you tick reference scenarios in Copy scenarios, a short report shows how many will be ready to run, which ones you need to complete first (and what for), and which ones your Test Framework does not allow. If your run list is ALL, it also warns that the scenarios to complete would run before they are completed."
+  },
+  {
     "id": "2026-10-12-catalogue-adapt",
     "date": "October 12, 2026",
     "tag": "Improvement",
