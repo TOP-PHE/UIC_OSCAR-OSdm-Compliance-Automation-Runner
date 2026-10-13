@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-sales-horizon",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "Departure dates: sales horizon and the past",
+    "summary": "Declare how far ahead a provider sells, and three reference scenarios test it: the last day, the day after, and yesterday.",
+    "content": "The Test Framework's Tariff Flexibility section has a new field, the sales horizon in days. OTST_SALE_AT_SALES_HORIZON sells a departure on its last day; NHF_SALE_BEYOND_SALES_HORIZON asks for the day after and NHF_SALE_DEPARTURE_IN_PAST for yesterday, and both expect a refusal or no offer. Any scenario can also set its own departure date, in days from the day of the run."
+  },
+  {
     "id": "2026-10-13-names-no-passenger",
     "date": "October 13, 2026",
     "tag": "New",

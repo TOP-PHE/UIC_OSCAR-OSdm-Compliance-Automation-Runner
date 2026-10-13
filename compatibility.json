@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.301",
+  "current_release": "2026.302",
   "releases": [
+    {
+      "release": "2026.302",
+      "date": "2026-10-13",
+      "server": "1.11.267",
+      "collection": "OTST_V2.0.149",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Departure dates: a scenario may set its own day (departureDaysFromToday); a departure in the past or beyond the declared sales horizon must be refused or give no offer (departureExpectRejection); Test Framework salesHorizonDays; three reference scenarios; simulator 0.24.0 (salesHorizon on gamma)."
+      ]
+    },
     {
       "release": "2026.301",
       "date": "2026-10-13",

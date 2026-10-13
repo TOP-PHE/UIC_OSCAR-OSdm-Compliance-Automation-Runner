@@ -62,6 +62,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.267] / [collection-OTST_V2.0.149] — 2026-10-13
+
+Issue #704, release 2026.302. Simulator 0.24.0.
+
+### Added
+
+- **A scenario can set its own departure date**: `departureDaysFromToday`,
+  in days from the day of the run (0 today, -1 yesterday, 90 in ninety days),
+  counted on the UTC calendar. It replaces the lead time and the trip's
+  weekday. Test Config → *Departure in days from today*.
+- **`departureExpectRejection`** (Test Config → *Departure date refused*,
+  `library-bruno/departureLimit.js`): POST /offers must refuse the date with a
+  4xx Problem, or give no offer; offers given fail. The scenario ends at step
+  01 either way, so nothing is booked.
+- **Test Framework → Tariff Flexibility → Sales horizon, in days**
+  (`salesHorizonDays`): how far ahead the provider sells.
+- **Three reference scenarios** (catalogue: 48):
+  `OTST_SALE_AT_SALES_HORIZON` (a sale on the last day of the horizon),
+  `NHF_SALE_BEYOND_SALES_HORIZON` (the day after), `NHF_SALE_DEPARTURE_IN_PAST`
+  (yesterday). The first two take the framework's horizon at copy time
+  (catalogue `limit` `SALES_HORIZON` / `OVER_SALES_HORIZON`) and cannot be
+  copied without one.
+
+### Simulator 0.24.0
+
+- Profile key `salesHorizon` `{ from, days }`: a trip from that stop place is
+  sold up to `days` days ahead; later gets no offer and a Problem
+  `SALES_HORIZON_EXCEEDED`, before today is refused with 400
+  `DEPARTURE_IN_PAST`. `gamma`: station `0000094`, 90 days. Scenarios
+  `SIM_SALE_AT_SALES_HORIZON_38`, `SIM_NHF_BEYOND_SALES_HORIZON_38`,
+  `SIM_NHF_DEPARTURE_IN_PAST_38` and trip requirement 12.
+
+### Default decisions (taken without asking)
+
+- The simulator applies its horizon to one stop place only: its tests and the
+  other scenarios use fixed dates, which would start failing once those dates
+  are past.
+- "Today" is the UTC calendar day, in the collection and in the simulator, so
+  a server in any time zone names the same day.
+- A departure beyond the horizon passes with no offer as well as with a 4xx:
+  OSDM does not say which a provider should give. No offer without a Problem
+  saying why is a WARNING.
+- The past-departure entry needs nothing declared: no provider sells a train
+  that has left.
+- The horizon field sits in the Tariff Flexibility section, the one about what
+  the provider sells.
+
+### Not verified
+
+- Not run against a real provider.
+- A real provider's horizon may count from the departure's local date, or
+  hour by hour; a scenario on the last day can then fail by one day near
+  midnight. If it does, the horizon declared should be one day shorter.
+
+Checked: the three simulator scenarios run with no failed check (230, 69 and
+70 checks). With the horizon removed from `gamma`, both negative scenarios
+fail one check each. Unit tests for the date (UTC, past and future, values
+out of range ignored), the probe (4xx, no offer, offers given, 5xx), the
+catalogue (missing horizon, copy at the horizon and the day after) and the
+Test Framework field. A full replay of the 87 simulator scenarios: the 84
+earlier ones are unchanged, and `OSCAR - Checks by scenario.md` is
+regenerated from it.
+
+---
+
 ## [server-1.11.266] / [collection-OTST_V2.0.148] — 2026-10-13
 
 Issue #703, release 2026.301.
