@@ -62,7 +62,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601) and,
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697) and,
   // with the rest of #592 and #611, the later functions are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;
@@ -103,12 +103,40 @@ test('the return scenarios name a model their version defines, and expect a tick
   }
 });
 
+// #697: a refund by passenger or by leg, on a trip of gamma sold with one
+// ticket per passenger or per leg (the only bookings it refunds so).
+const BY_SCOPE = new Map([
+  ['SIM_REFUND_PAX_2ADT_38', { axis: 'partialRefundByPax', selection: 'partialRefundPaxSelection', stop: 'perPassengerFrom', passengers: 2 }],
+  ['SIM_REFUND_LEG_1ADT_38', { axis: 'partialRefundByLeg', selection: 'partialRefundLegSelection', stop: 'perLegFrom', passengers: 1 }],
+]);
+
+test('the refunds by passenger and by leg run on gamma\'s trips sold per passenger and per leg (#697)', () => {
+  const gamma = loadProviders(PROVIDERS_DIR).get('gamma');
+  for (const [code, want] of BY_SCOPE) {
+    const scenario = datafile.scenarios.find((s) => s.code === code);
+    assert.ok(scenario, code);
+    assert.equal(scenario.scenarioType, 'REFUND');
+    assert.equal(scenario.scenarioAction, 'PATCH');
+    assert.equal(scenario[want.axis], 'on', code);
+    assert.equal(scenario[want.selection], 'last', code);
+    assert.equal(scenario.partialRefundByFulfillment, 'off', code);
+    assert.equal(scenario.offerSearchCriteria.returnOffsetDays, undefined, `${code} is one-way`);
+    const trip = datafile.tripRequirements.find((t) => t.id === scenario.tripRequirementId);
+    const origin = trip.trip?.origin ?? trip.legs[0].origin;
+    assert.equal(origin, gamma.ticketing[want.stop], code);
+    if (want.axis === 'partialRefundByLeg') assert.equal(trip.legs.length, 2);
+    assert.equal(datafile.passengersList.find((l) => l.id === scenario.passengersListId).passengers.length, want.passengers);
+    assert.ok(datafile.scenariosToRun.includes(code), code);
+  }
+});
+
 test('the refund scenarios refund a return: in full, and the inbound ticket alone', () => {
   // #595: a return gives one ticket per direction on the simulator, so a full
   // refund confirms two refund offers and a partial one refunds one ticket.
   // The confirmed ones; the withdrawn and the unconfirmed one (#611) are below.
   const refunds = datafile.scenarios.filter((s) => s.scenarioType === 'REFUND' && s.scenarioAction === 'PATCH'
-    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.code.startsWith(prefix)));
+    && !['SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_'].some((prefix) => s.code.startsWith(prefix))
+    && !BY_SCOPE.has(s.code));
   // Some providers sell a return only as one offer: the SIM_REFUND_COMBINED_ ones refund that.
   assert.equal(refunds.length, 16);
   for (const scenario of refunds) {

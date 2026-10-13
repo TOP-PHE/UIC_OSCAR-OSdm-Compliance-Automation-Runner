@@ -1294,6 +1294,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (git-ignored, so the update's `pull --ff-only` still works; applied by
     `up -d`, never by `restart`) and puts them back. OSCAR caps first: 10 per
     company (Test Framework), 20 per server (`MAX_CONCURRENT_RUNS`).
+  - **Tickets per passenger or per leg are chosen by the trip's stop place**
+    (#697, 0.23.0, profile `ticketing`): on `gamma` a trip from
+    `urn:uic:stn:0000096` gets one ticket per passenger, one from `0000095`
+    one admission per passenger and leg and one ticket per leg; only those
+    bookings (and the `per-passenger` variant) accept a refund scoped by
+    passenger or booking part. They are the sources of the catalogue's
+    `OTST_REFUND_PARTIAL_PASSENGER_2ADT` / `_LEG_1ADT`. A variant (last name)
+    cannot be a reference scenario's source: the copy would send that name
+    to the provider.
   - **Its version is visible and released on its own** (#617, 0.15.0):
     `/healthz` returns `{status, version}`; a version change on `main` tags
     `simulator-<version>` with a GitHub release whose notes

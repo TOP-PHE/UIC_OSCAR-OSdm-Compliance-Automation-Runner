@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.297",
+  "current_release": "2026.298",
   "releases": [
+    {
+      "release": "2026.298",
+      "date": "2026-10-13",
+      "server": "1.11.263",
+      "collection": "OTST_V2.0.145",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Two reference scenarios in the catalogue (37): partial refund by passenger (OTST_REFUND_PARTIAL_PASSENGER_2ADT) and by leg (OTST_REFUND_PARTIAL_LEG_1ADT), from two new simulator scenarios on trips gamma sells with one ticket per passenger or per leg (#697). Collection only; server unchanged at 1.11.263. Simulator 0.23.0."
+      ]
+    },
     {
       "release": "2026.297",
       "date": "2026-10-13",

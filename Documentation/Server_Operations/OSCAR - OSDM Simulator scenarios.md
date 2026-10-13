@@ -93,6 +93,15 @@ defines from 3.7.
 | `SIM_REFUND_DELETE_1ADT_38` | A one-way ticket: refund offer asked for (10), read (11), then withdrawn (15. DEL) instead of confirmed; the booking is read again (16). | The refund offer is `PROPOSED`; `DELETE` answers 204; the booking keeps its fulfilled ticket. (#611) | No failed check. |
 | `SIM_REFUND_ONLY_OFFER_1ADT_38` | A one-way ticket: refund offer asked for and read, then neither confirmed nor withdrawn (no `scenarioAction`); the run ends at 12. | The refund offer stays `PROPOSED` until it expires. (#611) | No failed check. |
 
+### Refund by passenger and by leg (#697)
+
+By default gamma gives one ticket per direction holding every passenger, and an admission covers the whole trip, so a refund by passenger or leg cannot be shown there: a scope by `passengerIds` or `bookingPartIds` is refused (`PARTIAL_REFUND_NOT_SUPPORTED`). Real providers divide a booking otherwise, and gamma (profile `ticketing`) sells two trips the same way: from station `0000096` (trip requirement 10, as trip 1) one ticket per passenger; from station `0000095` (trip requirement 11, as trip 4) one admission per passenger and leg, priced by the leg's share of the travel time, and one ticket per leg. On those bookings a refund scoped within the ticket named is offered.
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_REFUND_PAX_2ADT_38` | Two adults, then the last passenger refunded alone (`partialRefundByPax`, `last`): the refund names the ticket that holds that passenger, and only that passenger's parts are refunded. | One ticket per passenger; one refund offer for the second, which becomes `REFUNDED`, the first stays `FULFILLED`. | No failed check; the two merged-PDF warnings. |
+| `SIM_REFUND_LEG_1ADT_38` | A two-leg trip, then the last leg refunded alone (`partialRefundByLeg`, `last`): `bookingPartIds` names that leg's parts. | One admission and one ticket per leg; the refund offer gives back a third of the price (one hour of three) and the first leg's ticket stays `FULFILLED`. | No failed check; the two merged-PDF warnings. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an

@@ -69,6 +69,29 @@
       }
     },
     {
+      "code": "OTST_REFUND_PARTIAL_PASSENGER_2ADT",
+      "source": "SIM_REFUND_PAX_2ADT_38",
+      "purpose": "Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays.",
+      "checks": 469,
+      "needs": {
+        "trip": "SEARCH",
+        "tariff": "REFUNDABLE",
+        "passengers": 2
+      }
+    },
+    {
+      "code": "OTST_REFUND_PARTIAL_LEG_1ADT",
+      "source": "SIM_REFUND_LEG_1ADT_38",
+      "purpose": "Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays.",
+      "checks": 447,
+      "needs": {
+        "trip": "SPECIFICATION",
+        "legs": 2,
+        "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
       "code": "OTST_REFUND_TECHNICAL_CANCELLATION_1ADT",
       "source": "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38",
       "purpose": "Technical cancellation: refund with an overrule code, everything back and no fee.",

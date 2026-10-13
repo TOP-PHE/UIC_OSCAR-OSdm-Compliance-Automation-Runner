@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-catalogue-partial-refunds",
+    "date": "October 13, 2026",
+    "tag": "New",
+    "title": "Reference scenarios: partial refund by passenger and by leg",
+    "summary": "The scenario catalogue now offers a partial refund of one passenger, and of one leg of a two-leg journey.",
+    "content": "Two reference scenarios can be copied from Test Config: OTST_REFUND_PARTIAL_PASSENGER_2ADT refunds the last of two adults and checks that the other passenger's ticket stays; OTST_REFUND_PARTIAL_LEG_1ADT refunds the last leg of a two-leg journey and checks that the first one stays. Both need the sales flow Partial refund in the Test Framework."
+  },
+  {
     "id": "2026-10-13-idempotency-offer-once",
     "date": "October 13, 2026",
     "tag": "Improvement",
