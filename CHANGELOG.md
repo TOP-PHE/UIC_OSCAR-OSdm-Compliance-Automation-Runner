@@ -62,6 +62,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.263] / [collection-OTST_V2.0.144] — 2026-10-13
+
+Issue #693, release 2026.297.
+
+### Changed
+
+- **Idempotency-Key test: an offer that can be booked only once is a
+  provider rule, not a failure.** The test sends the booking a third time
+  with another key, with the same offer, and expects a new booking. A real
+  provider answered 409: it books an offer only once. Now, when that booking
+  is refused (4xx, no booking):
+  - a WARNING names the offer: refused for a second booking, the provider
+    books an offer only once;
+  - the offers are asked again with step 01's request (no Idempotency-Key),
+    and the offer standing for the chosen one is taken: same flexibility,
+    travel class and price, else same flexibility and class, else the first;
+  - the booking is made on it with another key and checked as before: 200
+    and a new booking.
+  The seats and reservations of the first booking name the old offer's
+  parts, so they are left out, and the log says so. A booking of several
+  offers is not made again: a warning, and the step is not checked.
+  `matchingOffer()`, `bookingOnOffer()` and `refusedWithoutBooking()` in
+  `library-bruno/idempotency.js` (pure).
+
+### Default decisions
+
+- A 5xx on the booking with another key is still a failure: only a refusal
+  (4xx without a booking) reads as "booked only once".
+- The booking with another key on the new offer is left pre-booked, as
+  before; it expires on its own.
+
+### Not verified
+
+- Not run against the provider. Unit tests run the step with
+  `bru.sendRequest` faked (409, new offers, booking). The simulator books an
+  offer twice, so a full replay of its 74 scenarios gives the same recording
+  before and after.
+
+---
+
 ## [server-1.11.262] / [collection-OTST_V2.0.143] — 2026-10-13
 
 Issue #692, release 2026.296.

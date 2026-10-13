@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.296",
+  "current_release": "2026.297",
   "releases": [
+    {
+      "release": "2026.297",
+      "date": "2026-10-13",
+      "server": "1.11.263",
+      "collection": "OTST_V2.0.144",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Idempotency-Key test: an offer booked only once gives a warning, and the booking with another key is made on a new offer (#693)."
+      ]
+    },
     {
       "release": "2026.296",
       "date": "2026-10-13",

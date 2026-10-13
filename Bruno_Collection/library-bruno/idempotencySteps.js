@@ -70,7 +70,7 @@ async function send(path, body, key) {
           Accept: 'application/json',
           Authorization: `Bearer ${bru.getEnvVar('access_token')}`,
           ...requestorHeader(bru.getEnvVar('requestor')),
-          'Idempotency-Key': key,
+          ...(key ? { 'Idempotency-Key': key } : {}),
         },
         data: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
       }, (err, r) => (err && !err.response ? reject(err) : resolve(r || err.response)));
@@ -94,11 +94,45 @@ async function checkBookingIdempotency(firstBody) {
   validationLogger(`[INFO] 🔑 Idempotency-Key — POST /bookings sent again with the same key (${key}), then with another key.`);
   const replay = await send('/bookings', body, key);
   record(idem.checkBookingReplay(firstBody, replay.body, replay.status));
-  const other = await send('/bookings', body, newKey());
+  let other = await send('/bookings', body, newKey());
+  if (idem.refusedWithoutBooking(other.status, other.body)) {
+    // #693: a provider may book an offer only once. That is its rule, not a
+    // fault of idempotency: said, then the booking with another key is made
+    // on a new offer.
+    const offerId = parseJson(body)?.offers?.[0]?.offerId;
+    validationLogger(`[WARNING] Idempotency-Key: POST /bookings with another key was refused (HTTP ${other.status}) for offer ${offerId}, already booked: this provider books an offer only once. New offers are asked for, and the booking with another key is made on one of them.`);
+    other = await bookOnNewOffer(body);
+    if (!other) return;
+  }
   record(idem.checkBookingOtherKey(firstBody, other.body, other.status));
   if (other.body?.booking?.id) {
     validationLogger(`[INFO] Idempotency-Key: the booking made with another key (${other.body.booking.id}) is left pre-booked; it expires on its own.`);
   }
+}
+
+function parseJson(value) {
+  if (value == null || typeof value !== 'string') return value ?? null;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+// #693: the offers asked again with step 01's request, the offer standing for
+// the one chosen, and the booking made on it with another key. Null, said,
+// when that cannot be done.
+async function bookOnNewOffer(bookingBody) {
+  const request = parseJson(bookingBody);
+  if (!Array.isArray(request?.offers) || request.offers.length !== 1) {
+    validationLogger('[WARNING] Idempotency-Key: the booking names several offers; new offers are not asked for, and the booking with another key is not checked.');
+    return null;
+  }
+  const offers = await send('/offers', bru.getEnvVar('OfferCollectionRequest'), null);
+  const match = offers.status === 200 ? idem.matchingOffer(parseJson(bru.getEnvVar('offer')), offers.body?.offers) : null;
+  if (!match) {
+    validationLogger(`[WARNING] Idempotency-Key: the offers asked again gave none (HTTP ${offers.status}); the booking with another key is not checked.`);
+    return null;
+  }
+  const rebooking = idem.bookingOnOffer(request, match.offer.offerId);
+  validationLogger(`[INFO] Idempotency-Key: new offer ${match.offer.offerId}, ${match.how}.${rebooking.droppedSelections ? ' The seats or reservations chosen for the first booking name the old offer, so they are left out.' : ''}`);
+  return send('/bookings', rebooking.body, newKey());
 }
 
 /** 06, after the confirmation: the same request with the same key. */

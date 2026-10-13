@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-13-idempotency-offer-once",
+    "date": "October 13, 2026",
+    "tag": "Improvement",
+    "title": "Idempotency test with offers booked only once",
+    "summary": "When a provider refuses to book the same offer a second time, the Idempotency-Key test now asks new offers and books one of them with another key.",
+    "content": "The Idempotency-Key test books once more with another key to check that a new booking is made. Some providers book an offer only once and refuse that request. The run now logs a warning naming the offer, asks the offers again, and checks the booking with another key on the matching new offer."
+  },
+  {
     "id": "2026-10-13-requestor-header",
     "date": "October 13, 2026",
     "tag": "Fix",
