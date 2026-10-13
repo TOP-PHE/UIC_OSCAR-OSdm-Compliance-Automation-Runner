@@ -300,6 +300,11 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "emptyPassengersExpectRejection": {
+            "description": "Negative test (#703). When on, POST /offers is sent with an empty anonymousPassengerSpecifications list, which OSDM does not allow (one or more): it must be refused with a 4xx RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "passengerLimitExpectRejection": {
             "description": "Negative test (#699). When on, the scenario's passengers are one more than the provider's maximum (Test Framework maxPassengers): POST /offers must refuse them (4xx with an RFC-9457 Problem, or no offer), or else POST /bookings must (4xx). The scenario ends at the refusal. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

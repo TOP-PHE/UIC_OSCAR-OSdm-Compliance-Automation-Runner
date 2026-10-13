@@ -1176,6 +1176,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   5xx fail). A probe needs no request file and no routing, so the run filter
   cannot skip it (#652). A catalogue entry with `exchangeRefundedProbe` needs
   EXCHANGE_FULL declared (`salesFlowsOf`).
+- **Names are compared after the update, and an empty passenger list is a
+  probe** (#703, 1.11.266 / OTST_V2.0.148). `OTST_SALE_ACCENTED_LONG_NAMES`
+  relies on 03/04's `sameOrAbsent` (a different name is a FAIL); the names the
+  booking itself returns are not compared, on purpose (one more check in
+  every scenario). `emptyPassengersExpectRejection` empties
+  `anonymousPassengerSpecifications` in 01's before-request
+  (`passengerLimit.js`). OSDM gives names no maximum length.
 - **The scenario catalogue is the simulator's scenarios under generic codes**
   (#612, 1.11.237). `scenario_catalogue.json` holds no scenario data: each
   entry names a `SIM_…` scenario of `simulator_datafile.json` (`source`), says

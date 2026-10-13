@@ -122,6 +122,13 @@ Negative probes sent from the step's own script (the flow of the scenario does n
 | `SIM_NHF_EXCHANGE_REFUNDED_38` | The same refund; then, at 14, an exchange offer asked for the refunded ticket (`exchangeRefundedProbe`). | 409 `only a valid ticket can be exchanged`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
 | `SIM_NHF_CONFIRM_AGAIN_38` | A sale; at 06, POST /fulfillments sent again without an Idempotency-Key (`confirmAgainProbe`). | 200 with the same fulfillments. | No failed check. |
 
+### Names and an empty passenger list (#703)
+
+| Scenario | What it tests | What the simulator answers | Expected |
+|---|---|---|---|
+| `SIM_SALE_ACCENTED_NAMES_38` | Two adults with accented (Czech) and long names (passenger list 21), updated after booking to other accented names; 03 and 04 compare every name read back with the one sent. | The names exactly as sent. | No failed check. |
+| `SIM_NHF_NO_PASSENGER_38` | Negative test: POST /offers with an empty `anonymousPassengerSpecifications` list (`emptyPassengersExpectRejection`). | 400 `VALIDATION_ERROR`, a Problem. | No failed check; one warning: the Problem has no `pointers`. |
+
 ### Technical cancellation (overrule codes, #596)
 
 `gamma` accepts four overrule codes and refuses any other. A refund with an

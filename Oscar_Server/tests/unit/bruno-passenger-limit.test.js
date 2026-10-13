@@ -117,3 +117,26 @@ describe('a partial refund of a third of the passengers', () => {
     expect(buildRefundSpecifications(two, { byPax: true, paxSel: 'third' })).toEqual([{ fulfillmentId: 'F2', passengerIds: ['P2'] }]);
   });
 });
+
+describe('#703 an offer request with no passenger', () => {
+  const pl = require(path.join(LIB, 'passengerLimit.js'));
+
+  test('the request goes out with an empty list; off, it is not touched', () => {
+    const on = { emptyPassengersExpectRejection: 'true', OfferCollectionRequest: JSON.stringify({ anonymousPassengerSpecifications: [{ externalRef: '1' }], tripSearchCriteria: { x: 1 } }) };
+    withBru(on, () => pl.prepareEmptyPassengers());
+    expect(JSON.parse(on.OfferCollectionRequest)).toEqual({ anonymousPassengerSpecifications: [], tripSearchCriteria: { x: 1 } });
+    const off = { OfferCollectionRequest: '{"anonymousPassengerSpecifications":[{}]}' };
+    withBru(off, () => pl.prepareEmptyPassengers());
+    expect(off.OfferCollectionRequest).toBe('{"anonymousPassengerSpecifications":[{}]}');
+  });
+
+  test('a 4xx Problem passes; a 200 fails; armed, the scenario ends either way', () => {
+    const ok = withBru({ emptyPassengersExpectRejection: 'true' }, () => pl.checkEmptyPassengersRefused(400, { title: 'Bad Request', detail: 'no passenger' }));
+    expect(ok.result).toBe(true);
+    expect(ok.tests.filter(t => t[1] === 'fail')).toEqual([]);
+    const bad = withBru({ emptyPassengersExpectRejection: 'true' }, () => pl.checkEmptyPassengersRefused(200, { offers: [{}] }));
+    expect(bad.result).toBe(true);
+    expect(bad.tests.find(t => t[1] === 'fail')[0]).toMatch(/No passenger probe \[POST \/offers\]: provider rejects with a client error/);
+    expect(withBru({}, () => pl.checkEmptyPassengersRefused(400, {})).result).toBe(false);
+  });
+});

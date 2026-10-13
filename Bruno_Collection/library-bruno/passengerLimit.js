@@ -15,6 +15,10 @@ http://www.apache.org/licenses/LICENSE-2.0
  * and expects a refusal: at POST /offers (a 4xx Problem, or a 2xx holding no
  * offer), or else at POST /bookings (a 4xx Problem). Either ends the
  * scenario; a booking made over the limit is a failure.
+ *
+ * #703: `emptyPassengersExpectRejection` sends the offer request with no
+ * passenger at all (OfferCollectionRequest requires one or more): it must be
+ * refused with a 4xx Problem, and the scenario ends there.
  */
 
 require('./displays.js');
@@ -103,5 +107,41 @@ function checkBookingOverLimit(status, body) {
   return true;
 }
 
-module.exports = { overLimitOutcome, passengerCountOf, checkOffersOverLimit, checkBookingOverLimit };
+// ── #703: no passenger at all ───────────────────────────────────────────────
+
+const emptyArmed = () => String(bru.getEnvVar('emptyPassengersExpectRejection')) === 'true';
+
+/** Step 01, before the request: the offer request goes out with no passenger. */
+function prepareEmptyPassengers() {
+  if (!emptyArmed()) return;
+  let request = bru.getEnvVar('OfferCollectionRequest');
+  if (typeof request === 'string') {
+    try { request = JSON.parse(request); } catch { request = {}; }
+  }
+  const body = request && typeof request === 'object' ? request : {};
+  body.anonymousPassengerSpecifications = [];
+  bru.setEnvVar('OfferCollectionRequest', JSON.stringify(body));
+  validationLogger('[INFO] 🧪 No passenger probe — POST /offers is sent with an empty anonymousPassengerSpecifications list (OSDM requires at least one); a refusal is expected.');
+}
+
+/** Step 01, after the response: graded as a refusal; true when the probe is armed (the scenario ends). */
+function checkEmptyPassengersRefused(status, body) {
+  if (!emptyArmed()) return false;
+  const { validateProblemResponse } = require('./requestedInformation.js');
+  validateProblemResponse({
+    status,
+    body,
+    targets: [],
+    prefix: '🧪 No passenger probe',
+    label: 'POST /offers',
+    assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+    log: (level, msg) => validationLogger(`[${level}] ${msg}`),
+  });
+  return true;
+}
+
+module.exports = {
+  overLimitOutcome, passengerCountOf, checkOffersOverLimit, checkBookingOverLimit,
+  prepareEmptyPassengers, checkEmptyPassengersRefused,
+};
 

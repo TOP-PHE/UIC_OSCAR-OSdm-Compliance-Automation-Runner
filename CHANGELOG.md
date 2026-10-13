@@ -62,6 +62,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.266] / [collection-OTST_V2.0.148] — 2026-10-13
+
+Issue #703, release 2026.301.
+
+### Added
+
+- **`OTST_SALE_ACCENTED_LONG_NAMES`** (catalogue: 45): two adults with
+  accented (Czech) and long names, updated after booking to other accented
+  names. Steps 03 and 04 compare each name read back with the one sent, so a
+  provider that drops accents or cuts names fails there.
+- **`NHF_SALE_NO_PASSENGER`**: POST /offers with an empty passenger list,
+  which OSDM does not allow (`minItems: 1`), must be refused with a 4xx
+  Problem. New scenario field `emptyPassengersExpectRejection` (Test Config →
+  *No passenger refused*), in `library-bruno/passengerLimit.js`; the scenario
+  ends at the refusal.
+
+### Default decisions (taken without asking)
+
+- The longest name is 43 characters: OSDM sets no maximum length for names,
+  so a test of "too long" would have no rule to check against.
+- Names are compared where the collection already compares them, after the
+  update (03 and 04). The names returned by the booking itself are not
+  compared: that would add a check to every scenario that books.
+- The purchaser keeps ASCII names: the collection reads `purchaserList[0]`
+  for every scenario (§6 of CLAUDE.md), so a scenario cannot have a purchaser
+  of its own.
+
+### Not verified
+
+- Not run against a real provider.
+
+Checked: both simulator scenarios run with no failed check (289 and 70
+checks). With the simulator changed to drop accents, the names scenario fails
+8 checks (first and last names of both passengers, at 03 and at 04). Unit
+tests for the probe (the request with an empty list, a 4xx passes, a 200
+fails). A full replay of the 84 simulator scenarios is the same as the
+recording made before the change, and `OSCAR - Checks by scenario.md` is
+regenerated from it.
+
+---
+
 ## [server-1.11.265] / [collection-OTST_V2.0.147] — 2026-10-13
 
 Issue #700, release 2026.300.
