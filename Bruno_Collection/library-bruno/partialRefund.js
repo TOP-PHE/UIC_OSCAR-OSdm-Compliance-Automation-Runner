@@ -375,7 +375,7 @@ function resolvePartialRefundScope(booking, opts) {
       return { armed: true, degraded: true, reason: `booking has only ${passengers.length} passenger(s) — per-passenger partial refund requires >=2` };
     }
     chosenPassengers = choosePassengers(passengers, opts.paxSel);
-    if (chosenPassengers.length === 0 || chosenPassengers.some((p) => !p || !p.id)) {
+    if (chosenPassengers.length === 0 || chosenPassengers.some((p) => !p?.id)) {
       return { armed: true, degraded: true, reason: 'passenger selection resolved to a row with no id — cannot scope' };
     }
   }
@@ -490,7 +490,7 @@ function severalPassengersScope({ fulfillments, allAdms, chosenPassengers, byLeg
   for (const passenger of chosenPassengers) {
     const own = passengerPartIds(allAdms, passenger).filter((id) => !byLeg || legParts.has(String(id)));
     const { fulfillment, reason } = fulfillmentForScope(fulfillments, own, passenger);
-    if (!fulfillment || !fulfillment.id) {
+    if (!fulfillment?.id) {
       return { armed: true, degraded: true, reason: `passenger ${passenger.id}: ${reason || 'no fulfillment holds their parts'}` };
     }
     const key = String(fulfillment.id);

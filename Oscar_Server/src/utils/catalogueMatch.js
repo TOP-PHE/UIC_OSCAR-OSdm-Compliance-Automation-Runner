@@ -137,16 +137,19 @@ function resizedPassengers(source, count) {
   return Array.from({ length: count }, (_, i) => {
     const p = structuredClone(given[i % given.length]);
     p.reference = String(i + 1).padStart(5, '0');
-    if (i >= given.length) {
-      const n = i + 1;
-      for (const key of ['firstName', 'updateFirstName']) if (typeof p[key] === 'string') p[key] = `${p[key]} ${n}`;
-      for (const key of ['email', 'updateEmail']) if (typeof p[key] === 'string') p[key] = p[key].replace('@', `+${n}@`);
-      for (const key of ['phoneNumber', 'updatePhoneNumber']) {
-        if (typeof p[key] === 'string' && /\d{3}$/.test(p[key])) p[key] = p[key].slice(0, -3) + String(n % 1000).padStart(3, '0');
-      }
-    }
+    if (i >= given.length) makeDistinct(p, i + 1);
     return p;
   });
+}
+
+// A copied passenger made the n-th: its own first name, e-mail and phone number.
+function makeDistinct(p, n) {
+  const text = (key) => typeof p[key] === 'string';
+  for (const key of ['firstName', 'updateFirstName'].filter(text)) p[key] = `${p[key]} ${n}`;
+  for (const key of ['email', 'updateEmail'].filter(text)) p[key] = p[key].replace('@', `+${n}@`);
+  for (const key of ['phoneNumber', 'updatePhoneNumber'].filter((k) => text(k) && /\d{3}$/.test(p[k]))) {
+    p[key] = p[key].slice(0, -3) + String(n % 1000).padStart(3, '0');
+  }
 }
 
 /**
