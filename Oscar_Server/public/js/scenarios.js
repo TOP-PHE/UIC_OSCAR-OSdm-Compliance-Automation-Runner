@@ -69,6 +69,8 @@ const ENUMS = {
   tripIdsExpectRejection:            ['off', 'on'],
   // #699: negative test, one passenger over the provider's maximum must be refused.
   passengerLimitExpectRejection:     ['off', 'on'],
+  // #703: negative test, an offer request with no passenger must be refused.
+  emptyPassengersExpectRejection:    ['off', 'on'],
   // #700: after-sale requests that must be refused.
   refundAgainProbe:                  ['off', 'on'],
   exchangeRefundedProbe:             ['off', 'on'],
@@ -1639,6 +1641,8 @@ function buildDetailHTML(idx) {
           'Negative test (#700). On: once the refund is confirmed, a refund offer is asked again for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}
         ${buildSelect(idx, 'exchangeRefundedProbe', 'Refunded ticket exchanged', ENUMS.exchangeRefundedProbe,
           'Negative test (#700). On: once the refund is confirmed, an exchange offer is asked for the refunded tickets and must be refused (4xx + RFC-9457 Problem).')}` : ''}
+        ${buildSelect(idx, 'emptyPassengersExpectRejection', 'No passenger refused', ENUMS.emptyPassengersExpectRejection,
+          'Negative test (#703). On: POST /offers is sent with no passenger (OSDM requires at least one) and must be refused (4xx + RFC-9457 Problem); the scenario ends there.')}
         ${buildSelect(idx, 'passengerLimitExpectRejection', 'Over the passenger limit', ENUMS.passengerLimitExpectRejection,
           'Negative test (#699). On: the scenario\'s passengers are one more than the provider\'s maximum (Test Framework → Passenger Types). POST /offers must refuse them (4xx + RFC-9457 Problem, or no offer), or else POST /bookings must; the scenario ends at the refusal, and a booking made over the limit fails.')}
         ${(() => {

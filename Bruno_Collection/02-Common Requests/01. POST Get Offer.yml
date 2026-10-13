@@ -64,6 +64,8 @@ runtime:
         postOfferResponsePreRequest();
         // #602: offers asked for a trip of POST /trips-collection, by its id.
         await prepareOfferRequestByTripIds();
+        // #703: negative probe, the offer request with no passenger.
+        require(bru.getEnvVar("library_base") + "passengerLimit.js").prepareEmptyPassengers();
     - type: after-response
       code: |-
         const { postOfferResponse } = require(bru.getEnvVar("library_base")+"offers.js");
@@ -78,6 +80,13 @@ runtime:
         if (require(bru.getEnvVar("library_base") + "offers.js").checkOfferRequestByTripIds(res.getStatus(), _tripIdsBody)) {
           const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
           loopbackOrStop("POST Get Offer (by trip id)");
+          return;
+        }
+
+        // #703: no passenger at all must be refused; the scenario ends here.
+        if (require(bru.getEnvVar("library_base") + "passengerLimit.js").checkEmptyPassengersRefused(res.getStatus(), _tripIdsBody)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (no passenger probe)");
           return;
         }
 

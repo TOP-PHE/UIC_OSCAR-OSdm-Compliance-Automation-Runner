@@ -34,6 +34,16 @@
       }
     },
     {
+      "code": "OTST_SALE_ACCENTED_LONG_NAMES",
+      "source": "SIM_SALE_ACCENTED_NAMES_38",
+      "purpose": "Accented (Czech) and long names, updated after booking to other accented names: every read must give them back unchanged.",
+      "checks": 289,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 2
+      }
+    },
+    {
       "code": "OTST_SALE_RETURN_SEPARATE_1ADT",
       "source": "SIM_RETURN_SEPARATE_1ADT_38",
       "purpose": "Return sold as two offers, one per direction (returnSearchParameters.outwardOfferIds).",
@@ -157,6 +167,16 @@
       "needs": {
         "trip": "SEARCH",
         "tariff": "REFUNDABLE",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "NHF_SALE_NO_PASSENGER",
+      "source": "SIM_NHF_NO_PASSENGER_38",
+      "purpose": "An offer request with no passenger at all must be refused.",
+      "checks": 70,
+      "needs": {
+        "trip": "SEARCH",
         "passengers": 1
       }
     },
