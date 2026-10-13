@@ -28,6 +28,7 @@ const { HttpError } = require('../http');
 const { noteRefund } = require('./documents');
 const { lifetimeOf } = require('./bookings');
 const variants = require('./variants');
+const ticketing = require('./ticketing');
 
 const REFUND_OFFER_LIFETIME_MS = 30 * 60 * 1000;
 const MAX_FULFILLMENT_IDS = 20;
@@ -76,6 +77,8 @@ function refuseScopedRefund(body, booking) {
   if (!Array.isArray(specs)) throw bad('refundSpecifications is not a list');
   // #611: the per-passenger variant offers a refund scoped within a fulfillment.
   if (variants.has(booking, 'per-passenger')) return;
+  // #697: so does a booking sold with tickets per passenger or per leg.
+  if (ticketing.of(booking)) return;
   const scoped = specs.some((s) => (Array.isArray(s?.bookingPartIds) && s.bookingPartIds.length > 0)
     || (Array.isArray(s?.passengerIds) && s.passengerIds.length > 0));
   if (scoped) {

@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (74 scenarios, SIM_…)  ──source──►  (35 reference scenarios, OTST_… / NHF_…)
+ (76 scenarios, SIM_…)  ──source──►  (37 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (74 scenarios)
+### 4.1 The simulator's data file (76 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -178,6 +178,7 @@ In short:
 | Return in one offer | 1 per version from 3.7 | `beta`, `gamma` |
 | Refund withdrawn, refund offer only, overrule codes (4 accepted, 1 refused) | 7 | `gamma` |
 | Refunds of a return in one offer (full, inbound only, overrule code, receipt) | 4 | `gamma` |
+| Partial refund by passenger and by leg, on trips sold with one ticket per passenger or per leg | 2 | `gamma` |
 | Reduction cards, named products, group tariffs (two of them negative), class per leg | 14 | `gamma` |
 | Seat reservations (mandatory, and the three ways of booking an optional one) | 4 | `gamma` |
 | Offers by trip id (two ways of choosing the trip, one refused id) | 3 | `gamma` |
@@ -188,7 +189,7 @@ In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (35)
+### 4.2 The reference scenarios of the catalogue (37)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -223,6 +224,8 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 |---|---|---|---|---|
 | `OTST_REFUND_RETURN_FULL_1ADT` | Full refund of a return: every refund offer confirmed, every fulfillment refunded. | REFUND_FULL, return model SEPARATE | 521 | `SIM_REFUND_RETURN_1ADT_38` |
 | `OTST_REFUND_RETURN_INBOUND_1ADT` | Partial refund of a return by fulfillment: the inbound ticket alone. | REFUND_PARTIAL, return model SEPARATE | 448 | `SIM_REFUND_INBOUND_1ADT_38` |
+| `OTST_REFUND_PARTIAL_PASSENGER_2ADT` | Partial refund by passenger: two adults, the last one refunded alone; the other passenger's ticket stays. | REFUND_PARTIAL | 469 | `SIM_REFUND_PAX_2ADT_38` |
+| `OTST_REFUND_PARTIAL_LEG_1ADT` | Partial refund by leg: a two-leg journey, the last leg refunded alone; the first leg stays. | REFUND_PARTIAL | 447 | `SIM_REFUND_LEG_1ADT_38` |
 | `OTST_REFUND_TECHNICAL_CANCELLATION_1ADT` | Technical cancellation: refund with an overrule code, everything back and no fee. | REFUND_FULL, return model SEPARATE | 525 | `SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38` |
 | `OTST_REFUND_WITHDRAWN_1ADT` | Refund offer asked for, then withdrawn instead of confirmed: the ticket stays. | REFUND_FULL | 327 | `SIM_REFUND_DELETE_1ADT_38` |
 | `OTST_REFUND_OFFER_ONLY_1ADT` | Refund offer asked for and read, neither confirmed nor withdrawn. | REFUND_FULL | 294 | `SIM_REFUND_ONLY_OFFER_1ADT_38` |

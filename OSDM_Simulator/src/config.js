@@ -91,6 +91,7 @@ function checkProvider(key, raw) {
     ...checkShortDeadlines(raw.shortDeadlines, bad),
     ...checkVariants(raw.variants, bad),
     ...checkPersonChecks(raw.personChecks, bad),
+    ...checkTicketing(raw.ticketing, bad),
   };
 }
 
@@ -199,6 +200,22 @@ function checkPersonChecks(value, bad) {
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || !isText(value.requestedInformationFrom, 1, 120)) throw bad('personChecks');
   return { personChecks: { requestedInformationFrom: value.requestedInformationFrom } };
+}
+
+// #697: the stop places whose trips are sold with one ticket per passenger
+// (perPassengerFrom) or one admission and ticket per leg (perLegFrom).
+// Absent: one ticket per direction.
+function checkTicketing(value, bad) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object') throw bad('ticketing');
+  const out = {};
+  for (const key of ['perPassengerFrom', 'perLegFrom']) {
+    if (value[key] === undefined) continue;
+    if (!isText(value[key], 1, 120)) throw bad('ticketing');
+    out[key] = value[key];
+  }
+  if (Object.keys(out).length === 0 || out.perPassengerFrom === out.perLegFrom) throw bad('ticketing');
+  return { ticketing: out };
 }
 
 // #603: the media of the documents issued on confirmation (PDF_A4 merged for
@@ -349,4 +366,4 @@ function loadSettings(env, baseDir) {
   };
 }
 
-module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, MIN_SECRET_LENGTH };
+module.exports = { ConfigError, loadProviders, loadClients, clientMatches, loadSettings, checkProvider, MIN_SECRET_LENGTH };

@@ -1,5 +1,5 @@
 {
-  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38"],
+  "scenariosToRun": ["SIM_SALE_SEARCH_1ADT_38", "SIM_SALE_SEARCH_2ADT_SAVER_38", "SIM_RETURN_SEPARATE_1ADT_38", "SIM_RETURN_COMBINED_1ADT_38", "SIM_REFUND_RETURN_1ADT_38", "SIM_REFUND_INBOUND_1ADT_38", "SIM_REFUND_OVERRULE_CONNECTION_BROKEN_38", "SIM_REFUND_OVERRULE_PAYMENT_FAILURE_38", "SIM_REFUND_OVERRULE_SALES_STAFF_ERROR_38", "SIM_REFUND_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_OVERRULE_REFUSED_38", "SIM_SALE_CARD_25_1ADT_38", "SIM_SALE_CARD_50_2ADT_38", "SIM_SALE_CARD_STUDENT_1YTH_38", "SIM_SALE_PRODUCT_TRAIN_BOUND_1ADT_38", "SIM_SALE_PRODUCT_ALL_DAY_1ADT_38", "SIM_SALE_PRODUCT_FLEXI_SAVER_1ADT_38", "SIM_GROUP_WEEKEND_2ADT_2CHD_38", "SIM_GROUP_WEEKEND_RETURN_1ADT_2CHD_38", "SIM_GROUP_6ADT_38", "SIM_GROUP_WEEKEND_6PAX_ABSENT_38", "SIM_GROUP_WEEKEND_3ADT_ABSENT_38", "SIM_SALE_CLASS_PER_LEG_1ADT_38", "SIM_SALE_RESERVATION_MANDATORY_2ADT_38", "SIM_SALE_RESERVATION_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38", "SIM_SALE_RESERVATION_ADD_LATER_2ADT_38", "SIM_SALE_BY_TRIP_ID_1ADT_38", "SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38", "SIM_SALE_BY_TRIP_ID_UNKNOWN_38", "SIM_SALE_DOCUMENTS_RETURN_1ADT_38", "SIM_REFUND_RECEIPT_RETURN_1ADT_38", "SIM_SALE_IDEMPOTENCY_1ADT_38", "SIM_EXCHANGE_1ADT_38", "SIM_EXCHANGE_DELETE_1ADT_38", "SIM_REFUND_DELETE_1ADT_38", "SIM_REFUND_ONLY_OFFER_1ADT_38", "SIM_NHF_EXPIRED_OFFER_38", "SIM_NHF_EXPIRED_BOOKING_38", "SIM_NHF_EXPIRED_REFUND_OFFER_38", "SIM_NHF_EXPIRED_CHAIN_SEATMAP_38", "SIM_NHF_EXPIRED_EXCHANGE_OFFER_38", "SIM_VARIANT_PER_PASSENGER_2ADT_38", "SIM_VARIANT_PER_PASSENGER_REFUND_PAX_2ADT_38", "SIM_VARIANT_REORDERED_2ADT_38", "SIM_VARIANT_MINIMAL_2ADT_38", "SIM_RI_AUTOFEED_1ADT_38", "SIM_NHF_RI_OMIT_1ADT_38", "SIM_NHF_RI_INVALID_1ADT_38", "SIM_PURCHASER_DEFERRED_1ADT_38", "SIM_NHF_PURCHASER_INVALID_1ADT_38", "SIM_REFUND_COMBINED_RETURN_1ADT_38", "SIM_REFUND_COMBINED_INBOUND_1ADT_38", "SIM_REFUND_COMBINED_OVERRULE_TECHNICAL_FAILURE_38", "SIM_REFUND_COMBINED_RECEIPT_1ADT_38", "SIM_SALE_CARD_STUDENT_RETURN_1YTH_38", "SIM_SALE_PRODUCT_ALL_DAY_RETURN_1ADT_38", "SIM_VARIANT_MAIN_PASSENGER_2ADT_38", "SIM_REFUND_PAX_2ADT_38", "SIM_REFUND_LEG_1ADT_38"],
   "systemInfoParameters": { "coachId": null, "productId": null },
   "knownDeviations": [],
   "scenarios": [
@@ -2631,6 +2631,78 @@
         "requestedOfferParts": []
       },
       "passengerUpdateScope": "MAIN"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_REFUND_PAX_2ADT_38",
+      "description": "Simulated provider: partial refund by passenger, the last of two adults refunded alone; the trip from station 0000096 is sold with one ticket per passenger (#697). OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 10,
+      "passengersListId": 2,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByPax": "on",
+      "partialRefundPaxSelection": "last",
+      "partialRefundByFulfillment": "off"
+    },
+    {
+      "collection": "OTST_V2.0.1_RFND_EXCH_ALL",
+      "loggingType": "INFO",
+      "code": "SIM_REFUND_LEG_1ADT_38",
+      "description": "Simulated provider: partial refund by leg, the last leg of a two-leg trip refunded alone; the trip from station 0000095 is sold with one admission and one ticket per leg (#697). OSDM 3.8.0, for gamma.",
+      "scenarioType": "REFUND",
+      "scenarioAction": "PATCH",
+      "osdmVersion": "3.8.0",
+      "desiredFlexibility": "FULL_FLEXIBLE",
+      "overruleCode": null,
+      "salesFlowActions": {
+        "patchPassengers": true,
+        "placeSelection": false,
+        "addAncillary": false,
+        "getBooking": false,
+        "deleteAncillary": false
+      },
+      "placeSelectionMode": null,
+      "tripRequirementId": 11,
+      "passengersListId": 1,
+      "purchaserListId": 1,
+      "requestedFulfillmentOptionsListId": 1,
+      "offerSearchCriteriaListId": 1,
+      "shared": true,
+      "version": "1.0",
+      "offerSearchCriteria": {
+        "serviceClass": [],
+        "travelClass": [],
+        "flexibilities": [],
+        "offerMode": null,
+        "requestedOfferParts": []
+      },
+      "partialRefundByLeg": "on",
+      "partialRefundLegSelection": "last",
+      "partialRefundByFulfillment": "off"
     }
   ],
   "offerSearchCriteriaList": [
@@ -2835,6 +2907,51 @@
         "productCategoryShortName": "",
         "description": "Simulated trip, station 0000097 (on gamma, its offers ask for each passenger's date of birth and phone number: requestedInformation) to station 0000002"
       }
+    },
+    {
+      "id": 10,
+      "tripType": "SEARCH",
+      "trip": {
+        "origin": "urn:uic:stn:0000096",
+        "destination": "urn:uic:stn:0000002",
+        "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+        "endDatetime": "%TRIP_DATE%T12:00:00+01:00",
+        "vehicleNumber": "",
+        "operatorCode": "",
+        "productCategoryRef": "",
+        "productCategoryName": "",
+        "productCategoryShortName": "",
+        "description": "Simulated trip, station 0000096 (on gamma, sold with one ticket per passenger) to station 0000002"
+      }
+    },
+    {
+      "id": 11,
+      "tripType": "SPECIFICATION",
+      "legs": [
+        {
+          "origin": "urn:uic:stn:0000095",
+          "destination": "urn:uic:stn:0000004",
+          "startDatetime": "%TRIP_DATE%T08:00:00+01:00",
+          "endDatetime": "%TRIP_DATE%T10:00:00+01:00",
+          "vehicleNumber": "101",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:IC",
+          "productCategoryName": "InterCity",
+          "productCategoryShortName": "IC"
+        },
+        {
+          "origin": "urn:uic:stn:0000004",
+          "destination": "urn:uic:stn:0000002",
+          "startDatetime": "%TRIP_DATE%T10:20:00+01:00",
+          "endDatetime": "%TRIP_DATE%T11:20:00+01:00",
+          "vehicleNumber": "2202",
+          "operatorCode": "",
+          "productCategoryRef": "urn:x_osdm_simulator:product-category:R",
+          "productCategoryName": "Regional",
+          "productCategoryShortName": "R"
+        }
+      ],
+      "description": "Simulated trip in two legs from station 0000095 (on gamma, sold with one admission and one ticket per leg): InterCity to station 0000004, then a regional train to station 0000002"
     }
   ],
   "purchaserList": [

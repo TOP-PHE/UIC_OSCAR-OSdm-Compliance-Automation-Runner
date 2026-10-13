@@ -23,6 +23,7 @@ const { reservationsToBook, reservationFrom, linkReservations } = require('./res
 const { issueDocuments } = require('./documents');
 const variants = require('./variants');
 const persons = require('./persons');
+const ticketing = require('./ticketing');
 
 const MAX_OFFERS_PER_BOOKING = 4;
 const MAX_PASSENGERS = 19;
@@ -188,6 +189,8 @@ function createBooking(body, findOffer, provider, nowMs) {
   // #611: the variants its passengers' last names name.
   variants.keepVariants(booking, variants.variantsOf(specs, provider));
   variants.shapeNewBooking(booking);
+  // #697: tickets per passenger or per leg, from the trips' stop place.
+  ticketing.keep(booking, ticketing.modeOf(booking.trips, provider));
   return booking;
 }
 
@@ -239,6 +242,7 @@ function confirmBooking(booking, provider, nowMs) {
   delete booking.confirmationTimeLimit;
   let groups = booking[ONE_FULFILLMENT] ? [admissions] : admissionsByTrip(booking);
   if (variants.has(booking, 'per-passenger')) groups = variants.groupsByPassenger(admissions);
+  else if (ticketing.of(booking)) groups = ticketing.groupsOf(admissions, ticketing.of(booking));
   booking.fulfillments = groups.map((group) => ({
     id: `${provider.idPrefix}-FUL-${randomId()}`,
     status: 'FULFILLED',

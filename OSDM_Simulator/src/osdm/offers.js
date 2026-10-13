@@ -43,6 +43,7 @@ const { HttpError } = require('../http');
 const { cardsOf, applyCards, reducedPrice, unknownCardProblem, appliedCardType } = require('./reductionCards');
 const { reservationsOfDirection, reservationProductOf } = require('./reservations');
 const persons = require('./persons');
+const ticketing = require('./ticketing');
 
 const MAX_PASSENGERS = 19;
 const MAX_TRIPS = 4;
@@ -457,7 +458,7 @@ function admissionsOfDirection(trip, ctx) {
   }
   const secondOnly = travelClass === 'FIRST' ? secondClassOnlyLegs(trip, provider) : [];
   if (secondOnly.length > 0) return upgradedAdmissions(trip, ctx, secondOnly);
-  return passengers.map((passenger) => ({
+  const admissions = passengers.map((passenger) => ({
     passengers: [passenger],
     amount: singlePrice(trip, passenger, travelClass),
     applied: appliedPassengerTypesOf(passenger, provider),
@@ -465,6 +466,8 @@ function admissionsOfDirection(trip, ctx) {
     product,
     legIds: legIdsOf(trip.legs),
   }));
+  // #697: a trip sold per leg has one admission per passenger and leg.
+  return ticketing.modeOf([trip], provider) === 'per-leg' ? ticketing.splitByLeg(trip, admissions) : admissions;
 }
 
 // An offer for `trip`, or, given `inboundTrip`, for both directions: one

@@ -62,6 +62,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.263] / [collection-OTST_V2.0.145] — 2026-10-13
+
+Issue #697, release 2026.298. Simulator 0.23.0.
+
+### Added
+
+- **Two reference scenarios in the catalogue (37): partial refund by
+  passenger and by leg.** Until now the catalogue's only partial refund was by
+  fulfillment (the inbound ticket of a return, one passenger), so no reference
+  scenario could show a provider refunding the wrong passenger, which a real
+  provider did on its own scenario.
+  - `OTST_REFUND_PARTIAL_PASSENGER_2ADT`: two adults, the last one refunded
+    alone (`partialRefundByPax`, `last`); the other passenger's ticket stays.
+  - `OTST_REFUND_PARTIAL_LEG_1ADT`: a two-leg journey, the last leg refunded
+    alone (`partialRefundByLeg`, `last`); the first leg stays.
+  Both need the sales flow `REFUND_PARTIAL` (golden rule), a refundable
+  tariff, and for the second a two-leg SPECIFICATION journey in the Test Data.
+  Their sources are two new simulator scenarios, `SIM_REFUND_PAX_2ADT_38` and
+  `SIM_REFUND_LEG_1ADT_38` (469 and 447 checks, no failure, the two
+  merged-PDF warnings).
+
+### Simulator 0.23.0
+
+- **`ticketing` (profile): trips sold with one ticket per passenger, or one
+  admission and one ticket per leg** (`src/osdm/ticketing.js`). A trip from
+  `perPassengerFrom` gives one ticket per passenger; one from `perLegFrom`
+  one admission per passenger and leg, priced by the leg's share of the
+  travel time (the parts add up to the trip's price), and one ticket per leg.
+  On those bookings a refund scoped by passenger or booking part
+  (`refundSpecifications`) is offered within the ticket named; elsewhere it is
+  still refused with `PARTIAL_REFUND_NOT_SUPPORTED`. `gamma`:
+  `urn:uic:stn:0000096` and `urn:uic:stn:0000095`. Before, a refund by
+  passenger was shown only by the `Simvariant-Per-Passenger` variant, which
+  cannot be the source of a reference scenario, and a refund by leg not at
+  all: every admission covered the whole trip.
+- Two scenarios in its data file (76) and two trip requirements (10: a search
+  from `0000096`; 11: trip 4's two legs from `0000095`).
+
+### Default decisions (taken without asking)
+
+- The passenger or leg refunded is the **last** one, as in the existing
+  variant scenario.
+- The new behaviour is chosen by the trip's stop place, as the expiry and
+  requested-information trips are, so no earlier scenario changes.
+- The leg scenario sells one adult: the partial-by-leg path then needs no
+  passenger intersection; the passenger scenario covers two passengers.
+
+### Not verified
+
+- Not run against a real provider. On the simulator: both scenarios
+  standalone with no failed check, the partial refunds resolved (not degraded
+  to full: one ticket `REFUNDED`, the other `FULFILLED`; the leg refund gives
+  back a third of the price, one hour of three).
+- The full replay of the 74 earlier scenarios was not recorded again: the
+  change only applies to trips from the two new stop places, which no earlier
+  scenario uses. `OSCAR - Checks by scenario.md` is regenerated from the
+  earlier recording plus the two new scenarios.
+
+Checked: simulator tests 195 → 202 (`ticketing.test.js`, and the data-file
+tests for the two scenarios), each of the three simulator changes
+mutation-checked (scoped refund accepted, split by leg, tickets per group);
+`replay.js catalogue` agrees (37 entries); the server's catalogue tests pass.
+
+---
+
 ## [server-1.11.263] / [collection-OTST_V2.0.144] — 2026-10-13
 
 Issue #693, release 2026.297.
