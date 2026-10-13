@@ -992,7 +992,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and replays them with `bru.sendRequest`, so the flow of the scenario does not
   change. Its key comes from `require('crypto')`, which the developer sandbox
   gives. The simulator keeps a *copy* of the first answer: the booking changes
-  afterwards, and a replay must not show its later state.
+  afterwards, and a replay must not show its later state. A provider may book
+  an offer only once (#693): a 4xx without a booking on the "another key"
+  request is a WARNING, then the offers are asked again
+  (`OfferCollectionRequest`, no key), `matchingOffer()` picks the chosen
+  offer's twin and `bookingOnOffer()` drops the old offer's seat choices.
+  The simulator books an offer twice, so only the unit tests reach it.
 - **A return is two offer calls, in one of two models** (#594, 1.11.224 /
   OTST_V2.0.109). `library-bruno/returnJourney.js` (pure) holds the rules:
   - **SEPARATE** names the outbound offer (`outwardOfferIds`), books two
