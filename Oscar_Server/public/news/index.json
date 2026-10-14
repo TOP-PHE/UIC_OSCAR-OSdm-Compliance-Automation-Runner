@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-partial-refund-scopes",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "Declare how a partial refund is scoped",
+    "summary": "The Test Framework now says whether a provider takes a partial refund per fulfillment, per leg or per passenger.",
+    "content": "In Test Framework → Refund, ticking Partial shows Partial refund scopes: Per fulfillment, Per leg, Per passenger. Untick what the provider does not accept. A scenario that asks for an undeclared scope gets a warning in Test Config and in the run log, and the scenario catalogue no longer copies it. Frameworks saved before keep every scope."
+  },
+  {
     "id": "2026-10-14-find-journeys",
     "date": "October 14, 2026",
     "tag": "New",

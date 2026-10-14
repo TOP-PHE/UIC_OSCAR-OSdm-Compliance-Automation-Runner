@@ -37,7 +37,7 @@
  * train and tariff, and needsText() says them to the person copying.
  */
 
-const { scenarioReturnModel } = require('./frameworkGating');
+const { scenarioReturnModel, partialRefundScopeDeclared } = require('./frameworkGating');
 
 const arr = (v) => (Array.isArray(v) ? v : []);
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -106,6 +106,15 @@ function catalogueProblems(catalogue, simulator) {
 
 const kindOf = (code) => (String(code).startsWith('NHF_') ? 'NHF' : 'OTST');
 
+// #713: the partial refund scopes a scenario arms, as the Test Framework names them.
+const PARTIAL_REFUND_FIELDS = [
+  ['partialRefundByFulfillment', 'FULFILLMENT'], ['partialRefundByLeg', 'LEG'], ['partialRefundByPax', 'PASSENGER'],
+];
+function partialRefundScopesOf(scenario) {
+  if (String(scenario.scenarioType || 'SALE').toUpperCase() !== 'REFUND') return [];
+  return PARTIAL_REFUND_FIELDS.filter(([field]) => ARMED.has(scenario[field])).map(([, scope]) => scope);
+}
+
 /** The sales flows a scenario uses, as the Test Framework names them. */
 function salesFlowsOf(scenario) {
   const type = String(scenario.scenarioType || 'SALE').toUpperCase();
@@ -130,6 +139,7 @@ function requirementsOf(scenario, datafile) {
   const model = scenarioReturnModel(scenario);
   return {
     salesFlows: salesFlowsOf(scenario),
+    partialRefundScopes: partialRefundScopesOf(scenario),
     returnModel: model,
     minOsdmVersion: model === 'COMBINED' ? '3.7' : null,
     passengerTypes: types,
@@ -143,6 +153,9 @@ function missingFor(requirements, framework) {
   const missing = [];
   const flows = arr(fw.salesFlows);
   for (const flow of requirements.salesFlows) if (!flows.includes(flow)) missing.push(`sales flow ${flow}`);
+  for (const scope of arr(requirements.partialRefundScopes)) {
+    if (!partialRefundScopeDeclared(fw, scope)) missing.push(`partial refund by ${scope.toLowerCase()}`);
+  }
   if (requirements.returnModel && Array.isArray(fw.returnModels) && !fw.returnModels.includes(requirements.returnModel)) {
     missing.push(`return model ${requirements.returnModel}`);
   }

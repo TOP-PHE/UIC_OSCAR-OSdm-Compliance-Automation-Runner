@@ -38,6 +38,7 @@
  *
  * Scope today (#218 follow-up):
  *   - partialRefundByLeg / partialRefundByPax  ↔  salesFlows: REFUND_PARTIAL
+ *     and, when the framework lists them, partialRefundScopes (#713)
  *   - a return's model (offerSearchCriteria.returnModel)  ↔  returnModels (#619)
  *   - (future) partialExchangeByLeg / partialExchangeByPax  ↔  EXCHANGE_PARTIAL
  *   - (future) requestedInformationProbe                    ↔  ???
@@ -47,17 +48,24 @@
  *   - `isArmed(value)`   : returns true when the field value represents "ON"
  *   - `requiresFlow`     : the salesFlows[] entry that must be declared
  *   - `requiresScenarioType` : optional, scopes the rule to a scenario type
+ *   - `scope`            : optional, the partialRefundScopes entry it needs
  */
 
 // #619: the return models a Test Framework may declare (framework.returnModels),
 // as the collection names them (library-bruno/returnJourney.js).
 const RETURN_MODELS = ['SEPARATE', 'COMBINED'];
 
+// #713: how a provider takes a partial refund (framework.partialRefundScopes).
+// Absent = every scope (frameworks from before 1.11.271); [] = none.
+const PARTIAL_REFUND_SCOPES = ['FULFILLMENT', 'LEG', 'PASSENGER'];
+
 module.exports = {
   gatingRules,
   isScenarioArmedForField,
   scenarioWarnings,
   RETURN_MODELS,
+  PARTIAL_REFUND_SCOPES,
+  partialRefundScopeDeclared,
   scenarioReturnModel,
   returnModelsUsed,
   needsFrameworkMigration,
@@ -89,6 +97,7 @@ function gatingRules() {
       isArmed: isArmedValue,
       requiresFlow: 'REFUND_PARTIAL',
       requiresScenarioType: 'REFUND',
+      scope: 'LEG',
       humanLabel: 'Partial refund per-leg',
     },
     {
@@ -96,6 +105,7 @@ function gatingRules() {
       isArmed: isArmedValue,
       requiresFlow: 'REFUND_PARTIAL',
       requiresScenarioType: 'REFUND',
+      scope: 'PASSENGER',
       humanLabel: 'Partial refund per-passenger',
     },
     {
@@ -103,9 +113,20 @@ function gatingRules() {
       isArmed: isArmedValue,
       requiresFlow: 'REFUND_PARTIAL',
       requiresScenarioType: 'REFUND',
+      scope: 'FULFILLMENT',
       humanLabel: 'Partial refund per-fulfillment',
     },
   ];
+}
+
+/**
+ * #713: true when the framework lets a partial refund take `scope`: no scope
+ * asked, or no list declared (every scope), or the scope is in the list.
+ */
+function partialRefundScopeDeclared(framework, scope) {
+  if (!scope) return true;
+  const declared = framework?.partialRefundScopes;
+  return !Array.isArray(declared) || declared.includes(scope);
 }
 
 /**
@@ -131,7 +152,7 @@ function scenarioWarnings(scenario, framework, rules) {
   const out = [];
   for (const rule of rules) {
     if (!isScenarioArmedForField(scenario, rule)) continue;
-    if (flows.includes(rule.requiresFlow)) continue;
+    if (flows.includes(rule.requiresFlow) && partialRefundScopeDeclared(framework, rule.scope)) continue;
     out.push(rule.field);
   }
   // #619: a return whose model the framework does not list. A framework with
