@@ -212,7 +212,8 @@ var TimedLegSpecification = class {
 
 var DatedJourney = class {
   constructor(productCategory, vehicleNumbers, carriers) {
-    this.productCategory = productCategory;
+    // Written only when there is one (#729): null is not a ProductCategory.
+    if (productCategory) this.productCategory = productCategory;
     this.vehicleNumbers = vehicleNumbers;
     this.carriers = carriers;
   }

@@ -10,8 +10,52 @@ const { bruTest: test } = require('./testCapture.js');
 const { OSDM_PASSENGER_TYPES, checkExtensibleCode } = require('./osdmEnums.js');
 
 module.exports = {
-  patchMultiPassengerResponse
+  patchMultiPassengerResponse,
+  ignoredParameters
 };
+
+// The members a provider says it ignored (#729). A PATCH answer may carry
+// problems such as PARAMETER_NOT_SUPPORTED "Parameter 'dateOfBirth' was
+// ignored." next to HTTP 200: the passenger then keeps the value it had. The
+// member is named by the problem's `pointers` (OSDM 3.x), else by the quoted
+// name in its title. Only the last segment is kept, lower-cased.
+function ignoredParameters(response) {
+  const problems = Array.isArray(response?.problems) ? response.problems : [];
+  const names = [];
+  for (const p of problems) {
+    if (!p || typeof p !== 'object') continue;
+    const code = String(p.code || '');
+    const title = String(p.title || '');
+    if (!code.endsWith('PARAMETER_NOT_SUPPORTED') && !/\bignored\b/i.test(title)) continue;
+    const refs = Array.isArray(p.pointers) && p.pointers.length ? p.pointers.map(String) : [];
+    if (!refs.length) {
+      const m = /'([^']+)'/.exec(title);
+      if (m) refs.push(m[1]);
+    }
+    for (const ref of refs) {
+      const last = ref.split(/[./]/).filter(Boolean).pop();
+      if (last) names.push(last.toLowerCase());
+    }
+  }
+  return [...new Set(names)];
+}
+
+// The ignored members are kept per passenger from 03 so that 04 (a GET, with
+// no problem to read) grades the same members the same way.
+function ignoredFor(response, passengerIndex) {
+  let kept = {};
+  try {
+    const raw = bru.getEnvVar("__passengerIgnoredFields");
+    kept = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : {};
+  } catch { kept = {}; }
+  const fromAnswer = ignoredParameters(response);
+  if (fromAnswer.length) {
+    const merged = [...new Set([...(kept[passengerIndex] || []), ...fromAnswer])];
+    kept[passengerIndex] = merged;
+    bru.setEnvVar("__passengerIgnoredFields", JSON.stringify(kept));
+  }
+  return new Set(kept[passengerIndex] || []);
+}
 
 // Function to validate passenger data
 function patchMultiPassengerResponse(response, passengerIndex) {
@@ -65,15 +109,24 @@ function patchMultiPassengerResponse(response, passengerIndex) {
   }
 
   validationLogger(`[DEBUG] Comparing passenger ${passengerIndex} values with expected values from data file.`);
+  const ignored = ignoredFor(response, passengerIndex);
 
   // A member the booking or the update gave must come back with the same
   // value: a different value is a FAIL. One the provider does not return at
   // all is a WARNING: OSDM does not oblige a provider to keep what it does not
   // need (some providers keep only the main passenger's names, and no date of birth).
-  const sameOrAbsent = (label, expected, actual) => {
+  // A member the provider said it ignored and that came back different is a
+  // WARNING too (#729): the provider told the caller, and OSDM lets it refuse a
+  // change it does not support.
+  const sameOrAbsent = (label, expected, actual, member) => {
     const name = `Passenger ${passengerIndex} - ${label} is correct (expected: ${expected}, actual: ${actual})`;
     const absent = actual === undefined || actual === null || actual === "";
     const wanted = expected !== undefined && expected !== null && expected !== "";
+    if (wanted && !absent && actual !== expected && member && ignored.has(member.toLowerCase())) {
+      validationLogger(`[WARNING] Passenger ${passengerIndex} - ${label}: the provider said it ignored '${member}' (sent: ${expected}, kept: ${actual}).`);
+      test(`Passenger ${passengerIndex} - ${label} not changed: the provider ignored '${member}' (WARNING)`, () => {});
+      return;
+    }
     if (absent && wanted) {
       validationLogger(`[WARNING] Passenger ${passengerIndex} - ${label} not returned by the provider (sent: ${expected}); OSDM does not require it to be kept.`);
       test(`Passenger ${passengerIndex} - ${label} not returned by the provider (WARNING, optional member)`, () => {});
@@ -85,13 +138,16 @@ function patchMultiPassengerResponse(response, passengerIndex) {
       expect(actual).to.equal(expected);
     });
   };
-  sameOrAbsent('First name', passenger.updateFirstName, firstName);
-  sameOrAbsent('Last name', passenger.updateLastName, lastName);
-  sameOrAbsent('Date of birth', passenger.updateDateOfBirth, dateOfBirth);
-  sameOrAbsent('Phone number', passenger.updatePhoneNumber, phoneNumber);
-  sameOrAbsent('Email', passenger.updateEmail, email);
+  sameOrAbsent('First name', passenger.updateFirstName, firstName, 'firstName');
+  sameOrAbsent('Last name', passenger.updateLastName, lastName, 'lastName');
+  sameOrAbsent('Date of birth', passenger.updateDateOfBirth, dateOfBirth, 'dateOfBirth');
+  sameOrAbsent('Phone number', passenger.updatePhoneNumber, phoneNumber, 'phoneNumber');
+  sameOrAbsent('Email', passenger.updateEmail, email, 'email');
 
-  if (gender != null) {
+  if (gender != null && gender !== passenger.updateGender && ignored.has('gender')) {
+    validationLogger(`[WARNING] Passenger ${passengerIndex} - Gender: the provider said it ignored 'gender' (sent: ${passenger.updateGender}, kept: ${gender}).`);
+    test(`Passenger ${passengerIndex} - Gender not changed: the provider ignored 'gender' (WARNING)`, () => {});
+  } else if (gender != null) {
     test(`Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`, () => {
       validationLogger(`[DEBUG] Passenger ${passengerIndex} - Gender is correct (expected: ${passenger.updateGender}, actual: ${gender})`);
       expect(gender).to.equal(passenger.updateGender);
