@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-discovery-journeys",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "Discover timetable keeps the provider's connections",
+    "summary": "Trips with 2 or 3 legs found by Discover timetable are now saved as journeys, and the search can use the provider's trip search.",
+    "content": "Run Discover timetable between two stations with no direct train: the connections the provider answers with are saved as journeys in Test Data, next to the train sets of their legs, ready to apply to a scenario. A new Search with option asks the provider's trip search (POST /trips-collection) instead of offers, and falls back to offers when the trip search is not available."
+  },
+  {
     "id": "2026-10-14-partial-refund-scopes",
     "date": "October 14, 2026",
     "tag": "New",

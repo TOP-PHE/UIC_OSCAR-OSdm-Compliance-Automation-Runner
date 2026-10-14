@@ -115,45 +115,136 @@ function _stopRef(end) {
  *     vehicleNumber, departureTime, arrivalTime, dayOfWeek }
  */
 function harvestTrips(resp, opts) {
+  const trips = (resp && Array.isArray(resp.trips)) ? resp.trips : [];
+  return trips.flatMap(trip => tripLegRecords(trip, opts));
+}
+
+// The records of one trip's timed legs, in order (see harvestTrips).
+function tripLegRecords(trip, opts) {
   opts = opts || {};
   const searchedOrigin = opts.searchedOrigin || '';
   const searchedDestination = opts.searchedDestination || '';
-  const out = [];
+  const legs = (trip && Array.isArray(trip.legs)) ? trip.legs : [];
+  const timed = legs.map(l => l?.timedLeg).filter(Boolean);
+  return timed.map((tl, idx) => {
+    const svc = tl.service || {};
+    const pc = svc.productCategory || {};
+    const veh = Array.isArray(svc.vehicleNumbers) ? svc.vehicleNumbers.filter(Boolean) : [];
+    const carrier = (Array.isArray(svc.carriers) && svc.carriers.length) ? svc.carriers[0] : null;
+    const start = tl.start || {};
+    const end = tl.end || {};
+    const dep = start.serviceDeparture?.timetabledTime;
+    const arr = end.serviceArrival?.timetabledTime;
+    let originURN = _stopRef(start);
+    let destinationURN = _stopRef(end);
+    // Substitute the searched O&D at the route endpoints (first/last leg).
+    if (searchedOrigin && idx === 0) originURN = searchedOrigin;
+    if (searchedDestination && idx === timed.length - 1) destinationURN = searchedDestination;
+    return {
+      originURN,
+      destinationURN,
+      originName:     start.stopPlaceName || '',
+      destName:       end.stopPlaceName || '',
+      operatorCode:   carrier ? (carrier.ref || '') : '',
+      productCategoryRef:       pc.productCategoryRef || '',
+      productCategoryName:      pc.name || '',
+      productCategoryShortName: pc.shortName || '',
+      vehicleNumber:  veh.join('/'),
+      departureTime:  timePartOf(dep),
+      arrivalTime:    timePartOf(arr),
+      dayOfWeek:      dayOfWeekCode(dep)
+    };
+  });
+}
+
+// ── Connections as journeys (#715) ────────────────────────────────────────
+// A trip of 2 or 3 timed legs is a connection the provider itself offers.
+// Discovery stores each leg as a train service (groupAndMerge); these turn the
+// connection into a JOURNEY resource pointing at those services.
+
+const CONNECTION_LEGS = { min: 2, max: 3 };
+
+/** The leg records of each trip of 2 or 3 timed legs (records as harvestTrips). */
+function harvestConnections(resp, opts) {
   const trips = (resp && Array.isArray(resp.trips)) ? resp.trips : [];
-  for (const trip of trips) {
-    const legs = (trip && Array.isArray(trip.legs)) ? trip.legs : [];
-    const timed = legs.map(l => l?.timedLeg).filter(Boolean);
-    timed.forEach((tl, idx) => {
-      const svc = tl.service || {};
-      const pc = svc.productCategory || {};
-      const veh = Array.isArray(svc.vehicleNumbers) ? svc.vehicleNumbers.filter(Boolean) : [];
-      const carrier = (Array.isArray(svc.carriers) && svc.carriers.length) ? svc.carriers[0] : null;
-      const start = tl.start || {};
-      const end = tl.end || {};
-      const dep = start.serviceDeparture?.timetabledTime;
-      const arr = end.serviceArrival?.timetabledTime;
-      let originURN = _stopRef(start);
-      let destinationURN = _stopRef(end);
-      // Substitute the searched O&D at the route endpoints (first/last leg).
-      if (searchedOrigin && idx === 0) originURN = searchedOrigin;
-      if (searchedDestination && idx === timed.length - 1) destinationURN = searchedDestination;
-      out.push({
-        originURN,
-        destinationURN,
-        originName:     start.stopPlaceName || '',
-        destName:       end.stopPlaceName || '',
-        operatorCode:   carrier ? (carrier.ref || '') : '',
-        productCategoryRef:       pc.productCategoryRef || '',
-        productCategoryName:      pc.name || '',
-        productCategoryShortName: pc.shortName || '',
-        vehicleNumber:  veh.join('/'),
-        departureTime:  timePartOf(dep),
-        arrivalTime:    timePartOf(arr),
-        dayOfWeek:      dayOfWeekCode(dep)
-      });
-    });
+  return trips.map(trip => tripLegRecords(trip, opts))
+    .filter(legs => legs.length >= CONNECTION_LEGS.min && legs.length <= CONNECTION_LEGS.max);
+}
+
+// "HH:MM[:SS]" on the clock, in minutes; null when not a time.
+function _clockMinutes(time) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(time || ''));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+// Every leg of a journey runs on the trip date (trip-apply.js gives them all
+// %TRIP_DATE%): each leg leaves no earlier on the clock than the previous one
+// arrived, and only the last may arrive after midnight.
+function _fitsOneTripDate(legs) {
+  for (let i = 0; i < legs.length; i++) {
+    const dep = _clockMinutes(legs[i].departureTime);
+    const arr = _clockMinutes(legs[i].arrivalTime);
+    if (dep === null || arr === null) return false;
+    const last = i === legs.length - 1;
+    if (!last && arr < dep) return false;
+    if (i > 0 && dep < _clockMinutes(legs[i - 1].arrivalTime)) return false;
   }
-  return out;
+  return true;
+}
+
+// The train service a leg record names among `trains` (TRAIN resources with
+// object data): same route and product category, same service, running that
+// day (a set without days runs every day). { trainResourceId, serviceIndex } or null.
+function _legRef(rec, trains) {
+  const key = serviceKey(rec);
+  for (const t of trains) {
+    const d = t.data || {};
+    if (d.originURN !== rec.originURN || d.destinationURN !== rec.destinationURN) continue;
+    if ((d.productCategoryRef || '') !== (rec.productCategoryRef || '')) continue;
+    const days = Array.isArray(d.daysOfWeek) ? d.daysOfWeek : [];
+    if (days.length && rec.dayOfWeek && !days.includes(rec.dayOfWeek)) continue;
+    const services = Array.isArray(d.services) ? d.services : [];
+    const serviceIndex = services.findIndex(s => serviceKey(s) === key);
+    if (serviceIndex !== -1) return { trainResourceId: t.id, serviceIndex };
+  }
+  return null;
+}
+
+const _legsKey = legs => legs.map(l => `${l.trainResourceId}#${l.serviceIndex}`).join('>');
+
+function _stopShort(urn) { return String(urn || '').split(':').pop(); }
+
+function _journeyLabel(legs) {
+  const first = legs[0];
+  const last = legs.at(-1);
+  const name = (n, urn) => n || _stopShort(urn);
+  // A change of train: the next leg's start, else the previous leg's end.
+  const via = legs.slice(1).map((l, i) => name(l.originName || legs[i].destName, l.originURN)).join(', ');
+  return `${name(first.originName, first.originURN)} → ${name(last.destName, last.destinationURN)} via ${via} (${String(first.departureTime).slice(0, 5)})`;
+}
+
+/**
+ * The JOURNEY resources to create for `connections` (harvestConnections), once
+ * their legs are stored as train services in `trains`. A connection whose leg
+ * has no service, or that does not fit one trip date, is skipped; one whose
+ * legs a journey in `existingJourneys` (or an earlier connection) already
+ * holds is not created again.
+ * @returns {{ toCreate: Array<{label, data:{legs}}>, skipped: number }}
+ */
+function journeysFromConnections(connections, trains, existingJourneys) {
+  const seen = new Set((existingJourneys || []).map(j => _legsKey(Array.isArray(j?.data?.legs) ? j.data.legs : [])));
+  const toCreate = [];
+  let skipped = 0;
+  for (const recs of connections || []) {
+    if (!_fitsOneTripDate(recs)) { skipped++; continue; }
+    const legs = recs.map(r => _legRef(r, trains || []));
+    if (legs.includes(null)) { skipped++; continue; }
+    const key = _legsKey(legs);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    toCreate.push({ label: _journeyLabel(recs), data: { legs } });
+  }
+  return { toCreate, skipped };
 }
 
 // Route key — a train set is identified by where the leg runs and what kind of
@@ -542,6 +633,8 @@ module.exports = {
   timePartOf,
   searchDates,
   harvestTrips,
+  harvestConnections,
+  journeysFromConnections,
   harvestOfferCatalog,
   routeKey,
   serviceKey,

@@ -1271,6 +1271,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   search has a budget (`SEARCH_BUDGET`) and reports `truncated`. A result is
   pushed as an unsaved journey; the Journeys section is drawn closed, so the
   page opens it before showing the new journey.
+- **Discover timetable keeps the provider's connections** (#715, 1.11.272).
+  Trips of 2 or 3 timed legs become JOURNEY resources over the services
+  `groupAndMerge` stored (`harvestConnections()` / `journeysFromConnections()`,
+  pure, in `services/timetable-discovery.js`; the route writes them after the
+  trains). A leg is found by route, product category, service key and day;
+  identical legs are never stored twice. `searchWith: 'trips-collection'`
+  asks the trip search first, `/offers` on a failed or empty day. The
+  simulator's search gives direct trips only, so only the tests show a
+  connection.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is
