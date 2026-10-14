@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-reservation-legs",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Reservations: no empty leg sent, renamed legs recognised",
+    "summary": "A reservation the provider offers without a leg is no longer sent with an empty one, and a reserved seat is found even when the booking renames the legs.",
+    "content": "Some providers offer a reservation without saying which leg it is for. OSCAR used to send it with an empty leg, which the provider refused. It now works out the leg when only one is possible, books it another way when it cannot, and says so in the log. Some providers also give the booked journey new leg identifiers; the check that the reservation was booked now recognises the same leg by its place in the journey."
+  },
+  {
     "id": "2026-10-14-test-data-place-lookup",
     "date": "October 14, 2026",
     "tag": "Improvement",

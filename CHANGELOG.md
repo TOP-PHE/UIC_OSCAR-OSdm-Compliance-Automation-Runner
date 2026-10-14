@@ -62,6 +62,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.282] / [collection-OTST_V2.0.158] — 2026-10-14
+
+Issue #737, release 2026.317. Collection and server tests; no server code.
+
+### Fixed
+- **No empty `tripLegCoverage` in a reservation request.** A provider's
+  offer gave an optional reservation with no `tripCoverage`, and OSCAR sent
+  `"tripLegCoverage": {}` for it (OSDM requires `tripId` and `legId`): the
+  booking was refused (404) in PLACE_SELECTION, and adding the reservation
+  later got a 500. A reservation's leg is now its own coverage, else the one
+  leg of the offer's trip that no other reservation part covers. One whose
+  leg cannot be told is never put in `placeSelections`: in PLACE_SELECTION it
+  is booked through `optionalReservationSelections`, in ADD_LATER it is not
+  added (OSDM 3.8 adds a reservation later through `placeSelections` only).
+  Each case is a WARNING. In an optional group, a part naming its leg is
+  chosen first.
+- **A booked reservation is found when the booking renames the legs.** The
+  same provider gives the booked trip new leg ids. "Booking: holds the
+  reservation on leg …" now matches a reservation on the leg at the same
+  place in the trip of the same id, from the offer response's trips kept in
+  `__offerTripLegs`; an exact leg id still matches first.
+
+Checked:
+- Simulator replay, all 89 scenarios, before and after.
+- Unit tests in `bruno-seat-reservations.test.js`, with the provider's
+  shapes: the renamed-leg check fails without the offer's trips.
+
+---
+
 ## [server-1.11.281] / [collection-OTST_V2.0.157] — 2026-10-14
 
 Issue #733, release 2026.316. Server only; the collection is unchanged.
