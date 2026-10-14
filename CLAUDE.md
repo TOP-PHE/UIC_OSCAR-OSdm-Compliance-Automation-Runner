@@ -1133,6 +1133,24 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `passengers.js`), kept in `__passengerIgnoredFields` so that 04 grades
     alike. An empty `/trips-collection` answer is described in the log
     (`describeTripsAnswer()`), since its body is not in the report.
+  - **OSCAR's own request is checked against OSDM** (#736). Two of OSCAR's
+    defects read as a provider's findings until the requests were opened by
+    hand. The global after-response checks each body sent to an OSDM endpoint
+    (`osdmRequestSchema.js`, pure but for `recordRequestConformance()`): one
+    `[OSCAR request] …` check; a failure is OSCAR's, lists paths, never values.
+    The schemas (`osdmRequestSchemas.js`) are **generated**, never hand-edited:
+    `Oscar_Server/scripts/generate-osdm-request-schemas.js` with
+    `OSDM_SPEC_DIR` holding the 3.4–3.8 files (only 3.8 is in the repo; the
+    others are on the OSDM gh-pages branch); a test pins 3.8 to the repo file.
+    A new endpoint OSCAR sends a body to goes in its `OPERATIONS`. Read what
+    the spec says before calling a body wrong: OSDM closes most objects
+    (`additionalProperties: false`, so a member of a later version fails on an
+    earlier one) and `PlaceRef` is a discriminator base, read as the subtype
+    `objectType` names. A negative test that sends a wrong body on purpose
+    goes in `NEGATIVE_TESTS` (method, path, the variable that arms it), or its
+    check fails as OSCAR's. Script-sent requests (`bru.sendRequest`) are not
+    checked yet. The raw runs of a replay (`replay/runs/*.json`) hold every
+    body sent: scanning them with `checkRequestBody()` is the quick check.
   - **A reservation's leg is never sent empty, and a booking may rename
     legs** (#737). `legOfReservation()` (`seatReservations.js`): the part's
     own coverage, else the one leg of the offer's trip no other reservation
