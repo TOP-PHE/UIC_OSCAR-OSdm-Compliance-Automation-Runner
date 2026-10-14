@@ -62,7 +62,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   // One file for the three providers (#614): a scenario asks for one version,
   // so each provider runs the scenarios of its own and the version check agrees.
   // The return covering both directions (#594, outboundTripIds) exists from 3.7.
-  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705) and,
+  // The overrule codes (#596), reduction cards (#597), products (#598), groups (#599), classes per leg (#600), reservations (#601), the refunds by passenger and leg (#697), the passenger limits (#699), the accented names (#703), the sales horizon (#704), the age bands (#705), the train filter (#722) and,
   // with the rest of #592 and #611, the later functions are gamma's only.
   const providers = [...loadProviders(PROVIDERS_DIR).values()];
   const byVersion = new Map();
@@ -75,7 +75,7 @@ test('each provider\'s OSDM version has the same scenarios, and the run list is 
   assert.deepEqual([...byVersion.keys()].sort(), providers.map((p) => p.osdmVersion).sort());
   const combined = 'SIM_RETURN_COMBINED_1ADT';
   const latest = byVersion.get('3.8.0');
-  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS'].some((prefix) => s.startsWith(prefix)));
+  const everyVersion = latest.filter((s) => !['SIM_REFUND_OVERRULE_', 'SIM_REFUND_COMBINED_', 'SIM_SALE_CARD_', 'SIM_SALE_PRODUCT_', 'SIM_GROUP_', 'SIM_SALE_CLASS_PER_LEG_', 'SIM_SALE_RESERVATION_', 'SIM_SALE_BY_TRIP_ID_', 'SIM_SALE_DOCUMENTS_', 'SIM_REFUND_RECEIPT_', 'SIM_SALE_IDEMPOTENCY_', 'SIM_EXCHANGE_', 'SIM_REFUND_DELETE_', 'SIM_REFUND_ONLY_OFFER_', 'SIM_NHF_', 'SIM_VARIANT_', 'SIM_WRONG_', 'SIM_RI_', 'SIM_PURCHASER_', 'SIM_REFUND_PAX_', 'SIM_REFUND_LEG_', 'SIM_SALE_MAX_PASSENGERS', 'SIM_SALE_ACCENTED_NAMES', 'SIM_SALE_AT_SALES_HORIZON', 'SIM_SALE_AGE_LIMITS', 'SIM_SALE_SEARCH_TRAIN_FILTER'].some((prefix) => s.startsWith(prefix)));
   for (const [version, sales] of byVersion) {
     let expected = latest;
     if (version === '3.7.0') expected = everyVersion;

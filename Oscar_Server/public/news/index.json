@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-minimal-offer-search",
+    "date": "October 14, 2026",
+    "tag": "Improvement",
+    "title": "Offer searches by place and time; the train filter has its own test",
+    "summary": "Scenarios no longer send the train and operator as a search filter, which some providers refuse; the train is chosen in the answer.",
+    "content": "An offer search now sends the origin, the destination and the time. The train of Test Data is then picked among the trips the provider answers, or the first one at the time asked when it is not there, with a warning. Sending the train and operator as a filter is optional in OSDM and some providers refuse it, which used to stop every scenario. It is now tested on its own: turn Train filter on in a trip's Trip Search Criteria, or copy the reference scenario OTST_SALE_SEARCH_TRAIN_FILTER_1ADT."
+  },
+  {
     "id": "2026-10-14-departure-probe-reason",
     "date": "October 14, 2026",
     "tag": "Fix",

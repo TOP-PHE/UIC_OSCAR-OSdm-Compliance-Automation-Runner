@@ -217,7 +217,7 @@ optional. Each is one reservation for all the passengers, on one leg.
 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` | The reservations booked by `placeSelections` naming the trip and the leg. | Both booked; a place selection naming the wrong leg would be refused. | No failed check. |
 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` | The optional reservation added after the booking, by `POST …/booked-offers/{id}/offer-parts` (step 09). | The mandatory one at booking, the optional one added to the pre-booked booking. | No failed check; one warning *"No booked reservation found for offer reservation[1]"*. It comes from the booking step (02), before step 09 adds the reservation; step 09 then checks that it was added. |
 
-### Offers by trip id (#602)
+### Offers by trip id (#602) and the train filter (#722)
 
 `POST /trips-collection` answers four departures for trip 1 (07:30, 08:00,
 09:00, 10:00), each with a train of its own.
@@ -227,6 +227,7 @@ optional. Each is one reservation for all the passengers, on one leg.
 | `SIM_SALE_BY_TRIP_ID_1ADT_38` | Step 01 asks the trips first and takes the first leaving at the time asked or later (08:00, not the 07:30 listed first). It then asks the offers with `tripIds`, and every offer must cover that trip. | The four departures; offers for the trip named. | No failed check. |
 | `SIM_SALE_BY_TRIP_ID_TRAIN_1ADT_38` | Trip 6 names train 1854, the 09:00 departure and the third trip of the answer: the trip of that train is taken. | As above; the booking is on the 09:00 train. | No failed check. |
 | `SIM_SALE_BY_TRIP_ID_UNKNOWN_38` | Negative test: `POST /offers` names a trip id the provider never gave and must be refused. The scenario ends there. | `400 VALIDATION_ERROR` with a Problem naming `tripIds`. | No failed check (the refusal is graded). |
+| `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` | Trip 14 turns the train filter on (Trip Search Criteria, #722): `POST /offers` carries train 4711 in `parameters.dataFilter.vehicleFilter`, and the answer must hold a trip of that train. Every other search goes by place and time only. | One trip, of train 4711. | No failed check. |
 
 ### Fulfilment documents and refund receipt (#603)
 

@@ -103,7 +103,7 @@ function resetScenarioEnvVars() {
     "placeSelectionProbes", "__placeProbeIndex", "placeProbeTarget", "__placeProbeSkipWarned",
     "__bookingFindingKeys",
     "desiredFlexibility", "accommodationSelection", "accommodationGenderPreference", "bookMandatoryReservations", "optionalReservationSelections", "requiresPlaceSelection",
-    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
+    "overruleCode", "overruleCodeExpectRejection", "refundDate", "TripType", "__cardPriceCompareDone", "OfferCollectionRequestWithoutCards", "__travelDay", "__expectedPassengerTypes", "expectedProduct", "__productNotOffered", "expectedProductAbsent", "__groupPriceCompareDone", "OfferCollectionRequestIndividual", "legTravelClasses", "__legClassesNotOffered", "reservationBookingForm", "reservationPlaceSelections", "reservationAddLaterSelections", "__reservationsBooked", "__reservationsAddedLater", "offersByTripIds", "tripIdsExpectRejection", "__searchTrainFilter", "passengerLimitExpectRejection", "emptyPassengersExpectRejection", "refundAgainProbe", "exchangeRefundedProbe", "confirmAgainProbe", "__tripIdsOutcome", "refundReceiptMaxWaitMinutes", "__fulfillmentsToRead", "__fulfillmentDocHolders", "fulfillmentToReadId", "__infoDocKeysBeforeRefund", "__refundReceiptStart", "__refundReceiptDeadline", "idempotencyCheck", "passengerUpdateScope", "__idempotencyKey_booking", "__idempotencyKey_confirmation",
     "tripStartStopPlaceRef", "tripEndStopPlaceRef", "tripStartDatetime", "tripEndDatetime",
     "tripOperatorCode", "tripVehicleNumber", "tripProductCategoryRef",
     "tripProductCategoryName", "tripProductCategoryShortName",
@@ -1429,8 +1429,20 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
 
   const legDef = legDefinitions[0];
 
-  const carrierFilter = legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
-  const vehicleFilter = legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
+  // #722: the train and operator filters are optional in OSDM, and a provider
+  // that does not take them refuses the whole search. They are sent only when
+  // the trip's Trip Search Criteria turn "Train filter" on (the filter's own
+  // test); otherwise the train is chosen in the answer (searchTrain.js).
+  const { trainFilterOn } = require('./searchTrain.js');
+  const _withFilter = trainFilterOn(searchCriteria);
+  bru.setEnvVar("__searchTrainFilter", _withFilter ? "true" : "");
+  const carrierFilter = _withFilter && legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
+  const vehicleFilter = _withFilter && legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
+  if (!_withFilter && (legDef.carrier || legDef.vehicleNumber)) {
+    const _train = legDef.vehicleNumber ? ' ' + legDef.vehicleNumber : '';
+    const _operator = legDef.carrier ? ' (operator ' + legDef.carrier + ')' : '';
+    validationLogger(`[INFO] 🔎 Search by place and time only: the train${_train}${_operator} is chosen in the answer, not sent as a filter. Trip Search Criteria → Train filter sends it.`);
+  }
 
   const tripDataFilter = (carrierFilter || vehicleFilter) ? new TripDataFilter(carrierFilter, vehicleFilter) : null;
   const tripParameters = tripDataFilter ? new TripParameters(tripDataFilter) : null;

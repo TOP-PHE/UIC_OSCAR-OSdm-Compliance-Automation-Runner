@@ -446,6 +446,16 @@
       }
     },
     {
+      "code": "OTST_SALE_SEARCH_TRAIN_FILTER_1ADT",
+      "source": "SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38",
+      "purpose": "An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only.",
+      "checks": 231,
+      "needs": {
+        "trip": "SEARCH",
+        "passengers": 1
+      }
+    },
+    {
       "code": "OTST_SALE_DOCUMENTS_RETURN_1ADT",
       "source": "SIM_SALE_DOCUMENTS_RETURN_1ADT_38",
       "purpose": "Fulfillment documents of a return, and each fulfillment read with GET /fulfillments/{id}.",

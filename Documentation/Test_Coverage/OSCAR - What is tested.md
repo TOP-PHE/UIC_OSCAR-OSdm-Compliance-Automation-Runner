@@ -22,7 +22,7 @@ them.
 
 ```
  simulator_datafile.json            scenario_catalogue.json
- (88 scenarios, SIM_…)  ──source──►  (49 reference scenarios, OTST_… / NHF_…)
+ (89 scenarios, SIM_…)  ──source──►  (50 reference scenarios, OTST_… / NHF_…)
           │                                     │
           │ run as is, against the simulator    │ copied into a company's data file
           ▼                                     ▼ (Test Config → Copy scenarios from… → Scenario catalogue)
@@ -165,7 +165,7 @@ an RFC 9457 Problem body.
 
 ## 4. The ready-made scenarios
 
-### 4.1 The simulator's data file (88 scenarios)
+### 4.1 The simulator's data file (89 scenarios)
 
 Each scenario, with what it tests, what the simulator answers and what a run
 must show, is in
@@ -194,7 +194,7 @@ In short:
 | Deliberately wrong answers (must fail; not in the run list) | 5 | `gamma` |
 | Requested information and purchaser | 5 | `gamma` |
 
-### 4.2 The reference scenarios of the catalogue (49)
+### 4.2 The reference scenarios of the catalogue (50)
 
 These are the scenarios a company can copy from Test Config. **Scope** is
 what the scenario tests. **Needs declared** is what the company's Test
@@ -222,6 +222,7 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 370 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
 | `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 367 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
 | `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 237 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
+| `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` | An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only. | — | 231 | `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` |
 | `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 351 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |
 | `OTST_SALE_IDEMPOTENCY_1ADT` | `Idempotency-Key` on the booking and the confirmation: the same key gives the same answer. | — | 236 | `SIM_SALE_IDEMPOTENCY_1ADT_38` |
 | `OTST_SALE_REQUESTED_INFORMATION_1ADT` | Requested information: what the offers ask for is checked and supplied. | — | 233 | `SIM_RI_AUTOFEED_1ADT_38` |

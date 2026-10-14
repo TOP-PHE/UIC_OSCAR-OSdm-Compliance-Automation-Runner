@@ -29,13 +29,13 @@ const { withBrunoExpect } = require('../helpers/bruno-chai');
 
 beforeEach(() => { envStore = { osdmVersion: '3.8.0' }; });
 
-function searchFor(vehicleNumber, operatorCode) {
+function searchFor(vehicleNumber, operatorCode, searchCriteria = { trainFilter: 'true' }) {
   const jestTest = global.test;
   global.test = (name, fn) => fn();
   try {
     withBrunoExpect(() => sp.osdmTripSearchCriteria([
       new TripLegDefinition('urn:uic:stn:5457076', '2026-10-24T09:37:00', 'urn:uic:stn:5433295', null, null, null, null, vehicleNumber, operatorCode),
-    ], null, null));
+    ], null, searchCriteria));
   } finally {
     global.test = jestTest;
   }
@@ -69,6 +69,18 @@ describe('the trip search filter', () => {
 
   test('neither: no data filter at all', () => {
     expect(searchFor(null, null).parameters?.dataFilter).toBeUndefined();
+  });
+
+  // #722: the filter is the train filter's own test; any other search goes by
+  // place and time, and the train is chosen in the answer.
+  test('without the train filter: no parameters at all, whatever the trip names', () => {
+    for (const criteria of [null, {}, { trainFilter: '' }, { trainFilter: 'false' }]) {
+      const tsc = searchFor('277', 'urn:uic:rics:1154', criteria);
+      expect(tsc.parameters).toBeUndefined();
+      expect(envStore.__searchTrainFilter).toBe('');
+    }
+    searchFor('277', null, { trainFilter: true });
+    expect(envStore.__searchTrainFilter).toBe('true');
   });
 
   test('the classes write what they are given, and nothing unset', () => {

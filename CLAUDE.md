@@ -1113,6 +1113,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     null `carrierFilter` / `vehicleFilter`, none nullable in OSDM 3.8, and a
     provider refused every such search as malformed. A new `model.js` class
     for a request must not assign unset members.
+  - **A search goes by place and time; the train is chosen in the answer**
+    (#722). The train and operator filters (`parameters.dataFilter`) are
+    optional in OSDM, and a provider that refused an operator code stopped
+    every scenario at 01. They are sent only when the trip's Trip Search
+    Criteria turn `trainFilter` on, and the answer is then checked
+    (`checkTrainFilter()`, `library-bruno/searchTrain.js`). Otherwise
+    `searchTripOffers()` (`offers.js`) keeps the offers covering the trip of
+    the Test Data train, else the first at the time asked, for a one-way
+    SEARCH only (not trip ids, not a return); 01c and 01d compare within the
+    same trip. One trip in the answer, or offers naming no trip, are left as
+    they are, so the simulator (one trip per search) gives the same checks.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The
