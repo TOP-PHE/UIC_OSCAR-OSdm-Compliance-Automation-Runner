@@ -463,6 +463,13 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     scenarioReturnModel: loadFunction(page, 'scenarioReturnModel'),
     fwReturnModels: loadFunction(page, 'fwReturnModels'),
   });
+  // #713: the page's scope table, read from its source as the page writes it.
+  const scopeLines = read(page).split('\n');
+  const scopeStart = scopeLines.indexOf('const FW_PARTIAL_REFUND_SCOPES = [');
+  const FW_PARTIAL_REFUND_SCOPES = vm.runInNewContext(
+    scopeLines.slice(scopeStart, scopeLines.indexOf('];', scopeStart) + 1).join('\n').replace('const FW_PARTIAL_REFUND_SCOPES = ', ''));
+  const fwPartialScopeDeclared = loadFunction(page, 'fwPartialScopeDeclared');
+  const undeclaredPartialScopes = loadFunction(page, 'undeclaredPartialScopes', { isArmed, fwPartialScopeDeclared, FW_PARTIAL_REFUND_SCOPES });
 
   test('isArmed accepts the spellings datafiles use, and nothing else', () => {
     for (const v of [true, 'on', 'true', 'yes', 1]) expect(isArmed(v)).toBe(true);
@@ -478,12 +485,12 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     ['#595: by fulfillment armed, flow not declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_FULL'], 1],
     ['#595: by fulfillment armed, flow declared', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['REFUND_PARTIAL'], 0],
   ])('fwUndeclaredArmedCount: %s', (_label, scenarios, salesFlows, expected) => {
-    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: { scenarios }, wizData: { framework: { salesFlows } } });
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, undeclaredPartialScopes, state: { scenarios }, wizData: { framework: { salesFlows } } });
     expect(count()).toBe(expected);
   });
 
   test('fwUndeclaredArmedCount with nothing loaded', () => {
-    expect(loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: null, wizData: null })()).toBe(0);
+    expect(loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, undeclaredPartialScopes, state: null, wizData: null })()).toBe(0);
   });
 
   test.each([
@@ -494,7 +501,60 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     ['#619: a framework from before the declaration', [{ offerSearchCriteria: { returnOffsetDays: 2 } }], undefined, 0],
     ['#619: counted once with a partial refund too', [{ scenarioType: 'REFUND', partialRefundByLeg: 'on', offerSearchCriteria: { returnOffsetDays: 2 } }], [], 1],
   ])('fwUndeclaredArmedCount: %s', (_label, scenarios, returnModels, expected) => {
-    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, state: { scenarios }, wizData: { framework: { salesFlows: [], returnModels } } });
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, undeclaredPartialScopes, state: { scenarios }, wizData: { framework: { salesFlows: [], returnModels } } });
+    expect(count()).toBe(expected);
+  });
+
+  test('#713: the scope table is the server\'s', () => {
+    const { PARTIAL_REFUND_SCOPES, gatingRules } = require('../../src/utils/frameworkGating');
+    expect(FW_PARTIAL_REFUND_SCOPES.map(([scope]) => scope).sort()).toEqual([...PARTIAL_REFUND_SCOPES].sort());
+    const ruleScopes = Object.fromEntries(gatingRules().filter((r) => r.scope).map((r) => [r.field, r.scope]));
+    expect(Object.fromEntries(FW_PARTIAL_REFUND_SCOPES.map(([scope, field]) => [field, scope]))).toEqual(ruleScopes);
+  });
+
+  test.each([
+    ['no list: every scope', { partialRefundByLeg: 'on', partialRefundByPax: 'on' }, undefined, []],
+    ['fulfillment only, leg armed', { partialRefundByLeg: 'on' }, ['FULFILLMENT'], ['per leg']],
+    ['fulfillment only, fulfillment armed', { partialRefundByFulfillment: true }, ['FULFILLMENT'], []],
+    ['none declared, two armed', { partialRefundByPax: 'yes', partialRefundByFulfillment: 'on' }, [], ['per fulfillment', 'per passenger']],
+    ['off is not armed', { partialRefundByLeg: 'off' }, [], []],
+  ])('#713 undeclaredPartialScopes: %s', (_label, flags, scopes, expected) => {
+    expect(undeclaredPartialScopes({ scenarioType: 'REFUND', ...flags }, { partialRefundScopes: scopes })).toEqual(expected);
+  });
+
+  test('#713 fwTogglePartialScope: the first click starts from every scope', () => {
+    const wizData = { framework: {} };
+    const el = { cls: new Set(['selected']), classList: { toggle(c, on) { if (on) el.cls.add(c); else el.cls.delete(c); } } };
+    const toggle = loadFunction(page, 'fwTogglePartialScope', { wizData, FW_PARTIAL_REFUND_SCOPES });
+    toggle(el, 'LEG');
+    expect(wizData.framework.partialRefundScopes).toEqual(['FULFILLMENT', 'PASSENGER']);
+    expect(el.cls.has('selected')).toBe(false);
+    toggle(el, 'LEG');
+    expect(wizData.framework.partialRefundScopes).toEqual(['FULFILLMENT', 'PASSENGER', 'LEG']);
+    expect(el.cls.has('selected')).toBe(true);
+  });
+
+  test('#713 partialScopePanelHtml: open with REFUND_PARTIAL, a pill per scope, selected when declared', () => {
+    const panel = loadFunction(page, 'partialScopePanelHtml', { FW_PARTIAL_REFUND_SCOPES, fwPartialScopeDeclared, esc: escHtml });
+    const html = panel({ salesFlows: ['REFUND_PARTIAL'], partialRefundScopes: ['FULFILLMENT'] });
+    expect(html).toContain('class="irops-panel open" id="partial-REFUND"');
+    expect(html).toContain('<div class="pill selected" data-action="fw-partial-scope" data-val="FULFILLMENT">Per fulfillment</div>');
+    expect(html).toContain('<div class="pill" data-action="fw-partial-scope" data-val="LEG">Per leg</div>');
+    expect(panel({ salesFlows: [] })).toContain('class="irops-panel" id="partial-REFUND"');
+    expect(panel({ salesFlows: [] }).match(/pill selected/g)).toHaveLength(3);
+  });
+
+  test('#713 undeclaredPartialScopes ignores anything but a refund', () => {
+    expect(undeclaredPartialScopes({ scenarioType: 'EXCHANGE', partialRefundByLeg: 'on' }, { partialRefundScopes: [] })).toEqual([]);
+    expect(undeclaredPartialScopes({ partialRefundByLeg: 'on' }, { partialRefundScopes: [] })).toEqual([]);
+  });
+
+  test.each([
+    ['#713: a scope not declared, flow declared', [{ scenarioType: 'REFUND', partialRefundByLeg: 'on' }], ['FULFILLMENT'], 1],
+    ['#713: the declared scope', [{ scenarioType: 'REFUND', partialRefundByFulfillment: 'on' }], ['FULFILLMENT'], 0],
+    ['#713: no list, any scope', [{ scenarioType: 'REFUND', partialRefundByPax: 'on' }], undefined, 0],
+  ])('fwUndeclaredArmedCount: %s', (_label, scenarios, partialRefundScopes, expected) => {
+    const count = loadFunction(page, 'fwUndeclaredArmedCount', { isArmed, returnModelUndeclared, undeclaredPartialScopes, state: { scenarios }, wizData: { framework: { salesFlows: ['REFUND_PARTIAL'], partialRefundScopes } } });
     expect(count()).toBe(expected);
   });
 

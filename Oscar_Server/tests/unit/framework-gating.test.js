@@ -336,3 +336,37 @@ describe('integration: migration + annotation', () => {
     expect(df.scenarios[1].__featureNotDeclaredWarnings).toBeUndefined();
   });
 });
+
+describe('#713 partial refund scopes', () => {
+  const { scenarioWarnings: warnings, partialRefundScopeDeclared, PARTIAL_REFUND_SCOPES } = require('../../src/utils/frameworkGating');
+  const refund = (extra) => ({ code: 'R', scenarioType: 'REFUND', ...extra });
+  const fw = (scopes) => ({ salesFlows: ['SALE', 'REFUND_PARTIAL'], ...(scopes ? { partialRefundScopes: scopes } : {}) });
+
+  test('the three scopes', () => {
+    expect(PARTIAL_REFUND_SCOPES).toEqual(['FULFILLMENT', 'LEG', 'PASSENGER']);
+  });
+
+  test('no list declared: every scope is allowed', () => {
+    expect(warnings(refund({ partialRefundByLeg: 'on', partialRefundByPax: 'on', partialRefundByFulfillment: 'on' }), fw())).toEqual([]);
+    expect(partialRefundScopeDeclared({}, 'LEG')).toBe(true);
+    expect(partialRefundScopeDeclared(null, 'LEG')).toBe(true);
+  });
+
+  test('a scope not in the list is warned about, the others are not', () => {
+    const f = fw(['FULFILLMENT']);
+    expect(warnings(refund({ partialRefundByFulfillment: 'on' }), f)).toEqual([]);
+    expect(warnings(refund({ partialRefundByLeg: 'on' }), f)).toEqual(['partialRefundByLeg']);
+    expect(warnings(refund({ partialRefundByPax: true, partialRefundByFulfillment: 'on' }), f)).toEqual(['partialRefundByPax']);
+    expect(warnings(refund({ partialRefundByLeg: 'on', partialRefundByPax: 'on' }), fw([]))).toEqual(['partialRefundByLeg', 'partialRefundByPax']);
+  });
+
+  test('without REFUND_PARTIAL the flow warning stands, list or not', () => {
+    expect(warnings(refund({ partialRefundByFulfillment: 'on' }), { salesFlows: ['SALE'], partialRefundScopes: ['FULFILLMENT'] }))
+      .toEqual(['partialRefundByFulfillment']);
+  });
+
+  test('a scope flag off, or on a sale, is never warned about', () => {
+    expect(warnings(refund({ partialRefundByLeg: 'off' }), fw([]))).toEqual([]);
+    expect(warnings({ code: 'S', scenarioType: 'SALE', partialRefundByLeg: 'on' }, fw([]))).toEqual([]);
+  });
+});

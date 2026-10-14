@@ -226,9 +226,15 @@ describe('featureNotDeclaredWarning', () => {
       .toContain('in the SEPARATE model');
   });
 
-  test('a partial-refund flag keeps its text', () => {
+  test('a partial-refund flag names its scope (#713)', () => {
     const line = sp.featureNotDeclaredWarning({ code: 'P1' }, 'partialRefundByLeg');
     expect(line).toMatch(/^\[WARNING\] Scenario "P1" arms partialRefundByLeg=on/);
-    expect(line).toContain('REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows');
+    expect(line).toContain('a partial refund by leg (REFUND_PARTIAL in the sales flows, and its scope under Partial refund scopes)');
+    expect(sp.featureNotDeclaredWarning({ code: 'P2' }, 'partialRefundByPax')).toContain('by passenger');
+    expect(sp.featureNotDeclaredWarning({ code: 'P3' }, 'partialRefundByFulfillment')).toContain('by fulfillment');
+  });
+
+  test('any other flag keeps the general text', () => {
+    expect(sp.featureNotDeclaredWarning({ code: 'P4' }, 'partialExchangeByLeg')).toContain('REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows');
   });
 });

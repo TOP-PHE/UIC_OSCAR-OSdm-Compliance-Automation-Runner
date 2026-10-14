@@ -94,7 +94,7 @@ describe('requirements and the golden rule', () => {
   test('a combined return needs its model and OSDM 3.7; passenger types other than PERSON must be declared', () => {
     const df = { passengersList: [{ id: 1, passengers: [{ type: 'PERSON' }, { type: 'YOUTH' }] }] };
     const r = requirementsOf({ scenarioType: 'SALE', passengersListId: 1, offerSearchCriteria: { returnOffsetDays: 2, returnModel: 'COMBINED' } }, df);
-    expect(r).toEqual({ salesFlows: ['SALE'], returnModel: 'COMBINED', minOsdmVersion: '3.7', passengerTypes: ['YOUTH'] });
+    expect(r).toEqual({ salesFlows: ['SALE'], partialRefundScopes: [], returnModel: 'COMBINED', minOsdmVersion: '3.7', passengerTypes: ['YOUTH'] });
     expect(missingFor(r, { salesFlows: ['SALE'], returnModels: ['SEPARATE'], osdmVersion: '3.6.0', passengerTypes: ['ADULT'] }))
       .toEqual(['return model COMBINED', 'OSDM 3.7 or later', 'passenger type YOUTH']);
     expect(missingFor(r, { config: { salesFlows: ['SALE'], returnModels: ['COMBINED'], osdmVersion: '3.8.0', passengerTypes: ['YOUTH'] } })).toEqual([]);
@@ -102,6 +102,36 @@ describe('requirements and the golden rule', () => {
     expect(missingFor(r, { salesFlows: ['SALE'], osdmVersion: '3.8', passengerTypes: ['YOUTH'] })).toEqual([]);
     expect(missingFor({ salesFlows: ['SALE', 'REFUND_FULL'], returnModel: null, minOsdmVersion: null, passengerTypes: [] }, null))
       .toEqual(['sales flow SALE', 'sales flow REFUND_FULL']);
+  });
+
+  test('#713: a partial refund needs its scope declared, when the framework lists scopes', () => {
+    const df = { passengersList: [{ id: 1, passengers: [{ type: 'ADULT' }] }] };
+    const byPax = requirementsOf({ scenarioType: 'REFUND', passengersListId: 1, partialRefundByPax: 'on' }, df);
+    expect(byPax.salesFlows).toEqual(['SALE', 'REFUND_PARTIAL']);
+    expect(byPax.partialRefundScopes).toEqual(['PASSENGER']);
+    const fw = { salesFlows: ['SALE', 'REFUND_PARTIAL'], passengerTypes: ['ADULT'] };
+    // No list: every scope (frameworks from before 1.11.271).
+    expect(missingFor(byPax, fw)).toEqual([]);
+    expect(missingFor(byPax, { ...fw, partialRefundScopes: ['FULFILLMENT'] })).toEqual(['partial refund by passenger']);
+    expect(missingFor(byPax, { ...fw, partialRefundScopes: ['FULFILLMENT', 'PASSENGER'] })).toEqual([]);
+    const both = requirementsOf({ scenarioType: 'REFUND', passengersListId: 1, partialRefundByLeg: 'on', partialRefundByFulfillment: true }, df);
+    expect(missingFor(both, { ...fw, partialRefundScopes: [] })).toEqual(['partial refund by fulfillment', 'partial refund by leg']);
+    // A scope flag on a sale or an exchange is not a partial refund.
+    expect(requirementsOf({ scenarioType: 'EXCHANGE', passengersListId: 1, partialRefundByLeg: 'on' }, df).partialRefundScopes).toEqual([]);
+  });
+
+  test('#713: the catalogue\'s partial refunds by passenger and by leg are refused to a fulfillment-only provider', () => {
+    const fw = {
+      osdmVersion: '3.8.0', salesFlows: ['SALE', 'REFUND_FULL', 'REFUND_PARTIAL'], partialRefundScopes: ['FULFILLMENT'],
+      passengerTypes: ['ADULT', 'CHILD', 'YOUTH', 'SENIOR', 'YOUNG_CHILD'], returnModels: ['SEPARATE', 'COMBINED'],
+    };
+    const listed = catalogueFor(catalogue, simulator, fw);
+    const scopeMissing = listed.filter((e) => e.missing.some((m) => m.startsWith('partial refund by')));
+    expect(scopeMissing.map((e) => e.code)).toEqual(expect.arrayContaining(['OTST_REFUND_PARTIAL_PASSENGER_2ADT', 'OTST_REFUND_PARTIAL_LEG_1ADT']));
+    for (const e of scopeMissing) expect(e.requirements.partialRefundScopes).not.toContain('FULFILLMENT');
+    const byFulfillment = listed.filter((e) => e.requirements.partialRefundScopes.includes('FULFILLMENT'));
+    expect(byFulfillment.length).toBeGreaterThan(0);
+    for (const e of byFulfillment) expect(e.missing.filter((m) => m.startsWith('partial refund by'))).toEqual([]);
   });
 });
 

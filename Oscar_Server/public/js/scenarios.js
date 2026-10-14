@@ -244,6 +244,64 @@ function fwDeclaresPartialRefund(scenarioType) {
   return flows.includes(String(scenarioType).toUpperCase() + '_PARTIAL');
 }
 
+// #713: the partial refund scopes, as the Test Framework names them, with the
+// scenario flag of each. Kept in sync with frameworkGating.js
+// (PARTIAL_REFUND_SCOPES, the rule table and partialRefundScopeDeclared()).
+const FW_PARTIAL_REFUND_SCOPES = [
+  ['FULFILLMENT', 'partialRefundByFulfillment', 'Per fulfillment'],
+  ['LEG', 'partialRefundByLeg', 'Per leg'],
+  ['PASSENGER', 'partialRefundByPax', 'Per passenger'],
+];
+
+// #713: no list declared means every scope (frameworks from before 1.11.271).
+function fwPartialScopeDeclared(fw, scope) {
+  const declared = fw?.partialRefundScopes;
+  return !Array.isArray(declared) || declared.includes(scope);
+}
+
+// #713: the labels of the scopes a refund scenario arms that the framework does not list.
+function undeclaredPartialScopes(sc, fw) {
+  if (String(sc?.scenarioType || 'SALE').toUpperCase() !== 'REFUND') return [];
+  return FW_PARTIAL_REFUND_SCOPES
+    .filter(([scope, field]) => isArmed(sc[field]) && !fwPartialScopeDeclared(fw, scope))
+    .map(([, , label]) => label.toLowerCase());
+}
+
+// #713: the scenario editor's note when REFUND_PARTIAL is declared but not the scope armed.
+function partialScopeWarningHtml(sc) {
+  if (!fwDeclaresPartialRefund(sc.scenarioType)) return '';
+  const missing = undeclaredPartialScopes(sc, wizData?.framework || {});
+  if (missing.length === 0) return '';
+  return `<div style="color:#e65100;font-size:12px;margin-top:4px;padding:6px 8px;border:1px solid #ffb74d;border-radius:4px;background:#fff8e1">
+      ⚠ The Test Framework does not declare a partial refund ${esc(missing.join(' or '))}: the provider may refuse it.
+      <span style="display:block;margin-top:3px;font-size:11px;color:#bf6f00">
+        Fix: tick the scope in Test Framework → ✂️ Partial refund scopes, or choose a declared one here.
+      </span>
+    </div>`;
+}
+
+// #713: the framework editor's Partial refund scopes, shown under the Refund row
+// while REFUND_PARTIAL is ticked.
+function partialScopePanelHtml(fw) {
+  const pills = FW_PARTIAL_REFUND_SCOPES.map(([scope, , label]) =>
+    `<div class="pill${fwPartialScopeDeclared(fw, scope) ? ' selected' : ''}" data-action="fw-partial-scope" data-val="${esc(scope)}">${esc(label)}</div>`).join('');
+  return `
+    <div class="irops-panel${fw.salesFlows.includes('REFUND_PARTIAL') ? ' open' : ''}" id="partial-REFUND">
+      <div class="irops-panel-title">✂️ Partial refund scopes</div>
+      <div style="margin-bottom:6px;font-size:11px;color:#78909c">How the provider takes a partial refund. A scenario armed with another scope gets a warning, and the scenario catalogue does not copy it.</div>
+      <div class="pill-group">${pills}</div>
+    </div>`;
+}
+
+// #713: a scope pill. No list means every scope, so the first click starts from all three.
+function fwTogglePartialScope(el, scope) {
+  const fw = wizData.framework;
+  const list = Array.isArray(fw.partialRefundScopes) ? fw.partialRefundScopes : FW_PARTIAL_REFUND_SCOPES.map(([s]) => s);
+  const on = list.includes(scope);
+  fw.partialRefundScopes = on ? list.filter(x => x !== scope) : [...list, scope];
+  el.classList.toggle('selected', !on);
+}
+
 // A scenario flag counts as armed in any of the spellings datafiles use.
 function isArmed(v) {
   return v === true || v === 'on' || v === 'true' || v === 'yes' || v === 1;
@@ -313,7 +371,7 @@ function fwUndeclaredArmedCount() {
     const partial = t === 'REFUND' && (isArmed(sc.partialRefundByLeg) || isArmed(sc.partialRefundByPax)
         || isArmed(sc.partialRefundByFulfillment))
         && !flows.has('REFUND_PARTIAL');
-    if (partial || returnModelUndeclared(sc, fw)) n++;
+    if (partial || returnModelUndeclared(sc, fw) || undeclaredPartialScopes(sc, fw).length > 0) n++;
   }
   return n;
 }
@@ -1895,6 +1953,8 @@ function buildPartialRefundFields(idx, sc) {
       </span>
     </div>`;
   }
+
+  warnings += partialScopeWarningHtml(sc);
 
   return `
     <div class="param-field" style="grid-column: span 2; padding:8px;border:1px dashed #b0bec5;border-radius:6px;margin-top:6px">
@@ -3875,6 +3935,7 @@ function renderWizardStep1() {
         </div>`).join('')}
       </div>
       ${iropsPanelHtml(prefix)}
+      ${prefix === 'REFUND' ? partialScopePanelHtml(fw) : ''}
     </div>`;
   }
 
@@ -4165,6 +4226,7 @@ function fwToggleAfterSales(key) {
   el.classList.toggle('selected', !was);
   if (!was) { if (!fw.salesFlows.includes(key)) fw.salesFlows.push(key); }
   else      { fw.salesFlows = fw.salesFlows.filter(f => f !== key); }
+  if (key === 'REFUND_PARTIAL') document.getElementById('partial-REFUND')?.classList.toggle('open', !was);
   if (key.endsWith('_IROPS')) {
     const prefix = key.split('_')[0];
     const panel  = document.getElementById(`irops-${prefix}`);
@@ -7236,6 +7298,8 @@ document.body.addEventListener('click', function(e) {
       fwToggleIrops(el.dataset.type, el.dataset.code, el); saveFrameworkDebounced(); break;
     case 'fw-toggle-aftersales':
       fwToggleAfterSales(el.dataset.val); saveFrameworkDebounced(); break;
+    case 'fw-partial-scope':
+      fwTogglePartialScope(el, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-pill':
       fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
     case 'fw-offer-pill':

@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.305",
+  "current_release": "2026.306",
   "releases": [
+    {
+      "release": "2026.306",
+      "date": "2026-10-14",
+      "server": "1.11.271",
+      "collection": "OTST_V2.0.152",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Test Framework: Partial refund scopes (fulfillment, leg, passenger); an undeclared scope is warned about and not copied from the catalogue (#713)."
+      ]
+    },
     {
       "release": "2026.305",
       "date": "2026-10-14",

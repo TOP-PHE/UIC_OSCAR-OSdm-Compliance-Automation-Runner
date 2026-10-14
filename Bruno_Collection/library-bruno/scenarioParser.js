@@ -1633,12 +1633,19 @@ function buildReturnSearchParameters(offsetDays, returnTime, outboundStart) {
   return { inwardReturnDate };
 }
 
+const PARTIAL_REFUND_SCOPE_OF = { partialRefundByFulfillment: 'fulfillment', partialRefundByLeg: 'leg', partialRefundByPax: 'passenger' };
+
 // The [WARNING] for one entry of __featureNotDeclaredWarnings: a field the
-// scenario arms that the Test Framework does not declare (#218, #619).
+// scenario arms that the Test Framework does not declare (#218, #619, #713).
 function featureNotDeclaredWarning(scenario, field) {
   if (field === 'returnModel') {
     const model = scenario?.offerSearchCriteria?.returnModel || 'SEPARATE';
     return `[WARNING] Scenario "${scenario.code}" asks for a return in the ${model} model, which the Test Framework does not declare (Return journeys). The run will proceed. Declare the model in the Test Framework, or choose a declared one on the scenario.`;
+  }
+  // #713: a partial refund needs REFUND_PARTIAL and, when the framework lists
+  // them, the scope (Partial refund scopes: fulfillment, leg, passenger).
+  if (PARTIAL_REFUND_SCOPE_OF[field]) {
+    return `[WARNING] Scenario "${scenario.code}" arms ${field}=on but the Test Framework does not declare a partial refund by ${PARTIAL_REFUND_SCOPE_OF[field]} (REFUND_PARTIAL in the sales flows, and its scope under Partial refund scopes). The run will proceed; the provider may refuse the refund. Declare it in the Test Framework, or unset ${field} on the scenario.`;
   }
   return `[WARNING] Scenario "${scenario.code}" arms ${field}=on but the Test Framework does not declare the corresponding capability (REFUND_PARTIAL / EXCHANGE_PARTIAL in salesFlows). The run will proceed; the runtime will degrade where the wire cannot convey the requested scope. Declare the capability in the Test Framework wizard to silence this warning, or unset ${field} on the scenario.`;
 }

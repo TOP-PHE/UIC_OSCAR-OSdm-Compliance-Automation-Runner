@@ -65,6 +65,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     undeclared model, marked, rather than changing it on display. A framework
     without the key is migrated from its scenarios on first read
     (`needsFrameworkMigration`); absent = no warning, `[]` = none declared.
+  - **Partial refund scopes** (#713, 1.11.271): `partialRefundScopes`
+    (`FULFILLMENT` / `LEG` / `PASSENGER`) under REFUND_PARTIAL. Absent = every
+    scope. A rule's `scope` in `frameworkGating.js` is checked by
+    `partialRefundScopeDeclared()`, and the catalogue's `missingFor()` says
+    "partial refund by …". The page's `FW_PARTIAL_REFUND_SCOPES` is pinned to
+    the rule table by `ui-scripts.test.js`.
   - **The run gets the annotation too** since 1.11.236: `/data/:filename`
     annotates on the run-secret branch only (`withFrameworkWarnings` in
     `server.js`). Before, only the browser's `GET /datafile` had it, so the

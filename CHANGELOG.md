@@ -62,6 +62,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.271] / [collection-OTST_V2.0.152] — 2026-10-14
+
+Issue #713, release 2026.306.
+
+A real provider's guide says it takes a partial refund per fulfillment only
+and refuses one scoped by booking part or passenger. The Test Framework could
+declare `REFUND_PARTIAL`, but not how a provider scopes a partial refund.
+
+### Added
+
+- **Test Framework → Refund → ✂️ Partial refund scopes**, shown while Partial
+  is ticked: Per fulfillment / Per leg / Per passenger
+  (`partialRefundScopes`: `FULFILLMENT`, `LEG`, `PASSENGER`).
+- **Golden rule (#218)** for the scope:
+  - **Run:** a refund scenario that arms `partialRefundByFulfillment`,
+    `partialRefundByLeg` or `partialRefundByPax` for a scope the framework
+    does not list gets the soft `[WARNING]` of an undeclared feature
+    (`frameworkGating.js`, `partialRefundScopeDeclared()`). The collection's
+    warning now names the scope.
+  - **Test Config:** the editor shows the same warning on the card, and
+    counts the scenario in the banner.
+  - **Catalogue:** the scenario catalogue does not copy an entry whose scope
+    is not declared ("partial refund by passenger").
+
+### Default decisions (taken without asking)
+
+- No list (every framework saved before this release) means every scope, so
+  nothing changes until a scope is unticked.
+- The first untick starts from all three ticked.
+- An undeclared scope is a warning, not a refusal, at run time, as for an
+  undeclared flow.
+
+### Not verified
+
+- Not run against the provider.
+- The simulator's replay does not go through the server's framework
+  annotation, so the new warning text is checked by unit test only.
+
+Checked:
+- Unit tests for the rule, the catalogue, the page helpers and the
+  collection's text.
+- A test pins the page's scope table to the server's rule table.
+- The page in a browser: the scopes are shown and saved, and the panel
+  follows the Partial card.
+
+---
+
 ## [server-1.11.270] / [collection-OTST_V2.0.151] — 2026-10-14
 
 Issue #711, release 2026.305. Server only; the collection is unchanged.
