@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-search-filter-nulls",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Train and operator filters no longer send empty fields",
+    "summary": "Offer searches that name a train or an operator no longer send empty filter fields that some providers refuse as malformed.",
+    "content": "When a trip names a train or an operator, OSCAR filters the offer search on it. The filter used to carry empty fields (line numbers, or the filter not used), which OSDM does not allow and which one provider refused as a malformed request on every such search. Only the fields that are set are sent now."
+  },
+  {
     "id": "2026-10-14-trip-calendars",
     "date": "October 14, 2026",
     "tag": "New",

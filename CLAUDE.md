@@ -1108,6 +1108,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     did not, and keeps the asked ones as the refunded set (`widerThanAsked`),
     which the CONFIRMED branch then uses. A full refund asks for all, so it
     is never narrowed.
+  - **A request object writes only the members it has** (#719,
+    OTST_V2.0.154): the trip search filter sent `"lineNumbers": null` and a
+    null `carrierFilter` / `vehicleFilter`, none nullable in OSDM 3.8, and a
+    provider refused every such search as malformed. A new `model.js` class
+    for a request must not assign unset members.
   - **An unset variable in a header template goes out as text** (#692,
     OTST_V2.0.143): 47 request files carry `Requestor: {{requestor}}`, and a
     provider without a requestor got that text on every request. The
