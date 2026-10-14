@@ -95,6 +95,10 @@ server code.
 Not checked: the requests a step's script sends itself (`/trips-collection`,
 the Idempotency-Key replays, the after-sale probes).
 
+The reference scenarios' check counts (`scenario_catalogue.json`, and the
+table of `OSCAR - What is tested`) go up by the new checks, and
+`OSCAR - Checks by scenario` is regenerated.
+
 Checked:
 - Unit tests in `bruno-request-schema.test.js`: the two refused bodies fail
   naming their paths; the simulator's requests pass in 3.6, 3.7 and 3.8.
