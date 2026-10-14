@@ -2542,7 +2542,7 @@ function buildTripSearchCriteriaPanel(tIdx, trip) {
   const isSet = v => v != null && String(v).trim() !== '';
   const setCount =
     ['via1Place', 'via2Place', 'notVias', 'transferLimit', 'numberOfResults',
-     'numberOfResultsBefore', 'numberOfResultsAfter', 'ignoreRealtimeData']
+     'numberOfResultsBefore', 'numberOfResultsAfter', 'ignoreRealtimeData', 'trainFilter']
       .filter(k => isSet(sc[k])).length
     + (sc.timeBasis === 'ARRIVAL' ? 1 : 0);
   const p = f => `trip.searchCriteria.${f}`;
@@ -2577,6 +2577,9 @@ function buildTripSearchCriteriaPanel(tIdx, trip) {
           ${buildTripTextField(tIdx, p('numberOfResultsAfter'), 'Results after', sc.numberOfResultsAfter, 'e.g. 5')}
           ${selField('ignoreRealtimeData', 'Ignore realtime data', 'plan on timetable only',
             [{ v: '', l: '— not set —' }, { v: 'true', l: 'true' }, { v: 'false', l: 'false' }])}
+          ${selField('trainFilter', 'Train filter',
+            'off: search by place and time, the train is chosen in the answer; on: send the train number and operator as a filter and check the answer (#722)',
+            [{ v: '', l: 'Off (default)' }, { v: 'true', l: 'Send the train as a filter' }])}
         </div>
       </div>
     </div>

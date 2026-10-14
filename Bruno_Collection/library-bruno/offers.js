@@ -44,6 +44,7 @@ module.exports = {
   prepareOfferRequestByTripIds,
   checkOfferRequestByTripIds,
   routeAfterOfferStep,
+  searchTripOffers,
 };
 
 // The envelope `warnings` member (#613 F10). From OSDM 3.5 on it is a
@@ -478,6 +479,33 @@ function captureExpiredOfferDeadline(selectedOffer) {
   }
 }
 
+// ── The train of a search (#722) ─────────────────────────────────────────────
+
+// Whether this offer answer is the outbound of a one-way SEARCH trip (not
+// offers by trip id, not a return).
+function oneWaySearch() {
+  return bru.getEnvVar("TripType") === "SEARCH"
+    && String(bru.getEnvVar("offersByTripIds")) !== "true"
+    && !bru.getEnvVar("returnInboundDate");
+}
+
+/**
+ * The offers of `body` on the trip a one-way search was for; every offer for
+ * any other answer. With `log`, says how the trip was chosen and records the
+ * train filter's checks when the filter was sent.
+ */
+function searchTripOffers(body, { log = false } = {}) {
+  const all = Array.isArray(body?.offers) ? body.offers : [];
+  if (!oneWaySearch()) return all;
+  const { offersOnSearchTrip, checkTrainFilter } = require('./searchTrain.js');
+  const vehicleNumber = bru.getEnvVar("tripVehicleNumber");
+  if (log && String(bru.getEnvVar("__searchTrainFilter")) === "true") recordChecks(checkTrainFilter(body, vehicleNumber));
+  const criteria = parseEnvJson("offerTripSearchCriteria", {}) || {};
+  const { offers, lines } = offersOnSearchTrip(body, { vehicleNumber, departureTime: criteria.departureTime });
+  if (log) lines.forEach((line) => validationLogger(line));
+  return offers;
+}
+
 function selectAndSetOffer(jsonData) {
   validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
@@ -520,7 +548,10 @@ function selectAndSetOffer(jsonData) {
     });
   }
 
-  let filteredOffers = jsonData.offers;
+  // #722: a one-way search asks by place and time; keep the offers of the trip
+  // it was for (the Test Data train, else the first at the time asked).
+  const onSearchTrip = searchTripOffers(jsonData, { log: true });
+  let filteredOffers = onSearchTrip;
 
   // Different accommodation selection handling
   if (accommodationSelection === "SEAT") {
@@ -586,7 +617,7 @@ function selectAndSetOffer(jsonData) {
   }
 
   // Select the first matching offer or default to the first offer
-  const selectedOffer = filteredOffers[0] || jsonData.offers[0];
+  const selectedOffer = filteredOffers[0] || onSearchTrip[0] || jsonData.offers[0];
 
   validationLogger(`[DEBUG] Selected Offer ID: ${selectedOffer.offerId}`);
   // Per-part summary first, so a certifier reading the log can tell at a glance
@@ -2078,7 +2109,7 @@ function compareOfferWithoutCards(status, body) {
     validationLogger(`[WARNING] Reduction cards: the offer request without cards answered ${status}; prices not compared.`);
     return;
   }
-  comparePrices(chosenOffer(), body, parseEnvJson("offerPassengerSpecifications", [])).forEach((c) => {
+  comparePrices(chosenOffer(), { ...body, offers: searchTripOffers(body) }, parseEnvJson("offerPassengerSpecifications", [])).forEach((c) => {
     if (c.level === "warn") {
       if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`);
       return;
@@ -2147,7 +2178,7 @@ function compareGroupOfferIndividual(status, body) {
     validationLogger(`[WARNING] Group offer: the INDIVIDUAL offer request answered ${status}; prices not compared.`);
     return;
   }
-  recordChecks(compareGroupWithIndividual(chosenOffer(), body));
+  recordChecks(compareGroupWithIndividual(chosenOffer(), { ...body, offers: searchTripOffers(body) }));
 }
 
 /**

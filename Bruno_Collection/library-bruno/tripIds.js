@@ -179,4 +179,5 @@ function checkOffersForTrip(body, tripId) {
 
 module.exports = {
   UNKNOWN_TRIP_ID, tripsCollectionRequest, vehicleNumbersOf, chooseTrip, checkTripsCollection, offerRequestByTripIds, checkOffersForTrip,
+  coveredTripsOf,
 };
