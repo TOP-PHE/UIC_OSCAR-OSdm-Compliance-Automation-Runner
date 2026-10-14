@@ -5818,27 +5818,70 @@ function journeyFinderResultHtml(j, i) {
   </div>`;
 }
 
+// What a search of Find journeys says (#730): when it ran and with what, what
+// it found, and, when it found nothing, why. One line per entry.
+function journeyFinderSummary(plan, q) {
+  const legs = q.maxLegs === 2 ? '2 legs' : '2 or 3 legs';
+  const lines = [`Searched at ${q.at}: ${q.origin || '?'} → ${q.destination || '?'}, ${legs}, transfer ${q.minTransfer}–${q.maxWait} min.`];
+  if (plan.error) {
+    lines.push(plan.error);
+    return lines;
+  }
+  const st = plan.stats || {};
+  if (plan.journeys.length > 0) {
+    const shown = plan.total > plan.journeys.length ? ` (the ${plan.journeys.length} shortest of ${plan.total})` : '';
+    lines.push(`${plan.total} journey(s) found${shown}.`);
+  } else {
+    lines.push(...journeyFinderEmptyReasons(st, q));
+  }
+  if (st.unsavedTrainSets) lines.push(`${st.unsavedTrainSets} train set(s) not saved yet were not used: click Save Train first.`);
+  if (plan.truncated) lines.push('The search stopped early: some journeys may be missing.');
+  return lines;
+}
+
+// Why a search found no journey (#730), from planJourneys().stats.
+function journeyFinderEmptyReasons(st, q) {
+  if (!st.services) return ['No journey found: Test Data has no saved train set with timed services.'];
+  const among = `among the ${st.services} services of ${st.trainSets} saved train set(s)`;
+  const reasons = [];
+  if (!st.fromOrigin) reasons.push(`No journey found: no train service leaves ${q.origin} ${among}. A train set from a nearby station has another stop place code.`);
+  if (!st.toDestination) reasons.push(`No journey found: no train service reaches ${q.destination} ${among}.`);
+  if (st.fromOrigin && st.toDestination) {
+    reasons.push(`No journey found: ${st.fromOrigin} service(s) leave the origin and ${st.toDestination} reach the destination, but none connect within the transfer limits. Add the trains in between, or allow a longer wait.`);
+  }
+  return reasons;
+}
+
 function runJourneyFinder() {
   const val = (id) => document.getElementById(id)?.value ?? '';
   const status = document.getElementById('jf-status');
   const result = document.getElementById('jf-result');
   if (!status || !result) return;
-  const plan = OscarJourneyPlanner.planJourneys(wizData.resources, val('jf-origin'), val('jf-dest'), {
+  const query = {
+    origin: val('jf-origin').trim(),
+    destination: val('jf-dest').trim(),
     maxLegs: Number(val('jf-legs')),
-    minTransferMinutes: Number(val('jf-min')),
-    maxWaitMinutes: Number(val('jf-max')),
+    minTransfer: Number(val('jf-min')),
+    maxWait: Number(val('jf-max')),
+    at: new Date().toLocaleTimeString(),
+  };
+  const plan = OscarJourneyPlanner.planJourneys(wizData.resources, query.origin, query.destination, {
+    maxLegs: query.maxLegs,
+    minTransferMinutes: query.minTransfer,
+    maxWaitMinutes: query.maxWait,
   });
   journeyFinderResults = plan.journeys;
   result.innerHTML = plan.journeys.map(journeyFinderResultHtml).join('');
-  if (plan.error) {
-    status.textContent = plan.error;
-  } else if (plan.journeys.length === 0) {
-    status.textContent = 'No journey found among the defined trains. Add the trains that connect (by hand or with Discover timetable), or allow a longer wait.';
-  } else {
-    const shown = plan.total > plan.journeys.length ? ` (the ${plan.journeys.length} shortest of ${plan.total})` : '';
-    status.textContent = `${plan.total} journey(s) found${shown}.`;
-  }
-  if (plan.truncated) status.textContent += ' The search stopped early: some journeys may be missing.';
+  status.style.whiteSpace = 'pre-line';
+  status.textContent = journeyFinderSummary(plan, query).join('\n');
+  // A short highlight, so that a search giving the same answer as the last
+  // one still shows it ran.
+  status.style.transition = 'none';
+  status.style.background = '#fff8e1';
+  requestAnimationFrame(() => {
+    status.style.transition = 'background 1.2s';
+    status.style.background = 'transparent';
+  });
 }
 
 function journeyFinderCreate(idx) {

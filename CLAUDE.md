@@ -1309,7 +1309,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   nothing can follow it: the wait check does that, with no separate rule. The
   search has a budget (`SEARCH_BUDGET`) and reports `truncated`. A result is
   pushed as an unsaved journey; the Journeys section is drawn closed, so the
-  page opens it before showing the new journey.
+  page opens it before showing the new journey. Unsaved train sets (no id)
+  are left out. Each search answers with its time and values first, and an
+  empty result with its reason, from `planJourneys().stats` (#730): without
+  that, a search giving the same answer as the last one looked like no click.
 - **Discover timetable keeps the provider's connections** (#715, 1.11.272).
   Trips of 2 or 3 timed legs become JOURNEY resources over the services
   `groupAndMerge` stored (`harvestConnections()` / `journeysFromConnections()`,

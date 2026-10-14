@@ -84,11 +84,16 @@
   }
 
   // Every timed service of every TRAIN resource, as a leg candidate.
-  function servicesOf(resources) {
+  // `unsaved.count` counts the train sets left out because they have no id
+  // yet: a journey can only point at a saved train set.
+  function servicesOf(resources, unsaved) {
     const out = [];
     for (const r of resources || []) {
       if (!r || (r.resource_type && r.resource_type !== 'TRAIN')) continue;
-      if (r.id === null || r.id === undefined || r.id === '') continue;
+      if (r.id === null || r.id === undefined || r.id === '') {
+        unsaved.count += 1;
+        continue;
+      }
       const d = tripApply.normalizeTrainData(tripApply.resourceData(r));
       const from = stopKey(d.originURN);
       const to = stopKey(d.destinationURN);
@@ -159,9 +164,11 @@
 
   /**
    * Journeys from `origin` to `destination` among the TRAIN resources of
-   * `resources`. Returns { journeys, truncated, error? }: `error` names a
-   * missing origin or destination; `truncated` says the search stopped at its
-   * budget, so a journey may be missing.
+   * `resources`. Returns { journeys, total, truncated, stats, error? }:
+   * `error` names a missing origin or destination; `truncated` says the
+   * search stopped at its budget, so a journey may be missing; `stats` counts
+   * the train sets and services used, those left out because not saved, and
+   * the services leaving the origin and reaching the destination.
    */
   function planJourneys(resources, origin, destination, options) {
     const o = settings(options);
@@ -170,7 +177,16 @@
     if (!from || !to) return { journeys: [], truncated: false, error: 'Give an origin and a destination.' };
     if (from === to) return { journeys: [], truncated: false, error: 'The origin and the destination are the same stop place.' };
 
-    const services = servicesOf(resources);
+    const unsaved = { count: 0 };
+    const services = servicesOf(resources, unsaved);
+    // What the search had to work with (#730), so that "no journey" can say why.
+    const stats = {
+      trainSets: new Set(services.map((s) => s.trainResourceId)).size,
+      services: services.length,
+      unsavedTrainSets: unsaved.count,
+      fromOrigin: services.filter((s) => s.from === from).length,
+      toDestination: services.filter((s) => s.to === to).length,
+    };
     const byOrigin = new Map();
     for (const s of services) {
       if (!byOrigin.has(s.from)) byOrigin.set(s.from, []);
@@ -212,7 +228,7 @@
     found.sort((a, b) => a.durationMinutes - b.durationMinutes
       || a.legs.length - b.legs.length
       || a.startUtc - b.startUtc);
-    return { journeys: found.slice(0, o.limit), total: found.length, truncated };
+    return { journeys: found.slice(0, o.limit), total: found.length, truncated, stats };
   }
 
   const api = Object.freeze({ planJourneys, stopKey, parseTime, commonDays, DEFAULTS, SEARCH_BUDGET });

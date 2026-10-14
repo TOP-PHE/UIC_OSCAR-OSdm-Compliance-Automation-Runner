@@ -170,3 +170,23 @@ describe('planJourneys', () => {
     expect(Date.now() - started).toBeLessThan(5000);
   });
 });
+
+describe('stats (#730): what the search had to work with', () => {
+  test('counts saved train sets and services, the unsaved ones, and the services at each end', () => {
+    const resources = [
+      train(1, A, B, [svc('1', '08:00', '09:00'), svc('2', '10:00', '11:00')]),
+      train(2, B, C, [svc('3', '09:30', '10:30')]),
+      { ...train(3, A, C, [svc('4', '08:00', '12:00')]), id: null },
+      { id: 4, resource_type: 'JOURNEY', data: '{}' },
+    ];
+    const r = planJourneys(resources, A, C);
+    expect(r.stats).toEqual({ trainSets: 2, services: 3, unsavedTrainSets: 1, fromOrigin: 2, toDestination: 1 });
+    expect(r.total).toBe(1);
+  });
+
+  test('a code written differently is the same place; another code is not', () => {
+    const r = planJourneys([train(1, 'urn:uic:stn:008101003', B, [svc('1', '08:00', '09:00')])], '8101003', B);
+    expect(r.stats.fromOrigin).toBe(1);
+    expect(planJourneys([train(1, 'urn:uic:stn:8101003', B, [svc('1', '08:00', '09:00')])], 'urn:uic:stn:8101081', B).stats.fromOrigin).toBe(0);
+  });
+});
