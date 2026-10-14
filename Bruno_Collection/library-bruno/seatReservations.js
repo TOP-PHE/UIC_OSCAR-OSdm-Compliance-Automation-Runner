@@ -81,7 +81,10 @@ function reservationsToBook(offer, { bookOptional }) {
     // In each optional group, a part that names its leg first (#737): one
     // that names none cannot go in a placeSelection.
     const hasLeg = (id) => listOf(listOf(offer?.reservationOfferParts).find((p) => p?.id === id)?.tripCoverage?.coveredLegIds).length > 0;
-    const firstOf = (refs) => (refs.find(hasLeg) ? [refs.find(hasLeg)] : refs.slice(0, 1));
+    const firstOf = (refs) => {
+      const withLeg = refs.find(hasLeg);
+      return withLeg ? [withLeg] : refs.slice(0, 1);
+    };
     const candidates = linked
       ? relations.filter(({ relation }) => !isMandatory(relation)).flatMap(({ refs }) => firstOf(refs))
       : [...known];
