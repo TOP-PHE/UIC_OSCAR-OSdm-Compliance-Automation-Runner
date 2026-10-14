@@ -30,21 +30,22 @@ const crypto = require('node:crypto');
 // What changes from one run to the next in a check's text: identifiers,
 // instants, quoted values, numbers. The order matters: an identifier holds
 // digits that the last rule would otherwise cut.
+const always = (text) => () => text;
 const VALUE = [
-  [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>'],
-  [/\b\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?/g, '<instant>'],
-  [/\b\d{4}-\d{2}-\d{2}\b/g, '<instant>'],
+  { pattern: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, to: always('<id>') },
+  { pattern: /\b\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?/g, to: always('<instant>') },
+  { pattern: /\b\d{4}-\d{2}-\d{2}\b/g, to: always('<instant>') },
   // A long token mixing letters and digits (a provider's id, a scenario code).
-  [/\b[A-Za-z0-9_-]{12,}\b/g, (t) => (/\d/.test(t) && /[A-Za-z]/.test(t) ? '<id>' : t)],
-  [/"[^"\n]{0,80}"/g, '"…"'],
-  [/'[^'\n]{0,80}'/g, "'…'"],
-  [/\b\d+(?:[.,]\d+)?\b/g, 'N'],
+  { pattern: /\b[A-Za-z0-9_-]{12,}\b/g, to: (t) => (/\d/.test(t) && /[A-Za-z]/.test(t) ? '<id>' : t) },
+  { pattern: /"[^"\n]{0,80}"/g, to: always('"…"') },
+  { pattern: /'[^'\n]{0,80}'/g, to: always("'…'") },
+  { pattern: /\b\d+(?:[.,]\d+)?\b/g, to: always('N') },
 ];
 
 /** A check's text with the values one run met replaced. */
 function checkText(name) {
   let out = String(name == null ? '' : name).trim();
-  for (const [pattern, placeholder] of VALUE) out = out.replace(pattern, (m) => (typeof placeholder === 'function' ? placeholder(m) : placeholder));
+  for (const { pattern, to } of VALUE) out = out.replace(pattern, to);
   return out;
 }
 
