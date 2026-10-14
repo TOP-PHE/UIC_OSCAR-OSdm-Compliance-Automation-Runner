@@ -1439,7 +1439,9 @@ function osdmTripSearchCriteria(legDefinitions, returnOpts, searchCriteria) {
   const carrierFilter = _withFilter && legDef.carrier ? new CarrierFilter([legDef.carrier], false) : null;
   const vehicleFilter = _withFilter && legDef.vehicleNumber ? new VehicleFilter([legDef.vehicleNumber], null, false) : null;
   if (!_withFilter && (legDef.carrier || legDef.vehicleNumber)) {
-    validationLogger(`[INFO] 🔎 Search by place and time only: the train${legDef.vehicleNumber ? ` ${legDef.vehicleNumber}` : ''}${legDef.carrier ? ` (operator ${legDef.carrier})` : ''} is chosen in the answer, not sent as a filter. Trip Search Criteria → Train filter sends it.`);
+    const _train = legDef.vehicleNumber ? ' ' + legDef.vehicleNumber : '';
+    const _operator = legDef.carrier ? ' (operator ' + legDef.carrier + ')' : '';
+    validationLogger(`[INFO] 🔎 Search by place and time only: the train${_train}${_operator} is chosen in the answer, not sent as a filter. Trip Search Criteria → Train filter sends it.`);
   }
 
   const tripDataFilter = (carrierFilter || vehicleFilter) ? new TripDataFilter(carrierFilter, vehicleFilter) : null;
