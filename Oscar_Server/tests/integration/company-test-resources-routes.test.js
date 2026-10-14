@@ -324,6 +324,85 @@ describe('test-resources — discover-timetable keeps connections (#715)', () =>
   });
 });
 
+// ── #717: fill missing calendars ──────────────────────────────────────────────
+describe('test-resources — fill-calendars (#717)', () => {
+  const { colEncrypt, colDecrypt } = require('../../src/db/db');
+  const O = 'urn:uic:stn:7200001';
+  const D = 'urn:uic:stn:7200002';
+  const seed = (id, label, data) => run(`INSERT INTO test_resources (id, company_id, resource_type, label, data) VALUES (?, ?, 'TRAIN', ?, ?)`,
+    [id, companyId, label, colEncrypt(JSON.stringify({ originURN: O, destinationURN: D, ...data }))]);
+  const read = (id) => JSON.parse(colDecrypt(get('SELECT data FROM test_resources WHERE id = ?', [id]).data));
+  const call = (role = 'test_manager', user = tmId) => request(app).post('/v1/company/test-resources/fill-calendars')
+    .set('Authorization', `Bearer ${makeToken(role, user)}`).send({});
+  // The provider runs R 1 at the weekend and R 2 on Mondays only.
+  const weekday = (date) => ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date(`${date}T12:00:00Z`).getUTCDay()];
+  const provider = async (_url, opts) => {
+    const date = JSON.parse(opts.body).tripSearchCriteria.departureTime.slice(0, 10);
+    const day = weekday(date);
+    const leg = (veh, time) => ({ timedLeg: {
+      start: { stopPlaceRef: O, serviceDeparture: { timetabledTime: `${date}T${time}` } },
+      end: { stopPlaceRef: D, serviceArrival: { timetabledTime: `${date}T12:00:00` } },
+      service: { vehicleNumbers: [veh] } } });
+    const trips = [];
+    if (day === 'SAT' || day === 'SUN') trips.push({ legs: [leg('R 1', '08:00:00')] });
+    if (day === 'MON') trips.push({ legs: [leg('R 2', '09:00:00')] });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ trips }) };
+  };
+
+  afterEach(() => run(`DELETE FROM test_resources WHERE company_id = ?`, [companyId]));
+
+  test('403 for a tester', async () => {
+    expect((await call('company_user', testerId)).status).toBe(403);
+  });
+
+  test('nothing to fill: the provider is not asked', async () => {
+    seed(uuidv4(), 'Dated', { daysOfWeek: ['MON'], services: [{ vehicleNumber: 'R 2' }] });
+    const origFetch = global.fetch;
+    let calls = 0;
+    global.fetch = async () => { calls++; return { ok: true, status: 200, text: async () => '{}' }; };
+    try {
+      const res = await call();
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: [], unresolved: [], routes: [] });
+      expect(calls).toBe(0);
+    } finally { global.fetch = origFetch; }
+  });
+
+  test('a set gets the days its services run; what cannot be decided is reported', async () => {
+    const weekend = uuidv4();
+    const mixed = uuidv4();
+    const dated = uuidv4();
+    seed(weekend, 'Weekend', { services: [{ vehicleNumber: 'R 1', departureTime: '08:00:00' }] });
+    seed(mixed, 'Mixed', { daysOfWeek: [], services: [{ vehicleNumber: 'R 1' }, { vehicleNumber: 'R 2' }] });
+    seed(dated, 'Dated', { daysOfWeek: ['TUE'], services: [{ vehicleNumber: 'R 9' }] });
+    const origFetch = global.fetch;
+    let calls = 0;
+    global.fetch = async (url, opts) => { calls++; return provider(url, opts); };
+    try {
+      const res = await call();
+      expect(res.status).toBe(200);
+      expect(calls).toBe(7);   // one route, seven days
+      expect(res.body.updated).toEqual([{ id: weekend, label: 'Weekend', daysOfWeek: ['SAT', 'SUN'] }]);
+      expect(res.body.unresolved).toEqual([{ id: mixed, label: 'Mixed', reason: 'its services run on different days: Discover timetable splits them into sets' }]);
+      expect(read(weekend).daysOfWeek).toEqual(['SAT', 'SUN']);
+      expect(read(mixed).daysOfWeek).toEqual([]);
+      expect(read(dated).daysOfWeek).toEqual(['TUE']);
+    } finally { global.fetch = origFetch; }
+  });
+
+  test('a provider that answers nothing leaves the set as it was, and says so', async () => {
+    const id = uuidv4();
+    seed(id, 'Weekend', { services: [{ vehicleNumber: 'R 1' }] });
+    const origFetch = global.fetch;
+    global.fetch = async () => ({ ok: false, status: 500, text: async () => 'err' });
+    try {
+      const res = await call();
+      expect(res.body.unresolved).toEqual([{ id, label: 'Weekend', reason: 'the provider answered no search of its route' }]);
+      expect(read(id).daysOfWeek).toBeUndefined();
+    } finally { global.fetch = origFetch; }
+  });
+});
+
 // ── reprobe-offers ─────────────────────────────────────────────────────────────
 describe('test-resources — reprobe-offers', () => {
   test('403 for a non-test_manager', async () => {

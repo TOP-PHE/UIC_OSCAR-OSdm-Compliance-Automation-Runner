@@ -1280,6 +1280,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   asks the trip search first, `/offers` on a failed or empty day. The
   simulator's search gives direct trips only, so only the tests show a
   connection.
+- **A run goes on a day its trip's trains run** (#717, 1.11.273 /
+  OTST_V2.0.153). Trips keep no calendar, so the server matches each trip
+  requirement against the TRAIN resources when it serves the run's copy
+  (`withTripCalendars()` in `server.js`, `utils/tripCalendar.js`): stop
+  places and train number, else departure time. It writes `__operatingDays`
+  and `__calendarNotes` there, never into the stored file. Test Data text in
+  a note has `{{` broken up, because the run reads the file as a template.
+  The collection's `tripDateFor()` (`library-bruno/tripCalendar.js`) moves an
+  unnamed date forward to the first such day; a day the scenario names
+  (`departureDay`, `departureDaysFromToday`) is kept and warned about.
+  `POST /test-resources/fill-calendars` fills sets without days from 7 days
+  of `/offers`, only when every service was seen (`calendarFromHarvest()`);
+  Discovery's merge fills a calendarless twin instead of adding a set
+  (`_uncalendaredTwin()`). `_vendorSession()` is the one place a route gets
+  the provider's endpoint, token and headers.
 - **`OSDM_Simulator/` is a stub OSDM provider for testing OSCAR, not a third
   half of the product** (#575, 2026-10-08, written for the external security
   test). It issues its own tokens and answers a basic sale; everything else is

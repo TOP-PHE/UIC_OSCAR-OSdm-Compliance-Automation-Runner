@@ -53,7 +53,7 @@ require('./db/db');
 // On first boot, generate a random secret and persist it. On subsequent boots,
 // reuse the stored secret. Admins can rotate via POST /v1/admin/rotate-jwt-secret
 // (which invalidates all current sessions intentionally).
-const { get: dbGet, run: dbRun, colDecrypt } = require('./db/db');
+const { get: dbGet, all: dbAll, run: dbRun, colDecrypt } = require('./db/db');
 let jwtRow = dbGet('SELECT value FROM server_config WHERE key = ?', ['JWT_SECRET']);
 if (!jwtRow) {
   const newSecret = crypto.randomBytes(32).toString('hex');
@@ -327,6 +327,28 @@ function withFrameworkWarnings(plaintext, companyId) {
   }
 }
 
+// #717: each trip requirement learns the days its Test Data trains run, so
+// the run can choose a date they all run on, and the notes it should log.
+// Like the framework warnings, the run's copy only; never the stored file.
+function withTripCalendars(plaintext, companyId) {
+  try {
+    const rows = dbAll(`SELECT id, label, data FROM test_resources WHERE company_id = ? AND resource_type = 'TRAIN'`, [companyId]);
+    if (rows.length === 0) return plaintext;
+    const trains = rows.map((r) => {
+      let data = {};
+      try { data = JSON.parse(colDecrypt(r.data)); } catch { /* a train that will not decrypt is left out */ }
+      return { id: r.id, label: r.label, data };
+    });
+    const { annotateTripCalendars } = require('./utils/tripCalendar');
+    const datafile = JSON.parse(plaintext.toString('utf8'));
+    if (annotateTripCalendars(datafile, trains) === 0) return plaintext;
+    return Buffer.from(JSON.stringify(datafile), 'utf8');
+  } catch (err) {
+    log.warn({ errMsg: err.message, companyId }, 'run datafile: trip calendars not added');
+    return plaintext;
+  }
+}
+
 app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   const filename = String(req.params.filename || '');
   const m = SAFE_DATAFILE_RE.exec(filename);
@@ -371,7 +393,7 @@ app.get('/data/:filename', fileDownloadLimiter, (req, res) => {
   } catch (err) {
     return res.status(500).send('Decryption failed: ' + err.message);
   }
-  if (runCompanyId !== null) plaintext = withFrameworkWarnings(plaintext, company.id);
+  if (runCompanyId !== null) plaintext = withTripCalendars(withFrameworkWarnings(plaintext, company.id), company.id);
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', String(plaintext.length));
   return res.end(plaintext);

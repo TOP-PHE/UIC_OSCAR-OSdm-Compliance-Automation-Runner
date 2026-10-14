@@ -558,6 +558,15 @@ describe('js/scenarios.js — helpers moved out of their host function (#526)', 
     expect(count()).toBe(expected);
   });
 
+  test('#717 fillCalendarsSummary says what was filled and what was not', () => {
+    const summary = loadFunction(page, 'fillCalendarsSummary');
+    expect(summary({ updated: [], unresolved: [] })).toBe('Every train set already has its operating days.');
+    expect(summary({ updated: [{ label: 'R', daysOfWeek: ['SAT', 'SUN'] }], unresolved: [{ label: 'M', reason: 'odd' }] }))
+      .toBe('1 train set(s) given their days (R: SAT SUN). 1 left as they were (M: odd).');
+    expect(summary({ updated: [], unresolved: [{ label: 'M', reason: 'odd' }] })).toBe('0 train set(s) given their days. 1 left as they were (M: odd).');
+    expect(summary(null)).toBe('Every train set already has its operating days.');
+  });
+
   test('armedCountBadge is amber when something is armed, grey when not', () => {
     const badge = loadFunction(page, 'armedCountBadge');
     const shape = 'display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;';

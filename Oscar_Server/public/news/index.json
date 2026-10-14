@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-trip-calendars",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "Runs choose a day the trains run",
+    "summary": "A run now books on a day the scenario's Test Data trains run, warns when times do not fit, and Test Data can fill missing train calendars from the provider.",
+    "content": "When a scenario's trip comes from Test Data trains, the run looks up the days they run and moves the departure to the first such day after the usual lead time. A day the scenario names itself is kept, with a warning if the trains do not run then. The run log also warns when the departure time is not the train's, or when the legs of a journey do not connect. Train sets without operating days can be completed with Test Data → Fill missing calendars, which asks the provider for the next 7 days."
+  },
+  {
     "id": "2026-10-14-discovery-journeys",
     "date": "October 14, 2026",
     "tag": "New",
