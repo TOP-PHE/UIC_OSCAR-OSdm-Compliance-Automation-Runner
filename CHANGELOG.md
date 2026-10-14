@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.280] / [collection-OTST_V2.0.157] — 2026-10-14
+
+Issue #730, release 2026.315. Server only; the collection is unchanged.
+
+### Fixed
+- **Find journeys shows that a search ran.** Each search now starts its
+  answer with the time and the values searched ("Searched at 14:05:12:
+  A → B, 2 or 3 legs, transfer 5–180 min"), and the answer is briefly
+  highlighted, so a search that gives the same answer as the last one is
+  still seen to have run.
+- **"No journey found" says why.** No train service leaves the origin (a
+  train set from a nearby station has another stop place code), none reaches
+  the destination, or services exist at both ends but none connect within
+  the transfer limits. Train sets not saved yet are counted: the planner
+  cannot use them, since a journey points at a saved train set.
+
+Checked:
+- Unit tests of `planJourneys().stats` (`journey-planner.test.js`) and of
+  the page's `journeyFinderSummary()` (`ui-scripts.test.js`).
+
+---
+
 ## [server-1.11.278] / [collection-OTST_V2.0.156] — 2026-10-14
 
 Issue #727, release 2026.313. Server only; the collection is unchanged.

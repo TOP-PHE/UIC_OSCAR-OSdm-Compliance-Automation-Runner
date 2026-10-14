@@ -1131,3 +1131,34 @@ describe('#709 the passenger update in the Test Framework', () => {
     expect(src).not.toContain("case 'fw-passenger-update'");
   });
 });
+
+describe('#730 Find journeys says when it searched, with what, and why it found nothing', () => {
+  const summary = loadFunction('js/scenarios.js', 'journeyFinderSummary');
+  const q = { origin: 'urn:uic:stn:8101081', destination: 'urn:uic:stn:8001071', maxLegs: 3, minTransfer: 5, maxWait: 180, at: '14:05:12' };
+  const plan = (stats, extra = {}) => ({ journeys: [], total: 0, truncated: false, stats, ...extra });
+  const first = 'Searched at 14:05:12: urn:uic:stn:8101081 → urn:uic:stn:8001071, 2 or 3 legs, transfer 5–180 min.';
+
+  test('every answer starts with the time and the search', () => {
+    expect(summary(plan({ services: 1, trainSets: 1, fromOrigin: 1, toDestination: 1 }), q)[0]).toBe(first);
+    expect(summary(plan({}), { ...q, maxLegs: 2 })[0]).toContain(', 2 legs,');
+    expect(summary({ journeys: [], error: 'Give an origin and a destination.' }, q)).toEqual([first, 'Give an origin and a destination.']);
+  });
+
+  test('journeys found', () => {
+    const found = { journeys: [{}, {}], total: 7, truncated: true, stats: {} };
+    expect(summary(found, q)).toEqual([first, '7 journey(s) found (the 2 shortest of 7).', 'The search stopped early: some journeys may be missing.']);
+  });
+
+  test('nothing found: the reason', () => {
+    expect(summary(plan({ services: 0, unsavedTrainSets: 2 }), q).slice(1)).toEqual([
+      'No journey found: Test Data has no saved train set with timed services.',
+      '2 train set(s) not saved yet were not used: click Save Train first.',
+    ]);
+    const lines = summary(plan({ services: 12, trainSets: 3, fromOrigin: 0, toDestination: 0 }), q).slice(1);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toBe('No journey found: no train service leaves urn:uic:stn:8101081 among the 12 services of 3 saved train set(s). A train set from a nearby station has another stop place code.');
+    expect(lines[1]).toContain('no train service reaches urn:uic:stn:8001071');
+    expect(summary(plan({ services: 12, trainSets: 3, fromOrigin: 4, toDestination: 2 }), q)[1])
+      .toBe('No journey found: 4 service(s) leave the origin and 2 reach the destination, but none connect within the transfer limits. Add the trains in between, or allow a longer wait.');
+  });
+});

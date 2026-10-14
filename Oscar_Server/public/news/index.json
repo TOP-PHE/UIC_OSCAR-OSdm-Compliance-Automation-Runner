@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-find-journeys-feedback",
+    "date": "October 14, 2026",
+    "tag": "Improvement",
+    "title": "Find journeys says what it searched and why it found nothing",
+    "summary": "Each search shows its time and values, and an empty result now gives its reason.",
+    "content": "Find journeys now starts every answer with the time of the search and what was searched (origin, destination, legs, transfer limits), so you can see that a click was taken into account. When no journey is found, it says why: no train leaves the origin or reaches the destination among your saved train sets (a nearby station has another stop place code), or the trains at both ends do not connect within the transfer limits. Train sets not saved yet are not used, and the answer says how many there are."
+  },
+  {
     "id": "2026-10-14-copy-message-visible",
     "date": "October 14, 2026",
     "tag": "Fix",
