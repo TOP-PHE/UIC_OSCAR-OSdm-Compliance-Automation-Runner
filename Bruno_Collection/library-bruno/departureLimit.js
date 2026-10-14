@@ -34,6 +34,33 @@ function describeDays(days) {
   return n < 0 ? `${-n} day(s) ago` : `${n} day(s) from today`;
 }
 
+// #721: the words of a refusal (code, title, detail of the Problem or of each
+// of its problems), lower case; '' when it gives none.
+function refusalText(body) {
+  if (!body || typeof body !== 'object') return '';
+  const items = Array.isArray(body.problems) ? body.problems : [body];
+  return items.filter((p) => p && typeof p === 'object')
+    .flatMap((p) => [p.code, p.title, p.detail])
+    .filter((t) => typeof t === 'string' && t.trim())
+    .join(' | ');
+}
+
+// Words that say a refusal is about the departure date. A date of birth is
+// about a passenger, so it is taken out first; word starts keep "validation"
+// and "invalidated" out.
+const DATE_WORDS = /\bdate|\btime\b|\bdepart|\bpast\b|horizon|\bperiod|\bfuture|\badvance|\bdays?\b|calendar|too (early|late)|not (yet )?bookable/i;
+const BIRTH_WORDS = /date[ _-]?of[ _-]?birth|birth[ _-]?date/gi;
+
+/**
+ * #721: whether a refusal is about the date: 'date' when its words say so,
+ * 'unknown' when it gives no reason, 'other' when it names something else.
+ */
+function refusalReason(body) {
+  const text = refusalText(body);
+  if (!text) return 'unknown';
+  return DATE_WORDS.test(text.replace(BIRTH_WORDS, ' ')) ? 'date' : 'other';
+}
+
 // ── Bruno glue ─────────────────────────────────────────────────────────────
 
 const armed = () => String(bru.getEnvVar('departureExpectRejection')) === 'true';
@@ -48,6 +75,7 @@ function checkDepartureRefused(status, body) {
   validationLogger(`[INFO] 🧪 Departure date probe — departure ${when}; the provider must not sell it.`);
   const outcome = departureOutcome(status, body);
   if (outcome === 'refused') {
+    gradeRefusalReason(body, when);
     const { validateProblemResponse } = require('./requestedInformation.js');
     validateProblemResponse({
       status,
@@ -74,4 +102,19 @@ function checkDepartureRefused(status, body) {
   return true;
 }
 
-module.exports = { departureOutcome, describeDays, checkDepartureRefused };
+// #721: a refusal for another reason shows nothing about dates.
+function gradeRefusalReason(body, when) {
+  const reason = refusalReason(body);
+  if (reason === 'unknown') {
+    validationLogger(`[INFO] 🧪 Departure date probe: the refusal gives no reason, so it cannot be checked that it is about the date.`);
+    return;
+  }
+  const text = refusalText(body).slice(0, 300);
+  test(`🧪 Departure date probe [departure ${when}, POST /offers]: the refusal is for the departure date`, () => {
+    if (reason === 'other') {
+      throw new Error(`the provider refused for another reason: "${text}". The probe shows nothing about dates until the rest of the request is accepted: check its filters, passengers and format (a request without the date problem must give offers).`);
+    }
+  });
+}
+
+module.exports = { departureOutcome, describeDays, refusalText, refusalReason, checkDepartureRefused };

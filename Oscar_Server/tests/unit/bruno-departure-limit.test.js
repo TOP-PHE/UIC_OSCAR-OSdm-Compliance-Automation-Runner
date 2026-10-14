@@ -80,7 +80,38 @@ describe('the departure-date probe', () => {
     expect(r.result).toBe(true);
     expect(r.tests.length).toBeGreaterThan(0);
     expect(r.tests.filter((t) => t[1] === 'fail')).toEqual([]);
-    expect(r.tests[0][0]).toMatch(/1 day\(s\) ago, POST \/offers.*client error/);
+    expect(r.tests.map((t) => t[0]).join('\n')).toMatch(/1 day\(s\) ago, POST \/offers.*client error/);
+    expect(r.tests.map((t) => t[0])).toContain('🧪 Departure date probe [departure 1 day(s) ago, POST /offers]: the refusal is for the departure date');
+  });
+
+  // #721: a refusal for another reason shows nothing about dates.
+  test('the reason of a refusal: the date, none, or something else', () => {
+    expect(dl.refusalReason({ code: 'DEPARTURE_IN_PAST' })).toBe('date');
+    expect(dl.refusalReason({ problems: [{ detail: 'The departure time is outside the sales horizon' }] })).toBe('date');
+    expect(dl.refusalReason({ title: 'Too early', detail: 'Trip date not yet bookable' })).toBe('date');
+    expect(dl.refusalReason({ problems: [{ code: 'INVALID_INPUT', detail: 'No mappings found for the given carriers: [urn:uic:rics:1181]' }] })).toBe('other');
+    expect(dl.refusalReason({ code: 'MALFORMED_REQUEST', title: 'Invalid request format.' })).toBe('other');
+    expect(dl.refusalReason({ detail: 'Validation failed for argument [0]' })).toBe('other');
+    expect(dl.refusalReason({ detail: 'dateOfBirth must be in the past' })).toBe('date');
+    expect(dl.refusalReason({ detail: 'dateOfBirth is invalid' })).toBe('other');
+    expect(dl.refusalReason({})).toBe('unknown');
+    expect(dl.refusalReason(null)).toBe('unknown');
+    expect(dl.refusalReason('<html>Request Rejected</html>')).toBe('unknown');
+  });
+
+  test('refused for another reason: a failed check quoting it', () => {
+    const r = withBru({ ...armed, departureDaysFromToday: '-1' }, () => dl.checkDepartureRefused(400,
+      { problems: [{ code: 'INVALID_INPUT', title: 'Invalid input', detail: 'No mappings found for the given carriers: [urn:uic:rics:1181]' }] }));
+    expect(r.result).toBe(true);
+    const reasonCheck = r.tests.find((t) => t[0].endsWith('the refusal is for the departure date'));
+    expect(reasonCheck[1]).toBe('fail');
+    expect(reasonCheck[2]).toContain('the provider refused for another reason: "INVALID_INPUT | Invalid input | No mappings found');
+  });
+
+  test('refused with no reason: an INFO line, and no reason check', () => {
+    const r = withBru({ ...armed }, () => dl.checkDepartureRefused(400, {}));
+    expect(r.tests.some((t) => t[0].endsWith('the refusal is for the departure date'))).toBe(false);
+    expect(r.logs.join('\n')).toMatch(/\[INFO\].*gives no reason/);
   });
 
   test('a 5xx is not a refusal the probe accepts', () => {

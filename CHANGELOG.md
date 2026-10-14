@@ -62,6 +62,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.275] / [collection-OTST_V2.0.155] — 2026-10-14
+
+Issue #721, release 2026.310.
+
+### Fixed
+
+- **The departure date probe no longer passes on a refusal for another
+  reason** (`departureLimit.js`). `departureExpectRejection` (#704) counted
+  any 4xx at step 01 as "the past or too-far departure was refused". On a
+  real provider the refusal was for an unknown carrier filter, so the probe
+  passed while proving nothing. It now reads the refusal's code, title and
+  detail (`refusalReason()`):
+  - words about the date (departure, date, time, past, horizon, period,
+    days…) pass as before;
+  - no reason at all passes with an INFO line;
+  - anything else fails a new check, "the refusal is for the departure
+    date", which quotes the reason and points to the rest of the request.
+  A date of birth does not count as a date.
+
+### Changed
+
+- `NHF_SALE_DEPARTURE_IN_PAST` has one more check on the simulator (71);
+  the catalogue and *What is tested* say so. *Checks by scenario* is
+  regenerated.
+
+### Default decisions (taken without asking)
+
+- Matching is by words in English, as providers write their Problems. A
+  refusal in another language with no date word counts as "another reason".
+- Only the departure date probe reads the reason. The other refusal probes
+  (passenger limit, empty passenger list) still accept any 4xx.
+
+### Not verified
+
+- Not run against a real provider.
+
+Checked:
+- Unit tests of `refusalReason()` on the two real providers' refusals and
+  the simulator's, and of the new check (fails on a carrier refusal, INFO
+  with no reason).
+- The simulator's two probes in a replay: 71 checks (+1, passed) and 69
+  (unchanged, a "no offer" answer).
+
+---
+
 ## [server-1.11.274] / [collection-OTST_V2.0.154] — 2026-10-14
 
 Issue #719, release 2026.309.

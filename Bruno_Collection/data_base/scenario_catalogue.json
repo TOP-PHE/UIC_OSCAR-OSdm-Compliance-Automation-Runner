@@ -228,7 +228,7 @@
       "code": "NHF_SALE_DEPARTURE_IN_PAST",
       "source": "SIM_NHF_DEPARTURE_IN_PAST_38",
       "purpose": "A departure yesterday: the offer request must be refused, or give no offer.",
-      "checks": 70,
+      "checks": 71,
       "needs": {
         "trip": "SEARCH",
         "passengers": 1
