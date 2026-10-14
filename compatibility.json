@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.312",
+  "current_release": "2026.313",
   "releases": [
+    {
+      "release": "2026.313",
+      "date": "2026-10-14",
+      "server": "1.11.278",
+      "collection": "OTST_V2.0.156",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Copy scenarios brings its message into view and is not blocked by unsaved edits when no data file is loaded (#727)."
+      ]
+    },
     {
       "release": "2026.312",
       "date": "2026-10-14",

@@ -1,4 +1,4 @@
-/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty, OscarCopyReport */  // defined in esc.js, nav.js, scenarios.js and copy-report.js
+/* global esc, oscarSelectedProvider, oscarToastAfterNav, dirty, state, OscarCopyReport */  // defined in esc.js, nav.js, scenarios.js and copy-report.js
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +27,10 @@
   let preview = null;      // the last preview answer
   let sourceId = null;
 
-  const hasUnsavedEdits = () => typeof dirty !== 'undefined' && dirty;   // scenarios.js
+  // scenarios.js. #727: with no data file loaded there is nothing a copy could
+  // overwrite, and Save & Apply has nothing to save: do not block on it.
+  const hasUnsavedEdits = () => typeof dirty !== 'undefined' && dirty
+    && typeof state !== 'undefined' && state !== null && typeof state === 'object';
   const stnShort = urn => String(urn || '').split(':').pop() || '?';
   const trainValue = (id, index) => ['train', id, index].join('::');
   const warningLine = w => `<br><span style="color:#e65100;font-size:12px">⚠ ${esc(w)}</span>`;
@@ -37,6 +40,9 @@
     if (!el) return;
     el.textContent = text;
     el.style.cssText = NOTE_STYLE + (kind === 'ok' ? OK_COLORS : ERR_COLORS) + (text ? '' : 'display:none');
+    // #727: the message sits at the top of the panel, screens above the Copy
+    // button; bring it into view or a refusal looks like nothing happened.
+    if (text && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   async function readError(res, fallback) {

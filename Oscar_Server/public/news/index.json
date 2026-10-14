@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-copy-message-visible",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Copy scenarios shows why it did not copy",
+    "summary": "A refused copy now shows its reason next to where you clicked, and an empty Test Config no longer blocks the copy.",
+    "content": "When Copy scenarios refused to copy, its reason appeared at the top of the copy panel, out of sight, so the Copy button seemed to do nothing. The message is now brought into view. A Test Config with no data file yet no longer asks you to save your changes before copying: there is nothing to save, and the copy can go ahead."
+  },
+  {
     "id": "2026-10-14-save-nothing-loaded",
     "date": "October 14, 2026",
     "tag": "Fix",

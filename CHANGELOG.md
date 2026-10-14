@@ -62,6 +62,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.278] / [collection-OTST_V2.0.156] — 2026-10-14
+
+Issue #727, release 2026.313. Server only; the collection is unchanged.
+
+### Fixed
+- **Copy scenarios no longer looks dead.** Its refusal ("Save or discard your
+  changes in this page first", a trip without a train, the rate limit) was
+  shown at the top of the copy panel, screens above the Copy button, so a
+  click seemed to do nothing. Any copy message is now scrolled into view.
+- **Copy is not blocked by "unsaved edits" when no data file is loaded.**
+  With no file there is nothing a copy could overwrite, and Save & Apply has
+  nothing to save (#725), so the page was stuck until reloaded.
+
+Checked:
+- In Chromium on a throw-away server: page marked as edited with no data
+  file, Copy clicked. Before, the refusal above; after, the copy is made
+  (`POST /v1/company/scenario-copy` → 200).
+- Unit tests of the two helpers (`scenario-copy-page.test.js`); two of them
+  fail on the previous page script.
+
+---
+
 ## [server-1.11.277] / [collection-OTST_V2.0.156] — 2026-10-14
 
 Issue #725, release 2026.312. Server only; the collection is unchanged.

@@ -486,6 +486,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     413, each with its reason. Before, Test Config's Save & Apply with no data
     file loaded sent `null` and saw only "500: Internal Server Error";
     `saveDatafile()` now sends nothing when `state` is not an object.
+  - **Copy scenarios shows its message where it is seen** (#727): `showMsg()`
+    in `scenario-copy.js` scrolls the panel's note into view, and
+    `hasUnsavedEdits()` only blocks a copy when a data file is loaded. Before,
+    an edited page with no file could neither save nor copy, and the refusal
+    sat screens above the Copy button. `scenario-copy-page.test.js` lifts both
+    helpers out of the IIFE by text.
 - **In the browser, only a 404 means "nothing there yet"** (#534, v1.11.201).
   Test Config read the datafile, the Test Framework and the test data with
   `if (res.ok) use it`, and treated every other outcome as "none". A network
