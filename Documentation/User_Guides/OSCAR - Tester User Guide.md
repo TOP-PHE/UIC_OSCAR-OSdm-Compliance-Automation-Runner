@@ -508,8 +508,10 @@ allocates the seats.
 
 - OSCAR reads each admission's `reservations` relations to know what is
   required. A relation whose `minGroupItemsToBeBooked` is above 0 is a
-  **mandatory** reservation, and OSCAR always books it with the booking. A
-  relation at 0 is **optional**.
+  **mandatory** reservation, and OSCAR always books it with the booking, in
+  `placeSelections` naming its trip and leg (#742), or in
+  `optionalReservationSelections` when the offer does not say which leg it
+  covers. A relation at 0 is **optional**.
 - **Optional reservations** (Booking Flow Actions) says how the optional ones
   are booked:
   - `RESERVATION_SELECTION`: `optionalReservationSelections` in the booking;

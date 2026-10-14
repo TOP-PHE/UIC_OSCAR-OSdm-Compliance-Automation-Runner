@@ -135,6 +135,29 @@ function reservationsWithoutLeg(offer, reservationIds, tripLegs = []) {
   return reservationIds.filter((id) => !legOfReservation(offer, id, tripLegs));
 }
 
+/**
+ * How the reservations booked with the offer are sent (#742). A mandatory
+ * reservation whose leg is known goes in placeSelections whatever the form:
+ * a provider refused a booking that named it in optionalReservationSelections
+ * ("not covered by any placeSelection"). The form decides for the optional
+ * ones: PLACE_SELECTION places them too, the others name them in
+ * optionalReservationSelections. A reservation whose leg cannot be told
+ * goes there as well (#737).
+ * @param {string[]} atBooking the reservations booked with the offer
+ * @param {string[]} mandatory the mandatory ones among them
+ * @returns {{ placeSelections: object[], optionalReservationSelections: object[], noLeg: string[] }}
+ */
+function bookingSelections(offer, { atBooking, mandatory, form }, tripLegs = []) {
+  const placeable = form === 'PLACE_SELECTION' ? atBooking : atBooking.filter((id) => mandatory.includes(id));
+  const noLeg = reservationsWithoutLeg(offer, placeable, tripLegs);
+  const named = atBooking.filter((id) => !placeable.includes(id) || noLeg.includes(id));
+  return {
+    placeSelections: placeSelectionsFor(offer, placeable, tripLegs),
+    optionalReservationSelections: named.map((id) => ({ reservationId: id })),
+    noLeg,
+  };
+}
+
 /** The trips of an offer response as { id, legIds }, for the functions above. */
 function tripLegsOf(trips) {
   return listOf(trips).filter((t) => t?.id).map((t) => ({ id: t.id, legIds: listOf(t.legs).map((l) => l?.id).filter(Boolean) }));
@@ -286,4 +309,4 @@ function splitByReservation(selection, offer) {
   });
 }
 
-module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };
+module.exports = { FORMS, fromEnv, normaliseForm, relationsOf, reservationsToBook, legOfReservation, placeSelectionsFor, reservationsWithoutLeg, bookingSelections, tripLegsOf, checkRelations, checkProviderRules, checkBookedReservations, reservationInBookingRequest, splitByReservation };

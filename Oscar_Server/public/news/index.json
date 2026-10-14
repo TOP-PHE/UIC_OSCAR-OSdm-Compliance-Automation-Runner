@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-mandatory-reservation-place-selection",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Mandatory reservations sent with their leg",
+    "summary": "A reservation the provider makes mandatory is now booked by naming its train leg, the form every provider accepts.",
+    "content": "When an offer comes with a mandatory seat reservation, OSCAR used to name it in the list meant for optional reservations, unless the scenario said otherwise. One provider refused such bookings. OSCAR now books a mandatory reservation by naming the train leg it covers. The scenario's reservation booking form still decides for the optional reservations."
+  },
+  {
     "id": "2026-10-14-suggested-findings-simulator-hint",
     "date": "October 14, 2026",
     "tag": "Improvement",

@@ -1939,24 +1939,20 @@ function handleOptionalReservationSelections(selectedOffer, trips) {
   const { mandatory, optional } = sr.reservationsToBook(selectedOffer, { bookOptional: !!form || legacy });
   const later = form === "ADD_LATER" ? optional : [];
   const atBooking = form === "ADD_LATER" ? mandatory : [...mandatory, ...optional];
-  if (form === "PLACE_SELECTION") {
-    // A reservation whose leg cannot be told goes in
-    // optionalReservationSelections instead (#737): a placeSelection needs it.
-    const noLeg = sr.reservationsWithoutLeg(selectedOffer, atBooking, tripLegs);
-    noLeg.forEach((id) => validationLogger(`[WARNING] Reservation ${id}: the offer gives no leg for it — booked through optionalReservationSelections instead of placeSelections.`));
-    bru.setEnvVar("reservationPlaceSelections", JSON.stringify(sr.placeSelectionsFor(selectedOffer, atBooking, tripLegs)));
-    bru.setEnvVar("optionalReservationSelections", JSON.stringify(noLeg.map((id) => ({ reservationId: id }))));
-  } else {
-    bru.setEnvVar("reservationPlaceSelections", JSON.stringify([]));
-    bru.setEnvVar("optionalReservationSelections", JSON.stringify(atBooking.map((id) => ({ reservationId: id }))));
-  }
+  // #742: a mandatory reservation whose leg is known goes in placeSelections
+  // whatever the form; one whose leg cannot be told goes in
+  // optionalReservationSelections instead (#737): a placeSelection needs it.
+  const sel = sr.bookingSelections(selectedOffer, { atBooking, mandatory, form }, tripLegs);
+  sel.noLeg.forEach((id) => validationLogger(`[WARNING] Reservation ${id}: the offer gives no leg for it — booked through optionalReservationSelections instead of placeSelections.`));
+  bru.setEnvVar("reservationPlaceSelections", JSON.stringify(sel.placeSelections));
+  bru.setEnvVar("optionalReservationSelections", JSON.stringify(sel.optionalReservationSelections));
   // Adding a reservation later takes placeSelections only (OSDM 3.8
   // BookedOfferPartRequest): one whose leg cannot be told is not added.
   const laterNoLeg = sr.reservationsWithoutLeg(selectedOffer, later, tripLegs);
   laterNoLeg.forEach((id) => validationLogger(`[WARNING] Reservation ${id}: the offer gives no leg for it — it cannot be added after the booking (placeSelections need a trip and a leg).`));
   bru.setEnvVar("reservationAddLaterSelections", JSON.stringify(sr.placeSelectionsFor(selectedOffer, later, tripLegs)));
   bru.setEnvVar("__reservationsBooked", JSON.stringify(atBooking));
-  validationLogger(`[INFO] Reservations: ${mandatory.length} mandatory, ${optional.length} optional booked; ${atBooking.length} with the booking${form === "PLACE_SELECTION" ? " (placeSelections)" : " (optionalReservationSelections)"}, ${later.length} added after it.`);
+  validationLogger(`[INFO] Reservations: ${mandatory.length} mandatory, ${optional.length} optional booked; ${atBooking.length} with the booking (${sel.placeSelections.length} in placeSelections, ${sel.optionalReservationSelections.length} in optionalReservationSelections), ${later.length} added after it.`);
 }
 
 function ensureYesWhenRefundOrExchangeSelected(selectedOffer) {
