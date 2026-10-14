@@ -201,7 +201,7 @@ runtime:
         if (bru.getEnvVar("reservationBookingForm") === "ADD_LATER" && _addedLater.length > 0) {
           const _ids = _addedLater.map((s) => s.reservationId);
           const _offer = fromEnv(bru.getEnvVar("offer"), null);
-          checkBookedReservations(body, _offer, _ids).forEach((c) => {
+          checkBookedReservations(body, _offer, _ids, { offerTrips: fromEnv(bru.getEnvVar("__offerTripLegs"), []) }).forEach((c) => {
             if (c.level === "warn") { if (!c.ok) validationLogger(`[WARNING] ${c.name} — ${c.message}`); return; }
             bruTest(c.name.replace(/^Booking:/, "Added reservation:"), () => { if (!c.ok) throw new Error(c.message); });
           });

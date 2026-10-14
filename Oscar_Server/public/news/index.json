@@ -1,5 +1,21 @@
 [
   {
+    "id": "2026-10-14-oscar-request-check",
+    "date": "October 14, 2026",
+    "tag": "New",
+    "title": "OSCAR checks its own requests against OSDM",
+    "summary": "Each request OSCAR sends is now checked against the OSDM version under test; a request that does not conform is reported as OSCAR's issue, not the provider's.",
+    "content": "Twice, a request that OSCAR built wrongly was refused by a provider, and the refusal looked like the provider's finding. Each request with a body is now checked against the OSDM schema of the version under test, after it is sent. The check is named \"[OSCAR request]\" in the report. When it fails, the problem is OSCAR's, whatever the provider answered, and the check names the fields at fault (never their values). Negative tests that send a wrong request on purpose say so and pass."
+  },
+  {
+    "id": "2026-10-14-reservation-legs",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "Reservations: no empty leg sent, renamed legs recognised",
+    "summary": "A reservation the provider offers without a leg is no longer sent with an empty one, and a reserved seat is found even when the booking renames the legs.",
+    "content": "Some providers offer a reservation without saying which leg it is for. OSCAR used to send it with an empty leg, which the provider refused. It now works out the leg when only one is possible, books it another way when it cannot, and says so in the log. Some providers also give the booked journey new leg identifiers; the check that the reservation was booked now recognises the same leg by its place in the journey."
+  },
+  {
     "id": "2026-10-14-test-data-place-lookup",
     "date": "October 14, 2026",
     "tag": "Improvement",

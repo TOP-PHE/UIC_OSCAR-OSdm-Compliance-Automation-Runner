@@ -1,8 +1,30 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.316",
+  "current_release": "2026.318",
   "releases": [
+    {
+      "release": "2026.318",
+      "date": "2026-10-14",
+      "server": "1.11.283",
+      "collection": "OTST_V2.0.159",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "OSCAR checks its own request bodies against the OSDM request schema of the version under test; a body that does not conform is reported as OSCAR's issue (#736)."
+      ]
+    },
+    {
+      "release": "2026.317",
+      "date": "2026-10-14",
+      "server": "1.11.282",
+      "collection": "OTST_V2.0.158",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "No empty tripLegCoverage in reservation requests; a booked reservation is found when the booking renames the legs (#737)."
+      ]
+    },
     {
       "release": "2026.316",
       "date": "2026-10-14",

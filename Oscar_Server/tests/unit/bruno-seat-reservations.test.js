@@ -196,7 +196,7 @@ describe('the steps, the builder and the parser', () => {
   });
 
   test('#644: step 02 checks the reservations asked for, without the place check', () => {
-    expect(read('02-Common Requests', '02. POST Create Booking.yml')).toMatch(/__reservationsBooked"\), \[\]\);\n\s+if \(_asked\.length > 0\) \{\n\s+checkBookedReservations\([^\n]*_asked, \{ places: false \}\)/);
+    expect(read('02-Common Requests', '02. POST Create Booking.yml')).toMatch(/__reservationsBooked"\), \[\]\);\n\s+if \(_asked\.length > 0\) \{\n\s+checkBookedReservations\([^\n]*_asked, \{ places: false, offerTrips: fromEnv\(bru\.getEnvVar\("__offerTripLegs"\), \[\]\) \}\)/);
   });
 
   test('the booking request carries the reservation place selections; the misplaced admission checks are gone', () => {
@@ -258,5 +258,77 @@ describe('splitByReservation', () => {
   test('the booking request does not name a reservation twice', () => {
     expect(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', 'library-bruno', 'requestsBuilder.js'), 'utf8'))
       .toMatch(/parseEnvJson\("reservationPlaceSelections", \[\]\)\.filter\(\(p\) => !seatMapIds\.has\(p\?\.reservationId\)\)/);
+  });
+});
+
+// #737: shapes from a real provider. Its offer covers a 3-leg trip; the
+// mandatory reservation names its leg, the optional one names none; its
+// booking gives the trip new leg ids, in the same order.
+describe('a reservation without a leg, and a booking that renames the legs (#737)', () => {
+  const tripLegs = [{ id: 'T9', legIds: ['a', 'b', 'c'] }];
+  const realOffer = {
+    offerId: 'O9',
+    tripCoverage: { coveredTripId: 'T9' },
+    admissionOfferParts: [{ id: 'A9', reservations: [relation(1, 'RM'), relation(0, 'RX')] }],
+    reservationOfferParts: [
+      { id: 'RM', passengerRefs: ['P1', 'P2'], tripCoverage: { coveredTripId: 'T9', coveredLegIds: ['a'] } },
+      { id: 'RX', passengerRefs: ['P1', 'P2'], summary: 'Second class reservation' },
+    ],
+  };
+
+  test('a part naming its leg keeps it; one naming none gets no leg when two or more are free', () => {
+    expect(sr.legOfReservation(realOffer, 'RM', tripLegs)).toEqual({ tripId: 'T9', legId: 'a' });
+    expect(sr.legOfReservation(realOffer, 'RX', tripLegs)).toBeNull();
+    expect(sr.legOfReservation(realOffer, 'nope', tripLegs)).toBeNull();
+  });
+
+  test('…and the one free leg when exactly one is left', () => {
+    const twoLegs = [{ id: 'T9', legIds: ['a', 'b'] }];
+    expect(sr.legOfReservation(realOffer, 'RX', twoLegs)).toEqual({ tripId: 'T9', legId: 'b' });
+    const noTripOnOffer = { ...realOffer, tripCoverage: undefined };
+    expect(sr.legOfReservation(noTripOnOffer, 'RX', twoLegs)).toEqual({ tripId: 'T9', legId: 'b' });
+    expect(sr.legOfReservation(noTripOnOffer, 'RX', [])).toBeNull();
+  });
+
+  test('placeSelections never carry an empty tripLegCoverage', () => {
+    const sels = sr.placeSelectionsFor(realOffer, ['RM', 'RX'], tripLegs);
+    expect(sels).toEqual([{ reservationId: 'RM', tripLegCoverage: { tripId: 'T9', legId: 'a' } }]);
+    expect(sr.reservationsWithoutLeg(realOffer, ['RM', 'RX'], tripLegs)).toEqual(['RX']);
+  });
+
+  test('in an optional group, a part naming its leg is chosen first', () => {
+    const group = { ...realOffer, admissionOfferParts: [{ id: 'A9', reservations: [relation(0, 'RX', 'RM')] }] };
+    expect(sr.reservationsToBook(group, { bookOptional: true }).optional).toEqual(['RM']);
+  });
+
+  test('a booked reservation on the renamed leg at the same place matches', () => {
+    const booking = {
+      trips: [{ id: 'T9', legs: [{ id: 'x' }, { id: 'y' }, { id: 'z' }] }],
+      bookedOffers: [{ reservations: [{ id: 'BR', tripCoverage: { coveredTripId: 'T9', coveredLegIds: ['x'] } }] }],
+    };
+    const ok = sr.checkBookedReservations(booking, realOffer, ['RM'], { places: false, offerTrips: tripLegs });
+    expect(ok.filter((c) => !c.ok)).toEqual([]);
+    // Without the offer's trips, the renamed leg cannot be told: the old failure.
+    expect(sr.checkBookedReservations(booking, realOffer, ['RM'], { places: false }).filter((c) => !c.ok)).toHaveLength(1);
+    // A reservation on another leg (place 2) does not match leg a (place 1).
+    const elsewhere = { ...booking, bookedOffers: [{ reservations: [{ id: 'BR', tripCoverage: { coveredTripId: 'T9', coveredLegIds: ['y'] } }] }] };
+    expect(sr.checkBookedReservations(elsewhere, realOffer, ['RM'], { places: false, offerTrips: tripLegs }).filter((c) => !c.ok)).toHaveLength(1);
+  });
+
+  test('the offer step: PLACE_SELECTION sends the leg-less one through optionalReservationSelections', () => {
+    envStore.reservationBookingForm = 'PLACE_SELECTION';
+    const both = { ...realOffer, admissionOfferParts: [{ id: 'A9', reservations: [relation(1, 'RM'), relation(1, 'RX')] }] };
+    withBrunoExpect(() => offers.handleOptionalReservationSelections(both, [{ id: 'T9', legs: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }]));
+    expect(JSON.parse(envStore.reservationPlaceSelections)).toEqual([{ reservationId: 'RM', tripLegCoverage: { tripId: 'T9', legId: 'a' } }]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'RX' }]);
+    expect(JSON.parse(envStore.__offerTripLegs)).toEqual(tripLegs);
+    expect(mockLogs.some((l) => l.includes('Reservation RX: the offer gives no leg for it — booked through optionalReservationSelections'))).toBe(true);
+  });
+
+  test('the offer step: ADD_LATER leaves out what cannot be added', () => {
+    envStore.reservationBookingForm = 'ADD_LATER';
+    withBrunoExpect(() => offers.handleOptionalReservationSelections(realOffer, [{ id: 'T9', legs: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }]));
+    expect(JSON.parse(envStore.reservationAddLaterSelections)).toEqual([]);
+    expect(mockLogs.some((l) => l.includes('Reservation RX: the offer gives no leg for it — it cannot be added after the booking'))).toBe(true);
   });
 });

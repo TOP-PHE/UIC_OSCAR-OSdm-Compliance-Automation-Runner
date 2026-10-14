@@ -62,6 +62,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.283] / [collection-OTST_V2.0.159] — 2026-10-14
+
+Issue #736, release 2026.318. Collection, a generator script and tests; no
+server code.
+
+### Added
+- **OSCAR's own requests are checked against OSDM.** Two of OSCAR's defects
+  (`"productCategory": {}` in a trip specification, #729, and
+  `"tripLegCoverage": {}` in a reservation, #737) reached a real provider and
+  read as its findings, because only its refusal showed them. The global
+  after-response now checks every body OSCAR sends to an OSDM endpoint
+  against the request schema of the version under test: one check per
+  request, `[OSCAR request] <method> <path> conforms to OSDM <version>
+  <schema>`. A failure says it is an OSCAR issue, not the provider's, and
+  lists the paths and members at fault (`offers[0].placeSelections[0].tripLegCoverage:
+  missing tripId, legId`), never their values. The request has already gone
+  out, so the provider's answer is still recorded.
+- What is checked: types, `nullable`, `required`, members OSDM does not define
+  where the schema closes the object (`additionalProperties: false`),
+  `minItems`/`maxItems`, lengths and closed code lists. An extensible code
+  list takes any text; formats and patterns are not checked. A polymorphic
+  member (`PlaceRef`) is read as the subtype its `objectType` names.
+- The schemas, `library-bruno/osdmRequestSchemas.js`, are generated from the
+  OSDM 3.4 to 3.8 files by `Oscar_Server/scripts/generate-osdm-request-schemas.js`,
+  for the 15 operations OSCAR sends a body to; a test pins the 3.8 set to the
+  repository's OSDM 3.8 file.
+- The negative tests that send a wrong body on purpose (the passenger and
+  purchaser sweeps of #258, the empty passenger list of #703) are checked
+  too; their check passes and says "on purpose".
+
+Not checked: the requests a step's script sends itself (`/trips-collection`,
+the Idempotency-Key replays, the after-sale probes).
+
+Checked:
+- Unit tests in `bruno-request-schema.test.js`: the two refused bodies fail
+  naming their paths; the simulator's requests pass in 3.6, 3.7 and 3.8.
+- Simulator replay, all 89 scenarios, before and after: the only change is
+  the new check, which passes everywhere.
+
+---
+
+## [server-1.11.282] / [collection-OTST_V2.0.158] — 2026-10-14
+
+Issue #737, release 2026.317. Collection and server tests; no server code.
+
+### Fixed
+- **No empty `tripLegCoverage` in a reservation request.** A provider's
+  offer gave an optional reservation with no `tripCoverage`, and OSCAR sent
+  `"tripLegCoverage": {}` for it (OSDM requires `tripId` and `legId`): the
+  booking was refused (404) in PLACE_SELECTION, and adding the reservation
+  later got a 500. A reservation's leg is now its own coverage, else the one
+  leg of the offer's trip that no other reservation part covers. One whose
+  leg cannot be told is never put in `placeSelections`: in PLACE_SELECTION it
+  is booked through `optionalReservationSelections`, in ADD_LATER it is not
+  added (OSDM 3.8 adds a reservation later through `placeSelections` only).
+  Each case is a WARNING. In an optional group, a part naming its leg is
+  chosen first.
+- **A booked reservation is found when the booking renames the legs.** The
+  same provider gives the booked trip new leg ids. "Booking: holds the
+  reservation on leg …" now matches a reservation on the leg at the same
+  place in the trip of the same id, from the offer response's trips kept in
+  `__offerTripLegs`; an exact leg id still matches first.
+
+Checked:
+- Simulator replay, all 89 scenarios, before and after.
+- Unit tests in `bruno-seat-reservations.test.js`, with the provider's
+  shapes: the renamed-leg check fails without the offer's trips.
+
+---
+
 ## [server-1.11.281] / [collection-OTST_V2.0.157] — 2026-10-14
 
 Issue #733, release 2026.316. Server only; the collection is unchanged.
