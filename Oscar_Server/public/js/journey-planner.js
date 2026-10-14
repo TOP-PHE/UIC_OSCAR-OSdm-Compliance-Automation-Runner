@@ -84,14 +84,14 @@
   }
 
   // Every timed service of every TRAIN resource, as a leg candidate.
-  // `unsaved` (when given) counts the train sets left out because they have
-  // no id yet: a journey can only point at a saved train set.
+  // `unsaved.count` counts the train sets left out because they have no id
+  // yet: a journey can only point at a saved train set.
   function servicesOf(resources, unsaved) {
     const out = [];
     for (const r of resources || []) {
       if (!r || (r.resource_type && r.resource_type !== 'TRAIN')) continue;
       if (r.id === null || r.id === undefined || r.id === '') {
-        if (unsaved) unsaved.count += 1;
+        unsaved.count += 1;
         continue;
       }
       const d = tripApply.normalizeTrainData(tripApply.resourceData(r));
