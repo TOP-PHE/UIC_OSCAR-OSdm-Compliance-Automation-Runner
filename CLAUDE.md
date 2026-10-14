@@ -998,7 +998,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
 - **A mandatory reservation is read from the admission's relations and booked
   by itself** (#601, 1.11.232 / OTST_V2.0.116). `library-bruno/seatReservations.js`
   (pure): `minGroupItemsToBeBooked` lives in `admission.reservations[]`
-  (ReservationRelation), never on the admission. `reservationBookingForm`
+  (ReservationRelation), never on the admission. A mandatory one whose leg
+  is known always goes in `placeSelections` (#742, `bookingSelections()`): a
+  provider refused it named in `optionalReservationSelections`, though OSDM
+  says a mandatory one is booked with the booking. `reservationBookingForm`
   books the optional ones (RESERVATION_SELECTION, PLACE_SELECTION, ADD_LATER);
   ADD_LATER goes through 09, and its run-filter gate is in `opencollection.yml`
   (`_addLaterForm`) as well as in 02's routing: a step a script routes to is

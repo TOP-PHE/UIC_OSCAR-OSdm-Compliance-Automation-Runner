@@ -143,28 +143,32 @@ describe('the checks', () => {
 describe('the offer step', () => {
   const choose = () => withBrunoExpect(() => offers.handleOptionalReservationSelections(offer));
 
-  test('no form: the mandatory one goes in optionalReservationSelections, nothing later', () => {
+  // #742: a provider refused the mandatory one named in
+  // optionalReservationSelections ("not covered by any placeSelection").
+  test('no form: the mandatory one goes in placeSelections with its leg, nothing later', () => {
     envStore.offerPassengerSpecifications = JSON.stringify([{ externalRef: 'P1' }, { externalRef: 'P2' }]);
     choose();
-    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R1' }]);
-    expect(JSON.parse(envStore.reservationPlaceSelections)).toEqual([]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([]);
+    expect(JSON.parse(envStore.reservationPlaceSelections)).toEqual([{ reservationId: 'R1', tripLegCoverage: { tripId: 'T1', legId: 'L1' } }]);
     expect(JSON.parse(envStore.reservationAddLaterSelections)).toEqual([]);
     expect(JSON.parse(envStore.__reservationsBooked)).toEqual(['R1']);
     expect(mockResults.every((r) => r.ok)).toBe(true);
     expect(mockResults.length).toBe(8);
   });
 
-  test('RESERVATION_SELECTION books both; PLACE_SELECTION sends both as place selections; ADD_LATER keeps the optional one for 09', () => {
+  test('RESERVATION_SELECTION names the optional one; PLACE_SELECTION sends both as place selections; ADD_LATER keeps the optional one for 09', () => {
     envStore.reservationBookingForm = 'RESERVATION_SELECTION';
     choose();
-    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R1' }, { reservationId: 'R2' }]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R2' }]);
+    expect(JSON.parse(envStore.reservationPlaceSelections).map((s) => s.reservationId)).toEqual(['R1']);
     envStore.reservationBookingForm = 'PLACE_SELECTION';
     choose();
     expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([]);
     expect(JSON.parse(envStore.reservationPlaceSelections).map((s) => [s.reservationId, s.tripLegCoverage.legId])).toEqual([['R1', 'L1'], ['R2', 'L2']]);
     envStore.reservationBookingForm = 'ADD_LATER';
     choose();
-    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R1' }]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([]);
+    expect(JSON.parse(envStore.reservationPlaceSelections).map((s) => s.reservationId)).toEqual(['R1']);
     expect(JSON.parse(envStore.reservationAddLaterSelections)).toEqual([{ reservationId: 'R2', tripLegCoverage: { tripId: 'T1', legId: 'L2' } }]);
     expect(JSON.parse(envStore.__reservationsBooked)).toEqual(['R1']);
   });
@@ -172,7 +176,8 @@ describe('the offer step', () => {
   test('the older switch books the optional ones too; an offer without reservations books none and warns only when asked', () => {
     envStore.bookMandatoryReservations = 'true';
     choose();
-    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R1' }, { reservationId: 'R2' }]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'R2' }]);
+    expect(JSON.parse(envStore.reservationPlaceSelections).map((s) => s.reservationId)).toEqual(['R1']);
     withBrunoExpect(() => offers.handleOptionalReservationSelections({ admissionOfferParts: [] }));
     expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([]);
     expect(mockLogs.some((l) => l.startsWith('[WARNING] The scenario books reservations (bookMandatoryReservations)'))).toBe(true);
@@ -323,6 +328,23 @@ describe('a reservation without a leg, and a booking that renames the legs (#737
     expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'RX' }]);
     expect(JSON.parse(envStore.__offerTripLegs)).toEqual(tripLegs);
     expect(mockLogs.some((l) => l.includes('Reservation RX: the offer gives no leg for it — booked through optionalReservationSelections'))).toBe(true);
+  });
+
+  test('the offer step (#742): with no form, a mandatory one without a leg is still named in optionalReservationSelections', () => {
+    const both = { ...realOffer, admissionOfferParts: [{ id: 'A9', reservations: [relation(1, 'RM'), relation(1, 'RX')] }] };
+    withBrunoExpect(() => offers.handleOptionalReservationSelections(both, [{ id: 'T9', legs: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }]));
+    expect(JSON.parse(envStore.reservationPlaceSelections)).toEqual([{ reservationId: 'RM', tripLegCoverage: { tripId: 'T9', legId: 'a' } }]);
+    expect(JSON.parse(envStore.optionalReservationSelections)).toEqual([{ reservationId: 'RX' }]);
+    expect(mockLogs).toContain('[INFO] Reservations: 2 mandatory, 0 optional booked; 2 with the booking (1 in placeSelections, 1 in optionalReservationSelections), 0 added after it.');
+  });
+
+  test('bookingSelections never names a reservation in both lists', () => {
+    const sel = sr.bookingSelections(realOffer, { atBooking: ['RM', 'RX'], mandatory: ['RM', 'RX'], form: null }, tripLegs);
+    const placed = sel.placeSelections.map((s) => s.reservationId);
+    const named = sel.optionalReservationSelections.map((s) => s.reservationId);
+    expect(placed.filter((id) => named.includes(id))).toEqual([]);
+    expect([...placed, ...named].sort()).toEqual(['RM', 'RX']);
+    expect(sel.noLeg).toEqual(['RX']);
   });
 
   test('the offer step: ADD_LATER leaves out what cannot be added', () => {

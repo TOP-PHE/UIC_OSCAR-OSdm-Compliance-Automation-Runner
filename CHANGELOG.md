@@ -62,6 +62,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.286] / [collection-OTST_V2.0.160] — 2026-10-14
+
+Issue #742, release 2026.321. Collection and server tests; no server code.
+
+### Fixed
+- **A mandatory reservation is booked through `placeSelections` when its
+  leg is known.** A provider refused a booking with 400 "Mandatory
+  reservation(s) not covered by any placeSelection": OSCAR had named the
+  mandatory reservation in `optionalReservationSelections`, because the
+  scenario set no `reservationBookingForm`. OSDM says a mandatory reservation
+  is booked with the booking, so the refusal stays a point for the provider,
+  but a `placeSelection` with the reservation's trip and leg is the request
+  every provider takes. `reservationBookingForm` now decides only for the
+  optional reservations. A mandatory reservation whose leg cannot be told
+  still goes in `optionalReservationSelections` (#737), with its WARNING.
+  The step-01 log line says how many went in each list.
+
+Checked:
+- Simulator replay, all scenarios, before and after (the simulator takes
+  both forms).
+- Unit tests in `bruno-seat-reservations.test.js`: every form, and a
+  reservation is never named in both lists.
+
+---
+
 ## [server-1.11.285] / [collection-OTST_V2.0.159] — 2026-10-14
 
 Issue #735 (part 3), release 2026.320. Server only.
