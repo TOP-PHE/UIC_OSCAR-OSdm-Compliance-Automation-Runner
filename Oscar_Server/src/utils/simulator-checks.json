@@ -1,6 +1,6 @@
 {
  "about": {
-  "collection": "OTST_V2.0.159",
+  "collection": "OTST_V2.0.161",
   "simulator": "0.25.0",
   "day": "2026-10-14",
   "scenarios": 84
@@ -480,10 +480,6 @@
   ],
   "get booking after fulfillments|reservation refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES]": [
    1,
-   0
-  ],
-  "get booking after fulfillments|reservation[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   7,
    0
   ],
   "get booking after fulfillments|reservation[N].offerMode matches between offer and booking : offer='…' booking='…'": [
@@ -1136,10 +1132,6 @@
   ],
   "get booking before fulfillments|reservation refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES]": [
    1,
-   0
-  ],
-  "get booking before fulfillments|reservation[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   7,
    0
   ],
   "get booking before fulfillments|reservation[N].offerMode matches between offer and booking : offer='…' booking='…'": [
@@ -3224,10 +3216,6 @@
   ],
   "post create booking|reservation refundable values have at least one member in common between offer and booking offer=[YES,YES] booking=[YES]": [
    2,
-   0
-  ],
-  "post create booking|reservation[N].isReservationRequired matches between offer and booking : offer='…' booking='…'": [
-   6,
    0
   ],
   "post create booking|reservation[N].offerMode matches between offer and booking : offer='…' booking='…'": [

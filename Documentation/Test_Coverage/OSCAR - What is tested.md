@@ -230,10 +230,10 @@ returns (more passengers, more parts, more fulfillments mean more checks).
 | `OTST_SALE_RETURN_SEPARATE_1ADT` | Return sold as two offers, one per direction (`returnSearchParameters.outwardOfferIds`). | return model SEPARATE | 314 | `SIM_RETURN_SEPARATE_1ADT_38` |
 | `OTST_SALE_RETURN_COMBINED_1ADT` | Return sold as one offer covering both directions (`outboundTripIds`). | return model COMBINED, OSDM 3.7+ | 356 | `SIM_RETURN_COMBINED_1ADT_38` |
 | `OTST_SALE_CLASS_PER_LEG_1ADT` | Travel class per leg on a two-leg trip: first class where the train has one. | — | 288 | `SIM_SALE_CLASS_PER_LEG_1ADT_38` |
-| `OTST_SALE_RESERVATION_MANDATORY_2ADT` | A mandatory seat reservation, detected from the admission and booked with it. | — | 346 | `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` |
-| `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 375 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |
-| `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 375 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
-| `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 373 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
+| `OTST_SALE_RESERVATION_MANDATORY_2ADT` | A mandatory seat reservation, detected from the admission and booked with it. | — | 343 | `SIM_SALE_RESERVATION_MANDATORY_2ADT_38` |
+| `OTST_SALE_RESERVATION_SELECTION_2ADT` | An optional seat reservation booked with `optionalReservationSelections`. | — | 369 | `SIM_SALE_RESERVATION_SELECTION_2ADT_38` |
+| `OTST_SALE_RESERVATION_PLACE_SELECTION_2ADT` | An optional seat reservation booked with `placeSelections`. | — | 369 | `SIM_SALE_RESERVATION_PLACE_SELECTION_2ADT_38` |
+| `OTST_SALE_RESERVATION_ADD_LATER_2ADT` | An optional seat reservation added to the pre-booked booking afterwards. | — | 368 | `SIM_SALE_RESERVATION_ADD_LATER_2ADT_38` |
 | `OTST_SALE_BY_TRIP_ID_1ADT` | Offers asked by trip id, after a trip search (`POST /trips-collection`). | — | 241 | `SIM_SALE_BY_TRIP_ID_1ADT_38` |
 | `OTST_SALE_SEARCH_TRAIN_FILTER_1ADT` | An offer search sent with the train filter (dataFilter): the answer must hold a trip of the train asked. Every other search goes by place and time only. | — | 235 | `SIM_SALE_SEARCH_TRAIN_FILTER_1ADT_38` |
 | `OTST_SALE_DOCUMENTS_RETURN_1ADT` | Fulfillment documents of a return, and each fulfillment read with `GET /fulfillments/{id}`. | return model COMBINED, OSDM 3.7+ | 356 | `SIM_SALE_DOCUMENTS_RETURN_1ADT_38` |

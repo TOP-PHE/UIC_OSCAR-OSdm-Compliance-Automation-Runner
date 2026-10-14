@@ -77,7 +77,13 @@ Issue #744, release 2026.322. Collection and server tests; no server code.
   is no longer looked for on reservation and ancillary parts.
 
 Checked:
-- Simulator replay, all scenarios, before and after: same checks.
+- Simulator replay, all scenarios, before and after: the same checks,
+  except "reservation[N].isReservationRequired matches" in the four
+  reservation scenarios (the simulator puts the member on its reservation
+  parts, which OSDM does not). The catalogue's counts for
+  `OTST_SALE_RESERVATION_MANDATORY_2ADT` (343), `_SELECTION_2ADT` (369),
+  `_PLACE_SELECTION_2ADT` (369) and `_ADD_LATER_2ADT` (368) follow, with
+  `OSCAR - Checks by scenario.md` and `simulator-checks.json` regenerated.
 - Unit tests in `bruno-bookings-part-pairing.test.js`; three of the four new
   tests fail on the old code.
 
