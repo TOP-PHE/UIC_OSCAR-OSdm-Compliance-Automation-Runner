@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-10-14-departure-probe-reason",
+    "date": "October 14, 2026",
+    "tag": "Fix",
+    "title": "The past-departure test checks why the provider refused",
+    "summary": "A refusal for another reason (an unknown filter, a malformed request) no longer counts as refusing a past or too-far departure.",
+    "content": "The departure date tests expect the provider to refuse a departure in the past or beyond its sales horizon. They used to accept any refusal. They now read the provider's reason: one about the date passes, one about something else fails with that reason quoted, so a problem elsewhere in the request is no longer mistaken for a correct refusal."
+  },
+  {
     "id": "2026-10-14-trip-calendars",
     "date": "October 14, 2026",
     "tag": "New",

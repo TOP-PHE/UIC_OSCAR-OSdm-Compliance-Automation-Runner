@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.308",
+  "current_release": "2026.310",
   "releases": [
+    {
+      "release": "2026.310",
+      "date": "2026-10-14",
+      "server": "1.11.275",
+      "collection": "OTST_V2.0.155",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "The departure date probe reads the refusal's reason: a refusal for another reason no longer passes (#721)."
+      ]
+    },
     {
       "release": "2026.308",
       "date": "2026-10-14",

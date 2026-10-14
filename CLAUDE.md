@@ -1196,6 +1196,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`departureLimit.js`) ends the scenario at 01 whatever the answer; a 4xx and
   "no offer" both pass. `salesHorizonDays` in the Test Framework; catalogue
   `limit` `SALES_HORIZON` / `OVER_SALES_HORIZON` sets the day at copy time.
+  A 4xx counts only when its reason is about the date (#721,
+  `refusalReason()`): a refusal for another reason (an unknown filter, a
+  malformed request) fails "the refusal is for the departure date".
   The simulator's horizon (`salesHorizon`, station `0000094` on `gamma`)
   covers that one stop place on purpose: its tests use fixed dates, and a
   horizon or past check everywhere would make them fail once those dates
